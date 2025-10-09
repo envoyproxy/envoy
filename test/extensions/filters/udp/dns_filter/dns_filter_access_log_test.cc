@@ -761,6 +761,105 @@ TEST(DnsFilterCommandParserTest, WrongMetadataType) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(DnsFilterCommandParserTest, WrongTypeForString) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Set number value where string is expected
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["query_name"] = ValueUtil::numberValue(123);
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  // Should return nullopt for wrong type
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_FALSE(result.has_value());
+
+  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(value.kind_case(), Protobuf::Value::kNullValue);
+}
+
+TEST(DnsFilterCommandParserTest, WrongTypeForBool) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("PARSE_STATUS", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Set string value where bool is expected
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["parse_status"] = ValueUtil::stringValue("true");
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  // Should return nullopt for wrong type
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_FALSE(result.has_value());
+
+  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(value.kind_case(), Protobuf::Value::kNullValue);
+}
+
+TEST(DnsFilterCommandParserTest, MissingFieldInMetadata) {
+  auto parser = createDnsFilterCommandParser();
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Set DNS metadata but without the field we're looking for
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["some_other_field"] = ValueUtil::stringValue("value");
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  // Test all formatters return nullopt when field is missing
+  auto query_name_fmt = parser->parse("QUERY_NAME", "", absl::nullopt);
+  EXPECT_FALSE(query_name_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+
+  auto query_type_fmt = parser->parse("QUERY_TYPE", "", absl::nullopt);
+  EXPECT_FALSE(query_type_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+
+  auto answer_count_fmt = parser->parse("ANSWER_COUNT", "", absl::nullopt);
+  EXPECT_FALSE(answer_count_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+
+  auto response_code_fmt = parser->parse("RESPONSE_CODE", "", absl::nullopt);
+  EXPECT_FALSE(response_code_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+
+  auto parse_status_fmt = parser->parse("PARSE_STATUS", "", absl::nullopt);
+  EXPECT_FALSE(parse_status_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+
+  auto query_class_fmt = parser->parse("QUERY_CLASS", "", absl::nullopt);
+  EXPECT_FALSE(query_class_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+}
+
+TEST(DnsFilterCommandParserTest, NullValueInMetadata) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Set null value in metadata
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["query_name"] = ValueUtil::nullValue();
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  // Should return nullopt
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_FALSE(result.has_value());
+}
+
 } // namespace
 } // namespace DnsFilter
 } // namespace UdpFilters
