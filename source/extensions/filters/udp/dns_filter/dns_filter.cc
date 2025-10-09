@@ -10,6 +10,7 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_access_log.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 namespace Envoy {
@@ -197,10 +198,12 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     max_pending_lookups_ = 0;
   }
 
-  // Initialize access logs
+  // Initialize access logs with DNS-specific command parser
   for (const auto& log_config : config.access_log()) {
+    std::vector<Formatter::CommandParserPtr> command_parsers;
+    command_parsers.push_back(createDnsFilterCommandParser());
     AccessLog::InstanceSharedPtr current_access_log =
-        AccessLog::AccessLogFactory::fromProto(log_config, context);
+        AccessLog::AccessLogFactory::fromProto(log_config, context, std::move(command_parsers));
     access_logs_.push_back(current_access_log);
   }
 }
@@ -663,15 +666,15 @@ void DnsFilter::logQuery(const DnsQueryContextPtr& context) {
   // Add query information
   if (!context->queries_.empty()) {
     const auto& query = context->queries_[0];
-    (*fields)["query_name"] = ValueUtil::stringValue(std::string(query->name_));
-    (*fields)["query_type"] = ValueUtil::numberValue(query->type_);
-    (*fields)["query_class"] = ValueUtil::numberValue(query->class_);
+    (*fields)["query_name"] = ValueUtil::stringValue(absl::StrCat(query->name_));
+    (*fields)["query_type"] = ValueUtil::stringValue(absl::StrCat(query->type_));
+    (*fields)["query_class"] = ValueUtil::stringValue(absl::StrCat(query->class_));
   }
 
   // Add response information
-  (*fields)["answer_count"] = ValueUtil::numberValue(context->answers_.size());
-  (*fields)["response_code"] = ValueUtil::numberValue(context->response_code_);
-  (*fields)["parse_status"] = ValueUtil::boolValue(context->parse_status_);
+  (*fields)["answer_count"] = ValueUtil::stringValue(absl::StrCat(context->answers_.size()));
+  (*fields)["response_code"] = ValueUtil::stringValue(absl::StrCat(context->response_code_));
+  (*fields)["parse_status"] = ValueUtil::stringValue(context->parse_status_ ? "true" : "false");
 
   stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
 

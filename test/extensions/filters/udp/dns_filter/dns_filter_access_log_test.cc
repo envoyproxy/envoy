@@ -2,7 +2,9 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.validate.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_access_log.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
@@ -36,34 +38,84 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
   return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
 }
 
-// Test access logger that captures metadata in memory
+// Test access logger that captures formatted output using DNS custom commands
 class TestAccessLog : public AccessLog::Instance {
 public:
+  TestAccessLog() {
+    auto parser = createDnsFilterCommandParser();
+    query_name_formatter_ = parser->parse("QUERY_NAME", "", absl::nullopt);
+    query_type_formatter_ = parser->parse("QUERY_TYPE", "", absl::nullopt);
+    query_class_formatter_ = parser->parse("QUERY_CLASS", "", absl::nullopt);
+    answer_count_formatter_ = parser->parse("ANSWER_COUNT", "", absl::nullopt);
+    response_code_formatter_ = parser->parse("RESPONSE_CODE", "", absl::nullopt);
+    parse_status_formatter_ = parser->parse("PARSE_STATUS", "", absl::nullopt);
+  }
+
   void log(const Formatter::HttpFormatterContext&,
            const StreamInfo::StreamInfo& stream_info) override {
     log_count_++;
-    last_metadata_ = stream_info.dynamicMetadata();
-    last_remote_address_ = stream_info.downstreamAddressProvider().remoteAddress()->asString();
-    last_local_address_ = stream_info.downstreamAddressProvider().localAddress()->asString();
+
+    // Use custom formatters to extract DNS information
+    query_name_ = query_name_formatter_->formatWithContext(Formatter::Context(), stream_info);
+    query_type_ = query_type_formatter_->formatWithContext(Formatter::Context(), stream_info);
+    query_class_ = query_class_formatter_->formatWithContext(Formatter::Context(), stream_info);
+    answer_count_ = answer_count_formatter_->formatWithContext(Formatter::Context(), stream_info);
+    response_code_ = response_code_formatter_->formatWithContext(Formatter::Context(), stream_info);
+    parse_status_ = parse_status_formatter_->formatWithContext(Formatter::Context(), stream_info);
+
+    // Store address information for testing
+    remote_address_ = stream_info.downstreamAddressProvider().remoteAddress()->asString();
+    local_address_ = stream_info.downstreamAddressProvider().localAddress()->asString();
   }
 
   size_t logCount() const { return log_count_; }
-  const envoy::config::core::v3::Metadata& lastMetadata() const { return last_metadata_; }
-  const std::string& lastRemoteAddress() const { return last_remote_address_; }
-  const std::string& lastLocalAddress() const { return last_local_address_; }
+
+  // Accessors for formatted values using custom commands
+  const absl::optional<std::string>& queryName() const { return query_name_; }
+  const absl::optional<std::string>& queryType() const { return query_type_; }
+  const absl::optional<std::string>& queryClass() const { return query_class_; }
+  const absl::optional<std::string>& answerCount() const { return answer_count_; }
+  const absl::optional<std::string>& responseCode() const { return response_code_; }
+  const absl::optional<std::string>& parseStatus() const { return parse_status_; }
+
+  // Accessors for address information
+  const std::string& remoteAddress() const { return remote_address_; }
+  const std::string& localAddress() const { return local_address_; }
 
   void reset() {
     log_count_ = 0;
-    last_metadata_.Clear();
-    last_remote_address_.clear();
-    last_local_address_.clear();
+    query_name_ = absl::nullopt;
+    query_type_ = absl::nullopt;
+    query_class_ = absl::nullopt;
+    answer_count_ = absl::nullopt;
+    response_code_ = absl::nullopt;
+    parse_status_ = absl::nullopt;
+    remote_address_.clear();
+    local_address_.clear();
   }
 
 private:
   size_t log_count_ = 0;
-  envoy::config::core::v3::Metadata last_metadata_;
-  std::string last_remote_address_;
-  std::string last_local_address_;
+
+  // Formatters using DNS custom commands
+  Formatter::FormatterProviderPtr query_name_formatter_;
+  Formatter::FormatterProviderPtr query_type_formatter_;
+  Formatter::FormatterProviderPtr query_class_formatter_;
+  Formatter::FormatterProviderPtr answer_count_formatter_;
+  Formatter::FormatterProviderPtr response_code_formatter_;
+  Formatter::FormatterProviderPtr parse_status_formatter_;
+
+  // Formatted values
+  absl::optional<std::string> query_name_;
+  absl::optional<std::string> query_type_;
+  absl::optional<std::string> query_class_;
+  absl::optional<std::string> answer_count_;
+  absl::optional<std::string> response_code_;
+  absl::optional<std::string> parse_status_;
+
+  // Address information
+  std::string remote_address_;
+  std::string local_address_;
 };
 
 class DnsFilterAccessLogTest : public testing::Test, public Event::TestUsingSimulatedTime {
@@ -178,7 +230,7 @@ server_config:
   sendQueryFromClient("127.0.0.1:1000", query);
 }
 
-// Test that access log is called with correct metadata
+// Test that access log is called with correct formatted DNS data using custom commands
 TEST_F(DnsFilterAccessLogTest, AccessLogCalledWithCorrectMetadata) {
   const std::string config_yaml = R"EOF(
 stat_prefix: "my_prefix"
@@ -204,31 +256,16 @@ server_config:
   // Verify access log was called
   ASSERT_EQ(test_access_log_->logCount(), 1);
 
-  // Verify dynamic metadata contains DNS information
-  const auto& metadata = test_access_log_->lastMetadata();
-  ASSERT_TRUE(metadata.filter_metadata().contains(DnsFilterName));
-
-  const auto& dns_metadata = metadata.filter_metadata().at(DnsFilterName);
-  ASSERT_TRUE(dns_metadata.fields().contains("query_name"));
-  EXPECT_EQ(dns_metadata.fields().at("query_name").string_value(), "www.example.com");
-
-  ASSERT_TRUE(dns_metadata.fields().contains("query_type"));
-  EXPECT_EQ(dns_metadata.fields().at("query_type").number_value(), DNS_RECORD_TYPE_A);
-
-  ASSERT_TRUE(dns_metadata.fields().contains("query_class"));
-  EXPECT_EQ(dns_metadata.fields().at("query_class").number_value(), DNS_RECORD_CLASS_IN);
-
-  ASSERT_TRUE(dns_metadata.fields().contains("answer_count"));
-  EXPECT_EQ(dns_metadata.fields().at("answer_count").number_value(), 2);
-
-  ASSERT_TRUE(dns_metadata.fields().contains("response_code"));
-  EXPECT_EQ(dns_metadata.fields().at("response_code").number_value(), DNS_RESPONSE_CODE_NO_ERROR);
-
-  ASSERT_TRUE(dns_metadata.fields().contains("parse_status"));
-  EXPECT_TRUE(dns_metadata.fields().at("parse_status").bool_value());
+  // Verify DNS custom command formatters extracted correct information
+  EXPECT_EQ(test_access_log_->queryName().value(), "www.example.com");
+  EXPECT_EQ(test_access_log_->queryType().value(), "1");  // DNS_RECORD_TYPE_A
+  EXPECT_EQ(test_access_log_->queryClass().value(), "1"); // DNS_RECORD_CLASS_IN
+  EXPECT_EQ(test_access_log_->answerCount().value(), "2");
+  EXPECT_EQ(test_access_log_->responseCode().value(), "0"); // DNS_RESPONSE_CODE_NO_ERROR
+  EXPECT_EQ(test_access_log_->parseStatus().value(), "true");
 }
 
-// Test access logging with AAAA query
+// Test access logging with AAAA query using custom formatters
 TEST_F(DnsFilterAccessLogTest, AccessLogForAAAAQuery) {
   const std::string config_yaml = R"EOF(
 stat_prefix: "my_prefix"
@@ -251,14 +288,12 @@ server_config:
   sendQueryFromClient("192.168.1.100:54321", query);
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
-  const auto& metadata = test_access_log_->lastMetadata();
-  const auto& dns_metadata = metadata.filter_metadata().at(DnsFilterName);
 
-  EXPECT_EQ(dns_metadata.fields().at("query_type").number_value(), DNS_RECORD_TYPE_AAAA);
-  EXPECT_EQ(dns_metadata.fields().at("answer_count").number_value(), 1);
+  EXPECT_EQ(test_access_log_->queryType().value(), "28"); // quad-A record type
+  EXPECT_EQ(test_access_log_->answerCount().value(), "1");
 }
 
-// Test access logging for NXDOMAIN (query for non-existent domain)
+// Test access logging for NXDOMAIN using custom formatters
 TEST_F(DnsFilterAccessLogTest, AccessLogForNXDOMAIN) {
   const std::string config_yaml = R"EOF(
 stat_prefix: "my_prefix"
@@ -281,12 +316,10 @@ server_config:
   sendQueryFromClient("192.168.1.100:54321", query);
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
-  const auto& metadata = test_access_log_->lastMetadata();
-  const auto& dns_metadata = metadata.filter_metadata().at(DnsFilterName);
 
-  EXPECT_EQ(dns_metadata.fields().at("query_name").string_value(), "nonexistent.example.com");
-  EXPECT_EQ(dns_metadata.fields().at("response_code").number_value(), DNS_RESPONSE_CODE_NAME_ERROR);
-  EXPECT_EQ(dns_metadata.fields().at("answer_count").number_value(), 0);
+  EXPECT_EQ(test_access_log_->queryName().value(), "nonexistent.example.com");
+  EXPECT_EQ(test_access_log_->responseCode().value(), "3"); // DNS_RESPONSE_CODE_NAME_ERROR
+  EXPECT_EQ(test_access_log_->answerCount().value(), "0");
 }
 
 // Test that multiple access loggers all get called
@@ -359,14 +392,11 @@ server_config:
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
 
-  // Verify remote (client) address
-  EXPECT_EQ(test_access_log_->lastRemoteAddress(), client_address);
-
-  // Verify local (listener) address
-  EXPECT_EQ(test_access_log_->lastLocalAddress(), "127.0.0.1:53");
+  EXPECT_EQ(test_access_log_->remoteAddress(), client_address);
+  EXPECT_EQ(test_access_log_->localAddress(), "127.0.0.1:53");
 }
 
-// Test access logging with malformed query (empty queries)
+// Test access logging with malformed query (empty queries) using custom formatters
 TEST_F(DnsFilterAccessLogTest, AccessLogWithMalformedQuery) {
   const std::string config_yaml = R"EOF(
 stat_prefix: "my_prefix"
@@ -386,22 +416,301 @@ server_config:
   sendQueryFromClient("192.168.1.100:54321", "");
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
-  const auto& metadata = test_access_log_->lastMetadata();
-  const auto& dns_metadata = metadata.filter_metadata().at(DnsFilterName);
 
-  // When queries are empty, query fields should not be present
-  EXPECT_FALSE(dns_metadata.fields().contains("query_name"));
-  EXPECT_FALSE(dns_metadata.fields().contains("query_type"));
-  EXPECT_FALSE(dns_metadata.fields().contains("query_class"));
+  // When queries are empty, custom formatters for query-specific fields should return nullopt
+  EXPECT_FALSE(test_access_log_->queryName().has_value());
+  EXPECT_FALSE(test_access_log_->queryType().has_value());
+  EXPECT_FALSE(test_access_log_->queryClass().has_value());
 
-  // But other fields should still be present
-  EXPECT_TRUE(dns_metadata.fields().contains("answer_count"));
-  EXPECT_EQ(dns_metadata.fields().at("answer_count").number_value(), 0);
+  EXPECT_EQ(test_access_log_->answerCount().value(), "0");
+  EXPECT_EQ(test_access_log_->parseStatus().value(), "false");
+}
 
-  EXPECT_TRUE(dns_metadata.fields().contains("parse_status"));
-  EXPECT_FALSE(dns_metadata.fields().at("parse_status").bool_value());
+// Test custom DNS command parser formatters
+TEST(DnsFilterCommandParserTest, QueryNameFormatter) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
 
-  EXPECT_TRUE(dns_metadata.fields().contains("response_code"));
+  // Create StreamInfo with DNS metadata
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Add DNS metadata
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["query_name"] = ValueUtil::stringValue("example.com");
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  // Test format string
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(result.value(), "example.com");
+
+  // Test format value
+  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(value.string_value(), "example.com");
+}
+
+TEST(DnsFilterCommandParserTest, QueryTypeFormatter) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("QUERY_TYPE", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["query_type"] = ValueUtil::stringValue("1");
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(result.value(), "1"); // A record type
+
+  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(value.string_value(), "1");
+}
+
+TEST(DnsFilterCommandParserTest, AnswerCountFormatter) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("ANSWER_COUNT", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["answer_count"] = ValueUtil::stringValue("5");
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(result.value(), "5");
+
+  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(value.string_value(), "5");
+}
+
+TEST(DnsFilterCommandParserTest, ResponseCodeFormatter) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("RESPONSE_CODE", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["response_code"] = ValueUtil::stringValue("0");
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(result.value(), "0"); // NO_ERROR
+
+  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(value.string_value(), "0");
+}
+
+TEST(DnsFilterCommandParserTest, ParseStatusFormatter) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("PARSE_STATUS", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["parse_status"] = ValueUtil::stringValue("true");
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(result.value(), "true");
+
+  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(value.string_value(), "true");
+}
+
+TEST(DnsFilterCommandParserTest, MissingMetadata) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  // StreamInfo without DNS metadata
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(DnsFilterCommandParserTest, QueryClassFormatter) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("QUERY_CLASS", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["query_class"] = ValueUtil::stringValue("1");
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(result.value(), "1"); // IN class
+
+  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(value.string_value(), "1");
+}
+
+TEST(DnsFilterCommandParserTest, UnknownCommand) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("UNKNOWN_COMMAND", "", absl::nullopt);
+  EXPECT_EQ(formatter, nullptr);
+}
+
+TEST(DnsFilterCommandParserTest, EmptyCommandArg) {
+  auto parser = createDnsFilterCommandParser();
+
+  // All DNS commands should work without command args
+  EXPECT_NE(parser->parse("QUERY_NAME", "", absl::nullopt), nullptr);
+  EXPECT_NE(parser->parse("QUERY_TYPE", "", absl::nullopt), nullptr);
+  EXPECT_NE(parser->parse("QUERY_CLASS", "", absl::nullopt), nullptr);
+  EXPECT_NE(parser->parse("ANSWER_COUNT", "", absl::nullopt), nullptr);
+  EXPECT_NE(parser->parse("RESPONSE_CODE", "", absl::nullopt), nullptr);
+  EXPECT_NE(parser->parse("PARSE_STATUS", "", absl::nullopt), nullptr);
+}
+
+TEST(DnsFilterCommandParserTest, CaseSensitiveCommands) {
+  auto parser = createDnsFilterCommandParser();
+
+  // Commands should be case-sensitive
+  EXPECT_NE(parser->parse("QUERY_NAME", "", absl::nullopt), nullptr);
+  EXPECT_EQ(parser->parse("query_name", "", absl::nullopt), nullptr);
+  EXPECT_EQ(parser->parse("Query_Name", "", absl::nullopt), nullptr);
+  EXPECT_EQ(parser->parse("QUERYNAME", "", absl::nullopt), nullptr);
+}
+
+TEST(DnsFilterCommandParserTest, FormatValueStringType) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["query_name"] = ValueUtil::stringValue("format.test.com");
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  // Test formatValue returns correct Protobuf value type
+  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(value.kind_case(), Protobuf::Value::kStringValue);
+  EXPECT_EQ(value.string_value(), "format.test.com");
+}
+
+TEST(DnsFilterCommandParserTest, FormatValueNullWhenMissing) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  // No metadata set
+
+  // Test formatValue returns null value
+  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(value.kind_case(), Protobuf::Value::kNullValue);
+}
+
+TEST(DnsFilterCommandParserTest, WrongTypeInMetadata) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Set number value where string is expected (all DNS metadata should be strings)
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["query_name"] = ValueUtil::numberValue(123);
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  // Should return nullopt for wrong type
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_FALSE(result.has_value());
+
+  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  EXPECT_EQ(value.kind_case(), Protobuf::Value::kNullValue);
+}
+
+TEST(DnsFilterCommandParserTest, MissingFieldInMetadata) {
+  auto parser = createDnsFilterCommandParser();
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Set DNS metadata but without the field we're looking for
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["some_other_field"] = ValueUtil::stringValue("value");
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  // Test all formatters return nullopt when field is missing
+  auto query_name_fmt = parser->parse("QUERY_NAME", "", absl::nullopt);
+  EXPECT_FALSE(query_name_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+
+  auto query_type_fmt = parser->parse("QUERY_TYPE", "", absl::nullopt);
+  EXPECT_FALSE(query_type_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+
+  auto answer_count_fmt = parser->parse("ANSWER_COUNT", "", absl::nullopt);
+  EXPECT_FALSE(answer_count_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+
+  auto response_code_fmt = parser->parse("RESPONSE_CODE", "", absl::nullopt);
+  EXPECT_FALSE(response_code_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+
+  auto parse_status_fmt = parser->parse("PARSE_STATUS", "", absl::nullopt);
+  EXPECT_FALSE(parse_status_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+
+  auto query_class_fmt = parser->parse("QUERY_CLASS", "", absl::nullopt);
+  EXPECT_FALSE(query_class_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+}
+
+TEST(DnsFilterCommandParserTest, NullValueInMetadata) {
+  auto parser = createDnsFilterCommandParser();
+  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  ASSERT_NE(formatter, nullptr);
+
+  Event::SimulatedTimeSystem test_time;
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Set null value in metadata
+  Protobuf::Struct dns_metadata;
+  (*dns_metadata.mutable_fields())["query_name"] = ValueUtil::nullValue();
+  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+
+  // Should return nullopt
+  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  EXPECT_FALSE(result.has_value());
 }
 
 } // namespace
