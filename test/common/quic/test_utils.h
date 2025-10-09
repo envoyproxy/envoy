@@ -378,13 +378,13 @@ REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory,
 
 class TestNetworkObserverRegistry : public Quic::EnvoyQuicNetworkObserverRegistry {
 public:
-  void onNetworkChanged() {
+  void onNetworkMadeDefault(NetworkHandle network) {
     std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
     for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
       existing_observers.push_back(observer);
     }
     for (auto* observer : existing_observers) {
-      observer->onNetworkChanged();
+      observer->onNetworkMadeDefault(network);
     }
   }
   using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;
