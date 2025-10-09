@@ -310,7 +310,7 @@ server_config:
 
   // Verify QUERY_TYPE formatter returns quad-A record
   ASSERT_TRUE(test_access_log_->queryType().has_value());
-  EXPECT_EQ(test_access_log_->queryType().value(), "28"); //quad-A record type
+  EXPECT_EQ(test_access_log_->queryType().value(), "28"); // quad-A record type
 
   // Verify ANSWER_COUNT formatter returns 1
   ASSERT_TRUE(test_access_log_->answerCount().has_value());
