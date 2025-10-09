@@ -291,7 +291,7 @@ public:
 
   DispatcherHelper& dispatcher_helper_;
   FakeStream* fake_stream_{};
-  AsyncStream<helloworld::HelloRequest> grpc_stream_{};
+  AsyncStream<helloworld::HelloRequest> grpc_stream_;
   const TestMetadata empty_metadata_;
   bool response_received_{};
 };
@@ -419,7 +419,7 @@ public:
     config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
 
     fillServiceWideInitialMetadata(config);
-    return *AsyncClientImpl::create(cm_, config, dispatcher_->timeSource());
+    return *AsyncClientImpl::create(config, server_factory_context_);
   }
 
   virtual envoy::config::core::v3::GrpcService createGoogleGrpcConfig() {
@@ -650,10 +650,10 @@ public:
 class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest,
                                   public GrpcClientIntegrationTestBase<Event::TestRealTimeSystem> {
 public:
-  virtual Network::Address::IpVersion getIpVersion() const override {
+  Network::Address::IpVersion getIpVersion() const override {
     return GrpcClientIntegrationParamTest::ipVersion();
   }
-  virtual ClientType getClientType() const override {
+  ClientType getClientType() const override {
     return GrpcClientIntegrationParamTest::clientType();
   };
 };
@@ -663,10 +663,10 @@ class EnvoyGrpcFlowControlTest
     : public EnvoyGrpcClientIntegrationParamTest,
       public GrpcClientIntegrationTestBase<Event::SimulatedTimeSystemHelper> {
 public:
-  virtual Network::Address::IpVersion getIpVersion() const override {
+  Network::Address::IpVersion getIpVersion() const override {
     return EnvoyGrpcClientIntegrationParamTest::ipVersion();
   }
-  virtual ClientType getClientType() const override {
+  ClientType getClientType() const override {
     return EnvoyGrpcClientIntegrationParamTest::clientType();
   };
 };

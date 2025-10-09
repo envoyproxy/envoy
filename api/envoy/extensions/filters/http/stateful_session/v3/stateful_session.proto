@@ -29,6 +29,15 @@ message StatefulSession {
   // which allows Envoy to fall back to its load balancing mechanism. In this case, if the requested destination is not
   // found, the request will be routed according to the load balancing algorithm.
   bool strict = 2;
+
+  // Optional stat prefix. If specified, the filter will emit statistics in the
+  // ``http.<stat_prefix>.stateful_session.<stat_prefix>.`` namespace. If not specified, no statistics will be emitted.
+  //
+  // .. note::
+  //
+  //   Per-route configuration overrides do not support statistics and will not emit stats even if this field is set
+  //   in the per-route config.
+  string stat_prefix = 3;
 }
 
 message StatefulSessionPerRoute {

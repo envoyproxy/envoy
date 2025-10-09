@@ -288,7 +288,6 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
         scope_name_by_hash_.erase(scope_info_iter->second->scopeKey().hash());
       }
     }
-    rds.set_route_config_name(scoped_route_config.route_configuration_name());
     std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
     std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
     if (scoped_route_config.has_route_configuration()) {

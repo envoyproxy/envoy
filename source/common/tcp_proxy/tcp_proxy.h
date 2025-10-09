@@ -242,6 +242,9 @@ public:
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
     }
+    const absl::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
+      return max_downstream_connection_duration_jitter_percentage_;
+    }
     const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
       return access_log_flush_interval_;
     }
@@ -256,11 +259,23 @@ public:
       return proxy_protocol_tlvs_;
     }
 
+    // Evaluate dynamic TLV formatters and combine with static TLVs.
+    Network::ProxyProtocolTLVVector
+    evaluateDynamicTLVs(const StreamInfo::StreamInfo& stream_info) const;
+
   private:
+    // Structure to hold TLV formatter information.
+    struct TlvFormatter {
+      uint8_t type;
+      Formatter::FormatterPtr formatter;
+    };
+
     static TcpProxyStats generateStats(Stats::Scope& scope);
 
     static Network::ProxyProtocolTLVVector
-    parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs);
+    parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs,
+              Server::Configuration::GenericFactoryContext& context,
+              std::vector<TlvFormatter>& dynamic_tlvs);
 
     // Hold a Scope for the lifetime of the configuration because connections in
     // the UpstreamDrainManager can live longer than the listener.
@@ -270,11 +285,13 @@ public:
     bool flush_access_log_on_connected_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
+    absl::optional<double> max_downstream_connection_duration_jitter_percentage_;
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
     BackOffStrategyPtr backoff_strategy_;
     Network::ProxyProtocolTLVVector proxy_protocol_tlvs_;
+    std::vector<TlvFormatter> dynamic_tlv_formatters_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -302,6 +319,11 @@ public:
   const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
     return shared_config_->maxDownstreamConnectionDuration();
   }
+  const absl::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
+    return shared_config_->maxDownstreamConnectionDurationJitterPercentage();
+  }
+  const absl::optional<std::chrono::milliseconds>
+  calculateMaxDownstreamConnectionDurationWithJitter();
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
     return shared_config_->accessLogFlushInterval();
   }

@@ -4,6 +4,7 @@
 
 #include "source/common/http/http3_status_tracker_impl.h"
 #include "source/common/http/mixed_conn_pool.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "quiche/quic/core/http/spdy_utils.h"
 #include "quiche/quic/core/quic_versions.h"
@@ -50,6 +51,10 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { onNextAttemptTimer(); })),
       stream_options_(options) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
+    decoder_handle_ = decoder.createResponseDecoderHandle();
+  }
+
   if (!stream_options_.can_use_http3_) {
     // If alternate protocols are explicitly disabled, there must have been a failed request over
     // HTTP/3 and the failure must be post-handshake. So disable HTTP/3 for this request.
@@ -70,7 +75,21 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::~ConnectionAttem
 ConnectivityGrid::StreamCreationResult
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
   ASSERT(!parent_.grid_.isPoolHttp3(pool()) || parent_.stream_options_.can_use_http3_);
-  auto* cancellable = pool().newStream(parent_.decoder_, *this, parent_.stream_options_);
+  Http::ResponseDecoder& decoder = parent_.decoder_;
+  if (parent_.decoder_handle_ != nullptr) {
+    if (OptRef<ResponseDecoder> opt_ref = parent_.decoder_handle_->get(); opt_ref.has_value()) {
+      decoder = opt_ref.value().get();
+    } else {
+      const std::string error_msg = "parent_.decoder_ use after free detected.";
+      IS_ENVOY_BUG(error_msg);
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     error_msg);
+      return StreamCreationResult::ImmediateResult;
+    }
+  }
+
+  auto* cancellable = pool().newStream(decoder, *this, parent_.stream_options_);
   if (cancellable == nullptr) {
     return StreamCreationResult::ImmediateResult;
   }
@@ -312,7 +331,9 @@ ConnectivityGrid::ConnectivityGrid(
   ASSERT(connectivity_options.protocols_.size() == 3);
   ASSERT(alternate_protocols);
   std::chrono::milliseconds rtt =
-      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(origin_));
+      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(
+          origin_, Runtime::runtimeFeatureEnabled(
+                       "envoy.reloadable_features.use_canonical_suffix_for_srtt")));
   if (rtt.count() != 0) {
     next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 2);
   }

@@ -201,6 +201,7 @@ public:
   const CookieSettings& codeVerifierCookieSettings() const {
     return code_verifier_cookie_settings_;
   }
+  bool disableTokenEncryption() const { return disable_token_encryption_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix,
@@ -235,6 +236,7 @@ private:
   const bool disable_id_token_set_cookie_ : 1;
   const bool disable_access_token_set_cookie_ : 1;
   const bool disable_refresh_token_set_cookie_ : 1;
+  const bool disable_token_encryption_ : 1;
   absl::optional<RouteRetryPolicy> retry_policy_;
   const CookieSettings bearer_token_cookie_settings_;
   const CookieSettings hmac_cookie_settings_;

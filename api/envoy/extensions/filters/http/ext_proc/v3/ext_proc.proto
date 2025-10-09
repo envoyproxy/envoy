@@ -96,7 +96,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 25]
+// [#next-free-field: 26]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -342,6 +342,16 @@ message ExternalProcessor {
   // Since ``request_header_mode`` is not applicable in any way, it's ignored in comparison.
   repeated ProcessingMode allowed_override_modes = 22;
 
+  // Decorator to introduce custom logic that runs after the ``ProcessingRequest`` is constructed, but
+  // before it is sent to the External Processor. The ``ProcessingRequest`` may be modified.
+  //
+  // .. note::
+  //   Processing request modifiers are currently in alpha.
+  //
+  // [#extension-category: envoy.http.ext_proc.processing_request_modifiers]
+  config.core.v3.TypedExtensionConfig processing_request_modifier = 25
+      [(xds.annotations.v3.field_status).work_in_progress = true];
+
   // Decorator to introduce custom logic that runs after a message received from
   // the External Processor is processed, but before continuing filter chain iteration.
   //
@@ -431,7 +441,7 @@ message ExtProcPerRoute {
 }
 
 // Overrides that may be set on a per-route basis
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ExtProcOverrides {
   // Set a different processing mode for this route than the default.
   ProcessingMode processing_mode = 1;
@@ -471,4 +481,11 @@ message ExtProcOverrides {
   // or could not be opened. This field is the per-route override of
   // :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`.
   google.protobuf.BoolValue failure_mode_allow = 8;
+
+  // Decorator to introduce custom logic that runs after the ``ProcessingRequest`` is constructed, but
+  // before it is sent to the External Processor. The ``ProcessingRequest`` may be modified.
+  // This is a per-route override of
+  // :ref:`processing_request_modifier <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_request_modifier>`.
+  config.core.v3.TypedExtensionConfig processing_request_modifier = 9
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }

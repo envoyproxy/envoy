@@ -172,12 +172,13 @@ void HttpServerPropertiesCacheImpl::setSrtt(const Origin& origin, std::chrono::m
   }
 }
 
-std::chrono::microseconds HttpServerPropertiesCacheImpl::getSrtt(const Origin& origin) const {
+std::chrono::microseconds HttpServerPropertiesCacheImpl::getSrtt(const Origin& origin,
+                                                                 bool use_canonical_suffix) const {
   auto entry_it = protocols_.find(origin);
   if (entry_it != protocols_.end()) {
     return entry_it->second.srtt;
   }
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_canonical_suffix_for_srtt")) {
+  if (use_canonical_suffix) {
     absl::optional<Origin> canonical = getCanonicalOrigin(origin.hostname_);
     if (canonical.has_value()) {
       entry_it = protocols_.find(*canonical);
