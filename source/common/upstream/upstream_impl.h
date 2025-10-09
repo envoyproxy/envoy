@@ -59,6 +59,7 @@
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/locality_pool.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
@@ -1173,7 +1174,10 @@ public:
   Config::ConstMetadataSharedPoolSharedPtr constMetadataSharedPool() {
     return const_metadata_shared_pool_;
   }
-  ConstLocalitySharedPoolSharedPtr constLocalitySharedPool() { return const_locality_shared_pool_; }
+
+  ConstLocalitySharedPoolSharedPtr constLocalitySharedPool() const {
+    return const_locality_shared_pool_;
+  }
 
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }

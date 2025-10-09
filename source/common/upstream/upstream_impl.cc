@@ -2145,12 +2145,14 @@ void PriorityStateManager::registerHostForPriority(
       locality_lb_endpoint.has_metadata()
           ? parent_.constMetadataSharedPool()->getObject(locality_lb_endpoint.metadata())
           : nullptr;
-  const auto& locality = locality_lb_endpoint.locality();
-  auto host_or_error = HostImpl::create(
-      parent_.info(), hostname, address, endpoint_metadata, locality_metadata,
-      lb_endpoint.load_balancing_weight().value(),
-      parent_.constLocalitySharedPool()->getObject(locality), lb_endpoint.health_check_config(),
-      priority, lb_endpoint.health_status(), address_list);
+  const auto host = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
+      HostImpl::create(
+          parent_.info(), hostname, address, endpoint_metadata, locality_metadata,
+          lb_endpoint.load_balancing_weight().value(),
+          parent_.constLocalitySharedPool()->getObject(locality_lb_endpoint.locality()),
+          lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
+          lb_endpoint.health_status(), address_list),
+      std::unique_ptr<HostImpl>));
   registerHostForPriority(host, locality_lb_endpoint);
 }
 
