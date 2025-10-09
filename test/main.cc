@@ -34,6 +34,8 @@ int main(int argc, char** argv) {
   Envoy::TestEnvironment::setEnvVar("ENVOY_IP_TEST_VERSIONS", "all", 0);
 
   // Initialize log recording sink.
-  [[maybe_unused]] const auto& _ = Envoy::GetLogSink();
+  if (std::getenv("ENVOY_NO_LOG_SINK") == nullptr) {
+    [[maybe_unused]] const auto& _ = Envoy::GetLogSink();
+  }
   return Envoy::TestRunner::runTests(argc, argv);
 }
