@@ -99,6 +99,93 @@ protected:
   bool async_lb_ = true;
 };
 
+//template <template <class> class testing::TestWithParam, typename PARAMS>
+template <typename T>
+class HttpProtocolIntegrationTestWithParams : 
+                                //public testing::TestWithParam<bool> {
+                                public testing::TestWithParam<T> {
+                                //public testing::TestWithParam<std::tuple<typename HttpProtocolTestParams, PARAMS>>//,
+                                    //public HttpIntegrationTest {
+    //using GetParam = testing::TestWithParam<T>::GetParam;
+public:
+    HttpProtocolIntegrationTestWithParams() {
+        //ASSERT(GetParam());
+        ASSERT(testing::TestWithParam<T>::GetParam());
+    }
+  
+    virtual void initialize() {}
+    
+#if 0
+  // By default returns 8 combinations of
+  // [HTTP  upstream / HTTP  downstream] x [Ipv4, IPv6]
+  // [HTTP  upstream / HTTP2 downstream] x [IPv4, Ipv6]
+  // [HTTP2 upstream / HTTP  downstream] x [Ipv4, IPv6]
+  // [HTTP2 upstream / HTTP2 downstream] x [IPv4, Ipv6]
+  //
+  // Upstream and downstream protocols may be changed via the input vectors.
+  // Address combinations are propagated from TestEnvironment::getIpVersionsForTest()
+  static std::vector<HttpProtocolTestParams>
+  getProtocolTestParams(const std::vector<Http::CodecType>& downstream_protocols =
+                            {
+                                Http::CodecType::HTTP1,
+                                Http::CodecType::HTTP2,
+                                Http::CodecType::HTTP3,
+                            },
+                        const std::vector<Http::CodecType>& upstream_protocols = {
+                            Http::CodecType::HTTP1,
+                            Http::CodecType::HTTP2,
+                            Http::CodecType::HTTP3,
+                        });
+
+  static std::vector<HttpProtocolTestParams> getProtocolTestParamsWithoutHTTP3() {
+    return getProtocolTestParams(
+        /*downstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2});
+  }
+
+  // Allows pretty printed test names of the form
+  // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
+#if 0
+  static std::string
+  protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
+#endif
+
+  HttpProtocolIntegrationTestWithParams() {
+     // : HttpProtocolIntegrationTestWithParams(ConfigHelper::httpProxyConfig(
+            ASSERT(GetParam());
+    }
+            /*downstream_is_quic=GetParam().downstream_protocol == Http::CodecType::HTTP3)) {}*/
+#if 0
+  HttpProtocolIntegrationTestWithParams(const std::string config)
+      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, config),
+        use_universal_header_validator_(GetParam().use_universal_header_validator) {
+    setupHttp2ImplOverrides(GetParam().http2_implementation);
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                      GetParam().use_universal_header_validator ? "true" : "false");
+  }
+
+  void SetUp() override {
+    setDownstreamProtocol(GetParam().downstream_protocol);
+    setUpstreamProtocol(GetParam().upstream_protocol);
+  }
+
+  void initialize() override {
+    if (async_lb_) {
+      config_helper_.setAsyncLb();
+    }
+    HttpIntegrationTest::initialize();
+  }
+
+  void setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
+  void setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
+
+protected:
+  const bool use_universal_header_validator_{false};
+  bool async_lb_ = true;
+#endif
+#endif
+};
+
 class UpstreamDownstreamIntegrationTest
     : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool>>,
       public HttpIntegrationTest {

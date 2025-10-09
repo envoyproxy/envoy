@@ -434,5 +434,27 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
   codec_client_->close();
 }
 
+
+class OutlierDetectionTemplateIntegrationTest : public HttpProtocolIntegrationTestWithParams<bool> {
+public:
+#if 0
+  void initialize() override { 
+    ASSERT_TRUE(HttpProtocolIntegrationTestWithParams::GetParam());
+    //HttpProtocolIntegrationTestWithParams<bool>::initialize(); }
+#endif
+};
+
+
+TEST_P(OutlierDetectionTemplateIntegrationTest, ClusterOverwriteGatewayErrors) {
+    ASSERT_TRUE(GetParam());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, OutlierDetectionTemplateIntegrationTest,
+    //testing::Combine(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3(), true),
+    testing::Values(true));
+
+    //HttpProtocolIntegrationTest::protocolTestParamsToString);
+
 } // namespace
 } // namespace Envoy
