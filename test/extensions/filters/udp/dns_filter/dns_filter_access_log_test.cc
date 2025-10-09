@@ -266,7 +266,7 @@ server_config:
 
   // Verify DNS custom command formatters extracted correct information
   EXPECT_EQ(test_access_log_->queryName().value(), "www.example.com");
-  EXPECT_EQ(test_access_log_->queryType().value(), "1"); // DNS_RECORD_TYPE_A
+  EXPECT_EQ(test_access_log_->queryType().value(), "1");  // DNS_RECORD_TYPE_A
   EXPECT_EQ(test_access_log_->queryClass().value(), "1"); // DNS_RECORD_CLASS_IN
   EXPECT_EQ(test_access_log_->answerCount().value(), "2");
   EXPECT_EQ(test_access_log_->responseCode().value(), "0"); // DNS_RESPONSE_CODE_NO_ERROR
@@ -324,7 +324,6 @@ server_config:
   sendQueryFromClient("192.168.1.100:54321", query);
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
-
 
   EXPECT_EQ(test_access_log_->queryName().value(), "nonexistent.example.com");
   EXPECT_EQ(test_access_log_->responseCode().value(), "3"); // DNS_RESPONSE_CODE_NAME_ERROR
@@ -705,26 +704,6 @@ TEST(DnsFilterCommandParserTest, FormatValueNullWhenMissing) {
   // Test formatValue returns null value
   auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
   EXPECT_EQ(value.kind_case(), Protobuf::Value::kNullValue);
-}
-
-TEST(DnsFilterCommandParserTest, WrongMetadataType) {
-  auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("QUERY_TYPE", "", absl::nullopt);
-  ASSERT_NE(formatter, nullptr);
-
-  Event::SimulatedTimeSystem test_time;
-  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
-  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
-                                         StreamInfo::FilterState::LifeSpan::Connection);
-
-  // Set string value where number is expected
-  Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["query_type"] = ValueUtil::stringValue("not_a_number");
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
-
-  // Should return nullopt for wrong type
-  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
-  EXPECT_FALSE(result.has_value());
 }
 
 TEST(DnsFilterCommandParserTest, WrongTypeInMetadata) {

@@ -71,10 +71,8 @@ absl::optional<std::string> getDnsMetadataString(const StreamInfo::StreamInfo& s
  */
 Formatter::FormatterProviderPtr makeDnsFieldProvider(absl::string_view field_name) {
   return std::make_unique<DnsFormatterProvider>(
-      [field_name = std::string(field_name)](
-          const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-        return getDnsMetadataString(stream_info, field_name);
-      });
+      [field_name = std::string(field_name)](const StreamInfo::StreamInfo& stream_info)
+          -> absl::optional<std::string> { return getDnsMetadataString(stream_info, field_name); });
 }
 
 /**
