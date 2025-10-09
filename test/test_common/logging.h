@@ -55,6 +55,7 @@ class LogExpectation;
 class LogRecordingSink : public Logger::SinkDelegate {
 public:
   explicit LogRecordingSink(Logger::DelegatingLogSinkSharedPtr log_sink);
+  ~LogRecordingSink() override;
 
   // Logger::SinkDelegate
   void log(absl::string_view msg, const spdlog::details::log_msg& log_msg) override;

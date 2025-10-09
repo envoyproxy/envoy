@@ -44,9 +44,10 @@ LogExpectation::~LogExpectation() { sink_.removeExpectation(this); }
 
 LogRecordingSink::LogRecordingSink(Logger::DelegatingLogSinkSharedPtr log_sink)
     : Logger::SinkDelegate(log_sink) {
-  // Note we do not restore the delegate since this sink is installed till the test completion.
   setDelegate();
 }
+
+LogRecordingSink::~LogRecordingSink() { restoreDelegate(); }
 
 void LogRecordingSink::log(absl::string_view msg, const spdlog::details::log_msg& log_msg) {
   previousDelegate()->log(msg, log_msg);
