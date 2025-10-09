@@ -10,19 +10,23 @@ namespace Envelope {
 
 constexpr absl::string_view OriginUpstreamValuePartFlag = "UV:";
 
-void EnvelopeSessionStateFactory::SessionStateImpl::onUpdate(
+bool EnvelopeSessionStateFactory::SessionStateImpl::onUpdate(
     absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) {
 
   const auto upstream_value_header = headers.get(factory_.name_);
   if (upstream_value_header.size() != 1) {
     ENVOY_LOG(trace, "Header {} not exist or occurs multiple times", factory_.name_);
-    return;
+    return false;
   }
 
+  // For envelope, we always update the header with the new host address, so consider it changed.
+  const bool host_changed =
+      !upstream_address_.has_value() || host_address != upstream_address_.value();
   const std::string new_header =
       absl::StrCat(Envoy::Base64::encode(host_address), ";", OriginUpstreamValuePartFlag,
                    Envoy::Base64::encode(upstream_value_header[0]->value().getStringView()));
   headers.setReferenceKey(factory_.name_, new_header);
+  return host_changed;
 }
 
 EnvelopeSessionStateFactory::EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config)
