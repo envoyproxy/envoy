@@ -63,7 +63,7 @@ TEST_P(AdminInstanceTest, Memory) {
                                   Property(&envoy::admin::v3::Memory::total_thread_cache, Ge(0))));
 }
 
-#if defined(TCMALLOC)
+#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
 TEST_P(AdminInstanceTest, MemoryTcmalloc) {
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
