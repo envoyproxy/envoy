@@ -185,6 +185,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_abort_when_accessing_dead_decoder)
 // TODO(pradeepcrao): Create a config option to enable this instead after
 // testing.
 FALSE_RUNTIME_GUARD(envoy_restart_features_use_cached_grpc_client_for_xds);
+// TODO(tsaarni): Flip to true after prod testing or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
