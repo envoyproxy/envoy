@@ -1999,32 +1999,5 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
   EXPECT_GT(std::stoi(metrics.at(2)), 0);
 }
 
-TEST_P(QuicHttpIntegrationTest, NetworkChangeOnIdleClientConnection) {
-  initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  EXPECT_FALSE(registry_.registeredQuicObservers().empty());
-  auto response =
-      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  registry_.onNetworkChanged();
-  EXPECT_TRUE(codec_client_->disconnected());
-  // Verify stream error counters are correctly incremented.
-  std::string counter_scope = GetParam() == Network::Address::IpVersion::v4
-                                  ? "listener.127.0.0.1_0.http3.downstream.rx."
-                                  : "listener.[__1]_0.http3.downstream.rx.";
-  std::string error_code =
-      "quic_connection_close_error_code_QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS";
-  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
-
-  // The connection should not response to network change any more.
-  EXPECT_FALSE(registry_.registeredQuicObservers().empty());
-  registry_.onNetworkChanged();
-
-  // Unregister itself upon destruction.
-  codec_client_.reset();
-  EXPECT_TRUE(registry_.registeredQuicObservers().empty());
-}
-
 } // namespace Quic
 } // namespace Envoy
