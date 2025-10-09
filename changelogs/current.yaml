@@ -118,6 +118,9 @@ minor_behavior_changes:
   change: |
     Check the request header count & size in kb after applying mutations is <= the configured limits
     and reject the response if not.
+- area: ext_proc
+  change: |
+    If onGrpcClose() with status=OK, save the grpc status code OK instead of Aborted.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
