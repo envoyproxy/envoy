@@ -67,6 +67,17 @@ absl::optional<std::string> getDnsMetadataString(const StreamInfo::StreamInfo& s
 }
 
 /**
+ * Helper to create a provider function for a given DNS metadata field name.
+ */
+Formatter::FormatterProviderPtr makeDnsFieldProvider(absl::string_view field_name) {
+  return std::make_unique<DnsFormatterProvider>(
+      [field_name = std::string(field_name)](
+          const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+        return getDnsMetadataString(stream_info, field_name);
+      });
+}
+
+/**
  * DNS Filter command parser implementation.
  */
 class DnsFilterCommandParser : public Formatter::CommandParser {
@@ -93,45 +104,27 @@ private:
         {
             {"QUERY_NAME",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                     return getDnsMetadataString(stream_info, "query_name");
-                   });
+               return makeDnsFieldProvider("query_name");
              }},
             {"QUERY_TYPE",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                     return getDnsMetadataString(stream_info, "query_type");
-                   });
+               return makeDnsFieldProvider("query_type");
              }},
             {"QUERY_CLASS",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                     return getDnsMetadataString(stream_info, "query_class");
-                   });
+               return makeDnsFieldProvider("query_class");
              }},
             {"ANSWER_COUNT",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                     return getDnsMetadataString(stream_info, "answer_count");
-                   });
+               return makeDnsFieldProvider("answer_count");
              }},
             {"RESPONSE_CODE",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                     return getDnsMetadataString(stream_info, "response_code");
-                   });
+               return makeDnsFieldProvider("response_code");
              }},
             {"PARSE_STATUS",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                     return getDnsMetadataString(stream_info, "parse_status");
-                   });
+               return makeDnsFieldProvider("parse_status");
              }},
         });
   }

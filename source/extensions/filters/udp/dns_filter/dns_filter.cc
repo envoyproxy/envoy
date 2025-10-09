@@ -666,7 +666,7 @@ void DnsFilter::logQuery(const DnsQueryContextPtr& context) {
   // Add query information
   if (!context->queries_.empty()) {
     const auto& query = context->queries_[0];
-    (*fields)["query_name"] = ValueUtil::stringValue(std::string(query->name_));
+    (*fields)["query_name"] = ValueUtil::stringValue(absl::StrCat(query->name_));
     (*fields)["query_type"] = ValueUtil::stringValue(absl::StrCat(query->type_));
     (*fields)["query_class"] = ValueUtil::stringValue(absl::StrCat(query->class_));
   }
