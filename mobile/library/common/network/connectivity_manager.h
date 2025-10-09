@@ -12,7 +12,6 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "library/common/engine_types.h"
-#include "library/common/network/envoy_mobile_quic_network_observer_registry_factory.h"
 #include "library/common/network/network_types.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
@@ -42,6 +41,7 @@
  */
 typedef uint16_t envoy_netconf_t;
 
+using NetworkHandle = int64_t;
 constexpr NetworkHandle kInvalidNetworkHandle = -1;
 
 namespace Envoy {
@@ -306,7 +306,6 @@ private:
 
   bool enable_interface_binding_{false};
   Upstream::ClusterManager& cluster_manager_;
-  Quic::EnvoyMobileQuicNetworkObserverRegistryFactory quic_observer_registry_factory_;
   // nullptr if draining hosts after refreshing DNS is disabled via setDrainPostDnsRefreshEnabled().
   std::unique_ptr<RefreshDnsWithPostDrainHandler> dns_refresh_handler_;
   DnsCacheManagerSharedPtr dns_cache_manager_;
