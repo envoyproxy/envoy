@@ -667,14 +667,14 @@ void DnsFilter::logQuery(const DnsQueryContextPtr& context) {
   if (!context->queries_.empty()) {
     const auto& query = context->queries_[0];
     (*fields)["query_name"] = ValueUtil::stringValue(std::string(query->name_));
-    (*fields)["query_type"] = ValueUtil::numberValue(query->type_);
-    (*fields)["query_class"] = ValueUtil::numberValue(query->class_);
+    (*fields)["query_type"] = ValueUtil::stringValue(absl::StrCat(query->type_));
+    (*fields)["query_class"] = ValueUtil::stringValue(absl::StrCat(query->class_));
   }
 
   // Add response information
-  (*fields)["answer_count"] = ValueUtil::numberValue(context->answers_.size());
-  (*fields)["response_code"] = ValueUtil::numberValue(context->response_code_);
-  (*fields)["parse_status"] = ValueUtil::boolValue(context->parse_status_);
+  (*fields)["answer_count"] = ValueUtil::stringValue(absl::StrCat(context->answers_.size()));
+  (*fields)["response_code"] = ValueUtil::stringValue(absl::StrCat(context->response_code_));
+  (*fields)["parse_status"] = ValueUtil::stringValue(context->parse_status_ ? "true" : "false");
 
   stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
 
