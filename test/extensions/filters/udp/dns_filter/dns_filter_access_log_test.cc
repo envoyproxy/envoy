@@ -301,7 +301,7 @@ server_config:
   EXPECT_EQ(test_access_log_->answerCount().value(), "1");
 }
 
-// Test access logging for NXDOMAIN (query for non-existent domain) using custom formatters
+// Test access logging for NXDOMAIN using custom formatters
 TEST_F(DnsFilterAccessLogTest, AccessLogForNXDOMAIN) {
   const std::string config_yaml = R"EOF(
 stat_prefix: "my_prefix"
