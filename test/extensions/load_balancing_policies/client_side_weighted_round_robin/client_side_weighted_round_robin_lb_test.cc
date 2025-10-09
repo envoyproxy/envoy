@@ -29,6 +29,8 @@ public:
     return worker_lb_->peekAnotherHost(context);
   }
 
+  void refreshWorkerLbWithPriority(int32_t priority) { worker_lb_->refresh(priority); }
+
   absl::Status initialize() { return lb_->initialize(); }
 
   void updateWeightsOnMainThread() { lb_->updateWeightsOnMainThread(); }
@@ -297,6 +299,23 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
   for (const auto& host_ptr : hostSet().hosts_) {
     EXPECT_EQ(host_ptr->weight(), 2000);
   }
+}
+
+TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, RefreshWorkerLbWithPriority) {
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"),
+      makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"),
+  };
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  init(false);
+
+  hostSet().runCallbacks({}, {});
+  // Refresh worker LB with priority 42 which does not exist, expect no crash.
+  lb_->refreshWorkerLbWithPriority(42);
 }
 
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_FirstReport) {

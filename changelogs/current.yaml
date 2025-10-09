@@ -70,6 +70,12 @@ minor_behavior_changes:
     In test code for external extensions, matchers ``Http::HeaderValueOf``, ``HasHeader``, and ``HeaderHasValueRef``
     must be replaced with ``ContainsHeader``.
     Any uses of matcher ``HeaderHasValue(...)`` should be replaced with ``::testing::Pointee(ContainsHeader(...))``.
+- area: thrift
+  change: |
+    :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
+    takes precedence over :ref:`field<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field>`
+    if both set. Not that :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
+    was in wip status.
 - area: generic_proxy
   change: |
     Generic proxy codec adds the same buffer limit as the connection buffer limit. If the buffer limit is
@@ -119,8 +125,8 @@ minor_behavior_changes:
     4MB could be encoded, which most upstream grpc services would, by default, treat as an error.
 - area: ext_authz
   change: |
-    Check the request header count after applying mutations is <= the configured limit and reject
-    the response if not.
+    Check the request header count & size in kb after applying mutations is <= the configured limits
+    and reject the response if not.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -145,6 +151,10 @@ bug_fixes:
     Fixed a bug where the access log was skipped for HTTP/3 requests when the stream was half closed. This behavior can be
     reverted by setting the runtime guard
     ``envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream`` to ``false``.
+- area: load_balancing
+  change: |
+    Fixed a bug in ClientSideWeightedRoundRobinLoadBalancer with worker lbs iterating over priorities
+    included in owning thread aware lb priority set that might have different number of priorities.
 - area: http
   change: |
     Fixed a bug where premature resets of streams could result in recursive draining and a potential
@@ -324,6 +334,14 @@ new_features:
     support evictable metrics. This is done :ref:`periodically
     <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_eviction_interval>`
     during the metric flush.
+- area: http
+  change: |
+    Added statistics to the :ref:`Stateful session filter <config_http_filters_stateful_session>`
+    to help operators understand routing outcomes when session overrides are requested. The filter now
+    emits counters in the ``http.<stat_prefix>.stateful_session.[<filter_stat_prefix>.]`` namespace. An
+    optional per-filter :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.stat_prefix>` can be used
+    to disambiguate multiple instances.
 - area: tap
   change: |
     Added :ref:`record_upstream_connection <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_upstream_connection>`
@@ -347,6 +365,13 @@ new_features:
     Added support for generating and propagating a request ID on synthesized upstream HTTP requests when tunneling requests.
     It can be configured using :ref:`request_id_extension
     <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_extension>`.
+- area: http
+  change: |
+    Added support for per-route compressor library override in the HTTP compressor filter.
+    Routes can now specify a different compressor library (e.g., gzip, brotli) via the
+    :ref:`compressor_library <envoy_v3_api_field_extensions.filters.http.compressor.v3.CompressorOverrides.compressor_library>`
+    field in the per-route configuration. This allows different routes to use different
+    compression algorithms and settings while maintaining the same filter configuration.
 - area: router_check_tool
   change: |
     Added support for testing routes with :ref:`dynamic metadata matchers <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>`
@@ -422,6 +447,11 @@ new_features:
   change: |
     Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
     :ref:`resource_detectors <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors>`.
+- area: otlp_stat_sink
+  change: |
+    Added support for :ref:`custom_metric_conversions
+    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.custom_metric_conversions>`. This allows renaming stats,
+    adding static labels, and aggregating multiple stats into generated metrics.
 - area: lua
   change: |
     Added ``virtualHost()`` to the Stream handle API, allowing Lua scripts to retrieve virtual host information. So far, the only method
@@ -434,12 +464,26 @@ new_features:
     :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.grpc_service>`
     in the per-route ``check_settings``. Routes without this configuration continue to use the default
     authorization service.
+- area: ext_authz
+  change: |
+    Added
+    :ref:`max_denied_response_body_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.max_denied_response_body_bytes>`
+    to the ``ext_authz`` HTTP filter. This allows configuring the maximum size of the response body
+    returned to the downstream client when a request is denied by the external authorization service.
+    If the authorization server returns a response body larger than this limit, it will be truncated.
 - area: ext_proc
   change: |
     Added :ref:`status_on_error <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.status_on_error>`
     to the ``ext_proc`` HTTP filter. This allows configuring the HTTP status code returned to the downstream
     client when communication with the external processor fails (e.g., gRPC error). Previously, these cases returned a
     fixed ``500``.
+- area: ext_proc
+  change: |
+    Introduced a new
+    :ref:`ProcessingRequestModifier <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_request_modifier>`
+    config and corresponding interface to enable modifying the ``ProcessingRequest`` before it is sent on the wire. Sample use cases include
+    modifying attribute and metadata keys to abstract away filter details. If the config is not set, then there is no behavior change.
+    Supports per-route overrides.
 - area: tracing
   change: |
     Added :ref:`trace_context_option <envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_context_option>` enum
@@ -509,6 +553,12 @@ new_features:
   change: |
     Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under ``dynamic_modules`` ID.
     In the Rust SDK, they are available as ``envoy_log_info``, etc.
+- area: tcp_proxy
+  change: |
+    Added support for dynamic TLV values in PROXY protocol using :ref:`format_string
+    <envoy_v3_api_field_config.core.v3.TlvEntry.format_string>` field. This allows TLV values to be
+    populated dynamically from stream information using format strings (e.g., ``%DYNAMIC_METADATA(...)%``,
+    ``%FILTER_STATE(...)%``, ``%DOWNSTREAM_REMOTE_ADDRESS%``).
 - area: http
   change: |
     Added ``upstream_rq_per_cx`` histogram to track requests per connection for monitoring connection reuse efficiency.
@@ -535,6 +585,10 @@ new_features:
     Envoy to scale the periodic timer for flushing downstream responses based on resource pressure.
     The new timer can be configured via the
     :ref:`ScaleTimersOverloadActionConfig <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>`.
+- area: thrift
+  change: |
+    Support :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
+    to extract specified fields in thrift body for thrift_to_metadata http filter.
 - area: dynamic_modules
   change: |
     Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.
@@ -548,5 +602,30 @@ new_features:
   change: |
     Added ``max_downstream_connection_duration_jitter_percentage`` to allow adding a jitter to the max downstream connection duration.
     This can be used to avoid thundering herd problems with many clients being disconnected and possibly reconnecting at the same time.
+- area: http
+  change: |
+    Added ``setUpstreamOverrideHost`` method to AsyncClient StreamOptions to enable direct host routing
+    that bypasses load balancer selection.
+- area: router
+  change: |
+    Added support for :ref:`request_headers_mutations
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.request_headers_mutations>` to enable header
+    manipulation for mirror requests.
+    Added support for :ref:`host_rewrite_literal
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.host_rewrite_literal>` in
+    :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to enable
+    host header rewrite for mirror requests.
+- area: outlier detection
+  change: |
+    Added :ref:`outlier_detection<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.outlier_detection>`
+    to cluster's http protocol options to allow defining via an http matcher whether a response should be treated
+    as error or as success by outlier detection.
+- area: reverse_tunnel
+  change: |
+    Added support for reverse tunnels that enable establishing persistent connections from downstream Envoy
+    instances to upstream Envoy instances without requiring the upstream to be directly reachable. This feature
+    is particularly useful when downstream instances are behind NATs, firewalls, or in private networks. The
+    feature is experimental and under active development, but is ready for experimental use. See
+    :ref:`reverse tunnel overview <overview_reverse_tunnel>` for details.
 
 deprecated:

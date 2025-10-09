@@ -78,6 +78,15 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   clusters:
+  - name: cache_internal_listener_cluster
+    load_assignment:
+      cluster_name: cache_internal_listener_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              envoy_internal_address:
+                server_listener_name: cache_internal_listener
   - name: service1
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
@@ -102,12 +111,3 @@ static_resources:
               socket_address:
                 address: service2
                 port_value: 8000
-  - name: cache_internal_listener_cluster
-    load_assignment:
-      cluster_name: cache_internal_listener_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              envoy_internal_address:
-                server_listener_name: cache_internal_listener

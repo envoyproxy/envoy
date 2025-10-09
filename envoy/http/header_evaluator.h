@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/formatter/substitution_formatter.h"
+#include "envoy/formatter/http_formatter_context.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 

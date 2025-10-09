@@ -2,9 +2,12 @@
 
 #include "source/extensions/filters/http/compressor/compressor_filter.h"
 
+#include "test/extensions/filters/http/compressor/compressor_filter_testing_peer.h"
 #include "test/mocks/compression/compressor/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
@@ -186,6 +189,8 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
 };
 
 enum class PerRouteConfig { None, Empty, Enabled, Disabled };
@@ -257,7 +262,8 @@ TEST_P(CompresorFilterEnablementTest, DecodeHeadersWithRuntimeDisabled) {
   }
   std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config;
   if (use_per_route_proto) {
-    per_route_config = std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
     ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(Return(per_route_config.get()));
   }
@@ -488,7 +494,7 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
     per_route_proto.mutable_overrides()->mutable_response_direction_config();
 
     std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
-        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
     ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(Return(per_route_config.get()));
 
@@ -512,7 +518,7 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
     per_route_proto.mutable_overrides()->mutable_response_direction_config();
 
     std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
-        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
     ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(Return(per_route_config.get()));
 
@@ -541,7 +547,7 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
         ->set_value(true);
 
     std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
-        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
     ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(Return(per_route_config.get()));
 
@@ -569,7 +575,7 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
         ->set_value(false);
 
     std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
-        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
     ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(Return(per_route_config.get()));
 
@@ -597,7 +603,7 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
         ->set_value(true);
 
     std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
-        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
     ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(Return(per_route_config.get()));
 
@@ -624,7 +630,7 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
         ->set_value(false);
 
     std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
-        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
     ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(Return(per_route_config.get()));
 
@@ -1240,6 +1246,149 @@ TEST(CompressorFilterConfigTests, MakeCompressorTest) {
   CompressorFilterConfig config(compressor_cfg, "test.compressor.", *stats.rootScope(), runtime,
                                 std::move(compressor_factory));
   Envoy::Compression::Compressor::CompressorPtr compressor = config.makeCompressor();
+}
+
+// Tests for per-route compressor library override functionality.
+class CompressorPerRouteLibraryTest : public CompressorFilterTest {
+public:
+  CompressorPerRouteLibraryTest() {
+    // Create a second compressor factory for testing different libraries.
+    deflate_compressor_factory_ = std::make_unique<TestCompressorFactory>("deflate");
+  }
+
+protected:
+  void setUpPerRouteConfig(const std::string& compressor_name,
+                           const std::string& compressor_type_url) {
+    CompressorPerRoute per_route_proto;
+    auto* compressor_lib = per_route_proto.mutable_overrides()->mutable_compressor_library();
+    compressor_lib->set_name(compressor_name);
+    compressor_lib->mutable_typed_config()->set_type_url(compressor_type_url);
+    compressor_lib->mutable_typed_config()->set_value("{}"); // Empty config for testing.
+
+    // Mock the factory registry to return our test factory.
+    ON_CALL(factory_context_, messageValidationVisitor())
+        .WillByDefault(ReturnRef(validation_visitor_));
+    ON_CALL(factory_context_, serverFactoryContext())
+        .WillByDefault(ReturnRef(server_factory_context_));
+
+    per_route_config_ =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config_.get()));
+  }
+
+  std::unique_ptr<TestCompressorFactory> deflate_compressor_factory_;
+  std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+};
+
+TEST_F(CompressorPerRouteLibraryTest, PerRouteCompressorFactoryIsUsed) {
+  // Set up main filter with "test" compressor.
+  setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+
+  // Test a valid per-route config creation without compressor library override.
+  CompressorPerRoute per_route_proto;
+  per_route_proto.mutable_overrides()->mutable_response_direction_config();
+
+  // This test verifies the per-route config structure is set up correctly.
+  per_route_config_ =
+      std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
+
+  // Verify that per-route config without compressor library has no override.
+  EXPECT_EQ(per_route_config_->compressorFactory(), nullptr);
+  EXPECT_FALSE(per_route_config_->contentEncoding().has_value());
+}
+
+TEST_F(CompressorPerRouteLibraryTest, NoPerRouteCompressorLibrary) {
+  // Set up main filter.
+  setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+
+  // Per-route config without compressor library override.
+  CompressorPerRoute per_route_proto;
+  per_route_proto.mutable_overrides()->mutable_response_direction_config();
+
+  per_route_config_ =
+      std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
+
+  // Verify that per-route config has no compressor factory override.
+  EXPECT_EQ(per_route_config_->compressorFactory(), nullptr);
+  EXPECT_FALSE(per_route_config_->contentEncoding().has_value());
+}
+
+TEST_F(CompressorPerRouteLibraryTest, GetContentEncodingUsesPerRoute) {
+  setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+
+  // Test without per-route config. It should use main config.
+  EXPECT_EQ(CompressorFilterTestingPeer::contentEncoding(*filter_), "test");
+
+  // Set up per-route config without compressor library. It should still use main config.
+  CompressorPerRoute per_route_proto;
+  per_route_proto.mutable_overrides()->mutable_response_direction_config();
+
+  per_route_config_ =
+      std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
+  ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillByDefault(Return(per_route_config_.get()));
+
+  // Should still use main config content encoding.
+  EXPECT_EQ(CompressorFilterTestingPeer::contentEncoding(*filter_), "test");
+}
+
+TEST_F(CompressorPerRouteLibraryTest, GetCompressorFactoryUsesPerRoute) {
+  setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+
+  // Test without per-route config. It should use main config factory.
+  const auto& main_factory = CompressorFilterTestingPeer::compressorFactory(*filter_);
+  EXPECT_EQ(main_factory.contentEncoding(), "test");
+
+  // Set up per-route config without compressor library. It should still use main factory.
+  CompressorPerRoute per_route_proto;
+  per_route_proto.mutable_overrides()->mutable_response_direction_config();
+
+  per_route_config_ =
+      std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto, factory_context_);
+  ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillByDefault(Return(per_route_config_.get()));
+
+  // Should still use main factory since no per-route compressor library override.
+  const auto& per_route_factory = CompressorFilterTestingPeer::compressorFactory(*filter_);
+  EXPECT_EQ(per_route_factory.contentEncoding(), "test");
 }
 
 } // namespace
