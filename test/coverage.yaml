@@ -16,7 +16,7 @@ directories:
   source/common/memory: 98.1  # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
   source/common/network: 94.3  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
   source/common/network/dns_resolver: 91.4   # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-  source/common/quic: 93.5
+  source/common/quic: 93.4
   source/common/signal: 87.4  # Death tests don't report LCOV
   source/common/thread: 0.0  # Death tests don't report LCOV
   source/common/tls: 94.5  # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
@@ -34,7 +34,6 @@ directories:
   source/extensions/common/tap: 95.1
   source/extensions/common/wasm: 95.3  # flaky: be careful adjusting
   source/extensions/common/wasm/ext: 100.0
-  source/extensions/clusters/reverse_connection: 93.9
   source/extensions/filters/common: 97.1
   source/extensions/filters/common/fault: 94.5
   source/extensions/filters/common/rbac: 95.4

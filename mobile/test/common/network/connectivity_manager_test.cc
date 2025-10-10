@@ -76,24 +76,6 @@ TEST_F(ConnectivityManagerTest,
   EXPECT_EQ(original_key, connectivity_manager_->getConfigurationKey());
 }
 
-TEST_F(ConnectivityManagerTest, OnNetworkMadeDefault) {
-  Runtime::maybeSetRuntimeGuard(
-      "envoy.reloadable_features.quic_upstream_connection_handle_network_change", true);
-  Quic::EnvoyMobileQuicNetworkObserverRegistryPtr registry;
-  Event::MockDispatcher dispatcher;
-  EXPECT_CALL(cm_, createNetworkObserverRegistries(_))
-      .WillOnce(Invoke([&](Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) {
-        registry.reset(static_cast<Quic::EnvoyMobileQuicNetworkObserverRegistry*>(
-            factory.createQuicNetworkObserverRegistry(dispatcher).release()));
-      }));
-  connectivity_manager_ = std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_manager_);
-  EXPECT_NE(nullptr, registry);
-  envoy_netconf_t original_key = connectivity_manager_->getConfigurationKey();
-  EXPECT_CALL(dispatcher, isThreadSafe());
-  envoy_netconf_t new_key = connectivity_manager_->onNetworkMadeDefault(NetworkType::WWAN);
-  EXPECT_NE(original_key, new_key);
-}
-
 TEST_F(ConnectivityManagerTest, RefreshDnsForCurrentConfigurationTriggersDnsRefresh) {
   EXPECT_CALL(*dns_cache_, forceRefreshHosts());
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();

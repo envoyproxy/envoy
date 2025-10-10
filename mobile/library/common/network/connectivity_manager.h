@@ -42,9 +42,10 @@
  */
 typedef uint16_t envoy_netconf_t;
 
+namespace Envoy {
+
 constexpr NetworkHandle kInvalidNetworkHandle = -1;
 
-namespace Envoy {
 namespace Network {
 
 /**
