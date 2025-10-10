@@ -1,0 +1,42 @@
+;; Use `compile_bpf.sh` to build.
+;; Output must then be copied into quic_lb.cc `createCompatibleLinuxBpfSocketOption()`.
+;;
+;; Uses of 0xabcdefff will be replaced with `concurrency` in post-processing.
+;;
+;; This should match bpfEquivalentFunction() in quic_lb.cc
+ld len
+tax                             ; store packet length in X
+jlt #9, fallback                ; packet length is shorter than minimum QUIC packet
+ldb [0]                         ; load quic header flags
+and #0x80                       ; mask long/short header bit
+jne #0, long_header
+
+short_header:
+ldb [1]                         ; config_version_and_length
+and #0x1f                       ; encrypted_cid_length
+add #3                          ; worker_id_offset + sizeof(worker_id)
+jgt %x, fallback                ; if offset is past end of packet
+sub #1                          ; worker_id_offset
+tax                             ; move worker_id_offset to X; loads from a register can only come from X
+ldb [x + 0]                     ; load worker_id
+jge #0xabcdefff, fallback       ; encoded worker_id >= concurrency (concurrency placeholder)
+ret a
+
+long_header:
+ld len
+jlt #14, fallback
+ldb [5]                         ; load encrypted cid length (worker id is one past this)
+add #6                          ; offset of end of CID
+jgt %x, fallback                ; if CID length goes past end of packet
+sub #1                          ; offset of thread id
+tax                             ; offset of thread id in X
+ldb [x + 0]
+ja mod_concurrency
+
+fallback:
+ld rxhash
+
+mod_concurrency:
+mod #0xabcdefff                 ; placeholder for Envoy concurrency
+ret a
+

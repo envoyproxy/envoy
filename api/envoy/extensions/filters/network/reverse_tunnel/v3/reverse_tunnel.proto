@@ -19,27 +19,98 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Reverse Tunnel Network Filter :ref:`configuration overview <config_network_filters_reverse_tunnel>`.
 // [#extension: envoy.filters.network.reverse_tunnel]
 
+// Validation configuration for reverse tunnel identifiers.
+// Validates the node ID and cluster ID extracted from reverse tunnel handshake headers
+// against expected values specified using format strings.
+message Validation {
+  // Format string to extract the expected node identifier for validation.
+  // The formatted value is compared against the ``x-envoy-reverse-tunnel-node-id`` header
+  // from the incoming handshake request. If they do not match, the connection is rejected
+  // with HTTP ``403 Forbidden``.
+  //
+  // Supports Envoy's :ref:`command operators <config_access_log_command_operators>`:
+  //
+  // * ``%DYNAMIC_METADATA(namespace:key)%``: Extract expected value from dynamic metadata.
+  // * ``%FILTER_STATE(key)%``: Extract expected value from filter state.
+  // * ``%DOWNSTREAM_REMOTE_ADDRESS%``: Use downstream connection IP address.
+  // * Plain strings: Use a static expected value.
+  //
+  // If empty, node ID validation is skipped.
+  //
+  // Example using dynamic metadata allowlist:
+  //
+  // .. code-block:: yaml
+  //
+  //    node_id_format: "%DYNAMIC_METADATA(envoy.reverse_tunnel.allowlist:expected_node_id)%"
+  //
+  string node_id_format = 1 [(validate.rules).string = {max_len: 1024}];
+
+  // Format string to extract the expected cluster identifier for validation.
+  // The formatted value is compared against the ``x-envoy-reverse-tunnel-cluster-id`` header
+  // from the incoming handshake request. If they do not match, the connection is rejected
+  // with HTTP ``403 Forbidden``.
+  //
+  // Supports the same :ref:`command operators <config_access_log_command_operators>` as
+  // ``node_id_format``.
+  //
+  // If empty, cluster ID validation is skipped.
+  //
+  // Example using filter state:
+  //
+  // .. code-block:: yaml
+  //
+  //    cluster_id_format: "%FILTER_STATE(expected_cluster_id)%"
+  //
+  string cluster_id_format = 2 [(validate.rules).string = {max_len: 1024}];
+
+  // Whether to emit validation results as dynamic metadata.
+  // When enabled, the filter emits metadata under the namespace specified by
+  // ``dynamic_metadata_namespace`` containing:
+  //
+  // * ``node_id``: The actual node ID from the handshake request.
+  // * ``cluster_id``: The actual cluster ID from the handshake request.
+  // * ``validation_result``: Either ``allowed`` or ``denied``.
+  //
+  // This metadata can be used by subsequent filters or for access logging.
+  // Defaults to ``false``.
+  bool emit_dynamic_metadata = 3;
+
+  // Namespace for emitted dynamic metadata when ``emit_dynamic_metadata`` is ``true``.
+  // If not specified, defaults to ``envoy.filters.network.reverse_tunnel``.
+  string dynamic_metadata_namespace = 4 [(validate.rules).string = {max_len: 255}];
+}
+
 // Configuration for the reverse tunnel network filter.
 // This filter handles reverse tunnel connection acceptance and rejection by processing
 // HTTP requests where required identification values are provided via HTTP headers.
+// [#next-free-field: 6]
 message ReverseTunnel {
   // Ping interval for health checks on established reverse tunnel connections.
-  // If not specified, defaults to 2 seconds.
+  // If not specified, defaults to ``2 seconds``.
   google.protobuf.Duration ping_interval = 1 [(validate.rules).duration = {
     lte {seconds: 300}
     gte {nanos: 1000000}
   }];
 
   // Whether to automatically close connections after processing reverse tunnel requests.
-  // When set to true, connections are closed after acceptance or rejection.
-  // When set to false, connections remain open for potential reuse. Defaults to false.
+  //
+  // * When set to ``true``, connections are closed after acceptance or rejection.
+  // * When set to ``false``, connections remain open for potential reuse.
+  //
+  // Defaults to ``false``.
   bool auto_close_connections = 2;
 
   // HTTP path to match for reverse tunnel requests.
-  // If not specified, defaults to "/reverse_connections/request".
+  // If not specified, defaults to ``/reverse_connections/request``.
   string request_path = 3 [(validate.rules).string = {min_len: 1 max_len: 255 ignore_empty: true}];
 
   // HTTP method to match for reverse tunnel requests.
   // If not specified (``METHOD_UNSPECIFIED``), this defaults to ``GET``.
   config.core.v3.RequestMethod request_method = 4 [(validate.rules).enum = {defined_only: true}];
+
+  // Optional validation configuration for node and cluster identifiers.
+  // If specified, the filter validates the ``x-envoy-reverse-tunnel-node-id`` and
+  // ``x-envoy-reverse-tunnel-cluster-id`` headers against expected values extracted
+  // using format strings. Requests that fail validation are rejected with HTTP ``403 Forbidden``.
+  Validation validation = 5;
 }
