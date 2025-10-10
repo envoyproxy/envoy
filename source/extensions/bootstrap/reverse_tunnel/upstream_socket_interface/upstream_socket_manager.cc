@@ -112,11 +112,11 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
     return nullptr;
   }
 
-  // Debugging: Print the number of free sockets on this worker thread
+  // Debugging: Print the number of free sockets on this worker thread.
   ENVOY_LOG(trace, "UpstreamSocketManager: found {} sockets for node: {}.",
             node_sockets_it->second.size(), node_id);
 
-  // Fetch the socket from the accepted_reverse_connections_ and remove it from the list
+  // Fetch the socket from the accepted_reverse_connections_ and remove it from the list.
   Network::ConnectionSocketPtr socket(std::move(node_sockets_it->second.front()));
   node_sockets_it->second.pop_front();
 
@@ -140,36 +140,29 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
 std::string UpstreamSocketManager::getNodeID(const std::string& key) {
   ENVOY_LOG(trace, "UpstreamSocketManager: getNodeID() called with key: {}.", key);
 
-  // First check if the key exists as a cluster ID by checking global stats
-  // This ensures we check across all threads, not just the current thread
-  if (auto extension = getUpstreamExtension()) {
-    // Check if any thread has sockets for this cluster by looking at global stats.
-    std::string cluster_stat_name = fmt::format("reverse_connections.clusters.{}", key);
-    auto& stats_store = extension->getStatsScope();
-    Stats::StatNameManagedStorage cluster_stat_name_storage(cluster_stat_name,
-                                                            stats_store.symbolTable());
-    auto& cluster_gauge = stats_store.gaugeFromStatName(cluster_stat_name_storage.statName(),
-                                                        Stats::Gauge::ImportMode::Accumulate);
-
-    if (cluster_gauge.value() > 0) {
-      // Key is a cluster ID with active connections, find a node from this cluster
-      auto cluster_nodes_it = cluster_to_node_map_.find(key);
-      if (cluster_nodes_it != cluster_to_node_map_.end() && !cluster_nodes_it->second.empty()) {
-        // Return a random existing node from this cluster
-        auto node_idx = random_generator_->random() % cluster_nodes_it->second.size();
-        std::string node_id = cluster_nodes_it->second[node_idx];
+  // Check if key exists as a cluster ID by looking at cluster_to_node_map_.
+  auto cluster_nodes_it = cluster_to_node_map_.find(key);
+  if (cluster_nodes_it != cluster_to_node_map_.end()) {
+    // Key is a cluster ID, find a node in this cluster with idle connections.
+    for (const std::string& node_id : cluster_nodes_it->second) {
+      auto node_sockets_it = accepted_reverse_connections_.find(node_id);
+      if (node_sockets_it != accepted_reverse_connections_.end() &&
+          !node_sockets_it->second.empty()) {
+        // Found a node in this cluster with idle connections.
         ENVOY_LOG(debug,
-                  "UpstreamSocketManager: key '{}' is a cluster ID with {} connections; returning "
-                  "random node {}.",
-                  key, cluster_gauge.value(), node_id);
+                  "UpstreamSocketManager: key '{}' is a cluster ID; returning node {} "
+                  "with {} idle connections.",
+                  key, node_id, node_sockets_it->second.size());
         return node_id;
       }
-      // If cluster has connections but no local mapping, assume key is a node ID
     }
+    ENVOY_LOG(debug,
+              "UpstreamSocketManager: key '{}' is a cluster ID but no nodes have "
+              "idle connections; returning as-is.",
+              key);
   }
 
-  // Key is not a cluster ID, has no connections, or has no local mapping
-  // Treat it as a node ID and return it directly
+  // Treat it as a node ID and return it directly.
   ENVOY_LOG(trace, "UpstreamSocketManager: key '{}' is a node ID; returning as-is.", key);
   return key;
 }
