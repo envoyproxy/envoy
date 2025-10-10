@@ -567,7 +567,7 @@ TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
     envoy::config::cluster::v3::Cluster::LeastRequestLbConfig legacy;
 
     Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
-                                                                                           legacy);
+                                                                                            legacy);
 
     EXPECT_FALSE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_FALSE(typed_config.lb_config_.has_slow_start_config());
@@ -592,7 +592,7 @@ TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
     common.mutable_locality_weighted_lb_config();
 
     Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
-                                                                                           legacy);
+                                                                                            legacy);
 
     EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_TRUE(typed_config.lb_config_.has_slow_start_config());
@@ -622,7 +622,7 @@ TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
     common.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
 
     Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
-                                                                                           legacy);
+                                                                                            legacy);
 
     EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_FALSE(typed_config.lb_config_.has_slow_start_config());
