@@ -2,11 +2,6 @@
 # lower case and title case (e.g. HTTP will accept http and Http). Entries in all lower case
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
-
-addrlen
-itr
-STREQ
-htonl
 ABI
 ACK
 ACL
@@ -401,7 +396,6 @@ RAII
 RANLUX
 RBAC
 RDN
-RDONLY
 RDS
 README
 RECVDSTADDR
@@ -665,7 +659,6 @@ circllhist
 clientcert
 cloneable
 cloneability
-CLOEXEC
 cmd
 cmsghdr
 codebase
@@ -1028,9 +1021,7 @@ mmap
 mmdb
 mmsg
 mmsghdr
-modularized
 mongo
-mountinfo
 moveable
 msec
 msg
@@ -1213,7 +1204,6 @@ readded
 readonly
 readv
 realloc
-reallocations
 rebalanced
 rebalancer
 rebalancing
@@ -1249,7 +1239,6 @@ reinitializations
 reinitialize
 reinitializes
 rele
-relatime
 releasor
 reloadable
 remoting
@@ -1422,7 +1411,6 @@ sys
 syscall
 syscalls
 sysctl
-systemd
 sysroot
 sz
 tchar
@@ -1595,7 +1583,3 @@ NXDOMAIN
 DNAT
 RSP
 EWMA
-CFS
-CPUSET
-TASKSET
-hw

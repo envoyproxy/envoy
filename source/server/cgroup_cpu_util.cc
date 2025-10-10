@@ -1,9 +1,10 @@
 // Container-aware CPU detection utility for Envoy
-// Inspired by Go's runtime cgroup CPU limit detection
+// Inspired by Go's runtime `cgroup` CPU limit detection
 // See: https://github.com/golang/go/blob/go1.23.4/src/internal/cgroup/cgroup_linux.go
 
 #include "source/server/cgroup_cpu_util.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "source/common/common/logger.h"
@@ -16,9 +17,9 @@
 
 namespace Envoy {
 
-// Returns the CPU limit from cgroup subsystem, following Go runtime behavior.
-// This function prioritizes cgroup v1 over v2 when both are available,
-// as v1 CPU controllers take precedence in hybrid environments.
+// Returns the CPU limit from `cgroup` subsystem, following Go runtime behavior.
+// This function prioritizes `cgroup` `v1` over `v2` when both are available,
+// as `v1` CPU controllers take precedence in hybrid environments.
 //
 // Return values:
 //   Valid uint32_t: Actual CPU limit (number of CPUs, rounded up)
@@ -27,7 +28,7 @@ absl::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs) {
   // Step 1: Mount Discovery - call once and reuse
   absl::optional<std::string> mount_opt = discoverCgroupMount(fs);
   if (!mount_opt.has_value()) {
-    // No cgroup filesystem found
+    // No `cgroup` filesystem found
     return absl::nullopt;
   }
   const std::string& mount_point = mount_opt.value();
@@ -35,7 +36,7 @@ absl::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs) {
   // Steps 2-3: Process Assignment + Path Construction
   absl::optional<CgroupInfo> cgroup_info_opt = constructCgroupPath(mount_point, fs);
   if (!cgroup_info_opt.has_value()) {
-    // No valid cgroup path found
+    // No valid `cgroup` path found
     return absl::nullopt;
   }
   const CgroupInfo& cgroup_info = cgroup_info_opt.value();
@@ -43,7 +44,7 @@ absl::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs) {
   // Step 4: File Access - append version-specific filenames and validate access
   absl::optional<CpuFiles> cpu_files_opt = accessCgroupFiles(cgroup_info, fs);
   if (!cpu_files_opt.has_value()) {
-    // File access failed - fallback to "no cgroup"
+    // File access failed - fallback to "no `cgroup`"
     return absl::nullopt;
   }
   const CpuFiles& cpu_files = cpu_files_opt.value();
@@ -55,13 +56,13 @@ absl::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs) {
     return absl::nullopt;
   }
 
-  // Convert float64 ratio to uint32_t CPU count (rounded up)
-  const uint32_t cpu_limit = static_cast<uint32_t>(std::ceil(cpu_ratio.value()));
+  // Convert float64 ratio to uint32_t CPU count (rounded down, minimum 1)
+  const uint32_t cpu_limit = std::max(1U, static_cast<uint32_t>(std::floor(cpu_ratio.value())));
   return cpu_limit;
 }
 
-// Validates cgroup file content following strict requirements.
-// This centralizes the validation logic used by both v1 and v2 cgroup file parsers.
+// Validates `cgroup` file content following strict requirements.
+// This centralizes the validation logic used by both `v1` and `v2` `cgroup` file parsers.
 //
 // Validation requirements:
 // - Newline requirement: Content must end with '\n'
@@ -71,7 +72,7 @@ absl::optional<absl::string_view>
 CgroupCpuUtil::validateCgroupFileContent(const std::string& content, const std::string& file_path) {
   // ✅ Newline Validation: Require trailing newline
   if (content.empty() || content.back() != '\n') {
-    ENVOY_LOG_MISC(warn, "Malformed cgroup file {}: missing trailing newline", file_path);
+    ENVOY_LOG_MISC(warn, "Malformed `cgroup` file {}: missing trailing newline", file_path);
     return absl::nullopt;
   }
 
@@ -79,24 +80,25 @@ CgroupCpuUtil::validateCgroupFileContent(const std::string& content, const std::
   return absl::string_view(content.data(), content.size() - 1);
 }
 
-// Parses /proc/self/cgroup to find the current process's cgroup path with priority handling.
+// Parses `/proc/self/cgroup` to find the current process's `cgroup` path with priority handling.
 //
 // File format (one line per hierarchy):
-//   cgroup v2: "0::/path/to/cgroup"
-//   cgroup v1: "N:controller,list:/path/to/cgroup"
+//   `cgroup` `v2`: "0::/path/to/cgroup"
+//   `cgroup` `v1`: "N:controller,list:/path/to/cgroup"
 //
 // Priority handling logic:
 //   - If hierarchy "0": Save v2 path, continue searching
 //   - If v1 hierarchy + containsCPU(): Return immediately (v1 wins)
 //   - Result: Single relative path + version with highest priority
 //
-// Returns CgroupPathInfo with relative path and version, or absl::nullopt if no suitable cgroup
+// Returns CgroupPathInfo with relative path and version, or absl::nullopt if no suitable `cgroup`
 // found.
 absl::optional<CgroupPathInfo> CgroupCpuUtil::getCurrentCgroupPath(Filesystem::Instance& fs) {
   const auto result = fs.fileReadToEnd(std::string(PROC_CGROUP_PATH));
   if (!result.ok()) {
-    // /proc/self/cgroup doesn't exist - not in a cgroup
-    ENVOY_LOG_MISC(warn, "Cannot read /proc/self/cgroup: not in a cgroup or file doesn't exist");
+    // `/proc/self/cgroup` doesn't exist - not in a `cgroup`
+    ENVOY_LOG_MISC(warn,
+                   "Cannot read `/proc/self/cgroup`: not in a `cgroup` or file doesn't exist");
     return absl::nullopt;
   }
 
@@ -501,7 +503,7 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
 // https://github.com/golang/go/blob/master/src/internal/runtime/cgroup/cgroup_linux.go
 std::string CgroupCpuUtil::unescapePath(const std::string& path) {
   std::string result;
-  result.reserve(path.length()); // Pre-allocate to avoid reallocations
+  result.reserve(path.length()); // Pre-allocate to avoid `reallocations`
 
   for (size_t i = 0; i < path.length(); ++i) {
     char c = path[i];
@@ -521,22 +523,34 @@ std::string CgroupCpuUtil::unescapePath(const std::string& path) {
       continue;
     }
 
-    // Parse three octal digits
-    unsigned char decoded = 0;
-    bool valid = true;
-
-    for (int j = 0; j < 3; ++j) {
-      char digit = path[i + 1 + j];
-      if (digit < '0' || digit > '9') {
-        // Not a valid octal digit
-        valid = false;
-        break;
-      }
-      decoded = decoded * 8 + (digit - '0');
+    // Parse three octal digits using `std::strtol`
+    // Extract exactly 3 characters after the backslash
+    if (i + 3 >= path.length()) {
+      // Not enough characters for complete octal sequence
+      ENVOY_LOG_MISC(warn, "Incomplete octal escape sequence in path '{}' at position {}", path, i);
+      result += c; // Keep the backslash as-is
+      continue;
     }
 
+    std::string octal_str = path.substr(i + 1, 3);
+
+    // Validate all characters are valid octal digits (0-7)
+    bool valid = std::all_of(octal_str.begin(), octal_str.end(),
+                             [](char c) { return c >= '0' && c <= '7'; });
+
     if (!valid) {
-      // Invalid escape sequence - not all octal digits
+      // Invalid octal digits found
+      ENVOY_LOG_MISC(warn, "Invalid octal escape sequence in path '{}' at position {}", path, i);
+      result += c; // Keep the backslash as-is
+      continue;
+    }
+
+    // Convert octal string to integer
+    char* end;
+    long decoded = std::strtol(octal_str.c_str(), &end, 8);
+
+    // Verify conversion was successful and complete
+    if (end != octal_str.c_str() + 3 || decoded > 255) {
       ENVOY_LOG_MISC(warn, "Invalid octal escape sequence in path '{}' at position {}", path, i);
       result += c; // Keep the backslash as-is
       continue;
@@ -554,8 +568,8 @@ std::string CgroupCpuUtil::unescapePath(const std::string& path) {
 // Format: mountID parentID major:minor root mountPoint options - fsType source superOptions
 //
 // Example lines:
-// 25 21 0:21 / /sys/fs/cgroup/cpu rw,relatime - cgroup cgroup rw,cpu
-// 26 21 0:22 / /sys/fs/cgroup cgroup2 rw,relatime - cgroup2 cgroup2 rw
+// 25 21 0:21 / /sys/fs/cgroup/cpu rw,`relatime` - cgroup cgroup rw,cpu
+// 26 21 0:22 / /sys/fs/cgroup cgroup2 rw,`relatime` - cgroup2 cgroup2 rw
 //
 // We extract field 5 (mount point) for cgroup/cgroup2 filesystem only.
 //

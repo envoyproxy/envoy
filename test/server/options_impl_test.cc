@@ -17,6 +17,8 @@
 #include "source/extensions/filters/http/buffer/buffer_filter.h"
 #include "source/server/options_impl.h"
 
+#include "absl/strings/ascii.h"
+
 #if defined(__linux__)
 #include <sched.h>
 #include "source/server/options_impl_platform_linux.h"
@@ -663,7 +665,7 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
 
 // Pure cgroup mock tests - use filesystem mocks to work on Linux
 TEST_F(OptionsImplPlatformLinuxTest, CgroupV2CpuLimit) {
-  // Test cgroup v2 CPU limit detection with modularized flow
+  // Test cgroup v2 CPU limit detection with ``modularized`` flow
   Filesystem::MockInstance mock_fs;
 
   // Step 1: Mock /proc/self/mountinfo for mount discovery (cgroup v2)
@@ -675,7 +677,7 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupV2CpuLimit) {
   EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
       .WillOnce(Return(std::string("0::/user.slice/user-1000.slice/session-1.scope")));
 
-  // Step 4 & 5: Mock v2 cpu.max file access - our modularized logic directly accesses v2 files
+  // Step 4 & 5: Mock v2 cpu.max file access - our `modularized` logic directly accesses v2 files
   // Based on version detection from /proc/self/cgroup, it goes straight to v2 files
   // CPU limit: 150ms quota, 100ms period = 1.5 CPUs
   EXPECT_CALL(mock_fs,
@@ -685,11 +687,11 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupV2CpuLimit) {
 
   absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 2); // max(1, ceil(1.5)) = max(1, 2) = 2
+  EXPECT_EQ(result.value(), 1); // max(1, floor(1.5)) = max(1, 1) = 1
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, CgroupV1CpuLimit) {
-  // Test cgroup v1 CPU limit detection with modularized flow
+  // Test cgroup v1 CPU limit detection with ``modularized`` flow
   Filesystem::MockInstance mock_fs;
 
   // Step 1: Mock /proc/self/mountinfo for mount discovery (cgroup v1 with CPU controller)
@@ -701,7 +703,7 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupV1CpuLimit) {
   EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
       .WillOnce(Return(std::string("2:cpu:/docker/container123")));
 
-  // Step 4 & 5: Mock v1 file access - our modularized logic directly accesses v1 files
+  // Step 4 & 5: Mock v1 file access - our ``modularized`` logic directly accesses v1 files
   // Based on version detection from /proc/self/cgroup, it goes straight to v1 files
   // v1 files: 50ms quota, 100ms period = 0.5 CPUs
   EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/docker/container123/cpu.cfs_quota_us"))
@@ -713,11 +715,11 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupV1CpuLimit) {
 
   absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 1); // max(1, ceil(0.5)) = max(1, 1) = 1
+  EXPECT_EQ(result.value(), 1); // max(1, floor(0.5)) = max(1, 0) = 1
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, CgroupUnlimited) {
-  // Test when cgroup shows unlimited CPU with modularized flow
+  // Test when cgroup shows unlimited CPU with ``modularized`` flow
   Filesystem::MockInstance mock_fs;
 
   // Step 1: Mock /proc/self/mountinfo for mount discovery (cgroup v2)
@@ -729,7 +731,7 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupUnlimited) {
   EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
       .WillOnce(Return(std::string("0::/system.slice")));
 
-  // Step 4 & 5: Mock v2 cpu.max file access - our modularized logic directly accesses v2 files
+  // Step 4 & 5: Mock v2 cpu.max file access - our `modularized` logic directly accesses v2 files
   // Based on version detection from /proc/self/cgroup, it goes straight to v2 files
   // Unlimited CPU: "max" indicates no limit
   EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/system.slice/cpu.max"))
@@ -788,7 +790,7 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupMinimumEnforcement) {
   EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
       .WillOnce(Return(std::string("0::/user.slice/user-1000.slice")));
 
-  // Step 4 & 5: Mock v2 cpu.max file access - our modularized logic directly accesses v2 files
+  // Step 4 & 5: Mock v2 cpu.max file access - our `modularized` logic directly accesses v2 files
   // Based on version detection from /proc/self/cgroup, it goes straight to v2 files
   // Very low CPU limit: 10ms quota, 100ms period = 0.1 CPUs
   EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/user.slice/user-1000.slice/cpu.max"))
@@ -797,17 +799,17 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupMinimumEnforcement) {
 
   absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 1); // max(1, ceil(0.1)) = max(1, 1) = 1
+  EXPECT_EQ(result.value(), 1); // max(1, floor(0.1)) = max(1, 0) = 1
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, CgroupHybridSystemdV1ActiveV2Tracking) {
-  // Test hybrid systemd setup: both v1 and v2 mounted, but v1 controls resources
-  // This is common in systemd environments where v2 is used for process tracking
+  // Test hybrid `systemd` setup: both v1 and v2 mounted, but v1 controls resources
+  // This is common in `systemd` environments where v2 is used for process tracking
   // while v1 controllers (cpu, memory, etc.) still manage actual resource limits
   Filesystem::MockInstance mock_fs;
 
   // Step 1: Mock /proc/self/mountinfo showing BOTH cgroup v1 and v2 mounts
-  // This simulates a systemd hybrid setup where both versions coexist
+  // This simulates a `systemd` hybrid setup where both versions coexist
   EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/mountinfo"))
       .WillOnce(Return(std::string(
           "25 21 0:21 / /sys/fs/cgroup/cpu rw,relatime - cgroup cgroup rw,cpu\n"
@@ -821,7 +823,7 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupHybridSystemdV1ActiveV2Tracking) {
       .WillOnce(Return(std::string("2:cpu:/docker/container123\n"
                                    "0::/user.slice/user-1000.slice/session-1.scope\n")));
 
-  // Step 3: Our modularized logic should prioritize v1 when both are available
+  // Step 3: Our `modularized` logic should prioritize v1 when both are available
   // Based on getCurrentCgroupPath(), it should detect v1 and use those files
   // Mock v1 CPU files: 200ms quota, 100ms period = 2.0 CPUs
   EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/docker/container123/cpu.cfs_quota_us"))
@@ -832,13 +834,12 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupHybridSystemdV1ActiveV2Tracking) {
       .WillOnce(Return(std::string("100000\n")));
 
   // Note: v2 files should NOT be accessed since v1 takes priority
-  // The v2 hierarchy exists but is only used for systemd process tracking
+  // The v2 hierarchy exists but is only used for `systemd` process tracking
 
   absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 2); // Uses v1 limit: max(1, ceil(2.0)) = max(1, 2) = 2
+  EXPECT_EQ(result.value(), 2); // Uses v1 limit: max(1, floor(2.0)) = max(1, 2) = 2
 }
-
 #endif
 
 class TestFactory : public Config::TypedFactory {

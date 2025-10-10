@@ -423,11 +423,11 @@ TEST_F(CgroupCpuUtilTest, ValidateCgroupFileContent_Empty) {
 }
 
 // =============================================================================
-// Tests for our new modularized functions
+// Tests for our new `modularized` functions
 // =============================================================================
 
 // =============================================================================
-// Test: accessCgroupV1Files (modularized file access for v1)
+// Test: accessCgroupV1Files (`modularized` file access for v1)
 // =============================================================================
 
 TEST_F(CgroupCpuUtilTest, AccessCgroupV1Files_Success) {
@@ -484,7 +484,7 @@ TEST_F(CgroupCpuUtilTest, AccessCgroupV1Files_BothFilesMissing) {
 }
 
 // =============================================================================
-// Test: accessCgroupV2Files (modularized file access for v2)
+// Test: accessCgroupV2Files (`modularized` file access for v2)
 // =============================================================================
 
 TEST_F(CgroupCpuUtilTest, AccessCgroupV2Files_Success) {
@@ -528,7 +528,7 @@ TEST_F(CgroupCpuUtilTest, AccessCgroupV2Files_UnlimitedContent) {
 }
 
 // =============================================================================
-// Test: readActualLimitsV1 (modularized parsing for v1)
+// Test: readActualLimitsV1 (`modularized` parsing for v1)
 // =============================================================================
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_Success) {
@@ -622,7 +622,7 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_WhitespaceHandling) {
 }
 
 // =============================================================================
-// Test: readActualLimitsV2 (modularized parsing for v2)
+// Test: readActualLimitsV2 (`modularized` parsing for v2)
 // =============================================================================
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_Success) {
