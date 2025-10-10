@@ -91,6 +91,7 @@ public:
 
   // Helper method to set up upstream extension.
   void setupUpstreamExtension() {
+    upstream_config_.set_stat_prefix("reverse_connections");
     // Create the upstream socket interface and extension.
     upstream_socket_interface_ =
         std::make_unique<ReverseConnection::ReverseTunnelAcceptor>(context_);
