@@ -1862,6 +1862,13 @@ envoy.load_balancing_policies.override_host:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
+envoy.load_balancing_policies.wrr_locality:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.wrr_locality.v3.WrrLocality
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation

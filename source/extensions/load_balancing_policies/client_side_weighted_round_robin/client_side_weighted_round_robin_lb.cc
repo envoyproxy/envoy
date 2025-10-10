@@ -257,9 +257,15 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::
 
 Upstream::LoadBalancerPtr ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::create(
     Upstream::LoadBalancerParams params) {
+  return createWithCommonLbConfig(cluster_info_.lbConfig(), params);
+}
+
+Upstream::LoadBalancerPtr
+ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::createWithCommonLbConfig(
+    const CommonLbConfig& common_lb_config, Upstream::LoadBalancerParams params) {
   return std::make_unique<Upstream::ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
       params.priority_set, params.local_priority_set, cluster_info_.lbStats(), runtime_, random_,
-      cluster_info_.lbConfig(), time_source_, tls_->get());
+      common_lb_config, time_source_, tls_->get());
 }
 
 void ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::applyWeightsToAllWorkers() {
