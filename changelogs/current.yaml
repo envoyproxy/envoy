@@ -621,5 +621,10 @@ new_features:
     is particularly useful when downstream instances are behind NATs, firewalls, or in private networks. The
     feature is experimental and under active development, but is ready for experimental use. See
     :ref:`reverse tunnel overview <overview_reverse_tunnel>` for details.
+- area: quic
+  change: |
+    Add a new quic configuration field, 'max_sessions_per_event_loop', to QuicProtocolOptions in Envoy listener.
+    This allows tuning the maximum number of new QUIC sessions created within a single event loop.
+    The default value is 16, preserving the previous hardcoded limit.
 
 deprecated:

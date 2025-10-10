@@ -102,6 +102,7 @@ private:
   // During hot restart, an optional handler for packets that weren't for existing connections.
   OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
   Network::IoHandle::UdpSaveCmsgConfig udp_save_cmsg_config_;
+  uint32_t max_sessions_per_event_loop_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

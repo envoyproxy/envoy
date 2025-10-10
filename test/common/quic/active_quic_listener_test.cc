@@ -107,6 +107,10 @@ public:
   static bool enabled(ActiveQuicListener& listener) { return listener.enabled_->enabled(); }
 
   static Network::Socket& socket(ActiveQuicListener& listener) { return listener.listen_socket_; }
+
+  static uint32_t getMaxSessionsPerEventLoop(ActiveQuicListener& listener) {
+    return listener.max_sessions_per_event_loop_;
+  }
 };
 
 class ActiveQuicListenerFactoryPeer {
@@ -673,6 +677,25 @@ TEST_P(ActiveQuicListenerTest, EcnReportingDualStack) {
   ASSERT(connection != nullptr);
   const quic::QuicConnectionStats& stats = connection->GetStats();
   EXPECT_EQ(stats.num_ecn_marks_received.ect1, 1);
+}
+
+TEST_P(ActiveQuicListenerTest, MaxSessionsPerEventLoopNotConfigured) {
+  initialize();
+  const uint32_t max_sessions_per_event_loop_for_test =
+      ActiveQuicListener::kNumSessionsToCreatePerLoop;
+  EXPECT_EQ(max_sessions_per_event_loop_for_test,
+            ActiveQuicListenerPeer::getMaxSessionsPerEventLoop(*quic_listener_));
+}
+
+TEST_P(ActiveQuicListenerTest, MaxSessionsPerEventLoopConfigured) {
+  const uint32_t max_sessions_per_event_loop = 2;
+  envoy::config::listener::v3::UdpListenerConfig udp_listener_config;
+  udp_listener_config.mutable_quic_options()->mutable_max_sessions_per_event_loop()->set_value(
+      max_sessions_per_event_loop);
+  ON_CALL(udp_listener_config_, config()).WillByDefault(ReturnRef(udp_listener_config));
+  initialize();
+  EXPECT_EQ(max_sessions_per_event_loop,
+            ActiveQuicListenerPeer::getMaxSessionsPerEventLoop(*quic_listener_));
 }
 
 class ActiveQuicListenerEmptyFlagConfigTest : public ActiveQuicListenerTest {
