@@ -31,7 +31,8 @@ using PerRouteProtoConfig =
 #define ALL_STATEFUL_SESSION_FILTER_STATS(COUNTER)                                                 \
   COUNTER(routed)                                                                                  \
   COUNTER(failed_open)                                                                             \
-  COUNTER(failed_closed)
+  COUNTER(failed_closed)                                                                           \
+  COUNTER(no_session)
 
 /**
  * Wrapper struct for Stateful Session filter stats. @see stats_macros.h
@@ -103,6 +104,11 @@ private:
   void markFailedOpen() {
     if (auto stats = effective_config_->stats(); stats.has_value()) {
       stats->failed_open_.inc();
+    }
+  }
+  void markNoSession() {
+    if (auto stats = effective_config_->stats(); stats.has_value()) {
+      stats->no_session_.inc();
     }
   }
 
