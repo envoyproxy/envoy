@@ -8,6 +8,17 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dependency
+  change: |
+    Resolve dependency CVEs:
+
+    - CVE-2025-0725: curl
+    - CVE-2024-7246: gRPC
+    - CVE-2024-11407: gRPC
+    - CVE-2025-27817: kafka
+    - CVE-2025-27818: kafka
+    - CVE-2024-51745: wasmtime
+    - CVE-2025-53901: wasmtime.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
