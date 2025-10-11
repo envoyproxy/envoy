@@ -1,6 +1,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
 #include <string>
+#include <algorithm>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
@@ -521,6 +522,13 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   if (ping_timer_) {
     ping_timer_->disableTimer();
     ping_timer_.reset();
+  }
+
+  // Remove this instance from the global socket managers list.
+  absl::WriterMutexLock lock(&UpstreamSocketManager::socket_manager_lock);
+  auto it = std::find(socket_managers_.begin(), socket_managers_.end(), this);
+  if (it != socket_managers_.end()) {
+    socket_managers_.erase(it);
   }
 }
 
