@@ -192,7 +192,8 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamWithServerReset) {
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
-  // Compliant gRPC server will reset the stream if it half-closes before the client.
+  // Compliant gRPC server can reset the stream gracefully with NO_ERROR if it half-closes before
+  // the client.
   stream->sendServerReset();
   dispatcher_helper_.runDispatcher();
 
