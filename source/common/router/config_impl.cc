@@ -447,12 +447,13 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         return vec;
       }()),
       filter_state_([&]() {
-        std::vector<Envoy::Matchers::FilterStateMatcherPtr> vec;
+        std::vector<Envoy::Matchers::FilterStateMatcher> vec;
+        vec.reserve(route.match().filter_state().size());
         for (const auto& elt : route.match().filter_state()) {
           Envoy::Matchers::FilterStateMatcherPtr match = THROW_OR_RETURN_VALUE(
               Envoy::Matchers::FilterStateMatcher::create(elt, factory_context),
               Envoy::Matchers::FilterStateMatcherPtr);
-          vec.push_back(std::move(match));
+          vec.emplace_back(std::move(*match));
         }
         return vec;
       }()),
@@ -773,7 +774,7 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
       // No need to check anymore as all filter state matchers must match for a match to occur.
       break;
     }
-    matches &= m->match(stream_info.filterState());
+    matches &= m.match(stream_info.filterState());
   }
 
   return matches;
