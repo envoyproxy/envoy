@@ -94,6 +94,24 @@ TEST(FixedHeapMonitorTest, ComputeUsageWithRealMemoryStats) {
   monitor->updateResourceUsage(resource);
   EXPECT_NEAR(resource.pressure(), expected_usage, 0.0005);
 }
+
+TEST(FixedHeapMonitorTest, ComputesUsageRuntimeUseAllocatedWithRealMemoryStats) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.fixed_heap_use_allocated", "true"}});
+
+  envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
+  const uint64_t max_heap = 1024 * 1024 * 1024;
+  config.set_max_heap_size_bytes(max_heap);
+  auto stats_reader = std::make_unique<MemoryStatsReader>();
+  const double expected_pressure =
+      stats_reader->allocatedHeapBytes() / static_cast<double>(max_heap);
+  auto monitor = std::make_unique<FixedHeapMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  EXPECT_NEAR(resource.pressure(), expected_pressure, 0.0005);
+}
+
 } // namespace
 } // namespace FixedHeapMonitor
 } // namespace ResourceMonitors

@@ -599,10 +599,10 @@ new_features:
     :ref:`reverse tunnel overview <overview_reverse_tunnel>` for details.
 - area: overload management
   change: |
-    The fixed heap resource monitor now supports calculating memory pressure as the ratio of currently allocated memory
-    to the configured maximum heap size. This method gives more accurate and lower memory pressure values and can avoid
-    unnecessary load shedding.
-    To enable this behavior, set ``envoy.reloadable_features.fixed_heap_use_allocated`` to true.
-    By default, the previous method for calculating used memory is applied: heap_size - pageheap_unmapped - pageheap_free.
+    The fixed heap resource monitor can now calculate memory pressure as currently allocated memory divided by maximum heap size,
+    giving more accurate and lower memory pressure values.
+    This can avoid unnecessary load shedding or overload actions.
+    To enable, set ``envoy.reloadable_features.fixed_heap_use_allocated`` to true.
+    The default algorithm (heap_size - pageheap_unmapped - pageheap_free) does not discount for free memory in TCMalloc caches.
 
 deprecated:
