@@ -458,3 +458,20 @@ envoy_cc_fuzz_test(
         "//test/mocks/http:http_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "quic_ssl_connection_info_test",
+    srcs = envoy_select_enable_http3(["quic_ssl_connection_info_test.cc"]),
+    data = [
+        "//test/config/integration/certs",
+    ],
+    rbe_pool = "6gig",
+    deps = envoy_select_enable_http3([
+        "//source/common/quic:quic_ssl_connection_info_lib",
+        "//source/common/tls:utility_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/http:utility_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ]),
+)
