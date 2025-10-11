@@ -160,7 +160,8 @@ private:
   // Map of node ID to cluster.
   absl::flat_hash_map<std::string, std::string> node_to_cluster_map_;
 
-  // Map of cluster IDs to node IDs.
+  // Map of cluster IDs to node IDs for node ID that have idle sockets (sockets that have not seen
+  // data requests).
   absl::flat_hash_map<std::string, std::vector<std::string>> cluster_to_node_map_;
 
   // File events and timers for ping functionality.
@@ -184,7 +185,7 @@ private:
   // connections to a different worker thread.
   absl::flat_hash_map<std::string, int> node_to_conn_count_map_;
 
-  // Global list of all socket managers across threads for rebalancing
+  // Global list of all socket managers across threads for rebalancing.
   static std::vector<UpstreamSocketManager*> socket_managers_;
   static absl::Mutex socket_manager_lock;
 };
