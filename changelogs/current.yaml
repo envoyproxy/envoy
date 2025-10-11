@@ -460,18 +460,17 @@ new_features:
     authorization service.
 - area: ext_authz
   change: |
-<<<<<<< HEAD
     Added support for retry policy in the ``ext_authz`` HTTP filter. The filter now supports
     :ref:`retry_policy <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.HttpService.retry_policy>`
     configuration for HTTP authorization servers. When configured, failed requests to the authorization server
     will be automatically retried according to the specified policy.
-=======
+- area: ext_authz
+  change: |
     Added
     :ref:`max_denied_response_body_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.max_denied_response_body_bytes>`
     to the ``ext_authz`` HTTP filter. This allows configuring the maximum size of the response body
     returned to the downstream client when a request is denied by the external authorization service.
     If the authorization server returns a response body larger than this limit, it will be truncated.
->>>>>>> 7b0712da4c00a6de694906dd997a8399f4a35c52
 - area: ext_proc
   change: |
     Added :ref:`status_on_error <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.status_on_error>`
