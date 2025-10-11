@@ -82,7 +82,7 @@ bool ReverseTunnelAcceptor::ipFamilySupported(int domain) {
   return domain == AF_INET || domain == AF_INET6;
 }
 
-// Get thread local registry for the current thread
+// Get thread local registry for the current thread.
 UpstreamSocketThreadLocal* ReverseTunnelAcceptor::getLocalRegistry() const {
   if (extension_) {
     return extension_->getLocalRegistry();

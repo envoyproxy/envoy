@@ -35,10 +35,9 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
                                                      Stats::Scope&)
     : IoSocketHandleImpl(fd), config_(config), cluster_manager_(cluster_manager),
       extension_(extension), original_socket_fd_(fd) {
-  ENVOY_LOG_MISC(
-      debug,
-      "Created ReverseConnectionIOHandle: fd={}, src_node={}, src_cluster: {}, num_clusters={}",
-      fd_, config_.src_node_id, config_.src_cluster_id, config_.remote_clusters.size());
+  ENVOY_LOG_MISC(debug,
+                 "Created reverse_tunnel: fd={}, src_node={}, src_cluster: {}, num_clusters={}",
+                 fd_, config_.src_node_id, config_.src_cluster_id, config_.remote_clusters.size());
 }
 
 ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
@@ -51,7 +50,7 @@ void ReverseConnectionIOHandle::cleanup() {
 
   // Clean up pipe trigger mechanism first to prevent use-after-free.
   ENVOY_LOG_MISC(trace,
-                 "ReverseConnectionIOHandle: cleaning up trigger pipe; "
+                 "reverse_tunnel: cleaning up trigger pipe; "
                  "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
                  trigger_pipe_write_fd_, trigger_pipe_read_fd_);
   if (trigger_pipe_write_fd_ >= 0) {
@@ -65,7 +64,7 @@ void ReverseConnectionIOHandle::cleanup() {
 
   // Cancel the retry timer safely.
   if (rev_conn_retry_timer_ && rev_conn_retry_timer_->enabled()) {
-    ENVOY_LOG_MISC(trace, "ReverseConnectionIOHandle: cancelling and resetting retry timer.");
+    ENVOY_LOG_MISC(trace, "reverse_tunnel: cancelling and resetting retry timer.");
     rev_conn_retry_timer_.reset();
   }
 
@@ -102,8 +101,7 @@ void ReverseConnectionIOHandle::cleanup() {
 
   // Clear established connections queue safely.
   size_t queue_size = established_connections_.size();
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: Cleaning up {} established connections.",
-            queue_size);
+  ENVOY_LOG(debug, "reverse_tunnel: Cleaning up {} established connections.", queue_size);
 
   while (!established_connections_.empty()) {
     auto connection = std::move(established_connections_.front());
@@ -119,9 +117,9 @@ void ReverseConnectionIOHandle::cleanup() {
       }
     }
   }
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: Completed established connections cleanup.");
+  ENVOY_LOG(debug, "reverse_tunnel: Completed established connections cleanup.");
 
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: Completed cleanup of reverse connection resources.");
+  ENVOY_LOG(debug, "reverse_tunnel: Completed cleanup of reverse connection resources.");
 }
 
 Api::SysCallIntResult ReverseConnectionIOHandle::listen(int) {
@@ -140,12 +138,12 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
             dispatcher.name(), fd_);
 
   if (is_reverse_conn_started_) {
-    ENVOY_LOG(debug, "ReverseConnectionIOHandle: Skipping initializeFileEvent() call because "
+    ENVOY_LOG(debug, "reverse_tunnel: Skipping initializeFileEvent() call because "
                      "reverse connections are already started");
     return;
   }
 
-  ENVOY_LOG(info, "ReverseConnectionIOHandle: Starting reverse connections on worker thread '{}'",
+  ENVOY_LOG(info, "reverse_tunnel: Starting reverse connections on worker thread '{}'",
             dispatcher.name());
 
   // Store worker dispatcher
@@ -160,7 +158,7 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
     }
   }
 
-  // CRITICAL: Replace the monitored FD with pipe read FD
+  // Replace the monitored FD with pipe read FD
   // This must happen before any event registration.
   int trigger_fd = getPipeMonitorFd();
   if (trigger_fd != -1) {
@@ -168,7 +166,7 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
     fd_ = trigger_fd;
   }
 
-  // Initialize reverse connections on worker thread
+  // Initialize reverse connections on worker thread.
   if (!rev_conn_retry_timer_) {
     rev_conn_retry_timer_ = dispatcher.createTimer([this]() {
       ENVOY_LOG(debug, "Reverse connection timer triggered on worker thread");
@@ -178,26 +176,25 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
   }
 
   is_reverse_conn_started_ = true;
-  ENVOY_LOG(info, "ReverseConnectionIOHandle: Reverse connections started on thread '{}'",
-            dispatcher.name());
+  ENVOY_LOG(info, "reverse_tunnel: Reverse connections started on thread '{}'", dispatcher.name());
 
-  // Call parent implementation
+  // Call parent implementation.
   IoSocketHandleImpl::initializeFileEvent(dispatcher, cb, trigger, events);
 }
 
 Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* addr,
                                                               socklen_t* addrlen) {
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: accept() called");
+  ENVOY_LOG(debug, "reverse_tunnel: accept() called");
   if (isTriggerPipeReady()) {
     char trigger_byte;
     ssize_t bytes_read = ::read(trigger_pipe_read_fd_, &trigger_byte, 1);
     if (bytes_read == 1) {
-      ENVOY_LOG(debug, "ReverseConnectionIOHandle: received trigger, processing connection.");
+      ENVOY_LOG(debug, "reverse_tunnel: received trigger, processing connection.");
       // When a connection is established, a byte is written to the trigger_pipe_write_fd_ and the
       // connection is inserted into the established_connections_ queue. The last connection in the
       // queue is therefore the one that got established last.
       if (!established_connections_.empty()) {
-        ENVOY_LOG(debug, "ReverseConnectionIOHandle: getting connection from queue.");
+        ENVOY_LOG(debug, "reverse_tunnel: getting connection from queue.");
         auto connection = std::move(established_connections_.front());
         established_connections_.pop();
         // Fill in address information for the reverse tunnel "client".
@@ -206,7 +203,7 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
           const auto& remote_addr = connection->connectionInfoProvider().remoteAddress();
 
           if (remote_addr) {
-            ENVOY_LOG(debug, "ReverseConnectionIOHandle: using actual client address: {}",
+            ENVOY_LOG(debug, "reverse_tunnel: using actual client address: {}",
                       remote_addr->asString());
             const sockaddr* sock_addr = remote_addr->sockAddr();
             socklen_t addr_len = remote_addr->sockAddrLen();
@@ -214,8 +211,7 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
             if (*addrlen >= addr_len) {
               memcpy(addr, sock_addr, addr_len); // NOLINT(safe-memcpy)
               *addrlen = addr_len;
-              ENVOY_LOG(trace, "ReverseConnectionIOHandle: copied {} bytes of address data",
-                        addr_len);
+              ENVOY_LOG(trace, "reverse_tunnel: copied {} bytes of address data", addr_len);
             } else {
               ENVOY_LOG(warn,
                         "ReverseConnectionIOHandle::accept() - buffer too small for address: "
@@ -224,9 +220,9 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
               *addrlen = addr_len; // Still set the required length
             }
           } else {
-            ENVOY_LOG(warn, "ReverseConnectionIOHandle: no remote address available, "
+            ENVOY_LOG(warn, "reverse_tunnel: no remote address available, "
                             "using synthetic localhost address");
-            // Fallback to synthetic address only when remote address is unavailable
+            // Fallback to synthetic address only when remote address is unavailable.
             auto synthetic_addr =
                 std::make_shared<Envoy::Network::Address::Ipv4Instance>("127.0.0.1", 0);
             const sockaddr* sock_addr = synthetic_addr->sockAddr();
@@ -235,7 +231,7 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
               memcpy(addr, sock_addr, addr_len); // NOLINT(safe-memcpy)
               *addrlen = addr_len;
             } else {
-              ENVOY_LOG(error, "ReverseConnectionIOHandle: buffer too small for synthetic address");
+              ENVOY_LOG(error, "reverse_tunnel: buffer too small for synthetic address");
               *addrlen = addr_len;
             }
           }
@@ -243,7 +239,7 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
 
         const std::string connection_key =
             connection->connectionInfoProvider().localAddress()->asString();
-        ENVOY_LOG(debug, "ReverseConnectionIOHandle: got connection key: {}", connection_key);
+        ENVOY_LOG(debug, "reverse_tunnel: got connection key: {}", connection_key);
 
         // Instead of moving the socket, duplicate the file descriptor.
         const Network::ConnectionSocketPtr& original_socket = connection->getSocket();
@@ -261,8 +257,7 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
 
         os_fd_t original_fd = original_socket->ioHandle().fdDoNotUse();
         os_fd_t duplicated_fd = duplicated_handle->fdDoNotUse();
-        ENVOY_LOG(debug,
-                  "ReverseConnectionIOHandle: duplicated fd: original_fd={}, duplicated_fd={}",
+        ENVOY_LOG(debug, "reverse_tunnel: duplicated fd: original_fd={}, duplicated_fd={}",
                   original_fd, duplicated_fd);
 
         // Create a new socket with the duplicated handle.
@@ -280,7 +275,7 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         auto io_handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
             std::move(duplicated_socket), this, connection_key);
 
-        ENVOY_LOG(debug, "ReverseConnectionIOHandle: RAII IoHandle created with duplicated socket "
+        ENVOY_LOG(debug, "reverse_tunnel: RAII IoHandle created with duplicated socket "
                          "and protection enabled.");
 
         // Reset file events on the original socket to prevent any pending operations. The socket
@@ -294,15 +289,14 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         // Close the original connection.
         connection->close(Network::ConnectionCloseType::NoFlush);
 
-        ENVOY_LOG(debug, "ReverseConnectionIOHandle: returning io_handle.");
+        ENVOY_LOG(debug, "reverse_tunnel: returning io_handle.");
         return io_handle;
       }
     } else if (bytes_read == 0) {
-      ENVOY_LOG(debug, "ReverseConnectionIOHandle: trigger pipe closed.");
+      ENVOY_LOG(debug, "reverse_tunnel: trigger pipe closed.");
       return nullptr;
     } else if (bytes_read == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-      ENVOY_LOG(error, "ReverseConnectionIOHandle: error reading from trigger pipe: {}",
-                errorDetails(errno));
+      ENVOY_LOG(error, "reverse_tunnel: error reading from trigger pipe: {}", errorDetails(errno));
       return nullptr;
     }
   }
@@ -335,7 +329,7 @@ ReverseConnectionIOHandle::connect(Envoy::Network::Address::InstanceConstSharedP
 // Individual reverse connections initiated by this ReverseConnectionIOHandle are managed via
 // DownstreamReverseConnectionIOHandle RAII ownership.
 Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
-  ENVOY_LOG(error, "ReverseConnectionIOHandle: performing graceful shutdown.");
+  ENVOY_LOG(error, "reverse_tunnel: performing graceful shutdown.");
 
   // Clean up original socket FD
   if (original_socket_fd_ != -1) {
@@ -362,7 +356,7 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
 void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
   // This is called when connection events occur.
   // For reverse connections, we handle these events through RCConnectionWrapper.
-  ENVOY_LOG(trace, "ReverseConnectionIOHandle: event: {}", static_cast<int>(event));
+  ENVOY_LOG(trace, "reverse_tunnel: event: {}", static_cast<int>(event));
 }
 
 int ReverseConnectionIOHandle::getPipeMonitorFd() const { return trigger_pipe_read_fd_; }
@@ -384,7 +378,7 @@ TimeSource& ReverseConnectionIOHandle::getTimeSource() const {
 
   // This should not happen in production. Assert to ensure proper initialization.
   ENVOY_BUG(false, "No time source available. dispatcher not properly initialized");
-  PANIC("ReverseConnectionIOHandle: No valid time source available");
+  PANIC("reverse_tunnel: No valid time source available");
 }
 
 // Use the thread-local registry to get the dispatcher.
@@ -394,8 +388,7 @@ Event::Dispatcher& ReverseConnectionIOHandle::getThreadLocalDispatcher() const {
 
   if (local_registry) {
     // Return the dispatcher from the thread-local registry.
-    ENVOY_LOG(debug, "ReverseConnectionIOHandle: dispatcher: {}",
-              local_registry->dispatcher().name());
+    ENVOY_LOG(debug, "reverse_tunnel: dispatcher: {}", local_registry->dispatcher().name());
     return local_registry->dispatcher();
   }
 
@@ -431,7 +424,7 @@ void ReverseConnectionIOHandle::maybeUpdateHostsMappingsAndConnections(
     }
     ENVOY_LOG(debug, "Adding remote host {} to cluster {}", host, cluster_id);
 
-    // Update or create host info
+    // Update or create host info.
     auto host_it = host_to_conn_info_map_.find(host);
     if (host_it == host_to_conn_info_map_.end()) {
       // Create host entry on-demand to avoid race conditions during host registration.
@@ -455,8 +448,8 @@ void ReverseConnectionIOHandle::maybeUpdateHostsMappingsAndConnections(
     }
   }
   cluster_to_resolved_hosts_map_[cluster_id] = new_hosts;
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: Removing {} remote hosts from cluster {}",
-            removed_hosts.size(), cluster_id);
+  ENVOY_LOG(debug, "reverse_tunnel: Removing {} remote hosts from cluster {}", removed_hosts.size(),
+            cluster_id);
 
   // Remove the hosts present in removed_hosts.
   for (const std::string& host : removed_hosts) {
@@ -466,7 +459,7 @@ void ReverseConnectionIOHandle::maybeUpdateHostsMappingsAndConnections(
 }
 
 void ReverseConnectionIOHandle::removeStaleHostAndCloseConnections(const std::string& host) {
-  ENVOY_LOG(info, "ReverseConnectionIOHandle: Removing all connections to remote host {}", host);
+  ENVOY_LOG(info, "reverse_tunnel: Removing all connections to remote host {}", host);
   // Find all wrappers for this host. Each wrapper represents a reverse connection to the host.
   std::vector<RCConnectionWrapper*> wrappers_to_remove;
   for (const auto& [wrapper, mapped_host] : conn_wrapper_to_host_map_) {
@@ -505,7 +498,7 @@ void ReverseConnectionIOHandle::removeStaleHostAndCloseConnections(const std::st
 void ReverseConnectionIOHandle::maintainClusterConnections(
     const std::string& cluster_name, const RemoteClusterConnectionConfig& cluster_config) {
   ENVOY_LOG(debug,
-            "ReverseConnectionIOHandle: Maintaining connections for cluster: {} with {} requested "
+            "reverse_tunnel: Maintaining connections for cluster: {} with {} requested "
             "connections per host",
             cluster_name, cluster_config.reverse_connection_count);
 
@@ -542,10 +535,8 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
 
   // Create connections to each host in the cluster.
   for (const auto& [host_address, host] : *host_map_ptr) {
-    ENVOY_LOG(
-        debug,
-        "ReverseConnectionIOHandle: Checking reverse connection count for host {} of cluster {}",
-        host_address, cluster_name);
+    ENVOY_LOG(debug, "reverse_tunnel: Checking reverse connection count for host {} of cluster {}",
+              host_address, cluster_name);
 
     // Ensure HostConnectionInfo exists for this host, handling internal addresses consistently.
     const std::string key = host_address;
@@ -568,8 +559,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
 
     // Check if we should attempt connection to this host (backoff logic).
     if (!shouldAttemptConnectionToHost(host_address, cluster_name)) {
-      ENVOY_LOG(debug,
-                "ReverseConnectionIOHandle: Skipping connection attempt to host {} due to backoff",
+      ENVOY_LOG(debug, "reverse_tunnel: Skipping connection attempt to host {} due to backoff",
                 host_address);
       continue;
     }
@@ -577,15 +567,14 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
     uint32_t current_connections = host_to_conn_info_map_[key].connection_keys.size();
 
     ENVOY_LOG(info,
-              "ReverseConnectionIOHandle: Number of reverse connections to host {} of cluster {}: "
+              "reverse_tunnel: Number of reverse connections to host {} of cluster {}: "
               "Current: {}, Required: {}",
               host_address, cluster_name, current_connections,
               cluster_config.reverse_connection_count);
     if (current_connections >= cluster_config.reverse_connection_count) {
-      ENVOY_LOG(
-          debug,
-          "ReverseConnectionIOHandle: No more reverse connections needed to host {} of cluster {}",
-          host_address, cluster_name);
+      ENVOY_LOG(debug,
+                "reverse_tunnel: No more reverse connections needed to host {} of cluster {}",
+                host_address, cluster_name);
       total_successful_connections += current_connections;
       continue;
     }
@@ -593,7 +582,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
         cluster_config.reverse_connection_count - current_connections;
 
     ENVOY_LOG(debug,
-              "ReverseConnectionIOHandle: Initiating {} reverse connections to host {} of remote "
+              "reverse_tunnel: Initiating {} reverse connections to host {} of remote "
               "cluster '{}' from source node '{}'",
               needed_connections, host_address, cluster_name, config_.src_node_id);
     // Create the required number of connections to this specific host.
@@ -617,12 +606,12 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
   // Update metrics based on overall success for the cluster.
   if (total_successful_connections > 0) {
     ENVOY_LOG(info,
-              "ReverseConnectionIOHandle: Successfully created {}/{} total reverse connections to "
+              "reverse_tunnel: Successfully created {}/{} total reverse connections to "
               "cluster {}",
               total_successful_connections, total_required_connections, cluster_name);
   } else {
     ENVOY_LOG(error,
-              "ReverseConnectionIOHandle: Failed to create any reverse connections to cluster {} - "
+              "reverse_tunnel: Failed to create any reverse connections to cluster {} - "
               "will retry later",
               cluster_name);
   }
@@ -662,7 +651,7 @@ bool ReverseConnectionIOHandle::shouldAttemptConnectionToHost(const std::string&
     auto remaining_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(host_info.backoff_until - now)
             .count();
-    ENVOY_LOG(debug, "ReverseConnectionIOHandle: Host {} still in backoff for {}ms", host_address,
+    ENVOY_LOG(debug, "reverse_tunnel: Host {} still in backoff for {}ms", host_address,
               remaining_ms);
     return false;
   }
@@ -700,10 +689,8 @@ void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_a
   const std::string backoff_connection_key = host_address + "_" + cluster_name + "_backoff";
   updateConnectionState(host_address, cluster_name, backoff_connection_key,
                         ReverseConnectionState::Backoff);
-  ENVOY_LOG(
-      debug,
-      "ReverseConnectionIOHandle: Marked host {} in cluster {} as Backoff with connection key {}",
-      host_address, cluster_name, backoff_connection_key);
+  ENVOY_LOG(debug, "reverse_tunnel: Marked host {} in cluster {} as Backoff with connection key {}",
+            host_address, cluster_name, backoff_connection_key);
 }
 
 void ReverseConnectionIOHandle::resetHostBackoff(const std::string& host_address) {
@@ -725,7 +712,7 @@ void ReverseConnectionIOHandle::resetHostBackoff(const std::string& host_address
 
   host_info.failure_count = 0;
   host_info.backoff_until = getTimeSource().monotonicTime();
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: Reset backoff for host {}", host_address);
+  ENVOY_LOG(debug, "reverse_tunnel: Reset backoff for host {}", host_address);
 
   // Mark host as recovered using the same key used by backoff to change the state from backoff to
   // recovered.
@@ -733,10 +720,9 @@ void ReverseConnectionIOHandle::resetHostBackoff(const std::string& host_address
       host_address + "_" + host_info.cluster_name + "_backoff";
   updateConnectionState(host_address, host_info.cluster_name, recovered_connection_key,
                         ReverseConnectionState::Recovered);
-  ENVOY_LOG(
-      debug,
-      "ReverseConnectionIOHandle: Marked host {} in cluster {} as Recovered with connection key {}",
-      host_address, host_info.cluster_name, recovered_connection_key);
+  ENVOY_LOG(debug,
+            "reverse_tunnel: Marked host {} in cluster {} as Recovered with connection key {}",
+            host_address, host_info.cluster_name, recovered_connection_key);
 }
 
 void ReverseConnectionIOHandle::updateConnectionState(const std::string& host_address,
@@ -746,7 +732,7 @@ void ReverseConnectionIOHandle::updateConnectionState(const std::string& host_ad
   // Update connection state in host info and handle old state.
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it != host_to_conn_info_map_.end()) {
-    // Remove old state if it exists
+    // Remove old connection state if it exists.
     auto old_state_it = host_it->second.connection_states.find(connection_key);
     if (old_state_it != host_it->second.connection_states.end()) {
       ReverseConnectionState old_state = old_state_it->second;
@@ -754,7 +740,7 @@ void ReverseConnectionIOHandle::updateConnectionState(const std::string& host_ad
       updateStateGauge(host_address, cluster_name, old_state, false /* decrement */);
     }
 
-    // Set new state
+    // Set new connection state.
     host_it->second.connection_states[connection_key] = new_state;
   }
 
@@ -769,28 +755,27 @@ void ReverseConnectionIOHandle::updateConnectionState(const std::string& host_ad
 void ReverseConnectionIOHandle::removeConnectionState(const std::string& host_address,
                                                       const std::string& cluster_name,
                                                       const std::string& connection_key) {
-  // Remove connection state from host info and decrement gauge
+  // Remove connection state from host info and decrement gauge.
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it != host_to_conn_info_map_.end()) {
     auto state_it = host_it->second.connection_states.find(connection_key);
     if (state_it != host_it->second.connection_states.end()) {
       ReverseConnectionState old_state = state_it->second;
-      // Decrement state gauge using unified function
+      // Decrement state gauge using unified function.
       updateStateGauge(host_address, cluster_name, old_state, false /* decrement */);
-      // Remove from map
+      // Remove gauge from map.
       host_it->second.connection_states.erase(state_it);
     }
   }
 
-  ENVOY_LOG(debug,
-            "ReverseConnectionIOHandle: Removed connection {} state for host {} in cluster {}",
+  ENVOY_LOG(debug, "reverse_tunnel: Removed connection {} state for host {} in cluster {}",
             connection_key, host_address, cluster_name);
 }
 
 void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& connection_key) {
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: Downstream connection closed: {}", connection_key);
+  ENVOY_LOG(debug, "reverse_tunnel: Downstream connection closed: {}", connection_key);
 
-  // Find the host for this connection key
+  // Find the host for this connection key.
   std::string host_address;
   std::string cluster_name;
 
@@ -819,13 +804,13 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
               host_address, host_it->second.connection_keys.size());
   }
 
-  // Remove connection state tracking
+  // Remove connection state tracking.
   removeConnectionState(host_address, cluster_name, connection_key);
 
   // The next call to maintainClusterConnections() will detect the missing connection
   // and re-initiate it automatically.
   ENVOY_LOG(debug,
-            "ReverseConnectionIOHandle: Connection closure recorded for host {} in cluster {}. "
+            "reverse_tunnel: Connection closure recorded for host {} in cluster {}. "
             "Next maintenance cycle will re-initiate if needed.",
             host_address, cluster_name);
 }
@@ -874,7 +859,7 @@ void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address
 }
 
 void ReverseConnectionIOHandle::maintainReverseConnections() {
-  // Validate required configuration parameters at the top level
+  // Validate required configuration parameters at the top level.
   if (config_.src_node_id.empty()) {
     ENVOY_LOG(error, "Source node ID is required but empty - cannot maintain reverse connections");
     return;
@@ -886,7 +871,7 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
 
     ENVOY_LOG(debug, "Processing cluster: {} with {} requested connections per host.", cluster_name,
               cluster_config.reverse_connection_count);
-    // Maintain connections for this cluster
+    // Maintain connections for this cluster.
     maintainClusterConnections(cluster_name, cluster_config);
   }
   ENVOY_LOG(debug, "Completed reverse TCP connection maintenance for all clusters.");
@@ -916,10 +901,10 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   }
 
   ENVOY_LOG(debug,
-            "ReverseConnectionIOHandle: Initiating one reverse connection to host {} of cluster "
+            "reverse_tunnel: Initiating one reverse connection to host {} of cluster "
             "'{}', source node '{}'",
             host_address, cluster_name, config_.src_node_id);
-  // Get the thread local cluster with additional validation
+  // Get the thread local cluster with additional validation.
   auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
     ENVOY_LOG(error, "Cluster '{}' not found in cluster manager", cluster_name);
@@ -928,7 +913,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
     return false;
   }
 
-  // Validate cluster info before attempting connection
+  // Validate cluster info before attempting connection.
   auto cluster_info = thread_local_cluster->info();
   if (!cluster_info) {
     ENVOY_LOG(error, "Cluster '{}' has null cluster info", cluster_name);
@@ -937,12 +922,12 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
     return false;
   }
 
-  // Validate priority set to prevent null pointer access
+  // Validate priority set to prevent null pointer access.
   const auto& priority_set = thread_local_cluster->prioritySet();
   const auto& host_sets = priority_set.hostSetsPerPriority();
   size_t host_count = host_sets.empty() ? 0 : host_sets[0]->hosts().size();
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: Cluster '{}' found with type {} and {} hosts",
-            cluster_name, static_cast<int>(cluster_info->type()), host_count);
+  ENVOY_LOG(debug, "reverse_tunnel: Cluster '{}' found with type {} and {} hosts", cluster_name,
+            static_cast<int>(cluster_info->type()), host_count);
 
   // Normalize host key for internal addresses to ensure consistent map lookups.
   std::string normalized_host_key = host_address;
@@ -950,43 +935,39 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
     normalized_host_key = host_address; // already canonical for internal addresses
   }
 
-  // Validate that we have hosts available for internal addresses
+  // Validate that we have hosts available for internal addresses.
   if (absl::StartsWith(host_address, "envoy://") && host_count == 0) {
-    ENVOY_LOG(
-        error,
-        "ReverseConnectionIOHandle: No hosts available in cluster '{}' for internal address '{}'",
-        cluster_name, host_address);
+    ENVOY_LOG(error, "reverse_tunnel: No hosts available in cluster '{}' for internal address '{}'",
+              cluster_name, host_address);
     updateConnectionState(host_address, cluster_name, temp_connection_key,
                           ReverseConnectionState::CannotConnect);
     return false;
   }
 
-  // Create load balancer context and validate it
+  // Create load balancer context and validate it.
   ReverseConnectionLoadBalancerContext lb_context(normalized_host_key);
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: Created load balancer context for host key: {}",
+  ENVOY_LOG(debug, "reverse_tunnel: Created load balancer context for host key: {}",
             normalized_host_key);
 
-  // Get connection from cluster manager with defensive error handling
+  // Get connection from cluster manager with defensive error handling.
   Upstream::Host::CreateConnectionData conn_data;
   ENVOY_LOG(debug,
-            "ReverseConnectionIOHandle: Creating TCP connection to {} in cluster {} using load "
+            "reverse_tunnel: Creating TCP connection to {} in cluster {} using load "
             "balancer context",
             host_address, cluster_name);
 
-  // Use tcpConn which should not throw exceptions in normal operation
+  // Use tcpConn which should not throw exceptions in normal operation.
   conn_data = thread_local_cluster->tcpConn(&lb_context);
 
   if (!conn_data.connection_) {
-    ENVOY_LOG(
-        error,
-        "ReverseConnectionIOHandle: tcpConn() returned null connection for host {} in cluster {}",
-        host_address, cluster_name);
+    ENVOY_LOG(error, "reverse_tunnel: tcpConn() returned null connection for host {} in cluster {}",
+              host_address, cluster_name);
     updateConnectionState(host_address, cluster_name, temp_connection_key,
                           ReverseConnectionState::CannotConnect);
     return false;
   }
 
-  // Create wrapper to manage the connection
+  // Create wrapper to manage the connection.
   // The wrapper will initiate and manage the reverse connection handshake using HTTP.
   auto wrapper = std::make_unique<RCConnectionWrapper>(*this, std::move(conn_data.connection_),
                                                        conn_data.host_description_, cluster_name);
@@ -994,10 +975,8 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   // Send the reverse connection handshake over the TCP connection.
   const std::string connection_key =
       wrapper->connect(config_.src_tenant_id, config_.src_cluster_id, config_.src_node_id);
-  ENVOY_LOG(
-      debug,
-      "ReverseConnectionIOHandle: Initiated reverse connection handshake for host {} with key {}",
-      host_address, connection_key);
+  ENVOY_LOG(debug, "reverse_tunnel: Initiated reverse connection handshake for host {} with key {}",
+            host_address, connection_key);
 
   // Mark as Connecting after handshake is initiated. Use the actual connection key so that it can
   // be marked as failed in onConnectionDone().
@@ -1014,12 +993,12 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
     }
     if (port_opt.has_value()) {
       ENVOY_LOG(debug,
-                "ReverseConnectionIOHandle: Successfully initiated reverse connection to host {} "
+                "reverse_tunnel: Successfully initiated reverse connection to host {} "
                 "({}:{}) in cluster {}",
                 host_address, addr_str, *port_opt, cluster_name);
     } else {
       ENVOY_LOG(debug,
-                "ReverseConnectionIOHandle: Successfully initiated reverse connection to host {} "
+                "reverse_tunnel: Successfully initiated reverse connection to host {} "
                 "({}) in cluster {}",
                 host_address, addr_str, cluster_name);
     }
@@ -1033,7 +1012,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
 
 // Trigger pipe used to wake up accept() when a connection is established.
 void ReverseConnectionIOHandle::createTriggerPipe() {
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: Creating trigger pipe for single-byte mechanism");
+  ENVOY_LOG(debug, "reverse_tunnel: Creating trigger pipe for single-byte mechanism");
   int pipe_fds[2];
   if (pipe(pipe_fds) == -1) {
     ENVOY_LOG(error, "Failed to create trigger pipe: {}", errorDetails(errno));
@@ -1052,7 +1031,7 @@ void ReverseConnectionIOHandle::createTriggerPipe() {
   if (flags != -1) {
     fcntl(trigger_pipe_read_fd_, F_SETFL, flags | O_NONBLOCK);
   }
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: Created trigger pipe: read_fd={}, write_fd={}",
+  ENVOY_LOG(debug, "reverse_tunnel: Created trigger pipe: read_fd={}, write_fd={}",
             trigger_pipe_read_fd_, trigger_pipe_write_fd_);
 }
 
@@ -1062,12 +1041,12 @@ bool ReverseConnectionIOHandle::isTriggerPipeReady() const {
 
 void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
                                                  RCConnectionWrapper* wrapper, bool closed) {
-  ENVOY_LOG(debug, "ReverseConnectionIOHandle: Connection wrapper done - error: '{}', closed: {}",
-            error, closed);
+  ENVOY_LOG(debug, "reverse_tunnel: Connection wrapper done - error: '{}', closed: {}", error,
+            closed);
 
   // Validate wrapper pointer before any access.
   if (!wrapper) {
-    ENVOY_LOG(error, "ReverseConnectionIOHandle: Null wrapper pointer in onConnectionDone");
+    ENVOY_LOG(error, "reverse_tunnel: Null wrapper pointer in onConnectionDone");
     return;
   }
 
@@ -1078,7 +1057,7 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
   // Safely get host address for wrapper.
   auto wrapper_it = conn_wrapper_to_host_map_.find(wrapper);
   if (wrapper_it == conn_wrapper_to_host_map_.end()) {
-    ENVOY_LOG(error, "ReverseConnectionIOHandle: Wrapper not found in conn_wrapper_to_host_map_ - "
+    ENVOY_LOG(error, "reverse_tunnel: Wrapper not found in conn_wrapper_to_host_map_ - "
                      "may have been cleaned up");
     return;
   }
@@ -1089,16 +1068,15 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
   if (host_it != host_to_conn_info_map_.end()) {
     cluster_name = host_it->second.cluster_name;
   } else {
-    ENVOY_LOG(warn, "ReverseConnectionIOHandle: Host info not found for {}, using fallback",
-              host_address);
+    ENVOY_LOG(warn, "reverse_tunnel: Host info not found for {}, using fallback", host_address);
   }
 
   if (cluster_name.empty()) {
     ENVOY_LOG(error,
-              "ReverseConnectionIOHandle: No cluster mapping for host {}, cannot process "
+              "reverse_tunnel: No cluster mapping for host {}, cannot process "
               "connection event",
               host_address);
-    // Still try to clean up the wrapper
+    // Still try to clean up the wrapper.
     conn_wrapper_to_host_map_.erase(wrapper);
     return;
   }
@@ -1108,12 +1086,12 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
   if (connection) {
     connection_key = connection->connectionInfoProvider().localAddress()->asString();
     ENVOY_LOG(debug,
-              "ReverseConnectionIOHandle: Processing connection event for host '{}', cluster "
+              "reverse_tunnel: Processing connection event for host '{}', cluster "
               "'{}', key '{}'",
               host_address, cluster_name, connection_key);
   } else {
     connection_key = "cleanup_" + host_address + "_" + std::to_string(rand());
-    ENVOY_LOG(debug, "ReverseConnectionIOHandle: Connection already null, using fallback key '{}'",
+    ENVOY_LOG(debug, "reverse_tunnel: Connection already null, using fallback key '{}'",
               connection_key);
   }
 
@@ -1125,10 +1103,9 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
                      error == "handshake successful" || error == "connection established");
 
   if (closed || (!error.empty() && !is_success)) {
-    // Handle connection failure
-    ENVOY_LOG(error,
-              "ReverseConnectionIOHandle: Connection failed - error '{}', cleaning up host {}",
-              error, host_address);
+    // Handle connection failure.
+    ENVOY_LOG(error, "reverse_tunnel: Connection failed - error '{}', cleaning up host {}", error,
+              host_address);
 
     updateConnectionState(host_address, cluster_name, connection_key,
                           ReverseConnectionState::Failed);
@@ -1144,8 +1121,8 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
     trackConnectionFailure(host_address, cluster_name);
 
   } else {
-    // Handle connection success
-    ENVOY_LOG(debug, "ReverseConnectionIOHandle: Connection succeeded for host {}", host_address);
+    // Handle connection success.
+    ENVOY_LOG(debug, "reverse_tunnel: Connection succeeded for host {}", host_address);
 
     resetHostBackoff(host_address);
     updateConnectionState(host_address, cluster_name, connection_key,
@@ -1153,20 +1130,16 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
 
     // Only proceed if connection is still valid.
     if (!connection) {
-      ENVOY_LOG(
-          error,
-          "ReverseConnectionIOHandle: Cannot complete successful handshake - connection is null");
+      ENVOY_LOG(error, "reverse_tunnel: Cannot complete successful handshake - connection is null");
       return;
     }
 
-    ENVOY_LOG(info, "ReverseConnectionIOHandle: Transferring tunnel socket for "
+    ENVOY_LOG(info, "reverse_tunnel: Transferring tunnel socket for "
                     "reverse_conn_listener consumption");
 
     // Reset file events safely.
     if (connection->getSocket()) {
-      ENVOY_LOG(
-          debug,
-          "ReverseConnectionIOHandle: Removing connection callbacks and resetting file events");
+      ENVOY_LOG(debug, "reverse_tunnel: Removing connection callbacks and resetting file events");
       connection->removeConnectionCallbacks(*wrapper);
       connection->getSocket()->ioHandle().resetFileEvents();
     }
@@ -1175,14 +1148,14 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
     auto host_it = host_to_conn_info_map_.find(host_address);
     if (host_it != host_to_conn_info_map_.end()) {
       host_it->second.connection_keys.insert(connection_key);
-      ENVOY_LOG(debug, "ReverseConnectionIOHandle: Added connection key {} for host {}",
-                connection_key, host_address);
+      ENVOY_LOG(debug, "reverse_tunnel: Added connection key {} for host {}", connection_key,
+                host_address);
     }
 
     Network::ClientConnectionPtr released_conn = wrapper->releaseConnection();
 
     if (released_conn) {
-      ENVOY_LOG(info, "ReverseConnectionIOHandle: Connection will be consumed by "
+      ENVOY_LOG(info, "reverse_tunnel: Connection will be consumed by "
                       "reverse_conn_listener for HTTP processing");
 
       // Move connection to established queue for reverse_conn_listener to consume.
@@ -1194,12 +1167,11 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
         ssize_t bytes_written = ::write(trigger_pipe_write_fd_, &trigger_byte, 1);
         if (bytes_written == 1) {
           ENVOY_LOG(info,
-                    "ReverseConnectionIOHandle: Successfully triggered reverse_conn_listener "
+                    "reverse_tunnel: Successfully triggered reverse_conn_listener "
                     "accept() for host {}",
                     host_address);
         } else {
-          ENVOY_LOG(error, "ReverseConnectionIOHandle: Failed to write trigger byte: {}",
-                    errorDetails(errno));
+          ENVOY_LOG(error, "reverse_tunnel: Failed to write trigger byte: {}", errorDetails(errno));
         }
       }
     }
@@ -1221,7 +1193,7 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
     std::unique_ptr<Event::DeferredDeletable> deletable_wrapper(
         static_cast<Event::DeferredDeletable*>(wrapper_to_delete.release()));
     getThreadLocalDispatcher().deferredDelete(std::move(deletable_wrapper));
-    ENVOY_LOG(debug, "ReverseConnectionIOHandle: Deferred delete of connection wrapper");
+    ENVOY_LOG(debug, "reverse_tunnel: Deferred delete of connection wrapper");
   }
 }
 

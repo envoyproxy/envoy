@@ -1210,6 +1210,7 @@ readded
 readonly
 readv
 realloc
+rebalance
 rebalanced
 rebalancer
 rebalancing

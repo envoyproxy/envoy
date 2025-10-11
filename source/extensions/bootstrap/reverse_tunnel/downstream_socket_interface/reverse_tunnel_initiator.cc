@@ -37,7 +37,7 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
                                Envoy::Network::Address::Type addr_type,
                                Envoy::Network::Address::IpVersion version, bool,
                                const Envoy::Network::SocketCreationOptions&) const {
-  ENVOY_LOG(debug, "ReverseTunnelInitiator: type={}, addr_type={}", static_cast<int>(socket_type),
+  ENVOY_LOG(debug, "reverse_tunnel: type={}, addr_type={}", static_cast<int>(socket_type),
             static_cast<int>(addr_type));
 
   // This method is called without reverse connection config, so create a regular socket.
@@ -64,13 +64,13 @@ Envoy::Network::IoHandlePtr ReverseTunnelInitiator::createReverseConnectionSocke
     Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
     Envoy::Network::Address::IpVersion version, const ReverseConnectionSocketConfig& config) const {
 
-  // Return early if no remote clusters are configured
+  // Return early if no remote clusters are configured.
   if (config.remote_clusters.empty()) {
-    ENVOY_LOG(debug, "ReverseTunnelInitiator: No remote clusters configured, returning nullptr");
+    ENVOY_LOG(debug, "reverse_tunnel: No remote clusters configured, returning nullptr");
     return nullptr;
   }
 
-  ENVOY_LOG(debug, "ReverseTunnelInitiator: Creating reverse connection socket for cluster: {}",
+  ENVOY_LOG(debug, "reverse_tunnel: Creating reverse connection socket for cluster: {}",
             config.remote_clusters[0].cluster_name);
 
   // For stream sockets on IP addresses, create our reverse connection IOHandle.
@@ -84,12 +84,11 @@ Envoy::Network::IoHandlePtr ReverseTunnelInitiator::createReverseConnectionSocke
       return nullptr;
     }
 
-    ENVOY_LOG(
-        debug,
-        "ReverseTunnelInitiator: Created socket fd={}, wrapping with ReverseConnectionIOHandle",
-        sock_fd);
+    ENVOY_LOG(debug,
+              "reverse_tunnel: Created socket fd={}, wrapping with ReverseConnectionIOHandle",
+              sock_fd);
 
-    // Get the scope from thread local registry, fallback to context scope
+    // Get the scope from thread local registry, fallback to context scope.
     Stats::Scope* scope_ptr = &context_->scope();
     auto* tls_registry = getLocalRegistry();
     if (tls_registry) {
@@ -114,7 +113,7 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
   const auto* reverse_addr = dynamic_cast<const ReverseConnectionAddress*>(addr.get());
   if (reverse_addr) {
     // Get the reverse connection config from the address.
-    ENVOY_LOG(debug, "ReverseTunnelInitiator: reverse_addr: {}", reverse_addr->asString());
+    ENVOY_LOG(debug, "reverse_tunnel: reverse_addr: {}", reverse_addr->asString());
     const auto& config = reverse_addr->reverseConnectionConfig();
 
     // Convert ReverseConnectionAddress::ReverseConnectionConfig to ReverseConnectionSocketConfig.

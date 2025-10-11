@@ -22,7 +22,7 @@ void ReverseTunnelInitiatorExtension::onServerInitialized() {
 }
 
 void ReverseTunnelInitiatorExtension::onWorkerThreadInitialized() {
-  ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension: creating thread local slot");
+  ENVOY_LOG(debug, "reverse_tunnel: creating thread local slot");
 
   // Create thread local slot on worker thread initialization.
   tls_slot_ =
@@ -33,14 +33,12 @@ void ReverseTunnelInitiatorExtension::onWorkerThreadInitialized() {
     return std::make_shared<DownstreamSocketThreadLocal>(dispatcher, context_.scope());
   });
 
-  ENVOY_LOG(
-      debug,
-      "ReverseTunnelInitiatorExtension: thread local slot created successfully in worker thread");
+  ENVOY_LOG(debug, "reverse_tunnel: thread local slot created successfully in worker thread");
 }
 
 DownstreamSocketThreadLocal* ReverseTunnelInitiatorExtension::getLocalRegistry() const {
   if (!tls_slot_) {
-    ENVOY_LOG(error, "ReverseTunnelInitiatorExtension: no thread local slot");
+    ENVOY_LOG(error, "reverse_tunnel: no thread local slot");
     return nullptr;
   }
 
@@ -67,7 +65,7 @@ void ReverseTunnelInitiatorExtension::updateConnectionStats(const std::string& h
 
   // Log a warning on first activation.
   if (!reverse_tunnel_detailed_stats_warning_logged) {
-    ENVOY_LOG(warn, "REVERSE TUNNEL: Detailed per-host/cluster stats are enabled. "
+    ENVOY_LOG(warn, "reverse_tunnel: Detailed per-host/cluster stats are enabled. "
                     "This may consume significant memory with high host counts. "
                     "Monitor memory usage and disable if experiencing issues.");
     reverse_tunnel_detailed_stats_warning_logged = true;
@@ -82,12 +80,12 @@ void ReverseTunnelInitiatorExtension::updateConnectionStats(const std::string& h
                                                      Stats::Gauge::ImportMode::HiddenAccumulate);
     if (increment) {
       host_gauge.inc();
-      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: incremented host stat {} to {}",
-                host_stat_name, host_gauge.value());
+      ENVOY_LOG(trace, "reverse_tunnel: incremented host stat {} to {}", host_stat_name,
+                host_gauge.value());
     } else {
       host_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: decremented host stat {} to {}",
-                host_stat_name, host_gauge.value());
+      ENVOY_LOG(trace, "reverse_tunnel: decremented host stat {} to {}", host_stat_name,
+                host_gauge.value());
     }
   }
 
@@ -101,12 +99,12 @@ void ReverseTunnelInitiatorExtension::updateConnectionStats(const std::string& h
                                                         Stats::Gauge::ImportMode::HiddenAccumulate);
     if (increment) {
       cluster_gauge.inc();
-      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: incremented cluster stat {} to {}",
-                cluster_stat_name, cluster_gauge.value());
+      ENVOY_LOG(trace, "reverse_tunnel: incremented cluster stat {} to {}", cluster_stat_name,
+                cluster_gauge.value());
     } else {
       cluster_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: decremented cluster stat {} to {}",
-                cluster_stat_name, cluster_gauge.value());
+      ENVOY_LOG(trace, "reverse_tunnel: decremented cluster stat {} to {}", cluster_stat_name,
+                cluster_gauge.value());
     }
   }
 
@@ -123,13 +121,12 @@ void ReverseTunnelInitiatorExtension::updatePerWorkerConnectionStats(
   std::string dispatcher_name;
   auto* local_registry = getLocalRegistry();
   if (local_registry == nullptr) {
-    ENVOY_LOG(error, "ReverseTunnelInitiatorExtension: No local registry found");
+    ENVOY_LOG(error, "reverse_tunnel: No local registry found");
     return;
   }
-  // Dispatcher name is of the form "worker_x" where x is the worker index
+  // Dispatcher name is of the form "worker_x" where x is the worker index.
   dispatcher_name = local_registry->dispatcher().name();
-  ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: Updating stats for worker {}",
-            dispatcher_name);
+  ENVOY_LOG(trace, "reverse_tunnel: Updating stats for worker {}", dispatcher_name);
 
   // Create/update per-worker host connection stat.
   if (!host_address.empty() && !state_suffix.empty()) {
@@ -141,11 +138,11 @@ void ReverseTunnelInitiatorExtension::updatePerWorkerConnectionStats(
         worker_host_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
     if (increment) {
       worker_host_gauge.inc();
-      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: incremented worker host stat {} to {}",
+      ENVOY_LOG(trace, "reverse_tunnel: incremented worker host stat {} to {}",
                 worker_host_stat_name, worker_host_gauge.value());
     } else {
       worker_host_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: decremented worker host stat {} to {}",
+      ENVOY_LOG(trace, "reverse_tunnel: decremented worker host stat {} to {}",
                 worker_host_stat_name, worker_host_gauge.value());
     }
   }
@@ -160,11 +157,11 @@ void ReverseTunnelInitiatorExtension::updatePerWorkerConnectionStats(
         worker_cluster_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
     if (increment) {
       worker_cluster_gauge.inc();
-      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: incremented worker cluster stat {} to {}",
+      ENVOY_LOG(trace, "reverse_tunnel: incremented worker cluster stat {} to {}",
                 worker_cluster_stat_name, worker_cluster_gauge.value());
     } else {
       worker_cluster_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: decremented worker cluster stat {} to {}",
+      ENVOY_LOG(trace, "reverse_tunnel: decremented worker cluster stat {} to {}",
                 worker_cluster_stat_name, worker_cluster_gauge.value());
     }
   }
@@ -181,8 +178,7 @@ ReverseTunnelInitiatorExtension::getCrossWorkerStatMap() {
   Stats::IterateFn<Stats::Gauge> gauge_callback =
       [&stats_map, this](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
     const std::string& gauge_name = gauge->name();
-    ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: gauge_name: {} gauge_value: {}", gauge_name,
-              gauge->value());
+    ENVOY_LOG(trace, "reverse_tunnel: gauge_name: {} gauge_value: {}", gauge_name, gauge->value());
     if (gauge_name.find(stat_prefix_ + ".") != std::string::npos &&
         (gauge_name.find(stat_prefix_ + ".host.") != std::string::npos ||
          gauge_name.find(stat_prefix_ + ".cluster.") != std::string::npos) &&
@@ -193,11 +189,10 @@ ReverseTunnelInitiatorExtension::getCrossWorkerStatMap() {
   };
   stats_store.iterate(gauge_callback);
 
-  ENVOY_LOG(
-      debug,
-      "ReverseTunnelInitiatorExtension: collected {} stats for reverse connections across all "
-      "worker threads",
-      stats_map.size());
+  ENVOY_LOG(debug,
+            "reverse_tunnel: collected {} stats for reverse connections across all "
+            "worker threads",
+            stats_map.size());
 
   return stats_map;
 }
@@ -205,7 +200,7 @@ ReverseTunnelInitiatorExtension::getCrossWorkerStatMap() {
 std::pair<std::vector<std::string>, std::vector<std::string>>
 ReverseTunnelInitiatorExtension::getConnectionStatsSync(
     std::chrono::milliseconds /* timeout_ms */) {
-  ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension: obtaining reverse connection stats");
+  ENVOY_LOG(debug, "reverse_tunnel: obtaining reverse connection stats");
 
   // Get all gauges with the reverse_connections prefix.
   auto connection_stats = getCrossWorkerStatMap();
@@ -213,7 +208,7 @@ ReverseTunnelInitiatorExtension::getConnectionStatsSync(
   std::vector<std::string> connected_hosts;
   std::vector<std::string> accepted_connections;
 
-  // Process the stats to extract connection information
+  // Process the stats to extract connection information.
   // For initiator, stats format is: <stat_prefix>.host.<host>.<state_suffix> or
   // <stat_prefix>.cluster.<cluster>.<state_suffix> We only want hosts/clusters with
   // "connected" state
@@ -245,8 +240,7 @@ ReverseTunnelInitiatorExtension::getConnectionStatsSync(
     }
   }
 
-  ENVOY_LOG(debug,
-            "ReverseTunnelInitiatorExtension: found {} connected hosts, {} accepted connections",
+  ENVOY_LOG(debug, "reverse_tunnel: found {} connected hosts, {} accepted connections",
             connected_hosts.size(), accepted_connections.size());
 
   return {connected_hosts, accepted_connections};
@@ -256,22 +250,20 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelInitiatorExtension::getP
   absl::flat_hash_map<std::string, uint64_t> stats_map;
   auto& stats_store = context_.scope();
 
-  // Get the current dispatcher name
+  // Get the current dispatcher name.
   std::string dispatcher_name = "main_thread"; // Default for main thread
   auto* local_registry = getLocalRegistry();
   if (local_registry) {
     // Dispatcher name is of the form "worker_x" where x is the worker index.
     dispatcher_name = local_registry->dispatcher().name();
   }
-  ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: Getting per worker stats map for {}",
-            dispatcher_name);
+  ENVOY_LOG(trace, "reverse_tunnel: Getting per worker stats map for {}", dispatcher_name);
 
   // Iterate through all gauges and filter for the current dispatcher.
   Stats::IterateFn<Stats::Gauge> gauge_callback =
       [&stats_map, &dispatcher_name, this](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
     const std::string& gauge_name = gauge->name();
-    ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: gauge_name: {} gauge_value: {}", gauge_name,
-              gauge->value());
+    ENVOY_LOG(trace, "reverse_tunnel: gauge_name: {} gauge_value: {}", gauge_name, gauge->value());
     if (gauge_name.find(stat_prefix_ + ".") != std::string::npos &&
         gauge_name.find(dispatcher_name + ".") != std::string::npos &&
         (gauge_name.find(".host.") != std::string::npos ||
@@ -283,8 +275,8 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelInitiatorExtension::getP
   };
   stats_store.iterate(gauge_callback);
 
-  ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension: collected {} stats for dispatcher '{}'",
-            stats_map.size(), dispatcher_name);
+  ENVOY_LOG(debug, "reverse_tunnel: collected {} stats for dispatcher '{}'", stats_map.size(),
+            dispatcher_name);
 
   return stats_map;
 }

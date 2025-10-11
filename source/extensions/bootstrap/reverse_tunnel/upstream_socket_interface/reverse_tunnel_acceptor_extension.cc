@@ -57,7 +57,7 @@ UpstreamSocketThreadLocal* ReverseTunnelAcceptorExtension::getLocalRegistry() co
 std::pair<std::vector<std::string>, std::vector<std::string>>
 ReverseTunnelAcceptorExtension::getConnectionStatsSync(std::chrono::milliseconds /* timeout_ms */) {
 
-  ENVOY_LOG(debug, "ReverseTunnelAcceptorExtension: obtaining reverse connection stats");
+  ENVOY_LOG(debug, "reverse_tunnel: obtaining reverse connection stats");
 
   // Get all gauges with the reverse_connections prefix.
   auto connection_stats = getCrossWorkerStatMap();
@@ -65,7 +65,7 @@ ReverseTunnelAcceptorExtension::getConnectionStatsSync(std::chrono::milliseconds
   std::vector<std::string> connected_nodes;
   std::vector<std::string> accepted_connections;
 
-  // Process the stats to extract connection information
+  // Process the stats to extract connection information.
   for (const auto& [stat_name, count] : connection_stats) {
     if (count > 0) {
       // Parse stat name to extract node/cluster information.
@@ -91,8 +91,7 @@ ReverseTunnelAcceptorExtension::getConnectionStatsSync(std::chrono::milliseconds
     }
   }
 
-  ENVOY_LOG(debug,
-            "ReverseTunnelAcceptorExtension: found {} connected nodes, {} accepted connections",
+  ENVOY_LOG(debug, "reverse_tunnel: found {} connected nodes, {} accepted connections",
             connected_nodes.size(), accepted_connections.size());
 
   return {connected_nodes, accepted_connections};
@@ -108,8 +107,7 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getCr
   Stats::IterateFn<Stats::Gauge> gauge_callback =
       [&stats_map, this](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
     const std::string& gauge_name = gauge->name();
-    ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: gauge_name: {} gauge_value: {}", gauge_name,
-              gauge->value());
+    ENVOY_LOG(trace, "reverse_tunnel: gauge_name: {} gauge_value: {}", gauge_name, gauge->value());
     std::string nodes_pattern = stat_prefix_ + ".nodes.";
     std::string clusters_pattern = stat_prefix_ + ".clusters.";
     if (gauge_name.find(stat_prefix_ + ".") != std::string::npos &&
@@ -123,7 +121,7 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getCr
   stats_store.iterate(gauge_callback);
 
   ENVOY_LOG(debug,
-            "ReverseTunnelAcceptorExtension: collected {} stats for reverse connections across all "
+            "reverse_tunnel: collected {} stats for reverse connections across all "
             "worker threads",
             stats_map.size());
 
@@ -159,13 +157,13 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
                                                      Stats::Gauge::ImportMode::HiddenAccumulate);
     if (increment) {
       node_gauge.inc();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented node stat {} to {}",
-                node_stat_name, node_gauge.value());
+      ENVOY_LOG(trace, "reverse_tunnel: incremented node stat {} to {}", node_stat_name,
+                node_gauge.value());
     } else {
       if (node_gauge.value() > 0) {
         node_gauge.dec();
-        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented node stat {} to {}",
-                  node_stat_name, node_gauge.value());
+        ENVOY_LOG(trace, "reverse_tunnel: decremented node stat {} to {}", node_stat_name,
+                  node_gauge.value());
       }
     }
   }
@@ -179,13 +177,13 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
                                                         Stats::Gauge::ImportMode::HiddenAccumulate);
     if (increment) {
       cluster_gauge.inc();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented cluster stat {} to {}",
-                cluster_stat_name, cluster_gauge.value());
+      ENVOY_LOG(trace, "reverse_tunnel: incremented cluster stat {} to {}", cluster_stat_name,
+                cluster_gauge.value());
     } else {
       if (cluster_gauge.value() > 0) {
         cluster_gauge.dec();
-        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented cluster stat {} to {}",
-                  cluster_stat_name, cluster_gauge.value());
+        ENVOY_LOG(trace, "reverse_tunnel: decremented cluster stat {} to {}", cluster_stat_name,
+                  cluster_gauge.value());
       }
     }
   }
@@ -203,15 +201,15 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::s
   std::string dispatcher_name;
   auto* local_registry = getLocalRegistry();
   if (local_registry == nullptr) {
-    ENVOY_LOG(error, "ReverseTunnelAcceptorExtension: No local registry found");
+    ENVOY_LOG(error, "reverse_tunnel: No local registry found");
     return;
   }
 
-  // Dispatcher name is of the form "worker_x" where x is the worker index
+  // Dispatcher name is of the form "worker_x" where x is the worker index.
   dispatcher_name = local_registry->dispatcher().name();
-  ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: Updating stats for worker {}", dispatcher_name);
+  ENVOY_LOG(trace, "reverse_tunnel: Updating stats for worker {}", dispatcher_name);
 
-  // Create/update per-worker node connection stat
+  // Create/update per-worker node connection stat.
   if (!node_id.empty()) {
     std::string worker_node_stat_name =
         fmt::format("{}.{}.node.{}", stat_prefix_, dispatcher_name, node_id);
@@ -221,24 +219,24 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::s
         worker_node_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
     if (increment) {
       worker_node_gauge.inc();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented worker node stat {} to {}",
+      ENVOY_LOG(trace, "reverse_tunnel: incremented worker node stat {} to {}",
                 worker_node_stat_name, worker_node_gauge.value());
     } else {
       // Guardrail: only decrement if the gauge value is greater than 0
       if (worker_node_gauge.value() > 0) {
         worker_node_gauge.dec();
-        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented worker node stat {} to {}",
+        ENVOY_LOG(trace, "reverse_tunnel: decremented worker node stat {} to {}",
                   worker_node_stat_name, worker_node_gauge.value());
       } else {
         ENVOY_LOG(trace,
-                  "ReverseTunnelAcceptorExtension: skipping decrement for worker node stat {} "
+                  "reverse_tunnel: skipping decrement for worker node stat {} "
                   "(already at 0)",
                   worker_node_stat_name);
       }
     }
   }
 
-  // Create/update per-worker cluster connection stat
+  // Create/update per-worker cluster connection stat.
   if (!cluster_id.empty()) {
     std::string worker_cluster_stat_name =
         fmt::format("{}.{}.cluster.{}", stat_prefix_, dispatcher_name, cluster_id);
@@ -248,17 +246,17 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::s
         worker_cluster_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
     if (increment) {
       worker_cluster_gauge.inc();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented worker cluster stat {} to {}",
+      ENVOY_LOG(trace, "reverse_tunnel: incremented worker cluster stat {} to {}",
                 worker_cluster_stat_name, worker_cluster_gauge.value());
     } else {
       // Guardrail: only decrement if the gauge value is greater than 0
       if (worker_cluster_gauge.value() > 0) {
         worker_cluster_gauge.dec();
-        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented worker cluster stat {} to {}",
+        ENVOY_LOG(trace, "reverse_tunnel: decremented worker cluster stat {} to {}",
                   worker_cluster_stat_name, worker_cluster_gauge.value());
       } else {
         ENVOY_LOG(trace,
-                  "ReverseTunnelAcceptorExtension: skipping decrement for worker cluster stat {} "
+                  "reverse_tunnel: skipping decrement for worker cluster stat {} "
                   "(already at 0)",
                   worker_cluster_stat_name);
       }
@@ -282,8 +280,7 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getPe
   Stats::IterateFn<Stats::Gauge> gauge_callback =
       [&stats_map, &dispatcher_name, this](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
     const std::string& gauge_name = gauge->name();
-    ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: gauge_name: {} gauge_value: {}", gauge_name,
-              gauge->value());
+    ENVOY_LOG(trace, "reverse_tunnel: gauge_name: {} gauge_value: {}", gauge_name, gauge->value());
     if (gauge_name.find(stat_prefix_ + ".") != std::string::npos &&
         gauge_name.find(dispatcher_name + ".") != std::string::npos &&
         (gauge_name.find(".node.") != std::string::npos ||
@@ -295,8 +292,8 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getPe
   };
   stats_store.iterate(gauge_callback);
 
-  ENVOY_LOG(debug, "ReverseTunnelAcceptorExtension: collected {} stats for dispatcher '{}'",
-            stats_map.size(), dispatcher_name);
+  ENVOY_LOG(debug, "reverse_tunnel: collected {} stats for dispatcher '{}'", stats_map.size(),
+            dispatcher_name);
 
   return stats_map;
 }

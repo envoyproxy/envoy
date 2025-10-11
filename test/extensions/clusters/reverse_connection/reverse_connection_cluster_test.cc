@@ -217,7 +217,7 @@ public:
 
     // Add the socket to the manager.
     tls_socket_manager->addConnectionSocket(node_id, cluster_id, std::move(socket),
-                                            std::chrono::seconds(30), false);
+                                            std::chrono::seconds(30));
   }
 
   // Helper method to call cleanup since this class is a friend of RevConCluster.
