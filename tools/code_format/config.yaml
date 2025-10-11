@@ -381,7 +381,6 @@ re:
   codeowners_contrib: (/contrib/[^@]*\s+)(@.*)
   codeowners_extensions: .*(extensions[^@]*\s+)(@.*)
   comment: //|\*
-  designated_initializer: \{\s*\.\w+\s*\=
   # Check for punctuation in a terminal ref clause, e.g.
   # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
   dot_multi_space: \. +
