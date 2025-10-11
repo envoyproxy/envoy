@@ -2208,6 +2208,46 @@ TEST_P(WasmHttpFilterTest, VerifySignature) {
   rootContext().onTick(0);
 }
 
+TEST_P(WasmHttpFilterTest, Sign) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(patricio78): test not yet implemented using Rust SDK.
+    return;
+  }
+  setupTest("", "sign");
+  setupFilter();
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::info, Eq(absl::string_view("signature created successfully"))));
+
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::err, Eq(absl::string_view("unknown is not supported."))));
+  EXPECT_CALL(
+      rootContext(),
+      log_(spdlog::level::err,
+           Eq(absl::string_view("Invalid key type: private key required for signing operation."))));
+  rootContext().onTick(0);
+}
+
+TEST_P(WasmHttpFilterTest, SignAndVerifySignature) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(patricio78): test not yet implemented using Rust SDK.
+    return;
+  }
+  setupTest("", "sign_and_verify_signature");
+  setupFilter();
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::info,
+                   Eq(absl::string_view("signature created successfully, length: 256"))));
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::info,
+                   Eq(absl::string_view(
+                       "end-to-end test passed: signature created and verified successfully"))));
+  EXPECT_CALL(
+      rootContext(),
+      log_(spdlog::level::info,
+           Eq(absl::string_view("mutual exclusion test passed: both PEM and DER keys rejected"))));
+  rootContext().onTick(0);
+}
+
 } // namespace Wasm
 } // namespace HttpFilters
 } // namespace Extensions
