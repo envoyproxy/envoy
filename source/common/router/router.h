@@ -372,21 +372,21 @@ public:
       return metadata_match_.get();
     }
 
-    absl::optional<Protobuf::Struct> connection_metadata;
+    OptRef<const Protobuf::Struct> connection_metadata;
     const auto* downstream_conn = downstreamConnection();
     if (downstream_conn != nullptr) {
       const auto& connection_fm = downstream_conn->streamInfo().dynamicMetadata().filter_metadata();
       if (const auto it = connection_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
           it != connection_fm.end()) {
-        connection_metadata = it->second;
+        connection_metadata = makeOptRef<const Protobuf::Struct>(it->second);
       }
     }
 
-    absl::optional<Protobuf::Struct> request_metadata;
+    OptRef<const Protobuf::Struct> request_metadata;
     const auto& request_fm = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
     if (const auto it = request_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
         it != request_fm.end()) {
-      request_metadata = it->second;
+      request_metadata = makeOptRef<const Protobuf::Struct>(it->second);
     }
 
     // The precedence is: request metadata > connection metadata > route criteria.
