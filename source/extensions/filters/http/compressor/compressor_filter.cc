@@ -31,6 +31,8 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Respons
     etag_handle(Http::CustomHeaders::get().Etag);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     vary_handle(Http::CustomHeaders::get().Vary);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    compression_status_handle(Http::Headers::get().EnvoyCompressionStatus);
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     request_content_encoding_handle(Http::CustomHeaders::get().ContentEncoding);
@@ -144,6 +146,7 @@ CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().remove_accept_encoding_header()
               : proto_config.remove_accept_encoding_header()),
+      status_header_enabled_(proto_config.response_direction_config().status_header_enabled()),
       uncompressible_response_codes_(uncompressibleResponseCodesSet(
           proto_config.response_direction_config().uncompressible_response_codes())),
       response_stats_{generateResponseStats(stats_prefix, scope)} {}
@@ -337,6 +340,10 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
   }
   const auto& config = config_->responseDirectionConfig();
 
+  if (config.statusHeaderEnabled()) {
+    return encodeHeadersWithStatusHeader(headers, end_stream, config, per_route_config_);
+  }
+
   // This is used to decide whether stats for accept-encoding header should be touched.
   const bool isEnabledAndContentLengthBigEnough =
       compressionEnabled(config, per_route_config_) && config.isMinimumContentLength(headers);
@@ -344,7 +351,8 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
   const bool isCompressible =
       isEnabledAndContentLengthBigEnough && !Http::Utility::isUpgrade(headers) &&
       config.isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
-      isEtagAllowed(headers) && !headers.getInline(response_content_encoding_handle.handle()) &&
+      checkIsEtagAllowedLogResponseStats(headers) &&
+      !headers.getInline(response_content_encoding_handle.handle()) &&
       isResponseCodeCompressible(headers, config);
   if (!end_stream && isAcceptEncodingAllowed(isEnabledAndContentLengthBigEnough, headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
@@ -365,6 +373,84 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
     insertVaryHeader(headers);
   }
 
+  return Http::FilterHeadersStatus::Continue;
+}
+
+Http::FilterHeadersStatus CompressorFilter::encodeHeadersWithStatusHeader(
+    Http::ResponseHeaderMap& headers, bool end_stream,
+    const CompressorFilterConfig::ResponseDirectionConfig& config,
+    const CompressorPerRouteFilterConfig* per_route_config) {
+  const bool meets_base_compression_preconditions =
+      compressionEnabled(config, per_route_config) && !Http::Utility::isUpgrade(headers) &&
+      !hasCacheControlNoTransform(headers) &&
+      !headers.getInline(response_content_encoding_handle.handle());
+
+  const bool is_compressible = meets_base_compression_preconditions &&
+                               config.isMinimumContentLength(headers) &&
+                               config.isContentTypeAllowed(headers) && isEtagAllowed(headers) &&
+                               isResponseCodeCompressible(headers, config);
+
+  // Even if we decide not to compress due to incompatible Accept-Encoding value,
+  // the Vary header should be inserted to let a caching proxy in front of Envoy
+  // know that the requested resource still can be served with compression applied.
+  if (is_compressible) {
+    insertVaryHeader(headers);
+  }
+
+  if (end_stream || !meets_base_compression_preconditions || !isTransferEncodingAllowed(headers) ||
+      !compressionEnabled(config, per_route_config)) {
+    config.stats().not_compressed_.inc();
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (!config.isMinimumContentLength(headers)) {
+    insertEnvoyCompressionStatusHeader(
+        headers, getContentEncoding(),
+        Http::Headers::get().EnvoyCompressionStatusValues.ContentLengthTooSmall);
+    config.stats().not_compressed_.inc();
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (!config.isContentTypeAllowed(headers)) {
+    insertEnvoyCompressionStatusHeader(
+        headers, getContentEncoding(),
+        Http::Headers::get().EnvoyCompressionStatusValues.ContentTypeNotAllowed);
+    config.stats().not_compressed_.inc();
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (!isEtagAllowed(headers)) {
+    insertEnvoyCompressionStatusHeader(
+        headers, getContentEncoding(),
+        Http::Headers::get().EnvoyCompressionStatusValues.EtagNotAllowed);
+    config.stats().not_compressed_.inc();
+    config_->responseDirectionConfig().responseStats().not_compressed_etag_.inc();
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (!isResponseCodeCompressible(headers, config)) {
+    insertEnvoyCompressionStatusHeader(
+        headers, getContentEncoding(),
+        Http::Headers::get().EnvoyCompressionStatusValues.StatusCodeNotAllowed);
+    config.stats().not_compressed_.inc();
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (!isAcceptEncodingAllowed(headers)) {
+    config.stats().not_compressed_.inc();
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  sanitizeEtagHeader(headers);
+  std::string content_length = std::string(headers.getContentLengthValue());
+  headers.removeContentLength();
+  headers.setInline(response_content_encoding_handle.handle(), getContentEncoding());
+  config.stats().compressed_.inc();
+  // Finally instantiate the compressor.
+  response_compressor_ = config_->makeCompressor();
+  insertEnvoyCompressionStatusHeader(headers, getContentEncoding(),
+                                     Http::Headers::get().EnvoyCompressionStatusValues.Compressed,
+                                     content_length);
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -587,7 +673,10 @@ bool CompressorFilter::isAcceptEncodingAllowed(bool maybe_compress,
   if (!maybe_compress) {
     return false;
   }
+  return isAcceptEncodingAllowed(headers);
+}
 
+bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& headers) const {
   if (accept_encoding_ == nullptr) {
     config_->responseDirectionConfig().responseStats().no_accept_header_.inc();
     return false;
@@ -624,13 +713,17 @@ bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
   return true;
 }
 
-bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
-  const bool is_etag_allowed = !(config_->responseDirectionConfig().disableOnEtagHeader() &&
-                                 headers.getInline(etag_handle.handle()));
+bool CompressorFilter::checkIsEtagAllowedLogResponseStats(Http::ResponseHeaderMap& headers) const {
+  const bool is_etag_allowed = isEtagAllowed(headers);
   if (!is_etag_allowed) {
     config_->responseDirectionConfig().responseStats().not_compressed_etag_.inc();
   }
   return is_etag_allowed;
+}
+
+bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
+  return !(config_->responseDirectionConfig().disableOnEtagHeader() &&
+           headers.getInline(etag_handle.handle()));
 }
 
 bool CompressorFilterConfig::ResponseDirectionConfig::areAllResponseCodesCompressible() const {
@@ -683,6 +776,27 @@ bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMa
   }
 
   return true;
+}
+
+std::string CompressorFilter::createEnvoyCompressionStatusHeaderValue(
+    absl::string_view encoding_type, absl::string_view status_to_set,
+    absl::optional<absl::string_view> original_length) {
+  const auto& constants = Http::Headers::get().EnvoyCompressionStatusValues;
+  if (status_to_set == constants.Compressed && original_length.has_value()) {
+    std::string original_length_part =
+        absl::StrCat(constants.OriginalLengthPrefix, *original_length);
+    return absl::StrJoin({encoding_type, status_to_set, original_length_part}, constants.Separator);
+  }
+  return absl::StrJoin({encoding_type, status_to_set}, constants.Separator);
+}
+
+void CompressorFilter::insertEnvoyCompressionStatusHeader(
+    Http::ResponseHeaderMap& headers, absl::string_view encoding_type,
+    absl::string_view status_to_set, absl::optional<absl::string_view> original_length) {
+  std::string status_value =
+      createEnvoyCompressionStatusHeaderValue(encoding_type, status_to_set, original_length);
+  headers.appendInline(compression_status_handle.handle(), status_value,
+                       Http::Headers::get().EnvoyCompressionStatusValues.ValueSeparator);
 }
 
 void CompressorFilter::insertVaryHeader(Http::ResponseHeaderMap& headers) {
