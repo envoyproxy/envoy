@@ -9,7 +9,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace ClusterProvided {
 
 class ClusterProvidedLbConfig : public Upstream::LoadBalancerConfig {
@@ -43,6 +43,6 @@ public:
 DECLARE_FACTORY(Factory);
 
 } // namespace ClusterProvided
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

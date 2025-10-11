@@ -9,7 +9,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Random {
 
 using RandomLbProto = envoy::extensions::load_balancing_policies::random::v3::Random;
@@ -56,6 +56,6 @@ public:
 DECLARE_FACTORY(Factory);
 
 } // namespace Random
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

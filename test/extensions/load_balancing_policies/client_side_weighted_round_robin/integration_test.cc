@@ -14,7 +14,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace ClientSideWeightedRoundRobin {
 namespace {
 
@@ -754,6 +754,6 @@ TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, AddRemoveLocality) {
 
 } // namespace
 } // namespace ClientSideWeightedRoundRobin
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

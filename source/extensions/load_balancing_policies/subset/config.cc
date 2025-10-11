@@ -6,7 +6,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Subset {
 
 using SubsetLbProto = envoy::extensions::load_balancing_policies::subset::v3::Subset;
@@ -106,6 +106,6 @@ SubsetLbFactory::loadLegacy(Server::Configuration::ServerFactoryContext& factory
 REGISTER_FACTORY(SubsetLbFactory, Upstream::TypedLoadBalancerFactory);
 
 } // namespace Subset
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

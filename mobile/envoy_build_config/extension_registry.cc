@@ -160,7 +160,7 @@ void ExtensionRegistry::registerFactories() {
   Upstream::forceRegisterDefaultUpstreamLocalAddressSelectorFactory();
 
   // This is required for load balancers of upstream clusters `base` and `base_clear`.
-  Envoy::Extensions::LoadBalancingPolices::ClusterProvided::forceRegisterFactory();
+  Envoy::Extensions::LoadBalancingPolicies::ClusterProvided::forceRegisterFactory();
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are downstream factories required if Envoy Mobile is compiled with

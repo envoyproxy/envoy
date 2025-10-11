@@ -37,7 +37,7 @@ void register_test_extensions() {
   Envoy::Extensions::HttpFilters::TestLogger::forceRegisterFactory();
   Envoy::Extensions::HttpFilters::TestRemoteResponse::
       forceRegisterTestRemoteResponseFilterFactory();
-  Envoy::Extensions::LoadBalancingPolices::RoundRobin::forceRegisterFactory();
+  Envoy::Extensions::LoadBalancingPolicies::RoundRobin::forceRegisterFactory();
   Envoy::HttpFilters::TestRead::forceRegisterTestReadFilterFactory();
   Envoy::Upstream::forceRegisterStaticClusterFactory();
 

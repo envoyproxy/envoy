@@ -6,7 +6,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Maglev {
 
 Upstream::ThreadAwareLoadBalancerPtr
@@ -31,6 +31,6 @@ Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
 REGISTER_FACTORY(Factory, Upstream::TypedLoadBalancerFactory);
 
 } // namespace Maglev
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

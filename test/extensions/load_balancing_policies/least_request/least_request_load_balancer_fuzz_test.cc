@@ -96,7 +96,7 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
                                   input.random_bytestring_for_requests());
 
   try {
-    Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig config(
+    Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig config(
         zone_aware_load_balancer_test_case.load_balancer_test_case().common_lb_config(),
         input.least_request_lb_config());
     const auto threshold = PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(

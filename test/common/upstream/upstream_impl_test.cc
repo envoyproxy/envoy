@@ -2750,7 +2750,7 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
             cluster->info()->loadBalancerFactory().name());
   auto slow_start_config =
       dynamic_cast<
-          const Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig*>(
+          const Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig*>(
           cluster->info()->loadBalancerConfig().ptr())
           ->lb_config_.slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),

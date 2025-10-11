@@ -26,7 +26,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace OverrideHost {
 namespace {
 
@@ -707,6 +707,6 @@ TEST_F(OverrideHostLoadBalancerTest, NullDownstreamHeaders) {
 
 } // namespace
 } // namespace OverrideHost
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

@@ -4,7 +4,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace RoundRobin {
 
 Upstream::LoadBalancerPtr RoundRobinCreator::operator()(
@@ -29,6 +29,6 @@ Upstream::LoadBalancerPtr RoundRobinCreator::operator()(
 REGISTER_FACTORY(Factory, Upstream::TypedLoadBalancerFactory);
 
 } // namespace RoundRobin
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

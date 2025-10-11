@@ -6,7 +6,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Random {
 
 TypedRandomLbConfig::TypedRandomLbConfig(const RandomLbProto& lb_config) : lb_config_(lb_config) {}
@@ -36,6 +36,6 @@ Upstream::LoadBalancerPtr RandomCreator::operator()(
 REGISTER_FACTORY(Factory, Upstream::TypedLoadBalancerFactory);
 
 } // namespace Random
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy
