@@ -15,6 +15,8 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/random_generator.h"
 
+#include "absl/synchronization/mutex.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -30,6 +32,7 @@ class UpstreamSocketManager : public ThreadLocal::ThreadLocalObject,
                               public Logger::Loggable<Logger::Id::filter> {
   // Friend class for testing
   friend class TestUpstreamSocketManager;
+  friend class TestUpstreamSocketManagerRebalancing;
 
 public:
   UpstreamSocketManager(Event::Dispatcher& dispatcher,
@@ -47,7 +50,19 @@ public:
    */
   void addConnectionSocket(const std::string& node_id, const std::string& cluster_id,
                            Network::ConnectionSocketPtr socket,
-                           const std::chrono::seconds& ping_interval, bool rebalanced);
+                           const std::chrono::seconds& ping_interval, bool rebalanced = true);
+
+  /**
+   * Hand off a socket to this socket manager's dispatcher.
+   * Used for cross-thread rebalancing of reverse connection sockets.
+   * @param node_id node_id of initiating node.
+   * @param cluster_id cluster_id of receiving cluster.
+   * @param socket the socket to be added.
+   * @param ping_interval the interval at which ping keepalives are sent.
+   */
+  void handoffSocketToWorker(const std::string& node_id, const std::string& cluster_id,
+                             Network::ConnectionSocketPtr socket,
+                             const std::chrono::seconds& ping_interval);
 
   /**
    * Get an available reverse connection socket.
@@ -137,6 +152,10 @@ private:
 
   // Map from file descriptor to node ID.
   absl::flat_hash_map<int, std::string> fd_to_node_map_;
+
+  // Map from file descriptor to cluster ID. This is used to look up the cluster ID when a socket
+  // dies.
+  absl::flat_hash_map<int, std::string> fd_to_cluster_map_;
 
   // Map of node ID to cluster.
   absl::flat_hash_map<std::string, std::string> node_to_cluster_map_;

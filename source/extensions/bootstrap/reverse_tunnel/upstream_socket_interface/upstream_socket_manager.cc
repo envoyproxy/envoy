@@ -18,7 +18,6 @@ namespace ReverseConnection {
 std::vector<UpstreamSocketManager*> UpstreamSocketManager::socket_managers_{};
 absl::Mutex UpstreamSocketManager::socket_manager_lock{};
 
-
 // UpstreamSocketManager implementation
 UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher,
                                              ReverseTunnelAcceptorExtension* extension)
@@ -26,13 +25,18 @@ UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher,
       extension_(extension) {
   ENVOY_LOG(debug, "UpstreamSocketManager: creating socket manager with stats integration.");
   ping_timer_ = dispatcher_.createTimer([this]() { pingConnections(); });
+
+  // Register this socket manager instance for rebalancing.
+  absl::WriterMutexLock lock(&UpstreamSocketManager::socket_manager_lock);
+  UpstreamSocketManager::socket_managers_.push_back(this);
 }
 
-UpstreamSocketManager& UpstreamSocketManager::pickLeastLoadedSocketManager(
-    const std::string& node_id, const std::string& cluster_id) {
+UpstreamSocketManager&
+UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
+                                                    const std::string& cluster_id) {
   absl::WriterMutexLock wlock(&UpstreamSocketManager::socket_manager_lock);
 
-  // Assume that this worker is the best candidate for sending the reverse
+  // Assume that this worker is the best candidate for sending the reverse.
   // connection socket.
   UpstreamSocketManager* target_socket_manager = this;
   const std::string source_worker = this->dispatcher_.name();
@@ -40,8 +44,8 @@ UpstreamSocketManager& UpstreamSocketManager::pickLeastLoadedSocketManager(
   // Contains the value that we assume to be the minimum value so far.
   int min_node_count = target_socket_manager->node_to_conn_count_map_[node_id];
 
-  // Iterate over UpstreamSocketManager instances of all threads to check
-  // if any of them have a lower number of accepted reverse tunnels for
+  // Iterate over UpstreamSocketManager instances of all threads to check.
+  // if any of them have a lower number of accepted reverse tunnels for.
   // the node 'node_id'.
   for (UpstreamSocketManager* socket_manager : socket_managers_) {
     int node_count = socket_manager->node_to_conn_count_map_[node_id];
@@ -59,7 +63,7 @@ UpstreamSocketManager& UpstreamSocketManager::pickLeastLoadedSocketManager(
     ENVOY_LOG(info,
               "UpstreamSocketManager: Rebalancing socket from worker {} to worker {} with min "
               "count {} for node {} cluster {}",
-              source_worker, dest_worker, target_socket_manager->node_to_conn_count_map_[node_id], 
+              source_worker, dest_worker, target_socket_manager->node_to_conn_count_map_[node_id],
               node_id, cluster_id);
   }
   target_socket_manager->node_to_conn_count_map_[node_id]++;
@@ -68,42 +72,69 @@ UpstreamSocketManager& UpstreamSocketManager::pickLeastLoadedSocketManager(
   return *target_socket_manager;
 }
 
+void UpstreamSocketManager::handoffSocketToWorker(const std::string& node_id,
+                                                  const std::string& cluster_id,
+                                                  Network::ConnectionSocketPtr socket,
+                                                  const std::chrono::seconds& ping_interval) {
+  dispatcher_.post(
+      [this, node_id, cluster_id, ping_interval, socket = std::move(socket)]() mutable -> void {
+        this->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval,
+                                  true /* rebalanced */);
+      });
+}
 
 void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
                                                 const std::string& cluster_id,
                                                 Network::ConnectionSocketPtr socket,
-                                                const std::chrono::seconds& ping_interval, bool rebalanced) {
+                                                const std::chrono::seconds& ping_interval,
+                                                bool rebalanced) {
+  // If not already rebalanced, check if we should move this socket to a different worker thread.
+  if (!rebalanced) {
+    UpstreamSocketManager& target_manager = pickLeastLoadedSocketManager(node_id, cluster_id);
+    if (&target_manager != this) {
+      ENVOY_LOG(debug,
+                "UpstreamSocketManager: Rebalancing socket to a different worker thread for node: "
+                "{} cluster: {}",
+                node_id, cluster_id);
+      target_manager.handoffSocketToWorker(node_id, cluster_id, std::move(socket), ping_interval);
+      return;
+    }
+  }
+
   ENVOY_LOG(debug, "UpstreamSocketManager: adding connection for node: {}, cluster: {}.", node_id,
             cluster_id);
 
   // Both node_id and cluster_id are mandatory for consistent state management and stats tracking.
   if (node_id.empty() || cluster_id.empty()) {
-    ENVOY_LOG(error,
-              "UpstreamSocketManager: node_id or cluster_id cannot be empty. node: '{}', cluster: '{}'.",
-              node_id, cluster_id);
+    ENVOY_LOG(
+        error,
+        "UpstreamSocketManager: node_id or cluster_id cannot be empty. node: '{}', cluster: '{}'.",
+        node_id, cluster_id);
     return;
   }
 
   const int fd = socket->ioHandle().fdDoNotUse();
   const std::string& connectionKey = socket->connectionInfoProvider().localAddress()->asString();
 
-  ENVOY_LOG(debug, "UpstreamSocketManager: adding socket with FD: {} for node: {}, cluster: {}.", fd,
-            node_id, cluster_id);
+  ENVOY_LOG(debug, "UpstreamSocketManager: adding socket with FD: {} for node: {}, cluster: {}.",
+            fd, node_id, cluster_id);
 
   // Store node -> cluster mapping.
-  ENVOY_LOG(trace, "UpstreamSocketManager: adding mapping node {} -> cluster {}.", node_id, cluster_id);
+  ENVOY_LOG(trace, "UpstreamSocketManager: adding mapping node {} -> cluster {}.", node_id,
+            cluster_id);
   if (node_to_cluster_map_.find(node_id) == node_to_cluster_map_.end()) {
     node_to_cluster_map_[node_id] = cluster_id;
     cluster_to_node_map_[cluster_id].push_back(node_id);
   }
 
   fd_to_node_map_[fd] = node_id;
+  fd_to_cluster_map_[fd] = cluster_id;
   // Initialize the ping timer before adding the socket to accepted_reverse_connections_.
-  // This is to prevent a race condition between pingConnections() and addConnectionSocket()
+  // This is to prevent a race condition between pingConnections() and addConnectionSocket().
   // where the timer is not initialized when pingConnections() tries to enable it.
   fd_to_timer_map_[fd] = dispatcher_.createTimer([this, fd]() { onPingTimeout(fd); });
 
-  // If local Envoy is responding to reverse connections, add the socket to
+  // If local Envoy is responding to reverse connections, add the socket to.
   // accepted_reverse_connections_. Thereafter, initiate ping keepalives on the socket.
   accepted_reverse_connections_[node_id].push_back(std::move(socket));
   Network::ConnectionSocketPtr& socket_ref = accepted_reverse_connections_[node_id].back();
@@ -177,7 +208,12 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
   fd_to_event_map_.erase(fd);
   fd_to_timer_map_.erase(fd);
 
-  cleanStaleNodeEntry(node_id);
+  // Clean up node-to-cluster mappings if this was the last idle socket for the node.
+  // We can safely clean up now because we track cluster_id per FD in fd_to_cluster_map_,.
+  // which will be used if the socket dies later.
+  if (node_sockets_it->second.empty()) {
+    cleanStaleNodeEntry(node_id);
+  }
 
   return socket;
 }
@@ -217,34 +253,42 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
 
   auto node_it = fd_to_node_map_.find(fd);
   if (node_it == fd_to_node_map_.end()) {
-    ENVOY_LOG(debug, "UpstreamSocketManager: fd {} not found in fd_to_node_map_.", fd);
+    ENVOY_LOG(warn, "UpstreamSocketManager: fd {} not found in fd_to_node_map_.", fd);
     return;
   }
 
-  const std::string node_id = node_it->second; // Make a COPY, not a reference
-  ENVOY_LOG(trace, "UpstreamSocketManager: found node '{}' for fd {}.", node_id, fd);
+  const std::string node_id = node_it->second; // Make a COPY, not a reference.
 
-  std::string cluster_id = (node_to_cluster_map_.find(node_id) != node_to_cluster_map_.end())
-                               ? node_to_cluster_map_[node_id]
-                               : "";
-  fd_to_node_map_.erase(fd); // Now it's safe to erase since node_id is a copy
+  // Get cluster_id from fd_to_cluster_map_.
+  auto cluster_it = fd_to_cluster_map_.find(fd)->second;
+  if (cluster_it == fd_to_cluster_map_.end()) {
+    ENVOY_LOG(warn, "UpstreamSocketManager: fd {} not found in fd_to_cluster_map_.", fd);
+    return;
+  }
+  const std::string cluster_id = cluster_it->second;
+  ENVOY_LOG(debug, "UpstreamSocketManager: found node '{}' cluster '{}' for fd: {}", node_id, cluster_id, fd);
 
-  // Check if this is a used connection by looking for node_id in accepted_reverse_connections_
+  fd_to_node_map_.erase(fd); // Now it's safe to erase since node_id is a copy.
+
+  // Check if this is a used connection by looking for node_id in accepted_reverse_connections_.
   auto& sockets = accepted_reverse_connections_[node_id];
   if (sockets.empty()) {
-    // This is a used connection. Mark the stats and return. The socket will be closed by the
+    // This is a used connection. Mark the stats and return. The socket will be closed by the.
     // owning UpstreamReverseConnectionIOHandle.
     ENVOY_LOG(debug,
               "UpstreamSocketManager: marking used socket dead. node: {} cluster: {} fd: {}.",
               node_id, cluster_id, fd);
-    // Update Envoy's stats system for production multi-tenant tracking
-    // This ensures stats are decremented when connections are removed
+    // Update Envoy's stats system for production multi-tenant tracking.
+    // This ensures stats are decremented when connections are removed.
     if (auto extension = getUpstreamExtension()) {
       extension->updateConnectionStats(node_id, cluster_id, false /* decrement */);
       ENVOY_LOG(trace,
                 "UpstreamSocketManager: decremented stats registry for node '{}' cluster '{}'.",
                 node_id, cluster_id);
     }
+
+    // Clean up node-to-cluster mappings since this used socket is now dead.
+    cleanStaleNodeEntry(node_id);
 
     return;
   }
@@ -308,8 +352,8 @@ void UpstreamSocketManager::cleanStaleNodeEntry(const std::string& node_id) {
   }
   ENVOY_LOG(debug, "UpstreamSocketManager: cleaning stale node entry for node {}.", node_id);
 
-  // Check if given node-id, is present in node_to_cluster_map_. If present,
-  // fetch the corresponding cluster-id. Use cluster-id and node-id to delete entry
+  // Check if given node-id, is present in node_to_cluster_map_. If present,.
+  // fetch the corresponding cluster-id. Use cluster-id and node-id to delete entry.
   // from cluster_to_node_map_ and node_to_cluster_map_ respectively.
   const auto& node_itr = node_to_cluster_map_.find(node_id);
   if (node_itr != node_to_cluster_map_.end()) {
@@ -323,7 +367,7 @@ void UpstreamSocketManager::cleanStaleNodeEntry(const std::string& node_id) {
                   cluster_itr->first);
         cluster_itr->second.erase(node_entry_itr);
 
-        // If the cluster to node-list map has an empty vector, remove
+        // If the cluster to node-list map has an empty vector, remove.
         // the entry from map.
         if (cluster_itr->second.size() == 0) {
           cluster_to_node_map_.erase(cluster_itr);
@@ -333,7 +377,7 @@ void UpstreamSocketManager::cleanStaleNodeEntry(const std::string& node_id) {
     node_to_cluster_map_.erase(node_itr);
   }
 
-  // Remove empty node entry from accepted_reverse_connections_
+  // Remove empty node entry from accepted_reverse_connections_.
   accepted_reverse_connections_.erase(node_id);
 }
 
@@ -352,7 +396,7 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
     return;
   }
 
-  // In this case, there is no read error, but the socket has been closed by the remote
+  // In this case, there is no read error, but the socket has been closed by the remote.
   // peer in a graceful manner, unlike a connection refused, or a reset.
   if (result.return_value_ == 0) {
     ENVOY_LOG(debug, "UpstreamSocketManager: FD: {}: reverse connection closed", fd);
@@ -395,9 +439,9 @@ void UpstreamSocketManager::pingConnections(const std::string& node_id) {
     auto ping_response_timeout = ping_interval_ / 2;
     fd_to_timer_map_[fd]->enableTimer(ping_response_timeout);
 
-    // Use a flag to signal whether the socket needs to be marked dead. If the socket is marked dead
-    // in markSocketDead(), it is erased from the list, and the iterator becomes invalid. We need to
-    // break out of the loop to avoid a use after free error.
+    // Use a flag to signal whether the socket needs to be marked dead. If the socket is marked
+    // dead. in markSocketDead(), it is erased from the list, and the iterator becomes invalid. We
+    // need to. break out of the loop to avoid a use after free error.
     bool socket_dead = false;
     while (buffer->length() > 0) {
       Api::IoCallUint64Result result = itr->get()->ioHandle().write(*buffer);
@@ -428,7 +472,7 @@ void UpstreamSocketManager::pingConnections(const std::string& node_id) {
       break;
     }
 
-    // Move to next socket
+    // Move to next socket.
     ++itr;
   }
 }
@@ -457,7 +501,7 @@ void UpstreamSocketManager::onPingTimeout(const int fd) {
 UpstreamSocketManager::~UpstreamSocketManager() {
   ENVOY_LOG(debug, "UpstreamSocketManager: destructor called.");
 
-  // Clean up all active file events and timers first
+  // Clean up all active file events and timers first.
   for (auto& [fd, event] : fd_to_event_map_) {
     ENVOY_LOG(trace, "UpstreamSocketManager: cleaning up file event. fd: {}.", fd);
     event.reset(); // This will cancel the file event.
@@ -470,7 +514,7 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   }
   fd_to_timer_map_.clear();
 
-  // Now mark all sockets as dead
+  // Now mark all sockets as dead.
   std::vector<int> fds_to_cleanup;
   for (const auto& [fd, node_id] : fd_to_node_map_) {
     fds_to_cleanup.push_back(fd);
@@ -478,17 +522,21 @@ UpstreamSocketManager::~UpstreamSocketManager() {
 
   for (int fd : fds_to_cleanup) {
     ENVOY_LOG(trace, "UpstreamSocketManager: marking socket dead in destructor. fd: {}.", fd);
-    markSocketDead(fd); // false = not used, just cleanup
+    markSocketDead(fd); // false = not used, just cleanup.
   }
 
-  // Clear the ping timer
+  // Clear any remaining fd mappings.
+  fd_to_node_map_.clear();
+  fd_to_cluster_map_.clear();
+
+  // Clear the ping timer.
   if (ping_timer_) {
     ping_timer_->disableTimer();
     ping_timer_.reset();
   }
 }
 
-} // namespace ReverseConnection
-} // namespace Bootstrap
-} // namespace Extensions
-} // namespace Envoy
+} // namespace ReverseConnection.
+} // namespace Bootstrap.
+} // namespace Extensions.
+} // namespace Envoy.
