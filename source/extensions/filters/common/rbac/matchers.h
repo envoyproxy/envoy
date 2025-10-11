@@ -199,13 +199,26 @@ private:
 class PolicyMatcher : public Matcher, NonCopyable {
 public:
   PolicyMatcher(const envoy::config::rbac::v3::Policy& policy,
-                Expr::BuilderInstanceSharedPtr& builder,
                 ProtobufMessage::ValidationVisitor& validation_visitor,
                 Server::Configuration::CommonFactoryContext& context)
       : permissions_(policy.permissions(), validation_visitor, context),
         principals_(policy.principals(), context),
+        arena_(policy.has_condition() ? std::make_unique<Protobuf::Arena>() : nullptr),
         expr_([&]() -> absl::optional<Expr::CompiledExpression> {
           if (policy.has_condition()) {
+            // Use the CEL configuration from the policy if available.
+            auto config_ref =
+                policy.has_cel_config()
+                    ? Envoy::makeOptRef(policy.cel_config())
+                    : Envoy::OptRef<const envoy::config::core::v3::CelExpressionConfig>{};
+
+            // Get the appropriate builder based on configuration.
+            auto builder =
+                (policy.has_cel_config() && policy.cel_config().enable_constant_folding())
+                    ? Expr::getBuilderWithArenaOptimization(context, policy.cel_config(),
+                                                            arena_.get())
+                    : Expr::getBuilder(context, config_ref);
+
             auto compiled = Expr::CompiledExpression::Create(builder, policy.condition());
             if (!compiled.ok()) {
               throw Expr::CelException(
@@ -222,6 +235,8 @@ public:
 private:
   const OrMatcher permissions_;
   const OrMatcher principals_;
+  // Arena for constant folding optimization. It is scoped to the policy lifetime.
+  const std::unique_ptr<Protobuf::Arena> arena_;
   const absl::optional<Expr::CompiledExpression> expr_;
 };
 
