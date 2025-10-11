@@ -125,10 +125,17 @@ EXTENSIONS = {
     "envoy.matching.inputs.dynamic_metadata":           "//source/extensions/matching/http/metadata_input:metadata_input_lib",
 
     #
+    # Transport Socket Matching Inputs
+    #
+    "envoy.matching.inputs.endpoint_metadata":     "//source/common/upstream:transport_socket_input_lib",
+    "envoy.matching.inputs.locality_metadata":     "//source/common/upstream:transport_socket_input_lib",
+
+    #
     # Matching actions
     #
 
     "envoy.matching.actions.format_string":             "//source/extensions/matching/actions/format_string:config",
+    "envoy.matching.action.transport_socket.name":      "//source/common/upstream:transport_socket_match_lib",
 
     #
     # StringMatchers

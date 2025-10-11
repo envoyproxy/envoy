@@ -22,6 +22,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/core/v3/collection_entry.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
@@ -45,7 +46,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 59]
+// [#next-free-field: 60]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -808,6 +809,42 @@ message Cluster {
   //
   // [#comment:TODO(incfly): add a detailed architecture doc on intended usage.]
   repeated TransportSocketMatch transport_socket_matches = 43;
+
+  // Optional matcher that selects a transport socket from
+  // :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
+  //
+  // This matcher uses the generic xDS matcher framework and may reference downstream
+  // connection attributes and endpoint metadata to select a named transport socket.
+  // This provides flexibility similar to the listener :ref:`filter_chain_matcher
+  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`.
+  //
+  // .. note::
+  //   All network-level inputs (destination IP, source IP, destination port, source port,
+  //   SNI, ALPN) refer to the **downstream connection** attributes, not the upstream connection.
+  //   For example:
+  //
+  //   * ``destination_ip``: The IP address of the upstream endpoint as seen by Envoy
+  //     (the local address of the connection on Envoy's side).
+  //   * ``source_ip``: The IP address of the downstream client.
+  //   * ``destination_port``: The port on which Envoy received the request.
+  //   * ``source_port``: The port used by the downstream client.
+  //   * ``server_name``: The SNI presented by the downstream client.
+  //   * ``application_protocols``: The ALPN protocols negotiated with the downstream client.
+  //
+  //   Additionally, endpoint-specific metadata inputs (endpoint_metadata, locality_metadata)
+  //   extract values from the selected upstream endpoint's metadata for transport socket selection.
+  //
+  // If this field is set, it takes precedence over legacy metadata-based selection
+  // performed by :ref:`transport_socket_matches
+  // <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` alone.
+  // If the matcher does not yield a match, Envoy uses the default transport socket
+  // configured for the cluster.
+  //
+  // When using this field, each entry in
+  // :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`
+  // must have a unique ``name``. The matcher outcome is expected to reference one of
+  // these names.
+  xds.type.matcher.v3.Matcher transport_socket_matcher = 59;
 
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
