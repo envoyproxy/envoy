@@ -180,7 +180,7 @@ private:
   // Upstream extension for stats integration.
   ReverseTunnelAcceptorExtension* extension_;
 
-  // Map of node IDs to the number of total accepted reverse connecitons
+  // Map of node IDs to the number of total accepted reverse connections
   // for the node. This is used to rebalance a request to accept reverse
   // connections to a different worker thread.
   absl::flat_hash_map<std::string, int> node_to_conn_count_map_;

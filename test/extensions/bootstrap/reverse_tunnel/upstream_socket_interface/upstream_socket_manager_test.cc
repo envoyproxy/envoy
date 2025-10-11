@@ -1053,7 +1053,7 @@ TEST_F(TestUpstreamSocketManagerRebalancing, NoRebalancingWhenCurrentWorkerIsLea
   socket_manager1_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval,
                                         false /* rebalanced */);
 
-  // Verify socket was added to socket_manager1 directly (no handoff).
+  // Verify socket was added to socket_manager1 directly.
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager1_.get(), node_id), 1);
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager2_.get(), node_id), 0);
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager3_.get(), node_id), 0);
