@@ -27,6 +27,7 @@ TEST(SendTrailersTest, Success) {
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   engine_builder.enforceTrustChainVerification(false)
+      .enableLogger(false)
       .setLogLevel(Logger::Logger::debug)
       .addNativeFilter("envoy.filters.http.assertion", typed_config)
 

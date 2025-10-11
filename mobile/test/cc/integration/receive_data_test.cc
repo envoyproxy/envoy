@@ -13,6 +13,7 @@ TEST(ReceiveDataTest, Success) {
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   engine_builder.enforceTrustChainVerification(false)
+      .enableLogger(false)
       .setLogLevel(Logger::Logger::debug)
       .setOnEngineRunning([&]() { engine_running.Notify(); });
   EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS,
