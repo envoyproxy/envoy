@@ -315,6 +315,16 @@ new_features:
     with the same hash value (e.g., same session ID, user ID, etc.) will consistently be
     routed to the same weighted cluster, enabling session affinity and consistent load
     balancing behavior.
+- area: router
+  change: |
+    Added :ref:`host_rewrite
+    <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite>` to
+    :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` to support substitution
+    formatting for host header rewriting.
+    Added :ref:`path_rewrite
+    <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite>` to
+    :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` to support substitution
+    formatting for path header rewriting.
 - area: stats
   change: |
     Added support to remove unused metrics from memory for extensions that
