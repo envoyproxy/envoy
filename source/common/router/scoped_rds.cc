@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -93,11 +94,13 @@ makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
         MessageUtil::downcastAndValidate<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             *config_proto, factory_context.messageValidationContext().staticValidationVisitor());
     if (!scoped_route_config.route_configuration_name().empty()) {
-      throw EnvoyException("Fetching routes via RDS (route_configuration_name) is not supported "
-                           "with inline scoped routes.");
+      throwEnvoyExceptionOrPanic(
+          "Fetching routes via RDS (route_configuration_name) is not supported "
+          "with inline scoped routes.");
     }
     if (!scoped_route_config.has_route_configuration()) {
-      throw EnvoyException("You must specify a route_configuration with inline scoped routes.");
+      throwEnvoyExceptionOrPanic(
+          "You must specify a route_configuration with inline scoped routes.");
     }
     RouteConfigProviderPtr route_config_provider =
         config_provider_manager.routeConfigProviderManager().createStaticRouteConfigProvider(

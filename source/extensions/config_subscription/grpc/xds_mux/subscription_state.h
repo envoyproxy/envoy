@@ -71,13 +71,13 @@ public:
     ENVOY_LOG(debug, "Handling response for {}", typeUrl());
     TRY_ASSERT_MAIN_THREAD { handleGoodResponse(response); }
     END_TRY
-    catch (const EnvoyException& e) {
+    CATCH(const EnvoyException& e, {
       if (xds_config_tracker_.has_value()) {
         xds_config_tracker_->onConfigRejected(response,
                                               Config::Utility::truncateGrpcStatusMessage(e.what()));
       }
       handleBadResponse(e, ack);
-    }
+    });
     previously_fetched_data_ = true;
     return ack;
   }

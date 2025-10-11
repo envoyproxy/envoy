@@ -26,6 +26,7 @@ build --verbose_failures
 build --workspace_status_command=../bazel/get_workspace_status
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
+build --define=envoy_mobile_xds=disabled
 build --define=google_grpc=disabled
 build --define=nghttp2=disabled
 build --define=envoy_yaml=disabled
@@ -246,6 +247,10 @@ test:mobile-remote-ci-android --config=mobile-android
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
+
+build:mobile-remote-ci-cc-xds-enabled --config=mobile-remote-ci-cc
+test:mobile-remote-ci-cc-xds-enabled --config=mobile-remote-ci-cc
+test:mobile-remote-ci-cc-xds-enabled --define=envoy_mobile_xds=enabled
 
 build:mobile-remote-ci-core --config=mobile-remote-ci
 test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH

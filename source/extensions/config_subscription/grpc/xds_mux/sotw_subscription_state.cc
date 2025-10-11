@@ -52,10 +52,10 @@ void SotwSubscriptionState::handleGoodResponse(
     for (const auto& any : message.resources()) {
       if (!any.Is<envoy::service::discovery::v3::Resource>() &&
           any.type_url() != message.type_url()) {
-        throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
-                                         "the message-wide type URL {} in DiscoveryResponse {}",
-                                         any.type_url(), message.type_url(),
-                                         message.DebugString()));
+        throwEnvoyExceptionOrPanic(
+            fmt::format("type URL {} embedded in an individual Any does not match "
+                        "the message-wide type URL {} in DiscoveryResponse {}",
+                        any.type_url(), message.type_url(), message.DebugString()));
       }
 
       auto decoded_resource = THROW_OR_RETURN_VALUE(
@@ -135,9 +135,8 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
         decoded_resources.emplace_back(std::move(decoded_resource));
       }
       END_TRY
-      catch (const EnvoyException& e) {
-        xds_resources_delegate_->onResourceLoadFailed(source_id, resource.name(), e);
-      }
+      CATCH(const EnvoyException& e,
+            { xds_resources_delegate_->onResourceLoadFailed(source_id, resource.name(), e); });
     }
 
     callbacks().onConfigUpdate(decoded_resources, version_info);
@@ -149,11 +148,11 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
     }
   }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     // TODO(abeyad): do something more than just logging the error?
     ENVOY_LOG(warn, "xDS delegate failed onEstablishmentFailure() for {}: {}", source_id.toKey(),
               e.what());
-  }
+  });
 }
 
 std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>
