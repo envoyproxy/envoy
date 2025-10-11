@@ -13,6 +13,7 @@
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_preferred_address_config_factory.h"
+#include "source/common/quic/envoy_quic_server_proof_verifier_factory_interface.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/server/active_udp_listener.h"
 
@@ -39,6 +40,7 @@ public:
                      uint32_t packets_to_read_to_connection_count_ratio,
                      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+                     EnvoyQuicServerProofVerifierFactoryInterface& proof_verifier_factory,
                      QuicConnectionIdGeneratorPtr&& cid_generator,
                      QuicConnectionIdWorkerSelector worker_selector,
                      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
@@ -138,6 +140,7 @@ protected:
       uint32_t packets_to_read_to_connection_count_ratio,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
       EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+      EnvoyQuicServerProofVerifierFactoryInterface& proof_verifier_factory,
       QuicConnectionIdGeneratorPtr&& cid_generator);
 
 private:
@@ -147,6 +150,8 @@ private:
       crypto_server_stream_factory_;
   absl::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
       proof_source_factory_;
+  absl::optional<std::reference_wrapper<EnvoyQuicServerProofVerifierFactoryInterface>>
+      proof_verifier_factory_;
   EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr connection_debug_visitor_factory_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
   EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;
