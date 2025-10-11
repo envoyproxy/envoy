@@ -359,6 +359,14 @@ new_features:
     Added support for generating and propagating a request ID on synthesized upstream HTTP requests when tunneling requests.
     It can be configured using :ref:`request_id_extension
     <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_extension>`.
+- area: tcp_proxy
+  change: |
+    Added configuration to customize the request ID header and dynamic metadata key used when tunneling requests.
+    Use :ref:`request_id_header
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_header>` and
+    :ref:`request_id_metadata_key
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_metadata_key>`.
+    When unset, the defaults remain ``x-request-id`` and ``tunnel_request_id`` respectively.
 - area: http
   change: |
     Added support for per-route compressor library override in the HTTP compressor filter.
