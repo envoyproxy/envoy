@@ -1678,6 +1678,96 @@ TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailOpen) {
   cleanup();
 }
 
+TEST_P(ExtAuthzHttpIntegrationTest, HttpRetryPolicy) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    const std::string ext_authz_config = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 300s
+      authorization_response:
+        allowed_upstream_headers:
+          patterns:
+          - exact: baz
+          - exact: bat
+      retry_policy:
+        retry_on: "5xx,gateway-error,connect-failure,reset"
+        num_retries: 2
+        retry_back_off:
+          base_interval: 0.01s
+          max_interval: 0.1s
+    failure_mode_allow: false
+    )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config_);
+    proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  const auto headers = Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  response_ = codec_client_->makeHeaderOnlyRequest(headers);
+
+  // Wait for the first ext_authz request.
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send a 503 error response to trigger retry.
+  Http::TestResponseHeaderMapImpl error_response_headers{{":status", "503"}};
+  ext_authz_request_->encodeHeaders(error_response_headers, true);
+
+  // Wait for the retry request to the ext_authz server.
+  FakeStreamPtr ext_authz_retry_request;
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_retry_request);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_retry_request->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send a successful response on the retry.
+  Http::TestResponseHeaderMapImpl success_response_headers{
+      {":status", "200"},
+      {"baz", "baz"},
+      {"bat", "bar"},
+  };
+  ext_authz_retry_request->encodeHeaders(success_response_headers, true);
+
+  // The request should now proceed to upstream.
+  result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Verify the request was modified by the successful ext_authz response.
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("baz", "baz"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  cleanup();
+}
+
 class ExtAuthzLocalReplyIntegrationTest : public HttpIntegrationTest,
                                           public TestWithParam<Network::Address::IpVersion> {
 public:
