@@ -213,7 +213,8 @@ HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& con
 
 bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
                             const StreamInfo::StreamInfo&) const {
-  return header_data_->matchesHeaders(context.requestHeaders());
+  return header_data_->matchesHeaders(
+      context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers));
 }
 
 ResponseFlagFilter::ResponseFlagFilter(
@@ -261,8 +262,9 @@ bool GrpcStatusFilter::evaluate(const Formatter::HttpFormatterContext& context,
                                 const StreamInfo::StreamInfo& info) const {
 
   Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
-  const auto& optional_status =
-      Grpc::Common::getGrpcStatus(context.responseTrailers(), context.responseHeaders(), info);
+  const auto optional_status = Grpc::Common::getGrpcStatus(
+      context.responseTrailers().value_or(*Http::StaticEmptyHeaders::get().response_trailers),
+      context.responseHeaders().value_or(*Http::StaticEmptyHeaders::get().response_headers), info);
   if (optional_status.has_value()) {
     status = optional_status.value();
   }

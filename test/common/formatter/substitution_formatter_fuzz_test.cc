@@ -32,8 +32,10 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
     return;
   }
 
-  const Formatter::HttpFormatterContext formatter_context{
-      request_headers.get(), response_headers.get(), response_trailers.get()};
+  Formatter::HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(*request_headers)
+      .setResponseHeaders(*response_headers)
+      .setResponseTrailers(*response_trailers);
 
   // Text formatter.
   {

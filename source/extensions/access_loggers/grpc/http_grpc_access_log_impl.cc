@@ -6,6 +6,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/utility.h"
@@ -56,7 +57,8 @@ void HttpGrpcAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
   // TODO(mattklein123): Populate sample_rate field.
   envoy::data::accesslog::v3::HTTPAccessLogEntry log_entry;
 
-  const auto& request_headers = context.requestHeaders();
+  const Http::RequestHeaderMap& request_headers =
+      context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers);
 
   GrpcCommon::Utility::extractCommonAccessLogProperties(
       *log_entry.mutable_common_properties(), request_headers, stream_info,
@@ -135,8 +137,10 @@ void HttpGrpcAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
   }
 
   // HTTP response properties.
-  const auto& response_headers = context.responseHeaders();
-  const auto& response_trailers = context.responseTrailers();
+  const Http::ResponseHeaderMap& response_headers =
+      context.responseHeaders().value_or(*Http::StaticEmptyHeaders::get().response_headers);
+  const Http::ResponseTrailerMap& response_trailers =
+      context.responseTrailers().value_or(*Http::StaticEmptyHeaders::get().response_trailers);
 
   auto* response_properties = log_entry.mutable_response();
   if (stream_info.responseCode()) {

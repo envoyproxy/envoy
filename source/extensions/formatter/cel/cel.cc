@@ -35,8 +35,8 @@ CELFormatter::formatWithContext(const Envoy::Formatter::HttpFormatterContext& co
                                 const StreamInfo::StreamInfo& stream_info) const {
   Protobuf::Arena arena;
   auto eval_status =
-      compiled_expr_.evaluate(arena, &local_info_, stream_info, &context.requestHeaders(),
-                              &context.responseHeaders(), &context.responseTrailers());
+      compiled_expr_.evaluate(arena, &local_info_, stream_info, context.requestHeaders().ptr(),
+                              context.responseHeaders().ptr(), context.responseTrailers().ptr());
   if (!eval_status.has_value() || eval_status.value().IsError()) {
     return absl::nullopt;
   }
@@ -54,8 +54,8 @@ CELFormatter::formatValueWithContext(const Envoy::Formatter::HttpFormatterContex
   if (typed_) {
     Protobuf::Arena arena;
     auto eval_status =
-        compiled_expr_.evaluate(arena, &local_info_, stream_info, &context.requestHeaders(),
-                                &context.responseHeaders(), &context.responseTrailers());
+        compiled_expr_.evaluate(arena, &local_info_, stream_info, context.requestHeaders().ptr(),
+                                context.responseHeaders().ptr(), context.responseTrailers().ptr());
     if (!eval_status.has_value() || eval_status.value().IsError()) {
       return ValueUtil::nullValue();
     }

@@ -103,6 +103,7 @@ envoy_cc_library(
         "//envoy/common:regex_interface",
         "//envoy/matcher:matcher_interface",
         "//envoy/thread_local:thread_local_interface",
+        "//source/common/common:empty_string",
     ],
 )
 

@@ -5,6 +5,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/utility.h"
 #include "source/extensions/access_loggers/grpc/grpc_access_log_utils.h"
@@ -37,8 +38,9 @@ void TcpGrpcAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
   // Common log properties.
   envoy::data::accesslog::v3::TCPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(
-      *log_entry.mutable_common_properties(), context.requestHeaders(), stream_info,
-      config_->common_config(), context.accessLogType());
+      *log_entry.mutable_common_properties(),
+      context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers),
+      stream_info, config_->common_config(), context.accessLogType());
 
   envoy::data::accesslog::v3::ConnectionProperties& connection_properties =
       *log_entry.mutable_connection_properties();

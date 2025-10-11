@@ -55,11 +55,11 @@ public:
                   absl::optional<size_t> max_length);
 
 protected:
-  absl::optional<std::string> format(const Http::HeaderMap& headers) const;
-  Protobuf::Value formatValue(const Http::HeaderMap& headers) const;
+  absl::optional<std::string> format(OptRef<const Http::HeaderMap> headers) const;
+  Protobuf::Value formatValue(OptRef<const Http::HeaderMap> headers) const;
 
 private:
-  const Http::HeaderEntry* findHeader(const Http::HeaderMap& headers) const;
+  const Http::HeaderEntry* findHeader(OptRef<const Http::HeaderMap> headers) const;
 
   Http::LowerCaseString main_header_;
   Http::LowerCaseString alternative_header_;
@@ -83,10 +83,10 @@ public:
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
-  uint64_t extractHeadersByteSize(const Http::RequestHeaderMap& request_headers,
-                                  const Http::ResponseHeaderMap& response_headers,
-                                  const Http::ResponseTrailerMap& response_trailers) const;
-  HeaderType header_type_;
+  uint64_t extractHeadersByteSize(OptRef<const Http::RequestHeaderMap> request_headers,
+                                  OptRef<const Http::ResponseHeaderMap> response_headers,
+                                  OptRef<const Http::ResponseTrailerMap> response_trailers) const;
+  const HeaderType header_type_{};
 };
 
 /**

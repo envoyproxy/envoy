@@ -46,6 +46,13 @@ TEST_F(XfccValueTest, Test) {
       std::move(Envoy::Formatter::SubstitutionFormatParser::parse("%XFCC_VALUE(uri)%").value()[0]);
 
   {
+    Envoy::Formatter::Context formatter_context;
+    // No headers.
+    EXPECT_TRUE(
+        formatter->formatValueWithContext(formatter_context, stream_info_).has_null_value());
+  }
+
+  {
     // No XFCC header.
     Http::TestRequestHeaderMapImpl headers{};
     EXPECT_TRUE(formatter->formatValueWithContext({&headers}, stream_info_).has_null_value());

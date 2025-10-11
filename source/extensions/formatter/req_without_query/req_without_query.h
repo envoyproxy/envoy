@@ -24,7 +24,7 @@ public:
                                          const StreamInfo::StreamInfo&) const override;
 
 private:
-  const Http::HeaderEntry* findHeader(const Http::HeaderMap& headers) const;
+  const Http::HeaderEntry* findHeader(OptRef<const Http::HeaderMap> headers) const;
 
   const Http::LowerCaseString main_header_;
   const Http::LowerCaseString alternative_header_;
