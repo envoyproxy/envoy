@@ -59,6 +59,7 @@
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/locality_pool.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
@@ -212,7 +213,7 @@ public:
   LoadMetricStats& loadMetricStats() const override { return load_metric_stats_; }
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
-  const envoy::config::core::v3::Locality& locality() const override { return locality_; }
+  const envoy::config::core::v3::Locality& locality() const override { return *locality_; }
   const MetadataConstSharedPtr localityMetadata() const override { return locality_metadata_; }
   Stats::StatName localityZoneStatName() const override {
     return locality_zone_stat_name_.statName();
@@ -248,7 +249,7 @@ protected:
       ClusterInfoConstSharedPtr cluster, const std::string& hostname,
       Network::Address::InstanceConstSharedPtr dest_address,
       MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-      const envoy::config::core::v3::Locality& locality,
+      std::shared_ptr<const envoy::config::core::v3::Locality> locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority, absl::Status& creation_status);
 
@@ -267,7 +268,7 @@ private:
   mutable absl::Mutex metadata_mutex_;
   MetadataConstSharedPtr endpoint_metadata_ ABSL_GUARDED_BY(metadata_mutex_);
   const MetadataConstSharedPtr locality_metadata_;
-  const envoy::config::core::v3::Locality locality_;
+  const std::shared_ptr<const envoy::config::core::v3::Locality> locality_;
   Stats::StatNameDynamicStorage locality_zone_stat_name_;
   mutable HostStats stats_;
   mutable LoadMetricStatsImpl load_metric_stats_;
@@ -294,7 +295,7 @@ public:
   create(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
          Network::Address::InstanceConstSharedPtr dest_address,
          MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-         const envoy::config::core::v3::Locality& locality,
+         std::shared_ptr<const envoy::config::core::v3::Locality> locality,
          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
          uint32_t priority, const AddressVector& address_list = {});
 
@@ -310,7 +311,7 @@ protected:
       absl::Status& creation_status, ClusterInfoConstSharedPtr cluster, const std::string& hostname,
       Network::Address::InstanceConstSharedPtr dest_address,
       MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-      const envoy::config::core::v3::Locality& locality,
+      std::shared_ptr<const envoy::config::core::v3::Locality> locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority, const AddressVector& address_list = {});
 
@@ -477,7 +478,7 @@ public:
   create(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
          Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr endpoint_metadata,
          MetadataConstSharedPtr locality_metadata, uint32_t initial_weight,
-         const envoy::config::core::v3::Locality& locality,
+         std::shared_ptr<const envoy::config::core::v3::Locality> locality,
          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
          uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
          const AddressVector& address_list = {});
@@ -486,7 +487,8 @@ protected:
   HostImpl(absl::Status& creation_status, ClusterInfoConstSharedPtr cluster,
            const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
            MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-           uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
+           uint32_t initial_weight,
+           std::shared_ptr<const envoy::config::core::v3::Locality> locality,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
            const AddressVector& address_list = {})
@@ -1173,6 +1175,10 @@ public:
     return const_metadata_shared_pool_;
   }
 
+  ConstLocalitySharedPoolSharedPtr constLocalitySharedPool() const {
+    return const_locality_shared_pool_;
+  }
+
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
   ClusterInfoConstSharedPtr info() const override { return info_; }
@@ -1251,6 +1257,7 @@ private:
   uint64_t pending_initialize_health_checks_{};
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
+  ConstLocalitySharedPoolSharedPtr const_locality_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
   UnitFloat drop_overload_{0};
   std::string drop_category_;

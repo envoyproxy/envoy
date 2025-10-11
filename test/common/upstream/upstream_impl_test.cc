@@ -1897,7 +1897,8 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_sub_zone("world");
   std::unique_ptr<HostImpl> host = *HostImpl::create(
       cluster.info_, "lyft.com", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(locality),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN);
   EXPECT_EQ(cluster.info_.get(), &host->cluster());
@@ -1923,7 +1924,8 @@ TEST_F(HostImplTest, CreateConnection) {
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
   auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(locality),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN));
 
@@ -1961,7 +1963,8 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   };
   auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(locality),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, address_list));
 
@@ -2008,7 +2011,8 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   };
   auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(locality),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, address_list));
 
@@ -2064,7 +2068,8 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   };
   auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(locality),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, address_list));
 
@@ -2115,7 +2120,8 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   };
   auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(locality),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, address_list));
 
@@ -2261,7 +2267,7 @@ TEST_F(HostImplTest, HealthPipeAddress) {
   config.set_port_value(8000);
   EXPECT_EQ(HostDescriptionImpl::create(
                 info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr, nullptr,
-                envoy::config::core::v3::Locality().default_instance(), config, 1)
+                std::make_shared<const envoy::config::core::v3::Locality>(), config, 1)
                 .status()
                 .message(),
             "Invalid host configuration: non-zero port for non-IP address");
@@ -2276,7 +2282,8 @@ TEST_F(HostImplTest, NetnsInvalid) {
       Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:9999", true, "/netns/filepath");
   EXPECT_EQ(
       HostDescriptionImpl::create(info, "", dest_addr, nullptr, nullptr,
-                                  envoy::config::core::v3::Locality().default_instance(), config, 1)
+                                  std::make_shared<const envoy::config::core::v3::Locality>(),
+                                  config, 1)
           .status()
           .message(),
       "Invalid host configuration: hosts cannot specify network namespaces with their address");
@@ -2296,7 +2303,7 @@ TEST_F(HostImplTest, HealthcheckHostname) {
   config.set_hostname("foo");
   std::unique_ptr<HostDescriptionImpl> descr = *HostDescriptionImpl::create(
       info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr, nullptr,
-      envoy::config::core::v3::Locality().default_instance(), config, 1);
+      std::make_shared<const envoy::config::core::v3::Locality>(), config, 1);
   EXPECT_EQ("foo", descr->hostnameForHealthChecks());
 }
 
