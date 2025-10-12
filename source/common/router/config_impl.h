@@ -91,7 +91,7 @@ using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBas
 class SslRedirector : public DirectResponseEntry {
 public:
   // Router::DirectResponseEntry
-  void finalizeResponseHeaders(Http::ResponseHeaderMap&, const Formatter::Context&,
+  void finalizeResponseHeaders(Http::ResponseHeaderMap&, const Formatter::HttpFormatterContext&,
                                const StreamInfo::StreamInfo&) const override {}
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
                                                   bool) const override {
@@ -598,12 +598,14 @@ public:
     }
     return HeaderParser::defaultParser();
   }
-  void finalizeRequestHeaders(Http::RequestHeaderMap& headers, const Formatter::Context& context,
+  void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                              const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool keep_original_host_or_path) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting = true) const override;
-  void finalizeResponseHeaders(Http::ResponseHeaderMap& headers, const Formatter::Context& context,
+  void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                               const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;

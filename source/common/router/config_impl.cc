@@ -213,7 +213,7 @@ std::string rewritePathByPrefixOrRegex(absl::string_view path, absl::string_view
                                        const Regex::CompiledMatcher* regex_rewrite,
                                        absl::string_view regex_rewrite_substitution) {
   if (!prefix_rewrite.empty()) {
-    ASSERT(absl::StartsWith(path, matched));
+    ASSERT(absl::StartsWithIgnoreCase(path, matched));
     return generateNewPath(path, matched, prefix_rewrite);
   }
 

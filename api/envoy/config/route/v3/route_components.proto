@@ -1316,6 +1316,7 @@ message RouteAction {
     // For example, with the following config:
     //
     //   .. code-block:: yaml
+    //
     //     host_rewrite: "prefix-%REQ(custom-host-header-name)%"
     //
     // Would rewrite the host header to ``prefix-some_value`` given the header
