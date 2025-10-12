@@ -64,6 +64,9 @@ build --incompatible_enforce_config_setting_visibility
 test --test_verbose_timeout_warnings
 test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 
+# Exclude CI-only tests from local builds
+test --test_tag_filters=-engflow_only
+
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
