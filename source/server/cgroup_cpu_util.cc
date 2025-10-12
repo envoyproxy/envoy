@@ -17,6 +17,11 @@
 
 namespace Envoy {
 
+// Implementation of CgroupDetector interface
+absl::optional<uint32_t> CgroupDetectorImpl::getCpuLimit(Filesystem::Instance& fs) {
+  return CgroupCpuUtil::getCpuLimit(fs);
+}
+
 // Returns the CPU limit from `cgroup` subsystem, following Go runtime behavior.
 // This function prioritizes `cgroup` `v1` over `v2` when both are available,
 // as `v1` CPU controllers take precedence in hybrid environments.

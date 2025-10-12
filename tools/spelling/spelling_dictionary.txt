@@ -2,6 +2,11 @@
 # lower case and title case (e.g. HTTP will accept http and Http). Entries in all lower case
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
+
+addrlen
+itr
+STREQ
+htonl
 ABI
 ACK
 ACL

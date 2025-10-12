@@ -4,10 +4,37 @@
 
 #include "envoy/filesystem/filesystem.h"
 
+#include "source/common/singleton/threadsafe_singleton.h"
+
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+/**
+ * Interface for cgroup CPU detection. Allows mocking in tests.
+ */
+class CgroupDetector {
+public:
+  virtual ~CgroupDetector() = default;
+
+  /**
+   * Detects CPU limit from `cgroup` subsystem.
+   * @param fs Filesystem instance for file operations.
+   * @return CPU limit or absl::nullopt if no `cgroup` limit found.
+   */
+  virtual absl::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs) PURE;
+};
+
+/**
+ * Production implementation of cgroup CPU detection.
+ */
+class CgroupDetectorImpl : public CgroupDetector {
+public:
+  absl::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs) override;
+};
+
+using CgroupDetectorSingleton = ThreadSafeSingleton<CgroupDetectorImpl>;
 
 /**
  * `Cgroup` filesystem mount information.

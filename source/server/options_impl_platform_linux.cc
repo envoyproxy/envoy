@@ -58,7 +58,8 @@ uint32_t OptionsImplPlatform::getCpuCount() {
 
   if (enable_cgroup_detection) {
     Filesystem::InstanceImpl fs;
-    absl::optional<uint32_t> detected_limit = CgroupCpuUtil::getCpuLimit(fs);
+    auto& detector = CgroupDetectorSingleton::get();
+    absl::optional<uint32_t> detected_limit = detector.getCpuLimit(fs);
     if (detected_limit.has_value()) {
       cgroup_limit = detected_limit.value();
     }

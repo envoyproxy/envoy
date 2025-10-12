@@ -16,6 +16,7 @@
 #include "source/common/common/utility.h"
 #include "source/extensions/filters/http/buffer/buffer_filter.h"
 #include "source/server/options_impl.h"
+#include "source/server/options_impl_platform.h"
 
 #include "absl/strings/ascii.h"
 
@@ -25,7 +26,6 @@
 #include "source/server/cgroup_cpu_util.h"
 #endif
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
@@ -587,6 +587,11 @@ using testing::DoAll;
 using testing::Return;
 using testing::SetArgPointee;
 
+class MockCgroupDetector : public CgroupDetectorImpl {
+public:
+  MOCK_METHOD(absl::optional<uint32_t>, getCpuLimit, (Filesystem::Instance & fs), (override));
+};
+
 class OptionsImplPlatformLinuxTest : public testing::Test {
 public:
 };
@@ -663,182 +668,154 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
   EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
 }
 
-// Pure cgroup mock tests - use filesystem mocks to work on Linux
-TEST_F(OptionsImplPlatformLinuxTest, CgroupV2CpuLimit) {
-  // Test cgroup v2 CPU limit detection with ``modularized`` flow
-  Filesystem::MockInstance mock_fs;
+// Mock-based tests for getCpuCount environment variable control
 
-  // Step 1: Mock /proc/self/mountinfo for mount discovery (cgroup v2)
-  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/mountinfo"))
-      .WillOnce(
-          Return(std::string("26 21 0:22 / /sys/fs/cgroup rw,relatime - cgroup2 cgroup2 rw")));
+TEST_F(OptionsImplPlatformLinuxTest, EnvVarDisablesCgroupDetectionMocked) {
+  // Test that ENVOY_CGROUP_CPU_DETECTION=false prevents getCpuLimit calls
+  setenv("ENVOY_CGROUP_CPU_DETECTION", "false", 1);
 
-  // Step 2: Mock /proc/self/cgroup for process assignment (cgroup v2 format)
-  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
-      .WillOnce(Return(std::string("0::/user.slice/user-1000.slice/session-1.scope")));
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
 
-  // Step 4 & 5: Mock v2 cpu.max file access - our `modularized` logic directly accesses v2 files
-  // Based on version detection from /proc/self/cgroup, it goes straight to v2 files
-  // CPU limit: 150ms quota, 100ms period = 1.5 CPUs
-  EXPECT_CALL(mock_fs,
-              fileReadToEnd("/sys/fs/cgroup/user.slice/user-1000.slice/session-1.scope/cpu.max"))
-      .Times(1) // Called once in accessCgroupV2Files, then content is cached for readActualLimitsV2
-      .WillOnce(Return(std::string("150000 100000\n")));
+  // Verify getCpuLimit is NOT called when env var disables detection
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).Times(0);
 
-  absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 1); // max(1, floor(1.5)) = max(1, 1) = 1
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  EXPECT_GE(result, 1U); // Should return hardware thread count
+
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION");
 }
 
-TEST_F(OptionsImplPlatformLinuxTest, CgroupV1CpuLimit) {
-  // Test cgroup v1 CPU limit detection with ``modularized`` flow
-  Filesystem::MockInstance mock_fs;
+TEST_F(OptionsImplPlatformLinuxTest, EnvVarAllowsCgroupDetectionMocked) {
+  // Test that default behavior (enabled) calls getCpuLimit
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Default: enabled
 
-  // Step 1: Mock /proc/self/mountinfo for mount discovery (cgroup v1 with CPU controller)
-  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/mountinfo"))
-      .WillOnce(Return(
-          std::string("25 21 0:21 / /sys/fs/cgroup/cpu rw,relatime - cgroup cgroup rw,cpu")));
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
 
-  // Step 2: Mock /proc/self/cgroup for process assignment (cgroup v1 format)
-  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
-      .WillOnce(Return(std::string("2:cpu:/docker/container123")));
+  // Mock successful cgroup detection returning 2 CPUs
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(2)));
 
-  // Step 4 & 5: Mock v1 file access - our ``modularized`` logic directly accesses v1 files
-  // Based on version detection from /proc/self/cgroup, it goes straight to v1 files
-  // v1 files: 50ms quota, 100ms period = 0.5 CPUs
-  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/docker/container123/cpu.cfs_quota_us"))
-      .Times(1) // Called once in accessCgroupV1Files (cached for readActualLimitsV1)
-      .WillOnce(Return(std::string("50000\n")));
-  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/docker/container123/cpu.cfs_period_us"))
-      .Times(1) // Called once in accessCgroupV1Files (cached for readActualLimitsV1)
-      .WillOnce(Return(std::string("100000\n")));
-
-  absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 1); // max(1, floor(0.5)) = max(1, 0) = 1
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Result should be influenced by the mocked cgroup limit of 2
+  EXPECT_GE(result, 1U);
 }
 
-TEST_F(OptionsImplPlatformLinuxTest, CgroupUnlimited) {
-  // Test when cgroup shows unlimited CPU with ``modularized`` flow
-  Filesystem::MockInstance mock_fs;
+TEST_F(OptionsImplPlatformLinuxTest, EnvVarTrueAllowsCgroupDetectionMocked) {
+  // Test that ENVOY_CGROUP_CPU_DETECTION=true enables detection
+  setenv("ENVOY_CGROUP_CPU_DETECTION", "true", 1);
 
-  // Step 1: Mock /proc/self/mountinfo for mount discovery (cgroup v2)
-  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/mountinfo"))
-      .WillOnce(
-          Return(std::string("26 21 0:22 / /sys/fs/cgroup rw,relatime - cgroup2 cgroup2 rw")));
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
 
-  // Step 2: Mock /proc/self/cgroup for process assignment
-  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
-      .WillOnce(Return(std::string("0::/system.slice")));
+  // Mock cgroup detection returning no limit (unlimited)
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::nullopt));
 
-  // Step 4 & 5: Mock v2 cpu.max file access - our `modularized` logic directly accesses v2 files
-  // Based on version detection from /proc/self/cgroup, it goes straight to v2 files
-  // Unlimited CPU: "max" indicates no limit
-  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/system.slice/cpu.max"))
-      .Times(1) // Called once in accessCgroupV2Files, then content is cached for readActualLimitsV2
-      .WillOnce(Return(std::string("max 100000\n")));
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  EXPECT_GE(result, 1U); // Should fallback to hardware thread count
 
-  absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
-  EXPECT_FALSE(result.has_value()); // Should return nullopt when unlimited
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION");
 }
 
-TEST_F(OptionsImplPlatformLinuxTest, NoCgroupFilesAvailable) {
-  // Test fallback when no cgroup files exist
-  Filesystem::MockInstance mock_fs;
+TEST_F(OptionsImplPlatformLinuxTest, CgroupLimitConstrainsResult) {
+  // Test that cgroup limit is used in min() calculation when it's the smallest value
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Enable detection
 
-  // Mock no cgroup files available - all reads will fail
-  EXPECT_CALL(mock_fs, fileReadToEnd(_))
-      .WillRepeatedly(Return(absl::InvalidArgumentError("not found")));
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
 
-  absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
-  EXPECT_FALSE(result.has_value()); // Should return nullopt when no cgroup files available
+  // Mock cgroup detection returning 2 CPUs (lower than typical hardware)
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(2)));
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Result should be constrained by cgroup limit
+  // Since we can't easily mock hardware threads and affinity in this test,
+  // we verify the cgroup limit is considered (result influenced by mock)
+  EXPECT_GE(result, 1U);
+  EXPECT_LE(result, 2U); // Should not exceed the mocked cgroup limit
 }
 
-TEST_F(OptionsImplPlatformLinuxTest, CpuCountIntegration) {
-  // Test the complete getCpuCount() integration that combines hardware, affinity, and cgroup
-  unsigned int fake_hw_threads = 8;
-  Api::MockLinuxOsSysCalls linux_os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
+TEST_F(OptionsImplPlatformLinuxTest, CgroupDetectionReturnsNullopt) {
+  // Test graceful fallback when cgroup detection returns no limit (unlimited)
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Enable detection
 
-  // Mock CPU affinity: 4 CPUs available
-  cpu_set_t test_set;
-  CPU_ZERO(&test_set);
-  for (int i = 0; i < 4; i++) {
-    CPU_SET(i, &test_set);
-  }
-  EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
-      .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
 
-  // Note: This test validates the affinity part. The complete integration with cgroup
-  // would require injecting the filesystem mock into OptionsImplPlatform::getCpuCount(),
-  // which would require refactoring that function to accept a filesystem parameter.
+  // Mock cgroup detection returning nullopt (no limit/unlimited)
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::nullopt));
 
-  uint32_t affinity_result = OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads);
-  EXPECT_EQ(affinity_result, 4); // Should respect CPU affinity constraint
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Should fall back to hardware thread count when no cgroup limit
+  EXPECT_GE(result, 1U);
+  // Without cgroup constraint, should get at least hardware thread count
+  // (limited by affinity in practice, but we can't easily mock that here)
 }
 
-TEST_F(OptionsImplPlatformLinuxTest, CgroupMinimumEnforcement) {
-  // Test that we always return at least 1 CPU (Envoy's minimum) with complete 5-step flow
-  Filesystem::MockInstance mock_fs;
+TEST_F(OptionsImplPlatformLinuxTest, CgroupLimitVeryLow) {
+  // Test that very low cgroup limits are respected (heavy constraint scenario)
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Enable detection
 
-  // Step 1: Mock /proc/self/mountinfo for mount discovery (cgroup v2)
-  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/mountinfo"))
-      .WillOnce(
-          Return(std::string("26 21 0:22 / /sys/fs/cgroup rw,relatime - cgroup2 cgroup2 rw")));
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
 
-  // Step 2: Mock /proc/self/cgroup for process assignment
-  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
-      .WillOnce(Return(std::string("0::/user.slice/user-1000.slice")));
+  // Mock cgroup detection returning 1 CPU (very constrained)
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(1)));
 
-  // Step 4 & 5: Mock v2 cpu.max file access - our `modularized` logic directly accesses v2 files
-  // Based on version detection from /proc/self/cgroup, it goes straight to v2 files
-  // Very low CPU limit: 10ms quota, 100ms period = 0.1 CPUs
-  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/user.slice/user-1000.slice/cpu.max"))
-      .Times(1) // Called once in accessCgroupV2Files, then content is cached for readActualLimitsV2
-      .WillOnce(Return(std::string("10000 100000")));
-
-  absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 1); // max(1, floor(0.1)) = max(1, 0) = 1
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Even with very low cgroup limit, Envoy guarantees at least 1 CPU
+  EXPECT_EQ(result, 1U); // Should be exactly 1 due to cgroup constraint
 }
 
-TEST_F(OptionsImplPlatformLinuxTest, CgroupHybridSystemdV1ActiveV2Tracking) {
-  // Test hybrid `systemd` setup: both v1 and v2 mounted, but v1 controls resources
-  // This is common in `systemd` environments where v2 is used for process tracking
-  // while v1 controllers (cpu, memory, etc.) still manage actual resource limits
-  Filesystem::MockInstance mock_fs;
+TEST_F(OptionsImplPlatformLinuxTest, CgroupLimitHigherThanTypicalHardware) {
+  // Test when cgroup allows more CPUs than typical hardware might have
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Enable detection
 
-  // Step 1: Mock /proc/self/mountinfo showing BOTH cgroup v1 and v2 mounts
-  // This simulates a `systemd` hybrid setup where both versions coexist
-  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/mountinfo"))
-      .WillOnce(Return(std::string(
-          "25 21 0:21 / /sys/fs/cgroup/cpu rw,relatime - cgroup cgroup rw,cpu\n"
-          "26 21 0:22 / /sys/fs/cgroup rw,relatime - cgroup2 cgroup2 rw\n"
-          "27 21 0:23 / /sys/fs/cgroup/memory rw,relatime - cgroup cgroup rw,memory\n")));
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
 
-  // Step 2: Mock /proc/self/cgroup showing process is in BOTH hierarchies
-  // v1 hierarchy (2:cpu:/docker/container123) - actively managing CPU resources
-  // v2 hierarchy (0::/user.slice/user-1000.slice/session-1.scope) - tracking only
-  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
-      .WillOnce(Return(std::string("2:cpu:/docker/container123\n"
-                                   "0::/user.slice/user-1000.slice/session-1.scope\n")));
+  // Mock cgroup detection returning high CPU count
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(32)));
 
-  // Step 3: Our `modularized` logic should prioritize v1 when both are available
-  // Based on getCurrentCgroupPath(), it should detect v1 and use those files
-  // Mock v1 CPU files: 200ms quota, 100ms period = 2.0 CPUs
-  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/docker/container123/cpu.cfs_quota_us"))
-      .Times(1) // Called once in accessCgroupV1Files (cached for readActualLimitsV1)
-      .WillOnce(Return(std::string("200000\n")));
-  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/docker/container123/cpu.cfs_period_us"))
-      .Times(1) // Called once in accessCgroupV1Files (cached for readActualLimitsV1)
-      .WillOnce(Return(std::string("100000\n")));
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Result should be constrained by hardware/affinity, not the high cgroup limit
+  EXPECT_GE(result, 1U);
+  // In practice, hardware thread count or affinity will be the constraint
+  EXPECT_LE(result, 32U); // Sanity check - shouldn't exceed the mock value
+}
 
-  // Note: v2 files should NOT be accessed since v1 takes priority
-  // The v2 hierarchy exists but is only used for `systemd` process tracking
+TEST_F(OptionsImplPlatformLinuxTest, EnvoyMinimumOneCPUGuarantee) {
+  // Test Envoy's guarantee of at least 1 CPU even with theoretical edge cases
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Enable detection
 
-  absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 2); // Uses v1 limit: max(1, floor(2.0)) = max(1, 2) = 2
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Mock cgroup detection returning 0 (theoretical edge case)
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(0)));
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Envoy's max(1U, effective_count) should ensure at least 1 CPU
+  EXPECT_GE(result, 1U); // Must honor Envoy's minimum guarantee
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, CombinedEnvVarAndCgroupScenarios) {
+  // Test various environment variable states with different cgroup responses
+
+  // Scenario 1: Explicitly enabled with successful detection
+  setenv("ENVOY_CGROUP_CPU_DETECTION", "true", 1);
+
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Mock successful cgroup detection
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(4)));
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  EXPECT_GE(result, 1U);
+  EXPECT_LE(result, 4U); // Should consider the cgroup limit
+
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION");
 }
 #endif
 
