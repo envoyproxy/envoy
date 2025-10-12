@@ -326,15 +326,28 @@ TEST_F(TestUpstreamSocketManager, TestGetNodeID) {
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node_id), 1);
   EXPECT_EQ(getNodeToClusterMapping(node_id), cluster_id);
 
+  // Key is a cluster ID with idle connections. This should return the node ID.
   std::string result_for_cluster = socket_manager_->getNodeID(cluster_id);
   EXPECT_EQ(result_for_cluster, node_id);
 
+  // Key is a node ID. This should return it as-is.
   std::string result_for_node = socket_manager_->getNodeID(node_id);
   EXPECT_EQ(result_for_node, node_id);
 
+  // Key doesn't exist. This should return it as-is.
   const std::string non_existent_cluster = "non-existent-cluster";
   std::string result_for_non_existent = socket_manager_->getNodeID(non_existent_cluster);
   EXPECT_EQ(result_for_non_existent, non_existent_cluster);
+
+  // Key is a cluster ID but no nodes have idle connections.
+  // Retrieve the only socket, making the node have no idle connections.
+  auto retrieved_socket = socket_manager_->getConnectionSocket(node_id);
+  EXPECT_NE(retrieved_socket, nullptr);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node_id), 0);
+
+  // getNodeID with cluster_id should return cluster_id as-is since no nodes have idle connections.
+  std::string result_for_cluster_no_idle = socket_manager_->getNodeID(cluster_id);
+  EXPECT_EQ(result_for_cluster_no_idle, cluster_id);
 }
 
 TEST_F(TestUpstreamSocketManager, GetConnectionSocketEmpty) {
@@ -791,12 +804,25 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadInvalidSocketNotInPool) {
 
   addFDToNodeMapping(123, node_id);
 
-  // Test the fallback logic: fd_to_cluster_map_ was erased during markSocketDead when socket.
+  // fd_to_cluster_map_ was erased during markSocketDead when socket
   // was retrieved, so markSocketDead should fall back to node_to_cluster_map_.
   socket_manager_->markSocketDead(123);
 
   EXPECT_FALSE(verifyFDToNodeMap(123));
   EXPECT_FALSE(verifyFDToClusterMap(123));
+
+  // Test inconsistent state where fd is in fd_to_node_map_ but not in fd_to_cluster_map_.
+  const int fd_456 = 456;
+  addFDToNodeMapping(fd_456, node_id);
+  addNodeToClusterMapping(node_id, cluster_id);
+
+  // Mark socket dead without having fd_to_cluster_map_ entry.
+  // This should log a warning, use node_to_cluster_map_ as fallback, and continue cleanup.
+  socket_manager_->markSocketDead(fd_456);
+
+  // Verify fd was removed from fd_to_node_map_ despite cluster map being missing initially.
+  EXPECT_FALSE(verifyFDToNodeMap(fd_456));
+  EXPECT_FALSE(verifyFDToClusterMap(fd_456));
 }
 
 TEST_F(TestUpstreamSocketManager, MarkSocketDeadClusterFallbackLogic) {
@@ -819,7 +845,7 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadClusterFallbackLogic) {
   EXPECT_TRUE(verifyFDToNodeMap(789));
   EXPECT_TRUE(verifyFDToClusterMap(789));
 
-  // Retrieve first socket - this removes it from idle pool but keeps fd mappings.
+  // Retrieve first socket. This removes it from idle pool but keeps fd mappings.
   auto retrieved_socket = socket_manager_->getConnectionSocket(node_id);
   EXPECT_NE(retrieved_socket, nullptr);
 
@@ -827,14 +853,14 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadClusterFallbackLogic) {
   EXPECT_TRUE(verifyFDToNodeMap(123));
   EXPECT_TRUE(verifyFDToClusterMap(123));
 
-  // Mark one idle socket dead - should use fd_to_cluster_map_ (preferred path).
+  // Mark one idle socket dead. This should use fd_to_cluster_map_.
   // Node-to-cluster mapping should still exist since socket 789 is still in the pool.
   socket_manager_->markSocketDead(456);
   EXPECT_FALSE(verifyFDToNodeMap(456));
   EXPECT_FALSE(verifyFDToClusterMap(456));
   EXPECT_EQ(getNodeToClusterMapping(node_id), cluster_id);
 
-  // Mark the last idle socket dead - this will trigger cleanStaleNodeEntry.
+  // Mark the last idle socket dead. This will trigger cleanStaleNodeEntry.
   // since the idle pool becomes empty.
   socket_manager_->markSocketDead(789);
   EXPECT_FALSE(verifyFDToNodeMap(789));
@@ -843,7 +869,7 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadClusterFallbackLogic) {
   // Node-to-cluster mapping is now cleared because idle pool is empty.
   EXPECT_EQ(getNodeToClusterMapping(node_id), "");
 
-  // Mark the used socket dead - fd_to_cluster_map_[123] should be found and used.
+  // Mark the used socket dead. The fd_to_cluster_map_[123] should be found and used.
   // This tests the primary path where fd_to_cluster_map_ is preferred.
   socket_manager_->markSocketDead(123);
   EXPECT_FALSE(verifyFDToNodeMap(123));
@@ -1041,7 +1067,7 @@ TEST_F(TestUpstreamSocketManagerRebalancing, NoRebalancingWhenCurrentWorkerIsLea
   setNodeConnCount(socket_manager2_.get(), node_id, 3);
   setNodeConnCount(socket_manager3_.get(), node_id, 5);
 
-  // Mock post() on all dispatchers (should NOT be called since no rebalancing needed).
+  // Mock post() on all dispatchers (should not be called since no rebalancing needed).
   EXPECT_CALL(dispatcher1_, post(_)).Times(0);
 
   EXPECT_CALL(dispatcher2_, post(_)).Times(0);
@@ -1077,7 +1103,7 @@ TEST_F(TestUpstreamSocketManagerRebalancing, RebalancingWithNewNode) {
   // New node has no entries, so all workers have count 0 for it.
   // Worker1 should be selected as it's the first one with count 0.
 
-  // Mock post() should NOT be called since worker1 is calling addConnectionSocket.
+  // Mock post() should not be called since worker1 is calling addConnectionSocket.
   EXPECT_CALL(dispatcher1_, post(_)).Times(0);
   EXPECT_CALL(dispatcher2_, post(_)).Times(0);
   EXPECT_CALL(dispatcher3_, post(_)).Times(0);
@@ -1108,7 +1134,7 @@ TEST_F(TestUpstreamSocketManagerRebalancing, RebalancingSkippedWhenAlreadyRebala
   setNodeConnCount(socket_manager2_.get(), node_id, 0);
   setNodeConnCount(socket_manager3_.get(), node_id, 10);
 
-  // Mock post() should NOT be called since rebalanced = true.
+  // Mock post() should not be called since rebalanced = true.
   EXPECT_CALL(dispatcher1_, post(_)).Times(0);
   EXPECT_CALL(dispatcher2_, post(_)).Times(0);
   EXPECT_CALL(dispatcher3_, post(_)).Times(0);
@@ -1123,7 +1149,7 @@ TEST_F(TestUpstreamSocketManagerRebalancing, RebalancingSkippedWhenAlreadyRebala
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager2_.get(), node_id), 0);
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager3_.get(), node_id), 1);
 
-  // Verify connection count - should NOT be incremented by pickLeastLoadedSocketManager.
+  // Verify connection count. This should not be incremented by pickLeastLoadedSocketManager.
   EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 0);
   EXPECT_EQ(getNodeConnCount(socket_manager2_.get(), node_id), 0);
   EXPECT_EQ(getNodeConnCount(socket_manager3_.get(), node_id), 10);

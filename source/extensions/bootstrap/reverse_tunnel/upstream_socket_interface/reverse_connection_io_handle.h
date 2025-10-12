@@ -65,6 +65,14 @@ public:
    */
   const Network::ConnectionSocket& getSocket() const { return *owned_socket_; }
 
+#ifdef ENVOY_ENABLE_FULL_PROTOS
+  /**
+   * Test-only method to release the owned socket without closing the fd.
+   * This allows testing of defensive code paths where owned_socket_ is nullptr.
+   */
+  void releaseSocketForTest() { owned_socket_.reset(); }
+#endif
+
 private:
   // The name of the cluster this reverse connection belongs to.
   std::string cluster_name_;

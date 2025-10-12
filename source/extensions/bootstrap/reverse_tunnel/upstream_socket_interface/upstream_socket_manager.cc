@@ -1,7 +1,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
-#include <string>
 #include <algorithm>
+#include <string>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
@@ -255,12 +255,18 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   const std::string node_id = node_it->second;
 
   // Get cluster_id from fd_to_cluster_map_.
+  std::string cluster_id;
   auto cluster_it = fd_to_cluster_map_.find(fd);
   if (cluster_it == fd_to_cluster_map_.end()) {
     ENVOY_LOG(warn, "reverse_tunnel: fd {} not found in fd_to_cluster_map_.", fd);
-    return;
+    // Try to get cluster_id from node_to_cluster_map_ as fallback.
+    auto node_cluster_it = node_to_cluster_map_.find(node_id);
+    if (node_cluster_it != node_to_cluster_map_.end()) {
+      cluster_id = node_cluster_it->second;
+    }
+  } else {
+    cluster_id = cluster_it->second;
   }
-  const std::string cluster_id = cluster_it->second;
   ENVOY_LOG(debug, "reverse_tunnel: found node '{}' cluster '{}' for fd: {}", node_id, cluster_id,
             fd);
 
