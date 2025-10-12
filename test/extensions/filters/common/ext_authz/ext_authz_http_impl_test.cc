@@ -676,29 +676,17 @@ TEST_F(ExtAuthzHttpClientTest, RetryPolicyConfiguration) {
       .WillOnce(Invoke(
           [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
-            // Verify retry policy is set.
-            EXPECT_TRUE(options.retry_policy.has_value());
+            // Verify parsed retry policy is set.
+            EXPECT_NE(options.parsed_retry_policy, nullptr);
             // Verify buffer body for retry is enabled.
             EXPECT_TRUE(options.buffer_body_for_retry);
-            // Verify retry policy fields.
-            EXPECT_TRUE(options.retry_policy.value().has_num_retries());
-            EXPECT_EQ(PROTOBUF_GET_WRAPPED_REQUIRED(options.retry_policy.value(), num_retries), 3);
-            // Verify retry_on includes our configured values plus defaults.
-            const std::string& retry_on = options.retry_policy.value().retry_on();
-            EXPECT_THAT(retry_on, testing::HasSubstr("5xx"));
-            EXPECT_THAT(retry_on, testing::HasSubstr("gateway-error"));
-            EXPECT_THAT(retry_on, testing::HasSubstr("connect-failure"));
-            EXPECT_THAT(retry_on, testing::HasSubstr("reset"));
+            // Verify retry policy fields from the implementation.
+            EXPECT_EQ(options.parsed_retry_policy->numRetries(), 3);
             // Verify backoff configuration.
-            EXPECT_TRUE(options.retry_policy.value().has_retry_back_off());
-            EXPECT_TRUE(options.retry_policy.value().retry_back_off().has_base_interval());
-            EXPECT_EQ(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(),
-                                               base_interval),
-                      500);
-            EXPECT_TRUE(options.retry_policy.value().retry_back_off().has_max_interval());
-            EXPECT_EQ(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(),
-                                               max_interval),
-                      5000);
+            EXPECT_TRUE(options.parsed_retry_policy->baseInterval().has_value());
+            EXPECT_EQ(options.parsed_retry_policy->baseInterval().value().count(), 500);
+            EXPECT_TRUE(options.parsed_retry_policy->maxInterval().has_value());
+            EXPECT_EQ(options.parsed_retry_policy->maxInterval().value().count(), 5000);
             return &async_request_;
           }));
 
@@ -728,8 +716,8 @@ TEST_F(ExtAuthzHttpClientTest, NoRetryPolicy) {
       .WillOnce(Invoke(
           [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
-            // Verify retry policy is not set.
-            EXPECT_FALSE(options.retry_policy.has_value());
+            // Verify parsed retry policy is not set.
+            EXPECT_EQ(options.parsed_retry_policy, nullptr);
             // Verify buffer body for retry is not enabled.
             EXPECT_FALSE(options.buffer_body_for_retry);
             return async_request;

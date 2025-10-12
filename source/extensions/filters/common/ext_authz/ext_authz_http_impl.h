@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/router/router.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/tracing/tracer.h"
 #include "envoy/type/matcher/v3/string.pb.h"
@@ -101,9 +101,7 @@ public:
   /**
    * Returns the retry policy for the authorization service.
    */
-  const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() const {
-    return retry_policy_;
-  }
+  const Router::RetryPolicyConstSharedPtr& retryPolicy() const { return retry_policy_; }
 
 private:
   static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -130,7 +128,7 @@ private:
   const std::string tracing_name_;
   Router::HeaderParserPtr request_headers_parser_;
   const bool encode_raw_headers_;
-  const absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
+  const Router::RetryPolicyConstSharedPtr retry_policy_;
 };
 
 using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;

@@ -11,6 +11,7 @@
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/utility.h"
+#include "source/common/router/retry_policy_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 
@@ -107,6 +108,18 @@ absl::StatusOr<std::string> validatePathPrefix(absl::string_view path_prefix) {
   return std::string(path_prefix);
 }
 
+absl::StatusOr<Router::RetryPolicyConstSharedPtr>
+createRetryPolicy(const envoy::config::core::v3::RetryPolicy& core_retry_policy,
+                  Server::Configuration::CommonFactoryContext& context) {
+  // Convert core retry policy to route retry policy and create the implementation.
+  envoy::config::route::v3::RetryPolicy route_retry_policy =
+      Http::Utility::convertCoreToRouteRetryPolicy(core_retry_policy,
+                                                   "5xx,gateway-error,connect-failure,reset");
+
+  return Router::RetryPolicyImpl::create(route_retry_policy, context.messageValidationVisitor(),
+                                         context);
+}
+
 } // namespace
 
 // Config
@@ -135,11 +148,10 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           Router::HeaderParserPtr)),
       encode_raw_headers_(config.encode_raw_headers()),
       retry_policy_(config.http_service().has_retry_policy()
-                        ? absl::optional<envoy::config::route::v3::RetryPolicy>(
-                              Http::Utility::convertCoreToRouteRetryPolicy(
-                                  config.http_service().retry_policy(),
-                                  "5xx,gateway-error,connect-failure,reset"))
-                        : absl::nullopt) {}
+                        ? THROW_OR_RETURN_VALUE(
+                              createRetryPolicy(config.http_service().retry_policy(), context),
+                              Router::RetryPolicyConstSharedPtr)
+                        : nullptr) {}
 
 ClientConfig::ClientConfig(
     const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
@@ -166,10 +178,9 @@ ClientConfig::ClientConfig(
       encode_raw_headers_(encode_raw_headers),
       retry_policy_(
           http_service.has_retry_policy()
-              ? absl::optional<envoy::config::route::v3::RetryPolicy>(
-                    Http::Utility::convertCoreToRouteRetryPolicy(
-                        http_service.retry_policy(), "5xx,gateway-error,connect-failure,reset"))
-              : absl::nullopt) {}
+              ? THROW_OR_RETURN_VALUE(createRetryPolicy(http_service.retry_policy(), context),
+                                      Router::RetryPolicyConstSharedPtr)
+              : nullptr) {}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -319,8 +330,8 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     options.setSendXff(false);
 
     // Apply retry policy if configured.
-    if (config_->retryPolicy().has_value()) {
-      options.setRetryPolicy(config_->retryPolicy().value());
+    if (config_->retryPolicy() != nullptr) {
+      options.setRetryPolicy(config_->retryPolicy());
       options.setBufferBodyForRetry(true);
     }
 
