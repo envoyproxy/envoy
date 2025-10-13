@@ -10,6 +10,7 @@ envoy_cc_library(
     hdrs = ["envoy_mobile_quic_network_observer_registry_factory.h"],
     repository = "@envoy",
     deps = [
+        ":network_types_lib",
         "@envoy//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
     ],
 )

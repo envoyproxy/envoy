@@ -235,16 +235,9 @@ private:
 
 using DefaultNetworkChangeCallback = std::function<void(envoy_netconf_t)>;
 
-class NetworkChangeObserver {
-public:
-  virtual ~NetworkChangeObserver() = default;
-  virtual void onNetworkMadeDefault(NetworkHandle network) PURE;
-  virtual void onNetworkDisconnected(NetworkHandle network) PURE;
-  virtual void onNetworkConnected(NetworkHandle network) PURE;
-};
-
 class ConnectivityManagerImpl : public ConnectivityManager,
                                 public Singleton::Instance,
+                                public Quic::NetworkConnectivityTracker,
                                 public Logger::Loggable<Logger::Id::upstream> {
 public:
   /**
@@ -284,10 +277,13 @@ public:
   void setDefaultNetworkChangeCallback(DefaultNetworkChangeCallback cb) {
     default_network_change_callback_ = cb;
   }
-  void setNetworkChangeObserver(NetworkChangeObserver* observer) { observer_ = observer; }
 
   // Refresh DNS regardless of configuration key change.
   void doRefreshDns(envoy_netconf_t configuration_key, bool drain_connections);
+
+  // Only used on Android.
+  NetworkHandle getDefaultNetwork() override;
+  absl::flat_hash_map<NetworkHandle, ConnectionType> getAllConnectedNetworks() override;
 
 private:
   // The states of the current default network picked by the platform.
@@ -320,7 +316,6 @@ private:
   absl::flat_hash_map<NetworkHandle, ConnectionType>
       connected_networks_ ABSL_GUARDED_BY(network_mutex_);
   DefaultNetworkChangeCallback default_network_change_callback_;
-  NetworkChangeObserver* observer_{nullptr};
 };
 
 using ConnectivityManagerImplSharedPtr = std::shared_ptr<ConnectivityManagerImpl>;

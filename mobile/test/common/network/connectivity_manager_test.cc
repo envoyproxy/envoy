@@ -1,4 +1,5 @@
 #include <net/if.h>
+#include <sys/types.h>
 
 #include "test/common/mocks/common/mocks.h"
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
@@ -15,7 +16,7 @@ using testing::Return;
 namespace Envoy {
 namespace Network {
 
-class MockNetworkChangeObserver : public NetworkChangeObserver {
+class MockNetworkConnectivityObserver : public Quic::QuicNetworkConnectivityObserver {
 public:
   MOCK_METHOD(void, onNetworkMadeDefault, (NetworkHandle network), (override));
   MOCK_METHOD(void, onNetworkDisconnected, (NetworkHandle network), (override));
@@ -35,6 +36,12 @@ public:
         {1, ConnectionType::CONNECTION_WIFI}, {2, ConnectionType::CONNECTION_UNKNOWN}};
     EXPECT_CALL(helper_handle_->mock_helper(), getAllConnectedNetworks())
         .WillOnce(Return(connected_networks));
+    EXPECT_CALL(cm_, createNetworkObserverRegistries(_))
+        .WillOnce(Invoke([this](Quic::EnvoyQuicNetworkObserverRegistryFactory& registry_factory) {
+          registry_.reset(static_cast<Quic::EnvoyMobileQuicNetworkObserverRegistry*>(
+              registry_factory.createQuicNetworkObserverRegistry(dispatcher_).release()));
+          registry_->registerObserver(observer_);
+        }));
     connectivity_manager_ = std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_manager_);
     ON_CALL(*dns_cache_manager_, lookUpCacheByName(_)).WillByDefault(Return(dns_cache_));
     // Toggle network to reset network state.
@@ -47,18 +54,19 @@ public:
       num_default_network_change_++;
     };
     connectivity_manager_->setDefaultNetworkChangeCallback(std::move(callback));
-    connectivity_manager_->setNetworkChangeObserver(&observer_);
   }
 
+  NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<NiceMock<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager>>
       dns_cache_manager_;
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCache> dns_cache_;
   NiceMock<Upstream::MockClusterManager> cm_{};
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
   ConnectivityManagerImplSharedPtr connectivity_manager_;
-  testing::StrictMock<MockNetworkChangeObserver> observer_;
+  testing::StrictMock<MockNetworkConnectivityObserver> observer_;
   // Track callback invocation count.
   int num_default_network_change_{0};
+  Quic::EnvoyMobileQuicNetworkObserverRegistryPtr registry_;
 };
 
 TEST_F(ConnectivityManagerTest, SetPreferredNetworkWithNewNetworkChangesConfigurationKey) {
@@ -301,6 +309,7 @@ TEST_F(ConnectivityManagerTest, NetworkChangeResultsInDifferentSocketOptionsHash
 // again, the signal will be ignored.
 TEST_F(ConnectivityManagerTest, DuplicatedSignalOfAndroidNetworkBecomesDefault) {
   EXPECT_CALL(observer_, onNetworkMadeDefault(_)).Times(0);
+  EXPECT_CALL(dispatcher_, post(_)).Times(0);
   connectivity_manager_->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_WIFI, 1);
   // The callback should not have been called.
   EXPECT_EQ(num_default_network_change_, 0);
@@ -311,6 +320,7 @@ TEST_F(ConnectivityManagerTest, DuplicatedSignalOfAndroidNetworkBecomesDefault) 
 TEST_F(ConnectivityManagerTest, AndroidNetworkConnectedAndThenBecomesDefault) {
   const NetworkHandle net_id = 123;
   const auto connection_type = ConnectionType::CONNECTION_WIFI;
+  EXPECT_CALL(dispatcher_, post(_)).Times(2u);
 
   // Simulate a network is connected.
   EXPECT_CALL(observer_, onNetworkConnected(net_id));
@@ -333,6 +343,7 @@ TEST_F(ConnectivityManagerTest, AndroidNetworkBecomesDefaultAndThenConnected) {
   const NetworkHandle net_id = 123;
   const auto connection_type = ConnectionType::CONNECTION_4G;
   const envoy_netconf_t initial_config_key = connectivity_manager_->getConfigurationKey();
+  EXPECT_CALL(dispatcher_, post(_)).Times(2u);
 
   // Simulate that the network becomes the default. At this point, it is not yet "connected".
   connectivity_manager_->onDefaultNetworkChangedAndroid(connection_type, net_id);
@@ -358,6 +369,7 @@ TEST_F(ConnectivityManagerTest, AndroidNetworkBecomesDefaultAndThenConnected) {
 TEST_F(ConnectivityManagerTest, AndroidNetworkConnectedAndThenDisconnected) {
   const NetworkHandle net_id = 123;
   const auto connection_type = ConnectionType::CONNECTION_WIFI;
+  EXPECT_CALL(dispatcher_, post(_)).Times(2u);
 
   EXPECT_CALL(observer_, onNetworkConnected(net_id));
   // Simulate a network is connected.
@@ -376,6 +388,7 @@ TEST_F(ConnectivityManagerTest, AndroidNetworkConnectedAndThenDisconnected) {
 // But if the network is exempted from purging, observer shouldn't be notified about it being
 // disconnected.
 TEST_F(ConnectivityManagerTest, AndroidPurgeNetworks) {
+  EXPECT_CALL(dispatcher_, post(_)).Times(7u);
 
   EXPECT_CALL(observer_, onNetworkConnected(_)).Times(3);
   connectivity_manager_->onNetworkConnectAndroid(ConnectionType::CONNECTION_WIFI, 123);
