@@ -314,8 +314,6 @@ envoy_cc_test(
     }),
 )
 
-
-
 envoy_cc_test(
     name = "overload_manager_impl_test",
     srcs = ["overload_manager_impl_test.cc"],
