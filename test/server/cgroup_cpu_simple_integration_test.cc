@@ -27,26 +27,21 @@ protected:
   }
 };
 
-// Test basic cgroup CPU detection functionality
+// Test basic cgroup CPU detection functionality - MUST have cgroups in CI
 TEST_F(CgroupCpuSimpleIntegrationTest, CgroupDetectionBasicFunctionality) {
   CgroupDetectorImpl detector;
   Filesystem::InstanceImpl fs;
 
   auto cpu_limit = detector.getCpuLimit(fs);
 
-  if (cpu_limit.has_value()) {
-    // If cgroup limit is detected, it should be exactly 2 for linux_x64_small pool
-    uint32_t limit = cpu_limit.value();
-    EXPECT_EQ(2U, limit); // linux_x64_small pool has exactly 2 CPUs
+  // In CI environment with Docker CPU limits, we MUST detect cgroups
+  ASSERT_TRUE(cpu_limit.has_value()) << "Cgroups not detected in CI environment - Docker CPU limits not working";
 
-    ENVOY_LOG_MISC(info, "Cgroup CPU limit detected: {}", limit);
-  } else {
-    // No cgroup limit detected - this is also valid (unlimited/no cgroup)
-    ENVOY_LOG_MISC(info, "No cgroup CPU limit detected (unlimited)");
-  }
+  // Should be exactly 2 for our Docker --cpus=2 configuration
+  uint32_t limit = cpu_limit.value();
+  EXPECT_EQ(2U, limit) << "Expected 2 CPUs from Docker --cpus=2 setting, got: " << limit;
 
-  // Test should not crash regardless of cgroup configuration
-  SUCCEED();
+  ENVOY_LOG_MISC(info, "Cgroup CPU limit detected: {}", limit);
 }
 
 // Test environment variable disable functionality

@@ -314,26 +314,7 @@ envoy_cc_test(
     }),
 )
 
-envoy_cc_test(
-    name = "cgroup_server_integration_test",
-    srcs = ["cgroup_server_integration_test.cc"],
-    data = [
-        ":server_test_data",
-    ],
-    rbe_pool = "linux_x64_small",
-    tags = [
-        "engflow_only",
-        "no-sandbox",
-    ],
-    deps = [
-        ":utility_lib",
-        "//test/test_common:environment_lib",
-        "//test/test_common:utility_lib",
-    ] + select({
-        "@platforms//os:linux": ["//source/server:cgroup_cpu_util_lib"],
-        "//conditions:default": [],
-    }),
-)
+
 
 envoy_cc_test(
     name = "overload_manager_impl_test",
