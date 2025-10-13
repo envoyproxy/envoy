@@ -53,19 +53,7 @@ Downstream socket interface
     :lineno-start: 8
     :caption: :download:`initiator-envoy.yaml </_configs/reverse_connection/initiator-envoy.yaml>`
 
-<<<<<<< HEAD
-  bootstrap_extensions:
-  - name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
-    typed_config:
-      "@type": >-
-        type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
-      stat_prefix: "downstream_reverse_connection"
-      enable_detailed_stats: false  # Optional: Enable detailed per-host/per-cluster stats (defaults to false)
-
-This extension enables the initiator to initiate and manage reverse tunnels to the responder Envoy.
-=======
 This extension enables the initiator Envoy to establish and maintain reverse tunnel connections to the responder Envoy.
->>>>>>> upstream/main
 
 .. _config_reverse_tunnel_listener:
 
@@ -98,11 +86,16 @@ In the example above, this expands to:
 
 The identifiers serve the following purposes:
 
-* **src_node_id**: Each node must have a unique ``src_node_id`` across the entire system to ensure proper routing and connection management. Data requests can target a specific node by its ID.
-* **src_cluster_id**: Multiple nodes can share the same ``src_cluster_id``, forming a logical group. Data requests sent using the cluster ID will be load balanced across all nodes in that cluster. The ``src_cluster_id`` must not collide with any ``src_node_id``.
-* **src_tenant_id**: Used in multi-tenant environments to isolate traffic and resources between different tenants or organizational units.
+* **src_node_id**: Each node must have a unique ``src_node_id`` across the entire system to ensure proper
+  routing and connection management. Data requests can target a specific node by its ID.
+* **src_cluster_id**: Multiple nodes can share the same ``src_cluster_id``, forming a logical group. Data
+  requests sent using the cluster ID will be load balanced across all nodes in that cluster. The
+  ``src_cluster_id`` must not collide with any ``src_node_id``.
+* **src_tenant_id**: Used in multi-tenant environments to isolate traffic and resources between different
+  tenants or organizational units.
 
-The ``downstream-service`` cluster in the example refers to the service behind the initiator Envoy that will be accessed via reverse tunnels from services behind the responder Envoy.
+The ``downstream-service`` cluster in the example refers to the service behind the initiator Envoy that will
+be accessed via reverse tunnels from services behind the responder Envoy.
 
 .. literalinclude:: /_configs/reverse_connection/initiator-envoy.yaml
     :language: yaml
@@ -209,19 +202,7 @@ Upstream socket interface
     :lineno-start: 8
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
-<<<<<<< HEAD
-  bootstrap_extensions:
-  - name: envoy.bootstrap.reverse_tunnel.upstream_socket_interface
-    typed_config:
-      "@type": >-
-        type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
-      stat_prefix: "upstream_reverse_connection"
-      enable_detailed_stats: false  # Optional: Enable detailed per-node/per-cluster stats (defaults to false)
-
-This extension enables the responder to accept and manage reverse connections from initiator Envoys.
-=======
 This extension enables the responder Envoy to accept and manage incoming reverse tunnel connections from initiator Envoys.
->>>>>>> upstream/main
 
 .. _config_reverse_tunnel_network_filter:
 
@@ -364,34 +345,13 @@ The reverse tunnel network filter emits handshake-related statistics with the pr
 
 **Downstream Socket Interface:**
 
-The downstream reverse tunnel extension emits aggregate statistics and optionally detailed per-host/per-cluster statistics.
+The downstream reverse tunnel extension emits per-host and per-cluster statistics only when the
+configuration flag ``enable_detailed_stats`` is set to ``true``.
 
-Aggregate Statistics
-^^^^^^^^^^^^^^^^^^^^
+Per-Host and Per-Cluster Statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The extension always emits aggregate statistics showing the total count of connections across all clusters by state.
-These stats use the pattern ``<stat_prefix>.connected_clusters.<state>``:
-
-.. csv-table::
-   :header: Name, Type, Description
-   :widths: 1, 1, 2
-
-   <stat_prefix>.connected_clusters.connecting, Gauge, Total number of connections currently being established across all clusters
-   <stat_prefix>.connected_clusters.connected, Gauge, Total number of successfully established connections across all clusters
-   <stat_prefix>.connected_clusters.failed, Gauge, Total number of failed connection attempts across all clusters
-   <stat_prefix>.connected_clusters.recovered, Gauge, Total number of connections that recovered from failure across all clusters
-   <stat_prefix>.connected_clusters.backoff, Gauge, Total number of hosts currently in backoff state across all clusters
-   <stat_prefix>.connected_clusters.cannot_connect, Gauge, Total connection attempts that could not be initiated across all clusters
-
-For example, with ``stat_prefix: "downstream_rc"``:
-
-* ``downstream_rc.connected_clusters.connecting`` - total connections being established across all clusters
-* ``downstream_rc.connected_clusters.connected`` - total established connections across all clusters
-
-Detailed Per-Host and Per-Cluster Statistics
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-When the configuration flag ``enable_detailed_stats`` is set to ``true``, the extension also emits detailed statistics
+When the configuration flag ``enable_detailed_stats`` is set to ``true``, the extension emits detailed statistics
 for individual hosts and clusters. The stat names follow the pattern:
 
 - Host-level: ``<stat_prefix>.host.<host_address>.<state>``
@@ -405,34 +365,20 @@ For example, with ``stat_prefix: "downstream_rc"`` and ``enable_detailed_stats: 
 * ``downstream_rc.cluster.upstream-cluster.connected`` - established connections to upstream-cluster
 
 .. warning::
-   Per-host and per-cluster stats are only emitted when the configuration flag ``enable_detailed_stats`` is set to ``true``.
-   These stats are emitted as hidden statistics and can be viewed using ``curl "http://localhost:9901/stats?hidden=include"``.
+   These stats are only emitted when the configuration flag ``enable_detailed_stats`` is set to ``true``.
+   They are emitted as hidden statistics and can be viewed using ``curl "http://localhost:9901/stats?hidden=include"``.
    Enabling detailed stats can lead to scalability issues when the number of hosts/clusters is high, as each unique host and cluster
    will create separate gauge metrics.
 
 **Upstream Socket Interface:**
 
-The upstream reverse tunnel extension emits aggregate statistics and optionally detailed per-node/per-cluster statistics.
+The upstream reverse tunnel extension emits per-node and per-cluster statistics only when the
+configuration flag ``enable_detailed_stats`` is set to ``true``.
 
-Aggregate Statistics
-^^^^^^^^^^^^^^^^^^^^
+Per-Node and Per-Cluster Statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The extension always emits an aggregate statistic showing the total count of accepted reverse connections:
-
-.. csv-table::
-   :header: Name, Type, Description
-   :widths: 1, 1, 2
-
-   <stat_prefix>.accepted_clusters, Gauge, Total number of active reverse connections accepted from all downstream nodes/clusters
-
-For example, with ``stat_prefix: "reverse_connections"``:
-
-* ``reverse_connections.accepted_clusters`` - total active reverse connections from all downstream nodes
-
-Detailed Per-Node and Per-Cluster Statistics
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-When the configuration flag ``enable_detailed_stats`` is set to ``true``, the extension also emits detailed statistics
+When the configuration flag ``enable_detailed_stats`` is set to ``true``, the extension emits detailed statistics
 for individual nodes and clusters. The stat names follow the pattern:
 
 * Node-level: ``<stat_prefix>.nodes.<node_id>``
@@ -444,8 +390,8 @@ For example, with ``stat_prefix: "reverse_connections"`` and ``enable_detailed_s
 * ``reverse_connections.clusters.downstream-cluster`` - active connections from downstream cluster "downstream-cluster"
 
 .. warning::
-   Per-node and per-cluster stats are only emitted when the configuration flag ``enable_detailed_stats`` is set to ``true``.
-   These stats are emitted as hidden statistics and can be viewed using ``curl "http://localhost:9901/stats?hidden=include"``.
+   These stats are only emitted when the configuration flag ``enable_detailed_stats`` is set to ``true``.
+   They are emitted as hidden statistics and can be viewed using ``curl "http://localhost:9901/stats?hidden=include"``.
    Enabling detailed stats can lead to scalability issues when the number of nodes/clusters is high, as each unique node and cluster
    will create separate gauge metrics.
 
