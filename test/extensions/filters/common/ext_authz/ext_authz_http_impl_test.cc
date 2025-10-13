@@ -652,6 +652,84 @@ TEST_F(ExtAuthzHttpClientTest, NoCluster) {
                  stream_info_);
 }
 
+// Test that retry policy is properly configured when set in HttpService.
+TEST_F(ExtAuthzHttpClientTest, RetryPolicyConfiguration) {
+  const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+      retry_policy:
+        retry_on: "5xx,gateway-error,connect-failure,reset"
+        num_retries: 3
+        retry_back_off:
+          base_interval: 0.5s
+          max_interval: 5s
+    )EOF";
+
+  initialize(yaml);
+
+  envoy::service::auth::v3::CheckRequest request;
+
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            // Verify parsed retry policy is set.
+            EXPECT_NE(options.parsed_retry_policy, nullptr);
+            // Verify buffer body for retry is enabled.
+            EXPECT_TRUE(options.buffer_body_for_retry);
+            // Verify retry policy fields from the implementation.
+            EXPECT_EQ(options.parsed_retry_policy->numRetries(), 3);
+            // Verify backoff configuration.
+            EXPECT_TRUE(options.parsed_retry_policy->baseInterval().has_value());
+            EXPECT_EQ(options.parsed_retry_policy->baseInterval().value().count(), 500);
+            EXPECT_TRUE(options.parsed_retry_policy->maxInterval().has_value());
+            EXPECT_EQ(options.parsed_retry_policy->maxInterval().value().count(), 5000);
+            return &async_request_;
+          }));
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  // Cancel the request to clean up.
+  EXPECT_CALL(async_request_, cancel());
+  client_->cancel();
+}
+
+// Test that request works correctly without retry policy.
+TEST_F(ExtAuthzHttpClientTest, NoRetryPolicy) {
+  const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+    )EOF";
+
+  initialize(yaml);
+
+  envoy::service::auth::v3::CheckRequest request;
+  Http::AsyncClient::Request* async_request = &async_request_;
+
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            // Verify parsed retry policy is not set.
+            EXPECT_EQ(options.parsed_retry_policy, nullptr);
+            // Verify buffer body for retry is not enabled.
+            EXPECT_FALSE(options.buffer_body_for_retry);
+            return async_request;
+          }));
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  // Cancel the request to clean up.
+  EXPECT_CALL(async_request_, cancel());
+  client_->cancel();
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace Common

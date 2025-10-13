@@ -23,7 +23,7 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RandomLoadBalancerTestCase& in
   load_balancer_fuzz.initializeLbComponents(input.load_balancer_test_case());
 
   try {
-    Extensions::LoadBalancingPolices::Random::TypedRandomLbConfig config(
+    Extensions::LoadBalancingPolicies::Random::TypedRandomLbConfig config(
         input.load_balancer_test_case().common_lb_config());
     const auto threshold = PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
         input.load_balancer_test_case().common_lb_config(), healthy_panic_threshold, 100, 50);
