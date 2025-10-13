@@ -1,4 +1,5 @@
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",

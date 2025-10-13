@@ -13,6 +13,9 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
+// Static warning flag for reverse tunnel detailed stats activation.
+static bool reverse_tunnel_detailed_stats_warning_logged = false;
+
 // ReverseTunnelInitiatorExtension implementation
 void ReverseTunnelInitiatorExtension::onServerInitialized() {
   ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension::onServerInitialized");
@@ -52,16 +55,31 @@ void ReverseTunnelInitiatorExtension::updateConnectionStats(const std::string& h
                                                             const std::string& cluster_id,
                                                             const std::string& state_suffix,
                                                             bool increment) {
-  // Register stats with Envoy's system for automatic cross-thread aggregation.
+  // Check if detailed stats are enabled via configuration flag.
+  // If detailed stats disabled, don't collect any stats and return early.
+  // Stats collection can consume significant memory when the number of hosts/clusters is high.
+  if (!enable_detailed_stats_) {
+    return;
+  }
+
+  // Obtain the stats store.
   auto& stats_store = context_.scope();
 
-  // Create/update host connection stat with state suffix
+  // Log a warning on first activation.
+  if (!reverse_tunnel_detailed_stats_warning_logged) {
+    ENVOY_LOG(warn, "REVERSE TUNNEL: Detailed per-host/cluster stats are enabled. "
+                    "This may consume significant memory with high host counts. "
+                    "Monitor memory usage and disable if experiencing issues.");
+    reverse_tunnel_detailed_stats_warning_logged = true;
+  }
+
+  // Create/update host connection stat with state suffix.
   if (!host_address.empty() && !state_suffix.empty()) {
     std::string host_stat_name =
         fmt::format("{}.host.{}.{}", stat_prefix_, host_address, state_suffix);
     Stats::StatNameManagedStorage host_stat_name_storage(host_stat_name, stats_store.symbolTable());
     auto& host_gauge = stats_store.gaugeFromStatName(host_stat_name_storage.statName(),
-                                                     Stats::Gauge::ImportMode::Accumulate);
+                                                     Stats::Gauge::ImportMode::HiddenAccumulate);
     if (increment) {
       host_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: incremented host stat {} to {}",
@@ -80,7 +98,7 @@ void ReverseTunnelInitiatorExtension::updateConnectionStats(const std::string& h
     Stats::StatNameManagedStorage cluster_stat_name_storage(cluster_stat_name,
                                                             stats_store.symbolTable());
     auto& cluster_gauge = stats_store.gaugeFromStatName(cluster_stat_name_storage.statName(),
-                                                        Stats::Gauge::ImportMode::Accumulate);
+                                                        Stats::Gauge::ImportMode::HiddenAccumulate);
     if (increment) {
       cluster_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: incremented cluster stat {} to {}",
