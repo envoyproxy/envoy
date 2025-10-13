@@ -1,13 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: October 13, 2025
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: dependency
   change: |
     Resolve dependency CVEs:
@@ -23,12 +16,7 @@ bug_fixes:
     This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.tls_inspector_no_length_check_on_error``
     to false.
 
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
 new_features:
 - area: tls_inspector
   change: |
     Added dynamic metadata when failing to parse the ``ClientHello``.
-
-deprecated:
