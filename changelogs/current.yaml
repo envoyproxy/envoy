@@ -485,6 +485,12 @@ new_features:
     to the ``ext_authz`` HTTP filter. This allows configuring the maximum size of the response body
     returned to the downstream client when a request is denied by the external authorization service.
     If the authorization server returns a response body larger than this limit, it will be truncated.
+- area: ext_authz
+  change: |
+    Added
+    :ref:`send_tls_alert_on_denial <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.send_tls_alert_on_denial>`
+    to the network ``ext_authz`` filter. When enabled, the filter sends a TLS ``access_denied(49)`` alert
+    before closing the connection when authorization is denied.
 - area: ext_proc
   change: |
     Added :ref:`status_on_error <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.status_on_error>`
