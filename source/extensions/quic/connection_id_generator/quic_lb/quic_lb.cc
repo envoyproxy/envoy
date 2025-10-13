@@ -87,7 +87,7 @@ QuicLbConnectionIdGenerator::ThreadLocalData::ThreadLocalData(
     absl::string_view server_id)
     : encoder_(*quic::QuicRandom::GetInstance(), nullptr /* visitor */,
                true /* len_self_encoded */),
-      unsafe_unencrypted_testing_mode_(config.unsafe_unencrypted_testing_mode()),
+      unencrypted_mode_(config.unencrypted_mode()),
       nonce_length_bytes_(config.nonce_length_bytes()), server_id_(server_id) {}
 
 absl::StatusOr<std::shared_ptr<QuicLbConnectionIdGenerator::ThreadLocalData>>
@@ -105,7 +105,7 @@ absl::Status
 QuicLbConnectionIdGenerator::ThreadLocalData::updateKeyAndVersion(absl::string_view key,
                                                                   uint8_t version) {
   absl::optional<quic::LoadBalancerConfig> lb_config;
-  if (unsafe_unencrypted_testing_mode_) {
+  if (unencrypted_mode_) {
     lb_config = quic::LoadBalancerConfig::CreateUnencrypted(version, server_id_.length(),
                                                             nonce_length_bytes_);
   } else {

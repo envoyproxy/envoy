@@ -68,7 +68,7 @@ message TcpProxy {
   // Configuration for tunneling TCP over other transports or application layers.
   // Tunneling is supported over HTTP/1.1 and HTTP/2. The upstream protocol is
   // determined by the cluster configuration.
-  // [#next-free-field: 8]
+  // [#next-free-field: 10]
   message TunnelingConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
@@ -130,6 +130,25 @@ message TcpProxy {
     // ``%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:tunnel_request_id)%`` formatter.
     // [#extension-category: envoy.request_id]
     http_connection_manager.v3.RequestIDExtension request_id_extension = 7;
+
+    // The request header name to use for emitting the generated request ID on the tunneling
+    // HTTP request.
+    //
+    // If not specified or set to an empty string, the default header name ``x-request-id`` is
+    // used.
+    //
+    // .. note::
+    //   This setting does not alter the internal request ID handling elsewhere in Envoy and
+    //   only controls the header emitted on the tunneling request.
+    string request_id_header = 8;
+
+    // The dynamic metadata key to use when storing the generated request ID. The metadata is
+    // stored under the namespace ``envoy.filters.network.tcp_proxy``.
+    //
+    // If not specified or set to an empty string, the default key ``tunnel_request_id`` is used.
+    // This enables customizing the key used by access log formatters such as
+    // ``%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:<key>)%``.
+    string request_id_metadata_key = 9;
   }
 
   message OnDemand {
