@@ -1,6 +1,12 @@
 date: Pending
 
 behavior_changes:
+- area: http_11_proxy
+  change: |
+    HTTP/1.1 proxy transport socket now generates RFC 9110 compliant CONNECT requests that include a Host header by default.
+    When proxy address is configured via endpoint metadata, the transport socket now prefers hostname:port format over IP:port
+    when hostname is available. The legacy behavior (CONNECT without Host header) can be restored by setting the runtime flag
+    ``envoy.reloadable_features.http_11_proxy_connect_legacy_format`` to ``true``.
 - area: response_decoder
   change: |
     Updated EnvoyQuicClientStream and ResponseDecoderWrapper to use a handle to access the response decoder
@@ -359,6 +365,14 @@ new_features:
     Added support for generating and propagating a request ID on synthesized upstream HTTP requests when tunneling requests.
     It can be configured using :ref:`request_id_extension
     <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_extension>`.
+- area: tcp_proxy
+  change: |
+    Added configuration to customize the request ID header and dynamic metadata key used when tunneling requests.
+    Use :ref:`request_id_header
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_header>` and
+    :ref:`request_id_metadata_key
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_metadata_key>`.
+    When unset, the defaults remain ``x-request-id`` and ``tunnel_request_id`` respectively.
 - area: http
   change: |
     Added support for per-route compressor library override in the HTTP compressor filter.
@@ -458,6 +472,12 @@ new_features:
     :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.grpc_service>`
     in the per-route ``check_settings``. Routes without this configuration continue to use the default
     authorization service.
+- area: ext_authz
+  change: |
+    Added support for retry policy in the ``ext_authz`` HTTP filter. The filter now supports
+    :ref:`retry_policy <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.HttpService.retry_policy>`
+    configuration for HTTP authorization servers. When configured, failed requests to the authorization server
+    will be automatically retried according to the specified policy.
 - area: ext_authz
   change: |
     Added
@@ -621,6 +641,14 @@ new_features:
     is particularly useful when downstream instances are behind NATs, firewalls, or in private networks. The
     feature is experimental and under active development, but is ready for experimental use. See
     :ref:`reverse tunnel overview <overview_reverse_tunnel>` for details.
+- area: compressor
+  change: |
+    Added (:ref:`status_header_enabled
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.status_header_enabled>`)
+    to Compressor Filter. When enabled it adds new response header x-envoy-compression-status to the compressor_filter.
+    This header provides information on whether the response was compressed and, if not, the reason why compression was skipped.
+    Enabling this feature alters the order of conditions checked within the compressor filter is altered
+    to emit the most appropriate status reason.
 - area: admin
   change: |
     Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.
