@@ -1,14 +1,17 @@
-date: October 13, 2025
+date: Pending
+
+behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
-- area: dependency
-  change: |
-    Resolve dependency CVEs:
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-    - CVE-2025-0725: curl
-    - CVE-2024-11407: gRPC
-    - CVE-2024-25176: luajit
-    - CVE-2024-25177: luajit
-    - CVE-2024-25178: luajit
-    - CVE-2025-27817: kafka
-    - CVE-2025-27818: kafka.
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+new_features:
+
+deprecated:
