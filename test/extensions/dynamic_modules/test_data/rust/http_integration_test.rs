@@ -1,6 +1,7 @@
 use abi::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::any::Any;
+use std::vec;
 
 declare_init_functions!(
   init,
@@ -66,7 +67,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         header_to_set: config_iter.next().unwrap().to_owned(),
       }))
     },
-    "inject_body" => Some(Box::new(InjectBodyHttpFilterConfig {})),
+    "streaming_terminal_filter" => Some(Box::new(StreamingTerminalFilterConfig {})),
     _ => panic!("Unknown filter name: {}", name),
   }
 }
@@ -804,7 +805,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
         .unwrap();
     }
 
-
     // Set gauges to provided value in header
     if let Some(header_val) = envoy_filter.get_request_header_value(self.header_to_set.as_str()) {
       let header_val = std::str::from_utf8(header_val.as_slice())
@@ -901,75 +901,89 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
   }
 }
 
-// Filter that blocks request and response body processing within the filter chain and
-// instead injects request and response body within a scheduler callback.
-struct InjectBodyHttpFilterConfig {}
+// Terminal filter that creates a response without an upstream.
+// This filter demonstrates a bidirectional stream with trailers - response processing
+// can happen in filter callbacks or scheduled events. We test scheduled events here
+// since it will be more common for terminal filters.
+//
+// Request flow:
+//   - Client sends headers
+//   - Filter returns headers and body
+//   - Client sends body
+//   - Filter returns body
+//   - Client closes request
+//   - Filter returns body and trailers
+struct StreamingTerminalFilterConfig {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for InjectBodyHttpFilterConfig {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StreamingTerminalFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(InjectBodyHttpFilter {})
+    Box::new(StreamingTerminalHttpFilter {
+      request_closed: false,
+    })
   }
 }
 
-const EVENT_INJECT_REQUEST_BODY: u64 = 1;
-const EVENT_INJECT_RESPONSE_BODY: u64 = 2;
+const EVENT_ID_START_RESPONSE: u64 = 1;
+const EVENT_ID_READ_REQUEST: u64 = 2;
 
-struct InjectBodyHttpFilter {}
+struct StreamingTerminalHttpFilter {
+  request_closed: bool,
+}
 
-impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for InjectBodyHttpFilter {
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
   fn on_request_headers(
     &mut self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    // Schedule request body injection outside the filter lifecycle.
-    envoy_filter
-      .new_scheduler()
-      .commit(EVENT_INJECT_REQUEST_BODY);
+    envoy_filter.new_scheduler().commit(EVENT_ID_START_RESPONSE);
     return envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue;
   }
 
   fn on_request_body(
     &mut self,
-    _envoy_filter: &mut EHF,
-    _end_of_stream: bool,
+    envoy_filter: &mut EHF,
+    end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
-    // Ignore downstream request body.
+    if end_of_stream {
+      self.request_closed = true;
+    }
+    envoy_filter.new_scheduler().commit(EVENT_ID_READ_REQUEST);
     return envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer;
   }
 
-  fn on_response_headers(
-    &mut self,
-    envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    // Schedule response body injection outside the filter lifecycle.
-    envoy_filter
-      .new_scheduler()
-      .commit(EVENT_INJECT_RESPONSE_BODY);
-    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
-  }
-
-  fn on_response_body(
-    &mut self,
-    _envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> envoy_dynamic_module_type_on_http_filter_response_body_status {
-    // Ignore upstream response body.
-    return envoy_dynamic_module_type_on_http_filter_response_body_status::StopIterationAndBuffer;
-  }
-
   fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
-    // Inject the request or response body based on the event type. We inject
-    // both without and with end_stream to ensure the full body is sent correctly.
     match event_id {
-      EVENT_INJECT_REQUEST_BODY => {
-        envoy_filter.inject_request_body(b"injected_", false);
-        envoy_filter.inject_request_body(b"request_body", true);
+      EVENT_ID_START_RESPONSE => {
+        envoy_filter.send_response_headers(
+          vec![
+            (":status", b"200"),
+            ("x-filter", b"terminal"),
+            ("trailers", b"x-status"),
+          ],
+          false,
+        );
+        envoy_filter.send_response_data(b"Who are you?", false);
       },
-      EVENT_INJECT_RESPONSE_BODY => {
-        envoy_filter.inject_response_body(b"injected_", false);
-        envoy_filter.inject_response_body(b"response_body", true);
+      EVENT_ID_READ_REQUEST => {
+        if !self.request_closed {
+          let mut body = Vec::new();
+          if let Some(buffers) = envoy_filter.get_request_body() {
+            for buffer in buffers {
+              body.extend_from_slice(buffer.as_slice());
+            }
+          }
+          envoy_filter.drain_request_body(body.len());
+          envoy_filter.send_response_data(
+            [b"Hi ", body.as_slice(), b". Anything else?"]
+              .concat()
+              .as_slice(),
+            false,
+          );
+        } else {
+          envoy_filter.send_response_data(b"Thanks!", false);
+          envoy_filter.send_response_trailers(vec![("x-status", b"finished")]);
+        }
       },
       _ => unreachable!(),
     }

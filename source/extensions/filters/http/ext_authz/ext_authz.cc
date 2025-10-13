@@ -9,6 +9,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/macros.h"
 #include "source/common/common/matchers.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
@@ -59,6 +60,11 @@ void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadat
       }
     }
   }
+}
+
+// Default CheckSettings for requests that are not overridden by the per-route configuration.
+const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& defaultCheckSettings() {
+  CONSTRUCT_ON_FIRST_USE(envoy::extensions::filters::http::ext_authz::v3::CheckSettings);
 }
 
 } // namespace
@@ -403,7 +409,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   request_headers_ = &headers;
-  const auto check_settings = per_route_flags.check_settings_;
+  const auto& check_settings = per_route_flags.check_settings_;
   buffer_data_ = (config_->withRequestBody() || check_settings.has_with_request_body()) &&
                  !check_settings.disable_request_body_buffering() &&
                  !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
@@ -1031,9 +1037,7 @@ void Filter::continueDecoding() {
 
 Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr& route) const {
   if (route == nullptr) {
-    return PerRouteFlags{
-        true /*skip_check_*/,
-        envoy::extensions::filters::http::ext_authz::v3::CheckSettings() /*check_settings_*/};
+    return PerRouteFlags{true /*skip_check_*/, defaultCheckSettings()};
   }
 
   const auto* specific_check_settings =
@@ -1043,9 +1047,7 @@ Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr
                          specific_check_settings->checkSettings()};
   }
 
-  return PerRouteFlags{
-      false /*skip_check_*/,
-      envoy::extensions::filters::http::ext_authz::v3::CheckSettings() /*check_settings_*/};
+  return PerRouteFlags{false /*skip_check_*/, defaultCheckSettings()};
 }
 
 } // namespace ExtAuthz

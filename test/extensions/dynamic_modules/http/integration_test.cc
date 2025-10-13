@@ -606,25 +606,75 @@ TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
   }
 }
 
-TEST_P(DynamicModulesIntegrationTest, InjectBody) {
-  initializeFilter("inject_body");
+std::string terminal_filter_config;
+
+class DynamicModulesTerminalIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModulesTerminalIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), terminal_filter_config) {};
+
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    terminal_filter_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
+    filter_chains:
+      filters:
+        name: envoy.filters.network.http_connection_manager
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          http_filters:
+          - name: http_integration_test
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+              dynamic_module_config:
+                name: http_integration_test
+              filter_name: streaming_terminal_filter
+              terminal_filter: true
+          route_config:
+            virtual_hosts:
+            - domains:
+              - '*'
+              name: local_proxy_route
+          stat_prefix: ingress_http
+      )EOF");
+  }
+
+  void SetUp() override { HttpIntegrationTest::initialize(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesTerminalIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DynamicModulesTerminalIntegrationTest, StreamingTerminalFilter) {
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
-  auto response =
-      codec_client_->makeRequestWithBody(default_request_headers_, "ignored_request_body");
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData("ignored_response_body", true);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
 
-  ASSERT_TRUE(response->waitForEndStream());
-
-  // Verify the injected request was received upstream, as expected.
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ("injected_request_body", upstream_request_->body().toString());
-  // Verify the injected response was received downstream, as expected.
-  EXPECT_TRUE(response->complete());
+  response->waitForHeaders();
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  EXPECT_EQ("injected_response_body", response->body());
+  EXPECT_EQ("terminal",
+            response->headers().get(Http::LowerCaseString("x-filter"))[0]->value().getStringView());
+
+  response->waitForBodyData(12);
+  EXPECT_EQ("Who are you?", response->body());
+  response->clearBody();
+
+  codec_client_->sendData(request_encoder, "Envoy", false);
+  response->waitForBodyData(24);
+  EXPECT_EQ("Hi Envoy. Anything else?", response->body());
+  response->clearBody();
+
+  codec_client_->sendData(request_encoder, "Nope", true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("Thanks!", response->body());
+  EXPECT_EQ("finished", response->trailers()
+                            .get()
+                            ->get(Http::LowerCaseString("x-status"))[0]
+                            ->value()
+                            .getStringView());
 }
 
 } // namespace Envoy
