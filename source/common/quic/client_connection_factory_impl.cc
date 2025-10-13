@@ -65,7 +65,9 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   // Update config with latest srtt, if available.
   if (rtt_cache.has_value()) {
     Http::HttpServerPropertiesCache::Origin origin("https", server_id.host(), server_id.port());
-    std::chrono::microseconds rtt = rtt_cache.value().get().getSrtt(origin);
+    std::chrono::microseconds rtt = rtt_cache.value().get().getSrtt(
+        origin, Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.use_canonical_suffix_for_initial_rtt_estimate"));
     if (rtt.count() != 0) {
       config.SetInitialRoundTripTimeUsToSend(rtt.count());
     }
