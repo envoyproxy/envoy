@@ -29,6 +29,11 @@ public:
                                        ProtobufMessage::ValidationVisitor&) override;
 
   std::string name() const override { return "envoy.extensions.filters.http.dynamic_modules"; }
+
+  bool isTerminalFilterByProtoTyped(const FilterConfig& proto_config,
+                                    Server::Configuration::ServerFactoryContext&) override {
+    return proto_config.terminal_filter();
+  }
 };
 using UpstreamDynamicModuleConfigFactory = DynamicModuleConfigFactory;
 

@@ -832,6 +832,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
       continue;
     }
     auto shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_);
+    applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
     const auto options =
         Http::AsyncClient::RequestOptions()
             .setTimeout(timeout_.global_timeout_)
@@ -859,6 +860,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
       // without waiting.
       Http::RequestMessagePtr request(new Http::RequestMessageImpl(
           Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_)));
+      applyShadowPolicyHeaders(shadow_policy, request->headers());
       config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
                                      options);
     } else {
@@ -1149,6 +1151,17 @@ absl::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& p
     ENVOY_STREAM_LOG(debug, "There is no cluster name in header: {}", *callbacks_,
                      policy.clusterHeader());
     return absl::nullopt;
+  }
+}
+
+void Filter::applyShadowPolicyHeaders(const ShadowPolicy& shadow_policy,
+                                      Http::RequestHeaderMap& headers) const {
+  const Envoy::Formatter::HttpFormatterContext formatter_context{&headers};
+  shadow_policy.headerEvaluator().evaluateHeaders(headers, formatter_context,
+                                                  callbacks_->streamInfo());
+
+  if (!shadow_policy.hostRewriteLiteral().empty()) {
+    headers.setHost(shadow_policy.hostRewriteLiteral());
   }
 }
 
