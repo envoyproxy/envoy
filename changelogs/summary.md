@@ -39,11 +39,10 @@
 * Dynamic Modules & Extensions:
   - Added logging ABI for modules to emit logs in standard Envoy logging stream.
   - Added support for counters, gauges, histograms in dynamic modules API.
-  - Enhanced Redis proxy with 33 new commands including COPY, RPOPLPUSH, SMOVE, SUNION, and others.
+  - Added new Redis commands including COPY, RPOPLPUSH, SMOVE, SUNION, and others.
   - Added reverse tunnel support for NAT/firewall traversal (experimental).
 
 * Runtime & Configuration:
-  - Removed 47 deprecated runtime guards and legacy code paths across HTTP, QUIC, DNS, stats, and other areas.
   - Enhanced rate limit filter with substitution formatter support at stream complete phase.
   - Added OTLP stat sink resource attributes and custom metric conversions.
   - Added support for request payloads in HTTP health checks.
