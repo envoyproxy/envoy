@@ -184,8 +184,8 @@ void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
   });
 }
 
-void FakeStream::encodeResetStream() {
-  postToConnectionThread([this]() -> void {
+void FakeStream::encodeResetStream(Http::StreamResetReason reason) {
+  postToConnectionThread([this, reason]() -> void {
     {
       absl::MutexLock lock(lock_);
       if (!parent_.connected() || saw_reset_) {
@@ -196,7 +196,7 @@ void FakeStream::encodeResetStream() {
     if (parent_.type() == Http::CodecType::HTTP1) {
       parent_.connection().close(Network::ConnectionCloseType::FlushWrite);
     } else {
-      encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset);
+      encoder_.getStream().resetStream(reason);
     }
   });
 }

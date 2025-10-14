@@ -274,7 +274,7 @@ message AccessLogCommon {
 }
 
 // Flags indicating occurrences during request/response processing.
-// [#next-free-field: 29]
+// [#next-free-field: 30]
 message ResponseFlags {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.ResponseFlags";
@@ -378,6 +378,9 @@ message ResponseFlags {
 
   // Indicates a downstream remote codec level reset was received on the stream
   bool downstream_remote_reset = 28;
+
+  // Indicates the stream was reset with the NO_ERROR code.
+  bool reset_no_error = 29;
 }
 
 // Properties of a negotiated TLS connection.

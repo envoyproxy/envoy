@@ -261,6 +261,7 @@ message ResponseFlagFilter {
         in: "DO"
         in: "DR"
         in: "UDO"
+        in: "RNE"
       }
     }
   }];

@@ -246,7 +246,9 @@ public:
     }
   }
 
-  void sendServerReset() { fake_stream_->encodeResetStream(); }
+  void sendServerReset() {
+    fake_stream_->encodeResetStream(Http::StreamResetReason::RemoteResetNoError);
+  }
 
   void encodeServerTrailers(Status::GrpcStatus grpc_status, const std::string& grpc_message,
                             const TestMetadata& metadata) {
