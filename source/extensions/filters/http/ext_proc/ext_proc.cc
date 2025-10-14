@@ -1594,9 +1594,8 @@ bool isLastBodyResponse(ProcessorState& state,
 void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
                                                const bool is_last_body_resp) {
 
-  if (stream_ == nullptr ||
-      !Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+  if (stream_ == nullptr || !Runtime::runtimeFeatureEnabled(
+                                "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
     return;
   }
 
