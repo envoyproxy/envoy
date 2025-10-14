@@ -667,6 +667,7 @@ void DnsFilter::logQuery(const DnsQueryContextPtr& context) {
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(formatter_context, stream_info);
   }
+}
 
 } // namespace DnsFilter
 } // namespace UdpFilters
