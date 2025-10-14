@@ -366,12 +366,14 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// See [`EnvoyHttpFilter::new_scheduler`] for more details on how to use this.
   fn on_scheduled(&mut self, _envoy_filter: &mut EHF, _event_id: u64) {}
 
-  /// This is called when the downstream buffer size goes above the high watermark.
+  /// This is called when the downstream buffer size goes above the high watermark for a
+  /// terminal filter.
   ///
   /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
   fn on_downstream_above_write_buffer_high_watermark(&mut self, _envoy_filter: &mut EHF) {}
 
-  /// This is called when the downstream buffer size goes below the low watermark.
+  /// This is called when the downstream buffer size goes below the low watermark for a
+  /// terminal filter.
   ///
   /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
   fn on_downstream_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut EHF) {}
