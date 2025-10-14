@@ -27,6 +27,12 @@ using PerRouteProtoConfig =
 
 /**
  * All stats for the Stateful Session filter. @see stats_macros.h
+ * routed: Requests successfully routed to the session-specified upstream.
+ * failed_open: Requests with session that failed to route, fell back to another upstream (non-strict mode).
+ * failed_closed: Requests with session that failed to route and were rejected (strict mode).
+ * no_session: Requests that reached upstream without session state when the filter is active.
+ *             This includes requests with no session cookie/header or where session extraction failed.
+ *             Excludes requests where the filter is explicitly disabled per-route.
  */
 #define ALL_STATEFUL_SESSION_FILTER_STATS(COUNTER)                                                 \
   COUNTER(routed)                                                                                  \
@@ -116,6 +122,8 @@ private:
   StatefulSessionConfigSharedPtr config_;
   // Cached effective config resolved from route or base config.
   StatefulSessionConfig* effective_config_{nullptr};
+  // Tracks whether the filter is active and not disabled per-route for this request.
+  bool filter_active_{false};
 };
 
 } // namespace StatefulSession
