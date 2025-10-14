@@ -129,3 +129,6 @@ The following statistics are supported:
   was unavailable and the request proceeded using default load balancing (``strict`` is ``false``)."
   failed_closed, Counter, "Total requests where an override was attempted but the requested
   destination was unavailable and the request was fail-closed with a ``503`` (``strict`` is ``true``)."
+  no_session, Counter, "Total requests that reached an upstream without session state when the filter
+  is active. This includes requests with no session cookie/header or where session extraction failed.
+  It excludes requests where the filter is explicitly disabled per-route."

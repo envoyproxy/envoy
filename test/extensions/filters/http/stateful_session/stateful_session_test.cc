@@ -339,6 +339,73 @@ stat_prefix: "test"
   EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
 }
 
+TEST_F(StatefulSessionTest, StatsNoSession) {
+  const std::string config_with_stats = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+stat_prefix: "test"
+)EOF";
+  initialize(config_with_stats);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  // Return nullptr to simulate no session state.
+  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(testing::ByMove(nullptr)));
+
+  // Initial stats should be zero.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.no_session").value());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // The encoder_callbacks_.stream_info_ mock has upstreamInfo() and upstreamHost() set up by
+  // default, so no_session stat will be incremented.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  // Verify no_session counter incremented.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+  EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.test.no_session").value());
+}
+
+TEST_F(StatefulSessionTest, StatsNoSessionNotIncrementedWhenDisabled) {
+  const std::string config_with_stats = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+stat_prefix: "test"
+)EOF";
+  initialize(config_with_stats, DisableYaml);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  // Filter is disabled per-route, so factory should not be called.
+  EXPECT_CALL(*factory_, create(_)).Times(0);
+
+  // Initial stats should be zero.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.no_session").value());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  // Verify no_session counter is NOT incremented when filter is disabled.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.no_session").value());
+}
+
 } // namespace
 } // namespace StatefulSession
 } // namespace HttpFilters
