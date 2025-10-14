@@ -33,6 +33,7 @@ proto_library(
         "//contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha:pkg",
         "//contrib/envoy/extensions/private_key_providers/qat/v3alpha:pkg",
         "//contrib/envoy/extensions/regex_engines/hyperscan/v3alpha:pkg",
+        "//contrib/envoy/extensions/reverse_connection/reverse_connection_listener_config/v3alpha:pkg",
         "//contrib/envoy/extensions/router/cluster_specifier/golang/v3alpha:pkg",
         "//contrib/envoy/extensions/tap_sinks/udp_sink/v3alpha:pkg",
         "//contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha:pkg",
