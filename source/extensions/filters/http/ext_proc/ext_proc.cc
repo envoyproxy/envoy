@@ -1558,8 +1558,12 @@ ProcessingMode effectiveModeOverride(const ProcessingMode& target_override,
   return mode_override;
 }
 
+// Returns true if this body response is the last message in the current direction (request or
+// response path). This means no further body chunks or trailers are expected in this direction.
+// For now, such check is only done for STREAMED or FULL_DUPLEX_STREAMED body mode. For any
+// other body mode, it always return false.
 bool isLastBodyResponse(ProcessorState& state,
-                        const envoy::service::ext_proc::v3::ProcessingResponse& response) {
+                        const envoy::service::ext_proc::v3::BodyResponse& body_response) {
   switch (state.bodyMode()) {
   case ProcessingMode::BUFFERED:
   case ProcessingMode::BUFFERED_PARTIAL:
@@ -1571,17 +1575,10 @@ bool isLastBodyResponse(ProcessorState& state,
     }
     break;
   case ProcessingMode::FULL_DUPLEX_STREAMED: {
-    const envoy::service::ext_proc::v3::BodyResponse* body_response = nullptr;
-    if (response.has_request_body()) {
-      body_response = &response.request_body();
-    } else if (response.has_response_body()) {
-      body_response = &response.response_body();
-    }
-    if (body_response != nullptr && body_response->has_response()) {
-      const auto& common_response = body_response->response();
-      if (common_response.has_body_mutation() &&
-          common_response.body_mutation().has_streamed_response()) {
-        return common_response.body_mutation().streamed_response().end_of_stream();
+    if (body_response.has_response() && body_response.response().has_body_mutation()) {
+      const auto& body_mutation = body_response.response().body_mutation();
+      if (body_mutation.has_streamed_response()) {
+        return body_mutation.streamed_response().end_of_stream();
       }
     }
     break;
@@ -1594,10 +1591,8 @@ bool isLastBodyResponse(ProcessorState& state,
 
 } // namespace
 
-// Close the gRPC stream if the last ProcessingResponse is received.
-void Filter::closeGrpcStreamIfLastRespReceived(
-    const std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response,
-    const bool is_last_body_resp) {
+void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
+                                               const bool is_last_body_resp) {
 
   if (stream_ == nullptr) {
     return;
@@ -1605,7 +1600,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(
 
   bool last_response = false;
 
-  switch (response->response_case()) {
+  switch (response.response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
     if ((decoding_state_.hasNoBody() ||
          (decoding_state_.bodyMode() == ProcessingMode::NONE && !decoding_state_.sendTrailers())) &&
@@ -1732,12 +1727,16 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    is_last_body_resp = isLastBodyResponse(decoding_state_, *response);
+    if (response->has_request_body()) {
+      is_last_body_resp = isLastBodyResponse(decoding_state_, response->request_body());
+    }
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
-    is_last_body_resp = isLastBodyResponse(encoding_state_, *response);
+    if (response->has_response_body()) {
+      is_last_body_resp = isLastBodyResponse(encoding_state_, response->response_body());
+    }
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
     break;
@@ -1809,7 +1808,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   }
 
   // Close the gRPC stream if no more external processing needed.
-  closeGrpcStreamIfLastRespReceived(response, is_last_body_resp);
+  closeGrpcStreamIfLastRespReceived(*response, is_last_body_resp);
 }
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& message) {

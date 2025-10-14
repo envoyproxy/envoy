@@ -620,10 +620,11 @@ private:
   // Gracefully close the gRPC stream based on configuration.
   void closeStreamMaybeGraceful();
 
-  // Close the gRPC stream if the last ProcessingResponse is received.
-  void closeGrpcStreamIfLastRespReceived(
-      const std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response,
-      const bool is_last_body_resp);
+  // Closing the gRPC stream if the last ProcessingResponse is received.
+  // This stream closing optimization only applies to STREAMED or FULL_DUPLEX_STREAMED body modes.
+  // For other body modes like BUFFERED or BUFFERED_PARTIAL, it is ignored.
+  void closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
+                                         const bool is_last_body_resp);
 
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
