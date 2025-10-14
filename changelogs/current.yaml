@@ -637,6 +637,9 @@ new_features:
     Added :ref:`outlier_detection<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.outlier_detection>`
     to cluster's http protocol options to allow defining via an http matcher whether a response should be treated
     as error or as success by outlier detection.
+- area: redis
+  change: |
+    Added support for ``redis_proxy`` filter to use separate credentials for each upstream Redis cluster.
 - area: reverse_tunnel
   change: |
     Added support for reverse tunnels that enable establishing persistent connections from downstream Envoy
