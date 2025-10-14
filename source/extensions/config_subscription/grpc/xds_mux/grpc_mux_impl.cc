@@ -482,7 +482,7 @@ Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   SubscriptionCallbacks&,
                                                   OpaqueResourceDecoderSharedPtr,
                                                   const SubscriptionOptions&) {
-  throw EnvoyException("ADS must be configured to support an ADS config source");
+  throwEnvoyExceptionOrPanic("ADS must be configured to support an ADS config source");
 }
 
 class DeltaGrpcMuxFactory : public MuxFactory {
