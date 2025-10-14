@@ -193,15 +193,6 @@ size_t BalsaParser::execute(const char* slice, int len) {
       }
     }
 
-    if (!allow_newlines_between_requests_) {
-      if (message_type_ == MessageType::Request && !allow_custom_methods_ &&
-          !isFirstCharacterOfValidMethod(*slice)) {
-        status_ = ParserStatus::Error;
-        error_message_ = "HPE_INVALID_METHOD";
-        return 0;
-      }
-    }
-
     if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_CONSTANT";
