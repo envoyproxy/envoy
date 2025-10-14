@@ -12,9 +12,10 @@
 namespace Envoy {
 namespace Upstream {
 
-using ConstLocalitySharedPoolSharedPtr =
-    std::shared_ptr<SharedPool::ObjectSharedPool<const envoy::config::core::v3::Locality,
-                                                 LocalityHash, LocalityEqualTo>>;
+using ConstLocalitySharedPool =
+    SharedPool::ObjectSharedPool<const envoy::config::core::v3::Locality, LocalityHash,
+                                 LocalityEqualTo>;
+using ConstLocalitySharedPoolSharedPtr = std::shared_ptr<ConstLocalitySharedPool>;
 
 class LocalityPool {
 public:
