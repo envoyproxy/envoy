@@ -1,4 +1,4 @@
-date: Pending
+date: October 14, 2025
 
 behavior_changes:
 - area: http_11_proxy
@@ -47,7 +47,6 @@ behavior_changes:
     behavior change for existing users of Zone Aware LBs.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: tap
   change: |
     Previously, streamed trace buffered data was only flushed when it reached the configured size.
@@ -129,7 +128,6 @@ minor_behavior_changes:
     Take into account connection-level metadata under the ``envoy.lb`` namespace when computing subset load balancing matches.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: tcp_proxy
   change: |
     Fixed a bug where when a downstream TCP connection is created and the upstream connection is not fully established, no idle timeout
@@ -221,7 +219,6 @@ bug_fixes:
     Fixed the distroless image to ensure nonroot.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: router
   change: |
     Removed runtime guard ``envoy.reloadable_features.shadow_policy_inherit_trace_sampling`` and legacy code paths.
@@ -656,5 +653,3 @@ new_features:
     This header provides information on whether the response was compressed and, if not, the reason why compression was skipped.
     Enabling this feature updates the order of conditions checked within the :ref:`compressor filter <config_http_filters_compressor>`
     to emit the most appropriate status reason.
-
-deprecated:
