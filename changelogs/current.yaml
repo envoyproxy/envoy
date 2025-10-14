@@ -314,6 +314,7 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.proxy_104`` and legacy code paths.
 
 new_features:
+<<<<<<< HEAD
 - area: router
   change: |
     Added :ref:`use_hash_policy <envoy_v3_api_field_config.route.v3.WeightedCluster.use_hash_policy>`
@@ -653,8 +654,9 @@ new_features:
     This header provides information on whether the response was compressed and, if not, the reason why compression was skipped.
     Enabling this feature updates the order of conditions checked within the :ref:`compressor filter <config_http_filters_compressor>`
     to emit the most appropriate status reason.
- - area: quic
-   change: |
-     Add a new quic configuration field, 'max_sessions_per_event_loop', to QuicProtocolOptions in Envoy listener.
-     This allows tuning the maximum number of new QUIC sessions created within a single event loop.
-     The default value is 16, preserving the previous hardcoded limit.
+- area: quic
+  change: |
+    Add a new quic configuration field, 'max_sessions_per_event_loop', to QuicProtocolOptions in Envoy listener.
+    This allows tuning the maximum number of new QUIC sessions created within a single event loop.
+    The default value is 16, preserving the previous hardcoded limit.
+deprecated:
