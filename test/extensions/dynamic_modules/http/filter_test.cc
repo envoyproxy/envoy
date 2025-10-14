@@ -788,7 +788,7 @@ TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
 
 TEST(HttpFilter, HeaderMapGetter) {
   Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter(filter_config_or_status.value(), symbol_table);
+  DynamicModuleHttpFilter filter(nullptr, symbol_table);
 
   EXPECT_EQ(absl::nullopt, filter.requestHeaders());
   EXPECT_EQ(absl::nullopt, filter.requestTrailers());
