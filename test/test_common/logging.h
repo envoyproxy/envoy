@@ -71,7 +71,7 @@ public:
 private:
   mutable absl::Mutex mtx_;
   std::vector<std::string> messages_ ABSL_GUARDED_BY(mtx_);
-  std::atomic<bool> enabled_{false};
+  bool enabled_ ABSL_GUARDED_BY(mtx_){false};
 
   absl::Mutex exp_mtx_;
   absl::flat_hash_set<LogExpectation*> expectations_ ABSL_GUARDED_BY(exp_mtx_);
