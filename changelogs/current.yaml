@@ -534,6 +534,10 @@ new_features:
 - area: dynamic_modules
   change: |
     Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.
+- area: wasm
+  change: |
+    Added ``sign`` foreign function to create cryptographic signatures.
+    See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
 - area: dns_resolver
   change: |
     Added :ref:`max_udp_channel_duration
