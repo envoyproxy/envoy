@@ -53,7 +53,6 @@ jobs:
         //test/cc/... //test/common/...
       request: ${{ needs.load.outputs.request }}
       target: cc-tests
-      timeout-minutes: 120
 
   cc-xds-integration-tests:
     permissions:
@@ -70,7 +69,6 @@ jobs:
         //test/common/integration/...
       request: ${{ needs.load.outputs.request }}
       target: cc-xds-integration-tests
-      timeout-minutes: 120
 
   request:
     secrets:
