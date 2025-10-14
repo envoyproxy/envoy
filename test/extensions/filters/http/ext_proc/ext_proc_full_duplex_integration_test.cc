@@ -448,8 +448,7 @@ TEST_P(ExtProcIntegrationTest, NoneToFullDuplexMoreDataAfterModeOverride) {
 }
 
 TEST_P(ExtProcIntegrationTest, ServerWaitforEnvoyHalfCloseThenCloseStream) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
   proto_config_.mutable_processing_mode()->set_request_body_mode(
       ProcessingMode::FULL_DUPLEX_STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);

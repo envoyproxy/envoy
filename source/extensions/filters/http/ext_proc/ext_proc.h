@@ -622,7 +622,8 @@ private:
 
   // Close the gRPC stream if the last ProcessingResponse is received.
   void closeGrpcStreamIfLastRespReceived(
-      const std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);
+      const std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response,
+      const bool is_last_body_resp);
 
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;

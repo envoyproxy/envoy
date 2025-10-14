@@ -1596,7 +1596,13 @@ bool isLastBodyResponse(ProcessorState& state,
 
 // Close the gRPC stream if the last ProcessingResponse is received.
 void Filter::closeGrpcStreamIfLastRespReceived(
-    const std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response) {
+    const std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response,
+    const bool is_last_body_resp) {
+
+  if (stream_ == nullptr) {
+    return;
+  }
+
   bool last_response = false;
 
   switch (response->response_case()) {
@@ -1608,7 +1614,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(
     }
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    if (isLastBodyResponse(decoding_state_, *response) && encoding_state_.noExternalProcess()) {
+    if (is_last_body_resp && encoding_state_.noExternalProcess()) {
       last_response = true;
     }
     break;
@@ -1624,7 +1630,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(
     }
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
-    if (isLastBodyResponse(encoding_state_, *response)) {
+    if (is_last_body_resp) {
       last_response = true;
     }
     break;
@@ -1714,9 +1720,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   ENVOY_STREAM_LOG(debug, "Received {} response", *decoder_callbacks_,
                    responseCaseToString(response->response_case()));
 
-  // Close the gRPC stream if this is the last response message.
-  closeGrpcStreamIfLastRespReceived(response);
-
+  bool is_last_body_resp = false;
   absl::Status processing_status;
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
@@ -1728,10 +1732,12 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
+    is_last_body_resp = isLastBodyResponse(decoding_state_, *response);
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
+    is_last_body_resp = isLastBodyResponse(encoding_state_, *response);
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
     break;
@@ -1801,6 +1807,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     stats_.stream_msgs_received_.inc();
     handleErrorResponse(processing_status);
   }
+
+  // Close the gRPC stream if no more external processing needed.
+  closeGrpcStreamIfLastRespReceived(response, is_last_body_resp);
 }
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& message) {
