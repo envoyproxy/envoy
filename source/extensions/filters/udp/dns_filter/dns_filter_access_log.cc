@@ -40,6 +40,38 @@ public:
 
 private:
   const FieldExtractor field_extractor_;
+};
+
+/**
+ * Helper to create formatter provider for query-dependent fields (fields that require queries_[0]).
+ */
+template <typename FieldAccessor>
+Formatter::FormatterProviderPtr makeQueryFieldProvider(FieldAccessor accessor) {
+  return std::make_unique<DnsFormatterProvider>(
+      [accessor](const Formatter::Context& ctx, const StreamInfo::StreamInfo&)
+          -> absl::optional<std::string> {
+        const auto dns_ctx = ctx.typedExtension<DnsQueryContext>();
+        if (!dns_ctx.has_value() || dns_ctx->queries_.empty()) {
+          return absl::nullopt;
+        }
+        return absl::StrCat(accessor(*dns_ctx));
+      });
+}
+
+/**
+ * Helper to create formatter provider for context-level fields (fields that don't require queries).
+ */
+template <typename FieldAccessor>
+Formatter::FormatterProviderPtr makeContextFieldProvider(FieldAccessor accessor) {
+  return std::make_unique<DnsFormatterProvider>(
+      [accessor](const Formatter::Context& ctx, const StreamInfo::StreamInfo&)
+          -> absl::optional<std::string> {
+        const auto dns_ctx = ctx.typedExtension<DnsQueryContext>();
+        if (!dns_ctx.has_value()) {
+          return absl::nullopt;
+        }
+        return accessor(*dns_ctx);
+      });
 }
 
 /**
@@ -69,74 +101,34 @@ private:
         {
             {"QUERY_NAME",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const Formatter::Context& ctx, const StreamInfo::StreamInfo&)
-                       -> absl::optional<std::string> {
-                     const auto dns_ctx = ctx.typedExtension<DnsQueryContext>();
-                     if (!dns_ctx.has_value() || dns_ctx->queries_.empty()) {
-                       return absl::nullopt;
-                     }
-                     return absl::StrCat(dns_ctx->queries_[0]->name_);
-                   });
+               return makeQueryFieldProvider(
+                   [](const DnsQueryContext& ctx) { return ctx.queries_[0]->name_; });
              }},
             {"QUERY_TYPE",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const Formatter::Context& ctx, const StreamInfo::StreamInfo&)
-                       -> absl::optional<std::string> {
-                     const auto dns_ctx = ctx.typedExtension<DnsQueryContext>();
-                     if (!dns_ctx.has_value() || dns_ctx->queries_.empty()) {
-                       return absl::nullopt;
-                     }
-                     return absl::StrCat(dns_ctx->queries_[0]->type_);
-                   });
+               return makeQueryFieldProvider(
+                   [](const DnsQueryContext& ctx) { return ctx.queries_[0]->type_; });
              }},
             {"QUERY_CLASS",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const Formatter::Context& ctx, const StreamInfo::StreamInfo&)
-                       -> absl::optional<std::string> {
-                     const auto dns_ctx = ctx.typedExtension<DnsQueryContext>();
-                     if (!dns_ctx.has_value() || dns_ctx->queries_.empty()) {
-                       return absl::nullopt;
-                     }
-                     return absl::StrCat(dns_ctx->queries_[0]->class_);
-                   });
+               return makeQueryFieldProvider(
+                   [](const DnsQueryContext& ctx) { return ctx.queries_[0]->class_; });
              }},
             {"ANSWER_COUNT",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const Formatter::Context& ctx, const StreamInfo::StreamInfo&)
-                       -> absl::optional<std::string> {
-                     const auto dns_ctx = ctx.typedExtension<DnsQueryContext>();
-                     if (!dns_ctx.has_value()) {
-                       return absl::nullopt;
-                     }
-                     return absl::StrCat(dns_ctx->answers_.size());
-                   });
+               return makeContextFieldProvider(
+                   [](const DnsQueryContext& ctx) { return absl::StrCat(ctx.answers_.size()); });
              }},
             {"RESPONSE_CODE",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const Formatter::Context& ctx, const StreamInfo::StreamInfo&)
-                       -> absl::optional<std::string> {
-                     const auto dns_ctx = ctx.typedExtension<DnsQueryContext>();
-                     if (!dns_ctx.has_value()) {
-                       return absl::nullopt;
-                     }
-                     return absl::StrCat(dns_ctx->response_code_);
-                   });
+               return makeContextFieldProvider(
+                   [](const DnsQueryContext& ctx) { return absl::StrCat(ctx.response_code_); });
              }},
             {"PARSE_STATUS",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return std::make_unique<DnsFormatterProvider>(
-                   [](const Formatter::Context& ctx, const StreamInfo::StreamInfo&)
-                       -> absl::optional<std::string> {
-                     const auto dns_ctx = ctx.typedExtension<DnsQueryContext>();
-                     if (!dns_ctx.has_value()) {
-                       return absl::nullopt;
-                     }
-                     return dns_ctx->parse_status_ ? "true" : "false";
+               return makeContextFieldProvider(
+                   [](const DnsQueryContext& ctx) -> std::string {
+                     return ctx.parse_status_ ? "true" : "false";
                    });
              }},
         });
