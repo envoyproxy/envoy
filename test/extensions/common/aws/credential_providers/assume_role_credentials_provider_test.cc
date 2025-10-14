@@ -821,7 +821,6 @@ TEST_F(AssumeRoleCredentialsProviderTest, MetadataFetcherCreateAndCancel) {
 
   setupProvider();
 
-  // First refresh - covers line 88 (!metadata_fetcher_)
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
   EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
@@ -829,8 +828,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, MetadataFetcherCreateAndCancel) {
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
 
-  // Second refresh - covers line 94 (metadata_fetcher_->cancel())
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
   EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   provider_friend.onClusterAddOrUpdate();
