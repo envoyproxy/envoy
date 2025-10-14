@@ -59,8 +59,9 @@ public:
     const std::string load_success_counter = "runtime.load_success";
     uint64_t load_success_value = getCounterValue(load_success_counter);
     // Send a RTDS request and get back the RTDS response.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_resource"},
-                                        {"some_rtds_resource"}, {}, true));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::getTypeUrl<envoy::service::runtime::v3::Runtime>(),
+                                        "", {"some_rtds_resource"}, {"some_rtds_resource"}, {},
+                                        true));
 
     envoy::service::runtime::v3::Runtime some_rtds_resource;
     some_rtds_resource.set_name("some_rtds_resource");
@@ -69,7 +70,8 @@ public:
         .set_bool_value(true);
 
     sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-        Config::TypeUrl::get().Runtime, {some_rtds_resource}, {some_rtds_resource}, {}, "1");
+        Config::getTypeUrl<envoy::service::runtime::v3::Runtime>(), {some_rtds_resource},
+        {some_rtds_resource}, {}, "1");
     // Wait until the RTDS updates from the DiscoveryResponse have been applied.
     ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
 
@@ -77,15 +79,15 @@ public:
     EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
     load_success_value = getCounterValue(load_success_counter);
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_resource"},
-                                        {"some_rtds_resource"}, {}));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::getTypeUrl<envoy::service::runtime::v3::Runtime>(),
+                                        "", {"some_rtds_resource"}, {"some_rtds_resource"}, {}));
     (*static_layer->mutable_fields())["envoy.reloadable_features.test_feature_false"]
         .set_bool_value(false);
 
     // Send another response with Resource wrapper.
     sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-        Config::TypeUrl::get().Runtime, {some_rtds_resource}, {some_rtds_resource}, {}, "2",
-        {{"test", ProtobufWkt::Any()}});
+        Config::getTypeUrl<envoy::service::runtime::v3::Runtime>(), {some_rtds_resource},
+        {some_rtds_resource}, {}, "2", {{"test", Protobuf::Any()}});
     // Wait until the RTDS updates from the DiscoveryResponse have been applied.
     ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
 
@@ -102,12 +104,12 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw)));
 
 TEST_P(RtdsIntegrationTest, RtdsReloadWithDfpMixedScheme) {
-  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"dfp_mixed_scheme", true}});
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"async_host_selection", true}});
   runReloadTest();
 }
 
 TEST_P(RtdsIntegrationTest, RtdsReloadWithoutDfpMixedScheme) {
-  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"dfp_mixed_scheme", false}});
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"async_host_selection", false}});
   runReloadTest();
 }
 

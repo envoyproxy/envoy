@@ -63,21 +63,22 @@ protected:
     const std::vector<std::string> expected_resources = getExpectedResources();
 
     // Envoy sends the initial DiscoveryRequest.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", expected_resources, {},
-                                        {}, /*expect_node=*/true));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(),
+                                        "", expected_resources, {}, {}, /*expect_node=*/true));
 
     Cluster cluster = createCluster();
     // Server sends back the initial DiscoveryResponse.
-    sendDiscoveryResponse<Cluster>(Config::TypeUrl::get().Cluster, {cluster}, {cluster}, {},
-                                   version);
+    sendDiscoveryResponse<Cluster>(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(),
+                                   {cluster}, {cluster}, {}, version);
 
     // Wait for cluster to be added.
     EXPECT_TRUE(waitForCounterGe("cluster_manager.cluster_added", 1));
     EXPECT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", cluster_count + 1));
 
     // ACK of the initial version.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, version, expected_resources,
-                                        {}, {}, /*expect_node=*/false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(),
+                                        version, expected_resources, {}, {},
+                                        /*expect_node=*/false));
 
     EXPECT_TRUE(waitForGaugeGe("cluster_manager.cluster_removed", 0));
   }
@@ -88,12 +89,13 @@ protected:
 
     // Server sends an updated DiscoveryResponse over the xDS stream.
     Cluster cluster = createCluster();
-    sendDiscoveryResponse<Cluster>(Config::TypeUrl::get().Cluster, {cluster}, {cluster}, {},
-                                   version);
+    sendDiscoveryResponse<Cluster>(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(),
+                                   {cluster}, {cluster}, {}, version);
 
     // ACK of the cluster update at the new version.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, version, expected_resources,
-                                        {}, {}, /*expect_node=*/false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(),
+                                        version, expected_resources, {}, {},
+                                        /*expect_node=*/false));
 
     // Cluster count should stay the same.
     EXPECT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", cluster_count));
