@@ -55,6 +55,8 @@ private:
                                    envoy::config::tap::v3::OutputSink::Format format);
     size_t getEventBodysize(const envoy::data::tap::v3::SocketEvent& event,
                             envoy::config::tap::v3::OutputSink::Format format);
+    size_t getEventSize(const envoy::data::tap::v3::SocketEvent& event,
+                        envoy::config::tap::v3::OutputSink::Format format);
     void handleSocketStreamedTraceForMMultiEventsBigBody(
         envoy::config::tap::v3::OutputSink::Format format,
         const envoy::data::tap::v3::SocketEvent& event, uint64_t trace_id);
