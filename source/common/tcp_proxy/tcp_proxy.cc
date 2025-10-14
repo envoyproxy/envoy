@@ -880,6 +880,14 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     }
     request_id_extension_ = extension_or_error.value();
   }
+
+  // Populate optional request ID customization fields if provided.
+  if (!config_message.tunneling_config().request_id_header().empty()) {
+    request_id_header_ = config_message.tunneling_config().request_id_header();
+  }
+  if (!config_message.tunneling_config().request_id_metadata_key().empty()) {
+    request_id_metadata_key_ = config_message.tunneling_config().request_id_metadata_key();
+  }
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
