@@ -185,7 +185,7 @@ PACKED_STRUCT(struct DnsHeader {
 /**
  * DnsQueryContext contains all the data necessary for responding to a query from a given client.
  */
-class DnsQueryContext : public Formatter::HttpFormatterContext::Extension {
+class DnsQueryContext : public Formatter::Context::Extension {
 public:
   DnsQueryContext(Network::Address::InstanceConstSharedPtr local,
                   Network::Address::InstanceConstSharedPtr peer, DnsParserCounters& counters,
