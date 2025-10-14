@@ -40,7 +40,7 @@ public:
   FilterMetadataStatus decodeMetadata(MetadataMap&) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
-    if (config_->terminal_filter_) {
+    if (config_ && config_->terminal_filter_) {
       decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
     }
   }
