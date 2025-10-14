@@ -20,7 +20,7 @@
   - Added support for weighted cluster hash policies for consistent session affinity.
   - Fixed client-side weighted round robin load balancer priority iteration issues.
   - Added network namespace filepath support to socket addresses for containerized environments.
-  - Enhanced network namespace input matching for ``RBAC`` and filter chain selection.
+  - Enhanced network namespace input matching for RBAC and filter chain selection.
 
 * External Processing & Authentication:
   - Re-enabled ``fail_open`` + ``FULL_DUPLEX_STREAMED`` configuration combination.
@@ -37,14 +37,14 @@
   - Added OAuth2 response code details for ``401`` local responses.
 
 * Dynamic Modules & Extensions:
-  - Added logging ``ABI`` for modules to emit logs in standard Envoy logging stream.
-  - Added support for counters, gauges, histograms in dynamic modules ``API``.
+  - Added logging ABI for modules to emit logs in standard Envoy logging stream.
+  - Added support for counters, gauges, histograms in dynamic modules API.
   - Added new Redis commands including ``COPY``, ``RPOPLPUSH``, ``SMOVE``, ``SUNION``, and others.
   - Added reverse tunnel support for NAT/firewall traversal (experimental).
 
 * Runtime & Configuration:
   - Enhanced rate limit filter with substitution formatter support at stream complete phase.
-  - Added ``OTLP`` stat sink resource attributes and custom metric conversions.
+  - Added OTLP stat sink resource attributes and custom metric conversions.
   - Added support for request payloads in HTTP health checks.
 
 * Notable Fixes:
