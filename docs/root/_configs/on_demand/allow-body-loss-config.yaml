@@ -1,0 +1,11 @@
+name: envoy.filters.http.on_demand
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+  odcds:
+    source:
+      ads: {}
+    timeout: 5s
+# Bootstrap configuration required for this option
+bootstrap:
+  on_demand_config:
+    allow_body_data_loss_for_per_route_config: true # WARNING: May lose request body data!
