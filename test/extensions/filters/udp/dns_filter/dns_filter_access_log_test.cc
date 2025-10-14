@@ -51,17 +51,17 @@ public:
     parse_status_formatter_ = parser->parse("PARSE_STATUS", "", absl::nullopt);
   }
 
-  void log(const Formatter::HttpFormatterContext&,
+  void log(const Formatter::HttpFormatterContext& context,
            const StreamInfo::StreamInfo& stream_info) override {
     log_count_++;
 
     // Use custom formatters to extract DNS information
-    query_name_ = query_name_formatter_->formatWithContext(Formatter::Context(), stream_info);
-    query_type_ = query_type_formatter_->formatWithContext(Formatter::Context(), stream_info);
-    query_class_ = query_class_formatter_->formatWithContext(Formatter::Context(), stream_info);
-    answer_count_ = answer_count_formatter_->formatWithContext(Formatter::Context(), stream_info);
-    response_code_ = response_code_formatter_->formatWithContext(Formatter::Context(), stream_info);
-    parse_status_ = parse_status_formatter_->formatWithContext(Formatter::Context(), stream_info);
+    query_name_ = query_name_formatter_->formatWithContext(context, stream_info);
+    query_type_ = query_type_formatter_->formatWithContext(context, stream_info);
+    query_class_ = query_class_formatter_->formatWithContext(context, stream_info);
+    answer_count_ = answer_count_formatter_->formatWithContext(context, stream_info);
+    response_code_ = response_code_formatter_->formatWithContext(context, stream_info);
+    parse_status_ = parse_status_formatter_->formatWithContext(context, stream_info);
 
     // Store address information for testing
     remote_address_ = stream_info.downstreamAddressProvider().remoteAddress()->asString();
@@ -432,23 +432,29 @@ TEST(DnsFilterCommandParserTest, QueryNameFormatter) {
   auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
-  // Create StreamInfo with DNS metadata
+  // Create StreamInfo
   Event::SimulatedTimeSystem test_time;
   auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
   StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  // Add DNS metadata
-  Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["query_name"] = ValueUtil::stringValue("example.com");
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+  // Create DNS query context with a query
+  NiceMock<Stats::MockCounter> mock_counter;
+  DnsParserCounters counters(mock_counter, mock_counter, mock_counter, mock_counter, mock_counter);
+  auto dns_context = std::make_unique<DnsQueryContext>(nullptr, nullptr, counters, 0);
+  dns_context->queries_.push_back(
+      std::make_unique<DnsQueryRecord>("example.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN));
+
+  // Create formatter context with DNS extension
+  Formatter::Context formatter_context;
+  formatter_context.setExtension(*dns_context);
 
   // Test format string
-  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  auto result = formatter->formatWithContext(formatter_context, stream_info);
   EXPECT_EQ(result.value(), "example.com");
 
   // Test format value
-  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  auto value = formatter->formatValueWithContext(formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "example.com");
 }
 
@@ -462,14 +468,19 @@ TEST(DnsFilterCommandParserTest, QueryTypeFormatter) {
   StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["query_type"] = ValueUtil::stringValue("1");
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+  NiceMock<Stats::MockCounter> mock_counter;
+  DnsParserCounters counters(mock_counter, mock_counter, mock_counter, mock_counter, mock_counter);
+  auto dns_context = std::make_unique<DnsQueryContext>(nullptr, nullptr, counters, 0);
+  dns_context->queries_.push_back(
+      std::make_unique<DnsQueryRecord>("test.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN));
 
-  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  Formatter::Context formatter_context;
+  formatter_context.setExtension(*dns_context);
+
+  auto result = formatter->formatWithContext(formatter_context, stream_info);
   EXPECT_EQ(result.value(), "1"); // A record type
 
-  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  auto value = formatter->formatValueWithContext(formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "1");
 }
 
@@ -483,14 +494,21 @@ TEST(DnsFilterCommandParserTest, AnswerCountFormatter) {
   StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["answer_count"] = ValueUtil::stringValue("5");
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+  NiceMock<Stats::MockCounter> mock_counter;
+  DnsParserCounters counters(mock_counter, mock_counter, mock_counter, mock_counter, mock_counter);
+  auto dns_context = std::make_unique<DnsQueryContext>(nullptr, nullptr, counters, 0);
+  // Add 5 dummy answers
+  for (int i = 0; i < 5; i++) {
+    dns_context->answers_.emplace("test.com", nullptr);
+  }
 
-  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  Formatter::Context formatter_context;
+  formatter_context.setExtension(*dns_context);
+
+  auto result = formatter->formatWithContext(formatter_context, stream_info);
   EXPECT_EQ(result.value(), "5");
 
-  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  auto value = formatter->formatValueWithContext(formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "5");
 }
 
@@ -504,14 +522,18 @@ TEST(DnsFilterCommandParserTest, ResponseCodeFormatter) {
   StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["response_code"] = ValueUtil::stringValue("0");
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+  NiceMock<Stats::MockCounter> mock_counter;
+  DnsParserCounters counters(mock_counter, mock_counter, mock_counter, mock_counter, mock_counter);
+  auto dns_context = std::make_unique<DnsQueryContext>(nullptr, nullptr, counters, 0);
+  dns_context->response_code_ = DNS_RESPONSE_CODE_NO_ERROR;
 
-  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  Formatter::Context formatter_context;
+  formatter_context.setExtension(*dns_context);
+
+  auto result = formatter->formatWithContext(formatter_context, stream_info);
   EXPECT_EQ(result.value(), "0"); // NO_ERROR
 
-  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  auto value = formatter->formatValueWithContext(formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "0");
 }
 
@@ -525,14 +547,18 @@ TEST(DnsFilterCommandParserTest, ParseStatusFormatter) {
   StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["parse_status"] = ValueUtil::stringValue("true");
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+  NiceMock<Stats::MockCounter> mock_counter;
+  DnsParserCounters counters(mock_counter, mock_counter, mock_counter, mock_counter, mock_counter);
+  auto dns_context = std::make_unique<DnsQueryContext>(nullptr, nullptr, counters, 0);
+  dns_context->parse_status_ = true;
 
-  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  Formatter::Context formatter_context;
+  formatter_context.setExtension(*dns_context);
+
+  auto result = formatter->formatWithContext(formatter_context, stream_info);
   EXPECT_EQ(result.value(), "true");
 
-  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  auto value = formatter->formatValueWithContext(formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "true");
 }
 
@@ -541,7 +567,7 @@ TEST(DnsFilterCommandParserTest, MissingMetadata) {
   auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
-  // StreamInfo without DNS metadata
+  // StreamInfo without DNS context extension
   Event::SimulatedTimeSystem test_time;
   auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
   StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
@@ -561,14 +587,19 @@ TEST(DnsFilterCommandParserTest, QueryClassFormatter) {
   StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["query_class"] = ValueUtil::stringValue("1");
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+  NiceMock<Stats::MockCounter> mock_counter;
+  DnsParserCounters counters(mock_counter, mock_counter, mock_counter, mock_counter, mock_counter);
+  auto dns_context = std::make_unique<DnsQueryContext>(nullptr, nullptr, counters, 0);
+  dns_context->queries_.push_back(
+      std::make_unique<DnsQueryRecord>("test.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN));
 
-  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
+  Formatter::Context formatter_context;
+  formatter_context.setExtension(*dns_context);
+
+  auto result = formatter->formatWithContext(formatter_context, stream_info);
   EXPECT_EQ(result.value(), "1"); // IN class
 
-  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  auto value = formatter->formatValueWithContext(formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "1");
 }
 
@@ -610,12 +641,17 @@ TEST(DnsFilterCommandParserTest, FormatValueStringType) {
   StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["query_name"] = ValueUtil::stringValue("format.test.com");
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+  NiceMock<Stats::MockCounter> mock_counter;
+  DnsParserCounters counters(mock_counter, mock_counter, mock_counter, mock_counter, mock_counter);
+  auto dns_context = std::make_unique<DnsQueryContext>(nullptr, nullptr, counters, 0);
+  dns_context->queries_.push_back(
+      std::make_unique<DnsQueryRecord>("format.test.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN));
+
+  Formatter::Context formatter_context;
+  formatter_context.setExtension(*dns_context);
 
   // Test formatValue returns correct Protobuf value type
-  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
+  auto value = formatter->formatValueWithContext(formatter_context, stream_info);
   EXPECT_EQ(value.kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(value.string_value(), "format.test.com");
 }
@@ -630,37 +666,14 @@ TEST(DnsFilterCommandParserTest, FormatValueNullWhenMissing) {
   StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  // No metadata set
+  // No DNS context set
 
   // Test formatValue returns null value
   auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
   EXPECT_EQ(value.kind_case(), Protobuf::Value::kNullValue);
 }
 
-TEST(DnsFilterCommandParserTest, WrongTypeInMetadata) {
-  auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
-  ASSERT_NE(formatter, nullptr);
-
-  Event::SimulatedTimeSystem test_time;
-  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
-  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
-                                         StreamInfo::FilterState::LifeSpan::Connection);
-
-  // Set number value where string is expected (all DNS metadata should be strings)
-  Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["query_name"] = ValueUtil::numberValue(123);
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
-
-  // Should return nullopt for wrong type
-  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
-  EXPECT_FALSE(result.has_value());
-
-  auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
-  EXPECT_EQ(value.kind_case(), Protobuf::Value::kNullValue);
-}
-
-TEST(DnsFilterCommandParserTest, MissingFieldInMetadata) {
+TEST(DnsFilterCommandParserTest, EmptyQueriesInContext) {
   auto parser = createDnsFilterCommandParser();
 
   Event::SimulatedTimeSystem test_time;
@@ -668,49 +681,33 @@ TEST(DnsFilterCommandParserTest, MissingFieldInMetadata) {
   StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  // Set DNS metadata but without the field we're looking for
-  Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["some_other_field"] = ValueUtil::stringValue("value");
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+  // Create DNS context but with no queries
+  NiceMock<Stats::MockCounter> mock_counter;
+  DnsParserCounters counters(mock_counter, mock_counter, mock_counter, mock_counter, mock_counter);
+  auto dns_context = std::make_unique<DnsQueryContext>(nullptr, nullptr, counters, 0);
 
-  // Test all formatters return nullopt when field is missing
+  Formatter::Context formatter_context;
+  formatter_context.setExtension(*dns_context);
+
+  // Test all formatters that depend on queries return nullopt when queries are empty
   auto query_name_fmt = parser->parse("QUERY_NAME", "", absl::nullopt);
-  EXPECT_FALSE(query_name_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+  EXPECT_FALSE(query_name_fmt->formatWithContext(formatter_context, stream_info).has_value());
 
   auto query_type_fmt = parser->parse("QUERY_TYPE", "", absl::nullopt);
-  EXPECT_FALSE(query_type_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
-
-  auto answer_count_fmt = parser->parse("ANSWER_COUNT", "", absl::nullopt);
-  EXPECT_FALSE(answer_count_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
-
-  auto response_code_fmt = parser->parse("RESPONSE_CODE", "", absl::nullopt);
-  EXPECT_FALSE(response_code_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
-
-  auto parse_status_fmt = parser->parse("PARSE_STATUS", "", absl::nullopt);
-  EXPECT_FALSE(parse_status_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
+  EXPECT_FALSE(query_type_fmt->formatWithContext(formatter_context, stream_info).has_value());
 
   auto query_class_fmt = parser->parse("QUERY_CLASS", "", absl::nullopt);
-  EXPECT_FALSE(query_class_fmt->formatWithContext(Formatter::Context(), stream_info).has_value());
-}
+  EXPECT_FALSE(query_class_fmt->formatWithContext(formatter_context, stream_info).has_value());
 
-TEST(DnsFilterCommandParserTest, NullValueInMetadata) {
-  auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
-  ASSERT_NE(formatter, nullptr);
+  // These should still work even without queries
+  auto answer_count_fmt = parser->parse("ANSWER_COUNT", "", absl::nullopt);
+  EXPECT_TRUE(answer_count_fmt->formatWithContext(formatter_context, stream_info).has_value());
 
-  Event::SimulatedTimeSystem test_time;
-  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
-  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
-                                         StreamInfo::FilterState::LifeSpan::Connection);
+  auto response_code_fmt = parser->parse("RESPONSE_CODE", "", absl::nullopt);
+  EXPECT_TRUE(response_code_fmt->formatWithContext(formatter_context, stream_info).has_value());
 
-  // Set null value in metadata
-  Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["query_name"] = ValueUtil::nullValue();
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
-
-  // Should return nullopt
-  auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
-  EXPECT_FALSE(result.has_value());
+  auto parse_status_fmt = parser->parse("PARSE_STATUS", "", absl::nullopt);
+  EXPECT_TRUE(parse_status_fmt->formatWithContext(formatter_context, stream_info).has_value());
 }
 
 } // namespace

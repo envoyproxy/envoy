@@ -659,30 +659,14 @@ void DnsFilter::logQuery(const DnsQueryContextPtr& context) {
   StreamInfo::StreamInfoImpl stream_info(listener_.dispatcher().timeSource(), connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  // Add DNS-specific information to dynamic metadata
-  Protobuf::Struct dns_metadata;
-  auto* fields = dns_metadata.mutable_fields();
-
-  // Add query information
-  if (!context->queries_.empty()) {
-    const auto& query = context->queries_[0];
-    (*fields)["query_name"] = ValueUtil::stringValue(absl::StrCat(query->name_));
-    (*fields)["query_type"] = ValueUtil::stringValue(absl::StrCat(query->type_));
-    (*fields)["query_class"] = ValueUtil::stringValue(absl::StrCat(query->class_));
-  }
-
-  // Add response information
-  (*fields)["answer_count"] = ValueUtil::stringValue(absl::StrCat(context->answers_.size()));
-  (*fields)["response_code"] = ValueUtil::stringValue(absl::StrCat(context->response_code_));
-  (*fields)["parse_status"] = ValueUtil::stringValue(context->parse_status_ ? "true" : "false");
-
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+  // Create formatter context with DNS query context extension
+  Formatter::Context formatter_context;
+  formatter_context.setExtension(*context);
 
   // Log to all configured access loggers
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log({}, stream_info);
+    access_log->log(formatter_context, stream_info);
   }
-}
 
 } // namespace DnsFilter
 } // namespace UdpFilters
