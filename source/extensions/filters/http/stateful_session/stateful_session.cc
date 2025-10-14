@@ -72,10 +72,10 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
     }
     effective_config_ = route_config->statefulSessionConfig();
   }
-  
+
   // Filter is active and not disabled per-route.
   filter_active_ = true;
-  
+
   session_state_ = effective_config_->createSessionState(headers);
   if (session_state_ == nullptr) {
     return Http::FilterHeadersStatus::Continue;
