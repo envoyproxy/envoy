@@ -95,3 +95,11 @@ void envoy_dynamic_module_on_http_filter_http_callout_done(
 void envoy_dynamic_module_on_http_filter_scheduled(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t event_id) {}
+
+void envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr) {}
+
+void envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr) {}
