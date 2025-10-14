@@ -1,7 +1,7 @@
 **Summary of changes**:
 
 * HTTP:
-  - **Breaking**: Changed default HTTP/2 max concurrent streams from unlimited to 1024, initial stream window from 256MiB to 16MiB, and connection window from 256MiB to 24MiB for improved memory safety.
+  - Changed default HTTP/2 max concurrent streams from unlimited to 1024, initial stream window from 256MiB to 16MiB, and connection window from 256MiB to 24MiB for improved memory safety.
   - Added HTTP/1.1 proxy transport RFC 9110 compliant ``CONNECT`` requests with ``Host`` header by default.
   - Enhanced route refresh to trigger tracing refresh, applying new route's sampling and decoration to active spans.
   - Added support for decompressed HTTP header bytes tracking in access logs.
