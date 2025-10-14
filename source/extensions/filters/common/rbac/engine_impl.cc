@@ -45,21 +45,9 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::CommonFactoryContext& context, const EnforcementMode mode)
     : action_(rules.action()), mode_(mode) {
-  // A pointer to the builder, if one will be created.
-  Expr::BuilderInstanceSharedPtr builder = nullptr;
-  // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
-    if (policy.second.has_condition()) {
-      builder_with_arena_ = std::make_unique<ExprBuilderWithArena>();
-      builder_with_arena_->builder_ = Expr::createBuilder(&builder_with_arena_->constant_arena_);
-      builder = builder_with_arena_->builder_;
-      break;
-    }
-  }
-
-  for (const auto& policy : rules.policies()) {
-    policies_.emplace(policy.first, std::make_unique<PolicyMatcher>(policy.second, builder,
-                                                                    validation_visitor, context));
+    policies_.emplace(policy.first,
+                      std::make_unique<PolicyMatcher>(policy.second, validation_visitor, context));
   }
 }
 
