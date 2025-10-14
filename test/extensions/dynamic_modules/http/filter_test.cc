@@ -787,22 +787,6 @@ TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
 }
 
 TEST(HttpFilter, HeaderMapGetter) {
-  // This test only checks some implementation details but we ensure to pass a valid
-  // module to represent a valid configuration.
-  const std::string filter_name = "foo";
-  const std::string filter_config = "bar";
-
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
-
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Stats::IsolatedStoreImpl stats_store;
-  auto filter_config_or_status =
-      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()),
-          *stats_store.createScope(""), context);
-  EXPECT_TRUE(filter_config_or_status.ok());
-
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter(filter_config_or_status.value(), symbol_table);
 
