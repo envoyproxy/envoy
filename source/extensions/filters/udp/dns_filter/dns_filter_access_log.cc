@@ -19,8 +19,8 @@ namespace {
  */
 class DnsFormatterProvider : public Formatter::FormatterProvider {
 public:
-  using FieldExtractor =
-      std::function<absl::optional<std::string>(const Formatter::Context&, const StreamInfo::StreamInfo&)>;
+  using FieldExtractor = std::function<absl::optional<std::string>(const Formatter::Context&,
+                                                                   const StreamInfo::StreamInfo&)>;
 
   DnsFormatterProvider(FieldExtractor field_extractor)
       : field_extractor_(std::move(field_extractor)) {}
@@ -48,8 +48,8 @@ private:
 template <typename FieldAccessor>
 Formatter::FormatterProviderPtr makeQueryFieldProvider(FieldAccessor accessor) {
   return std::make_unique<DnsFormatterProvider>(
-      [accessor](const Formatter::Context& ctx, const StreamInfo::StreamInfo&)
-          -> absl::optional<std::string> {
+      [accessor](const Formatter::Context& ctx,
+                 const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
         const auto dns_ctx = ctx.typedExtension<DnsQueryContext>();
         if (!dns_ctx.has_value() || dns_ctx->queries_.empty()) {
           return absl::nullopt;
@@ -64,8 +64,8 @@ Formatter::FormatterProviderPtr makeQueryFieldProvider(FieldAccessor accessor) {
 template <typename FieldAccessor>
 Formatter::FormatterProviderPtr makeContextFieldProvider(FieldAccessor accessor) {
   return std::make_unique<DnsFormatterProvider>(
-      [accessor](const Formatter::Context& ctx, const StreamInfo::StreamInfo&)
-          -> absl::optional<std::string> {
+      [accessor](const Formatter::Context& ctx,
+                 const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
         const auto dns_ctx = ctx.typedExtension<DnsQueryContext>();
         if (!dns_ctx.has_value()) {
           return absl::nullopt;
@@ -126,10 +126,9 @@ private:
              }},
             {"PARSE_STATUS",
              [](absl::string_view, absl::optional<size_t>) -> Formatter::FormatterProviderPtr {
-               return makeContextFieldProvider(
-                   [](const DnsQueryContext& ctx) -> std::string {
-                     return ctx.parse_status_ ? "true" : "false";
-                   });
+               return makeContextFieldProvider([](const DnsQueryContext& ctx) -> std::string {
+                 return ctx.parse_status_ ? "true" : "false";
+               });
              }},
         });
   }
