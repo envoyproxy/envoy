@@ -31,6 +31,12 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(); });
 };
 
+MetadataCredentialsProviderBase::~MetadataCredentialsProviderBase() {
+  if (metadata_fetcher_) {
+    metadata_fetcher_->cancel();
+  }
+}
+
 void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
   ENVOY_LOG(debug, "Received callback from aws cluster manager for cluster {}", cluster_name_);
   if (!cache_duration_timer_) {

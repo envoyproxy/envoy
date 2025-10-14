@@ -139,7 +139,7 @@ public:
   // Thread local shim to store callbacks for weight updates of worker local lb.
   class ThreadLocalShim : public Envoy::ThreadLocal::ThreadLocalObject {
   public:
-    Common::CallbackManager<void, uint32_t> apply_weights_cb_helper_;
+    Common::CallbackManager<void> apply_weights_cb_helper_;
   };
 
   // This class is used to handle the load balancing on the worker thread.
@@ -172,7 +172,7 @@ public:
 
     bool recreateOnHostChange() const override { return false; }
 
-    void applyWeightsToAllWorkers(uint32_t priority);
+    void applyWeightsToAllWorkers();
 
     std::unique_ptr<Envoy::ThreadLocal::TypedSlot<ThreadLocalShim>> tls_;
 

@@ -66,6 +66,13 @@ def envoy_select_envoy_mobile_listener(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if Envoy Mobile xDS is enabled in the current build.
+def envoy_select_envoy_mobile_xds(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_envoy_mobile_xds": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values if http3 is enabled in the current build.
 def envoy_select_enable_http3(xs, repository = ""):
     return select({

@@ -49,6 +49,11 @@ protected:
     // Create the socket interface.
     socket_interface_ = std::make_unique<ReverseTunnelInitiator>(context_);
 
+    // Set stat prefix to "reverse_connections" for tests.
+    config_.set_stat_prefix("reverse_connections");
+    // Enable detailed stats for tests that need per-node/cluster stats.
+    config_.set_enable_detailed_stats(true);
+
     // Create the extension.
     extension_ = std::make_unique<ReverseTunnelInitiatorExtension>(context_, config_);
 
@@ -1187,6 +1192,7 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateReverseConnectionWithCustomScope) 
   envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface custom_config;
   custom_config.set_stat_prefix("custom_stats");
+  custom_config.set_enable_detailed_stats(true);
 
   auto custom_extension =
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);

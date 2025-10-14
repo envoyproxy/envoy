@@ -12,7 +12,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace RingHash {
 
 using RingHashLbProto = envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash;
@@ -49,6 +49,6 @@ public:
 };
 
 } // namespace RingHash
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

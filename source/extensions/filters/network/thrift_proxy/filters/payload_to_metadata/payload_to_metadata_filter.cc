@@ -22,7 +22,7 @@ using FieldSelector = envoy::extensions::filters::network::thrift_proxy::filters
 Config::Config(const envoy::extensions::filters::network::thrift_proxy::filters::
                    payload_to_metadata::v3::PayloadToMetadata& config,
                Regex::Engine& regex_engine) {
-  trie_root_ = std::make_shared<Trie>();
+  trie_root_ = std::make_shared<PayloadExtractor::Trie>();
   request_rules_.reserve(config.request_rules().size());
   for (const auto& entry : config.request_rules()) {
     request_rules_.emplace_back(entry, static_cast<uint16_t>(request_rules_.size()), trie_root_,
@@ -30,7 +30,8 @@ Config::Config(const envoy::extensions::filters::network::thrift_proxy::filters:
   }
 }
 
-Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root, Regex::Engine& regex_engine)
+Rule::Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieSharedPtr root,
+           Regex::Engine& regex_engine)
     : rule_(rule), rule_id_(rule_id) {
   if (!rule_.has_on_present() && !rule_.has_on_missing()) {
     throw EnvoyException("payload to metadata filter: neither `on_present` nor `on_missing` set");
@@ -66,23 +67,7 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root, Regex::E
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  const FieldSelector* field_selector = &rule_.field_selector();
-  TrieSharedPtr node = root;
-  while (true) {
-    int16_t id = static_cast<int16_t>(field_selector->id());
-    if (node->children_.find(id) == node->children_.end()) {
-      node->children_[id] = std::make_shared<Trie>(node);
-    }
-    node = node->children_[id];
-    node->name_ = field_selector->name();
-    if (!field_selector->has_child()) {
-      break;
-    }
-
-    field_selector = &field_selector->child();
-  }
-
-  node->rule_ids_.push_back(rule_id_);
+  root->insert<FieldSelector>(&rule_.field_selector(), rule_id_);
 }
 
 bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
@@ -105,98 +90,12 @@ bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
          (metadata.hasMethodName() && absl::StartsWith(metadata.methodName(), service_name));
 }
 
-FilterStatus TrieMatchHandler::messageEnd() {
-  ASSERT(steps_ == 0);
-  ENVOY_LOG(trace, "TrieMatchHandler messageEnd");
-  parent_.handleOnMissing();
-  complete_ = true;
-  return FilterStatus::Continue;
-}
-
-FilterStatus TrieMatchHandler::structBegin(absl::string_view) {
-  ENVOY_LOG(trace, "TrieMatchHandler structBegin id: {}, steps: {}",
-            field_ids_.empty() ? "top_level_struct" : std::to_string(field_ids_.back()), steps_);
-  ASSERT(steps_ >= 0);
-  assertNode();
-  if (!field_ids_.empty()) {
-    if (steps_ == 0 && node_->children_.find(field_ids_.back()) != node_->children_.end()) {
-      node_ = node_->children_[field_ids_.back()];
-      ENVOY_LOG(trace, "name: {}", node_->name_);
-    } else {
-      steps_++;
-    }
-  }
-  return FilterStatus::Continue;
-}
-
-FilterStatus TrieMatchHandler::structEnd() {
-  ENVOY_LOG(trace, "TrieMatchHandler structEnd, steps: {}", steps_);
-  assertNode();
-  if (steps_ > 0) {
-    steps_--;
-  } else if (node_->parent_.lock()) {
-    node_ = node_->parent_.lock();
-  } else {
-    // last decoder event
-    node_ = nullptr;
-  }
-  ASSERT(steps_ >= 0);
-  return FilterStatus::Continue;
-}
-
-FilterStatus TrieMatchHandler::fieldBegin(absl::string_view, FieldType&, int16_t& field_id) {
-  ENVOY_LOG(trace, "TrieMatchHandler fieldBegin id: {}", field_id);
-  field_ids_.push_back(field_id);
-  return FilterStatus::Continue;
-}
-
-FilterStatus TrieMatchHandler::fieldEnd() {
-  ENVOY_LOG(trace, "TrieMatchHandler fieldEnd");
-  field_ids_.pop_back();
-  return FilterStatus::Continue;
-}
-
-FilterStatus TrieMatchHandler::stringValue(absl::string_view value) {
-  assertLastFieldId();
-  ENVOY_LOG(trace, "TrieMatchHandler stringValue id:{} value:{}", field_ids_.back(), value);
-  return handleString(static_cast<std::string>(value));
-}
-
-template <typename NumberType> FilterStatus TrieMatchHandler::numberValue(NumberType value) {
-  assertLastFieldId();
-  ENVOY_LOG(trace, "TrieMatchHandler numberValue id:{} value:{}", field_ids_.back(), value);
-  return handleString(std::to_string(value));
-}
-
-FilterStatus TrieMatchHandler::handleString(std::string value) {
-  ASSERT(steps_ >= 0);
-  assertNode();
-  assertLastFieldId();
-  if (steps_ == 0 && node_->children_.find(field_ids_.back()) != node_->children_.end() &&
-      !node_->children_[field_ids_.back()]->rule_ids_.empty()) {
-    auto on_present_node = node_->children_[field_ids_.back()];
-    ENVOY_LOG(trace, "name: {}", on_present_node->name_);
-    parent_.handleOnPresent(std::move(value), on_present_node->rule_ids_);
-  }
-  return FilterStatus::Continue;
-}
-
-void TrieMatchHandler::assertNode() {
-  if (node_ == nullptr) {
-    throw EnvoyException("payload to metadata filter: invalid trie state, node is null");
-  }
-}
-
-void TrieMatchHandler::assertLastFieldId() {
-  if (field_ids_.empty()) {
-    throw EnvoyException("payload to metadata filter: invalid trie state, field_ids_ is null");
-  }
-}
-
 PayloadToMetadataFilter::PayloadToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
 
-void PayloadToMetadataFilter::handleOnPresent(std::string&& value,
-                                              const std::vector<uint16_t>& rule_ids) {
+void PayloadToMetadataFilter::handleOnPresent(
+    absl::variant<absl::string_view, int64_t, double> value, const std::vector<uint16_t>& rule_ids,
+    bool is_request) {
+  ASSERT(is_request); // Currently we only support request rules.
   for (uint16_t rule_id : rule_ids) {
     if (matched_rule_ids_.find(rule_id) == matched_rule_ids_.end()) {
       ENVOY_LOG(trace, "rule_id {} is not matched.", rule_id);
@@ -207,20 +106,31 @@ void PayloadToMetadataFilter::handleOnPresent(std::string&& value,
     matched_rule_ids_.erase(rule_id);
     ASSERT(rule_id < config_->requestRules().size());
     const Rule& rule = config_->requestRules()[rule_id];
-    if (!value.empty() && rule.rule().has_on_present()) {
+    std::string value_str;
+    if (absl::holds_alternative<absl::string_view>(value)) {
+      value_str = absl::get<absl::string_view>(value);
+    } else if (absl::holds_alternative<int64_t>(value)) {
+      value_str = std::to_string(absl::get<int64_t>(value));
+    } else {
+      value_str = std::to_string(absl::get<double>(value));
+    }
+
+    if (!value_str.empty() && rule.rule().has_on_present()) {
       // We can *not* always std::move(value) here since we need `value` if multiple rules are
       // matched. Optimize the most common usage, which is one rule per payload field.
       if (rule_ids.size() == 1) {
-        applyKeyValue(std::move(value), rule, rule.rule().on_present());
+        applyKeyValue(std::move(value_str), rule, rule.rule().on_present());
         break;
       } else {
-        applyKeyValue(value, rule, rule.rule().on_present());
+        applyKeyValue(value_str, rule, rule.rule().on_present());
       }
     }
   }
 }
 
-void PayloadToMetadataFilter::handleOnMissing() {
+void PayloadToMetadataFilter::handleComplete(bool is_request) {
+  ASSERT(is_request); // Currently we only support request rules.
+
   ENVOY_LOG(trace, "{} rules missing", matched_rule_ids_.size());
 
   for (uint16_t rule_id : matched_rule_ids_) {
@@ -343,7 +253,7 @@ static std::string getHexRepresentation(Buffer::Instance& data) {
 
 FilterStatus PayloadToMetadataFilter::passthroughData(Buffer::Instance& data) {
   if (!matched_rule_ids_.empty()) {
-    TrieMatchHandler handler(*this, config_->trieRoot());
+    PayloadExtractor::TrieMatchHandler handler(*this, config_->trieRoot());
     ProtocolPtr protocol = createProtocol(decoder_callbacks_->downstreamProtocolType());
 
     // TODO(kuochunghsu): avoid copying payload https://github.com/envoyproxy/envoy/issues/23901
@@ -358,7 +268,7 @@ FilterStatus PayloadToMetadataFilter::passthroughData(Buffer::Instance& data) {
       IS_ENVOY_BUG(fmt::format("decoding error, error_message: {}, payload: {}", e.what(),
                                getHexRepresentation(data)));
       if (!handler.isComplete()) {
-        handleOnMissing();
+        handleComplete(true);
       }
     });
     finalizeDynamicMetadata();
