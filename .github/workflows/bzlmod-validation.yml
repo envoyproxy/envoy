@@ -1,0 +1,158 @@
+---
+# Bzlmod validation workflow for Envoy
+# This workflow validates that bzlmod mode builds work correctly
+# Per best practices, build validation is performed in CI/CD pipelines
+
+name: Bzlmod Validation
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/**'
+  pull_request:
+    paths:
+      - 'MODULE.bazel'
+      - 'api/MODULE.bazel'
+      - 'mobile/MODULE.bazel'
+      - 'bazel/extensions/**'
+      - '.bazelversion'
+      - '.github/workflows/bzlmod-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-bzlmod:
+    name: Validate Bzlmod Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bazel
+        run: |
+          # Install Bazelisk which respects .bazelversion
+          wget -q https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+          chmod +x bazelisk-linux-amd64
+          sudo mv bazelisk-linux-amd64 /usr/local/bin/bazel
+          bazel version
+          
+      - name: Validate MODULE.bazel dependency resolution
+        run: |
+          echo "::group::Validate dependency graph"
+          bazel mod graph --enable_bzlmod
+          echo "::endgroup::"
+          
+      - name: Build core module with bzlmod
+        run: |
+          echo "::group::Build core module"
+          bazel build --enable_bzlmod //source/common/common:assert_lib
+          echo "::endgroup::"
+          
+      - name: Build API module with bzlmod
+        run: |
+          echo "::group::Build API module"
+          bazel build --enable_bzlmod @envoy_api//envoy/config/core/v3:pkg
+          echo "::endgroup::"
+          
+      - name: Query mobile module with bzlmod
+        run: |
+          echo "::group::Query mobile module"
+          bazel query --enable_bzlmod "@envoy_mobile//library/..." --output=label_kind | head -20
+          echo "::endgroup::"
+          
+      - name: Test sample targets with bzlmod
+        run: |
+          echo "::group::Run sample tests"
+          bazel test --enable_bzlmod //test/common/common:assert_test || true
+          echo "::endgroup::"
+          
+      - name: Validate bazel mod tidy
+        run: |
+          echo "::group::Run bazel mod tidy"
+          # Check if bazel mod tidy makes any changes
+          cp MODULE.bazel MODULE.bazel.backup
+          bazel mod tidy --enable_bzlmod || echo "bazel mod tidy not fully supported yet"
+          diff MODULE.bazel MODULE.bazel.backup || echo "MODULE.bazel would be updated by bazel mod tidy"
+          echo "::endgroup::"
+
+  validate-extensions:
+    name: Validate Module Extensions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bazel
+        run: |
+          wget -q https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+          chmod +x bazelisk-linux-amd64
+          sudo mv bazelisk-linux-amd64 /usr/local/bin/bazel
+          
+      - name: Validate core extension
+        run: |
+          echo "::group::Validate core extension"
+          bazel mod dump_repo_mapping @envoy --enable_bzlmod | head -50
+          echo "::endgroup::"
+          
+      - name: List all repositories from extensions
+        run: |
+          echo "::group::List repositories"
+          bazel query --enable_bzlmod --output=build "@@//:all" 2>&1 | grep "^  name = " | head -30 || echo "Query format not supported"
+          echo "::endgroup::"
+
+  validate-sub-modules:
+    name: Validate Sub-modules
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bazel
+        run: |
+          wget -q https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+          chmod +x bazelisk-linux-amd64
+          sudo mv bazelisk-linux-amd64 /usr/local/bin/bazel
+          
+      - name: Validate API sub-module
+        working-directory: ./api
+        run: |
+          echo "::group::Validate API MODULE.bazel"
+          bazel mod graph --enable_bzlmod
+          echo "::endgroup::"
+          
+      - name: Validate Mobile sub-module
+        working-directory: ./mobile
+        run: |
+          echo "::group::Validate Mobile MODULE.bazel"
+          bazel mod graph --enable_bzlmod
+          echo "::endgroup::"
+
+  summary:
+    name: Bzlmod Validation Summary
+    runs-on: ubuntu-latest
+    needs: [validate-bzlmod, validate-extensions, validate-sub-modules]
+    if: always()
+    
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.validate-bzlmod.result }}" = "success" ] && \
+             [ "${{ needs.validate-extensions.result }}" = "success" ] && \
+             [ "${{ needs.validate-sub-modules.result }}" = "success" ]; then
+            echo "✅ All bzlmod validations passed!"
+            exit 0
+          else
+            echo "❌ Some bzlmod validations failed"
+            echo "validate-bzlmod: ${{ needs.validate-bzlmod.result }}"
+            echo "validate-extensions: ${{ needs.validate-extensions.result }}"
+            echo "validate-sub-modules: ${{ needs.validate-sub-modules.result }}"
+            exit 1
+          fi

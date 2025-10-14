@@ -20,6 +20,7 @@ exports_files([
     "repository_locations.bzl",
     "exported_symbols.txt",
     "exported_symbols_apple.txt",
+    "native_binding_wrapper.bzl",
 ])
 
 sh_library(

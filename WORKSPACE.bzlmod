@@ -1,0 +1,15 @@
+# WORKSPACE.bzlmod - Bazel 8 bzlmod mode supplement file
+#
+# Per Bazel's migration guide (https://bazel.build/external/migration#hybrid-mode):
+# This file is loaded when --enable_bzlmod is used, AFTER MODULE.bazel is processed.
+# It provides repository rules that cannot be expressed in MODULE.bazel.
+#
+# Bazel 8.4.2 benefits:
+# - Improved MODULE.bazel/WORKSPACE isolation
+# - Better dual-mode support without workarounds
+# - Extensions can use isolate = True for reproducibility
+#
+# Current state: Empty - all dependencies handled by MODULE.bazel + extensions
+# This demonstrates Bazel 8's capability to fully migrate to bzlmod without hybrid workarounds.
+
+workspace(name = "envoy")
