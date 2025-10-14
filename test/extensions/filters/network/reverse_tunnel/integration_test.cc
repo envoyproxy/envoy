@@ -32,12 +32,14 @@ public:
 name: envoy.bootstrap.reverse_tunnel.upstream_socket_interface
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+  enable_detailed_stats: true
 )EOF");
 
     config_helper_.addBootstrapExtension(R"EOF(
 name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
+  enable_detailed_stats: true
 )EOF");
 
     // Call parent initialize to complete setup.
@@ -465,8 +467,8 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshake) {
   timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
 
   // Test that the full flow works by checking upstream socket interface metrics.
-  test_server_->waitForGaugeGe("reverse_connections.nodes.e2e-node", 1);
-  test_server_->waitForGaugeGe("reverse_connections.clusters.e2e-cluster", 1);
+  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.e2e-node", 1);
+  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.clusters.e2e-cluster", 1);
 
   // Verify stats show successful reverse tunnel handshake.
   test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
