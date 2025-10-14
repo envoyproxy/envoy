@@ -16,7 +16,8 @@ using namespace Envoy::Http;
  */
 class DynamicModuleHttpFilter : public Http::StreamFilter,
                                 public std::enable_shared_from_this<DynamicModuleHttpFilter>,
-                                public Logger::Loggable<Logger::Id::dynamic_modules> {
+                                public Logger::Loggable<Logger::Id::dynamic_modules>,
+                                public Http::DownstreamWatermarkCallbacks {
 public:
   DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config,
                           Stats::SymbolTable& symbol_table)
@@ -39,6 +40,9 @@ public:
   FilterMetadataStatus decodeMetadata(MetadataMap&) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
+    if (config_->terminal_filter_) {
+      decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
+    }
   }
   void decodeComplete() override;
 
@@ -52,6 +56,10 @@ public:
     encoder_callbacks_ = &callbacks;
   }
   void encodeComplete() override;
+
+  // ----------  Http::DownstreamWatermarkCallbacks  ----------
+  void onAboveWriteBufferHighWatermark() override;
+  void onBelowWriteBufferLowWatermark() override;
 
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
