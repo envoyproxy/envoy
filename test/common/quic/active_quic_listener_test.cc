@@ -681,9 +681,7 @@ TEST_P(ActiveQuicListenerTest, EcnReportingDualStack) {
 
 TEST_P(ActiveQuicListenerTest, MaxSessionsPerEventLoopNotConfigured) {
   initialize();
-  const uint32_t max_sessions_per_event_loop_for_test =
-      ActiveQuicListener::kNumSessionsToCreatePerLoop;
-  EXPECT_EQ(max_sessions_per_event_loop_for_test,
+  EXPECT_EQ(ActiveQuicListener::kNumSessionsToCreatePerLoop,
             ActiveQuicListenerPeer::getMaxSessionsPerEventLoop(*quic_listener_));
 }
 
