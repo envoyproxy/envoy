@@ -60,8 +60,8 @@ minor_behavior_changes:
     disabled by the runtime guard ``envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain``.
 - area: websocket
   change: |
-      Support route and per-try timeouts on WebSocket upgrade. This can be disabled by the runtime guard
-      ``envoy.reloadable_features.websocket_enable_timeout_on_upgrade_response``.
+    Support route and per-try timeouts on WebSocket upgrade. This can be disabled by the runtime guard
+    ``envoy.reloadable_features.websocket_enable_timeout_on_upgrade_response``.
 - area: testing
   change: |
     In test code for external extensions, matchers ``Http::HeaderValueOf``, ``HasHeader``, and ``HeaderHasValueRef``
@@ -95,8 +95,8 @@ minor_behavior_changes:
     ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%`` access log command operators.
 - area: formatter
   change: |
-    Deprecated legacy header formatter support for ``%DYNAMIC_METADATA(["namespace", "key", ...])%``
-    , ``%UPSTREAM_METADATA(["namespace", "key", ...])%`` and ``%PER_REQUEST_STATE(key)%``. Please use
+    Deprecated legacy header formatter support for ``%DYNAMIC_METADATA(["namespace", "key", ...])%``,
+    ``%UPSTREAM_METADATA(["namespace", "key", ...])%`` and ``%PER_REQUEST_STATE(key)%``. Please use
     ``%DYNAMIC_METADATA(namespace:key:...])%``, ``%UPSTREAM_METADATA(namespace:key:...])%``
     and ``%FILTER_STATE(key:PLAIN)%`` as alternatives.
     This change is guarded by the runtime flag
@@ -117,9 +117,9 @@ minor_behavior_changes:
     :ref:`client_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.client_config>` is empty.
 - area: grpc_json_transcoder
   change: |
-    Cap the frame size for streamed grpc at 1MB. Without this change there was a small chance
+    Cap the frame size for streamed gRPC at 1MB. Without this change there was a small chance
     that if a request streamed in sufficiently faster than it was processed, a frame larger than
-    4MB could be encoded, which most upstream grpc services would, by default, treat as an error.
+    4MB could be encoded, which most upstream gRPC services would, by default, treat as an error.
 - area: ext_authz
   change: |
     Check the request header count after applying mutations is <= the configured limit and reject
@@ -375,7 +375,7 @@ new_features:
     When unset, the defaults remain ``x-request-id`` and ``tunnel_request_id`` respectively.
 - area: http
   change: |
-    Added support for per-route compressor library override in the HTTP compressor filter.
+    Added support for per-route compressor library override in the :ref:`compressor filter <config_http_filters_compressor>`.
     Routes can now specify a different compressor library (e.g., gzip, brotli) via the
     :ref:`compressor_library <envoy_v3_api_field_extensions.filters.http.compressor.v3.CompressorOverrides.compressor_library>`
     field in the per-route configuration. This allows different routes to use different
@@ -649,11 +649,12 @@ new_features:
     :ref:`reverse tunnel overview <overview_reverse_tunnel>` for details.
 - area: compressor
   change: |
-    Added (:ref:`status_header_enabled
-    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.status_header_enabled>`)
-    to Compressor Filter. When enabled it adds new response header x-envoy-compression-status to the compressor_filter.
+    Added :ref:`status_header_enabled
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.status_header_enabled>`
+    to the :ref:`compressor filter <config_http_filters_compressor>`. When enabled, it adds a new response header
+    ``x-envoy-compression-status`` to the :ref:`compressor filter <config_http_filters_compressor>`.
     This header provides information on whether the response was compressed and, if not, the reason why compression was skipped.
-    Enabling this feature alters the order of conditions checked within the compressor filter is altered
+    Enabling this feature updates the order of conditions checked within the :ref:`compressor filter <config_http_filters_compressor>`
     to emit the most appropriate status reason.
 
 deprecated:
