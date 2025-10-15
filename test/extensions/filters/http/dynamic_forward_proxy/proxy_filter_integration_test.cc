@@ -148,14 +148,9 @@ name: stream-info-to-headers-filter
 
     if (prepend_custom_filter_config_yaml.has_value()) {
       // Prepend DFP filter.
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") ||
-          use_dfp_even_when_cluster_resolves_hosts) {
+      if (use_dfp_even_when_cluster_resolves_hosts) {
         config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster
                                                      : filter_use_dns_cache);
-      } else if (use_sub_cluster) {
-        config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
-                                          "false");
-        config_helper_.prependFilter(filter_use_sub_cluster);
       }
 
       // Prepend the custom_filter from the parameter.
@@ -164,14 +159,9 @@ name: stream-info-to-headers-filter
       // Prepend stream_info_filter.
       config_helper_.prependFilter(stream_info_filter_config_str);
     } else {
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") ||
-          use_dfp_even_when_cluster_resolves_hosts) {
+      if (use_dfp_even_when_cluster_resolves_hosts) {
         config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster
                                                      : filter_use_dns_cache);
-      } else if (use_sub_cluster) {
-        config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
-                                          "false");
-        config_helper_.prependFilter(filter_use_sub_cluster);
       }
 
       config_helper_.prependFilter(stream_info_filter_config_str);
@@ -687,21 +677,11 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsSuccessfulHost
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
 
   // This should result in a cache hit because the previous DNS query succeeded.
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
-    EXPECT_LOG_CONTAINS("debug", "cache hit for host 'localhost", {
-      auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-      ASSERT_TRUE(response2->waitForEndStream());
-      EXPECT_EQ("200", response2->headers().getStatusValue());
-      // No new query attempt.
-      EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
-    });
-  } else {
-    auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    ASSERT_TRUE(response2->waitForEndStream());
-    EXPECT_EQ("200", response2->headers().getStatusValue());
-    // No new query attempt.
-    EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
-  }
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+  // No new query attempt.
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
 }
 
 // TODO(yanavlasov) Enable per #26642
@@ -788,13 +768,8 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
-    // The suspicious host will be set to an empty host resulting in host not found (503)
-    EXPECT_EQ("503", response->headers().getStatusValue());
-  } else {
-    // The suspicious host will be set to an empty host resulting in a bad request (400)
-    EXPECT_EQ("400", response->headers().getStatusValue());
-  }
+  // The suspicious host will be set to an empty host resulting in host not found (503).
+  EXPECT_EQ("503", response->headers().getStatusValue());
   std::string access_log = waitForAccessLog(access_log_name_);
   EXPECT_THAT(access_log, HasSubstr("empty_host_header"));
   EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
@@ -1687,7 +1662,6 @@ TEST_P(ProxyFilterIntegrationTest, ResetStreamDuringDnsLookup) {
 // also requires the Host header to be modified between DFP and Router filters to trigger abnormal
 // behavior in the DNS resolution processing loop.
 TEST_P(ProxyFilterIntegrationTest, DoubleResolution) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts", "true");
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests", "true");
   upstream_tls_ = false;

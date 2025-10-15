@@ -61,10 +61,8 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
     std::string dns_start = "envoy.dynamic_forward_proxy.dns_start_ms";
     std::string dns_end = "envoy.dynamic_forward_proxy.dns_end_ms";
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
-      dns_start = "envoy.router.host_selection_start_ms";
-      dns_end = "envoy.router.host_selection_end_ms";
-    }
+    dns_start = "envoy.router.host_selection_start_ms";
+    dns_end = "envoy.router.host_selection_end_ms";
     StreamInfo::StreamInfo& stream_info = decoder_callbacks_->streamInfo();
     const StreamInfo::StreamInfo& conn_stream_info = decoder_callbacks_->connection()->streamInfo();
 
