@@ -15,7 +15,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_listener.h"
 
-#include "absl/base/no_destructor.h"
+#include "absl/debugging/leak_check.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -164,9 +164,10 @@ int TestRunner::runTests(int argc, char** argv) {
   Envoy::Assert::resetEnvoyBugCountersForTest();
 
   // Initialize log recording sink.
+  LogRecordingSink* recorder;
   if (std::getenv("ENVOY_NO_LOG_SINK") == nullptr) {
-    auto recorder = absl::NoDestructor<LogRecordingSink>(Logger::Registry::getSink());
-    Logger::Registry::getSink()->recorder_test_only_ = recorder.get();
+    recorder = absl::IgnoreLeak(new LogRecordingSink(Logger::Registry::getSink()));
+    Logger::Registry::getSink()->recorder_test_only_ = recorder;
   }
 
 #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
