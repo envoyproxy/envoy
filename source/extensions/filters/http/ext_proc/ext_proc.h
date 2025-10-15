@@ -89,7 +89,7 @@ public:
     std::chrono::microseconds total_latency_;
     std::chrono::microseconds max_latency_;
     std::chrono::microseconds min_latency_;
-    const ProcessingEffect::Effect processing_effect_;
+    ProcessingEffect::Effect processing_effect_;
   };
 
   struct GrpcCallStats {

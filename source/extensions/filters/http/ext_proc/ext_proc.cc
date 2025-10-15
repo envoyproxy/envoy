@@ -291,12 +291,10 @@ std::string processingEffectToString(ProcessingEffect::Effect processing_effect)
   switch (processing_effect) {
   case ProcessingEffect::Effect::None:
     return "none";
-  case ProcessingEffect::Effect::ContentModified:
-    return "content_modified";
-  case ProcessingEffect::Effect::ImmediateResponse:
-    return "immediate_response";
-  case ProcessingEffect::Effect::ContinueAndReplace:
-    return "continue_and_replace";
+  case ProcessingEffect::Effect::MutationApplied:
+    return "mutation_applied";
+  case ProcessingEffect::Effect::MutationRejected:
+    return "mutation_rejected";
   default:
     return "unknown";
   }
@@ -675,7 +673,7 @@ void Filter::onError() {
   } else {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
-    onFinishProcessorCalls(Grpc::Status::Aborted, ProcessingEffect::Effect::ImmediateResponse);
+    onFinishProcessorCalls(Grpc::Status::Aborted);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(
         static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
@@ -1564,7 +1562,7 @@ void Filter::handleErrorResponse(absl::Status processing_status) {
   ENVOY_STREAM_LOG(debug, "Sending immediate response: {}", *decoder_callbacks_,
                    processing_status.message());
   processing_complete_ = true;
-  onFinishProcessorCalls(processing_status.raw_code(), ProcessingEffect::Effect::ImmediateResponse);
+  onFinishProcessorCalls(processing_status.raw_code());
   closeStream();
   ImmediateResponse invalid_mutation_response;
   invalid_mutation_response.mutable_status()->set_code(
@@ -1705,7 +1703,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // receive this message.
       ENVOY_STREAM_LOG(debug, "Sending immediate response", *decoder_callbacks_);
       processing_complete_ = true;
-      onFinishProcessorCalls(Grpc::Status::Ok, ProcessingEffect::Effect::ImmediateResponse);
+      onFinishProcessorCalls(Grpc::Status::Ok);
       if (config_->gracefulGrpcClose()) {
         halfCloseAndWaitForRemoteClose();
       } else {
@@ -1773,7 +1771,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     processing_complete_ = true;
     // Since the stream failed, there is no need to handle timeouts, so
     // make sure that they do not fire now.
-    onFinishProcessorCalls(status, ProcessingEffect::Effect::ImmediateResponse);
+    onFinishProcessorCalls(status);
     closeStream();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(
@@ -1815,8 +1813,7 @@ void Filter::onMessageTimeout() {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
     closeStream();
-    onFinishProcessorCalls(Grpc::Status::DeadlineExceeded,
-                           ProcessingEffect::Effect::ImmediateResponse);
+    onFinishProcessorCalls(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
@@ -1833,10 +1830,9 @@ void Filter::clearAsyncState(Grpc::Status::GrpcStatus call_status) {
 
 // Regardless of the current state, ensure that the timers won't fire
 // again.
-void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status,
-                                    ProcessingEffect::Effect processing_effect) {
-  decoding_state_.onFinishProcessorCall(call_status, processing_effect);
-  encoding_state_.onFinishProcessorCall(call_status, processing_effect);
+void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
+  decoding_state_.onFinishProcessorCall(call_status);
+  encoding_state_.onFinishProcessorCall(call_status);
 }
 
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {
