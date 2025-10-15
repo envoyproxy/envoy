@@ -8,6 +8,7 @@
 namespace Envoy {
 namespace Quic {
 
+// An interface to provide current network states.
 class NetworkConnectivityTracker {
 public:
   virtual ~NetworkConnectivityTracker() = default;

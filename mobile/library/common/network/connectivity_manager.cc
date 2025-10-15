@@ -1,4 +1,3 @@
-#include "connectivity_manager.h"
 #include "library/common/network/connectivity_manager.h"
 
 #include <net/if.h>
@@ -85,7 +84,10 @@ ConnectivityManagerImpl::ConnectivityManagerImpl(Upstream::ClusterManager& clust
     : cluster_manager_(cluster_manager), quic_observer_registry_factory_(*this),
       dns_cache_manager_(dns_cache_manager) {
   initializeNetworkStates();
-  cluster_manager_.createNetworkObserverRegistries(quic_observer_registry_factory_);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.mobile_use_network_observer_registry")) {
+    cluster_manager_.createNetworkObserverRegistries(quic_observer_registry_factory_);
+  }
 }
 
 envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(int network) {

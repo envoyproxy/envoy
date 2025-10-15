@@ -81,6 +81,9 @@ minor_behavior_changes:
     Explicitly drain connections upon network change events regardless of whether the DNS cache is refreshed or not.
     This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh`` to ``false``.
+- area: mobile
+    Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
+    setting the runtime guard ``envoy.reloadable_features.mobile_use_network_observer_registry``.
 - area: http
   change: |
     Added accounting for decompressed HTTP header bytes sent and received. Existing stats only count wire-encoded header bytes.

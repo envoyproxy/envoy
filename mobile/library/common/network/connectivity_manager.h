@@ -281,6 +281,7 @@ public:
   // Refresh DNS regardless of configuration key change.
   void doRefreshDns(envoy_netconf_t configuration_key, bool drain_connections);
 
+  // Quic::NetworkConnectivityTracker.
   // Only used on Android.
   NetworkHandle getDefaultNetwork() override;
   absl::flat_hash_map<NetworkHandle, ConnectionType> getAllConnectedNetworks() override;

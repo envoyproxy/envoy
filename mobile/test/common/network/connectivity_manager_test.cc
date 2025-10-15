@@ -36,12 +36,15 @@ public:
         {1, ConnectionType::CONNECTION_WIFI}, {2, ConnectionType::CONNECTION_UNKNOWN}};
     EXPECT_CALL(helper_handle_->mock_helper(), getAllConnectedNetworks())
         .WillOnce(Return(connected_networks));
-    EXPECT_CALL(cm_, createNetworkObserverRegistries(_))
-        .WillOnce(Invoke([this](Quic::EnvoyQuicNetworkObserverRegistryFactory& registry_factory) {
-          registry_.reset(static_cast<Quic::EnvoyMobileQuicNetworkObserverRegistry*>(
-              registry_factory.createQuicNetworkObserverRegistry(dispatcher_).release()));
-          registry_->registerObserver(observer_);
-        }));
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.mobile_use_network_observer_registry")) {
+      EXPECT_CALL(cm_, createNetworkObserverRegistries(_))
+          .WillOnce(Invoke([this](Quic::EnvoyQuicNetworkObserverRegistryFactory& registry_factory) {
+            registry_.reset(static_cast<Quic::EnvoyMobileQuicNetworkObserverRegistry*>(
+                registry_factory.createQuicNetworkObserverRegistry(dispatcher_).release()));
+            registry_->registerObserver(observer_);
+          }));
+    }
     connectivity_manager_ = std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_manager_);
     ON_CALL(*dns_cache_manager_, lookUpCacheByName(_)).WillByDefault(Return(dns_cache_));
     // Toggle network to reset network state.
@@ -308,6 +311,10 @@ TEST_F(ConnectivityManagerTest, NetworkChangeResultsInDifferentSocketOptionsHash
 // Verifies that when the platform notifies about the same default network
 // again, the signal will be ignored.
 TEST_F(ConnectivityManagerTest, DuplicatedSignalOfAndroidNetworkBecomesDefault) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.mobile_use_network_observer_registry")) {
+    return;
+  }
   EXPECT_CALL(observer_, onNetworkMadeDefault(_)).Times(0);
   EXPECT_CALL(dispatcher_, post(_)).Times(0);
   connectivity_manager_->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_WIFI, 1);
@@ -318,6 +325,11 @@ TEST_F(ConnectivityManagerTest, DuplicatedSignalOfAndroidNetworkBecomesDefault) 
 // Verifies that when a network is connected and then becomes the default
 // default_network_change_callback_ called at the end rather than in the middle.
 TEST_F(ConnectivityManagerTest, AndroidNetworkConnectedAndThenBecomesDefault) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.mobile_use_network_observer_registry")) {
+    return;
+  }
+
   const NetworkHandle net_id = 123;
   const auto connection_type = ConnectionType::CONNECTION_WIFI;
   EXPECT_CALL(dispatcher_, post(_)).Times(2u);
@@ -340,6 +352,11 @@ TEST_F(ConnectivityManagerTest, AndroidNetworkConnectedAndThenBecomesDefault) {
 // default_network_change_callback_ is not called. And it should be called once the network is
 // connected.
 TEST_F(ConnectivityManagerTest, AndroidNetworkBecomesDefaultAndThenConnected) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.mobile_use_network_observer_registry")) {
+    return;
+  }
+
   const NetworkHandle net_id = 123;
   const auto connection_type = ConnectionType::CONNECTION_4G;
   const envoy_netconf_t initial_config_key = connectivity_manager_->getConfigurationKey();
@@ -367,6 +384,11 @@ TEST_F(ConnectivityManagerTest, AndroidNetworkBecomesDefaultAndThenConnected) {
 // Verifies that the observer is notified about a network becoming connected and
 // disconnected.
 TEST_F(ConnectivityManagerTest, AndroidNetworkConnectedAndThenDisconnected) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.mobile_use_network_observer_registry")) {
+    return;
+  }
+
   const NetworkHandle net_id = 123;
   const auto connection_type = ConnectionType::CONNECTION_WIFI;
   EXPECT_CALL(dispatcher_, post(_)).Times(2u);
@@ -388,6 +410,11 @@ TEST_F(ConnectivityManagerTest, AndroidNetworkConnectedAndThenDisconnected) {
 // But if the network is exempted from purging, observer shouldn't be notified about it being
 // disconnected.
 TEST_F(ConnectivityManagerTest, AndroidPurgeNetworks) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.mobile_use_network_observer_registry")) {
+    return;
+  }
+
   EXPECT_CALL(dispatcher_, post(_)).Times(7u);
 
   EXPECT_CALL(observer_, onNetworkConnected(_)).Times(3);
