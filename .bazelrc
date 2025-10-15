@@ -319,7 +319,7 @@ build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 # Include engflow_only tests in remote execution
-test:remote --test_tag_filters=
+test:remote --test_tag_filters=-
 
 # Windows bazel does not allow sandboxed as a spawn strategy
 build:remote-windows --spawn_strategy=remote,local
@@ -383,7 +383,7 @@ build:compile-time-options --test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true
 build:compile-time-options --@envoy//bazel:http3=False
 build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
 # Include engflow_only tests in compile-time-options CI
-test:compile-time-options --test_tag_filters=
+test:compile-time-options --test_tag_filters=-
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
@@ -396,7 +396,7 @@ build:docker-sandbox --define=EXECUTOR=remote
 build:docker-sandbox --experimental_docker_verbose
 build:docker-sandbox --experimental_enable_docker_sandbox
 # Include engflow_only tests in docker sandbox
-test:docker-sandbox --test_tag_filters=
+test:docker-sandbox --test_tag_filters=-
 
 build:docker-clang --config=docker-sandbox
 build:docker-clang --config=rbe-toolchain-clang
@@ -422,14 +422,14 @@ build:docker-tsan --config=tsan
 build:remote-ci --config=ci
 build:remote-ci --remote_download_minimal
 # Include engflow_only tests in remote CI
-test:remote-ci --test_tag_filters=
+test:remote-ci --test_tag_filters=-
 
 # Note this config is used by mobile CI also.
 common:ci --noshow_progress
 common:ci --noshow_loading_progress
 common:ci --test_output=errors
 # Include engflow_only tests in CI environments
-test:ci --test_tag_filters=
+test:ci --test_tag_filters=-
 
 # Fuzz builds
 
@@ -568,7 +568,7 @@ common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker
 common:rbe-envoy-engflow --jobs=200
 common:rbe-envoy-engflow --define=engflow_rbe=true
 # Include engflow_only tests when running on EngFlow RBE
-test:rbe-envoy-engflow --test_tag_filters=
+test:rbe-envoy-engflow --test_tag_filters=-
 
 common:remote-envoy-engflow --config=common-envoy-engflow
 common:remote-envoy-engflow --config=cache-envoy-engflow
