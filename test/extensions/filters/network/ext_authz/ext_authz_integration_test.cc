@@ -445,7 +445,6 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnectionWithCheckOnNewConnection
   payload_reader_->setDataToWaitFor("world");
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
 
-
   while (!connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
