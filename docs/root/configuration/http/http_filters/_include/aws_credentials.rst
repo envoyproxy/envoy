@@ -77,12 +77,19 @@ Credential Provider Ordering
 ----------------------------
 
 By default, credential providers will be searched for credentials in the following order:
+
 1. :ref:`inline_credentials <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.inline_credential>`
+
 2. :ref:`environment credential provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.environment_credential_provider>`
+
 3. :ref:`credentials file provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.credentials_file_provider>`
+
 4. :ref:`assume role credential provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.assume_role_credential_provider>`
+
 5. :ref:`assume role with web identity credential provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.assume_role_with_web_identity_provider>`
+
 6. :ref:`container credential provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.container_credential_provider>`
+
 7. :ref:`instance profile credential provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.instance_profile_credential_provider>`
 
 By using the :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field you can enable only particular

@@ -137,6 +137,8 @@ public:
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
+  uint32_t maxDeniedResponseBodyBytes() const { return max_denied_response_body_bytes_; }
+
   bool packAsBytes() const { return pack_as_bytes_; }
 
   bool headersAsBytes() const { return encode_raw_headers_; }
@@ -246,6 +248,7 @@ private:
   const bool failure_mode_allow_header_add_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
+  const uint32_t max_denied_response_body_bytes_;
   const bool pack_as_bytes_;
   const bool encode_raw_headers_;
   const Http::Code status_on_error_;
@@ -341,7 +344,7 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  envoy::extensions::filters::http::ext_authz::v3::CheckSettings checkSettings() const {
+  const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& checkSettings() const {
     return check_settings_;
   }
 
@@ -441,7 +444,7 @@ private:
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
     const bool skip_check_;
-    const envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
+    const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& check_settings_;
   };
   PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
 
