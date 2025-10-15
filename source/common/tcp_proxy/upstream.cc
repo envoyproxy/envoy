@@ -214,6 +214,10 @@ Tcp::ConnectionPool::ConnectionData*
 HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
+    ENVOY_LOG_MISC(debug,
+                   "HttpUpstream: downstream event {}, resetting encoder (read_half_closed_={}, "
+                   "write_half_closed_={}).",
+                   static_cast<int>(event), read_half_closed_, write_half_closed_);
     resetEncoder(Network::ConnectionEvent::LocalClose, false);
   }
   return nullptr;
