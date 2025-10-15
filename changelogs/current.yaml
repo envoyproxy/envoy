@@ -8,6 +8,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: connection pool
+  change: |
+    Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
+    or responses trigger flow control.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
