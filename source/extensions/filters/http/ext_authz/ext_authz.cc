@@ -475,12 +475,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
                    "set to the encoded response:",
                    *encoder_callbacks_, response_headers_to_add_.size(),
                    response_headers_to_set_.size());
+  bool omitted_response_headers = false;
   if (!response_headers_to_add_.empty()) {
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter added header(s) to the encoded response:", *encoder_callbacks_);
     for (const auto& [key, value] : response_headers_to_add_) {
       if (headers.size() >= headers.maxHeadersCount()) {
-        ENVOY_STREAM_LOG(trace, "Cannot add new response header, header map is full.",
+        omitted_response_headers = true;
+        ENVOY_STREAM_LOG(warn, "Cannot add new response header, header map is full.",
                          *encoder_callbacks_);
         break;
       }
@@ -494,7 +496,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
         trace, "ext_authz filter set header(s) to the encoded response:", *encoder_callbacks_);
     for (const auto& [key, value] : response_headers_to_set_) {
       if (headers.get(key).empty() && headers.size() >= headers.maxHeadersCount()) {
-        ENVOY_STREAM_LOG(trace, "Cannot add new response header, header map is full.",
+        omitted_response_headers = true;
+        ENVOY_STREAM_LOG(warn, "Cannot add new response header, header map is full.",
                          *encoder_callbacks_);
         // Continue because there could be other existing headers that can be set without increasing
         // the number of headers.
@@ -510,6 +513,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, key.get(), value);
       if (auto header_entry = headers.get(key); header_entry.empty()) {
         if (headers.size() >= headers.maxHeadersCount()) {
+          omitted_response_headers = true;
           ENVOY_STREAM_LOG(warn, "Cannot add new response header, header map is full.",
                            *encoder_callbacks_);
           break;
@@ -531,6 +535,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       }
     }
   }
+
+  if (omitted_response_headers) {
+    stats_.omitted_response_headers_.inc();
+  }
+
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -959,7 +968,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           // times, e.g. `Set-Cookie`.
           for (const auto& [key, value] : headers) {
             if (response_headers.size() >= response_headers.maxHeadersCount()) {
-              ENVOY_STREAM_LOG(trace, "Cannot add new response header, header map is full.",
+              stats_.omitted_response_headers_.inc();
+              ENVOY_STREAM_LOG(warn, "Cannot add new response header, header map is full.",
                                *encoder_callbacks_);
               break;
             }

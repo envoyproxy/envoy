@@ -5192,6 +5192,7 @@ TEST_F(HttpFilterTest, EncodeHeadersToAddExceedsLimit) {
   EXPECT_TRUE(response_headers.has("key1"));
   EXPECT_FALSE(response_headers.has("key2"));
   EXPECT_FALSE(response_headers.has("key3"));
+  EXPECT_EQ(1U, config_->stats().omitted_response_headers_.value());
 }
 
 // Verifies that the filter stops adding new headers from `response_headers_to_set` once the header
@@ -5235,6 +5236,7 @@ TEST_F(HttpFilterTest, EncodeHeadersToSetExceedsLimit) {
             "new-value");
   EXPECT_FALSE(response_headers.has("new-header-to-add"));
   EXPECT_FALSE(response_headers.has("another-new-header"));
+  EXPECT_EQ(1U, config_->stats().omitted_response_headers_.value());
 }
 
 // Verifies that the filter stops adding headers from `response_headers_to_add_if_absent` once the
@@ -5274,6 +5276,7 @@ TEST_F(HttpFilterTest, EncodeHeadersToAddIfAbsentExceedsLimit) {
   EXPECT_EQ(response_headers.size(), 3);
   EXPECT_TRUE(response_headers.has("key1"));
   EXPECT_FALSE(response_headers.has("key2"));
+  EXPECT_EQ(1U, config_->stats().omitted_response_headers_.value());
 }
 
 // Verifies that `response_headers_to_overwrite_if_exists` can still modify headers even when the
@@ -5318,6 +5321,7 @@ TEST_F(HttpFilterTest, EncodeHeadersToOverwriteIfExistsNotLimited) {
                 .getStringView(),
             "new-value");
   EXPECT_FALSE(response_headers.has("non-existing-header"));
+  EXPECT_EQ(0U, config_->stats().omitted_response_headers_.value());
 }
 
 // Verifies that the filter stops adding headers to a local reply (when the ext_authz sends a
@@ -5364,6 +5368,7 @@ TEST_F(HttpFilterTest, DeniedResponseLocalReplyExceedsLimit) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(1U, config_->stats().omitted_response_headers_.value());
 }
 
 } // namespace
