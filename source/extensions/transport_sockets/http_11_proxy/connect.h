@@ -27,6 +27,11 @@ public:
   static bool isValidConnectResponse(absl::string_view response_payload, bool& headers_complete,
                                      size_t& bytes_processed);
 
+  // Helper method to create a properly formatted CONNECT request with Host header.
+  // @param target the target hostname:port or IP:port to connect to.
+  // @return a properly formatted CONNECT request string per RFC 9110 section 9.3.6.
+  static std::string formatConnectRequest(absl::string_view target);
+
   UpstreamHttp11ConnectSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsConstSharedPtr options,
                               std::shared_ptr<const Upstream::HostDescription> host);
@@ -38,6 +43,9 @@ public:
 private:
   void generateHeader();
   Network::IoResult writeHeader();
+
+  inline void handleProxyInfoConnect();
+  inline void handleHostMetadataConnect(std::shared_ptr<const Upstream::HostDescription> host);
 
   Network::TransportSocketOptionsConstSharedPtr options_;
   Network::TransportSocketCallbacks* callbacks_{};
