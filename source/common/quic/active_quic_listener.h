@@ -27,7 +27,7 @@ class ActiveQuicListener : public Envoy::Server::ActiveUdpListenerBase,
                            Logger::Loggable<Logger::Id::quic> {
 public:
   // TODO(bencebeky): Tune this value.
-  static const size_t kNumSessionsToCreatePerLoop = 16;
+  static constexpr size_t kNumSessionsToCreatePerLoop = 16;
 
   ActiveQuicListener(Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
                      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,

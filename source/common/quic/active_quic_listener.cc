@@ -1,5 +1,6 @@
 #include "source/common/quic/active_quic_listener.h"
 
+#include <ratio>
 #include <utility>
 #include <vector>
 
@@ -199,7 +200,7 @@ void ActiveQuicListener::onReadReady() {
   }
 
   quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
-
+  ENVOY_LOG(info, "number of sessions to create per loop: {}", kNumSessionsToCreatePerLoop);
   // If there were more buffered than the limit, schedule again for the next event loop.
   if (quic_dispatcher_->HasChlosBuffered()) {
     udp_listener_->activateRead();
