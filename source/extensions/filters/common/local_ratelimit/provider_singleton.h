@@ -132,7 +132,7 @@ public:
 
     std::shared_ptr<LocalRateLimiterImpl> getLimiter();
 
-    bool isInitTargetSet() { return init_target_ != nullptr; }
+    Init::TargetImpl* getInitTarget() { return init_target_ ? init_target_.get() : nullptr; }
 
     void setInitTarget(std::unique_ptr<Init::TargetImpl> target) {
       init_target_ = std::move(target);

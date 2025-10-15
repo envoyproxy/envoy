@@ -57,14 +57,17 @@ RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton
                                                 subscription, limiter);
   }
 
-  if (!subscription->isInitTargetSet()) {
+  if (!subscription->getInitTarget()) {
     // This is the case when the corresponding resource is removed and the
     // subscription need a new init target to wait for a new resource.
     auto init_target =
         std::make_unique<Init::TargetImpl>(fmt::format("RateLimitConfigCallback-{}", key), []() {});
-    factory_context.initManager().add(*init_target);
     subscription->setInitTarget(std::move(init_target));
   }
+
+  // Add the init target to the listener's init manager to wait for the
+  // resource.
+  factory_context.initManager().add(*subscription->getInitTarget());
 
   // Otherwise, return a wrapper with a null limiter. The limiter will be
   // set when the config is received.
@@ -122,6 +125,8 @@ void RateLimiterProviderSingleton::TokenBucketSubscription::handleAddedResource(
   auto new_limiter = createRateLimiterImpl(config, parent_.factory_context_.mainThreadDispatcher());
   limiter_ = new_limiter;
   for (auto& [key, setter] : setters_) {
+    // The method is called on main thread while the limiter will be accessed in the worker thread
+    // so setter will call `runOnAllThreads` to set underneath.
     setter(new_limiter);
   }
 
