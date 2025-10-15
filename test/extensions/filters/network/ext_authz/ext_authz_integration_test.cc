@@ -223,6 +223,7 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertEnabled) {
 
   ssl_client_->close(Network::ConnectionCloseType::NoFlush);
 
+  ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   // Clean up the ext_authz gRPC connection.
   if (fake_ext_authz_connection_ != nullptr) {
@@ -272,7 +273,6 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertDisabled) {
   // Run the dispatcher one more time to ensure all events are processed.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   EXPECT_TRUE(connect_callbacks_.closed());
 
   // When send_tls_alert_on_denial is false, the connection is closed without sending an alert.
@@ -292,6 +292,9 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertDisabled) {
       << "Expected no transport failure reason when TLS alert is disabled, got: " << failure_reason;
 
   ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Clean up the ext_authz gRPC connection.
   if (fake_ext_authz_connection_ != nullptr) {
@@ -339,15 +342,15 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnection) {
   payload_reader_->setDataToWaitFor("world");
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
 
-  ASSERT_TRUE(fake_upstream_connection->close());
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-
   while (!connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ssl_client_->close(Network::ConnectionCloseType::NoFlush);
 
   EXPECT_EQ("world", payload_reader_->data());
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Clean up the ext_authz gRPC connection.
   if (fake_ext_authz_connection_ != nullptr) {
@@ -391,7 +394,9 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithoutTls) {
   // Close the client connection to clean up the test.
   tcp_client->close();
 
+  ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
   // Clean up the ext_authz gRPC connection.
   if (fake_ext_authz_connection_ != nullptr) {
     AssertionResult result = fake_ext_authz_connection_->close();
@@ -440,8 +445,6 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnectionWithCheckOnNewConnection
   payload_reader_->setDataToWaitFor("world");
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
 
-  ASSERT_TRUE(fake_upstream_connection->close());
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   while (!connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -449,6 +452,9 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnectionWithCheckOnNewConnection
   ssl_client_->close(Network::ConnectionCloseType::NoFlush);
 
   EXPECT_EQ("world", payload_reader_->data());
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Clean up the ext_authz gRPC connection.
   if (fake_ext_authz_connection_ != nullptr) {
