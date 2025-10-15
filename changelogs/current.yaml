@@ -24,6 +24,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` and legacy code paths.
+- area: dfp
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.dfp_cluster_resolves_hosts`` and legacy code paths.
 
 new_features:
 

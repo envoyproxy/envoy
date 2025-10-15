@@ -432,10 +432,8 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   Upstream::HostConstSharedPtr host = findHostByName(hostname);
   bool force_refresh =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reresolve_if_no_connections") &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") &&
       host && !host->used();
-  if ((host && !force_refresh) ||
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+  if (host && !force_refresh) {
     return {host};
   }
 
