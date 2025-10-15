@@ -52,11 +52,9 @@ LogRecordingSink::~LogRecordingSink() { restoreDelegate(); }
 void LogRecordingSink::log(absl::string_view msg, const spdlog::details::log_msg& log_msg) {
   previousDelegate()->log(msg, log_msg);
 
-  {
+  if (enabled_) {
     absl::MutexLock ml(&mtx_);
-    if (enabled_) {
-      messages_.push_back(std::string(msg));
-    }
+    messages_.push_back(std::string(msg));
   }
 
   absl::MutexLock ml(&exp_mtx_);
@@ -72,15 +70,14 @@ const std::vector<std::string> LogRecordingSink::messages() const {
 }
 
 void LogRecordingSink::start() {
-  absl::MutexLock ml(&mtx_);
   ASSERT(!enabled_);
   enabled_ = true;
 }
 
 void LogRecordingSink::stop() {
-  absl::MutexLock ml(&mtx_);
   ASSERT(enabled_);
   enabled_ = false;
+  absl::MutexLock ml(&mtx_);
   messages_.clear();
 }
 
