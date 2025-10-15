@@ -135,9 +135,7 @@ message RouteConfiguration {
 
   // Normally, virtual host matching is done using the :authority (or
   // Host: in HTTP < 2) HTTP header. Setting this will instead, use a
-  // different HTTP header for this purpose. This is intended to be
-  // combined with an "early_header_mutation" extension to allow
-  // alternate or simplified host values to be used for host matching.
+  // different HTTP header for this purpose.
   string vhost_header = 18;
 
   // Ignore path-parameters in path-matching.
