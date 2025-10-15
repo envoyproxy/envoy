@@ -47,11 +47,15 @@ HeaderFormatter::HeaderFormatter(absl::string_view main_header,
                                  absl::optional<size_t> max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
-const Http::HeaderEntry* HeaderFormatter::findHeader(const Http::HeaderMap& headers) const {
-  const auto header = headers.get(main_header_);
+const Http::HeaderEntry* HeaderFormatter::findHeader(OptRef<const Http::HeaderMap> headers) const {
+  if (!headers.has_value()) {
+    return nullptr;
+  }
+
+  const auto header = headers->get(main_header_);
 
   if (header.empty() && !alternative_header_.get().empty()) {
-    const auto alternate_header = headers.get(alternative_header_);
+    const auto alternate_header = headers->get(alternative_header_);
     // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header values.
     return alternate_header.empty() ? nullptr : alternate_header[0];
   }
@@ -59,7 +63,7 @@ const Http::HeaderEntry* HeaderFormatter::findHeader(const Http::HeaderMap& head
   return header.empty() ? nullptr : header[0];
 }
 
-absl::optional<std::string> HeaderFormatter::format(const Http::HeaderMap& headers) const {
+absl::optional<std::string> HeaderFormatter::format(OptRef<const Http::HeaderMap> headers) const {
   const Http::HeaderEntry* header = findHeader(headers);
   if (!header) {
     return absl::nullopt;
@@ -70,7 +74,7 @@ absl::optional<std::string> HeaderFormatter::format(const Http::HeaderMap& heade
   return std::string(val);
 }
 
-Protobuf::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
+Protobuf::Value HeaderFormatter::formatValue(OptRef<const Http::HeaderMap> headers) const {
   const Http::HeaderEntry* header = findHeader(headers);
   if (!header) {
     return SubstitutionFormatUtils::unspecifiedValue();
@@ -136,15 +140,16 @@ HeadersByteSizeFormatter::HeadersByteSizeFormatter(const HeaderType header_type)
     : header_type_(header_type) {}
 
 uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
-    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap& response_trailers) const {
+    OptRef<const Http::RequestHeaderMap> request_headers,
+    OptRef<const Http::ResponseHeaderMap> response_headers,
+    OptRef<const Http::ResponseTrailerMap> response_trailers) const {
   switch (header_type_) {
   case HeaderType::RequestHeaders:
-    return request_headers.byteSize();
+    return request_headers.has_value() ? request_headers->byteSize() : 0;
   case HeaderType::ResponseHeaders:
-    return response_headers.byteSize();
+    return response_headers.has_value() ? response_headers->byteSize() : 0;
   case HeaderType::ResponseTrailers:
-    return response_trailers.byteSize();
+    return response_trailers.has_value() ? response_trailers->byteSize() : 0;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
@@ -165,7 +170,11 @@ HeadersByteSizeFormatter::formatValueWithContext(const HttpFormatterContext& con
 
 Protobuf::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                                          const StreamInfo::StreamInfo&) const {
-  auto trace_id = context.activeSpan().getTraceId();
+  const auto active_span = context.activeSpan();
+  if (!active_span.has_value()) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  auto trace_id = active_span->getTraceId();
   if (trace_id.empty()) {
     return SubstitutionFormatUtils::unspecifiedValue();
   }
@@ -175,7 +184,12 @@ Protobuf::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterCont
 absl::optional<std::string>
 TraceIDFormatter::formatWithContext(const HttpFormatterContext& context,
                                     const StreamInfo::StreamInfo&) const {
-  auto trace_id = context.activeSpan().getTraceId();
+  const auto active_span = context.activeSpan();
+  if (!active_span.has_value()) {
+    return absl::nullopt;
+  }
+
+  auto trace_id = active_span->getTraceId();
   if (trace_id.empty()) {
     return absl::nullopt;
   }
@@ -205,11 +219,14 @@ GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
 absl::optional<std::string>
 GrpcStatusFormatter::formatWithContext(const HttpFormatterContext& context,
                                        const StreamInfo::StreamInfo& info) const {
-  if (!Grpc::Common::isGrpcRequestHeaders(context.requestHeaders())) {
+  if (!Grpc::Common::isGrpcRequestHeaders(
+          context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers))) {
     return absl::nullopt;
   }
-  const auto grpc_status = Grpc::Common::getGrpcStatus(context.responseTrailers(),
-                                                       context.responseHeaders(), info, true);
+  const auto grpc_status = Grpc::Common::getGrpcStatus(
+      context.responseTrailers().value_or(*Http::StaticEmptyHeaders::get().response_trailers),
+      context.responseHeaders().value_or(*Http::StaticEmptyHeaders::get().response_headers), info,
+      true);
   if (!grpc_status.has_value()) {
     return absl::nullopt;
   }
@@ -239,11 +256,14 @@ GrpcStatusFormatter::formatWithContext(const HttpFormatterContext& context,
 Protobuf::Value
 GrpcStatusFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                             const StreamInfo::StreamInfo& info) const {
-  if (!Grpc::Common::isGrpcRequestHeaders(context.requestHeaders())) {
+  if (!Grpc::Common::isGrpcRequestHeaders(
+          context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers))) {
     return SubstitutionFormatUtils::unspecifiedValue();
   }
-  const auto grpc_status = Grpc::Common::getGrpcStatus(context.responseTrailers(),
-                                                       context.responseHeaders(), info, true);
+  const auto grpc_status = Grpc::Common::getGrpcStatus(
+      context.responseTrailers().value_or(*Http::StaticEmptyHeaders::get().response_trailers),
+      context.responseHeaders().value_or(*Http::StaticEmptyHeaders::get().response_headers), info,
+      true);
   if (!grpc_status.has_value()) {
     return SubstitutionFormatUtils::unspecifiedValue();
   }
@@ -279,8 +299,13 @@ QueryParameterFormatter::QueryParameterFormatter(absl::string_view parameter_key
 absl::optional<std::string>
 QueryParameterFormatter::formatWithContext(const HttpFormatterContext& context,
                                            const StreamInfo::StreamInfo&) const {
-  const auto query_params = Envoy::Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(
-      context.requestHeaders().getPathValue());
+  const auto request_headers = context.requestHeaders();
+  if (!request_headers.has_value()) {
+    return absl::nullopt;
+  }
+
+  const auto query_params =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(request_headers->getPathValue());
   absl::optional<std::string> value = query_params.getFirstValue(parameter_key_);
   if (value.has_value() && max_length_.has_value()) {
     SubstitutionFormatUtils::truncate(value.value(), max_length_.value());
@@ -298,19 +323,22 @@ absl::optional<std::string> PathFormatter::formatWithContext(const HttpFormatter
                                                              const StreamInfo::StreamInfo&) const {
 
   absl::string_view path_view;
-  const Http::RequestHeaderMap& headers = context.requestHeaders();
+  const auto headers = context.requestHeaders();
+  if (!headers.has_value()) {
+    return absl::nullopt;
+  }
   switch (option_) {
   case OriginalPathOrPath:
-    path_view = headers.getEnvoyOriginalPathValue();
+    path_view = headers->getEnvoyOriginalPathValue();
     if (path_view.empty()) {
-      path_view = headers.getPathValue();
+      path_view = headers->getPathValue();
     }
     break;
   case PathOnly:
-    path_view = headers.getPathValue();
+    path_view = headers->getPathValue();
     break;
   case OriginalPathOnly:
-    path_view = headers.getEnvoyOriginalPathValue();
+    path_view = headers->getEnvoyOriginalPathValue();
     break;
   }
 

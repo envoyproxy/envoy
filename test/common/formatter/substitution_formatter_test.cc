@@ -2681,8 +2681,10 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   Http::TestResponseTrailerMapImpl response_trailer{{":method", "POST"}, {"test-2", "test-2"}};
   std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header)
+      .setResponseHeaders(response_header)
+      .setResponseTrailers(response_trailer);
 
   {
     RequestHeaderFormatter formatter(":Method", "", absl::optional<size_t>());
@@ -2724,7 +2726,8 @@ TEST(SubstitutionFormatterTest, QueryPraameterFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/path?x=xxxxxx"}};
 
-  HttpFormatterContext formatter_context(&request_header);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header);
 
   {
     QueryParameterFormatter formatter("x", absl::optional<size_t>());
@@ -2753,10 +2756,11 @@ TEST(SubstitutionFormatterTest, headersByteSizeFormatter) {
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{":method", "PUT"}};
   Http::TestResponseTrailerMapImpl response_trailer{{":method", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header)
+      .setResponseHeaders(response_header)
+      .setResponseTrailers(response_trailer);
 
   {
     HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::RequestHeaders);
@@ -2783,10 +2787,11 @@ TEST(SubstitutionFormatterTest, responseHeaderFormatter) {
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
   Http::TestResponseTrailerMapImpl response_trailer{{":method", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header)
+      .setResponseHeaders(response_header)
+      .setResponseTrailers(response_trailer);
 
   {
     ResponseHeaderFormatter formatter(":method", "", absl::optional<size_t>());
@@ -2829,10 +2834,11 @@ TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
   Http::TestResponseTrailerMapImpl response_trailer{{":method", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header)
+      .setResponseHeaders(response_header)
+      .setResponseTrailers(response_trailer);
 
   {
     ResponseTrailerFormatter formatter(":method", "", absl::optional<size_t>());
@@ -2872,17 +2878,14 @@ TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
 
 TEST(SubstitutionFormatterTest, TraceIDFormatter) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header{};
-  Http::TestResponseHeaderMapImpl response_header{};
-  Http::TestResponseTrailerMapImpl response_trailer{};
-  std::string body;
 
   Tracing::MockSpan active_span;
   EXPECT_CALL(active_span, getTraceId()).WillRepeatedly(Return("ae0046f9075194306d7de2931bd38ce3"));
 
   {
-    HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                           body, AccessLogType::NotSet, &active_span);
+    HttpFormatterContext formatter_context;
+    formatter_context.setActiveSpan(active_span);
+
     TraceIDFormatter formatter{};
     EXPECT_EQ("ae0046f9075194306d7de2931bd38ce3",
               formatter.formatWithContext(formatter_context, stream_info));
@@ -2891,8 +2894,7 @@ TEST(SubstitutionFormatterTest, TraceIDFormatter) {
   }
 
   {
-    HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                           body);
+    HttpFormatterContext formatter_context;
     TraceIDFormatter formatter{};
     EXPECT_EQ(absl::nullopt, formatter.formatWithContext(formatter_context, stream_info));
     EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
@@ -3363,10 +3365,11 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
                                                 {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header)
+      .setResponseHeaders(response_header)
+      .setResponseTrailers(response_trailer);
 
   std::vector<std::string> grpc_statuses{
       "OK",       "Canceled",       "Unknown",          "InvalidArgument",   "DeadlineExceeded",
@@ -3437,10 +3440,11 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
                                                 {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header)
+      .setResponseHeaders(response_header)
+      .setResponseTrailers(response_trailer);
 
   std::vector<std::string> grpc_statuses{"OK",
                                          "CANCELLED",
@@ -3523,10 +3527,11 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
                                                 {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header)
+      .setResponseHeaders(response_header)
+      .setResponseTrailers(response_trailer);
 
   const int grpcStatuses = static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown) + 1;
 
@@ -3845,11 +3850,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterNonExistentHeaderTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
   Http::TestResponseHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header).setResponseHeaders(response_header);
 
   const std::string expected_json_map = R"EOF({
     "protocol": "HTTP/1.1",
@@ -3881,11 +3884,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
       {"request_present_header", "REQUEST_PRESENT_HEADER"}};
   Http::TestResponseHeaderMapImpl response_header{
       {"response_present_header", "RESPONSE_PRESENT_HEADER"}};
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header).setResponseHeaders(response_header);
 
   absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"request_present_header_or_request_absent_header", "REQUEST_PRESENT_HEADER"},
@@ -3917,13 +3918,6 @@ TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
 
 TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
-  Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
-  std::string body;
-
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
@@ -3947,19 +3941,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
                             key_mapping);
   JsonFormatterImpl formatter(key_mapping, false);
 
-  EXPECT_TRUE(TestUtility::jsonStringEqual(
-      formatter.formatWithContext(formatter_context, stream_info), expected_json_map));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.formatWithContext({}, stream_info),
+                                           expected_json_map));
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataTest) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
-  Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
@@ -3994,13 +3983,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataTest) {
 
 TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataNoClusterInfoTest) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
-  Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
 
   const std::string expected_json_map = R"EOF(
       {"test_key": null}
@@ -4029,13 +4013,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataNoClusterInfoTest) {
 
 TEST(SubstitutionFormatterTest, JsonFormatterUpstreamHostMetadataTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
-  Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
 
   const auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   populateMetadataTestData(*metadata);
@@ -4072,13 +4051,6 @@ TEST(SubstitutionFormatterTest, JsonFormatterUpstreamHostMetadataTest) {
 
 TEST(SubstitutionFormatterTest, JsonFormatterUpstreamHostMetadataNullPtrs) {
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
-  Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
-  std::string body;
-
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
 
   const std::string expected_json_map = R"EOF(
     {"test_key": null}
@@ -4094,8 +4066,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterUpstreamHostMetadataNullPtrs) {
   // Empty optional (absl::nullopt)
   {
     EXPECT_CALL(Const(stream_info), upstreamInfo()).WillOnce(Return(absl::nullopt));
-    EXPECT_TRUE(TestUtility::jsonStringEqual(
-        formatter.formatWithContext(formatter_context, stream_info), expected_json_map));
+    EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.formatWithContext({}, stream_info),
+                                             expected_json_map));
     testing::Mock::VerifyAndClearExpectations(&stream_info);
   }
   // Empty host description info (nullptr)
@@ -4103,20 +4075,13 @@ TEST(SubstitutionFormatterTest, JsonFormatterUpstreamHostMetadataNullPtrs) {
     std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
         std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(stream_info.upstreamInfo());
     EXPECT_CALL(*mock_upstream_info, upstreamHost()).WillOnce(Return(nullptr));
-    EXPECT_TRUE(TestUtility::jsonStringEqual(
-        formatter.formatWithContext(formatter_context, stream_info), expected_json_map));
+    EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.formatWithContext({}, stream_info),
+                                             expected_json_map));
   }
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterFilterStateTest) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
-
-  HttpFormatterContext formatter_context(&request_headers, &response_headers, &response_trailers,
-                                         body);
 
   stream_info.filter_state_->setData("test_key",
                                      std::make_unique<Router::StringAccessorImpl>("test_value"),
@@ -4143,21 +4108,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterFilterStateTest) {
                             key_mapping);
   JsonFormatterImpl formatter(key_mapping, false);
 
-  EXPECT_TRUE(TestUtility::jsonStringEqual(
-      formatter.formatWithContext(formatter_context, stream_info), expected_json_map));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.formatWithContext({}, stream_info),
+                                           expected_json_map));
 }
 
 // Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additional specifier,
 // the FilterState can call the serializeAsProto or serializeAsString methods correctly.
 TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  std::string body;
-
-  HttpFormatterContext formatter_context(&request_headers, &response_headers, &response_trailers,
-                                         body);
 
   stream_info.filter_state_->setData(
       "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
@@ -4189,20 +4147,13 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
                             key_mapping);
   JsonFormatterImpl formatter(key_mapping, false);
 
-  EXPECT_TRUE(TestUtility::jsonStringEqual(
-      formatter.formatWithContext(formatter_context, stream_info), expected_json_map));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.formatWithContext({}, stream_info),
+                                           expected_json_map));
 }
 
 // Error specifier will cause an exception to be thrown.
 TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferTest) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
-
-  HttpFormatterContext formatter_context(&request_headers, &response_headers, &response_trailers,
-                                         body);
 
   stream_info.filter_state_->setData(
       "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
@@ -4245,13 +4196,6 @@ TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferFieldNoNameTest) {
 
 TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
-
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
 
   time_t expected_time_in_epoch = 1522280158;
   SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
@@ -4280,9 +4224,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
                             key_mapping);
   JsonFormatterImpl formatter(key_mapping, false);
 
-  verifyStructOutput(
-      TestUtility::jsonToStruct(formatter.formatWithContext(formatter_context, stream_info)),
-      expected_json_map);
+  verifyStructOutput(TestUtility::jsonToStruct(formatter.formatWithContext({}, stream_info)),
+                     expected_json_map);
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
@@ -4291,11 +4234,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
     Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
     Http::TestResponseHeaderMapImpl response_header{
         {"some_response_header", "SOME_RESPONSE_HEADER"}};
-    Http::TestResponseTrailerMapImpl response_trailer;
-    std::string body;
 
-    HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                           body);
+    HttpFormatterContext formatter_context;
+    formatter_context.setRequestHeaders(request_header).setResponseHeaders(response_header);
 
     absl::node_hash_map<std::string, std::string> expected_json_map = {
         {"multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
@@ -4321,12 +4262,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"key_1", "value_1"},
                                                 {"key_2", R"(value_with_quotes_"_)"}};
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header);
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
@@ -4384,13 +4322,6 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
 
 TEST(SubstitutionFormatterTest, JsonFormatterWithOrderedPropertiesTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
-
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
@@ -4427,7 +4358,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterWithOrderedPropertiesTest) {
 
   // The formatter will always order the properties alphabetically.
   JsonFormatterImpl formatter(key_mapping, false);
-  const std::string out_json = formatter.formatWithContext(formatter_context, stream_info);
+  const std::string out_json = formatter.formatWithContext({}, stream_info);
   // Check string equality to verify the order.
   EXPECT_EQ(out_json, expected);
 }
@@ -4436,10 +4367,11 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
   Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header)
+      .setResponseHeaders(response_header)
+      .setResponseTrailers(response_trailer);
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -4632,13 +4564,14 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
 
 TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header{};
-  Http::TestResponseHeaderMapImpl response_header{};
-  Http::TestResponseTrailerMapImpl response_trailer{};
-  std::string body;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
+  HttpFormatterContext formatter_context;
+  formatter_context.setRequestHeaders(request_header)
+      .setResponseHeaders(response_header)
+      .setResponseTrailers(response_trailer);
 
   {
     const std::string format = "%PROTOCOL%|%RESP(not_exist)%|"
@@ -4659,7 +4592,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
 
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(absl::nullopt));
 
-    EXPECT_EQ("||||", formatter->formatWithContext(formatter_context, stream_info));
+    EXPECT_EQ("||||", formatter->formatWithContext({}, stream_info));
   }
 
   {

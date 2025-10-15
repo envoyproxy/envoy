@@ -31,7 +31,8 @@ using PerRouteProtoConfig =
 #define ALL_STATEFUL_SESSION_FILTER_STATS(COUNTER)                                                 \
   COUNTER(routed)                                                                                  \
   COUNTER(failed_open)                                                                             \
-  COUNTER(failed_closed)
+  COUNTER(failed_closed)                                                                           \
+  COUNTER(no_session)
 
 /**
  * Wrapper struct for Stateful Session filter stats. @see stats_macros.h
@@ -105,11 +106,18 @@ private:
       stats->failed_open_.inc();
     }
   }
+  void markNoSession() {
+    if (auto stats = effective_config_->stats(); stats.has_value()) {
+      stats->no_session_.inc();
+    }
+  }
 
   Http::SessionStatePtr session_state_;
   StatefulSessionConfigSharedPtr config_;
   // Cached effective config resolved from route or base config.
   StatefulSessionConfig* effective_config_{nullptr};
+  // Tracks whether the filter is active and not disabled per-route for this request.
+  bool filter_active_{false};
 };
 
 } // namespace StatefulSession
