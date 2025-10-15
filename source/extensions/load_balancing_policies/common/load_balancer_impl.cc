@@ -108,13 +108,12 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterLbSta
   recalculatePerPriorityPanic();
 
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) -> absl::Status {
+      [this](uint32_t priority, const HostVector&, const HostVector&) {
         recalculatePerPriorityState(priority, priority_set_, per_priority_load_,
                                     per_priority_health_, per_priority_degraded_,
                                     total_healthy_hosts_);
         recalculatePerPriorityPanic();
         stashed_random_.clear();
-        return absl::OkStatus();
       });
 }
 
@@ -427,8 +426,14 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
+  if (locality_weighted_balancing_) {
+    for (uint32_t priority = 0; priority < priority_set_.hostSetsPerPriority().size(); ++priority) {
+      rebuildLocalityWrrForPriority(priority);
+    }
+  }
+
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) -> absl::Status {
+      [this](uint32_t priority, const HostVector&, const HostVector&) {
         // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
         resizePerPriorityState();
         // If P=0 changes, regenerate locality routing structures. Locality based routing is
@@ -436,7 +441,10 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
         if (local_priority_set_ && priority == 0) {
           regenerateLocalityRoutingStructures();
         }
-        return absl::OkStatus();
+
+        if (locality_weighted_balancing_) {
+          rebuildLocalityWrrForPriority(priority);
+        }
       });
   if (local_priority_set_) {
     // Multiple priorities are unsupported for local priority sets.
@@ -445,14 +453,20 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     // the locality routing structure.
     ASSERT(local_priority_set_->hostSetsPerPriority().size() == 1);
     local_priority_set_member_update_cb_handle_ = local_priority_set_->addPriorityUpdateCb(
-        [this](uint32_t priority, const HostVector&, const HostVector&) -> absl::Status {
+        [this](uint32_t priority, const HostVector&, const HostVector&) {
           ASSERT(priority == 0);
           // If the set of local Envoys changes, regenerate routing for P=0 as it does priority
           // based routing.
           regenerateLocalityRoutingStructures();
-          return absl::OkStatus();
         });
   }
+}
+
+void ZoneAwareLoadBalancerBase::rebuildLocalityWrrForPriority(uint32_t priority) {
+  ASSERT(priority < priority_set_.hostSetsPerPriority().size());
+  auto& host_set = *priority_set_.hostSetsPerPriority()[priority];
+  per_priority_state_[priority]->locality_wrr_ =
+      std::make_unique<LocalityWrr>(host_set, random_.random());
 }
 
 void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
@@ -811,9 +825,9 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   if (locality_weighted_balancing_) {
     absl::optional<uint32_t> locality;
     if (host_availability == HostAvailability::Degraded) {
-      locality = host_set.chooseDegradedLocality();
+      locality = chooseDegradedLocality(host_set);
     } else {
-      locality = host_set.chooseHealthyLocality();
+      locality = chooseHealthyLocality(host_set);
     }
 
     if (locality.has_value()) {
@@ -919,16 +933,12 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // so we will need to do better at delta tracking to scale (see
   // https://github.com/envoyproxy/envoy/issues/2874).
   priority_update_cb_ = priority_set.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) {
-        refresh(priority);
-        return absl::OkStatus();
-      });
-  member_update_cb_ = priority_set.addMemberUpdateCb(
-      [this](const HostVector& hosts_added, const HostVector&) -> absl::Status {
+      [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
+  member_update_cb_ =
+      priority_set.addMemberUpdateCb([this](const HostVector& hosts_added, const HostVector&) {
         if (isSlowStartEnabled()) {
           recalculateHostsInSlowStart(hosts_added);
         }
-        return absl::OkStatus();
       });
 }
 
@@ -963,6 +973,10 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
 }
 
 void EdfLoadBalancerBase::refresh(uint32_t priority) {
+  // Ensure that priority is within hostSetsPerPriority.
+  if (priority >= priority_set_.hostSetsPerPriority().size()) {
+    return;
+  }
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
     // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};

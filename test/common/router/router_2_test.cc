@@ -29,7 +29,15 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, false));
+
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _, false))
+      .WillOnce(Invoke([this](Http::RequestHeaderMap& headers,
+                              const Formatter::HttpFormatterContext& context,
+                              const StreamInfo::StreamInfo&, bool) {
+        EXPECT_EQ(context.requestHeaders().ptr(), &headers);
+        EXPECT_EQ(context.activeSpan().ptr(), &callbacks_.active_span_);
+      }));
+
   router_->decodeHeaders(headers, true);
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
 

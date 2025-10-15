@@ -26,12 +26,14 @@
 #include "source/common/config/datasource.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/hash_policy.h"
+#include "source/common/http/header_mutation.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/per_filter_config.h"
+#include "source/common/router/retry_policy_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
@@ -90,7 +92,7 @@ using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBas
 class SslRedirector : public DirectResponseEntry {
 public:
   // Router::DirectResponseEntry
-  void finalizeResponseHeaders(Http::ResponseHeaderMap&,
+  void finalizeResponseHeaders(Http::ResponseHeaderMap&, const Formatter::HttpFormatterContext&,
                                const StreamInfo::StreamInfo&) const override {}
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
                                                   bool) const override {
@@ -263,12 +265,7 @@ public:
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
   bool includeIsTimeoutRetryHeader() const override { return include_is_timeout_retry_header_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
-  RetryPolicyConstOptRef retryPolicy() const {
-    if (retry_policy_ != nullptr) {
-      return *retry_policy_;
-    }
-    return absl::nullopt;
-  }
+  const RetryPolicyConstSharedPtr& retryPolicy() const { return retry_policy_; }
   HedgePolicyConstOptRef hedgePolicy() const {
     if (hedge_policy_ != nullptr) {
       return *hedge_policy_;
@@ -352,7 +349,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
-  std::unique_ptr<envoy::config::route::v3::RetryPolicy> retry_policy_;
+  RetryPolicyConstSharedPtr retry_policy_;
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   RouteMetadataPackPtr metadata_;
@@ -400,80 +397,7 @@ private:
 };
 
 using VirtualHostImplSharedPtr = std::shared_ptr<VirtualHostImpl>;
-
-/**
- * Implementation of RetryPolicy that reads from the proto route or virtual host config.
- */
-class RetryPolicyImpl : public RetryPolicy {
-
-public:
-  static absl::StatusOr<std::unique_ptr<RetryPolicyImpl>>
-  create(const envoy::config::route::v3::RetryPolicy& retry_policy,
-         ProtobufMessage::ValidationVisitor& validation_visitor,
-         Upstream::RetryExtensionFactoryContext& factory_context,
-         Server::Configuration::CommonFactoryContext& common_context);
-  RetryPolicyImpl() = default;
-
-  // Router::RetryPolicy
-  std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
-  std::chrono::milliseconds perTryIdleTimeout() const override { return per_try_idle_timeout_; }
-  uint32_t numRetries() const override { return num_retries_; }
-  uint32_t retryOn() const override { return retry_on_; }
-  std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override;
-  Upstream::RetryPrioritySharedPtr retryPriority() const override;
-  absl::Span<const Upstream::RetryOptionsPredicateConstSharedPtr>
-  retryOptionsPredicates() const override {
-    return retry_options_predicates_;
-  }
-  uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
-  const std::vector<uint32_t>& retriableStatusCodes() const override {
-    return retriable_status_codes_;
-  }
-  const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
-    return retriable_headers_;
-  }
-  const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
-    return retriable_request_headers_;
-  }
-  absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
-  absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
-  const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
-    return reset_headers_;
-  }
-  std::chrono::milliseconds resetMaxInterval() const override { return reset_max_interval_; }
-
-private:
-  RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                  Upstream::RetryExtensionFactoryContext& factory_context,
-                  Server::Configuration::CommonFactoryContext& common_context,
-                  absl::Status& creation_status);
-  std::chrono::milliseconds per_try_timeout_{0};
-  std::chrono::milliseconds per_try_idle_timeout_{0};
-  // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
-  // set) so that when retries get enabled through the x-envoy-retry-on header we default to 1
-  // retry.
-  uint32_t num_retries_{1};
-  uint32_t retry_on_{};
-  // Each pair contains the name and config proto to be used to create the RetryHostPredicates
-  // that should be used when with this policy.
-  std::vector<std::pair<Upstream::RetryHostPredicateFactory&, ProtobufTypes::MessagePtr>>
-      retry_host_predicate_configs_;
-  // Name and config proto to use to create the RetryPriority to use with this policy. Default
-  // initialized when no RetryPriority should be used.
-  std::pair<Upstream::RetryPriorityFactory*, ProtobufTypes::MessagePtr> retry_priority_config_;
-  uint32_t host_selection_attempts_{1};
-  std::vector<uint32_t> retriable_status_codes_;
-  std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
-  std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
-  absl::optional<std::chrono::milliseconds> base_interval_;
-  absl::optional<std::chrono::milliseconds> max_interval_;
-  std::vector<ResetHeaderParserSharedPtr> reset_headers_;
-  std::chrono::milliseconds reset_max_interval_{300000};
-  ProtobufMessage::ValidationVisitor* validation_visitor_{};
-  std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
-};
-using DefaultRetryPolicy = ConstSingleton<RetryPolicyImpl>;
+using HeaderMutationsPtr = std::unique_ptr<Http::HeaderMutations>;
 
 /**
  * Implementation of ShadowPolicy that reads from the proto route config.
@@ -482,7 +406,8 @@ class ShadowPolicyImpl : public ShadowPolicy {
 public:
   using RequestMirrorPolicy = envoy::config::route::v3::RouteAction::RequestMirrorPolicy;
   static absl::StatusOr<std::shared_ptr<ShadowPolicyImpl>>
-  create(const RequestMirrorPolicy& config);
+  create(const RequestMirrorPolicy& config,
+         Server::Configuration::CommonFactoryContext& factory_context);
 
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
@@ -490,10 +415,16 @@ public:
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
   absl::optional<bool> traceSampled() const override { return trace_sampled_; }
-  bool disableShadowHostSuffixAppend() const override { return disable_shadow_host_suffix_append_; }
+  bool disableShadowHostSuffixAppend() const override {
+    return disable_shadow_host_suffix_append_ || !host_rewrite_literal_.empty();
+  }
+  const Http::HeaderEvaluator& headerEvaluator() const override;
+  absl::string_view hostRewriteLiteral() const override { return host_rewrite_literal_; }
 
 private:
-  explicit ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Status& creation_status);
+  explicit ShadowPolicyImpl(const RequestMirrorPolicy& config,
+                            Server::Configuration::CommonFactoryContext& factory_context,
+                            absl::Status& creation_status);
 
   const std::string cluster_;
   const Http::LowerCaseString cluster_header_;
@@ -501,6 +432,8 @@ private:
   envoy::type::v3::FractionalPercent default_value_;
   absl::optional<bool> trace_sampled_;
   const bool disable_shadow_host_suffix_append_;
+  const std::string host_rewrite_literal_;
+  HeaderMutationsPtr request_headers_mutations_;
 };
 
 /**
@@ -677,11 +610,13 @@ public:
     return HeaderParser::defaultParser();
   }
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                              const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool keep_original_host_or_path) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting = true) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                               const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;
@@ -707,11 +642,9 @@ public:
     }
     return DefaultRateLimitPolicy::get();
   }
-  const RetryPolicy& retryPolicy() const override {
-    if (retry_policy_ != nullptr) {
-      return *retry_policy_;
-    }
-    return DefaultRetryPolicy::get();
+  const RetryPolicyConstSharedPtr& retryPolicy() const override {
+    ASSERT(retry_policy_ != nullptr);
+    return retry_policy_;
   }
   const InternalRedirectPolicy& internalRedirectPolicy() const override {
     if (internal_redirect_policy_ != nullptr) {
@@ -907,11 +840,11 @@ private:
   buildHedgePolicy(HedgePolicyConstOptRef vhost_hedge_policy,
                    const envoy::config::route::v3::RouteAction& route_config) const;
 
-  absl::StatusOr<std::unique_ptr<RetryPolicyImpl>>
-  buildRetryPolicy(RetryPolicyConstOptRef vhost_retry_policy,
+  absl::StatusOr<RetryPolicyConstSharedPtr>
+  buildRetryPolicy(const RetryPolicyConstSharedPtr& vhost_retry_policy,
                    const envoy::config::route::v3::RouteAction& route_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor,
-                   Server::Configuration::ServerFactoryContext& factory_context) const;
+                   Server::Configuration::CommonFactoryContext& factory_context) const;
 
   absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>>
   buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config,
@@ -958,7 +891,7 @@ private:
   std::unique_ptr<const RuntimeData> runtime_;
   std::unique_ptr<const ::Envoy::Http::Utility::RedirectConfig> redirect_config_;
   std::unique_ptr<const HedgePolicyImpl> hedge_policy_;
-  std::unique_ptr<const RetryPolicyImpl> retry_policy_;
+  RetryPolicyConstSharedPtr retry_policy_;
   std::unique_ptr<const InternalRedirectPolicyImpl> internal_redirect_policy_;
   std::unique_ptr<const RateLimitPolicyImpl> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
@@ -973,7 +906,7 @@ private:
   HeaderParserPtr response_headers_parser_;
   RouteMetadataPackPtr metadata_;
   const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
-  const std::vector<Envoy::Matchers::FilterStateMatcherPtr> filter_state_;
+  const std::vector<Envoy::Matchers::FilterStateMatcher> filter_state_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;

@@ -233,7 +233,7 @@ message FilterChain {
   google.protobuf.BoolValue use_proxy_proto = 4
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // [#not-implemented-hide:] filter chain metadata.
+  // Filter chain metadata.
   core.v3.Metadata metadata = 5;
 
   // Optional custom transport socket implementation to use for downstream connections.

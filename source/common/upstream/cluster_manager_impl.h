@@ -84,7 +84,7 @@ public:
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
   absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                                       const xds::core::v3::ResourceLocator* cds_resources_locator,
-                                      ClusterManager& cm) override;
+                                      ClusterManager& cm, bool support_multi_ads_sources) override;
 
 protected:
   Server::Configuration::ServerFactoryContext& context_;
@@ -274,6 +274,17 @@ public:
   OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
+      return *it->second->cluster_;
+    }
+    return absl::nullopt;
+  }
+
+  OptRef<const Cluster> getActiveOrWarmingCluster(const std::string& cluster_name) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
+      return *it->second->cluster_;
+    }
+    if (const auto& it = warming_clusters_.find(cluster_name); it != warming_clusters_.end()) {
       return *it->second->cluster_;
     }
     return absl::nullopt;
@@ -604,7 +615,7 @@ private:
                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                        LocalityWeightsConstSharedPtr locality_weights,
                        const HostVector& hosts_added, const HostVector& hosts_removed,
-                       uint64_t seed, absl::optional<bool> weighted_priority_health,
+                       absl::optional<bool> weighted_priority_health,
                        absl::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 

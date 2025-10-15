@@ -43,7 +43,7 @@ envoy_cc_library(
         ":matcher_visitor_lib",
         ":metadatamatchcriteria_lib",
         ":per_filter_config_lib",
-        ":reset_header_parser_lib",
+        ":retry_policy_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
         ":tls_context_match_criteria_lib",
@@ -66,6 +66,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/http:hash_policy_lib",
+        "//source/common/http:header_mutation_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:path_utility_lib",
@@ -129,6 +130,7 @@ envoy_cc_library(
         "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/config:well_known_names",
+        "//source/common/http:hash_policy_lib",
     ],
 )
 
@@ -348,6 +350,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "upstream_to_downstream_impl_base",
+    hdrs = [
+        "upstream_to_downstream_impl_base.h",
+    ],
+    deps = [
+        "//envoy/router:router_interface",
+        "//source/common/http:response_decoder_impl_base",
+    ],
+)
+
+envoy_cc_library(
     name = "router_lib",
     srcs = [
         "router.cc",
@@ -364,6 +377,7 @@ envoy_cc_library(
         ":metadatamatchcriteria_lib",
         ":retry_state_lib",
         ":upstream_codec_filter_lib",
+        ":upstream_to_downstream_impl_base",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/grpc:status",
@@ -422,6 +436,7 @@ envoy_cc_library(
     ],
     deps = [
         ":config_lib",
+        ":upstream_to_downstream_impl_base",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:filter_interface",
@@ -489,6 +504,7 @@ envoy_cc_library(
     ],
     hdrs = ["header_parser.h"],
     deps = [
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
         "//source/common/formatter:substitution_formatter_lib",
@@ -496,6 +512,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -539,5 +556,21 @@ envoy_cc_library(
     deps = [
         ":delegating_route_lib",
         "//envoy/router:cluster_specifier_plugin_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "retry_policy_lib",
+    srcs = ["retry_policy_impl.cc"],
+    hdrs = ["retry_policy_impl.h"],
+    deps = [
+        ":reset_header_parser_lib",
+        ":retry_state_lib",
+        "//envoy/router:router_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/config:utility_lib",
+        "//source/common/upstream:retry_factory_lib",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )

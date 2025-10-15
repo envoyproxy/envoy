@@ -184,13 +184,10 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
       return;
     }
   } else { // Strict DNS
-    for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
-      // Strict DNS clusters must ensure that the priority for all localities
-      // are set to zero when using zone-aware routing. Zone-aware routing only
-      // works for localities with priority zero (the highest).
-      SET_AND_RETURN_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint),
-                               creation_status);
-    }
+    // Strict DNS clusters must ensure that the priority for all localities
+    // are set to zero when using zone-aware routing. Zone-aware routing only
+    // works for localities with priority zero (the highest).
+    SET_AND_RETURN_IF_NOT_OK(validateEndpoints(locality_lb_endpoints, {}), creation_status);
   }
 
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
@@ -229,7 +226,7 @@ void DnsClusterImpl::startPreInit() {
 
 void DnsClusterImpl::updateAllHosts(const HostVector& hosts_added, const HostVector& hosts_removed,
                                     uint32_t current_priority) {
-  PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
+  PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
   // At this point we know that we are different so make a new host list and notify.
   //
   // TODO(dio): The uniqueness of a host address resolved in STRICT_DNS cluster per priority is not

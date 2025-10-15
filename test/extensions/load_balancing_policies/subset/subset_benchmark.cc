@@ -25,7 +25,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Subset {
 namespace {
 
@@ -68,10 +68,10 @@ public:
   void update() {
     priority_set_.updateHosts(
         0, Upstream::HostSetImpl::partitionHosts(smaller_hosts_, smaller_locality_hosts_), nullptr,
-        {}, host_moved_, random_.random(), absl::nullopt);
+        {}, host_moved_, absl::nullopt);
     priority_set_.updateHosts(
         0, Upstream::HostSetImpl::partitionHosts(orig_hosts_, orig_locality_hosts_), nullptr,
-        host_moved_, {}, random_.random(), absl::nullopt);
+        host_moved_, {}, absl::nullopt);
   }
 
   std::unique_ptr<Upstream::SubsetLoadBalancerConfig> subset_config_;
@@ -122,6 +122,6 @@ BENCHMARK(benchmarkSubsetLoadBalancerUpdate)
 
 } // namespace
 } // namespace Subset
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

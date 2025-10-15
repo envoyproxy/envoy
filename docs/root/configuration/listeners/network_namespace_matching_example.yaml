@@ -1,0 +1,243 @@
+# Example configuration demonstrating network namespace-based filter chain matching
+# This configuration shows how to route traffic to different filter chains based on
+# the network namespace of the listener address.
+static_resources:
+  listeners:
+  - name: multi_namespace_listener
+    # This listener will bind to all three network namespaces on the same IP:port.
+    # Individual addresses can specify different namespaces.
+    address:
+      socket_address:
+        protocol: TCP
+        address: 127.0.0.1
+        port_value: 8080
+        network_namespace_filepath: "/var/run/netns/development"
+    additional_addresses:
+    - address:
+        socket_address:
+          protocol: TCP
+          address: 127.0.0.1
+          port_value: 8080
+          network_namespace_filepath: "/var/run/netns/staging"
+    - address:
+        socket_address:
+          protocol: TCP
+          address: 127.0.0.1
+          port_value: 8080
+          network_namespace_filepath: "/var/run/netns/production"
+
+    # Use filter_chain_matcher to route based on network namespace.
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: envoy.matching.inputs.network_namespace
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.NetworkNamespaceInput
+        exact_match_map:
+          map:
+            # Route traffic from namespace 'production' to production filter chain.
+            "/var/run/netns/production":
+              action:
+                name: production_chain
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: production_chain
+            # Route traffic from namespace 'staging' to staging filter chain.
+            "/var/run/netns/staging":
+              action:
+                name: staging_chain
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: staging_chain
+            # Route traffic from namespace 'development' to development filter chain.
+            "/var/run/netns/development":
+              action:
+                name: development_chain
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: development_chain
+    # Define filter chains for Production environment.
+    filter_chains:
+    - name: production_chain
+      filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: production_hcm
+          route_config:
+            name: production_routes
+            virtual_hosts:
+            - name: production_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: production_cluster
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    # Define filter chains for Staging environment.
+    - name: staging_chain
+      filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: staging_hcm
+          route_config:
+            name: staging_routes
+            virtual_hosts:
+            - name: staging_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: staging_cluster
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    # Define filter chains for Development environment.
+    - name: development_chain
+      filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: development_hcm
+          route_config:
+            name: development_routes
+            virtual_hosts:
+            - name: development_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: development_cluster
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    # Default filter chain for connections from unknown namespaces or non-Linux platforms.
+    default_filter_chain:
+      filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: default_hcm
+          route_config:
+            name: default_routes
+            virtual_hosts:
+            - name: default_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                direct_response:
+                  status: 503
+                  body:
+                    inline_string: "Service not available from this network namespace"
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  # Multiple listeners with different network namespaces.
+  - name: production_listener
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 8081
+        network_namespace_filepath: "/var/run/netns/production"
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: production_dedicated
+          route_config:
+            name: production_dedicated_routes
+            virtual_hosts:
+            - name: production_dedicated_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: production_cluster
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  - name: staging_listener
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 8081  # Same port, different namespace
+        network_namespace_filepath: "/var/run/netns/staging"
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: staging_dedicated
+          route_config:
+            name: staging_dedicated_routes
+            virtual_hosts:
+            - name: staging_dedicated_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: staging_cluster
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: production_cluster
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: production_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: production-backend
+                port_value: 80
+
+  - name: staging_cluster
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: staging_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: staging-backend
+                port_value: 80
+
+  - name: development_cluster
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: development_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: development-backend
+                port_value: 80

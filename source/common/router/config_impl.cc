@@ -44,13 +44,10 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/header_cluster_specifier.h"
 #include "source/common/router/matcher_visitor.h"
-#include "source/common/router/reset_header_parser.h"
-#include "source/common/router/retry_state_impl.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
-#include "source/common/upstream/retry_factory.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 #include "source/extensions/matching/network/common/inputs.h"
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
@@ -217,128 +214,6 @@ HedgePolicyImpl::HedgePolicyImpl(const envoy::config::route::v3::HedgePolicy& he
 
 HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_timeout_(false) {}
 
-absl::StatusOr<std::unique_ptr<RetryPolicyImpl>>
-RetryPolicyImpl::create(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                        ProtobufMessage::ValidationVisitor& validation_visitor,
-                        Upstream::RetryExtensionFactoryContext& factory_context,
-                        Server::Configuration::CommonFactoryContext& common_context) {
-  absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<RetryPolicyImpl>(new RetryPolicyImpl(
-      retry_policy, validation_visitor, factory_context, common_context, creation_status));
-  RETURN_IF_NOT_OK(creation_status);
-  return ret;
-}
-RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 Upstream::RetryExtensionFactoryContext& factory_context,
-                                 Server::Configuration::CommonFactoryContext& common_context,
-                                 absl::Status& creation_status)
-    : retriable_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
-          retry_policy.retriable_headers(), common_context)),
-      retriable_request_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
-          retry_policy.retriable_request_headers(), common_context)),
-      validation_visitor_(&validation_visitor) {
-  per_try_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
-  per_try_idle_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_idle_timeout, 0));
-  num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
-  retry_on_ = RetryStateImpl::parseRetryOn(retry_policy.retry_on()).first;
-  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on()).first;
-
-  for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
-        host_predicate);
-    auto config = Envoy::Config::Utility::translateToFactoryConfig(host_predicate,
-                                                                   validation_visitor, factory);
-    retry_host_predicate_configs_.emplace_back(factory, std::move(config));
-  }
-
-  const auto& retry_priority = retry_policy.retry_priority();
-  if (!retry_priority.name().empty()) {
-    auto& factory =
-        Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(retry_priority);
-    retry_priority_config_ =
-        std::make_pair(&factory, Envoy::Config::Utility::translateToFactoryConfig(
-                                     retry_priority, validation_visitor, factory));
-  }
-
-  for (const auto& options_predicate : retry_policy.retry_options_predicates()) {
-    auto& factory =
-        Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryOptionsPredicateFactory>(
-            options_predicate);
-    retry_options_predicates_.emplace_back(
-        factory.createOptionsPredicate(*Envoy::Config::Utility::translateToFactoryConfig(
-                                           options_predicate, validation_visitor, factory),
-                                       factory_context));
-  }
-
-  auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
-  if (host_selection_attempts) {
-    host_selection_attempts_ = host_selection_attempts;
-  }
-
-  for (auto code : retry_policy.retriable_status_codes()) {
-    retriable_status_codes_.emplace_back(code);
-  }
-
-  if (retry_policy.has_retry_back_off()) {
-    base_interval_ = std::chrono::milliseconds(
-        PROTOBUF_GET_MS_REQUIRED(retry_policy.retry_back_off(), base_interval));
-    if ((*base_interval_).count() < 1) {
-      base_interval_ = std::chrono::milliseconds(1);
-    }
-
-    max_interval_ = PROTOBUF_GET_OPTIONAL_MS(retry_policy.retry_back_off(), max_interval);
-    if (max_interval_) {
-      // Apply the same rounding to max interval in case both are set to sub-millisecond values.
-      if ((*max_interval_).count() < 1) {
-        max_interval_ = std::chrono::milliseconds(1);
-      }
-
-      if ((*max_interval_).count() < (*base_interval_).count()) {
-        creation_status = absl::InvalidArgumentError(
-            "retry_policy.max_interval must greater than or equal to the base_interval");
-        return;
-      }
-    }
-  }
-
-  if (retry_policy.has_rate_limited_retry_back_off()) {
-    reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(
-        retry_policy.rate_limited_retry_back_off().reset_headers());
-
-    absl::optional<std::chrono::milliseconds> reset_max_interval =
-        PROTOBUF_GET_OPTIONAL_MS(retry_policy.rate_limited_retry_back_off(), max_interval);
-    if (reset_max_interval.has_value()) {
-      std::chrono::milliseconds max_interval = reset_max_interval.value();
-      if (max_interval.count() < 1) {
-        max_interval = std::chrono::milliseconds(1);
-      }
-      reset_max_interval_ = max_interval;
-    }
-  }
-}
-
-std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPredicates() const {
-  std::vector<Upstream::RetryHostPredicateSharedPtr> predicates;
-  predicates.reserve(retry_host_predicate_configs_.size());
-  for (const auto& config : retry_host_predicate_configs_) {
-    predicates.emplace_back(config.first.createHostPredicate(*config.second, num_retries_));
-  }
-
-  return predicates;
-}
-
-Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
-  if (retry_priority_config_.first == nullptr) {
-    return nullptr;
-  }
-
-  return retry_priority_config_.first->createRetryPriority(*retry_priority_config_.second,
-                                                           *validation_visitor_, num_retries_);
-}
-
 absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>> InternalRedirectPolicyImpl::create(
     const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
     ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name) {
@@ -425,16 +300,21 @@ absl::Status validateMirrorClusterSpecifier(
 }
 
 absl::StatusOr<std::shared_ptr<ShadowPolicyImpl>>
-ShadowPolicyImpl::create(const RequestMirrorPolicy& config) {
+ShadowPolicyImpl::create(const RequestMirrorPolicy& config,
+                         Server::Configuration::CommonFactoryContext& factory_context) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::shared_ptr<ShadowPolicyImpl>(new ShadowPolicyImpl(config, creation_status));
+  auto ret = std::shared_ptr<ShadowPolicyImpl>(
+      new ShadowPolicyImpl(config, factory_context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
-ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Status& creation_status)
+ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
+                                   Server::Configuration::CommonFactoryContext& factory_context,
+                                   absl::Status& creation_status)
     : cluster_(config.cluster()), cluster_header_(config.cluster_header()),
-      disable_shadow_host_suffix_append_(config.disable_shadow_host_suffix_append()) {
+      disable_shadow_host_suffix_append_(config.disable_shadow_host_suffix_append()),
+      host_rewrite_literal_(config.host_rewrite_literal()) {
   SET_AND_RETURN_IF_NOT_OK(validateMirrorClusterSpecifier(config), creation_status);
 
   if (config.has_runtime_fraction()) {
@@ -451,6 +331,21 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Stat
   // disabled.
   trace_sampled_ = config.has_trace_sampled() ? absl::optional<bool>(config.trace_sampled().value())
                                               : absl::nullopt;
+
+  // Create HeaderMutations directly from HeaderMutation rules
+  if (!config.request_headers_mutations().empty()) {
+    auto mutations_or_error =
+        Http::HeaderMutations::create(config.request_headers_mutations(), factory_context);
+    SET_AND_RETURN_IF_NOT_OK(mutations_or_error.status(), creation_status);
+    request_headers_mutations_ = std::move(mutations_or_error.value());
+  }
+}
+
+const Http::HeaderEvaluator& ShadowPolicyImpl::headerEvaluator() const {
+  if (request_headers_mutations_) {
+    return *request_headers_mutations_;
+  }
+  return HeaderParser::defaultParser();
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
@@ -552,12 +447,13 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         return vec;
       }()),
       filter_state_([&]() {
-        std::vector<Envoy::Matchers::FilterStateMatcherPtr> vec;
+        std::vector<Envoy::Matchers::FilterStateMatcher> vec;
+        vec.reserve(route.match().filter_state().size());
         for (const auto& elt : route.match().filter_state()) {
           Envoy::Matchers::FilterStateMatcherPtr match = THROW_OR_RETURN_VALUE(
               Envoy::Matchers::FilterStateMatcher::create(elt, factory_context),
               Envoy::Matchers::FilterStateMatcherPtr);
-          vec.push_back(std::move(match));
+          vec.emplace_back(std::move(*match));
         }
         return vec;
       }()),
@@ -586,7 +482,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   auto policy_or_error =
       buildRetryPolicy(vhost->retryPolicy(), route.route(), validator, factory_context);
   SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
-  retry_policy_ = std::move(policy_or_error.value());
+  retry_policy_ = policy_or_error.value() != nullptr ? std::move(policy_or_error.value())
+                                                     : RetryPolicyImpl::DefaultRetryPolicy;
 
   if (route.has_direct_response() && route.direct_response().has_body()) {
     auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider::create(
@@ -622,7 +519,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   shadow_policies_.reserve(route.route().request_mirror_policies().size());
   for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
-    auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config);
+    auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config, factory_context);
     SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
     shadow_policies_.push_back(std::move(policy_or_error.value()));
   }
@@ -877,7 +774,7 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
       // No need to check anymore as all filter state matchers must match for a match to occur.
       break;
     }
-    matches &= m->match(stream_info.filterState());
+    matches &= m.match(stream_info.filterState());
   }
 
   return matches;
@@ -910,12 +807,13 @@ void RouteEntryImplBase::finalizeHostHeader(Http::RequestHeaderMap& headers,
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                                                const Formatter::HttpFormatterContext& context,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool keep_original_host_or_path) const {
   for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers, stream_info);
+    header_parser->evaluateHeaders(headers, context, stream_info);
   }
 
   // Restore the port if this was a CONNECT request.
@@ -940,12 +838,12 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                                                 const Formatter::HttpFormatterContext& context,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers, {stream_info.getRequestHeaders(), &headers},
-                                   stream_info);
+    header_parser->evaluateHeaders(headers, context, stream_info);
   }
 }
 
@@ -1137,27 +1035,20 @@ std::unique_ptr<HedgePolicyImpl> RouteEntryImplBase::buildHedgePolicy(
   return nullptr;
 }
 
-absl::StatusOr<std::unique_ptr<RetryPolicyImpl>> RouteEntryImplBase::buildRetryPolicy(
-    RetryPolicyConstOptRef vhost_retry_policy,
+absl::StatusOr<RetryPolicyConstSharedPtr> RouteEntryImplBase::buildRetryPolicy(
+    const RetryPolicyConstSharedPtr& vhost_retry_policy,
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validation_visitor,
-    Server::Configuration::ServerFactoryContext& factory_context) const {
-  Upstream::RetryExtensionFactoryContextImpl retry_factory_context(
-      factory_context.singletonManager());
+    Server::Configuration::CommonFactoryContext& factory_context) const {
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
     return RetryPolicyImpl::create(route_config.retry_policy(), validation_visitor,
-                                   retry_factory_context, factory_context);
-  }
-
-  // If not, we fallback to the virtual host policy if there is one.
-  if (vhost_retry_policy.has_value()) {
-    return RetryPolicyImpl::create(*vhost_retry_policy, validation_visitor, retry_factory_context,
                                    factory_context);
   }
 
-  // Otherwise, an empty policy will do.
-  return nullptr;
+  // If not, we fallback to the virtual host policy if there is one. Note the
+  // virtual host policy may be nullptr.
+  return vhost_retry_policy;
 }
 
 absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>>
@@ -1589,8 +1480,10 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
 
   // Retry and Hedge policies must be set before routes, since they may use them.
   if (virtual_host.has_retry_policy()) {
-    retry_policy_ = std::make_unique<envoy::config::route::v3::RetryPolicy>();
-    retry_policy_->CopyFrom(virtual_host.retry_policy());
+    auto policy_or_error =
+        RetryPolicyImpl::create(virtual_host.retry_policy(), validator, factory_context);
+    SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+    retry_policy_ = std::move(policy_or_error.value());
   }
   if (virtual_host.has_hedge_policy()) {
     hedge_policy_ = std::make_unique<envoy::config::route::v3::HedgePolicy>();
@@ -1605,7 +1498,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
   for (const auto& mirror_policy_config : virtual_host.request_mirror_policies()) {
-    auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config);
+    auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config, factory_context);
     SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
     shadow_policies_.push_back(std::move(policy_or_error.value()));
   }
@@ -2039,7 +1932,7 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
   if (!config.request_mirror_policies().empty()) {
     shadow_policies_.reserve(config.request_mirror_policies().size());
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {
-      auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config);
+      auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config, factory_context);
       SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
       shadow_policies_.push_back(std::move(policy_or_error.value()));
     }

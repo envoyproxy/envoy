@@ -19,6 +19,7 @@ builtin:
 - envoy.matching.inputs.direct_source_ip
 - envoy.matching.inputs.source_type
 - envoy.matching.inputs.server_name
+- envoy.matching.inputs.network_namespace
 - envoy.matching.inputs.transport_protocol
 - envoy.matching.inputs.application_protocol
 - envoy.matching.inputs.filter_state
@@ -64,6 +65,7 @@ security_postures:
 categories:
 - envoy.access_loggers
 - envoy.bootstrap
+- envoy.built_in_formatters
 - envoy.clusters
 - envoy.compression.compressor
 - envoy.compression.decompressor
@@ -83,6 +85,7 @@ categories:
 - envoy.health_checkers
 - envoy.health_check.event_sinks
 - envoy.http.cache
+- envoy.http.cache_v2
 - envoy.http.header_validators
 - envoy.http.stateful_header_formatters
 - envoy.internal_redirect_predicates
@@ -120,6 +123,7 @@ categories:
 - envoy.common.key_value
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
+- envoy.resolvers
 - envoy.rbac.matchers
 - envoy.rbac.principals
 - envoy.rbac.audit_loggers
@@ -141,6 +145,7 @@ categories:
 - envoy.load_balancing_policies
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
+- envoy.http.ext_proc.processing_request_modifiers
 - envoy.http.ext_proc.response_processors
 - envoy.router.cluster_specifier_plugin
 - envoy.tap_sinks.udp_sink

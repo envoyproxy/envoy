@@ -206,6 +206,16 @@ TEST(Ipv4InstanceTest, PortOnly) {
   EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
+TEST(Ipv4InstanceTest, NetnsComparison) {
+  Ipv4Instance address1("1.2.3.4", nullptr, "/var/run/netns/11111");
+  Ipv4Instance address2("1.2.3.4", nullptr, "/var/run/netns/22222");
+  // Same netns as address1.
+  Ipv4Instance address3("1.2.3.4", nullptr, "/var/run/netns/11111");
+
+  EXPECT_EQ(address1, address3);
+  EXPECT_NE(address1, address2);
+}
+
 TEST(Ipv4InstanceTest, Multicast) {
   Ipv4Instance address("230.0.0.1");
   EXPECT_EQ("230.0.0.1:0", address.asString());
@@ -332,6 +342,16 @@ TEST(Ipv6InstanceTest, ScopeIdStripping) {
   EXPECT_EQ("[fe80::f8f3:11ff:fef4:25a8]:80", no_scope_address->asString());
   EXPECT_EQ(IpVersion::v6, no_scope_address->ip()->version());
   EXPECT_EQ(0U, no_scope_address->ip()->ipv6()->scopeId());
+}
+
+TEST(Ipv6InstanceTest, NetnsCompare) {
+  Ipv6Instance address1("::0001", 80, nullptr, true, "/var/run/netns/11111");
+  Ipv6Instance address2("::0001", 80, nullptr, true, "/var/run/netns/22222");
+  // Same netns as address1.
+  Ipv6Instance address3("::0001", 80, nullptr, true, "/var/run/netns/11111");
+
+  EXPECT_NE(address1, address2);
+  EXPECT_EQ(address1, address3);
 }
 
 TEST(Ipv6InstanceTest, PortOnly) {

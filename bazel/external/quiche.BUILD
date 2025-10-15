@@ -1,4 +1,5 @@
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -13,7 +14,6 @@ load(
     "envoy_quiche_platform_impl_cc_test_library",
     "quiche_copts",
 )
-load("@rules_proto//proto:defs.bzl", "proto_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -2884,12 +2884,12 @@ envoy_cc_library(
         "quiche/quic/core/frames/quic_blocked_frame.cc",
         "quiche/quic/core/frames/quic_connection_close_frame.cc",
         "quiche/quic/core/frames/quic_crypto_frame.cc",
+        "quiche/quic/core/frames/quic_datagram_frame.cc",
         "quiche/quic/core/frames/quic_frame.cc",
         "quiche/quic/core/frames/quic_goaway_frame.cc",
         "quiche/quic/core/frames/quic_handshake_done_frame.cc",
         "quiche/quic/core/frames/quic_immediate_ack_frame.cc",
         "quiche/quic/core/frames/quic_max_streams_frame.cc",
-        "quiche/quic/core/frames/quic_message_frame.cc",
         "quiche/quic/core/frames/quic_new_connection_id_frame.cc",
         "quiche/quic/core/frames/quic_new_token_frame.cc",
         "quiche/quic/core/frames/quic_padding_frame.cc",
@@ -2911,13 +2911,13 @@ envoy_cc_library(
         "quiche/quic/core/frames/quic_blocked_frame.h",
         "quiche/quic/core/frames/quic_connection_close_frame.h",
         "quiche/quic/core/frames/quic_crypto_frame.h",
+        "quiche/quic/core/frames/quic_datagram_frame.h",
         "quiche/quic/core/frames/quic_frame.h",
         "quiche/quic/core/frames/quic_goaway_frame.h",
         "quiche/quic/core/frames/quic_handshake_done_frame.h",
         "quiche/quic/core/frames/quic_immediate_ack_frame.h",
         "quiche/quic/core/frames/quic_inlined_frame.h",
         "quiche/quic/core/frames/quic_max_streams_frame.h",
-        "quiche/quic/core/frames/quic_message_frame.h",
         "quiche/quic/core/frames/quic_mtu_discovery_frame.h",
         "quiche/quic/core/frames/quic_new_connection_id_frame.h",
         "quiche/quic/core/frames/quic_new_token_frame.h",
@@ -3212,6 +3212,7 @@ envoy_quic_cc_library(
 
 envoy_quic_cc_library(
     name = "quic_force_blockable_packet_writer_lib",
+    srcs = ["quiche/quic/core/quic_force_blockable_packet_writer.cc"],
     hdrs = ["quiche/quic/core/quic_force_blockable_packet_writer.h"],
     deps = [":quic_core_packet_writer_lib"],
 )

@@ -406,4 +406,275 @@ TEST_P(DynamicModulesIntegrationTest, FakeExternalCache) {
   }
 }
 
+TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
+  initializeFilter("stats_callbacks", "header_to_count,header_to_set");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // End-to-end request
+  {
+    Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+    request_headers.addCopy(Http::LowerCaseString("header_to_count"), "3");
+    request_headers.addCopy(Http::LowerCaseString("header_to_set"), "100");
+    auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+    auto response = std::move(encoder_decoder.second);
+    waitForNextUpstreamRequest();
+    test_server_->waitUntilHistogramHasSamples("dynamicmodulescustom.requests_header_values");
+
+    EXPECT_EQ(test_server_->counter("dynamicmodulescustom.requests_total")->value(), 1);
+    EXPECT_EQ(test_server_->gauge("dynamicmodulescustom.requests_pending")->value(), 1);
+    EXPECT_EQ(test_server_->gauge("dynamicmodulescustom.requests_set_value")->value(), 100);
+    auto requests_header_values =
+        test_server_->histogram("dynamicmodulescustom.requests_header_values");
+    EXPECT_EQ(
+        TestUtility::readSampleCount(test_server_->server().dispatcher(), *requests_header_values),
+        1);
+    EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                          *requests_header_values)),
+              3);
+
+    EXPECT_EQ(
+        test_server_
+            ->counter(
+                "dynamicmodulescustom.entrypoint_total.entrypoint.on_request_headers.method.GET")
+            ->value(),
+        1);
+    EXPECT_EQ(
+        test_server_
+            ->gauge(
+                "dynamicmodulescustom.entrypoint_pending.entrypoint.on_request_headers.method.GET")
+            ->value(),
+        1);
+    EXPECT_EQ(test_server_
+                  ->gauge("dynamicmodulescustom.entrypoint_set_value.entrypoint.on_request_headers."
+                          "method.GET")
+                  ->value(),
+              100);
+    auto request_entrypoint_header_values = test_server_->histogram(
+        "dynamicmodulescustom.entrypoint_header_values.entrypoint.on_request_headers.method.GET");
+    EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(),
+                                           *request_entrypoint_header_values),
+              1);
+    EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                          *request_entrypoint_header_values)),
+              3);
+
+    Http::TestResponseHeaderMapImpl response_headers = default_response_headers_;
+    response_headers.addCopy(Http::LowerCaseString("header_to_count"), "3");
+    response_headers.addCopy(Http::LowerCaseString("header_to_set"), "999");
+    upstream_request_->encodeHeaders(response_headers, false);
+    response->waitForHeaders();
+    test_server_->waitUntilHistogramHasSamples(
+        "dynamicmodulescustom.entrypoint_header_values.entrypoint.on_response_headers.method.GET");
+
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+    EXPECT_EQ(
+        test_server_
+            ->counter(
+                "dynamicmodulescustom.entrypoint_total.entrypoint.on_response_headers.method.GET")
+            ->value(),
+        1);
+    EXPECT_EQ(
+        test_server_
+            ->gauge(
+                "dynamicmodulescustom.entrypoint_pending.entrypoint.on_response_headers.method.GET")
+            ->value(),
+        1);
+    EXPECT_EQ(test_server_
+                  ->gauge("dynamicmodulescustom.entrypoint_set_value.entrypoint.on_response_"
+                          "headers.method.GET")
+                  ->value(),
+              999);
+    auto response_entrypoint_header_values = test_server_->histogram(
+        "dynamicmodulescustom.entrypoint_header_values.entrypoint.on_response_headers.method.GET");
+    EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(),
+                                           *response_entrypoint_header_values),
+              1);
+    EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                          *response_entrypoint_header_values)),
+              3);
+
+    Buffer::OwnedImpl response_data("goodbye");
+    upstream_request_->encodeData(response_data, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+
+    EXPECT_EQ(
+        test_server_
+            ->gauge(
+                "dynamicmodulescustom.entrypoint_pending.entrypoint.on_response_headers.method.GET")
+            ->value(),
+        0);
+
+    // Check if stats preserved within filter
+    EXPECT_EQ(
+        test_server_
+            ->counter(
+                "dynamicmodulescustom.entrypoint_total.entrypoint.on_request_headers.method.GET")
+            ->value(),
+        1);
+    EXPECT_EQ(
+        test_server_
+            ->gauge(
+                "dynamicmodulescustom.entrypoint_pending.entrypoint.on_request_headers.method.GET")
+            ->value(),
+        0);
+    EXPECT_EQ(test_server_
+                  ->gauge("dynamicmodulescustom.entrypoint_set_value.entrypoint.on_request_headers."
+                          "method.GET")
+                  ->value(),
+              100);
+    EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(),
+                                           *request_entrypoint_header_values),
+              1);
+    EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                          *request_entrypoint_header_values)),
+              3);
+    EXPECT_EQ(
+        test_server_
+            ->counter(
+                "dynamicmodulescustom.entrypoint_total.entrypoint.on_response_headers.method.GET")
+            ->value(),
+        1);
+    EXPECT_EQ(test_server_
+                  ->gauge("dynamicmodulescustom.entrypoint_set_value.entrypoint.on_response_"
+                          "headers.method.GET")
+                  ->value(),
+              999);
+    EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(),
+                                           *response_entrypoint_header_values),
+              1);
+    EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                          *response_entrypoint_header_values)),
+              3);
+  }
+
+  // Test stat values persisted after filter is destroyed
+  {
+    Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+    request_headers.addCopy(Http::LowerCaseString("header_to_count"), "13");
+    auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+    auto response = std::move(encoder_decoder.second);
+    waitForNextUpstreamRequest();
+    test_server_->waitForNumHistogramSamplesGe("dynamicmodulescustom.requests_header_values", 2);
+
+    EXPECT_EQ(test_server_->counter("dynamicmodulescustom.requests_total")->value(), 2);
+    EXPECT_EQ(test_server_->gauge("dynamicmodulescustom.requests_pending")->value(), 1);
+    EXPECT_EQ(test_server_->gauge("dynamicmodulescustom.requests_set_value")->value(),
+              100); // set above in first request
+    auto requests_header_values =
+        test_server_->histogram("dynamicmodulescustom.requests_header_values");
+    EXPECT_EQ(
+        TestUtility::readSampleCount(test_server_->server().dispatcher(), *requests_header_values),
+        2);
+    EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                          *requests_header_values)),
+              3 + 13);
+
+    EXPECT_EQ(
+        test_server_
+            ->counter(
+                "dynamicmodulescustom.entrypoint_total.entrypoint.on_request_headers.method.GET")
+            ->value(),
+        2);
+    EXPECT_EQ(
+        test_server_
+            ->gauge(
+                "dynamicmodulescustom.entrypoint_pending.entrypoint.on_request_headers.method.GET")
+            ->value(),
+        1);
+    EXPECT_EQ(test_server_
+                  ->gauge("dynamicmodulescustom.entrypoint_set_value.entrypoint.on_request_headers."
+                          "method.GET")
+                  ->value(),
+              100); // set above in first request
+    auto request_entrypoint_header_values = test_server_->histogram(
+        "dynamicmodulescustom.entrypoint_header_values.entrypoint.on_request_headers.method.GET");
+    EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(),
+                                           *request_entrypoint_header_values),
+              2);
+    EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                          *request_entrypoint_header_values)),
+              3 + 13);
+
+    Http::TestResponseHeaderMapImpl response_headers = default_response_headers_;
+    response_headers.addCopy(Http::LowerCaseString("header_to_count"), "5");
+    response_headers.addCopy(Http::LowerCaseString("header_to_set"), "1000");
+    upstream_request_->encodeHeaders(response_headers, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+  }
+}
+
+std::string terminal_filter_config;
+
+class DynamicModulesTerminalIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModulesTerminalIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), terminal_filter_config) {};
+
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    terminal_filter_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
+    filter_chains:
+      filters:
+        name: envoy.filters.network.http_connection_manager
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          http_filters:
+          - name: http_integration_test
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+              dynamic_module_config:
+                name: http_integration_test
+              filter_name: streaming_terminal_filter
+              terminal_filter: true
+          route_config:
+            virtual_hosts:
+            - domains:
+              - '*'
+              name: local_proxy_route
+          stat_prefix: ingress_http
+      )EOF");
+  }
+
+  void SetUp() override { HttpIntegrationTest::initialize(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesTerminalIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DynamicModulesTerminalIntegrationTest, StreamingTerminalFilter) {
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("terminal",
+            response->headers().get(Http::LowerCaseString("x-filter"))[0]->value().getStringView());
+
+  response->waitForBodyData(12);
+  EXPECT_EQ("Who are you?", response->body());
+  response->clearBody();
+
+  codec_client_->sendData(request_encoder, "Envoy", false);
+  response->waitForBodyData(24);
+  EXPECT_EQ("Hi Envoy. Anything else?", response->body());
+  response->clearBody();
+
+  codec_client_->sendData(request_encoder, "Nope", true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("Thanks!", response->body());
+  EXPECT_EQ("finished", response->trailers()
+                            .get()
+                            ->get(Http::LowerCaseString("x-status"))[0]
+                            ->value()
+                            .getStringView());
+}
+
 } // namespace Envoy

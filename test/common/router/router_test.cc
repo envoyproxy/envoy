@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 
+#include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/upstreams/http/generic/v3/generic_connection_pool.pb.h"
@@ -54,7 +55,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -478,7 +478,13 @@ TEST_F(RouterTest, Http1Upstream) {
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, true));
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _, true))
+      .WillOnce(Invoke([this](Http::RequestHeaderMap& headers,
+                              const Formatter::HttpFormatterContext& context,
+                              const StreamInfo::StreamInfo&, bool) {
+        EXPECT_EQ(context.requestHeaders().ptr(), &headers);
+        EXPECT_EQ(context.activeSpan().ptr(), &span_);
+      }));
 
   router_->decodeHeaders(headers, true);
   EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));
@@ -760,11 +766,55 @@ TEST_F(RouterTest, MetadataMatchCriteria) {
 }
 
 TEST_F(RouterTest, MetadataMatchCriteriaFromRequest) {
-  verifyMetadataMatchCriteriaFromRequest(true);
+  // Set up route metadata that will be overridden by request metadata
+  setRouteMetadataMatchCriteria(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v3.0
+)EOF");
+
+  // Set up request metadata that overrides route metadata
+  setRequestMetadata({{"version", "v3.1"}, {"stage", "devel"}});
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 2);
+    auto it = match.begin();
+
+    // Note: metadataMatchCriteria() keeps its entries sorted, so the order matters.
+
+    // `stage` was only set by the request, not by the route entry.
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    // `version` should be what came from the request, overriding the route entry.
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+  });
 }
 
 TEST_F(RouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
-  verifyMetadataMatchCriteriaFromRequest(false);
+  // No route metadata set
+  ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+
+  // Set up request metadata only
+  setRequestMetadata({{"version", "v3.1"}, {"stage", "devel"}});
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 2);
+    auto it = match.begin();
+
+    // Note: metadataMatchCriteria() keeps its entries sorted, so the order matters.
+
+    // `stage` was only set by the request.
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    // `version` should be what came from the request.
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+  });
 }
 
 TEST_F(RouterTest, NoMetadataMatchCriteria) {
@@ -786,6 +836,165 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
   router_->onDestroy();
+}
+
+TEST_F(RouterTest, MetadataMatchCriteriaFromConnectionOnly) {
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v3.1
+)EOF");
+
+  ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 1);
+
+    auto it = match.begin();
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+  });
+}
+
+TEST_F(RouterTest, MetadataMatchCriteriaRouteAndConnection) {
+  setRouteMetadataMatchCriteria(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v2.0
+    env: prod
+)EOF");
+
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v3.0
+    stage: devel
+)EOF");
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 3);
+    auto it = match.begin();
+
+    EXPECT_EQ((*it)->name(), "env");
+    EXPECT_EQ((*it)->value().value().string_value(), "prod");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    // Connection metadata overrides route metadata for "version"
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.0");
+  });
+}
+
+TEST_F(RouterTest, MetadataMatchCriteriaConnectionAndRequest) {
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v3.0
+    stage: staging
+)EOF");
+
+  setRequestMetadata({{"version", "v4.0"}, {"env", "test"}});
+
+  ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 3);
+    auto it = match.begin();
+
+    EXPECT_EQ((*it)->name(), "env");
+    EXPECT_EQ((*it)->value().value().string_value(), "test");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "staging");
+    it++;
+
+    // Request metadata overrides connection metadata for "version"
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v4.0");
+  });
+}
+
+TEST_F(RouterTest, MetadataMatchCriteriaAllThreeTypes) {
+  setRouteMetadataMatchCriteria(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v1.0
+    env: prod
+    cluster: east
+)EOF");
+
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v2.0
+    stage: staging
+)EOF");
+
+  setRequestMetadata({{"version", "v3.0"}, {"deployment", "canary"}});
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 5);
+    auto it = match.begin();
+
+    // Sorted order: cluster, deployment, env, stage, version
+    EXPECT_EQ((*it)->name(), "cluster");
+    EXPECT_EQ((*it)->value().value().string_value(), "east");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "deployment");
+    EXPECT_EQ((*it)->value().value().string_value(), "canary");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "env");
+    EXPECT_EQ((*it)->value().value().string_value(), "prod");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "staging");
+    it++;
+
+    // Request metadata has highest priority for "version"
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.0");
+  });
+}
+
+TEST_F(RouterTest, MetadataMatchCriteriaPrecedenceTest) {
+  setRouteMetadataMatchCriteria(R"EOF(
+filter_metadata:
+  envoy.lb:
+    priority_key: route_value
+    route_only: route_data
+)EOF");
+
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    priority_key: connection_value
+    connection_only: connection_data
+)EOF");
+
+  setRequestMetadata({{"priority_key", "request_value"}, {"request_only", "request_data"}});
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 4);
+
+    // Verify that request metadata wins for the conflicting key
+    bool found_priority_key = false;
+    for (const auto& criterion : match) {
+      if (criterion->name() == "priority_key") {
+        EXPECT_EQ(criterion->value().value().string_value(), "request_value");
+        found_priority_key = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(found_priority_key);
+  });
 }
 
 TEST_F(RouterTest, CancelBeforeBoundToPool) {
@@ -1028,7 +1237,7 @@ public:
 // Also verify retry options predicates work.
 TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
-  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+  callbacks_.route_->route_entry_.retry_policy_->retry_options_predicates_.emplace_back(
       retry_options_predicate);
 
   setIncludeAttemptCountInRequest(true);
@@ -1907,7 +2116,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
 TEST_F(RouterTest, UpstreamPerTryIdleTimeout) {
   InSequence s;
 
-  callbacks_.route_->route_entry_.retry_policy_.per_try_idle_timeout_ =
+  callbacks_.route_->route_entry_.retry_policy_->per_try_idle_timeout_ =
       std::chrono::milliseconds(3000);
 
   // This pattern helps ensure that we're actually invoking the callback.
@@ -1978,7 +2187,7 @@ TEST_F(RouterTest, UpstreamPerTryIdleTimeout) {
 TEST_F(RouterTest, UpstreamPerTryIdleTimeoutSuccess) {
   InSequence s;
 
-  callbacks_.route_->route_entry_.retry_policy_.per_try_idle_timeout_ =
+  callbacks_.route_->route_entry_.retry_policy_->per_try_idle_timeout_ =
       std::chrono::milliseconds(3000);
 
   NiceMock<Http::MockRequestEncoder> encoder;
@@ -2183,7 +2392,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
 // canceled). Also verify retry options predicates work.
 TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
-  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+  callbacks_.route_->route_entry_.retry_policy_->retry_options_predicates_.emplace_back(
       retry_options_predicate);
 
   enableHedgeOnPerTryTimeout();
@@ -2674,7 +2883,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
 // has sent any of the body. Also verify retry options predicates work.
 TEST_F(RouterTest, RetryRequestBeforeBody) {
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
-  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+  callbacks_.route_->route_entry_.retry_policy_->retry_options_predicates_.emplace_back(
       retry_options_predicate);
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -5030,7 +5239,10 @@ std::shared_ptr<ShadowPolicyImpl>
 makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
                  absl::optional<std::string> runtime_key = absl::nullopt,
                  absl::optional<envoy::type::v3::FractionalPercent> default_value = absl::nullopt,
-                 bool trace_sampled = true) {
+                 bool trace_sampled = true,
+                 std::vector<envoy::config::common::mutation_rules::v3::HeaderMutation>
+                     request_headers_mutations = {},
+                 std::string host_rewrite_literal = "") {
   envoy::config::route::v3::RouteAction::RequestMirrorPolicy policy;
   policy.set_cluster(cluster);
   policy.set_cluster_header(cluster_header);
@@ -5042,7 +5254,18 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
   }
   policy.mutable_trace_sampled()->set_value(trace_sampled);
 
-  return THROW_OR_RETURN_VALUE(ShadowPolicyImpl::create(policy), std::shared_ptr<ShadowPolicyImpl>);
+  // Add HeaderMutation objects directly
+  for (const auto& mutation : request_headers_mutations) {
+    *policy.add_request_headers_mutations() = mutation;
+  }
+
+  if (!host_rewrite_literal.empty()) {
+    policy.set_host_rewrite_literal(host_rewrite_literal);
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  return THROW_OR_RETURN_VALUE(ShadowPolicyImpl::create(policy, factory_context),
+                               std::shared_ptr<ShadowPolicyImpl>);
 }
 
 } // namespace
@@ -5050,8 +5273,6 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
 class RouterShadowingTest : public RouterTest, public testing::WithParamInterface<bool> {
 public:
   RouterShadowingTest() : streaming_shadow_(GetParam()) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.streaming_shadow", streaming_shadow_ ? "true" : "false"}});
     // Add default mock for requestBodyBufferLimit which is called during router initialization.
     EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
         .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
@@ -5274,6 +5495,174 @@ TEST_P(RouterShadowingTest, ShadowRequestCarriesParentContext) {
   router_->onDestroy();
 }
 
+TEST_P(RouterShadowingTest, ShadowWithHeaderManipulation) {
+  const std::vector<std::string> mutation_yamls = {
+      R"EOF(
+append:
+  header:
+    key: "x-mirror-test"
+    value: "mirror-value"
+  append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+)EOF",
+      R"EOF(
+append:
+  header:
+    key: "x-mirror-static"
+    value: "static-value"
+  append_action: "APPEND_IF_EXISTS_OR_ADD"
+)EOF",
+      R"EOF(
+remove: "x-sensitive-header"
+)EOF",
+      R"EOF(
+remove: "authorization"
+)EOF"};
+
+  std::vector<envoy::config::common::mutation_rules::v3::HeaderMutation> mutations;
+  for (const auto& yaml : mutation_yamls) {
+    envoy::config::common::mutation_rules::v3::HeaderMutation mutation;
+    TestUtility::loadFromYaml(yaml, mutation);
+    mutations.push_back(mutation);
+  }
+
+  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar", absl::nullopt, true, mutations);
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setCopy(Http::LowerCaseString("x-sensitive-header"), "secret");
+  headers.setCopy(Http::LowerCaseString("authorization"), "Bearer token123");
+
+  NiceMock<Http::MockAsyncClient> foo_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
+
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr& shadow_headers,
+                           const Http::AsyncClient::RequestOptions&) {
+        // Verify headers were added
+        EXPECT_EQ("mirror-value", shadow_headers->get(Http::LowerCaseString("x-mirror-test"))[0]
+                                      ->value()
+                                      .getStringView());
+        EXPECT_EQ("static-value", shadow_headers->get(Http::LowerCaseString("x-mirror-static"))[0]
+                                      ->value()
+                                      .getStringView());
+
+        // Verify headers were removed
+        EXPECT_TRUE(shadow_headers->get(Http::LowerCaseString("x-sensitive-header")).empty());
+        EXPECT_TRUE(shadow_headers->get(Http::LowerCaseString("authorization")).empty());
+
+        return &foo_request;
+      }));
+
+  router_->decodeHeaders(headers, false);
+
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, true));
+
+  response_decoder->decodeHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+                                      Http::TestResponseHeaderMapImpl{{":status", "200"}}),
+                                  true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+
+  router_->onDestroy();
+}
+
+TEST_P(RouterShadowingTest, ShadowWithMixedMutationsAndHostRewrite) {
+  const std::vector<std::string> mutation_yamls = {
+      R"EOF(
+append:
+  header:
+    key: "x-test-env"
+    value: "shadow"
+  append_action: "APPEND_IF_EXISTS_OR_ADD"
+)EOF",
+      R"EOF(
+append:
+  header:
+    key: "x-shadow-id"
+    value: "12345"
+  append_action: "APPEND_IF_EXISTS_OR_ADD"
+)EOF",
+      R"EOF(
+remove: "x-remove-me"
+)EOF"};
+
+  std::vector<envoy::config::common::mutation_rules::v3::HeaderMutation> mutations;
+  for (const auto& yaml : mutation_yamls) {
+    envoy::config::common::mutation_rules::v3::HeaderMutation mutation;
+    TestUtility::loadFromYaml(yaml, mutation);
+    mutations.push_back(mutation);
+  }
+
+  ShadowPolicyPtr policy =
+      makeShadowPolicy("foo", "", "bar", absl::nullopt, true, mutations, "shadow-host.example.com");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setCopy(Http::LowerCaseString("x-remove-me"), "should-be-removed");
+
+  NiceMock<Http::MockAsyncClient> foo_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
+
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr& shadow_headers,
+                           const Http::AsyncClient::RequestOptions&) {
+        // Verify header mutations
+        EXPECT_EQ(
+            "shadow",
+            shadow_headers->get(Http::LowerCaseString("x-test-env"))[0]->value().getStringView());
+        EXPECT_EQ(
+            "12345",
+            shadow_headers->get(Http::LowerCaseString("x-shadow-id"))[0]->value().getStringView());
+        EXPECT_TRUE(shadow_headers->get(Http::LowerCaseString("x-remove-me")).empty());
+
+        // Verify host was rewritten
+        EXPECT_EQ("shadow-host.example.com", shadow_headers->getHostValue());
+
+        return &foo_request;
+      }));
+
+  router_->decodeHeaders(headers, false);
+
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, true));
+
+  response_decoder->decodeHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+                                      Http::TestResponseHeaderMapImpl{{":status", "200"}}),
+                                  true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+
+  router_->onDestroy();
+}
+
 TEST_F(RouterTest, AltStatName) {
   // Also test no upstream timeout here.
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
@@ -5325,7 +5714,7 @@ TEST_F(RouterTest, Redirect) {
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
-  EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
+  EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "301"}, {"location", "hello"}};
@@ -5345,7 +5734,7 @@ TEST_F(RouterTest, RedirectFound) {
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Found));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
-  EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
+  EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "302"}, {"location", "hello"}};
@@ -5856,7 +6245,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
+    route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(7);
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"}};
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false, false);
@@ -5869,7 +6258,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(10);
+    route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(10);
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
     Http::TestRequestHeaderMapImpl headers;
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false, false);
@@ -5882,7 +6271,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
+    route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(7);
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
                                            {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
@@ -6035,7 +6424,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
-    route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
+    route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(7);
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"},
                                            {"x-envoy-upstream-rq-timeout-ms", "15"}};
@@ -6051,7 +6440,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
-    route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
+    route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(7);
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"},
                                            {"x-envoy-upstream-rq-timeout-ms", "15"},
@@ -6696,7 +7085,7 @@ TEST_F(RouterTest, Http3DisabledForHttp11Proxies) {
 
 TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
-  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+  callbacks_.route_->route_entry_.retry_policy_->retry_options_predicates_.emplace_back(
       retry_options_predicate);
 
   setIncludeAttemptCountInRequest(true);
@@ -7101,7 +7490,8 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
 
 class TestOrcaLoadReportLbData : public Upstream::HostLbPolicyData {
 public:
-  MOCK_METHOD(absl::Status, onOrcaLoadReport, (const Upstream::OrcaLoadReport&), (override));
+  MOCK_METHOD(absl::Status, onOrcaLoadReport,
+              (const Upstream::OrcaLoadReport&, const StreamInfo::StreamInfo&), (override));
 };
 
 TEST_F(RouterTest, OrcaLoadReportCallbacks) {
@@ -7123,8 +7513,9 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
 
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
-  EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_))
-      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
+  EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                           const StreamInfo::StreamInfo&) {
         received_orca_load_report = orca_load_report;
         return absl::OkStatus();
       }));
@@ -7176,8 +7567,9 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
   cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
 
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
-  EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_))
-      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
+  EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                           const StreamInfo::StreamInfo&) {
         received_orca_load_report = orca_load_report;
         // Return an error that gets logged by router filter.
         return absl::InvalidArgumentError("Unexpected ORCA load Report");
@@ -7214,7 +7606,7 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
   auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
   cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
-  EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_)).Times(0);
+  EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _)).Times(0);
 
   // Send report with invalid ORCA proto.
   std::string proto_string = "Invalid ORCA proto value";
