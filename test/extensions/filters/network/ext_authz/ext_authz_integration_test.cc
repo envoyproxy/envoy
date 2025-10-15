@@ -35,7 +35,7 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  void initializeTest(bool send_tls_alert_on_denial, bool with_tls) {
+  void initializeTest(bool send_tls_alert_on_denial, bool with_tls, bool check_on_new_connection) {
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -44,53 +44,55 @@ public:
       ConfigHelper::setHttp2(*ext_authz_cluster);
     });
 
-    config_helper_.addConfigModifier([this, send_tls_alert_on_denial, with_tls](
-                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* filter_chain = listener->mutable_filter_chains(0);
+    config_helper_.addConfigModifier(
+        [this, send_tls_alert_on_denial, with_tls,
+         check_on_new_connection](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          auto* filter_chain = listener->mutable_filter_chains(0);
 
-      envoy::extensions::filters::network::ext_authz::v3::ExtAuthz ext_authz_config;
-      ext_authz_config.set_stat_prefix("ext_authz");
-      setGrpcService(*ext_authz_config.mutable_grpc_service(), "ext_authz",
-                     fake_upstreams_.back()->localAddress());
-      ext_authz_config.set_send_tls_alert_on_denial(send_tls_alert_on_denial);
+          envoy::extensions::filters::network::ext_authz::v3::ExtAuthz ext_authz_config;
+          ext_authz_config.set_stat_prefix("ext_authz");
+          setGrpcService(*ext_authz_config.mutable_grpc_service(), "ext_authz",
+                         fake_upstreams_.back()->localAddress());
+          ext_authz_config.set_send_tls_alert_on_denial(send_tls_alert_on_denial);
+          ext_authz_config.set_check_on_new_connection(check_on_new_connection);
 
-      // Save the existing tcp_proxy filter config.
-      auto tcp_proxy_filter = filter_chain->filters(0);
+          // Save the existing tcp_proxy filter config.
+          auto tcp_proxy_filter = filter_chain->filters(0);
 
-      // Clear and rebuild with ext_authz first, then tcp_proxy.
-      filter_chain->clear_filters();
+          // Clear and rebuild with ext_authz first, then tcp_proxy.
+          filter_chain->clear_filters();
 
-      auto* ext_authz_filter = filter_chain->add_filters();
-      ext_authz_filter->set_name("envoy.filters.network.ext_authz");
-      ext_authz_filter->mutable_typed_config()->PackFrom(ext_authz_config);
+          auto* ext_authz_filter = filter_chain->add_filters();
+          ext_authz_filter->set_name("envoy.filters.network.ext_authz");
+          ext_authz_filter->mutable_typed_config()->PackFrom(ext_authz_config);
 
-      filter_chain->add_filters()->CopyFrom(tcp_proxy_filter);
+          filter_chain->add_filters()->CopyFrom(tcp_proxy_filter);
 
-      // Configure TLS if requested.
-      if (with_tls) {
-        envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-        const std::string rundir = TestEnvironment::runfilesDirectory();
+          // Configure TLS if requested.
+          if (with_tls) {
+            envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+            const std::string rundir = TestEnvironment::runfilesDirectory();
 
-        auto* common_tls_context = tls_context.mutable_common_tls_context();
-        common_tls_context->add_alpn_protocols("h2");
-        common_tls_context->add_alpn_protocols("http/1.1");
+            auto* common_tls_context = tls_context.mutable_common_tls_context();
+            common_tls_context->add_alpn_protocols("h2");
+            common_tls_context->add_alpn_protocols("http/1.1");
 
-        auto* validation_context = common_tls_context->mutable_validation_context();
-        validation_context->mutable_trusted_ca()->set_filename(
-            rundir + "/test/config/integration/certs/cacert.pem");
+            auto* validation_context = common_tls_context->mutable_validation_context();
+            validation_context->mutable_trusted_ca()->set_filename(
+                rundir + "/test/config/integration/certs/cacert.pem");
 
-        auto* tls_certificate = common_tls_context->add_tls_certificates();
-        tls_certificate->mutable_certificate_chain()->set_filename(
-            rundir + "/test/config/integration/certs/servercert.pem");
-        tls_certificate->mutable_private_key()->set_filename(
-            rundir + "/test/config/integration/certs/serverkey.pem");
+            auto* tls_certificate = common_tls_context->add_tls_certificates();
+            tls_certificate->mutable_certificate_chain()->set_filename(
+                rundir + "/test/config/integration/certs/servercert.pem");
+            tls_certificate->mutable_private_key()->set_filename(
+                rundir + "/test/config/integration/certs/serverkey.pem");
 
-        auto* transport_socket = filter_chain->mutable_transport_socket();
-        transport_socket->set_name("envoy.transport_sockets.tls");
-        transport_socket->mutable_typed_config()->PackFrom(tls_context);
-      }
-    });
+            auto* transport_socket = filter_chain->mutable_transport_socket();
+            transport_socket->set_name("envoy.transport_sockets.tls");
+            transport_socket->mutable_typed_config()->PackFrom(tls_context);
+          }
+        });
 
     BaseIntegrationTest::initialize();
 
@@ -157,7 +159,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzNetworkIntegrationTest, GRPC_CLIENT
 // Test that when ext_authz denies with TLS and send_tls_alert_on_denial is true,
 // the connection is closed with a TLS alert.
 TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertEnabled) {
-  initializeTest(true /* send_tls_alert_on_denial */, true /* with_tls */);
+  initializeTest(true /* send_tls_alert_on_denial */, true /* with_tls */,
+                 false /* check_on_new_connection */);
 
   setupSslConnection();
   ASSERT_TRUE(connect_callbacks_.connected());
@@ -167,7 +170,14 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertEnabled) {
   Buffer::OwnedImpl data("some_data");
   ssl_client_->write(data, false);
 
-  AssertionResult result = waitForExtAuthzConnection();
+  // When check_on_new_connection is false, the upstream connection starts before the connection
+  // to the ext_authz upstream. Since tcp_proxy creates the connection on new connection and the
+  // ext_authz filter only starts the check request on new data.
+  FakeRawConnectionPtr fake_upstream_connection;
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
+  RELEASE_ASSERT(result, result.message());
+
+  result = waitForExtAuthzConnection();
   RELEASE_ASSERT(result, result.message());
   result = waitForExtAuthzRequest();
   RELEASE_ASSERT(result, result.message());
@@ -213,6 +223,7 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertEnabled) {
 
   ssl_client_->close(Network::ConnectionCloseType::NoFlush);
 
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   // Clean up the ext_authz gRPC connection.
   if (fake_ext_authz_connection_ != nullptr) {
     AssertionResult result = fake_ext_authz_connection_->close();
@@ -226,7 +237,8 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertEnabled) {
 // Test that when ext_authz denies with TLS and send_tls_alert_on_denial is false,
 // the connection is still closed without the alert.
 TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertDisabled) {
-  initializeTest(false /* send_tls_alert_on_denial */, true /* with_tls */);
+  initializeTest(false /* send_tls_alert_on_denial */, true /* with_tls */,
+                 false /* check_on_new_connection */);
 
   setupSslConnection();
   ASSERT_TRUE(connect_callbacks_.connected());
@@ -234,7 +246,14 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertDisabled) {
   Buffer::OwnedImpl data("some_data");
   ssl_client_->write(data, false);
 
-  AssertionResult result = waitForExtAuthzConnection();
+  // When check_on_new_connection is false, the upstream connection starts before the connection
+  // to the ext_authz upstream. Since tcp_proxy creates the connection on new connection and the
+  // ext_authz filter only starts the check request on new data.
+  FakeRawConnectionPtr fake_upstream_connection;
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
+  RELEASE_ASSERT(result, result.message());
+
+  result = waitForExtAuthzConnection();
   RELEASE_ASSERT(result, result.message());
   result = waitForExtAuthzRequest();
   RELEASE_ASSERT(result, result.message());
@@ -253,6 +272,7 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertDisabled) {
   // Run the dispatcher one more time to ensure all events are processed.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   EXPECT_TRUE(connect_callbacks_.closed());
 
   // When send_tls_alert_on_denial is false, the connection is closed without sending an alert.
@@ -285,7 +305,8 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertDisabled) {
 
 // Test that when ext_authz allows the connection, it proceeds to tcp_proxy.
 TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnection) {
-  initializeTest(true /* send_tls_alert_on_denial */, true /* with_tls */);
+  initializeTest(true /* send_tls_alert_on_denial */, true /* with_tls */,
+                 false /* check_on_new_connection */);
 
   setupSslConnection();
   ASSERT_TRUE(connect_callbacks_.connected());
@@ -293,7 +314,111 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnection) {
   Buffer::OwnedImpl data("some_data");
   ssl_client_->write(data, false);
 
-  AssertionResult result = waitForExtAuthzConnection();
+  // When check_on_new_connection is false, the upstream connection starts before the connection
+  // to the ext_authz upstream. Since tcp_proxy creates the connection on new connection and the
+  // ext_authz filter only starts the check request on new data.
+  FakeRawConnectionPtr fake_upstream_connection;
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
+  RELEASE_ASSERT(result, result.message());
+
+  result = waitForExtAuthzConnection();
+  RELEASE_ASSERT(result, result.message());
+  result = waitForExtAuthzRequest();
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::Ok);
+
+  test_server_->waitForCounterGe("ext_authz.ext_authz.ok", 1);
+
+  result = fake_upstream_connection->waitForData(9);
+  RELEASE_ASSERT(result, result.message());
+
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  payload_reader_->setDataToWaitFor("world");
+  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  while (!connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+
+  EXPECT_EQ("world", payload_reader_->data());
+
+  // Clean up the ext_authz gRPC connection.
+  if (fake_ext_authz_connection_ != nullptr) {
+    AssertionResult result = fake_ext_authz_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = fake_ext_authz_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    fake_ext_authz_connection_ = nullptr;
+  }
+}
+
+// Test that denial works without TLS. No alert sent, but connection still closes.
+TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithoutTls) {
+  initializeTest(true /* send_tls_alert_on_denial */, false /* with_tls */,
+                 false /* check_on_new_connection */);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("some_data", false, false));
+
+  // When check_on_new_connection is false, the upstream connection starts before the connection
+  // to the ext_authz upstream. Since tcp_proxy creates the connection on new connection and the
+  // ext_authz filter only starts the check request on new data.
+  FakeRawConnectionPtr fake_upstream_connection;
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
+  RELEASE_ASSERT(result, result.message());
+
+  result = waitForExtAuthzConnection();
+  RELEASE_ASSERT(result, result.message());
+  result = waitForExtAuthzRequest();
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+
+  // Wait for denial to be processed.
+  test_server_->waitForCounterGe("ext_authz.ext_authz.denied", 1);
+  test_server_->waitForCounterGe("ext_authz.ext_authz.cx_closed", 1);
+
+  // For non-TLS connections, ext_authz closes immediately without sending an alert.
+  // Close the client connection to clean up the test.
+  tcp_client->close();
+
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  // Clean up the ext_authz gRPC connection.
+  if (fake_ext_authz_connection_ != nullptr) {
+    AssertionResult result = fake_ext_authz_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = fake_ext_authz_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    fake_ext_authz_connection_ = nullptr;
+  }
+}
+
+// Test that the upstream connection only gets made after the check request passes
+TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnectionWithCheckOnNewConnection) {
+  initializeTest(true /* send_tls_alert_on_denial */, true /* with_tls */,
+                 true /* check_on_new_connection */);
+
+  setupSslConnection();
+  ASSERT_TRUE(connect_callbacks_.connected());
+
+  Buffer::OwnedImpl data("some_data");
+  ssl_client_->write(data, false);
+
+  // When check_on_new_connection is true the tcp_proxy filter is forced to wait for the check
+  // request to complete.
+  AssertionResult result = fake_upstreams_[0]->assertPendingConnectionsEmpty();
+  RELEASE_ASSERT(result, result.message());
+
+  result = waitForExtAuthzConnection();
   RELEASE_ASSERT(result, result.message());
   result = waitForExtAuthzRequest();
   RELEASE_ASSERT(result, result.message());
@@ -334,15 +459,20 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnection) {
     fake_ext_authz_connection_ = nullptr;
   }
 }
-
 // Test that denial works without TLS. No alert sent, but connection still closes.
-TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithoutTls) {
-  initializeTest(true /* send_tls_alert_on_denial */, false /* with_tls */);
+TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithCheckOnNewConnection) {
+  initializeTest(true /* send_tls_alert_on_denial */, false /* with_tls */,
+                 true /* check_on_new_connection */);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   ASSERT_TRUE(tcp_client->write("some_data", false, false));
 
-  AssertionResult result = waitForExtAuthzConnection();
+  // When check_on_new_connection is true the tcp_proxy filter is forced to wait for the check
+  // request to complete.
+  AssertionResult result = fake_upstreams_[0]->assertPendingConnectionsEmpty();
+  RELEASE_ASSERT(result, result.message());
+
+  result = waitForExtAuthzConnection();
   RELEASE_ASSERT(result, result.message());
   result = waitForExtAuthzRequest();
   RELEASE_ASSERT(result, result.message());
@@ -350,6 +480,9 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithoutTls) {
   RELEASE_ASSERT(result, result.message());
 
   sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+
+  result = fake_upstreams_[0]->assertPendingConnectionsEmpty();
+  RELEASE_ASSERT(result, result.message());
 
   // Wait for denial to be processed.
   test_server_->waitForCounterGe("ext_authz.ext_authz.denied", 1);

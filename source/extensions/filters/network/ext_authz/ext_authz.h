@@ -77,11 +77,8 @@ public:
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
   bool includePeerCertificate() const { return include_peer_certificate_; }
   bool includeTLSSession() const { return include_tls_session_; }
-<<<<<<< HEAD
-  bool checkOnNewConnection() const { return check_on_new_connection_; }
-=======
   bool sendTlsAlertOnDenial() const { return send_tls_alert_on_denial_; }
->>>>>>> origin/main
+  bool checkOnNewConnection() const { return check_on_new_connection_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
   bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
     return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
@@ -94,11 +91,8 @@ private:
   LabelsMap destination_labels_;
   const bool include_peer_certificate_;
   const bool include_tls_session_;
-<<<<<<< HEAD
-  const bool check_on_new_connection_;
-=======
   const bool send_tls_alert_on_denial_;
->>>>>>> origin/main
+  const bool check_on_new_connection_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
 };
 
