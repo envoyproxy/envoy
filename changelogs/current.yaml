@@ -6,6 +6,7 @@ behavior_changes:
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: ext_proc
+  change: |
     Use one of a hard-coded set of error messages when a :ref:`HeaderMutation
     <envoy_v3_api_msg_service.ext_proc.v3.HeaderMutation>` fails. Removing
     request-specific details allows grouping by similar failure types. Detailed
