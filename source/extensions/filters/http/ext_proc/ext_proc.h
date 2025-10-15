@@ -51,7 +51,6 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_ignored)                                                               \
   COUNTER(clear_route_cache_disabled)                                                              \
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
-  COUNTER(send_immediate_resp_upstream_ignored)                                                    \
   COUNTER(http_not_ok_resp_received)
 
 struct ExtProcFilterStats {
@@ -145,27 +144,6 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
   std::string http_response_code_details_;
-};
-
-// Changes to headers are normally tested against the MutationRules supplied
-// with configuration. When writing an immediate response message, however,
-// we want to support a more liberal set of rules so that filters can create
-// custom error messages, and we want to prevent the MutationRules in the
-// configuration from making that impossible. This is a fixed, permissive
-// set of rules for that purpose.
-class ImmediateMutationChecker {
-public:
-  ImmediateMutationChecker(Regex::Engine& regex_engine) {
-    envoy::config::common::mutation_rules::v3::HeaderMutationRules rules;
-    rules.mutable_allow_all_routing()->set_value(true);
-    rules.mutable_allow_envoy()->set_value(true);
-    rule_checker_ = std::make_unique<Filters::Common::MutationRules::Checker>(rules, regex_engine);
-  }
-
-  const Filters::Common::MutationRules::Checker& checker() const { return *rule_checker_; }
-
-private:
-  std::unique_ptr<Filters::Common::MutationRules::Checker> rule_checker_;
 };
 
 class ThreadLocalStreamManager;
@@ -284,10 +262,6 @@ public:
     return untyped_receiving_namespaces_;
   }
 
-  const ImmediateMutationChecker& immediateMutationChecker() const {
-    return immediate_mutation_checker_;
-  }
-
   const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
   allowedOverrideModes() const {
     return allowed_override_modes_;
@@ -365,7 +339,6 @@ private:
   const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       allowed_override_modes_;
   const ExpressionManager expression_manager_;
-  const ImmediateMutationChecker immediate_mutation_checker_;
 
   const std::function<std::unique_ptr<ProcessingRequestModifier>()>
       processing_request_modifier_factory_cb_;

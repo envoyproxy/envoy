@@ -712,12 +712,6 @@ class FormatChecker:
             report_error(
                 "Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
                 "in envoy/common/platform.h instead")
-        if self.config.re["designated_initializer"].search(line):
-            # Designated initializers are not part of the C++14 standard and are not supported
-            # by MSVC
-            report_error(
-                "Don't use designated initializers in struct initialization, "
-                "they are not part of C++14")
         if " ?: " in line:
             # The ?: operator is non-standard, it is a GCC extension
             report_error("Don't use the '?:' operator, it is a non-standard GCC extension")

@@ -2932,8 +2932,8 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "ads_lrs_grpc_client_cache_test",
-    srcs = ["ads_lrs_grpc_client_cache_test.cc"],
+    name = "ads_lrs_grpc_client_cache_integration_test",
+    srcs = ["ads_lrs_grpc_client_cache_integration_test.cc"],
     deps = [
         ":http_integration_lib",
         "//test/test_common:test_runtime_lib",

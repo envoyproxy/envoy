@@ -21,7 +21,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace OverrideHost {
 namespace {
 
@@ -226,6 +226,6 @@ TEST(OverrideHostLbonfigTest, FallbackLbCalledToChooseHost) {
 
 } // namespace
 } // namespace OverrideHost
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy
