@@ -1234,7 +1234,7 @@ private:
 
   VirtualHostImplSharedPtr default_virtual_host_;
   const bool ignore_port_in_host_matching_{false};
-  const std::string alternate_header_for_host_matching_;
+  const std::string vhost_header_;
 };
 
 /**

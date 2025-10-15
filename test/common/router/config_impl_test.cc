@@ -2879,7 +2879,7 @@ virtual_hosts:
 
 TEST_F(RouteMatcherTest, AlternateHostHeaderMatching) {
   const std::string yaml = R"EOF(
-alternate_header_for_host_matching: "alternate"
+vhost_header: "alternate"
 virtual_hosts:
 - name: default_service
   domains:

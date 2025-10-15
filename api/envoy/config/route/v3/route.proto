@@ -138,7 +138,7 @@ message RouteConfiguration {
   // different HTTP header for this purpose. This is intended to be
   // combined with an "early_header_mutation" extension to allow
   // alternate or simplified host values to be used for host matching.
-  string alternate_header_for_host_matching = 18;
+  string vhost_header = 18;
 
   // Ignore path-parameters in path-matching.
   // Before RFC3986, URI were like(RFC1808): <scheme>://<net_loc>/<path>;<params>?<query>#<fragment>
