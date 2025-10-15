@@ -17,17 +17,15 @@ namespace Formatter {
 
 class CELFormatterTest : public ::testing::Test {
 public:
+  CELFormatterTest() { formatter_context_.setRequestHeaders(request_headers_); }
+
   Http::TestRequestHeaderMapImpl request_headers_{
       {":method", "GET"},
       {":path", "/request/path?secret=parameter"},
       {"x-envoy-original-path", "/original/path?secret=parameter"}};
-  Http::TestResponseHeaderMapImpl response_headers_;
-  Http::TestResponseTrailerMapImpl response_trailers_;
   StreamInfo::MockStreamInfo stream_info_;
-  std::string body_;
 
-  Envoy::Formatter::HttpFormatterContext formatter_context_{&request_headers_, &response_headers_,
-                                                            &response_trailers_, body_};
+  Envoy::Formatter::HttpFormatterContext formatter_context_;
 
   envoy::config::core::v3::SubstitutionFormatString config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -93,6 +91,43 @@ TEST_F(CELFormatterTest, TestFormatNullValue) {
   auto typed_formatter = cel_parser->parse("TYPED_CEL", "request.headers.nope", max_length);
   EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
               ProtoEq(ValueUtil::nullValue()));
+}
+
+TEST_F(CELFormatterTest, TestFormatNoHeaders) {
+  Envoy::Formatter::Context formatter_context;
+
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+
+  {
+    auto formatter = cel_parser->parse("CEL", "request.headers.nope", max_length);
+    EXPECT_THAT(formatter->formatValueWithContext(formatter_context, stream_info_),
+                ProtoEq(ValueUtil::nullValue()));
+
+    auto typed_formatter = cel_parser->parse("TYPED_CEL", "request.headers.nope", max_length);
+    EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context, stream_info_),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    auto formatter = cel_parser->parse("CEL", "response.headers.nope", max_length);
+    EXPECT_THAT(formatter->formatValueWithContext(formatter_context, stream_info_),
+                ProtoEq(ValueUtil::nullValue()));
+
+    auto typed_formatter = cel_parser->parse("TYPED_CEL", "response.headers.nope", max_length);
+    EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context, stream_info_),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    auto formatter = cel_parser->parse("CEL", "response.trailers.nope", max_length);
+    EXPECT_THAT(formatter->formatValueWithContext(formatter_context, stream_info_),
+                ProtoEq(ValueUtil::nullValue()));
+
+    auto typed_formatter = cel_parser->parse("TYPED_CEL", "response.trailers.nope", max_length);
+    EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context, stream_info_),
+                ProtoEq(ValueUtil::nullValue()));
+  }
 }
 
 TEST_F(CELFormatterTest, TestFormatBoolValue) {
