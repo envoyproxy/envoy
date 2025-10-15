@@ -104,6 +104,11 @@ minor_behavior_changes:
     If :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>` is true,
     save the gRPC failure status code returned from the ext_proc server in the filter state.
     Previously, all fail-open cases would return ``call_status`` ``Grpc::Status::Aborted``.
+- area: ext_proc
+  change: |
+    Closing the gRPC stream if Envoy detects no more external processing needed. This behavior can be
+    reverted by setting the runtime guard
+    ``envoy.reloadable_features.ext_proc_stream_close_optimization`` to ``false``.
 - area: dns_filter
   change: |
     Honor the default DNS resolver configuration in the bootstrap config
