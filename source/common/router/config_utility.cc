@@ -50,10 +50,8 @@ bool ConfigUtility::QueryParameterMatcher::matches(
   auto data = request_query_params.getFirstValue(name_);
 
   // If we're doing a present_match, return whether the parameter exists and matches the expected
-  // presence
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_new_query_param_present_match_behavior") &&
-      present_match_.has_value()) {
+  // presence.
+  if (present_match_.has_value()) {
     return data.has_value() == present_match_.value();
   }
 
