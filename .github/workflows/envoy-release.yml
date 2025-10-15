@@ -142,19 +142,19 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.25
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.26
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.25
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.26
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
         strip-prefix: release/
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.25
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.26
       name: Re-open branch
       with:
         command: >-
@@ -169,7 +169,7 @@ jobs:
       name: Dev version
       id: dev
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.25
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.26
       with:
         base: ${{ github.ref_name }}
         commit: false
