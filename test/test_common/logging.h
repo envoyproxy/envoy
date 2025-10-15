@@ -7,7 +7,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 
-#include "absl/base/no_destructor.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/synchronization/mutex.h"
@@ -89,8 +88,7 @@ public:
 
 // Initializes the global log environment and must be called prior to execution of Envoy code.
 inline LogRecordingSink& GetLogSink() {
-  static absl::NoDestructor<LogRecordingSink> sink(Envoy::Logger::Registry::getSink());
-  return *sink;
+  return *static_cast<LogRecordingSink*>(Logger::Registry::getSink()->recorder_test_only_);
 }
 
 class StartStopRecording {

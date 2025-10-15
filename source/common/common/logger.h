@@ -240,6 +240,8 @@ public:
    */
   static std::string escapeLogLine(absl::string_view source);
 
+  SinkDelegate* recorder_test_only_{};
+
 private:
   friend class SinkDelegate;
 

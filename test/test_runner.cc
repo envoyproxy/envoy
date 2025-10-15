@@ -12,8 +12,10 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_listener.h"
 
+#include "absl/base/no_destructor.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -160,6 +162,12 @@ int TestRunner::runTests(int argc, char** argv) {
 
   // Reset all ENVOY_BUG counters.
   Envoy::Assert::resetEnvoyBugCountersForTest();
+
+  // Initialize log recording sink.
+  if (std::getenv("ENVOY_NO_LOG_SINK") == nullptr) {
+    auto recorder = absl::NoDestructor<LogRecordingSink>(Logger::Registry::getSink());
+    Logger::Registry::getSink()->recorder_test_only_ = recorder.get();
+  }
 
 #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
   // Fuzz tests may run Envoy tests in fuzzing mode to generate corpora. In this case, we do not

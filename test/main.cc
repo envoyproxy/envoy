@@ -2,7 +2,6 @@
 #include "envoy/thread/thread.h"
 
 #include "test/test_common/environment.h"
-#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 #include "test/test_runner.h"
 
@@ -32,10 +31,5 @@ int main(int argc, char** argv) {
   // v4 and v6 addresses is desired. This feature is in progress and will be rolled out to all tests
   // in upcoming PRs.
   Envoy::TestEnvironment::setEnvVar("ENVOY_IP_TEST_VERSIONS", "all", 0);
-
-  // Initialize log recording sink.
-  if (std::getenv("ENVOY_NO_LOG_SINK") == nullptr) {
-    [[maybe_unused]] const auto& _ = Envoy::GetLogSink();
-  }
   return Envoy::TestRunner::runTests(argc, argv);
 }
