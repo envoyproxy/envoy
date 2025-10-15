@@ -26,5 +26,8 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    Added ``vhost_header`` to the RouteConfiguration, allowing use of a different header for vhost matching.
 
 deprecated:
