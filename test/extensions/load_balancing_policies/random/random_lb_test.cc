@@ -68,7 +68,7 @@ TEST(TypedRandomLbConfigTest, TypedRandomLbConfigTest) {
   {
     envoy::config::cluster::v3::Cluster::CommonLbConfig common;
 
-    Extensions::LoadBalancingPolices::Random::TypedRandomLbConfig typed_config(common);
+    Extensions::LoadBalancingPolicies::Random::TypedRandomLbConfig typed_config(common);
 
     EXPECT_FALSE(typed_config.lb_config_.has_locality_lb_config());
   }
@@ -78,7 +78,7 @@ TEST(TypedRandomLbConfigTest, TypedRandomLbConfigTest) {
 
     common.mutable_locality_weighted_lb_config();
 
-    Extensions::LoadBalancingPolices::Random::TypedRandomLbConfig typed_config(common);
+    Extensions::LoadBalancingPolicies::Random::TypedRandomLbConfig typed_config(common);
 
     EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_TRUE(typed_config.lb_config_.locality_lb_config().has_locality_weighted_lb_config());
@@ -92,7 +92,7 @@ TEST(TypedRandomLbConfigTest, TypedRandomLbConfigTest) {
     common.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(23.0);
     common.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
 
-    Extensions::LoadBalancingPolices::Random::TypedRandomLbConfig typed_config(common);
+    Extensions::LoadBalancingPolicies::Random::TypedRandomLbConfig typed_config(common);
 
     EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_FALSE(typed_config.lb_config_.locality_lb_config().has_locality_weighted_lb_config());
