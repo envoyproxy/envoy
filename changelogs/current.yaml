@@ -17,6 +17,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: router
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.async_host_selection`` and legacy code paths.
 
 new_features:
 
