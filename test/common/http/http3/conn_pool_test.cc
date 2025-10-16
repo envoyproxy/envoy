@@ -292,6 +292,14 @@ TEST_F(Http3ConnPoolImplTest, MigrationEnabledNoDrain) {
   EXPECT_FALSE(pool_->isIdle());
 }
 
+// These are no-op currently. Just test them to have test coverage.
+TEST_F(Http3ConnPoolImplTest, GetNetworkChangeEvents) {
+  createNewStream();
+  observers_.onNetworkConnected(-1);
+  observers_.onNetworkMadeDefault(-1);
+  observers_.onNetworkDisconnected(-1);
+}
+
 } // namespace Http3
 } // namespace Http
 } // namespace Envoy
