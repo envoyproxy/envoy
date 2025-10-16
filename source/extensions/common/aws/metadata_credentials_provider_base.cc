@@ -99,15 +99,18 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
       const auto now = context_.api().timeSource().systemTime();
       if (expiration_time_.has_value() && (expiration_time_.value() > now)) {
         auto time_until_expiration = expiration_time_.value() - now;
-        auto grace_period = std::chrono::duration_cast<std::chrono::system_clock::duration>(REFRESH_GRACE_PERIOD);
-        
+        auto grace_period =
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(REFRESH_GRACE_PERIOD);
+
         // Subtract grace period, but ensure we don't go negative
         if (time_until_expiration > grace_period) {
-          cache_duration_ = std::chrono::duration_cast<std::chrono::seconds>(time_until_expiration - grace_period);
+          cache_duration_ = std::chrono::duration_cast<std::chrono::seconds>(time_until_expiration -
+                                                                             grace_period);
         } else {
-          cache_duration_ = std::chrono::seconds(1); // Refresh immediately if too close to expiration
+          cache_duration_ =
+              std::chrono::seconds(1); // Refresh immediately if too close to expiration
         }
-        
+
         ENVOY_LOG(debug,
                   "Metadata fetcher setting credential refresh to {}, based on "
                   "credential expiration with grace period",
@@ -118,7 +121,8 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
                   "Metadata fetcher setting credential refresh to {}, based on default expiration",
                   std::chrono::seconds(cache_duration_.count()));
       }
-      cache_duration_timer_->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(cache_duration_));
+      cache_duration_timer_->enableTimer(
+          std::chrono::duration_cast<std::chrono::milliseconds>(cache_duration_));
     }
   }
 }

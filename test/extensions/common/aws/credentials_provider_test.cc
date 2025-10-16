@@ -208,7 +208,8 @@ TEST_F(AsyncCredentialHandlingTest, ExpirationWithGracePeriod) {
       MetadataFetcher::MetadataReceiver::RefreshState::Ready;
   std::chrono::seconds initialization_timer = std::chrono::seconds(2);
 
-  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider = {};
+  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
+      {};
   cred_provider.mutable_web_identity_token_data_source()->set_inline_string("abced");
   cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
   cred_provider.set_role_session_name("role-session-name");
@@ -223,14 +224,15 @@ TEST_F(AsyncCredentialHandlingTest, ExpirationWithGracePeriod) {
         return std::move(metadata_fetcher_);
       },
       refresh_state, initialization_timer, cred_provider);
-  
+
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  
+
   // Set expiration time 10 minutes from now
   auto future_time = context_.api().timeSource().systemTime() + std::chrono::minutes(10);
-  auto expiration_timestamp = std::chrono::duration_cast<std::chrono::seconds>(future_time.time_since_epoch()).count();
-  
+  auto expiration_timestamp =
+      std::chrono::duration_cast<std::chrono::seconds>(future_time.time_since_epoch()).count();
+
   auto document = fmt::format(R"EOF(
   {{
     "AssumeRoleWithWebIdentityResponse": {{
@@ -244,16 +246,19 @@ TEST_F(AsyncCredentialHandlingTest, ExpirationWithGracePeriod) {
       }}
     }}
   }}
-  )EOF", expiration_timestamp);
+  )EOF",
+                              expiration_timestamp);
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke([&](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
-        receiver.onMetadataSuccess(std::move(document));
-      }));
+      .WillOnce(Invoke(
+          [&](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
+            receiver.onMetadataSuccess(std::move(document));
+          }));
 
   // Expect timer to be set to less than 10 minutes due to grace period
-  EXPECT_CALL(*timer_, enableTimer(testing::Lt(std::chrono::minutes(10)), nullptr)).Times(testing::AtLeast(1));
-  
+  EXPECT_CALL(*timer_, enableTimer(testing::Lt(std::chrono::minutes(10)), nullptr))
+      .Times(testing::AtLeast(1));
+
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
 }
@@ -263,7 +268,8 @@ TEST_F(AsyncCredentialHandlingTest, ExpirationTooCloseToGracePeriod) {
       MetadataFetcher::MetadataReceiver::RefreshState::Ready;
   std::chrono::seconds initialization_timer = std::chrono::seconds(2);
 
-  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider = {};
+  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
+      {};
   cred_provider.mutable_web_identity_token_data_source()->set_inline_string("abced");
   cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
   cred_provider.set_role_session_name("role-session-name");
@@ -278,14 +284,15 @@ TEST_F(AsyncCredentialHandlingTest, ExpirationTooCloseToGracePeriod) {
         return std::move(metadata_fetcher_);
       },
       refresh_state, initialization_timer, cred_provider);
-  
+
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  
+
   // Set expiration time only 10 seconds from now (less than grace period)
   auto future_time = context_.api().timeSource().systemTime() + std::chrono::seconds(10);
-  auto expiration_timestamp = std::chrono::duration_cast<std::chrono::seconds>(future_time.time_since_epoch()).count();
-  
+  auto expiration_timestamp =
+      std::chrono::duration_cast<std::chrono::seconds>(future_time.time_since_epoch()).count();
+
   auto document = fmt::format(R"EOF(
   {{
     "AssumeRoleWithWebIdentityResponse": {{
@@ -299,14 +306,17 @@ TEST_F(AsyncCredentialHandlingTest, ExpirationTooCloseToGracePeriod) {
       }}
     }}
   }}
-  )EOF", expiration_timestamp);
+  )EOF",
+                              expiration_timestamp);
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke([&](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
-        receiver.onMetadataSuccess(std::move(document));
-      }));
+      .WillOnce(Invoke(
+          [&](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
+            receiver.onMetadataSuccess(std::move(document));
+          }));
 
-  // Expect timer to be set multiple times - first 1ms for initial trigger, then 1000ms for immediate refresh
+  // Expect timer to be set multiple times - first 1ms for initial trigger, then 1000ms for
+  // immediate refresh
   EXPECT_CALL(*timer_, enableTimer(_, nullptr)).Times(testing::AtLeast(1));
 
   provider_friend.onClusterAddOrUpdate();
