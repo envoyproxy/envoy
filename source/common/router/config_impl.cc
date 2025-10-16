@@ -1832,8 +1832,8 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   }
 
   absl::string_view host_header_value;
-  if (vhost_header_ != "") {
-    auto result = headers.get(Http::LowerCaseString(vhost_header_));
+  if (!vhost_header_.get().empty()) {
+    auto result = headers.get(vhost_header_);
     // If using an alternate header, it must not be empty.
     if (result.empty()) {
       return nullptr;
