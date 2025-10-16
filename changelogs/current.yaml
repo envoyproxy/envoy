@@ -14,7 +14,7 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area:
+- area: lua
   change: |
     Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
     larger payload (greater than the body buffer limit).
