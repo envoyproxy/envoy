@@ -1571,7 +1571,8 @@ bool isLastBodyResponse(ProcessorState& state,
 
 void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
                                                const bool is_last_body_resp) {
-
+  // Bail out if the gRPC stream has already been closed. This can happen in scenarios
+  // like immediate responses or rejected header mutations.
   if (stream_ == nullptr || !Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
     return;
@@ -1706,16 +1707,12 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    if (response->has_request_body()) {
-      is_last_body_resp = isLastBodyResponse(decoding_state_, response->request_body());
-    }
+    is_last_body_resp = isLastBodyResponse(decoding_state_, response->request_body());
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
-    if (response->has_response_body()) {
-      is_last_body_resp = isLastBodyResponse(encoding_state_, response->response_body());
-    }
+    is_last_body_resp = isLastBodyResponse(encoding_state_, response->response_body());
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
     break;
