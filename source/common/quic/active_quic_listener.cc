@@ -129,6 +129,10 @@ ActiveQuicListener::ActiveQuicListener(
       udp_save_cmsg_config_.expected_size = save_cmsg_config.expected_size();
     }
   }
+
+  max_sessions_per_event_loop_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(listener_config.udpListenerConfig()->config().quic_options(),
+                                      max_sessions_per_event_loop, kNumSessionsToCreatePerLoop);
 }
 
 ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
@@ -198,7 +202,7 @@ void ActiveQuicListener::onReadReady() {
     event_loops_with_buffered_chlo_for_test_++;
   }
 
-  quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
+  quic_dispatcher_->ProcessBufferedChlos(max_sessions_per_event_loop_);
 
   // If there were more buffered than the limit, schedule again for the next event loop.
   if (quic_dispatcher_->HasChlosBuffered()) {
