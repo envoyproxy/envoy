@@ -14,6 +14,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: lua
+  change: |
+    Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
+    larger payload (greater than the body buffer limit).
 - area: connection pool
   change: |
     Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
@@ -21,9 +25,15 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` and legacy code paths.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_cookie`` and legacy code paths.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
@@ -34,5 +44,9 @@ new_features:
     Supported skipping conversion for matched stats via
     :ref:`SkipAction
     <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.SkipAction>` during custom metric conversion.
+- area: wasm
+  change: |
+    Added ``sign`` foreign function to create cryptographic signatures.
+    See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
 
 deprecated:

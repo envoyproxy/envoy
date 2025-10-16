@@ -24,13 +24,13 @@ ReverseConnectionResolver::resolve(const envoy::config::core::v3::SocketAddress&
                     socket_address.port_value()));
   }
 
-  // Extract reverse connection config
+  // Extract reverse connection config.
   auto reverse_conn_config_or_error = extractReverseConnectionConfig(socket_address);
   if (!reverse_conn_config_or_error.ok()) {
     return reverse_conn_config_or_error.status();
   }
 
-  // Create and return ReverseConnectionAddress
+  // Create and return ReverseConnectionAddress.
   auto reverse_conn_address =
       std::make_shared<ReverseConnectionAddress>(reverse_conn_config_or_error.value());
 
@@ -43,10 +43,10 @@ ReverseConnectionResolver::extractReverseConnectionConfig(
 
   const std::string& address_str = socket_address.address();
 
-  // Parse the reverse connection URL format
+  // Parse the reverse connection URL format.
   std::string config_part = address_str.substr(5); // Remove "rc://" prefix
 
-  // Split by '@' to separate source info from cluster config
+  // Split by '@' to separate source info from cluster config.
   std::vector<std::string> parts = absl::StrSplit(config_part, '@');
   if (parts.size() != 2) {
     return absl::InvalidArgumentError(
@@ -82,7 +82,7 @@ ReverseConnectionResolver::extractReverseConnectionConfig(
         fmt::format("Invalid connection count: {}", cluster_parts[1]));
   }
 
-  // Create the config struct
+  // Create the config struct.
   ReverseConnectionAddress::ReverseConnectionConfig config;
   config.src_node_id = source_parts[0];
   config.src_cluster_id = source_parts[1];
@@ -100,7 +100,7 @@ ReverseConnectionResolver::extractReverseConnectionConfig(
   return config;
 }
 
-// Register the factory
+// Register the factory.
 REGISTER_FACTORY(ReverseConnectionResolver, Network::Address::Resolver);
 
 } // namespace ReverseConnection
