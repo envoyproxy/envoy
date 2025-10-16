@@ -674,8 +674,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       callbacks_->dispatcher().timeSource().monotonicTime());
 
   auto host_selection_response = cluster->chooseHost(this);
-  if (!host_selection_response.cancelable ||
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.async_host_selection")) {
+  if (!host_selection_response.cancelable) {
     if (host_selection_response.cancelable) {
       host_selection_response.cancelable->cancel();
     }
@@ -2191,8 +2190,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
       "envoy.router.host_selection_start_ms",
       callbacks_->dispatcher().timeSource().monotonicTime());
   auto host_selection_response = cluster->chooseHost(this);
-  if (!host_selection_response.cancelable ||
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.async_host_selection")) {
+  if (!host_selection_response.cancelable) {
     if (host_selection_response.cancelable) {
       host_selection_response.cancelable->cancel();
     }
