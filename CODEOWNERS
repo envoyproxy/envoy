@@ -274,6 +274,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/compression/zstd @rainingmaster @mattklein123
 # cel
 /*/extensions/access_loggers/filters/cel @kyessenov @douglas-reid @adisuissa
+# process rate limit
+/*/extensions/access_loggers/filters/process_ratelimit @taoxuy @kyessenov
 # health check
 /*/extensions/filters/http/health_check @mattklein123 @adisuissa
 # lua
