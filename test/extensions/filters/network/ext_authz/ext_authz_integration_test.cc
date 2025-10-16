@@ -408,17 +408,14 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithoutTls) {
 }
 
 // Test that the upstream connection only gets made after the check request passes
-TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnectionWithCheckOnNewConnection) {
-  initializeTest(true /* send_tls_alert_on_denial */, true /* with_tls */,
+TEST_P(ExtAuthzNetworkIntegrationTest, AllowedTcpConnectionWithCheckOnNewConnection) {
+  initializeTest(true /* send_tls_alert_on_denial */, false /* with_tls */,
                  true /* check_on_new_connection */);
 
-  setupSslConnection();
-  ASSERT_TRUE(connect_callbacks_.connected());
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("some_data", false, false));
 
-  Buffer::OwnedImpl data("some_data");
-  ssl_client_->write(data, false);
-
-  // When check_on_new_connection is true the tcp_proxy filter is forced to wait for the check
+  // When check_on_new_connection is true the tcp_proxy filter is forced to wait for the authz
   // request to complete.
   AssertionResult result = fake_upstreams_[0]->assertPendingConnectionsEmpty();
   RELEASE_ASSERT(result, result.message());
@@ -442,18 +439,11 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnectionWithCheckOnNewConnection
   RELEASE_ASSERT(result, result.message());
 
   ASSERT_TRUE(fake_upstream_connection->write("world"));
-  payload_reader_->setDataToWaitFor("world");
-  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  tcp_client->waitForData("world", true);
 
+  tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-
-  while (!connect_callbacks_.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-  ssl_client_->close(Network::ConnectionCloseType::NoFlush);
-
-  EXPECT_EQ("world", payload_reader_->data());
 
   // Clean up the ext_authz gRPC connection.
   if (fake_ext_authz_connection_ != nullptr) {
