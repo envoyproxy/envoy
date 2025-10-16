@@ -456,8 +456,7 @@ typed_config:
         local body_length = request_handle:body():length()
 
         request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
-        local dynamic_metadata_value =
-        request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"]
+        local dynamic_metadata_value = request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"]
 
         local test_header_value_0 = request_handle:headers():getAtIndex("X-Test-Header", 0)
         request_handle:headers():add("test_header_value_0", test_header_value_0)
@@ -469,12 +468,9 @@ typed_config:
         end
         local test_header_value_size = request_handle:headers():getNumValues("x-test-header")
         request_handle:headers():add("test_header_value_size", test_header_value_size)
-        request_handle:headers():add("cookie_0",
-        request_handle:headers():getAtIndex("set-cookie", 0))
-        request_handle:headers():add("cookie_1",
-        request_handle:headers():getAtIndex("set-cookie", 1))
-        request_handle:headers():add("cookie_size",
-        request_handle:headers():getNumValues("set-cookie"))
+        request_handle:headers():add("cookie_0", request_handle:headers():getAtIndex("set-cookie", 0))
+        request_handle:headers():add("cookie_1", request_handle:headers():getAtIndex("set-cookie", 1))
+        request_handle:headers():add("cookie_size", request_handle:headers():getNumValues("set-cookie"))
 
         request_handle:headers():add("request_body_size", body_length)
         request_handle:headers():add("request_vhost_metadata_foo", vhost_metadata["foo"])
@@ -514,8 +510,8 @@ typed_config:
         response_handle:headers():add("response_metadata_foo", metadata["foo"])
         response_handle:headers():add("response_metadata_baz", metadata["baz"])
         response_handle:headers():add("response_body_size", body_length)
-        response_handle:headers():add("request_protocol",
-        response_handle:streamInfo():protocol()) response_handle:headers():remove("foo")
+        response_handle:headers():add("request_protocol", response_handle:streamInfo():protocol())
+        response_handle:headers():remove("foo")
       end
 )EOF";
 
@@ -1042,8 +1038,7 @@ typed_config:
         local sig = request_handle:headers():get("signature")
         local rawsig = sig:fromhex()
         local data = request_handle:headers():get("message")
-        local ok, error = request_handle:verifySignature(hash, pubkey, rawsig,
-        string.len(rawsig), data, string.len(data))
+        local ok, error = request_handle:verifySignature(hash, pubkey, rawsig, string.len(rawsig), data, string.len(data))
 
         if ok then
           request_handle:headers():add("signature_verification", "approved")
@@ -1919,8 +1914,7 @@ typed_config:
       inline_string: |
         function envoy_on_request(request_handle)
           -- Access Proxy Protocol typed metadata
-          local meta =
-          request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
+          local meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
           if meta and meta.typed_metadata then
             -- Add ALPN values
             if meta.typed_metadata.PP2_TYPE_ALPN then
@@ -1929,14 +1923,12 @@ typed_config:
 
             -- Add Authority
             if meta.typed_metadata.PP2_TYPE_AUTHORITY then
-              request_handle:headers():add("pp-authority",
-              meta.typed_metadata.PP2_TYPE_AUTHORITY)
+              request_handle:headers():add("pp-authority", meta.typed_metadata.PP2_TYPE_AUTHORITY)
             end
 
             -- Add unique ID if present
             if meta.typed_metadata.PP2_TYPE_UNIQUE_ID then
-              request_handle:headers():add("pp-unique-id",
-              meta.typed_metadata.PP2_TYPE_UNIQUE_ID)
+              request_handle:headers():add("pp-unique-id", meta.typed_metadata.PP2_TYPE_UNIQUE_ID)
             end
 
             -- Check SSL properties
