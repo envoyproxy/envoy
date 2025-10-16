@@ -1805,8 +1805,7 @@ typed_config:
 
             -- Check protocol field
             if meta.typed_metadata.protocol_version then
-              request_handle:headers():add("protocol_version",
-              meta.typed_metadata.protocol_version)
+              request_handle:headers():add("protocol_version", meta.typed_metadata.protocol_version)
             end
 
             -- Check authority field
@@ -1826,8 +1825,8 @@ typed_config:
 
           -- Test missing metadata
           local missing =
-          request_handle:connectionStreamInfo():dynamicTypedMetadata("missing.metadata") if
-          missing == nil then
+          request_handle:connectionStreamInfo():dynamicTypedMetadata("missing.metadata")
+          if missing == nil then
             request_handle:headers():add("missing_metadata", "is_nil")
           end
         end
