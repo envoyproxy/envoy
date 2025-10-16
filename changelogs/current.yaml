@@ -35,5 +35,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
 
 new_features:
+- area: wasm
+  change: |
+    Added ``sign`` foreign function to create cryptographic signatures.
+    See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
 
 deprecated:
