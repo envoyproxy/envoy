@@ -18,13 +18,6 @@ namespace {
 // These run only in EngFlow 'RBE' environments with linux_x64_small pool (2 CPUs).
 // Tests basic cgroup detection without heavy server integration dependencies.
 class CgroupCpuSimpleIntegrationTest : public testing::Test {
-protected:
-  void SetUp() override {
-    // Skip test if not in CI environment
-    if (!TestEnvironment::getOptionalEnvVar("CI").has_value()) {
-      GTEST_SKIP() << "Skipping cgroup test - not in CI environment";
-    }
-  }
 };
 
 // Test basic cgroup CPU detection functionality - MUST have 'cgroups' in CI
