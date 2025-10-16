@@ -53,7 +53,22 @@ jobs:
         //test/cc/... //test/common/...
       request: ${{ needs.load.outputs.request }}
       target: cc-tests
-      timeout-minutes: 120
+
+  cc-xds-integration-tests:
+    permissions:
+      contents: read
+      packages: read
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-cc }}
+    needs: load
+    name: cc-xds-integration-tests
+    uses: ./.github/workflows/_mobile_container_ci.yml
+    with:
+      args: >-
+        test
+        --config=mobile-remote-ci-cc-xds-enabled
+        //test/common/integration/...
+      request: ${{ needs.load.outputs.request }}
+      target: cc-xds-integration-tests
 
   request:
     secrets:
@@ -72,6 +87,7 @@ jobs:
     needs:
     - load
     - cc-tests
+    - cc-xds-integration-tests
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}

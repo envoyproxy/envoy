@@ -23,13 +23,15 @@ public:
   SubstitutionFormatStringUtilsTest() {
     absl::optional<uint32_t> response_code{200};
     EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(Return(response_code));
+
+    formatter_context_.setRequestHeaders(request_headers_);
   }
 
   Http::TestRequestHeaderMapImpl request_headers_{
       {":method", "GET"}, {":path", "/bar/foo"}, {"content-type", "application/json"}};
   StreamInfo::MockStreamInfo stream_info_;
 
-  HttpFormatterContext formatter_context_{&request_headers_};
+  HttpFormatterContext formatter_context_;
 
   envoy::config::core::v3::SubstitutionFormatString config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;

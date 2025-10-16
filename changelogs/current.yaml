@@ -19,9 +19,25 @@ bug_fixes:
     Fixed a bug where Envoy will leak memory if the HTTP2 stream is reset before the request headers are
     sent. For example, if one upstream http filter send a local reply after the connection is established but
     before the request headers are sent, the memory allocated for the stream will not be released.
+- area: connection pool
+  change: |
+    Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
+    or responses trigger flow control.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_cookie`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
 
 new_features:
 
