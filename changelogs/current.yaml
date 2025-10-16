@@ -29,5 +29,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
 
 new_features:
+- area: otlp_stat_sink
+  change: |
+    Supported skipping conversion for matched stats via
+    :ref:`SkipAction
+    <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.SkipAction>` during custom metric conversion.
 
 deprecated:

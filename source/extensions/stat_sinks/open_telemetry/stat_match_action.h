@@ -17,11 +17,11 @@ namespace OpenTelemetry {
 
 struct ActionContext {};
 
-class OnMatchAction
+class ConversionAction
     : public Matcher::ActionBase<
           envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction> {
 public:
-  explicit OnMatchAction(
+  explicit ConversionAction(
       const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction& config)
       : config_(config) {}
 
@@ -34,6 +34,13 @@ private:
   const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction config_;
 };
 
+class SkipAction : public Matcher::ActionBase<
+                       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::SkipAction> {
+public:
+  explicit SkipAction(
+      const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::SkipAction&) {}
+};
+
 class ActionValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Stats::StatMatchingData> {
 public:
@@ -43,7 +50,7 @@ public:
   }
 };
 
-class ActionFactory : public Matcher::ActionFactory<ActionContext> {
+class ConversionActionFactory : public Matcher::ActionFactory<ActionContext> {
 public:
   Matcher::ActionConstSharedPtr
   createAction(const Protobuf::Message& config, ActionContext&,
@@ -51,7 +58,7 @@ public:
     const auto& action_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction&>(
         config, validation_visitor);
-    return std::make_shared<OnMatchAction>(action_config);
+    return std::make_shared<ConversionAction>(action_config);
   }
 
   std::string name() const override { return "otlp_metric_conversion_action_factory"; }
@@ -59,6 +66,25 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
         envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction>();
+  }
+};
+
+class SkipActionFactory : public Matcher::ActionFactory<ActionContext> {
+public:
+  Matcher::ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, ActionContext&,
+               ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& action_config = MessageUtil::downcastAndValidate<
+        const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::SkipAction&>(
+        config, validation_visitor);
+    return std::make_shared<SkipAction>(action_config);
+  }
+
+  std::string name() const override { return "otlp_metric_drop_action_factory"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::SkipAction>();
   }
 };
 } // namespace OpenTelemetry

@@ -183,9 +183,13 @@ public:
                                 int64_t last_flush_time_ns) const override;
 
 private:
+  struct MetricConfigResult {
+    bool skip_conversion{false};
+    OptRef<const SinkConfig::ConversionAction> conversion_action;
+  };
+
 private:
-  template <class StatType>
-  OptRef<const SinkConfig::ConversionAction> getMetricConfig(const StatType& stat) const;
+  template <class StatType> MetricConfigResult getMetricConfig(const StatType& stat) const;
 
   template <class StatType>
   std::string getMetricName(const StatType& stat,
