@@ -342,15 +342,15 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnection) {
   payload_reader_->setDataToWaitFor("world");
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
 
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
   while (!connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ssl_client_->close(Network::ConnectionCloseType::NoFlush);
 
   EXPECT_EQ("world", payload_reader_->data());
-
-  ASSERT_TRUE(fake_upstream_connection->close());
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Clean up the ext_authz gRPC connection.
   if (fake_ext_authz_connection_ != nullptr) {
@@ -445,15 +445,15 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnectionWithCheckOnNewConnection
   payload_reader_->setDataToWaitFor("world");
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
 
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
   while (!connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ssl_client_->close(Network::ConnectionCloseType::NoFlush);
 
   EXPECT_EQ("world", payload_reader_->data());
-
-  ASSERT_TRUE(fake_upstream_connection->close());
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Clean up the ext_authz gRPC connection.
   if (fake_ext_authz_connection_ != nullptr) {
