@@ -21,6 +21,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` and legacy code paths.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` and legacy code paths.
