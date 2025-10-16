@@ -263,6 +263,23 @@ public:
     expectResponseBodyRewrite(code, true, enable_wrap_body);
   }
 
+  IntegrationStreamDecoderPtr initializeAndSendRequest(const std::string& code) {
+    initializeFilter(code);
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                   {":path", "/test/long/url"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "foo.lyft.com"},
+                                                   {"x-forwarded-for", "10.0.0.1"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    Buffer::OwnedImpl request_data("done");
+    encoder_decoder.first.encodeData(request_data, true);
+    waitForNextUpstreamRequest();
+
+    return std::move(encoder_decoder.second);
+  }
+
   void cleanup() {
     codec_client_->close();
     if (fake_lua_connection_ != nullptr) {
@@ -439,7 +456,8 @@ typed_config:
         local body_length = request_handle:body():length()
 
         request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
-        local dynamic_metadata_value = request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"]
+        local dynamic_metadata_value =
+        request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"]
 
         local test_header_value_0 = request_handle:headers():getAtIndex("X-Test-Header", 0)
         request_handle:headers():add("test_header_value_0", test_header_value_0)
@@ -451,9 +469,12 @@ typed_config:
         end
         local test_header_value_size = request_handle:headers():getNumValues("x-test-header")
         request_handle:headers():add("test_header_value_size", test_header_value_size)
-        request_handle:headers():add("cookie_0", request_handle:headers():getAtIndex("set-cookie", 0))
-        request_handle:headers():add("cookie_1", request_handle:headers():getAtIndex("set-cookie", 1))
-        request_handle:headers():add("cookie_size", request_handle:headers():getNumValues("set-cookie"))
+        request_handle:headers():add("cookie_0",
+        request_handle:headers():getAtIndex("set-cookie", 0))
+        request_handle:headers():add("cookie_1",
+        request_handle:headers():getAtIndex("set-cookie", 1))
+        request_handle:headers():add("cookie_size",
+        request_handle:headers():getNumValues("set-cookie"))
 
         request_handle:headers():add("request_body_size", body_length)
         request_handle:headers():add("request_vhost_metadata_foo", vhost_metadata["foo"])
@@ -493,8 +514,8 @@ typed_config:
         response_handle:headers():add("response_metadata_foo", metadata["foo"])
         response_handle:headers():add("response_metadata_baz", metadata["baz"])
         response_handle:headers():add("response_body_size", body_length)
-        response_handle:headers():add("request_protocol", response_handle:streamInfo():protocol())
-        response_handle:headers():remove("foo")
+        response_handle:headers():add("request_protocol",
+        response_handle:streamInfo():protocol()) response_handle:headers():remove("foo")
       end
 )EOF";
 
@@ -1021,7 +1042,8 @@ typed_config:
         local sig = request_handle:headers():get("signature")
         local rawsig = sig:fromhex()
         local data = request_handle:headers():get("message")
-        local ok, error = request_handle:verifySignature(hash, pubkey, rawsig, string.len(rawsig), data, string.len(data))
+        local ok, error = request_handle:verifySignature(hash, pubkey, rawsig,
+        string.len(rawsig), data, string.len(data))
 
         if ok then
           request_handle:headers():add("signature_verification", "approved")
@@ -1411,6 +1433,41 @@ typed_config:
   testRewriteResponse(FILTER_AND_CODE);
 }
 
+// Rewrite response buffer to a huge body.
+TEST_P(LuaIntegrationTest, RewriteResponseToHugeBody) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_response(response_handle)
+        -- Default HTTP2 body buffer limit is 16MB for now. To set
+        -- a 16MB+ body to ensure both HTTP1 and HTTP2 will hit the limit.
+        local huge_body = string.rep("a", 1024 * 1024 * 16 + 1) -- 16MB + 1
+        local content_length = response_handle:body():setBytes(huge_body)
+        response_handle:logTrace(content_length)
+      end
+)EOF";
+
+  auto response = initializeAndSendRequest(FILTER_AND_CODE);
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data1("good");
+  upstream_request_->encodeData(response_data1, false);
+  Buffer::OwnedImpl response_data2("bye");
+  upstream_request_->encodeData(response_data2, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  EXPECT_EQ(response->headers().getStatusValue(), "500");
+
+  cleanup();
+}
+
 // Rewrite response buffer, without original upstream response body
 // and always wrap body.
 TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutUpstreamBody) {
@@ -1744,7 +1801,8 @@ typed_config:
       inline_string: |
         function envoy_on_request(request_handle)
           -- Test valid metadata
-          local meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.test.typed_metadata")
+          local meta =
+          request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.test.typed_metadata")
           if meta and meta.typed_metadata then
             -- Check basic key-value pair
             request_handle:headers():add("typed_metadata_key", meta.typed_metadata.test_key)
@@ -1752,7 +1810,8 @@ typed_config:
 
             -- Check protocol field
             if meta.typed_metadata.protocol_version then
-              request_handle:headers():add("protocol_version", meta.typed_metadata.protocol_version)
+              request_handle:headers():add("protocol_version",
+              meta.typed_metadata.protocol_version)
             end
 
             -- Check authority field
@@ -1771,8 +1830,9 @@ typed_config:
           end
 
           -- Test missing metadata
-          local missing = request_handle:connectionStreamInfo():dynamicTypedMetadata("missing.metadata")
-          if missing == nil then
+          local missing =
+          request_handle:connectionStreamInfo():dynamicTypedMetadata("missing.metadata") if
+          missing == nil then
             request_handle:headers():add("missing_metadata", "is_nil")
           end
         end
@@ -1859,7 +1919,8 @@ typed_config:
       inline_string: |
         function envoy_on_request(request_handle)
           -- Access Proxy Protocol typed metadata
-          local meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
+          local meta =
+          request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
           if meta and meta.typed_metadata then
             -- Add ALPN values
             if meta.typed_metadata.PP2_TYPE_ALPN then
@@ -1868,12 +1929,14 @@ typed_config:
 
             -- Add Authority
             if meta.typed_metadata.PP2_TYPE_AUTHORITY then
-              request_handle:headers():add("pp-authority", meta.typed_metadata.PP2_TYPE_AUTHORITY)
+              request_handle:headers():add("pp-authority",
+              meta.typed_metadata.PP2_TYPE_AUTHORITY)
             end
 
             -- Add unique ID if present
             if meta.typed_metadata.PP2_TYPE_UNIQUE_ID then
-              request_handle:headers():add("pp-unique-id", meta.typed_metadata.PP2_TYPE_UNIQUE_ID)
+              request_handle:headers():add("pp-unique-id",
+              meta.typed_metadata.PP2_TYPE_UNIQUE_ID)
             end
 
             -- Check SSL properties
