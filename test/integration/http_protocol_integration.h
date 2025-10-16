@@ -32,8 +32,7 @@ absl::string_view http2ImplementationToString(Http2Impl impl);
 // ....
 // }
 // TODO(#20996) consider switching to SimulatedTimeSystem instead of using real time.
-class HttpProtocolIntegrationTest : public testing::TestWithParam<HttpProtocolTestParams>,
-                                    public HttpIntegrationTest {
+class HttpProtocolIntegrationTestBase : public HttpIntegrationTest, public testing::Test {
 public:
   // By default returns 8 combinations of
   // [HTTP  upstream / HTTP  downstream] x [Ipv4, IPv6]
@@ -67,21 +66,21 @@ public:
   static std::string
   protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
 
-  HttpProtocolIntegrationTest()
-      : HttpProtocolIntegrationTest(ConfigHelper::httpProxyConfig(
-            /*downstream_is_quic=*/GetParam().downstream_protocol == Http::CodecType::HTTP3)) {}
+  HttpProtocolIntegrationTestBase(const HttpProtocolTestParams& test_params)
+      : HttpProtocolIntegrationTestBase(ConfigHelper::httpProxyConfig(
+            /*downstream_is_quic=*/test_params.downstream_protocol == Http::CodecType::HTTP3), test_params) {}
 
-  HttpProtocolIntegrationTest(const std::string config)
-      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, config),
-        use_universal_header_validator_(GetParam().use_universal_header_validator) {
-    setupHttp2ImplOverrides(GetParam().http2_implementation);
+  HttpProtocolIntegrationTestBase(const std::string config, const HttpProtocolTestParams& test_params)
+      : HttpIntegrationTest(test_params.downstream_protocol, test_params.version, config), test_params_(test_params),
+        use_universal_header_validator_(test_params.use_universal_header_validator) {
+    setupHttp2ImplOverrides(test_params.http2_implementation);
     config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
-                                      GetParam().use_universal_header_validator ? "true" : "false");
+                                      test_params.use_universal_header_validator ? "true" : "false");
   }
 
   void SetUp() override {
-    setDownstreamProtocol(GetParam().downstream_protocol);
-    setUpstreamProtocol(GetParam().upstream_protocol);
+    setDownstreamProtocol(test_params_.downstream_protocol);
+    setUpstreamProtocol(test_params_.upstream_protocol);
   }
 
   void initialize() override {
@@ -95,96 +94,29 @@ public:
   void setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
 
 protected:
+  // Current test params.
+  const HttpProtocolTestParams& test_params_;
   const bool use_universal_header_validator_{false};
   bool async_lb_ = true;
 };
 
-//template <template <class> class testing::TestWithParam, typename PARAMS>
-template <typename T>
+template <typename... T>
 class HttpProtocolIntegrationTestWithParams : 
-                                //public testing::TestWithParam<bool> {
-                                public testing::TestWithParam<T> {
-                                //public testing::TestWithParam<std::tuple<typename HttpProtocolTestParams, PARAMS>>//,
-                                    //public HttpIntegrationTest {
-    //using GetParam = testing::TestWithParam<T>::GetParam;
+                                public testing::WithParamInterface<typename std::conditional<(sizeof...(T) > 0), std::tuple<HttpProtocolTestParams, T...>, HttpProtocolTestParams>::type>,
+                                public HttpProtocolIntegrationTestBase {
 public:
-    HttpProtocolIntegrationTestWithParams() {
-        //ASSERT(GetParam());
-        ASSERT(testing::TestWithParam<T>::GetParam());
+    // Constructor when there is no extra params.
+    template<bool with_params = false>
+    HttpProtocolIntegrationTestWithParams() : HttpProtocolIntegrationTestBase(testing::TestWithParam<HttpProtocolTestParams>::GetParam()) {
     }
-  
-    virtual void initialize() {}
-    
-#if 0
-  // By default returns 8 combinations of
-  // [HTTP  upstream / HTTP  downstream] x [Ipv4, IPv6]
-  // [HTTP  upstream / HTTP2 downstream] x [IPv4, Ipv6]
-  // [HTTP2 upstream / HTTP  downstream] x [Ipv4, IPv6]
-  // [HTTP2 upstream / HTTP2 downstream] x [IPv4, Ipv6]
-  //
-  // Upstream and downstream protocols may be changed via the input vectors.
-  // Address combinations are propagated from TestEnvironment::getIpVersionsForTest()
-  static std::vector<HttpProtocolTestParams>
-  getProtocolTestParams(const std::vector<Http::CodecType>& downstream_protocols =
-                            {
-                                Http::CodecType::HTTP1,
-                                Http::CodecType::HTTP2,
-                                Http::CodecType::HTTP3,
-                            },
-                        const std::vector<Http::CodecType>& upstream_protocols = {
-                            Http::CodecType::HTTP1,
-                            Http::CodecType::HTTP2,
-                            Http::CodecType::HTTP3,
-                        });
-
-  static std::vector<HttpProtocolTestParams> getProtocolTestParamsWithoutHTTP3() {
-    return getProtocolTestParams(
-        /*downstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
-        /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2});
-  }
-
-  // Allows pretty printed test names of the form
-  // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
-#if 0
-  static std::string
-  protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
-#endif
-
-  HttpProtocolIntegrationTestWithParams() {
-     // : HttpProtocolIntegrationTestWithParams(ConfigHelper::httpProxyConfig(
-            ASSERT(GetParam());
+    // Constructor when there are extra params.
+    template<std::enable_if<(sizeof...(T) > 0), bool> = true>
+    HttpProtocolIntegrationTestWithParams() : HttpProtocolIntegrationTestBase(std::get<0>(testing::TestWithParam<std::tuple<HttpProtocolTestParams, T...>>::GetParam())) {
     }
-            /*downstream_is_quic=GetParam().downstream_protocol == Http::CodecType::HTTP3)) {}*/
-#if 0
-  HttpProtocolIntegrationTestWithParams(const std::string config)
-      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, config),
-        use_universal_header_validator_(GetParam().use_universal_header_validator) {
-    setupHttp2ImplOverrides(GetParam().http2_implementation);
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
-                                      GetParam().use_universal_header_validator ? "true" : "false");
-  }
-
-  void SetUp() override {
-    setDownstreamProtocol(GetParam().downstream_protocol);
-    setUpstreamProtocol(GetParam().upstream_protocol);
-  }
-
-  void initialize() override {
-    if (async_lb_) {
-      config_helper_.setAsyncLb();
-    }
-    HttpIntegrationTest::initialize();
-  }
-
-  void setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
-  void setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
-
-protected:
-  const bool use_universal_header_validator_{false};
-  bool async_lb_ = true;
-#endif
-#endif
 };
+
+// Basic class used for testing without additional parameters.
+using HttpProtocolIntegrationTest = HttpProtocolIntegrationTestWithParams<>;
 
 class UpstreamDownstreamIntegrationTest
     : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool>>,

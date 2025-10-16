@@ -435,7 +435,7 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
 }
 
 
-class OutlierDetectionTemplateIntegrationTest : public HttpProtocolIntegrationTestWithParams<bool> {
+class OutlierDetectionTemplateIntegrationTest : public HttpProtocolIntegrationTestWithParams<std::tuple<bool, bool>> {
 public:
 #if 0
   void initialize() override { 
@@ -446,13 +446,18 @@ public:
 
 
 TEST_P(OutlierDetectionTemplateIntegrationTest, ClusterOverwriteGatewayErrors) {
-    ASSERT_TRUE(GetParam());
+    //ASSERT_FALSE(std::get<1>(GetParam()));
+    ASSERT_TRUE(std::get<1>(std::get<1>(GetParam())));
 }
 
 INSTANTIATE_TEST_SUITE_P(
     Protocols, OutlierDetectionTemplateIntegrationTest,
-    //testing::Combine(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3(), true),
-    testing::Values(true));
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()), 
+                     testing::Values(std::make_tuple(true, true), std::make_tuple(true, true))));
+    //testing::Values(std::make_tuple(
+      //      HttpProtocolTestParams{Network::Address::IpVersion::v4, Http::CodecType::HTTP2, Http::CodecType::HTTP2,
+       //                                          Http2Impl::Nghttp2, false}, true)));
+    //testing::Values(std::tuple<HttpProtocolTestParams, bool>(Http::CodecType::HTTP1, true)));
 
     //HttpProtocolIntegrationTest::protocolTestParamsToString);
 
