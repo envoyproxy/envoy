@@ -355,9 +355,9 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   for (const auto& gauge : snapshot.gauges()) {
     if (predicate_(gauge)) {
       auto metric_config_result = getMetricConfig(gauge.get());
-      if (metric_config_result.skip_conversion) {
+      if (metric_config_result.skip_conversion)
         continue;
-      }
+
       const std::string metric_name =
           getMetricName(gauge.get(), metric_config_result.conversion_action);
       auto attributes = getCombinedAttributes(gauge.get(), metric_config_result.conversion_action);
@@ -366,9 +366,9 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   }
   for (const auto& gauge : snapshot.hostGauges()) {
     auto metric_config_result = getMetricConfig(gauge);
-    if (metric_config_result.skip_conversion) {
+    if (metric_config_result.skip_conversion)
       continue;
-    }
+
     const std::string metric_name = getMetricName(gauge, metric_config_result.conversion_action);
     auto attributes = getCombinedAttributes(gauge, metric_config_result.conversion_action);
     aggregator.addGauge(metric_name, gauge.value(), attributes);
@@ -382,9 +382,9 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   for (const auto& counter : snapshot.counters()) {
     if (predicate_(counter.counter_)) {
       auto metric_config_result = getMetricConfig(counter.counter_.get());
-      if (metric_config_result.skip_conversion) {
+      if (metric_config_result.skip_conversion)
         continue;
-      }
+
       const std::string metric_name =
           getMetricName(counter.counter_.get(), metric_config_result.conversion_action);
       auto attributes =
@@ -395,9 +395,9 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   }
   for (const auto& counter : snapshot.hostCounters()) {
     auto metric_config_result = getMetricConfig(counter);
-    if (metric_config_result.skip_conversion) {
+    if (metric_config_result.skip_conversion)
       continue;
-    }
+
     const std::string metric_name = getMetricName(counter, metric_config_result.conversion_action);
     auto attributes = getCombinedAttributes(counter, metric_config_result.conversion_action);
     aggregator.addCounter(metric_name, counter.value(), counter.delta(), counter_temporality,
@@ -412,9 +412,9 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   for (const auto& histogram : snapshot.histograms()) {
     if (predicate_(histogram)) {
       auto metric_config_result = getMetricConfig(histogram.get());
-      if (metric_config_result.skip_conversion) {
+      if (metric_config_result.skip_conversion)
         continue;
-      }
+
       const std::string metric_name =
           getMetricName(histogram.get(), metric_config_result.conversion_action);
       auto attributes =
