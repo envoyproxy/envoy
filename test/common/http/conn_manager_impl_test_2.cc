@@ -1820,6 +1820,8 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   // Start the response without processing the request headers through all
   // filters.
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  ResponseHeaderMap* original_response_headers = response_headers.get();
+
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
@@ -1837,6 +1839,8 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   // The 500 goes directly to the encoder.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
+        // The new headers should overwrite the original headers.
+        EXPECT_NE(&headers, original_response_headers);
         // Make sure this is a 500
         EXPECT_EQ("500", headers.getStatusValue());
         // Make sure Envoy standard sanitization has been applied.
@@ -1848,6 +1852,10 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
   decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
   EXPECT_EQ("Internal Server Error", response_body);
+
+  // The active stream will keep the overwritten headers alive to avoid potential lifetime issues.
+  // Ensure the original headers are still valid.
+  EXPECT_EQ(original_response_headers->getStatusValue(), "200");
 
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
