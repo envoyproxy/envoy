@@ -189,7 +189,7 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
   case Envoy::AccessLog::AccessLogType::DownstreamEnd:
     // log called by AccessLogDownstreamStart will happen before doHeaders
     if (initRequest()) {
-      request_headers_ = const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders());
+      request_headers_ = const_cast<Http::RequestHeaderMap*>(log_context.requestHeaders().ptr());
     }
 
     if (request_headers_ != nullptr) {
@@ -204,14 +204,14 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
       decoding_state_.trailers = request_trailers_;
     }
 
-    activation_response_headers_ = &log_context.responseHeaders();
+    activation_response_headers_ = log_context.responseHeaders().ptr();
     if (activation_response_headers_ != nullptr) {
       resp_header_num = activation_response_headers_->size();
       resp_header_bytes = activation_response_headers_->byteSize();
       encoding_state_.headers = const_cast<Http::ResponseHeaderMap*>(activation_response_headers_);
     }
 
-    activation_response_trailers_ = &log_context.responseTrailers();
+    activation_response_trailers_ = log_context.responseTrailers().ptr();
     if (activation_response_trailers_ != nullptr) {
       resp_trailer_num = activation_response_trailers_->size();
       resp_trailer_bytes = activation_response_trailers_->byteSize();

@@ -17,6 +17,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
+#include "envoy/http/header_evaluator.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/router/path_matcher.h"
@@ -548,6 +549,16 @@ public:
    * @return true if host name should be suffixed with "-shadow".
    */
   virtual bool disableShadowHostSuffixAppend() const PURE;
+
+  /**
+   * @return the header evaluator for manipulating headers in mirrored requests.
+   */
+  virtual const Http::HeaderEvaluator& headerEvaluator() const PURE;
+
+  /**
+   * @return the literal value to rewrite the host header with, or empty if no rewrite.
+   */
+  virtual absl::string_view hostRewriteLiteral() const PURE;
 };
 
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;

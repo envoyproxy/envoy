@@ -185,6 +185,8 @@ public:
   Server::Configuration::ServerFactoryContext& serverFactoryContext() const override {
     return server_factory_context_;
   }
+  const std::string& requestIDHeader() const override { return request_id_header_; }
+  const std::string& requestIDMetadataKey() const override { return request_id_metadata_key_; }
 
 private:
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
@@ -194,6 +196,9 @@ private:
   std::string post_path_;
   // Request ID extension for tunneling requests. If null, no request ID is generated.
   Envoy::Http::RequestIDExtensionSharedPtr request_id_extension_;
+  // Optional overrides for request ID header name and metadata key.
+  std::string request_id_header_;
+  std::string request_id_metadata_key_;
   Stats::StatNameManagedStorage route_stat_name_storage_;
   const Router::FilterConfig router_config_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;

@@ -343,7 +343,7 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  envoy::extensions::filters::http::ext_authz::v3::CheckSettings checkSettings() const {
+  const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& checkSettings() const {
     return check_settings_;
   }
 
@@ -443,7 +443,7 @@ private:
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
     const bool skip_check_;
-    const envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
+    const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& check_settings_;
   };
   PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
 
