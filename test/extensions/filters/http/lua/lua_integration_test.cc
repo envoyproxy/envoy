@@ -27,7 +27,7 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
- void initializeFilter(const std::string& filter_config, const std::string& domain = "*",
+  void initializeFilter(const std::string& filter_config, const std::string& domain = "*",
                         bool test_large_body = false) {
     config_helper_.prependFilter(filter_config);
 
