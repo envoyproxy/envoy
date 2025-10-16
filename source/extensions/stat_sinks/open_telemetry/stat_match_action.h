@@ -80,7 +80,7 @@ public:
     return std::make_shared<SkipAction>(action_config);
   }
 
-  std::string name() const override { return "otlp_metric_drop_action_factory"; }
+  std::string name() const override { return "otlp_metric_skip_action_factory"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
