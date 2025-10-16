@@ -280,13 +280,16 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
 void ExtProcLoggingInfo::recordGrpcCall(
     std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
     ProcessorState::CallbackState callback_state,
-    envoy::config::core::v3::TrafficDirection traffic_direction) {
+    envoy::config::core::v3::TrafficDirection traffic_direction, bool continue_and_replace) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
 
   // Record the gRPC call stats for the header.
   if (callback_state == ProcessorState::CallbackState::HeadersCallback) {
     if (grpcCalls(traffic_direction).header_stats_ == nullptr) {
       grpcCalls(traffic_direction).header_stats_ = std::make_unique<GrpcCall>(latency, call_status);
+    }
+    if (continue_and_replace){
+      grpcCalls(traffic_direction).continue_and_replace_ = true;
     }
     return;
   }
@@ -316,6 +319,10 @@ void ExtProcLoggingInfo::recordGrpcCall(
       body_stats->min_latency_ = latency;
     }
   }
+}
+
+void ExtProcLoggingInfo::recordImmediateResponse(envoy::config::core::v3::TrafficDirection traffic_direction){
+  grpcCalls(traffic_direction).immediate_response_ = true;
 }
 
 ExtProcLoggingInfo::GrpcCalls&
@@ -1790,6 +1797,10 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   };
 
   sent_immediate_response_ = true;
+  if (logging_info_ != nullptr){
+    logging_info_->recordImmediateResponse(encoding_state_.trafficDirection());
+    logging_info_->recordImmediateResponse(decoding_state_.trafficDirection());
+  }
   ENVOY_STREAM_LOG(debug, "Sending local reply with status code {}", *decoder_callbacks_,
                    status_code);
   const auto details = StringUtil::replaceAllEmptySpace(response.details());
