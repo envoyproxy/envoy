@@ -37,7 +37,7 @@ message SinkConfig {
     repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
   }
 
-  // SkipAction is used to drop a stat when being converted to a metric.
+  // SkipAction is used to skip conversion for the matched stats.
   message SkipAction {
   }
 
