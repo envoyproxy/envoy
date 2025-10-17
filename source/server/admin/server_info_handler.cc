@@ -57,12 +57,15 @@ Http::Code ServerInfoHandler::handlerMemory(Http::ResponseHeaderMap& response_he
 Http::Code ServerInfoHandler::handleMemoryTcmallocStats(Http::ResponseHeaderMap& response_headers,
                                                         Buffer::Instance& response, AdminStream&) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
-  response.add(Memory::Stats::dumpStats());
-#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
-  return Http::Code::OK;
-#else
+  auto stats = Memory::Stats::dumpStats();
+
+  if (stats.has_value()) {
+    response.add(stats.value());
+    return Http::Code::OK;
+  }
+
+  response.add("Envoy was not built with tcmalloc.\n");
   return Http::Code::NotImplemented;
-#endif
 }
 
 Http::Code ServerInfoHandler::handlerReady(Http::ResponseHeaderMap&, Buffer::Instance& response,

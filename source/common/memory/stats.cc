@@ -107,7 +107,7 @@ void Stats::dumpStatsToLog() {
 #endif
 }
 
-std::string Stats::dumpStats() {
+absl::optional<std::string> Stats::dumpStats() {
 #if defined(TCMALLOC)
   return tcmalloc::MallocExtension::GetStats();
 #elif defined(GPERFTOOLS_TCMALLOC)
@@ -117,7 +117,7 @@ std::string Stats::dumpStats() {
   buffer.resize(strlen(buffer.c_str()));
   return buffer;
 #else
-  return "Envoy was not built with tcmalloc.";
+  return absl::nullopt;
 #endif
 }
 

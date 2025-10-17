@@ -66,9 +66,9 @@ public:
   static void dumpStatsToLog();
 
   /**
-   * Get detailed stats about current memory allocation.
+   * Get detailed stats about current memory allocation. Returns nullopt if not supported.
    */
-  static std::string dumpStats();
+  static absl::optional<std::string> dumpStats();
 };
 
 class AllocatorManager {
