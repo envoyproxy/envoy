@@ -702,7 +702,9 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, CredentialExpiration) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
   // 10 minutes - 60s grace period = 540 seconds
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::minutes(10)) - std::chrono::milliseconds(std::chrono::seconds(60)), nullptr))
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::minutes(10)) -
+                                       std::chrono::milliseconds(std::chrono::seconds(60)),
+                                   nullptr))
       .Times(2);
 
   // Kick off a refresh

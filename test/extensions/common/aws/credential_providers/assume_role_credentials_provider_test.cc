@@ -388,7 +388,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, ExpiredTokenException) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  // bad expiration format will cause a refresh of 1 hour - 60s grace period (3540 seconds) by default
+  // bad expiration format will cause a refresh of 1 hour - 60s grace period (3540 seconds) by
+  // default
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3540)), nullptr));
 
   // Kick off a refresh
@@ -432,7 +433,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, BadExpirationFormat) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  // bad expiration format will cause a refresh of 1 hour - 60s grace period (3540 seconds) by default
+  // bad expiration format will cause a refresh of 1 hour - 60s grace period (3540 seconds) by
+  // default
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3540)), nullptr));
 
   // Kick off a refresh
