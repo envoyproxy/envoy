@@ -259,7 +259,10 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   }
   const std::string node_id = node_it->second;
 
-  // Get cluster_id from fd_to_cluster_map_.
+  // Get cluster_id from fd_to_cluster_map_. We use thefd_to_cluster_map_ to get the cluster_id
+  // and not the cluster_to_node_info_map_ because the node might have changed clusters before the
+  // socket is marked dead, but the FD will always be tied to the same cluster in
+  // fd_to_cluster_map_.
   std::string cluster_id;
   auto cluster_it = fd_to_cluster_map_.find(fd);
   if (cluster_it == fd_to_cluster_map_.end()) {
