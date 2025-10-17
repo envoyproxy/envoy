@@ -43,7 +43,7 @@ new_features:
   change: |
     Supported dropping stats
     :ref:`DropAction
-    <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.SkipAction>` during custom metric conversion.
+    <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during custom metric conversion.
 - area: wasm
   change: |
     Added ``sign`` foreign function to create cryptographic signatures.
