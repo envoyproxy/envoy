@@ -48,5 +48,12 @@ new_features:
   change: |
     Added ``sign`` foreign function to create cryptographic signatures.
     See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
+- area: overload management
+  change: |
+    The fixed heap resource monitor can now calculate memory pressure as currently allocated memory divided by maximum heap size,
+    giving more accurate and lower memory pressure values.
+    This can avoid unnecessary load shedding or overload actions.
+    To enable, set ``envoy.reloadable_features.fixed_heap_use_allocated`` to true.
+    The default algorithm (heap_size - pageheap_unmapped - pageheap_free) does not discount for free memory in TCMalloc caches.
 
 deprecated:
