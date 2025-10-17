@@ -14,6 +14,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: lua
+  change: |
+    Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
+    larger payload (greater than the body buffer limit).
 - area: connection pool
   change: |
     Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
@@ -21,277 +25,26 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` and legacy code paths.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_cookie`` and legacy code paths.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
 
 new_features:
-- area: router
+- area: wasm
   change: |
-    Added :ref:`use_hash_policy <envoy_v3_api_field_config.route.v3.WeightedCluster.use_hash_policy>`
-    field to :ref:`WeightedCluster <envoy_v3_api_msg_config.route.v3.WeightedCluster>` to enable
-    route-level hash policies for weighted cluster selection. When set to ``true``,
-    the existing route-level :ref:`hash_policy
-    <envoy_v3_api_field_config.route.v3.RouteAction.hash_policy>`
-    will be used for consistent hashing between weighted clusters, ensuring that requests
-    with the same hash value (e.g., same session ID, user ID, etc.) will consistently be
-    routed to the same weighted cluster, enabling session affinity and consistent load
-    balancing behavior.
-- area: stats
-  change: |
-    Added support to remove unused metrics from memory for extensions that
-    support evictable metrics. This is done :ref:`periodically
-    <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_eviction_interval>`
-    during the metric flush.
-- area: tap
-  change: |
-    Added :ref:`record_upstream_connection <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_upstream_connection>`
-    to determine whether upstream connection information is recorded in the HTTP buffer trace output.
-- area: quic
-  change: |
-    Added new option to support :ref:`base64 encoded server ID
-    <envoy_v3_api_field_extensions.quic.connection_id_generator.quic_lb.v3.Config.server_id_base64_encoded>`
-    in QUIC-LB.
-- area: health_check
-  change: |
-    Added support for request payloads in HTTP health checks. The ``send`` field in ``HttpHealthCheck`` can now be
-    used to specify a request body to be sent during health checking. This feature supports both hex-encoded text
-    and binary payloads, similar to TCP health checks. The payload can only be used with HTTP methods that support
-    request bodies (``POST``, ``PUT``, ``PATCH``, ``OPTIONS``). Methods that must not have request bodies
-    (``GET``, ``HEAD``, ``DELETE``, ``TRACE``) are validated and will throw an error if combined with payloads.
-    The implementation is optimized to process the payload once during configuration and reuse it for all health
-    check requests. See :ref:`HttpHealthCheck <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
-- area: tcp_proxy
-  change: |
-    Added support for generating and propagating a request ID on synthesized upstream HTTP requests when tunneling requests.
-    It can be configured using :ref:`request_id_extension
-    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_extension>`.
-- area: http
-  change: |
-    Added support for per-route compressor library override in the HTTP compressor filter.
-    Routes can now specify a different compressor library (e.g., gzip, brotli) via the
-    :ref:`compressor_library <envoy_v3_api_field_extensions.filters.http.compressor.v3.CompressorOverrides.compressor_library>`
-    field in the per-route configuration. This allows different routes to use different
-    compression algorithms and settings while maintaining the same filter configuration.
-- area: router_check_tool
-  change: |
-    Added support for testing routes with :ref:`dynamic metadata matchers <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>`
-    in the router check tool. The tool now accepts a ``dynamic_metadata`` field in test input to set metadata
-    that can be matched by route configuration. This allows comprehensive testing of routes that depend on
-    dynamic metadata for routing decisions.
-- area: oauth2
-  change: |
-    Added :ref:`disable_token_encryption
-    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_token_encryption>` option to the OAuth2 filter to
-    store ID and access tokens without encryption when running in trusted environments.
-- area: lua
-  change: |
-    Added a new ``filterState()`` to ``streamInfo()`` which provides access to filter state objects stored during request processing.
-    This allows Lua scripts to retrieve string, boolean, and numeric values stored by various filters for use in routing decisions,
-    header modifications, and other processing logic. See :ref:`Filter State API <config_http_filters_lua_stream_info_filter_state_wrapper>`
-    for more details.
-- area: socket
-  change: |
-    Added ``network_namespace_filepath`` to :ref:`SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`. This field allows
-    specifying a Linux network namespace filepath for socket creation, enabling network isolation in containerized environments.
-- area: ratelimit
-  change: |
-    Added the :ref:`rate_limits
-    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits>`
-    field to generate rate limit descriptors. If this field is set, the
-    :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
-    :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields will be ignored. However,
-    :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
-    will take precedence over this field.
-- area: ratelimit
-  change: |
-    Enhanced the rate limit filter to support substitution formatters for descriptors that generated
-    at the stream complete phase. Before this change, substitution formatters at the stream complete
-    phase cannot work because rate limit filter does not provide the necessary context.
+    Added ``sign`` foreign function to create cryptographic signatures.
+    See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
 - area: redis
   change: |
     Added cluster-scope command support with flexible response handling framework.
-- area: observability
-  change: |
-    Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in production environments.
-- area: dns_filter, redis_proxy and prefix_matcher_map
-  change: |
-    Switch to using Radix Tree instead of Trie for performance improvements.
-- area: header_to_metadata
-  change: |
-    Added optional statistics collection for the Header-To-Metadata filter. When the :ref:`stat_prefix
-    <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.stat_prefix>` field is configured,
-    the filter emits detailed counters for rule processing, metadata operations, etc. See
-    :ref:`Header-To-Metadata filter statistics <config_http_filters_header_to_metadata>` for details.
-- area: load_reporting
-  change: |
-    Added support for endpoint-level load stats and metrics reporting. Locality load reports now include per
-    endpoint statistics and metrics, but only for endpoints with updated stats, optimizing report size and efficiency.
-- area: overload management
-  change: |
-    Added load shed point ``envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch``
-    that sends ``GOAWAY`` and closes connections for HTTP/2 server processing of requests. When
-    a ``GOAWAY`` frame is submitted by this load shed point, the counter ``http2.goaway_sent`` will be
-    incremented.
-- area: router
-  change: |
-    Added :ref:`request_body_buffer_limit
-    <envoy_v3_api_field_config.route.v3.VirtualHost.request_body_buffer_limit>` and
-    :ref:`request_body_buffer_limit
-    <envoy_v3_api_field_config.route.v3.Route.request_body_buffer_limit>` configuration fields
-    to enable buffering of large request bodies beyond connection buffer limits.
-- area: otlp_stat_sink
-  change: |
-    Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
-    :ref:`resource_detectors <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors>`.
-- area: otlp_stat_sink
-  change: |
-    Added support for :ref:`custom_metric_conversions
-    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.custom_metric_conversions>`. This allows renaming stats,
-    adding static labels, and aggregating multiple stats into generated metrics.
-- area: lua
-  change: |
-    Added ``virtualHost()`` to the Stream handle API, allowing Lua scripts to retrieve virtual host information. So far, the only method
-    implemented is ``metadata()``, allowing Lua scripts to access virtual host metadata scoped to the specific filter name. See
-    :ref:`Virtual host object API <config_http_filters_lua_virtual_host_wrapper>` for more details.
-- area: ext_authz
-  change: |
-    Added support for per-route gRPC service override in the ``ext_authz`` HTTP filter. This allows different routes
-    to use different external authorization backends by configuring a
-    :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.grpc_service>`
-    in the per-route ``check_settings``. Routes without this configuration continue to use the default
-    authorization service.
-- area: ext_proc
-  change: |
-    Added :ref:`status_on_error <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.status_on_error>`
-    to the ``ext_proc`` HTTP filter. This allows configuring the HTTP status code returned to the downstream
-    client when communication with the external processor fails (e.g., gRPC error). Previously, these cases returned a
-    fixed ``500``.
-- area: ext_proc
-  change: |
-    Introduced a new
-    :ref:`ProcessingRequestModifier <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_request_modifier>`
-    config and corresponding interface to enable modifying the ``ProcessingRequest`` before it is sent on the wire. Sample use cases include
-    modifying attribute and metadata keys to abstract away filter details. If the config is not set, then there is no behavior change.
-    Supports per-route overrides.
-- area: tracing
-  change: |
-    Added :ref:`trace_context_option <envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_context_option>` enum
-    in the Zipkin tracer config. When set to ``USE_B3_WITH_W3C_PROPAGATION``, the tracer will:
-    extract trace information from W3C trace headers when B3 headers are not present (downstream),
-    and inject both B3 and W3C trace headers for upstream requests to maximize compatibility.
-    The default value ``USE_B3`` maintains backward compatibility with B3-only behavior.
-- area: tracing
-  change: |
-    Enhanced Zipkin tracer with advanced collector configuration via
-    :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`
-    using ``HttpService``. New features include:
-
-    #. **Custom HTTP Headers**: Add headers to collector requests for custom metadata, service identification,
-       and collector-specific routing.
-
-    #. **Full URI Parsing**: The ``uri`` field now supports both path-only (``/api/v2/spans``) and
-       full URI formats (``https://zipkin-collector.example.com/api/v2/spans``). When using full URIs,
-       Envoy automatically extracts hostname and path components - hostname sets the HTTP ``Host`` header,
-       and path sets the request path. Path-only URIs fall back to using the cluster name as the hostname.
-
-    When configured, ``collector_service`` takes precedence over legacy configuration fields (``collector_cluster``,
-    ``collector_endpoint``, ``collector_hostname``), which will be deprecated in a future release. Legacy configuration
-    does not support custom headers or URI parsing.
-- area: composite
-  change: |
-    Allow the composite filter to be configured to insert a filter into the filter chain outside of the decode headers lifecycle phase.
-- area: rbac
-  change: |
-    Switched the IP matcher to use LC-Trie for performance improvements.
-- area: tls_inspector
-  change: |
-    Added dynamic metadata when failing to parse the ``ClientHello``.
-- area: matching
-  change: |
-    Added :ref:`NetworkNamespaceInput
-    <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.NetworkNamespaceInput>` to the
-    matcher framework. This input returns the listener address's ``network_namespace_filepath``
-    for use with :ref:`filter_chain_matcher
-    <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`, enabling filter chain
-    selection based on the Linux network namespace of the bound socket. On non-Linux platforms,
-    the input returns an empty value and connections use the default filter chain.
-- area: rbac
-  change: |
-    Enabled use of :ref:`NetworkNamespaceInput
-    <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.NetworkNamespaceInput>` in the
-    network RBAC filter's matcher. This allows RBAC policies to evaluate the Linux network namespace
-    of the listening socket via the generic matcher API.
-- area: lua
-  change: |
-    Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method
-    implemented is ``metadata()``, allowing Lua scripts to access route metadata scoped to the specific filter name. See
-    :ref:`Route object API <config_http_filters_lua_route_wrapper>` for more details.
-- area: cel
-  change: |
-    Added a new ``%TYPED_CEL%`` formatter command that, unlike ``%CEL%``, can output non-string values (number, boolean, null, etc.)
-    when used in formatting contexts that accept non-string values, such as
-    :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`. The new command is introduced
-    so as to not break compatibility with the existing command's behavior.
-- area: rbac
-  change: |
-    Enabled use of :ref:`NetworkNamespaceInput
-    <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.NetworkNamespaceInput>` in the
-    network and HTTP RBAC filters' matchers. This allows RBAC policies to evaluate the Linux network
-    namespace of the listening socket via the generic matcher API.
-- area: dynamic_modules
-  change: |
-    Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under ``dynamic_modules`` ID.
-    In the Rust SDK, they are available as ``envoy_log_info``, etc.
-- area: http
-  change: |
-    Added ``upstream_rq_per_cx`` histogram to track requests per connection for monitoring connection reuse efficiency.
-- area: http
-  change: |
-    Added
-    :ref:`stream_flush_timeout
-    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`
-    to allow for configuring a stream flush timeout independently from the stream idle timeout.
-- area: http
-  change: |
-    Added support for header removal based on header key matching. The new
-    :ref:`remove_on_match <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove_on_match>`
-    allows removing headers that match a specified key pattern. This enables more flexible and
-    dynamic header manipulation based on header names.
-- area: geoip
-  change: |
-    Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.
-    This can be used to monitor the freshness of the databases currently in use by the filter.
-    See `MaxMind-DB build_epoch <https://maxmind.github.io/MaxMind-DB/#build_epoch>`_ for more details.
-- area: overload management
-  change: |
-    Added a new scaled timer type ``HttpDownstreamStreamFlush`` to the overload manager. This allows
-    Envoy to scale the periodic timer for flushing downstream responses based on resource pressure.
-    The new timer can be configured via the
-    :ref:`ScaleTimersOverloadActionConfig <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>`.
-- area: thrift
-  change: |
-    Support :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
-    to extract specified fields in thrift body for thrift_to_metadata http filter.
-- area: dynamic_modules
-  change: |
-    Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.
-- area: dns_resolver
-  change: |
-    Added :ref:`max_udp_channel_duration
-    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
-    configuration field to the c-ares DNS resolver. This allows periodic refresh of the UDP channel
-    to help avoid stale socket states and provide better load distribution across UDP ports.
-- area: tcp_proxy
-  change: |
-    Added ``max_downstream_connection_duration_jitter_percentage`` to allow adding a jitter to the max downstream connection duration.
-    This can be used to avoid thundering herd problems with many clients being disconnected and possibly reconnecting at the same time.
-- area: http
-  change: |
-    Added ``setUpstreamOverrideHost`` method to AsyncClient StreamOptions to enable direct host routing
-    that bypasses load balancer selection.
 
 deprecated:
