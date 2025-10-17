@@ -74,8 +74,10 @@ constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_c
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
 constexpr absl::string_view ImmediateResonseField = "immediate_response";
-constexpr absl::string_view RequestHeaderContinueAndReplaceField = "request_header_continue_and_replace";
-constexpr absl::string_view ResponseHeaderContinueAndReplaceField = "response_header_continue_and_replace";
+constexpr absl::string_view RequestHeaderContinueAndReplaceField =
+    "request_header_continue_and_replace";
+constexpr absl::string_view ResponseHeaderContinueAndReplaceField =
+    "response_header_continue_and_replace";
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -280,10 +282,11 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
 }
 
-void ExtProcLoggingInfo::recordGrpcCall(
-    std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
-    ProcessorState::CallbackState callback_state,
-    envoy::config::core::v3::TrafficDirection traffic_direction, bool continue_and_replace) {
+void ExtProcLoggingInfo::recordGrpcCall(std::chrono::microseconds latency,
+                                        Grpc::Status::GrpcStatus call_status,
+                                        ProcessorState::CallbackState callback_state,
+                                        envoy::config::core::v3::TrafficDirection traffic_direction,
+                                        bool continue_and_replace) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
 
   // Record the gRPC call stats for the header.
@@ -291,7 +294,7 @@ void ExtProcLoggingInfo::recordGrpcCall(
     if (grpcCalls(traffic_direction).header_stats_ == nullptr) {
       grpcCalls(traffic_direction).header_stats_ = std::make_unique<GrpcCall>(latency, call_status);
     }
-    if (continue_and_replace){
+    if (continue_and_replace) {
       grpcCalls(traffic_direction).continue_and_replace_ = true;
     }
     return;
@@ -397,8 +400,7 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<double>(bytes_sent_));
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
-  (*struct_msg->mutable_fields())[ImmediateResonseField].set_bool_value(
-      immediate_response_);
+  (*struct_msg->mutable_fields())[ImmediateResonseField].set_bool_value(immediate_response_);
   (*struct_msg->mutable_fields())[RequestHeaderContinueAndReplaceField].set_bool_value(
       decoding_processor_grpc_calls_.continue_and_replace_);
   (*struct_msg->mutable_fields())[ResponseHeaderContinueAndReplaceField].set_bool_value(
@@ -507,13 +509,13 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == BytesReceivedField) {
     return static_cast<int64_t>(bytes_received_);
   }
-  if (field_name == ImmediateResonseField){
+  if (field_name == ImmediateResonseField) {
     return bool(immediate_response_);
   }
-  if (field_name == RequestHeaderContinueAndReplaceField){
+  if (field_name == RequestHeaderContinueAndReplaceField) {
     return bool(decoding_processor_grpc_calls_.continue_and_replace_);
   }
-  if (field_name == ResponseHeaderContinueAndReplaceField){
+  if (field_name == ResponseHeaderContinueAndReplaceField) {
     return bool(encoding_processor_grpc_calls_.continue_and_replace_);
   }
   return {};
@@ -1811,7 +1813,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   };
 
   sent_immediate_response_ = true;
-  if (logging_info_ != nullptr){
+  if (logging_info_ != nullptr) {
     logging_info_->setImmediateResponse();
   }
   ENVOY_STREAM_LOG(debug, "Sending local reply with status code {}", *decoder_callbacks_,

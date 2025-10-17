@@ -96,8 +96,9 @@ public:
 
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
-                      envoy::config::core::v3::TrafficDirection traffic_direction, bool continue_and_replace = false);
-  void setImmediateResponse(){immediate_response_ = true;};
+                      envoy::config::core::v3::TrafficDirection traffic_direction,
+                      bool continue_and_replace = false);
+  void setImmediateResponse() { immediate_response_ = true; };
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
