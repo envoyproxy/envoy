@@ -64,7 +64,7 @@ protected:
     EXPECT_EQ(socket_manager_->accepted_reverse_connections_.size(), 0);
     EXPECT_EQ(socket_manager_->fd_to_node_map_.size(), 0);
     EXPECT_EQ(socket_manager_->node_to_cluster_map_.size(), 0);
-    EXPECT_EQ(socket_manager_->cluster_to_node_map_.size(), 0);
+    EXPECT_EQ(socket_manager_->cluster_to_node_info_map_.size(), 0);
   }
 
   bool verifyFDToNodeMap(int fd) {
@@ -104,15 +104,15 @@ protected:
   }
 
   std::vector<std::string> getClusterToNodeMapping(const std::string& cluster_id) {
-    auto it = socket_manager_->cluster_to_node_map_.find(cluster_id);
-    if (it == socket_manager_->cluster_to_node_map_.end()) {
+    auto it = socket_manager_->cluster_to_node_info_map_.find(cluster_id);
+    if (it == socket_manager_->cluster_to_node_info_map_.end()) {
       return {};
     }
-    return it->second;
+    return it->second.nodes;
   }
 
   size_t getNodeToClusterMapSize() { return socket_manager_->node_to_cluster_map_.size(); }
-  size_t getClusterToNodeMapSize() { return socket_manager_->cluster_to_node_map_.size(); }
+  size_t getClusterToNodeMapSize() { return socket_manager_->cluster_to_node_info_map_.size(); }
   size_t getAcceptedReverseConnectionsSize() {
     return socket_manager_->accepted_reverse_connections_.size();
   }
@@ -120,7 +120,7 @@ protected:
   // Helper methods for the new test cases.
   void addNodeToClusterMapping(const std::string& node_id, const std::string& cluster_id) {
     socket_manager_->node_to_cluster_map_[node_id] = cluster_id;
-    socket_manager_->cluster_to_node_map_[cluster_id].push_back(node_id);
+    socket_manager_->cluster_to_node_info_map_[cluster_id].nodes.push_back(node_id);
   }
 
   void addFDToNodeMapping(int fd, const std::string& node_id) {
@@ -315,41 +315,6 @@ TEST_F(TestUpstreamSocketManager, AddAndGetSocketsMultipleNodes) {
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node2), 0);
 }
 
-TEST_F(TestUpstreamSocketManager, TestGetNodeID) {
-  const std::string node_id = "test-node";
-  const std::string cluster_id = "test-cluster";
-  const std::chrono::seconds ping_interval(30);
-
-  auto socket1 = createMockSocket(123);
-  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket1), ping_interval);
-
-  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node_id), 1);
-  EXPECT_EQ(getNodeToClusterMapping(node_id), cluster_id);
-
-  // Key is a cluster ID with idle connections. This should return the node ID.
-  std::string result_for_cluster = socket_manager_->getNodeID(cluster_id);
-  EXPECT_EQ(result_for_cluster, node_id);
-
-  // Key is a node ID. This should return it as-is.
-  std::string result_for_node = socket_manager_->getNodeID(node_id);
-  EXPECT_EQ(result_for_node, node_id);
-
-  // Key doesn't exist. This should return it as-is.
-  const std::string non_existent_cluster = "non-existent-cluster";
-  std::string result_for_non_existent = socket_manager_->getNodeID(non_existent_cluster);
-  EXPECT_EQ(result_for_non_existent, non_existent_cluster);
-
-  // Key is a cluster ID but no nodes have idle connections.
-  // Retrieve the only socket, making the node have no idle connections.
-  auto retrieved_socket = socket_manager_->getConnectionSocket(node_id);
-  EXPECT_NE(retrieved_socket, nullptr);
-  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node_id), 0);
-
-  // getNodeID with cluster_id should return cluster_id as-is since no nodes have idle connections.
-  std::string result_for_cluster_no_idle = socket_manager_->getNodeID(cluster_id);
-  EXPECT_EQ(result_for_cluster_no_idle, cluster_id);
-}
-
 TEST_F(TestUpstreamSocketManager, GetConnectionSocketEmpty) {
   auto socket = socket_manager_->getConnectionSocket("non-existent-node");
   EXPECT_EQ(socket, nullptr);
@@ -374,64 +339,6 @@ TEST_F(TestUpstreamSocketManager, CleanStaleNodeEntryWithActiveSockets) {
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node_id), 2);
   EXPECT_EQ(getNodeToClusterMapping(node_id), cluster_id);
   EXPECT_EQ(getClusterToNodeMapping(cluster_id).size(), 1);
-}
-
-TEST_F(TestUpstreamSocketManager, CleanStaleNodeEntryClusterCleanup) {
-  auto socket1 = createMockSocket(123);
-  auto socket2 = createMockSocket(456);
-  auto socket3 = createMockSocket(789);
-  const std::string node1 = "node1";
-  const std::string node2 = "node2";
-  const std::string cluster_id = "shared-cluster";
-  const std::chrono::seconds ping_interval(30);
-
-  socket_manager_->addConnectionSocket(node1, cluster_id, std::move(socket1), ping_interval);
-  // Add two sockets for node2 to test the cleanStaleNodeEntry logic.
-  socket_manager_->addConnectionSocket(node2, cluster_id, std::move(socket2), ping_interval);
-  socket_manager_->addConnectionSocket(node2, cluster_id, std::move(socket3), ping_interval);
-
-  EXPECT_EQ(getNodeToClusterMapping(node1), cluster_id);
-  EXPECT_EQ(getNodeToClusterMapping(node2), cluster_id);
-  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node2), 2);
-  auto cluster_nodes = getClusterToNodeMapping(cluster_id);
-  EXPECT_EQ(cluster_nodes.size(), 2);
-  EXPECT_EQ(getClusterToNodeMapSize(), 1);
-
-  auto retrieved_socket1 = socket_manager_->getConnectionSocket(node1);
-  EXPECT_NE(retrieved_socket1, nullptr);
-
-  EXPECT_EQ(getNodeToClusterMapping(node1), "");
-  EXPECT_EQ(getNodeToClusterMapping(node2), cluster_id);
-  cluster_nodes = getClusterToNodeMapping(cluster_id);
-  EXPECT_EQ(cluster_nodes.size(), 1);
-  EXPECT_EQ(cluster_nodes[0], node2);
-  EXPECT_EQ(getClusterToNodeMapSize(), 1);
-
-  // Pop the first socket for node2. Since there's still 1 socket left,.
-  // cleanStaleNodeEntry should not be called yet.
-  auto retrieved_socket2 = socket_manager_->getConnectionSocket(node2);
-  EXPECT_NE(retrieved_socket2, nullptr);
-
-  // Verify that node2 mappings are still present.
-  EXPECT_EQ(getNodeToClusterMapping(node2), cluster_id);
-  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node2), 1);
-  cluster_nodes = getClusterToNodeMapping(cluster_id);
-  EXPECT_EQ(cluster_nodes.size(), 1);
-  EXPECT_EQ(cluster_nodes[0], node2);
-  EXPECT_EQ(getClusterToNodeMapSize(), 1);
-
-  // Now pop the last socket for node2. This should trigger cleanStaleNodeEntry.
-  // and remove all cluster/node mappings.
-  auto retrieved_socket3 = socket_manager_->getConnectionSocket(node2);
-  EXPECT_NE(retrieved_socket3, nullptr);
-
-  // Verify that node2 mappings have been cleaned up now.
-  EXPECT_EQ(getNodeToClusterMapping(node1), "");
-  EXPECT_EQ(getNodeToClusterMapping(node2), "");
-  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node2), 0);
-  cluster_nodes = getClusterToNodeMapping(cluster_id);
-  EXPECT_EQ(cluster_nodes.size(), 0);
-  EXPECT_EQ(getClusterToNodeMapSize(), 0);
 }
 
 TEST_F(TestUpstreamSocketManager, FileEventAndTimerCleanup) {
@@ -853,27 +760,273 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadClusterFallbackLogic) {
   EXPECT_TRUE(verifyFDToNodeMap(123));
   EXPECT_TRUE(verifyFDToClusterMap(123));
 
-  // Mark one idle socket dead. This should use fd_to_cluster_map_.
-  // Node-to-cluster mapping should still exist since socket 789 is still in the pool.
+  // Mark one idle socket dead.
+  // Node-to-cluster mapping should still exist since socket 789 is idle and socket 123 is used.
   socket_manager_->markSocketDead(456);
   EXPECT_FALSE(verifyFDToNodeMap(456));
   EXPECT_FALSE(verifyFDToClusterMap(456));
   EXPECT_EQ(getNodeToClusterMapping(node_id), cluster_id);
 
-  // Mark the last idle socket dead. This will trigger cleanStaleNodeEntry.
-  // since the idle pool becomes empty.
+  // Mark the last idle socket dead.
+  // Node-to-cluster mapping should still exist because there's a used socket (123).
   socket_manager_->markSocketDead(789);
   EXPECT_FALSE(verifyFDToNodeMap(789));
   EXPECT_FALSE(verifyFDToClusterMap(789));
+  EXPECT_EQ(getNodeToClusterMapping(node_id), cluster_id);
 
-  // Node-to-cluster mapping is now cleared because idle pool is empty.
-  EXPECT_EQ(getNodeToClusterMapping(node_id), "");
-
-  // Mark the used socket dead. The fd_to_cluster_map_[123] should be found and used.
-  // This tests the primary path where fd_to_cluster_map_ is preferred.
+  // Mark the used socket dead. This is the last socket for the cluster, so cleanStaleNodeEntry
+  // should be called.
   socket_manager_->markSocketDead(123);
   EXPECT_FALSE(verifyFDToNodeMap(123));
   EXPECT_FALSE(verifyFDToClusterMap(123));
+
+  // Now all sockets are dead, so node-to-cluster mapping should be cleaned up.
+  EXPECT_EQ(getNodeToClusterMapping(node_id), "");
+  auto cluster_nodes = getClusterToNodeMapping(cluster_id);
+  EXPECT_EQ(cluster_nodes.size(), 0);
+}
+
+// getNodeWithSocket tests.
+TEST_F(TestUpstreamSocketManager, GetNodeWithSocketClusterRoundRobin) {
+  const std::string node1 = "test-node-1";
+  const std::string node2 = "test-node-2";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Add 2 sockets for node1 and 1 socket for node2, both in the same cluster.
+  auto socket1_node1 = createMockSocket(123);
+  auto socket2_node1 = createMockSocket(456);
+  auto socket1_node2 = createMockSocket(789);
+
+  socket_manager_->addConnectionSocket(node1, cluster_id, std::move(socket1_node1), ping_interval);
+  socket_manager_->addConnectionSocket(node1, cluster_id, std::move(socket2_node1), ping_interval);
+  socket_manager_->addConnectionSocket(node2, cluster_id, std::move(socket1_node2), ping_interval);
+
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node1), 2);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node2), 1);
+
+  // First call to getNodeWithSocket should return node1 (first in round-robin).
+  std::string result1 = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result1, node1);
+
+  // Use up one socket for node1 (now node1 has 1 idle, 1 used).
+  auto retrieved_socket1 = socket_manager_->getConnectionSocket(node1);
+  EXPECT_NE(retrieved_socket1, nullptr);
+
+  // Second call to getNodeWithSocket should return node2 (next in round-robin).
+  std::string result2 = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result2, node2);
+
+  // Use up the socket for node2 (now node2 has 0 idle, 1 used).
+  auto retrieved_socket2 = socket_manager_->getConnectionSocket(node2);
+  EXPECT_NE(retrieved_socket2, nullptr);
+
+  // State: node1: 1 idle, 1 used; node2: 0 idle, 1 used.
+  // Verify cluster-node mappings are still present.
+  auto cluster_nodes = getClusterToNodeMapping(cluster_id);
+  EXPECT_EQ(cluster_nodes.size(), 2);
+  EXPECT_EQ(getNodeToClusterMapping(node1), cluster_id);
+  EXPECT_EQ(getNodeToClusterMapping(node2), cluster_id);
+
+  // Mark node1's used socket dead (FD 123).
+  socket_manager_->markSocketDead(123);
+
+  // Verify cluster-node mappings are still present (node1 still has 1 idle socket).
+  cluster_nodes = getClusterToNodeMapping(cluster_id);
+  EXPECT_EQ(cluster_nodes.size(), 2);
+  EXPECT_EQ(getNodeToClusterMapping(node1), cluster_id);
+
+  // Third call to getNodeWithSocket should return node1 (continues round-robin).
+  std::string result3 = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result3, node1);
+
+  // Use up the last idle socket for node1 (now node1 has 0 idle, 1 used).
+  auto retrieved_socket3 = socket_manager_->getConnectionSocket(node1);
+  EXPECT_NE(retrieved_socket3, nullptr);
+
+  // Mark it dead immediately.
+  socket_manager_->markSocketDead(456);
+
+  // Node1 now has no sockets, so it should be removed from cluster mappings.
+  cluster_nodes = getClusterToNodeMapping(cluster_id);
+  EXPECT_EQ(cluster_nodes.size(), 1);
+  EXPECT_EQ(cluster_nodes[0], node2);
+  EXPECT_EQ(getNodeToClusterMapping(node1), "");
+
+  // Fourth call to getNodeWithSocket should return node2 (only node left).
+  std::string result4 = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result4, node2);
+
+  // Mark node2's socket dead (FD 789).
+  socket_manager_->markSocketDead(789);
+
+  // All nodes are gone, cluster should be empty.
+  cluster_nodes = getClusterToNodeMapping(cluster_id);
+  EXPECT_EQ(cluster_nodes.size(), 0);
+  EXPECT_EQ(getNodeToClusterMapping(node2), "");
+
+  // Fifth call to getNodeWithSocket should return cluster_id as-is (no nodes in cluster).
+  std::string result5 = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result5, cluster_id);
+}
+
+TEST_F(TestUpstreamSocketManager, GetNodeWithSocketNodeIdLookup) {
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  auto socket1 = createMockSocket(123);
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket1), ping_interval);
+
+  // Key is a node ID. This should return it as-is.
+  std::string result_for_node = socket_manager_->getNodeWithSocket(node_id);
+  EXPECT_EQ(result_for_node, node_id);
+
+  // Key doesn't exist in cluster map. This should return it as-is.
+  const std::string non_existent_cluster = "non-existent-cluster";
+  std::string result_for_non_existent = socket_manager_->getNodeWithSocket(non_existent_cluster);
+  EXPECT_EQ(result_for_non_existent, non_existent_cluster);
+}
+
+// Test getNodeWithSocket with mixed calls with cluster ID and node ID.
+TEST_F(TestUpstreamSocketManager, GetNodeWithSocketComprehensiveMixedCalls) {
+  const std::string node1 = "test-node-1";
+  const std::string node2 = "test-node-2";
+  const std::string node3 = "test-node-3";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Initial state: Add sockets for 3 nodes in the same cluster.
+  auto socket1_node1 = createMockSocket(100);
+  auto socket2_node1 = createMockSocket(101);
+  auto socket1_node2 = createMockSocket(200);
+  auto socket1_node3 = createMockSocket(300);
+
+  socket_manager_->addConnectionSocket(node1, cluster_id, std::move(socket1_node1), ping_interval);
+  socket_manager_->addConnectionSocket(node1, cluster_id, std::move(socket2_node1), ping_interval);
+  socket_manager_->addConnectionSocket(node2, cluster_id, std::move(socket1_node2), ping_interval);
+  socket_manager_->addConnectionSocket(node3, cluster_id, std::move(socket1_node3), ping_interval);
+
+  // State: node1: 2 idle, node2: 1 idle, node3: 1 idle.
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node1), 2);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node2), 1);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node3), 1);
+
+  // Call with cluster_id should return node1 (first in round-robin).
+  std::string result = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result, node1);
+
+  // Call with node1 should return node1 as-is.
+  result = socket_manager_->getNodeWithSocket(node1);
+  EXPECT_EQ(result, node1);
+
+  // Call with node2 should return node2 as-is.
+  result = socket_manager_->getNodeWithSocket(node2);
+  EXPECT_EQ(result, node2);
+
+  // Use up one socket for node1 (state: node1: 1 idle, 1 used).
+  auto used_socket1 = socket_manager_->getConnectionSocket(node1);
+  EXPECT_NE(used_socket1, nullptr);
+
+  // Call with cluster_id should return node2 (next in round-robin).
+  result = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result, node2);
+
+  // Call with non-existent cluster should return it as-is.
+  result = socket_manager_->getNodeWithSocket("non-existent-cluster");
+  EXPECT_EQ(result, "non-existent-cluster");
+
+  // Use up socket for node2 (state: node2: 0 idle, 1 used).
+  auto used_socket2 = socket_manager_->getConnectionSocket(node2);
+  EXPECT_NE(used_socket2, nullptr);
+
+  // Call with cluster_id should return node3 (next in round-robin).
+  result = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result, node3);
+
+  // Call with node2 (which has only used socket) should still return node2 as-is.
+  result = socket_manager_->getNodeWithSocket(node2);
+  EXPECT_EQ(result, node2);
+
+  // Mark node3's idle socket dead (FD 300).
+  socket_manager_->markSocketDead(300);
+
+  // State: node1: 1 idle, 1 used; node2: 0 idle, 1 used; node3: removed.
+  // Call with cluster_id should return node1 (wraps around in round-robin).
+  result = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result, node1);
+
+  // Verify node3 is removed from cluster.
+  auto cluster_nodes = getClusterToNodeMapping(cluster_id);
+  EXPECT_EQ(cluster_nodes.size(), 2);
+
+  // Call with node3 (which is now removed) should return node3 as-is.
+  result = socket_manager_->getNodeWithSocket(node3);
+  EXPECT_EQ(result, node3);
+
+  // Use up node1's last idle socket (state: node1: 0 idle, 2 used).
+  auto used_socket3 = socket_manager_->getConnectionSocket(node1);
+  EXPECT_NE(used_socket3, nullptr);
+
+  // Call with cluster_id should return node2 (next in round-robin, skips node1 as it cycles).
+  result = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result, node2);
+
+  // Call with cluster_id again should return node1 (continues round-robin).
+  result = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result, node1);
+
+  // Both nodes still have used sockets, so cluster should have both.
+  cluster_nodes = getClusterToNodeMapping(cluster_id);
+  EXPECT_EQ(cluster_nodes.size(), 2);
+
+  // Mark node1's first used socket dead (FD 100).
+  socket_manager_->markSocketDead(100);
+
+  // State: node1: 0 idle, 1 used; node2: 0 idle, 1 used.
+  // Call with cluster_id should return node2 (next in round-robin).
+  result = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result, node2);
+
+  // Verify both nodes still in cluster.
+  cluster_nodes = getClusterToNodeMapping(cluster_id);
+  EXPECT_EQ(cluster_nodes.size(), 2);
+
+  // Mark node1's last socket dead (FD 101).
+  socket_manager_->markSocketDead(101);
+
+  // State: node1: removed; node2: 0 idle, 1 used.
+  // Verify node1 is removed from cluster.
+  cluster_nodes = getClusterToNodeMapping(cluster_id);
+  EXPECT_EQ(cluster_nodes.size(), 1);
+  EXPECT_EQ(cluster_nodes[0], node2);
+
+  // Call with cluster_id should return node2 (only node left).
+  result = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result, node2);
+
+  // Call with node1 (which is removed) should still return node1 as-is.
+  result = socket_manager_->getNodeWithSocket(node1);
+  EXPECT_EQ(result, node1);
+
+  // Mark node2's last socket dead (FD 200).
+  socket_manager_->markSocketDead(200);
+
+  // State: All nodes removed, cluster is empty.
+  cluster_nodes = getClusterToNodeMapping(cluster_id);
+  EXPECT_EQ(cluster_nodes.size(), 0);
+
+  // Call with cluster_id should return cluster_id as-is (no nodes in cluster).
+  result = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_EQ(result, cluster_id);
+
+  // Call with node1 should still return node1 as-is.
+  result = socket_manager_->getNodeWithSocket(node1);
+  EXPECT_EQ(result, node1);
+
+  // Call with node2 should still return node2 as-is.
+  result = socket_manager_->getNodeWithSocket(node2);
+  EXPECT_EQ(result, node2);
 }
 
 // Socket Rebalancing Tests.
