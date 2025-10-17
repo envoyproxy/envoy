@@ -123,7 +123,7 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   ENVOY_LOG(trace, "reverse_tunnel: adding mapping node {} -> cluster {}.", node_id, cluster_id);
   if (node_to_cluster_map_.find(node_id) == node_to_cluster_map_.end()) {
     node_to_cluster_map_[node_id] = cluster_id;
-    cluster_to_node_map_[cluster_id].push_back(node_id);
+    cluster_to_node_info_map_[cluster_id].nodes.push_back(node_id);
   }
 
   fd_to_node_map_[fd] = node_id;
@@ -204,44 +204,49 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
   fd_to_event_map_.erase(fd);
   fd_to_timer_map_.erase(fd);
 
-  // Clean up node-to-cluster mappings if this was the last idle socket for the node.
-  // We can safely clean up now because we track cluster_id per FD in fd_to_cluster_map_,.
-  // which will be used if the socket dies later.
-  if (node_sockets_it->second.empty()) {
-    cleanStaleNodeEntry(node_id);
-  }
-
   return socket;
 }
 
-std::string UpstreamSocketManager::getNodeID(const std::string& key) {
-  ENVOY_LOG(trace, "reverse_tunnel: getNodeID() called with key: {}.", key);
+std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
+  ENVOY_LOG(trace, "reverse_tunnel: getNodeWithSocket() called with key: {}.", key);
 
-  // Check if key exists as a cluster ID by looking at cluster_to_node_map_.
-  auto cluster_nodes_it = cluster_to_node_map_.find(key);
-  if (cluster_nodes_it != cluster_to_node_map_.end()) {
-    // Key is a cluster ID, find a node in this cluster with idle connections.
-    for (const std::string& node_id : cluster_nodes_it->second) {
-      auto node_sockets_it = accepted_reverse_connections_.find(node_id);
-      if (node_sockets_it != accepted_reverse_connections_.end() &&
-          !node_sockets_it->second.empty()) {
-        // Found a node in this cluster with idle connections.
-        ENVOY_LOG(debug,
-                  "reverse_tunnel: key '{}' is a cluster ID; returning node {} "
-                  "with {} idle connections.",
-                  key, node_id, node_sockets_it->second.size());
-        return node_id;
-      }
-    }
-    ENVOY_LOG(debug,
-              "reverse_tunnel: key '{}' is a cluster ID but no nodes have "
-              "idle connections; returning as-is.",
-              key);
+  // Check if key exists as a cluster ID by looking at cluster_to_node_info_map_.
+  auto cluster_it = cluster_to_node_info_map_.find(key);
+  if (cluster_it != cluster_to_node_info_map_.end() && !cluster_it->second.nodes.empty()) {
+    // Key is a cluster ID, use round-robin to select a node.
+    auto& cluster_info = cluster_it->second;
+    const auto& nodes = cluster_info.nodes;
+
+    // Select node at current index and advance for next call.
+    const std::string& selected_node = nodes[cluster_info.round_robin_index % nodes.size()];
+    cluster_info.round_robin_index = (cluster_info.round_robin_index + 1) % nodes.size();
+
+    ENVOY_LOG(debug, "reverse_tunnel: key '{}' is a cluster ID; returning node {} via round-robin.",
+              key, selected_node);
+    return selected_node;
   }
 
-  // Treat it as a node ID and return it directly.
-  ENVOY_LOG(trace, "reverse_tunnel: key '{}' is a node ID; returning as-is.", key);
+  // Key not found in cluster map, treat it as a node ID and return it directly.
+  ENVOY_LOG(trace, "reverse_tunnel: key '{}' treated as node ID; returning as-is.", key);
   return key;
+}
+
+bool UpstreamSocketManager::hasAnySocketsForNode(const std::string& node_id) {
+  // Check idle sockets first via map lookup O(1) instead of iterating fd_to_node_map_ O(n).
+  // Note: fd_to_node_map_ contains all FDs (idle + used), but this is faster for the common case.
+  auto idle_it = accepted_reverse_connections_.find(node_id);
+  if (idle_it != accepted_reverse_connections_.end() && !idle_it->second.empty()) {
+    return true;
+  }
+
+  // Check if node has any used sockets.
+  for (const auto& [fd, n_id] : fd_to_node_map_) {
+    if (n_id == node_id) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void UpstreamSocketManager::markSocketDead(const int fd) {
@@ -254,7 +259,10 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   }
   const std::string node_id = node_it->second;
 
-  // Get cluster_id from fd_to_cluster_map_.
+  // Get cluster_id from fd_to_cluster_map_. We use the fd_to_cluster_map_ to get the cluster_id
+  // and not the cluster_to_node_info_map_ because the node might have changed clusters before the
+  // socket is marked dead, but the FD will always be tied to the same cluster in
+  // fd_to_cluster_map_.
   std::string cluster_id;
   auto cluster_it = fd_to_cluster_map_.find(fd);
   if (cluster_it == fd_to_cluster_map_.end()) {
@@ -270,62 +278,52 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   ENVOY_LOG(debug, "reverse_tunnel: found node '{}' cluster '{}' for fd: {}", node_id, cluster_id,
             fd);
 
-  fd_to_node_map_.erase(fd);    // Clean up fd from fd_to_node_map_.
-  fd_to_cluster_map_.erase(fd); // Clean up fd from fd_to_cluster_map_.
+  // Remove FD from tracking maps before checking remaining sockets.
+  fd_to_node_map_.erase(fd);
+  fd_to_cluster_map_.erase(fd);
 
-  // Check if this is a used connection by looking for node_id in accepted_reverse_connections_.
+  // Determine if this is an idle or used socket by searching for the FD in the idle pool.
   auto& sockets = accepted_reverse_connections_[node_id];
-  if (sockets.empty()) {
-    // This is a used connection. Mark the stats and return. The socket will be closed by the.
-    // owning UpstreamReverseConnectionIOHandle.
-    ENVOY_LOG(debug, "reverse_tunnel: marking used socket dead. node: {} cluster: {} fd: {}.",
-              node_id, cluster_id, fd);
-    // Update Envoy's stats system for production multi-tenant tracking.
-    // This ensures stats are decremented when connections are removed.
-    if (auto extension = getUpstreamExtension()) {
-      extension->updateConnectionStats(node_id, cluster_id, false /* decrement */);
-      ENVOY_LOG(trace, "reverse_tunnel: decremented stats registry for node '{}' cluster '{}'.",
-                node_id, cluster_id);
-    }
+  bool is_idle_socket = false;
 
-    // Clean up node-to-cluster mappings since this used socket is now dead.
-    cleanStaleNodeEntry(node_id);
-
-    return;
-  }
-
-  // This is an idle connection, find and remove it from the pool.
-  bool socket_found = false;
   for (auto itr = sockets.begin(); itr != sockets.end(); itr++) {
     if (fd == itr->get()->ioHandle().fdDoNotUse()) {
-      ENVOY_LOG(debug, "reverse_tunnel: marking socket dead. node: {} cluster: {} fd: {}.", node_id,
-                cluster_id, fd);
+      // Found the FD in idle pool, this is an idle socket.
+      ENVOY_LOG(debug, "reverse_tunnel: marking idle socket dead. node: {} cluster: {} fd: {}.",
+                node_id, cluster_id, fd);
       ::shutdown(fd, SHUT_RDWR);
       itr = sockets.erase(itr);
-      socket_found = true;
+      is_idle_socket = true;
 
       fd_to_event_map_.erase(fd);
       fd_to_timer_map_.erase(fd);
-
-      // Update Envoy's stats system for production multi-tenant tracking.
-      // This ensures stats are decremented when connections are removed.
-      if (auto extension = getUpstreamExtension()) {
-        extension->updateConnectionStats(node_id, cluster_id, false /* decrement */);
-        ENVOY_LOG(trace, "reverse_tunnel: decremented stats registry for node '{}' cluster '{}'.",
-                  node_id, cluster_id);
-      }
       break;
     }
   }
 
-  if (!socket_found) {
-    ENVOY_LOG(error,
-              "reverse_tunnel: attempted to mark a non-existent socket dead. node: {} fd: {}.",
-              node_id, fd);
+  if (!is_idle_socket) {
+    // FD not found in idle pool, this is a used socket.
+    // The socket will be closed by the owning UpstreamReverseConnectionIOHandle.
+    ENVOY_LOG(debug, "reverse_tunnel: marking used socket dead. node: {} cluster: {} fd: {}.",
+              node_id, cluster_id, fd);
   }
 
-  if (sockets.size() == 0) {
+  // Update Envoy's stats system.
+  if (auto extension = getUpstreamExtension()) {
+    extension->updateConnectionStats(node_id, cluster_id, false /* decrement */);
+    ENVOY_LOG(trace, "reverse_tunnel: decremented stats registry for node '{}' cluster '{}'.",
+              node_id, cluster_id);
+  }
+
+  // Only clean up node-to-cluster mappings if this node has no remaining sockets (idle or used).
+  if (!hasAnySocketsForNode(node_id)) {
+    ENVOY_LOG(debug,
+              "reverse_tunnel: node '{}' has no remaining sockets, cleaning up cluster mappings.",
+              node_id);
     cleanStaleNodeEntry(node_id);
+  } else {
+    ENVOY_LOG(trace, "reverse_tunnel: node '{}' still has remaining sockets, keeping in maps.",
+              node_id);
   }
 }
 
@@ -350,25 +348,24 @@ void UpstreamSocketManager::cleanStaleNodeEntry(const std::string& node_id) {
   }
   ENVOY_LOG(debug, "reverse_tunnel: cleaning stale node entry for node {}.", node_id);
 
-  // Check if given node-id, is present in node_to_cluster_map_. If present,.
-  // fetch the corresponding cluster-id. Use cluster-id and node-id to delete entry.
-  // from cluster_to_node_map_ and node_to_cluster_map_ respectively.
+  // Check if given node-id is present in node_to_cluster_map_. If present,
+  // fetch the corresponding cluster-id and remove the node from the cluster's node list.
   const auto& node_itr = node_to_cluster_map_.find(node_id);
   if (node_itr != node_to_cluster_map_.end()) {
-    const auto& cluster_itr = cluster_to_node_map_.find(node_itr->second);
-    if (cluster_itr != cluster_to_node_map_.end()) {
-      const auto& node_entry_itr =
-          find(cluster_itr->second.begin(), cluster_itr->second.end(), node_id);
+    const auto& cluster_itr = cluster_to_node_info_map_.find(node_itr->second);
+    if (cluster_itr != cluster_to_node_info_map_.end()) {
+      auto& nodes = cluster_itr->second.nodes;
+      const auto& node_entry_itr = find(nodes.begin(), nodes.end(), node_id);
 
-      if (node_entry_itr != cluster_itr->second.end()) {
+      if (node_entry_itr != nodes.end()) {
         ENVOY_LOG(trace, "reverse_tunnel: removing stale node {} from cluster {}.", node_id,
                   cluster_itr->first);
-        cluster_itr->second.erase(node_entry_itr);
+        nodes.erase(node_entry_itr);
 
-        // If the cluster to node-list map has an empty vector, remove.
-        // the entry from map.
-        if (cluster_itr->second.size() == 0) {
-          cluster_to_node_map_.erase(cluster_itr);
+        // If the cluster has no more nodes, remove the entire cluster entry.
+        if (nodes.empty()) {
+          ENVOY_LOG(trace, "reverse_tunnel: removing empty cluster {}.", cluster_itr->first);
+          cluster_to_node_info_map_.erase(cluster_itr);
         }
       }
     }

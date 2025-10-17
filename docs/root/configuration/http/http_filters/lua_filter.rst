@@ -1114,6 +1114,36 @@ Returns a downstream :ref:`SSL connection info object <config_http_filters_lua_s
 Returns the string representation of :repo:`requested server name <envoy/stream_info/stream_info.h>`
 (e.g. SNI in TLS) for the current request if present.
 
+``drainConnectionUponCompletion()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:drainConnectionUponCompletion()
+
+Marks the connection to be drained upon completion of the current request.
+
+* For HTTP/1.1, this will add a ``Connection: close`` header to the response.
+* For HTTP/2 and HTTP/3, this will trigger the sending of a ``GOAWAY`` frame.
+
+This is useful when you want to force clients to re-establish connections, for example:
+
+* After authorization failures to ensure clients reconnect with updated credentials.
+* When detecting network changes that may affect connection validity.
+* To implement custom connection lifecycle policies.
+
+Example usage:
+
+.. code-block:: lua
+
+  function envoy_on_response(response_handle)
+    -- Check for status from upstream and force connection drain on authorization failure.
+    local status_header = response_handle:headers():get(":status")
+    if status_header == "403" then
+      response_handle:streamInfo():drainConnectionUponCompletion()
+    end
+  end
+
 .. _config_http_filters_lua_cx_stream_info_wrapper:
 
 Connection stream info object API

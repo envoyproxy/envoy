@@ -71,7 +71,7 @@ Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_v
   ASSERT(socket_manager != nullptr, "Socket manager should be initialized before request handling");
 
   // Use SocketManager to resolve the key to a node ID.
-  std::string node_id = socket_manager->getNodeID(std::string(host_id));
+  std::string node_id = socket_manager->getNodeWithSocket(std::string(host_id));
   ENVOY_LOG(debug, "reverse_connection: resolved key '{}' to node: '{}'", host_id, node_id);
 
   {
