@@ -12,6 +12,7 @@ minor_behavior_changes:
     request-specific details allows grouping by similar failure types. Detailed
     messages remain available in debug logs.
 - area: mobile
+  change: |
     Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.mobile_use_network_observer_registry``.
 
