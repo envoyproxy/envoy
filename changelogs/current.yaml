@@ -19,6 +19,10 @@ bug_fixes:
     Fixed a bug where Envoy will leak memory if the HTTP2 stream is reset before the request headers are
     sent. For example, if one upstream http filter send a local reply after the connection is established but
     before the request headers are sent, the memory allocated for the stream will not be released.
+- area: lua
+  change: |
+    Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
+    larger payload (greater than the body buffer limit).
 - area: connection pool
   change: |
     Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
@@ -40,5 +44,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
 
 new_features:
+- area: wasm
+  change: |
+    Added ``sign`` foreign function to create cryptographic signatures.
+    See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
 
 deprecated:

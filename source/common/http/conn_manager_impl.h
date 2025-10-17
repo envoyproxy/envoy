@@ -250,11 +250,15 @@ private:
       informational_headers_ = std::move(informational_headers);
     }
     void setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) override {
-      // We'll overwrite the headers in the case where we fail the stream after upstream headers
-      // have begun filter processing but before they have been sent downstream.
+      if (response_headers_ != nullptr) {
+        overwritten_headers_.emplace_back(std::move(response_headers_));
+      }
       response_headers_ = std::move(response_headers);
     }
     void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override {
+      if (response_trailers_ != nullptr) {
+        overwritten_headers_.emplace_back(std::move(response_trailers_));
+      }
       response_trailers_ = std::move(response_trailers);
     }
     void chargeStats(const ResponseHeaderMap& headers) override;
@@ -447,6 +451,13 @@ private:
     ResponseHeaderMapPtr informational_headers_;
     ResponseHeaderMapSharedPtr response_headers_;
     ResponseTrailerMapSharedPtr response_trailers_;
+
+    // Keep track all the historical headers to avoid potential lifetime issues.
+    // For example,
+    // when Envoy processing a response, if we send a local reply, then the local reply
+    // headers will overwrite the original response and result in the previous response
+    // being dangling. To avoid this, we store the original headers.
+    std::vector<std::shared_ptr<HeaderMap>> overwritten_headers_;
 
     // Note: The FM must outlive the above headers, as they are possibly accessed during filter
     // destruction.
