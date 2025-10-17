@@ -4764,11 +4764,13 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoContinueAndReplace) {
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
     auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
-
     // Test field extraction for coverage.
-    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
-
+    (*json_format->mutable_fields())["field_request_header_cr"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_continue_and_replace)%");
+    (*json_format->mutable_fields())["field_response_header_cr"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_continue_and_replace)%");
+    (*json_format->mutable_fields())["field_immeidate_response"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:immediate_response)%");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
   });
   initializeConfig();
@@ -4788,12 +4790,15 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoContinueAndReplace) {
   // Ensure that we replaced and did not append to the request.
   EXPECT_EQ(upstream_request_->body().toString(), "Hello, Server!");
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  LOG(INFO) << log_result;
-  // auto json_log = Json::Factory::loadFromString(log_result).value();
-  // // 0: NONE, 1: CONTENT_MODIFIED, 2: IMMEDIATE_RESPONSE, 3: CONTINUE_AND_REPLACE
-  // auto field_request_header_effect = json_log->getString("field_request_header_effect");
-  // EXPECT_TRUE(field_request_header_effect.ok());
-  // EXPECT_EQ(*field_request_header_effect, "3");
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_request_header_continue = json_log->getString("field_request_header_cr");
+  EXPECT_TRUE(field_request_header_continue.ok());
+  EXPECT_EQ(*field_request_header_continue, "1");
+  auto field_response_header_continue = json_log->getString("field_response_header_cr");
+  EXPECT_TRUE(field_response_header_continue.ok());
+  EXPECT_EQ(*field_response_header_continue, "0");
+  auto field_immediate_response = json_log->getString("field_immeidate_response");
+  EXPECT_EQ(*field_immediate_response, "0");
 
   cleanupUpstreamAndDownstream();
 }
@@ -4801,60 +4806,52 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoContinueAndReplace) {
 // Test immediate_response behavior with STREAMED request body. Even though the
 // headers have been processed, an immediate response on a request body chunk
 // should still be seen by the downstream.
-// TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoImmediateResponse) {
-//   auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoImmediateResponse) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
 
-//   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-//     auto* access_log = cm.add_access_log();
-//     access_log->set_name("accesslog");
-//     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-//     access_log_config.set_path(access_log_path);
-//     auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
 
-//     // Test field extraction for coverage.
-//     (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
-//         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
-//     (*json_format->mutable_fields())["field_request_body_effect"].set_string_value(
-//         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_processing_effect)%");
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["field_immeidate_response"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:immediate_response)%");
 
-//     access_log->mutable_typed_config()->PackFrom(access_log_config);
-//   });
-//   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-//   ConfigOptions config_options;
-//   config_options.add_response_processor = true;
-//   initializeConfig(config_options);
-//   HttpIntegrationTest::initialize();
-//   auto response = sendDownstreamRequestWithBody("Evil content!", absl::nullopt);
-//   processRequestHeadersMessage(
-//       *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& resp) {
-//         auto* hdr = resp.mutable_response()->mutable_header_mutation()->add_set_headers();
-//         hdr->mutable_append()->set_value(false);
-//         hdr->mutable_header()->set_key("foo");
-//         hdr->mutable_header()->set_raw_value("bar");
-//         return true;
-//       });
-//   processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
-//     immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
-//     immediate.set_body("{\"reason\": \"Request too evil\"}");
-//     immediate.set_details("Failed because I don't like this payload");
-//   });
-//   // ext_proc will immediately close side stream in this case, which causes it
-//   // to be reset, since side stream codec had not yet observed server trailers.
-//   EXPECT_TRUE(processor_stream_->waitForReset());
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  ConfigOptions config_options;
+  config_options.add_response_processor = true;
+  initializeConfig(config_options);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("Evil content!", absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& resp) {
+        auto* hdr = resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
+        hdr->mutable_header()->set_key("foo");
+        hdr->mutable_header()->set_raw_value("bar");
+        return true;
+      });
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
+    immediate.set_body("{\"reason\": \"Request too evil\"}");
+    immediate.set_details("Failed because I don't like this payload");
+  });
+  // ext_proc will immediately close side stream in this case, which causes it
+  // to be reset, since side stream codec had not yet observed server trailers.
+  EXPECT_TRUE(processor_stream_->waitForReset());
 
-//   verifyDownstreamResponse(*response, 400);
-//   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-//   auto json_log = Json::Factory::loadFromString(log_result).value();
-//   // 0: NONE, 1: CONTENT_MODIFIED, 2: IMMEDIATE_RESPONSE, 3: CONTINUE_AND_REPLACE
-//   auto field_request_header_effect = json_log->getString("field_request_header_effect");
-//   EXPECT_TRUE(field_request_header_effect.ok());
-//   EXPECT_EQ(*field_request_header_effect, "1");
-
-//   auto field_request_body_effect = json_log->getString("field_request_body_effect");
-//   EXPECT_TRUE(field_request_body_effect.ok());
-//   EXPECT_EQ(*field_request_body_effect, "2");
-//   cleanupUpstreamAndDownstream();
-// }
+  verifyDownstreamResponse(*response, 400);
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_immediate_response = json_log->getString("field_immeidate_response");
+  EXPECT_EQ(*field_immediate_response, "1");
+  cleanupUpstreamAndDownstream();
+}
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters

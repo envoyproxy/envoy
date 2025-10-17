@@ -73,6 +73,9 @@ constexpr absl::string_view ResponseTrailerLatencyUsField = "response_trailer_la
 constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_call_status";
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
+constexpr absl::string_view ImmediateResonseField = "immediate_response";
+constexpr absl::string_view RequestHeaderContinueAndReplaceField = "request_header_continue_and_replace";
+constexpr absl::string_view ResponseHeaderContinueAndReplaceField = "response_header_continue_and_replace";
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -321,10 +324,6 @@ void ExtProcLoggingInfo::recordGrpcCall(
   }
 }
 
-void ExtProcLoggingInfo::recordImmediateResponse(envoy::config::core::v3::TrafficDirection traffic_direction){
-  grpcCalls(traffic_direction).immediate_response_ = true;
-}
-
 ExtProcLoggingInfo::GrpcCalls&
 ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) {
   ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
@@ -398,6 +397,12 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<double>(bytes_sent_));
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
+  (*struct_msg->mutable_fields())[ImmediateResonseField].set_bool_value(
+      immediate_response_);
+  (*struct_msg->mutable_fields())[RequestHeaderContinueAndReplaceField].set_bool_value(
+      decoding_processor_grpc_calls_.continue_and_replace_);
+  (*struct_msg->mutable_fields())[ResponseHeaderContinueAndReplaceField].set_bool_value(
+      encoding_processor_grpc_calls_.continue_and_replace_);
   return struct_msg;
 }
 
@@ -501,6 +506,15 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   }
   if (field_name == BytesReceivedField) {
     return static_cast<int64_t>(bytes_received_);
+  }
+  if (field_name == ImmediateResonseField){
+    return bool(immediate_response_);
+  }
+  if (field_name == RequestHeaderContinueAndReplaceField){
+    return bool(decoding_processor_grpc_calls_.continue_and_replace_);
+  }
+  if (field_name == ResponseHeaderContinueAndReplaceField){
+    return bool(encoding_processor_grpc_calls_.continue_and_replace_);
   }
   return {};
 }
@@ -1798,8 +1812,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
 
   sent_immediate_response_ = true;
   if (logging_info_ != nullptr){
-    logging_info_->recordImmediateResponse(encoding_state_.trafficDirection());
-    logging_info_->recordImmediateResponse(decoding_state_.trafficDirection());
+    logging_info_->setImmediateResponse();
   }
   ENVOY_STREAM_LOG(debug, "Sending local reply with status code {}", *decoder_callbacks_,
                    status_code);
