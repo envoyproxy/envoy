@@ -29,11 +29,11 @@ namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace PeakEwma {
 
-// Forward declarations and type aliases
+// Forward declarations and type aliases.
 using Config = envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma;
 
 constexpr int64_t kDefaultDecayTimeSeconds = 10;
-constexpr double kDefaultRttMilliseconds = 10.0; // Default RTT for new hosts (10ms)
+constexpr double kDefaultRttMilliseconds = 10.0; // Default RTT for new hosts (10ms).
 
 namespace {
 class PeakEwmaTestPeer;
@@ -76,50 +76,50 @@ public:
 private:
   friend struct GlobalHostStats;
 
-  // Host management - attach atomic data structures to each host
+  // Host management - attach atomic data structures to each host.
   void addPeakEwmaLbPolicyDataToHosts(const Upstream::HostVector& hosts);
   PeakEwmaHostLbPolicyData* getPeakEwmaData(Upstream::HostConstSharedPtr host);
 
-  // Timer-based aggregation - processes host-attached sample data
+  // Timer-based aggregation - processes host-attached sample data.
   void aggregateWorkerData();
   void processHostSamples(Upstream::HostConstSharedPtr host, PeakEwmaHostLbPolicyData* data);
   void onAggregationTimer();
 
-  // Power of Two Choices selection
+  // Power of Two Choices selection.
   Upstream::HostConstSharedPtr selectFromTwoCandidates(const Upstream::HostVector& hosts,
                                                        uint64_t random_value);
   double calculateHostCost(Upstream::HostConstSharedPtr host);
 
-  // EWMA calculation helpers
+  // EWMA calculation helpers.
   size_t calculateNewSampleCount(size_t last_processed, size_t current_write, size_t max_samples);
   double calculateTimeBasedAlpha(uint64_t current_time_ns, uint64_t sample_time_ns);
   double updateEwmaWithSample(double current_ewma, double new_rtt_ms, double alpha);
 
-  // Core infrastructure
+  // Core infrastructure.
   const Upstream::PrioritySet& priority_set_;
   const envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma config_proto_;
   Random::RandomGenerator& random_;
   TimeSource& time_source_;
 
-  // Business logic components
+  // Business logic components.
   Cost cost_;
   Observability observability_;
 
-  // Timer infrastructure for periodic EWMA calculation
+  // Timer infrastructure for periodic EWMA calculation.
   Event::Dispatcher& main_dispatcher_;
   Event::TimerPtr aggregation_timer_;
   const std::chrono::milliseconds aggregation_interval_;
 
-  // Host stats for admin interface visibility
+  // Host stats for admin interface visibility.
   absl::flat_hash_map<Upstream::HostConstSharedPtr, std::unique_ptr<GlobalHostStats>>
       all_host_stats_;
 
-  // Priority set callback for adding atomic data to new hosts
+  // Priority set callback for adding atomic data to new hosts.
   Common::CallbackHandlePtr priority_update_cb_;
 
-  // EWMA calculation constants
-  const int64_t tau_nanos_;  // Decay time in nanoseconds
-  const size_t max_samples_; // Configurable ring buffer size per host
+  // EWMA calculation constants.
+  const int64_t tau_nanos_;  // Decay time in nanoseconds.
+  const size_t max_samples_; // Configurable ring buffer size per host.
 };
 
 } // namespace PeakEwma

@@ -20,7 +20,7 @@ namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace PeakEwma {
 
-// Peak EWMA Load Balancer Implementation
+// Peak EWMA Load Balancer Implementation.
 
 PeakEwmaLoadBalancer::PeakEwmaLoadBalancer(
     const Upstream::PrioritySet& priority_set, const Upstream::PrioritySet* /*local_priority_set*/,
@@ -51,12 +51,12 @@ PeakEwmaLoadBalancer::PeakEwmaLoadBalancer(
                        ? config_proto_.max_samples_per_host().value()
                        : 1000) {
 
-  // Add PeakEwmaHostLbPolicyData to all existing hosts
+  // Add PeakEwmaHostLbPolicyData to all existing hosts.
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     addPeakEwmaLbPolicyDataToHosts(host_set->hosts());
   }
 
-  // Setup callback to add data to new hosts
+  // Setup callback to add data to new hosts.
   priority_update_cb_ =
       priority_set_.addPriorityUpdateCb([this](uint32_t, const Upstream::HostVector& hosts_added,
                                                const Upstream::HostVector&) -> absl::Status {
@@ -64,16 +64,16 @@ PeakEwmaLoadBalancer::PeakEwmaLoadBalancer(
         return absl::OkStatus();
       });
 
-  // Create timer for EWMA aggregation
+  // Create timer for EWMA aggregation.
   aggregation_timer_ = main_dispatcher_.createTimer([this]() -> void { onAggregationTimer(); });
   aggregation_timer_->enableTimer(aggregation_interval_);
 
-  // Peak EWMA load balancer initialized successfully
+  // Peak EWMA load balancer initialized successfully.
 }
 
 PeakEwmaLoadBalancer::~PeakEwmaLoadBalancer() {
-  // Post timer cancellation to main thread to avoid cross-thread timer operations
-  // Timer must be disabled from the same thread that created it (main_dispatcher_)
+  // Post timer cancellation to main thread to avoid cross-thread timer operations.
+  // Timer must be disabled from the same thread that created it (main_dispatcher_).
   if (aggregation_timer_) {
     main_dispatcher_.post([timer = std::move(aggregation_timer_)]() mutable {
       if (timer) {
@@ -83,9 +83,9 @@ PeakEwmaLoadBalancer::~PeakEwmaLoadBalancer() {
     });
   }
 
-  // EWMA snapshot cleanup is automatic via shared_ptr destructor
+  // EWMA snapshot cleanup is automatic via shared_ptr destructor.
 
-  // Clean up host data
+  // Clean up host data.
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     for (const auto& host : host_set->hosts()) {
       host->setLbPolicyData(nullptr);
@@ -93,7 +93,7 @@ PeakEwmaLoadBalancer::~PeakEwmaLoadBalancer() {
   }
 }
 
-// Host management
+// Host management.
 void PeakEwmaLoadBalancer::addPeakEwmaLbPolicyDataToHosts(const Upstream::HostVector& hosts) {
   for (const auto& host_ptr : hosts) {
     if (!host_ptr->lbPolicyData().has_value()) {
@@ -111,22 +111,22 @@ PeakEwmaHostLbPolicyData* PeakEwmaLoadBalancer::getPeakEwmaData(Upstream::HostCo
 }
 
 void PeakEwmaLoadBalancer::onAggregationTimer() {
-  // Timer callback - aggregate EWMA data from all hosts
+  // Timer callback - aggregate EWMA data from all hosts.
   aggregateWorkerData();
 
-  // Reschedule timer for next cycle
+  // Reschedule timer for next cycle.
   aggregation_timer_->enableTimer(aggregation_interval_);
 }
 
 double PeakEwmaLoadBalancer::calculateHostCost(Upstream::HostConstSharedPtr host) {
-  // Get EWMA RTT from host-attached atomic data
+  // Get EWMA RTT from host-attached atomic data.
   auto* peak_data = getPeakEwmaData(host);
   double ewma_rtt = peak_data ? peak_data->getEwmaRtt() : 0.0;
 
-  // Get active requests from host stats
+  // Get active requests from host stats.
   double active_requests = host->stats().rq_active_.value();
 
-  // Calculate cost using business logic
+  // Calculate cost using business logic.
   double default_rtt_ms = config_proto_.has_default_rtt()
                               ? DurationUtil::durationToMilliseconds(config_proto_.default_rtt())
                               : kDefaultRttMilliseconds;
@@ -142,12 +142,12 @@ PeakEwmaLoadBalancer::selectFromTwoCandidates(const Upstream::HostVector& hosts,
     return hosts.empty() ? nullptr : hosts[0];
   }
 
-  // Generate two distinct host indices using random value
+  // Generate two distinct host indices using random value.
   const size_t host_count = hosts.size();
   const size_t first_index = random_value % host_count;
   size_t second_index = (random_value >> 16) % host_count;
 
-  // Ensure distinct indices
+  // Ensure distinct indices.
   if (second_index == first_index) {
     second_index = (second_index + 1) % host_count;
   }
@@ -155,31 +155,31 @@ PeakEwmaLoadBalancer::selectFromTwoCandidates(const Upstream::HostVector& hosts,
   auto first_host = hosts[first_index];
   auto second_host = hosts[second_index];
 
-  // Calculate costs using host-attached EWMA data
+  // Calculate costs using host-attached EWMA data.
   double first_cost = calculateHostCost(first_host);
   double second_cost = calculateHostCost(second_host);
 
-  // Select host with lower cost (tie-breaking with random)
+  // Select host with lower cost (tie-breaking with random).
   bool costs_equal = (first_cost == second_cost);
   bool prefer_first = costs_equal ? (random_value & 0x1) != 0 : first_cost < second_cost;
 
   auto selected_host = prefer_first ? first_host : second_host;
 
-  // Host selection complete
+  // Host selection complete.
 
   return selected_host;
 }
 
 Upstream::HostSelectionResponse
 PeakEwmaLoadBalancer::chooseHost(Upstream::LoadBalancerContext* /* context */) {
-  // Power of Two Choices selection using host-attached EWMA data
+  // Power of Two Choices selection using host-attached EWMA data.
   const auto& host_sets = priority_set_.hostSetsPerPriority();
 
   if (host_sets.empty()) {
     return {nullptr, ""};
   }
 
-  // Use first priority for now (can be extended for multi-priority)
+  // Use first priority for now (can be extended for multi-priority).
   const auto& hosts = host_sets[0]->healthyHosts();
 
   if (hosts.empty()) {
@@ -190,7 +190,7 @@ PeakEwmaLoadBalancer::chooseHost(Upstream::LoadBalancerContext* /* context */) {
     return {hosts[0], ""};
   }
 
-  // Power of Two Choices selection using host-attached EWMA data
+  // Power of Two Choices selection using host-attached EWMA data.
   uint64_t random_value = random_.random();
   return {selectFromTwoCandidates(hosts, random_value), ""};
 }
@@ -201,9 +201,9 @@ Upstream::HostConstSharedPtr PeakEwmaLoadBalancer::peekAnotherHost(
 }
 
 void PeakEwmaLoadBalancer::aggregateWorkerData() {
-  // Process atomic ring buffers attached to each host
+  // Process atomic ring buffers attached to each host.
 
-  // Process each host's atomic ring buffer directly (no cross-thread complexity)
+  // Process each host's atomic ring buffer directly (no cross-thread complexity).
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     for (const auto& host : host_set->hosts()) {
       auto* peak_data = getPeakEwmaData(host);
@@ -213,7 +213,7 @@ void PeakEwmaLoadBalancer::aggregateWorkerData() {
     }
   }
 
-  // Publish stats for admin interface visibility
+  // Publish stats for admin interface visibility.
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     for (const auto& host : host_set->hosts()) {
       auto* peak_data = getPeakEwmaData(host);
@@ -226,26 +226,26 @@ void PeakEwmaLoadBalancer::aggregateWorkerData() {
                               ? DurationUtil::durationToMilliseconds(config_proto_.default_rtt())
                               : kDefaultRttMilliseconds);
 
-        // Create stats object if it doesn't exist
+        // Create stats object if it doesn't exist.
         auto it = all_host_stats_.find(host);
         if (it == all_host_stats_.end()) {
           all_host_stats_[host] = observability_.createHostStats(host);
           it = all_host_stats_.find(host);
         }
 
-        // Update stats for observability
+        // Update stats for observability.
         if (it != all_host_stats_.end()) {
           it->second->setEwmaRttStat(ewma_rtt);
           it->second->setActiveRequestsStat(active_requests);
           it->second->setComputedCostStat(cost);
         }
 
-        // Host processing complete
+        // Host processing complete.
       }
     }
   }
 
-  // Aggregation cycle complete
+  // Aggregation cycle complete.
 }
 
 size_t PeakEwmaLoadBalancer::calculateNewSampleCount(size_t last_processed, size_t current_write,
@@ -257,7 +257,7 @@ size_t PeakEwmaLoadBalancer::calculateNewSampleCount(size_t last_processed, size
   if (current_write >= last_processed) {
     return current_write - last_processed;
   } else {
-    // Write index wrapped around
+    // Write index wrapped around.
     return (max_samples - last_processed) + current_write;
   }
 }
@@ -266,26 +266,26 @@ double PeakEwmaLoadBalancer::calculateTimeBasedAlpha(uint64_t current_time_ns,
                                                      uint64_t sample_time_ns) {
   int64_t time_delta_ns = static_cast<int64_t>(current_time_ns - sample_time_ns);
   if (time_delta_ns <= 0) {
-    return 1.0; // Use full weight for future/concurrent samples
+    return 1.0; // Use full weight for future/concurrent samples.
   }
 
-  // Time-based exponential decay: α = 1 - e^(-Δt/τ)
+  // Time-based exponential decay: α = 1 - e^(-Δt/τ).
   double time_delta_s = time_delta_ns / 1000000000.0;
   double tau_s = tau_nanos_ / 1000000000.0;
   double alpha = 1.0 - std::exp(-time_delta_s / tau_s);
 
-  // Clamp alpha to reasonable bounds
+  // Clamp alpha to reasonable bounds.
   return std::min(1.0, std::max(0.0, alpha));
 }
 
 double PeakEwmaLoadBalancer::updateEwmaWithSample(double current_ewma, double new_rtt_ms,
                                                   double alpha) {
   if (current_ewma == 0.0) {
-    // First sample - initialize EWMA
+    // First sample - initialize EWMA.
     return new_rtt_ms;
   }
 
-  // EWMA update: new_ewma = α × new_rtt + (1-α) × old_ewma
+  // EWMA update: new_ewma = α × new_rtt + (1-α) × old_ewma.
   return alpha * new_rtt_ms + (1.0 - alpha) * current_ewma;
 }
 
@@ -294,7 +294,7 @@ void PeakEwmaLoadBalancer::processHostSamples(Upstream::HostConstSharedPtr /* ho
   if (!data)
     return;
 
-  // Get the range of new samples to process (atomic ring buffer)
+  // Get the range of new samples to process (atomic ring buffer).
   auto [last_processed, current_write] = data->getNewSampleRange();
 
   size_t num_new_samples =
@@ -302,13 +302,13 @@ void PeakEwmaLoadBalancer::processHostSamples(Upstream::HostConstSharedPtr /* ho
   if (num_new_samples == 0)
     return;
 
-  // Get current EWMA state
+  // Get current EWMA state.
   double current_ewma = data->getEwmaRtt();
   uint64_t current_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                  time_source_.monotonicTime().time_since_epoch())
                                  .count();
 
-  // Process all new samples in chronological order
+  // Process all new samples in chronological order.
   size_t processed_index = last_processed;
   for (size_t i = 0; i < num_new_samples; ++i) {
     size_t ring_index = processed_index % data->max_samples_;
@@ -316,7 +316,7 @@ void PeakEwmaLoadBalancer::processHostSamples(Upstream::HostConstSharedPtr /* ho
     double rtt_ms = data->rtt_samples_[ring_index].load();
     uint64_t timestamp_ns = data->timestamps_[ring_index].load();
 
-    // Skip invalid samples (should be rare)
+    // Skip invalid samples (should be rare).
     if (rtt_ms <= 0.0 || timestamp_ns == 0) {
       processed_index++;
       continue;
@@ -327,7 +327,7 @@ void PeakEwmaLoadBalancer::processHostSamples(Upstream::HostConstSharedPtr /* ho
     processed_index++;
   }
 
-  // Update atomic EWMA in host data
+  // Update atomic EWMA in host data.
   data->updateEwma(current_ewma, current_time_ns);
   data->markSamplesProcessed(current_write);
 }
