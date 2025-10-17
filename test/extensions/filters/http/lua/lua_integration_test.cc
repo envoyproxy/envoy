@@ -2545,5 +2545,41 @@ virtual_hosts:
 }
 #endif
 
+// Test drainConnectionUponCompletion triggers connection draining for HTTP/1.1.
+TEST_P(LuaIntegrationTest, DrainConnectionUponCompletion) {
+  const std::string filter_config =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        -- Set drain on every request to test connection closure behavior.
+        request_handle:streamInfo():drainConnectionUponCompletion()
+      end
+)EOF";
+
+  initializeFilter(filter_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Make request.
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // For HTTP/1.1, we should see Connection: close header.
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    EXPECT_EQ("close", response->headers().getConnectionValue());
+  }
+
+  // Connection should be closed after request completes.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy

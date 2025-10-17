@@ -39,6 +39,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
 
 new_features:
+- area: lua
+  change: |
+    Added ``drainConnectionUponCompletion()`` to the Lua filter stream info API. This allows Lua scripts
+    to mark connections for draining, which adds a ``Connection: close`` header for HTTP/1.1 or sends a
+    ``GOAWAY`` frame for HTTP/2 and HTTP/3.
 - area: wasm
   change: |
     Added ``sign`` foreign function to create cryptographic signatures.
