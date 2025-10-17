@@ -2,14 +2,17 @@ syntax = "proto3";
 
 package envoy.source.extensions.common.wasm;
 
+// Arguments for verifying a signature with a public key.
 message VerifySignatureArguments {
-  string hash_function = 1;
-  bytes public_key = 2;
-  bytes signature = 3;
-  bytes text = 4;
-};
+  string hash_function = 1;  // Hash function used (e.g., "sha256")
+  bytes public_key = 2;      // Public key in DER format (mutually exclusive with public_key_pem)
+  string public_key_pem = 5; // Public key in PEM format (mutually exclusive with public_key)
+  bytes signature = 3;       // Signature to verify
+  bytes text = 4;            // Original data that was signed
+}
 
+// Result of the signature verification.
 message VerifySignatureResult {
-  bool result = 1;
-  string error = 2;
+  bool result = 1;  // True if signature is valid
+  string error = 2; // Error message if verification failed
 };

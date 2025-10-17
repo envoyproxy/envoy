@@ -767,6 +767,10 @@ def _fast_float():
 def _highway():
     external_http_archive(
         name = "highway",
+        patches = [
+            "@envoy//bazel:highway-ppc64le.patch",
+        ],
+        patch_args = ["-p1"],
     )
 
 def _dragonbox():
