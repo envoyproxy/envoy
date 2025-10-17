@@ -44,22 +44,18 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_beh
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_generic_proxy_codec_buffer_limit);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
-RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_allow_cr_or_lf_at_request_start);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_delay_reset);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_extension);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_propagate_reset_events);
 RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
-RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_cookie);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
-RUNTIME_GUARD(envoy_reloadable_features_jwt_fetcher_use_scheme_from_uri);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_cleanup_cookies);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_encrypt_tokens);
 RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
-RUNTIME_GUARD(envoy_reloadable_features_original_src_fix_port_exhaustion);
 RUNTIME_GUARD(envoy_reloadable_features_prefix_map_matcher_resume_after_subtree_miss);
 RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_defer_logging_miss_for_half_closed_stream);
@@ -190,6 +186,8 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_use_cached_grpc_client_for_xds);
 // Runtime guard to revert back to old non-RFC-compliant CONNECT behavior without Host header.
 // TODO(vinaykul): Drop this false-runtime-guard when deemed safe with RFC 9110 compliant CONNECT.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_11_proxy_connect_legacy_format);
+// TODO(tsaarni): Flip to true after prod testing or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

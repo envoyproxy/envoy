@@ -111,6 +111,7 @@ envoy_cc_extension(
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_null_vm_wasm_api",
         "//source/extensions/common/wasm/ext:set_envoy_filter_state_cc_proto",
+        "//source/extensions/common/wasm/ext:sign_cc_proto",
         "//source/extensions/common/wasm/ext:verify_signature_cc_proto",
         "//source/extensions/filters/common/expr:context_lib",
         "@com_google_absl//absl/base",

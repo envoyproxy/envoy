@@ -48,13 +48,15 @@ protected:
     transport_socket->set_name("envoy.transport_sockets.tls");
     transport_socket->mutable_typed_config()->PackFrom(tls_context);
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {cds_cluster}, {cds_cluster}, {}, "55");
+        Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(), {cds_cluster}, {cds_cluster}, {},
+        "55");
   }
 
   void sendSdsResponse(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) {
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("1");
-    discovery_response.set_type_url(Config::TypeUrl::get().Secret);
+    discovery_response.set_type_url(
+        Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
     discovery_response.add_resources()->PackFrom(secret);
     xds_stream_->sendGrpcMessage(discovery_response);
   }
