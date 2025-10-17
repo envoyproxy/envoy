@@ -1,14 +1,18 @@
 #pragma once
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/filter.h"
 
+#include "source/common/access_log/access_log_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/radix_tree.h"
 #include "source/common/config/config_provider_impl.h"
+#include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_resolver.h"
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
@@ -18,6 +22,8 @@ namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
 namespace DnsFilter {
+
+inline constexpr absl::string_view DnsFilterName = "envoy.filters.udp.dns_filter";
 
 /**
  * All DNS Filter stats. @see stats_macros.h
@@ -98,6 +104,7 @@ public:
   const Network::DnsResolverFactory& dnsResolverFactory() const { return *dns_resolver_factory_; }
   Api::Api& api() const { return api_; }
   const RadixTree<DnsVirtualDomainConfigSharedPtr>& getDnsTrie() const { return dns_lookup_trie_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const { return access_logs_; }
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
@@ -130,6 +137,7 @@ private:
   uint64_t max_pending_lookups_;
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config_;
   Network::DnsResolverFactory* dns_resolver_factory_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
 };
 
 using DnsFilterEnvoyConfigSharedPtr = std::shared_ptr<const DnsFilterEnvoyConfig>;
@@ -368,6 +376,13 @@ private:
    * @brief Helper function to retrieve a cluster name that a domain may be redirected towards
    */
   const absl::string_view getClusterNameForDomain(const absl::string_view domain);
+
+  /**
+   * @brief Logs the DNS query to configured access loggers
+   *
+   * @param context object containing the query context
+   */
+  void logQuery(const DnsQueryContextPtr& context);
 
   const DnsFilterEnvoyConfigSharedPtr config_;
   Network::UdpListener& listener_;
