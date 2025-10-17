@@ -119,11 +119,11 @@ public:
                                          std::vector<uint64_t>& upstream_usage) {
     // Expected number of upstreams.
     upstream_usage.resize(3);
-    ENVOY_LOG(trace, "Start sending {} requests.", number_of_requests);
+    ENVOY_LOG(error, "Start sending {} requests.", number_of_requests);
 
     for (uint64_t i = 0; i < number_of_requests; i++) {
-      ENVOY_LOG(trace, "Before request {}.", i);
-
+      ENVOY_LOG(error, "Before request {}.", i);
+      absl::SleepFor(absl::Milliseconds(10));
       codec_client_ = makeHttpConnection(lookupPort("http"));
 
       Http::TestRequestHeaderMapImpl request_headers{
@@ -131,7 +131,9 @@ public:
 
       auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
-      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2});
+      absl::SleepFor(absl::Milliseconds(10));
+
+      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2}, std::chrono::seconds(15));
       ASSERT(upstream_index.has_value());
       upstream_usage[upstream_index.value()]++;
 
@@ -146,9 +148,9 @@ public:
 
       EXPECT_TRUE(upstream_request_->complete());
       EXPECT_TRUE(response->complete());
-
       cleanupUpstreamAndDownstream();
-      ENVOY_LOG(trace, "After request {}.", i);
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
+      ENVOY_LOG(error, "After request {}.", i);
     }
   }
 
@@ -537,10 +539,11 @@ public:
     }
     // Expected number of upstreams.
     upstream_usage.resize(number_of_upstreams);
-    ENVOY_LOG(trace, "Start sending {} requests.", number_of_requests);
+    ENVOY_LOG(error, "Start sending {} requests.", number_of_requests);
 
     for (uint64_t i = 0; i < number_of_requests; i++) {
-      ENVOY_LOG(trace, "Before request {}.", i);
+      ENVOY_LOG(error, "Before request {}.", i);
+      absl::SleepFor(absl::Milliseconds(10));
 
       codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -550,8 +553,9 @@ public:
                                                      {":authority", "example.com"}};
 
       auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+      absl::SleepFor(absl::Milliseconds(10));
 
-      auto upstream_index = waitForNextUpstreamRequest(upstream_indices);
+      auto upstream_index = waitForNextUpstreamRequest(upstream_indices, std::chrono::seconds(30));
       ASSERT(upstream_index.has_value());
       upstream_usage[upstream_index.value()]++;
 
@@ -568,7 +572,9 @@ public:
       EXPECT_TRUE(response->complete());
 
       cleanupUpstreamAndDownstream();
-      ENVOY_LOG(trace, "After request {}.", i);
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+      ENVOY_LOG(error, "After request {}.", i);
     }
   }
 
@@ -724,19 +730,21 @@ TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, AddRemoveLocality) {
         Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
         {current_endpoints}, {}, {"cluster_1"}, "2");
 
+    ENVOY_LOG(error, "before initial_usage");
+
     // Upstream QPS for ORCA load reports. All hosts report the same QPS.
     const std::vector<uint64_t> upstream_qps = {100, 100, 100, 100};
     // Send 100 requests to cluster1 so host weights are updated.
     std::vector<uint64_t> initial_usage;
     sendRequestsAndTrackUpstreamUsage(FirstUpstreamIndex, upstream_qps, 10, initial_usage);
-    ENVOY_LOG(trace, "initial_usage {}", initial_usage);
+    ENVOY_LOG(error, "initial_usage {}", initial_usage);
 
     EXPECT_EQ(i + 1, test_server_->counter("cluster.cluster_1.membership_change")->value());
 
     // Send another 100 requests to cluster1, expecting weights to be used.
     std::vector<uint64_t> upstream_usage;
     sendRequestsAndTrackUpstreamUsage(FirstUpstreamIndex, upstream_qps, 100, upstream_usage);
-    ENVOY_LOG(trace, "upstream_usage {}", upstream_usage);
+    ENVOY_LOG(error, "upstream_usage {}", upstream_usage);
     // Expect the usage of first locality to be non-zero.
     EXPECT_GT(upstream_usage[0], 0);
     EXPECT_GT(upstream_usage[1], 0);
