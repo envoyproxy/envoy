@@ -14,6 +14,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: lua
+  change: |
+    Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
+    larger payload (greater than the body buffer limit).
 - area: connection pool
   change: |
     Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
@@ -39,5 +43,24 @@ new_features:
   change: |
     Added support for not-equal operator for access log filter rules, in
     :ref:`ComparisonFilter <envoy_v3_api_msg_config.accesslog.v3.ComparisonFilter>`.
+- area: lua
+  change: |
+    Added ``drainConnectionUponCompletion()`` to the Lua filter stream info API. This allows Lua scripts
+    to mark connections for draining, which adds a ``Connection: close`` header for HTTP/1.1 or sends a
+    ``GOAWAY`` frame for HTTP/2 and HTTP/3.
+- area: wasm
+  change: |
+    Added ``sign`` foreign function to create cryptographic signatures.
+    See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
+- area: redis
+  change: |
+    Added cluster-scope command support with flexible response handling framework.
+- area: overload management
+  change: |
+    The fixed heap resource monitor can now calculate memory pressure as currently allocated memory divided by maximum heap size,
+    giving more accurate and lower memory pressure values.
+    This can avoid unnecessary load shedding or overload actions.
+    To enable, set ``envoy.reloadable_features.fixed_heap_use_allocated`` to true.
+    The default algorithm (heap_size - pageheap_unmapped - pageheap_free) does not discount for free memory in TCMalloc caches.
 
 deprecated:

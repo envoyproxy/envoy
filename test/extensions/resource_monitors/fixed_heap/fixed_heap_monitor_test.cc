@@ -2,6 +2,8 @@
 
 #include "source/extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
 
+#include "test/test_common/test_runtime.h"
+
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -21,6 +23,7 @@ public:
   MOCK_METHOD(uint64_t, reservedHeapBytes, ());
   MOCK_METHOD(uint64_t, unmappedHeapBytes, ());
   MOCK_METHOD(uint64_t, freeMappedHeapBytes, ());
+  MOCK_METHOD(uint64_t, allocatedHeapBytes, ());
 };
 
 class ResourcePressure : public Server::ResourceUpdateCallbacks {
@@ -58,6 +61,23 @@ TEST(FixedHeapMonitorTest, ComputesCorrectUsage) {
   EXPECT_EQ(resource.pressure(), 0.5);
 }
 
+TEST(FixedHeapMonitorTest, ComputesCorrectUsageRuntimeUseAllocated) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.fixed_heap_use_allocated", "true"}});
+
+  envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
+  config.set_max_heap_size_bytes(1000);
+  auto stats_reader = std::make_unique<MockMemoryStatsReader>();
+  EXPECT_CALL(*stats_reader, allocatedHeapBytes()).WillOnce(Return(600));
+  auto monitor = std::make_unique<FixedHeapMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasPressure());
+  ASSERT_FALSE(resource.hasError());
+  EXPECT_EQ(resource.pressure(), 0.6);
+}
+
 TEST(FixedHeapMonitorTest, ComputeUsageWithRealMemoryStats) {
 
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
@@ -74,6 +94,24 @@ TEST(FixedHeapMonitorTest, ComputeUsageWithRealMemoryStats) {
   monitor->updateResourceUsage(resource);
   EXPECT_NEAR(resource.pressure(), expected_usage, 0.0005);
 }
+
+TEST(FixedHeapMonitorTest, ComputesUsageRuntimeUseAllocatedWithRealMemoryStats) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.fixed_heap_use_allocated", "true"}});
+
+  envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
+  const uint64_t max_heap = 1024 * 1024 * 1024;
+  config.set_max_heap_size_bytes(max_heap);
+  auto stats_reader = std::make_unique<MemoryStatsReader>();
+  const double expected_pressure =
+      stats_reader->allocatedHeapBytes() / static_cast<double>(max_heap);
+  auto monitor = std::make_unique<FixedHeapMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  EXPECT_NEAR(resource.pressure(), expected_pressure, 0.0005);
+}
+
 } // namespace
 } // namespace FixedHeapMonitor
 } // namespace ResourceMonitors
