@@ -294,7 +294,7 @@ OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
       Envoy::Matcher::evaluateMatch<Stats::StatMatchingData>(*config_->matcher(), data);
   ASSERT(result.isComplete());
   if (result.isMatch()) {
-    if (dynamic_cast<const SkipAction*>(result.action().get())) {
+    if (dynamic_cast<const DropAction*>(result.action().get())) {
       return {true, {}};
     }
 
@@ -355,7 +355,7 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   for (const auto& gauge : snapshot.gauges()) {
     if (predicate_(gauge)) {
       auto metric_config_result = getMetricConfig(gauge.get());
-      if (metric_config_result.skip_conversion)
+      if (metric_config_result.drop_stat)
         continue;
 
       const std::string metric_name =
@@ -366,7 +366,7 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   }
   for (const auto& gauge : snapshot.hostGauges()) {
     auto metric_config_result = getMetricConfig(gauge);
-    if (metric_config_result.skip_conversion)
+    if (metric_config_result.drop_stat)
       continue;
 
     const std::string metric_name = getMetricName(gauge, metric_config_result.conversion_action);
@@ -382,7 +382,7 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   for (const auto& counter : snapshot.counters()) {
     if (predicate_(counter.counter_)) {
       auto metric_config_result = getMetricConfig(counter.counter_.get());
-      if (metric_config_result.skip_conversion)
+      if (metric_config_result.drop_stat)
         continue;
 
       const std::string metric_name =
@@ -395,7 +395,7 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   }
   for (const auto& counter : snapshot.hostCounters()) {
     auto metric_config_result = getMetricConfig(counter);
-    if (metric_config_result.skip_conversion)
+    if (metric_config_result.drop_stat)
       continue;
 
     const std::string metric_name = getMetricName(counter, metric_config_result.conversion_action);
@@ -412,7 +412,7 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   for (const auto& histogram : snapshot.histograms()) {
     if (predicate_(histogram)) {
       auto metric_config_result = getMetricConfig(histogram.get());
-      if (metric_config_result.skip_conversion)
+      if (metric_config_result.drop_stat)
         continue;
 
       const std::string metric_name =

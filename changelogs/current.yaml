@@ -41,8 +41,8 @@ removed_config_or_runtime:
 new_features:
 - area: otlp_stat_sink
   change: |
-    Supported skipping conversion for matched stats via
-    :ref:`SkipAction
+    Supported dropping stats
+    :ref:`DropAction
     <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.SkipAction>` during custom metric conversion.
 - area: wasm
   change: |

@@ -184,7 +184,7 @@ public:
 
 private:
   struct MetricConfigResult {
-    bool skip_conversion{false};
+    bool drop_stat{false};
     OptRef<const SinkConfig::ConversionAction> conversion_action;
   };
 

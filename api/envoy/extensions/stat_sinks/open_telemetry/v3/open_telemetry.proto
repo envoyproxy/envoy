@@ -37,8 +37,8 @@ message SinkConfig {
     repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
   }
 
-  // SkipAction is used to skip conversion for the matched stats.
-  message SkipAction {
+  // DropAction is an action that, when matched, will prevent the stat from being converted to an OTLP metric and flushed.
+  message DropAction {
   }
 
   oneof protocol_specifier {
@@ -77,8 +77,8 @@ message SinkConfig {
 
   // The custom conversion from a stat to a metric. Currently, the only supported input is
   // ``envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput``.
-  // The supported actions is
-  // - ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.SkipAction``.
+  // The supported actions are
+  // - ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction``.
   // - ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction``.
   // If stats are not matched, they will be directly converted to OTLP metrics as usual.
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;

@@ -1079,7 +1079,7 @@ TEST_F(OtlpMetricsFlusherTests, DropMetrics) {
                 name: "otlp_metric_drop_action"
                 typed_config {
                   [type.googleapis.com/envoy.extensions.stat_sinks
-                       .open_telemetry.v3.SinkConfig.SkipAction] {}
+                       .open_telemetry.v3.SinkConfig.DropAction] {}
                 }
               }
             }
@@ -1144,7 +1144,7 @@ TEST_F(OtlpMetricsFlusherTests, OnNoMatchDrop) {
             name: "otlp_metric_drop_action"
             typed_config {
               [type.googleapis.com/envoy.extensions.stat_sinks
-                  .open_telemetry.v3.SinkConfig.SkipAction] {}
+                  .open_telemetry.v3.SinkConfig.DropAction] {}
             }
           }
         }

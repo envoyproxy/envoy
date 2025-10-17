@@ -6,7 +6,7 @@ namespace StatSinks {
 namespace OpenTelemetry {
 
 REGISTER_FACTORY(ConversionActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
-REGISTER_FACTORY(SkipActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
+REGISTER_FACTORY(DropActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
 
 } // namespace OpenTelemetry
 } // namespace StatSinks

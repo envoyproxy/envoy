@@ -34,11 +34,11 @@ private:
   const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction config_;
 };
 
-class SkipAction : public Matcher::ActionBase<
-                       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::SkipAction> {
+class DropAction : public Matcher::ActionBase<
+                       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::DropAction> {
 public:
-  explicit SkipAction(
-      const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::SkipAction&) {}
+  explicit DropAction(
+      const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::DropAction&) {}
 };
 
 class ActionValidationVisitor
@@ -69,22 +69,22 @@ public:
   }
 };
 
-class SkipActionFactory : public Matcher::ActionFactory<ActionContext> {
+class DropActionFactory : public Matcher::ActionFactory<ActionContext> {
 public:
   Matcher::ActionConstSharedPtr
   createAction(const Protobuf::Message& config, ActionContext&,
                ProtobufMessage::ValidationVisitor& validation_visitor) override {
     const auto& action_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::SkipAction&>(
+        const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::DropAction&>(
         config, validation_visitor);
-    return std::make_shared<SkipAction>(action_config);
+    return std::make_shared<DropAction>(action_config);
   }
 
-  std::string name() const override { return "otlp_metric_skip_action_factory"; }
+  std::string name() const override { return "otlp_metric_drop_action_factory"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::SkipAction>();
+        envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::DropAction>();
   }
 };
 } // namespace OpenTelemetry
