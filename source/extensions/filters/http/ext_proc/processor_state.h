@@ -149,7 +149,8 @@ public:
   void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                             CallbackState callback_state);
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
-                             CallbackState next_state = CallbackState::Idle, bool continue_and_replace = false);
+                             CallbackState next_state = CallbackState::Idle,
+                             bool continue_and_replace = false);
   void stopMessageTimer();
   bool restartMessageTimer(const uint32_t message_timeout_ms);
 

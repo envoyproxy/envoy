@@ -49,7 +49,8 @@ void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
         filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
     ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
     if (logging_info != nullptr) {
-      logging_info->recordGrpcCall(duration, call_status, callback_state_, trafficDirection(), continue_and_replace);
+      logging_info->recordGrpcCall(duration, call_status, callback_state_, trafficDirection(),
+                                   continue_and_replace);
     }
     call_start_time_ = absl::nullopt;
   }
@@ -165,7 +166,6 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
   }
 
   clearRouteCache(common_response);
-  // onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp(common_response));
 
   if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
     onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp(common_response), true);
