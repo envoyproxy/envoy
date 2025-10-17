@@ -126,11 +126,14 @@ public:
   ReverseTunnelAcceptorExtension* getUpstreamExtension() const { return extension_; }
 
   /**
-   * Automatically discern whether the key is a node ID or cluster ID.
-   * @param key the key to get the node ID for.
-   * @return the node ID.
+   * Get a node that has a socket (idle or used) for the given key.
+   * If the key is found in the cluster_to_node_info_map_, assume it is the cluster ID and return a
+   * node in that cluster in a round-robin manner. If the key is not found in the
+   * cluster_to_node_info_map_, assume it is the node ID and return it as-is.
+   * @param key the cluster ID or node ID to lookup.
+   * @return the node ID, or the key itself if it cannot be resolved.
    */
-  std::string getNodeID(const std::string& key);
+  std::string getNodeWithSocket(const std::string& key);
 
   /**
    * Pick the least loaded socket manager across all worker threads for a given node.
@@ -142,6 +145,13 @@ public:
                                                       const std::string& cluster_id);
 
 private:
+  /**
+   * Helper method to check if a node has any reverse connection sockets (idle or used).
+   * @param node_id the node ID to check.
+   * @return true if the node has any sockets, false otherwise.
+   */
+  bool hasAnySocketsForNode(const std::string& node_id);
+
   // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
   Random::RandomGeneratorPtr random_generator_;
@@ -150,19 +160,29 @@ private:
   absl::flat_hash_map<std::string, std::list<Network::ConnectionSocketPtr>>
       accepted_reverse_connections_;
 
-  // Map from file descriptor to node ID.
+  // Map from file descriptor to node ID. An entry is added when a reverse tunnel is accepted from a
+  // node and is removed when the socket dies.
   absl::flat_hash_map<int, std::string> fd_to_node_map_;
 
-  // Map from file descriptor to cluster ID. This is used to look up the cluster ID when a socket
-  // dies.
+  // Map from file descriptor to cluster ID. An entry is added when a reverse tunnel is accepted
+  // from a node and is removed when the socket dies.
   absl::flat_hash_map<int, std::string> fd_to_cluster_map_;
 
-  // Map of node ID to cluster.
+  // Map of node ID to cluster, for all nodes that have a reverse tunnel socket.
   absl::flat_hash_map<std::string, std::string> node_to_cluster_map_;
 
-  // Map of cluster IDs to node IDs for node ID that have idle sockets (sockets that have not seen
-  // data requests).
-  absl::flat_hash_map<std::string, std::vector<std::string>> cluster_to_node_map_;
+  // Cluster information for tracking member nodes.
+  struct ClusterInfo {
+    // List of node IDs that belong to this cluster and have any sockets (idle or used).
+    std::vector<std::string> nodes;
+    // Round-robin index for load distribution when selecting member nodes.
+    size_t round_robin_index = 0;
+  };
+
+  // Map of cluster IDs to cluster node information.
+  // A cluster entry is added when a reverse tunnel is accepted from a node in that cluster
+  // and is removed only when all nodes in the cluster have no remaining sockets.
+  absl::flat_hash_map<std::string, ClusterInfo> cluster_to_node_info_map_;
 
   // File events and timers for ping functionality.
   absl::flat_hash_map<int, Event::FileEventPtr> fd_to_event_map_;
