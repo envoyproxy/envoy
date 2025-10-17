@@ -488,10 +488,8 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
   }
   ASSERT(!header_name.empty());
   if (!Http::HeaderUtility::isPseudoHeader(header_name)) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_remove_empty_cookie")) {
-      if (header_name == "cookie" && header_value.empty()) {
-        return Http::HeaderUtility::HeaderValidationResult::DROP;
-      }
+    if (header_name == "cookie" && header_value.empty()) {
+      return Http::HeaderUtility::HeaderValidationResult::DROP;
     }
     return result;
   }
