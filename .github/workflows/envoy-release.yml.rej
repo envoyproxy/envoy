@@ -1,0 +1,32 @@
+--- .github/workflows/envoy-release.yml
++++ .github/workflows/envoy-release.yml
+@@ -65,13 +65,13 @@
+             with:
+               github-token: ${{ secrets.ENVOY_GITHUB_TOKEN }}
+               script: |
+-                const version = "${{ github.event.pull_request.title }}".match(/(\d+\.\d+\.\d+)/)[1];
+                 const { data: pr } = await github.rest.pulls.get({
+                   ...context.repo,
+                   pull_number: context.issue.number,
+                 });
++                const version = pr.title.match(/(\d+\.\d+\.\d+)/)[1];
+                 github.rest.git.createRef({
+                   ...context.repo,
+                   ref: `refs/heads/release/v${version}`,
+                   sha: pr.merge_commit_sha,
+                 });
+@@ -83,13 +83,13 @@
+             with:
+               github-token: ${{ secrets.ENVOY_GITHUB_TOKEN }}
+               script: |
+-                const version = "${{ github.event.pull_request.title }}".match(/(\d+\.\d+\.\d+)/)[1];
+                 const { data: pr } = await github.rest.pulls.get({
+                   ...context.repo,
+                   pull_number: context.issue.number,
+                 });
++                const version = pr.title.match(/(\d+\.\d+\.\d+)/)[1];
+                 github.rest.git.createRef({
+                   ...context.repo,
+                   ref: `refs/tags/v${version}`,
+                   sha: pr.merge_commit_sha,
+                 });
