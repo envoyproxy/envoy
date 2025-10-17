@@ -482,8 +482,8 @@ TEST_F(RouterTest, Http1Upstream) {
       .WillOnce(Invoke([this](Http::RequestHeaderMap& headers,
                               const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo&, bool) {
-        EXPECT_EQ(&context.requestHeaders(), &headers);
-        EXPECT_EQ(&context.activeSpan(), &span_);
+        EXPECT_EQ(context.requestHeaders().ptr(), &headers);
+        EXPECT_EQ(context.activeSpan().ptr(), &span_);
       }));
 
   router_->decodeHeaders(headers, true);

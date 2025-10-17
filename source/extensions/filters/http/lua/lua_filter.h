@@ -419,7 +419,7 @@ private:
   TimeSource& time_source_;
 
   // The inserted crypto object pointers will not be removed from this map.
-  absl::flat_hash_map<std::string, Envoy::Common::Crypto::CryptoObjectPtr> public_key_storage_;
+  absl::flat_hash_map<std::string, Envoy::Common::Crypto::PKeyObjectPtr> public_key_storage_;
 };
 
 /**

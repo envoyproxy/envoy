@@ -379,7 +379,12 @@ PERF
 PGV
 PID
 PKCE
+PKCS
 PKCS12
+PKCS1
+PKCS8
+PKCS#1
+PKCS#8
 PKTINFO
 PNG
 Pointwise
@@ -1210,6 +1215,7 @@ readded
 readonly
 readv
 realloc
+rebalance
 rebalanced
 rebalancer
 rebalancing
