@@ -3,7 +3,14 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
+Allshard
+FLUSHALL
+NUMPAT
+PUBSUB
+RANDOMKEY
+SLOWLOG
 addrlen
+flushdb
 itr
 STREQ
 htonl
@@ -1383,6 +1390,7 @@ struct
 structs
 subclassed
 subclasses
+subcommands
 subcomponent
 subdirectories
 subdirectory

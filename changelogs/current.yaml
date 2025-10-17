@@ -48,6 +48,9 @@ new_features:
   change: |
     Added ``sign`` foreign function to create cryptographic signatures.
     See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
+- area: redis
+  change: |
+    Added cluster-scope command support with flexible response handling framework.
 - area: overload management
   change: |
     The fixed heap resource monitor can now calculate memory pressure as currently allocated memory divided by maximum heap size,
