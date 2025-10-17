@@ -27,14 +27,15 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
+  void initializeFilter(const std::string& filter_config, const std::string& domain = "*",
+                        bool test_large_body = false) {
     config_helper_.prependFilter(filter_config);
 
     // Create static clusters.
     createClusters();
 
     config_helper_.addConfigModifier(
-        [domain](
+        [domain, test_large_body, this](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           hcm.mutable_route_config()
@@ -51,6 +52,10 @@ public:
               new_route->mutable_response_headers_to_add()->Add()->mutable_header();
           response_header->set_key("fake_header");
           response_header->set_value("fake_value");
+          if (downstream_protocol_ == Http::CodecType::HTTP2 && test_large_body) {
+            hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
+                16 * 1024 * 1024);
+          }
 
           const std::string key = "envoy.filters.http.lua";
           const std::string yaml =
@@ -202,7 +207,7 @@ public:
   }
 
   IntegrationStreamDecoderPtr initializeAndSendRequest(const std::string& code) {
-    initializeFilter(code);
+    initializeFilter(code, "*", true);
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
     Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                    {":path", "/test/long/url"},
