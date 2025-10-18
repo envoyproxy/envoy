@@ -9,7 +9,11 @@
 #include <thread>
 
 #include "source/common/api/os_sys_calls_impl_linux.h"
+#include "source/common/filesystem/filesystem_impl.h"
+#include "source/server/cgroup_cpu_util.h"
 #include "source/server/options_impl_platform.h"
+
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 
@@ -39,7 +43,30 @@ uint32_t OptionsImplPlatformLinux::getCpuAffinityCount(unsigned int hw_threads) 
 
 uint32_t OptionsImplPlatform::getCpuCount() {
   unsigned int hw_threads = std::max(1U, std::thread::hardware_concurrency());
-  return OptionsImplPlatformLinux::getCpuAffinityCount(hw_threads);
+  uint32_t affinity_count = OptionsImplPlatformLinux::getCpuAffinityCount(hw_threads);
+
+  uint32_t cgroup_limit = hw_threads; // Fallback to hardware threads if `cgroup` detection fails
+
+  // Check environment variable for cgroup detection (safe during early startup)
+  const char* env_value = std::getenv("ENVOY_CGROUP_CPU_DETECTION");
+  bool enable_cgroup_detection = true; // Default: enabled
+
+  if (env_value != nullptr) {
+    std::string value = absl::AsciiStrToLower(env_value);
+    enable_cgroup_detection = (value != "false");
+  }
+
+  if (enable_cgroup_detection) {
+    Filesystem::InstanceImpl fs;
+    auto& detector = CgroupDetectorSingleton::get();
+    absl::optional<uint32_t> detected_limit = detector.getCpuLimit(fs);
+    if (detected_limit.has_value()) {
+      cgroup_limit = detected_limit.value();
+    }
+  }
+
+  uint32_t effective_count = std::min({hw_threads, affinity_count, cgroup_limit});
+  return std::max(1U, effective_count);
 }
 
 } // namespace Envoy
