@@ -19,14 +19,21 @@ namespace Formatter {
 
 class CELFormatterTest : public ::testing::Test {
 public:
-  CELFormatterTest() { formatter_context_.setRequestHeaders(request_headers_); }
+  CELFormatterTest() {
+    formatter_context_.setRequestHeaders(request_headers_);
+    formatter_context_.setResponseHeaders(response_headers_);
+    formatter_context_.setResponseTrailers(response_trailers_);
+  }
 
   Http::TestRequestHeaderMapImpl request_headers_{
       {":method", "GET"},
       {":path", "/request/path?secret=parameter"},
       {":authority", "example.com:443"},
       {"x-envoy-original-path", "/original/path?secret=parameter"}};
+  Http::TestResponseHeaderMapImpl response_headers_;
+  Http::TestResponseTrailerMapImpl response_trailers_;
   StreamInfo::MockStreamInfo stream_info_;
+  std::string body_;
 
   Envoy::Formatter::HttpFormatterContext formatter_context_;
 
