@@ -63,21 +63,25 @@ public:
 
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
-static std::string testNameFromTestParams(
-    const HttpProtocolTestParams& params);
+  static std::string testNameFromTestParams(const HttpProtocolTestParams& params);
   static std::string
   protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
 
   HttpProtocolIntegrationTestBase(const HttpProtocolTestParams& test_params)
-      : HttpProtocolIntegrationTestBase(ConfigHelper::httpProxyConfig(
-            /*downstream_is_quic=*/test_params.downstream_protocol == Http::CodecType::HTTP3), test_params) {}
+      : HttpProtocolIntegrationTestBase(
+            ConfigHelper::httpProxyConfig(
+                /*downstream_is_quic=*/test_params.downstream_protocol == Http::CodecType::HTTP3),
+            test_params) {}
 
-  HttpProtocolIntegrationTestBase(const std::string config, const HttpProtocolTestParams& test_params)
-      : HttpIntegrationTest(test_params.downstream_protocol, test_params.version, config), test_params_(test_params),
+  HttpProtocolIntegrationTestBase(const std::string config,
+                                  const HttpProtocolTestParams& test_params)
+      : HttpIntegrationTest(test_params.downstream_protocol, test_params.version, config),
+        test_params_(test_params),
         use_universal_header_validator_(test_params.use_universal_header_validator) {
     setupHttp2ImplOverrides(test_params.http2_implementation);
     config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
-                                      test_params.use_universal_header_validator ? "true" : "false");
+                                      test_params.use_universal_header_validator ? "true"
+                                                                                 : "false");
   }
 
   void SetUp() override {
@@ -102,22 +106,24 @@ protected:
   bool async_lb_ = true;
 };
 
-
 // Variadic template used to add additional test params to Http protocol integration tests.
 template <typename... T>
-class HttpProtocolIntegrationTestWithParams : 
-                                public testing::WithParamInterface<typename std::conditional<(sizeof...(T) > 0), std::tuple<HttpProtocolTestParams, T...>, HttpProtocolTestParams>::type>,
-                                public HttpProtocolIntegrationTestBase {
-static const HttpProtocolTestParams&
-getTestBaseParam() {
+class HttpProtocolIntegrationTestWithParams
+    : public testing::WithParamInterface<
+          typename std::conditional<(sizeof...(T) > 0), std::tuple<HttpProtocolTestParams, T...>,
+                                    HttpProtocolTestParams>::type>,
+      public HttpProtocolIntegrationTestBase {
+  static const HttpProtocolTestParams& getTestBaseParam() {
     if constexpr (sizeof...(T) > 0) {
-        return std::get<0>(testing::TestWithParam<std::tuple<HttpProtocolTestParams, T...>>::GetParam());
+      return std::get<0>(
+          testing::TestWithParam<std::tuple<HttpProtocolTestParams, T...>>::GetParam());
     } else {
-        return testing::TestWithParam<HttpProtocolTestParams>::GetParam();
+      return testing::TestWithParam<HttpProtocolTestParams>::GetParam();
     }
-}
+  }
+
 public:
-    HttpProtocolIntegrationTestWithParams() : HttpProtocolIntegrationTestBase(getTestBaseParam()) {}
+  HttpProtocolIntegrationTestWithParams() : HttpProtocolIntegrationTestBase(getTestBaseParam()) {}
 };
 
 // Basic class used for testing without additional parameters.

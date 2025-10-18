@@ -196,12 +196,14 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntimeProto) {
 #endif
 }
 
-// Parameterized integration test. The parameters in the tupple are:
+// Parameterized integration test. The parameters in the tuple are:
 // - name of the test
 // - basic (legacy) outlier detection config snippet
 // - outlier detection extension config snippet to be added to the cluster
-// - response code to be sent from upstream 
-class OutlierDetectionIntegrationTest : public HttpProtocolIntegrationTestWithParams<std::tuple<std::string, absl::string_view, absl::string_view, uint32_t, absl::string_view>> {
+// - response code to be sent from upstream
+class OutlierDetectionIntegrationTest
+    : public HttpProtocolIntegrationTestWithParams<std::tuple<
+          std::string, absl::string_view, absl::string_view, uint32_t, absl::string_view>> {
 public:
   static constexpr size_t TEST_NAME = 0;
   static constexpr size_t BASIC_OD_CONFIG = 1;
@@ -209,31 +211,34 @@ public:
   static constexpr size_t RESPONSE_CODE = 3;
   static constexpr size_t OPTIONAL_HEADER = 4;
 
-    // TODO: can I define a type in the template and here just use that type instead of repeating whole thing?
-    static std::string protocolTestParamsToString(
-const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, std::tuple<std::string, absl::string_view, absl::string_view, uint32_t, absl::string_view>>>& params) {
-        
-        return absl::StrCat(HttpProtocolIntegrationTestBase::testNameFromTestParams(std::get<0>(params.param)), "_",
-               std::get<TEST_NAME>(std::get<1>(params.param)));
-    }
-    // Set of basic outlier detection configs. 
-    static constexpr absl::string_view consecutive_5xx_only = R"EOF(
+  // TODO: can I define a type in the template and here just use that type instead of repeating
+  // whole thing?
+  static std::string protocolTestParamsToString(
+      const ::testing::TestParamInfo<std::tuple<
+          HttpProtocolTestParams, std::tuple<std::string, absl::string_view, absl::string_view,
+                                             uint32_t, absl::string_view>>>& params) {
+
+    return absl::StrCat(
+        HttpProtocolIntegrationTestBase::testNameFromTestParams(std::get<0>(params.param)), "_",
+        std::get<TEST_NAME>(std::get<1>(params.param)));
+  }
+  // Set of basic outlier detection configs.
+  static constexpr absl::string_view consecutive_5xx_only = R"EOF(
       consecutive_5xx: 2
       max_ejection_percent: 100
     )EOF";
 
-    static constexpr absl::string_view gateway_only = R"EOF(
+  static constexpr absl::string_view gateway_only = R"EOF(
       consecutive_5xx: 0
       consecutive_gateway_failure: 2
       enforcing_consecutive_gateway_failure: 100
       max_ejection_percent: 100
         )EOF";
 
-
-    // set of different outlier detection extension configs.
-    // Configure any response with code 300-305 or response test-header containing
-    // string "treat-as-error" to be treated as 5xx code.
-    static constexpr absl::string_view error_3xx_and_header = R"EOF(
+  // set of different outlier detection extension configs.
+  // Configure any response with code 300-305 or response test-header containing
+  // string "treat-as-error" to be treated as 5xx code.
+  static constexpr absl::string_view error_3xx_and_header = R"EOF(
          outlier_detection:
            error_matcher:
              or_match:
@@ -251,7 +256,7 @@ const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, std::tuple<std
                          contains: "treat-as-error"
     )EOF";
 
-    static constexpr absl::string_view gateway_error = R"EOF(
+  static constexpr absl::string_view gateway_error = R"EOF(
          outlier_detection:
            error_matcher:
                http_response_headers_match:
@@ -296,10 +301,10 @@ TEST_P(OutlierDetectionIntegrationTest, ExtensionsTest) {
     )EOF";
     }
 
-    // Add config outlier detection extensionconfig
+    // Add config outlier detection extension config
     protocol_options_yaml += std::get<EXT_OD_CONFIG>(std::get<1>(GetParam()));
 
-        TestUtility::loadFromYaml(protocol_options_yaml, protocol_options);
+    TestUtility::loadFromYaml(protocol_options_yaml, protocol_options);
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
@@ -312,8 +317,9 @@ TEST_P(OutlierDetectionIntegrationTest, ExtensionsTest) {
   default_response_headers_.setStatus(response_code);
   // Add header if test parameter includes one.
   if (!std::get<OPTIONAL_HEADER>(std::get<1>(GetParam())).empty()) {
-  default_response_headers_.appendCopy(Http::LowerCaseString("test-header"), std::get<OPTIONAL_HEADER>(std::get<1>(GetParam())));
-    }
+    default_response_headers_.appendCopy(Http::LowerCaseString("test-header"),
+                                         std::get<OPTIONAL_HEADER>(std::get<1>(GetParam())));
+  }
   for (auto i = 1; i <= 2; i++) {
     auto response =
         sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
@@ -335,23 +341,28 @@ TEST_P(OutlierDetectionIntegrationTest, ExtensionsTest) {
 
 INSTANTIATE_TEST_SUITE_P(
     Protocols, OutlierDetectionIntegrationTest,
-    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTestBase::getProtocolTestParamsWithoutHTTP3()), 
-                     testing::Values(
-                        // Regression test.  Test verifies that empty outlier detection setting in protocol options
-                        // do not interfere with existing outlier detection.
-                        std::make_tuple(std::string("test1"), OutlierDetectionIntegrationTest::consecutive_5xx_only, std::string(""), 500, ""),
-                        // In this test, outlier extentions define 3xx codes as errors.
-                        std::make_tuple(std::string("test2"), OutlierDetectionIntegrationTest::consecutive_5xx_only, 
-                        OutlierDetectionIntegrationTest::error_3xx_and_header, 301, ""),
-                        // Test verifies that when outlier extensions include gateway code 502, that code
-                        // is forwarded in original form and is not converted to generic code 500.
-                        std::make_tuple(std::string("test3"), OutlierDetectionIntegrationTest::gateway_only, 
-                        OutlierDetectionIntegrationTest::gateway_error, 502, ""),
-                        // Test verifies that responses where a matcher matches not code, but response
-                        // header are treated as errors.
-                        std::make_tuple(std::string("test4"), OutlierDetectionIntegrationTest::consecutive_5xx_only, 
-                        OutlierDetectionIntegrationTest::error_3xx_and_header, 200, "treat-as-error")
-                        )),
+    testing::Combine(
+        testing::ValuesIn(HttpProtocolIntegrationTestBase::getProtocolTestParamsWithoutHTTP3()),
+        testing::Values(
+            // Regression test. Test verifies that empty outlier detection setting in protocol
+            // options do not interfere with existing outlier detection.
+            std::make_tuple(std::string("test1"),
+                            OutlierDetectionIntegrationTest::consecutive_5xx_only, std::string(""),
+                            500, ""),
+            // In this test, outlier extensions define 3xx codes as errors.
+            std::make_tuple(std::string("test2"),
+                            OutlierDetectionIntegrationTest::consecutive_5xx_only,
+                            OutlierDetectionIntegrationTest::error_3xx_and_header, 301, ""),
+            // Test verifies that when outlier extensions include gateway code 502, that code
+            // is forwarded in original form and is not converted to generic code 500.
+            std::make_tuple(std::string("test3"), OutlierDetectionIntegrationTest::gateway_only,
+                            OutlierDetectionIntegrationTest::gateway_error, 502, ""),
+            // Test verifies that responses where a matcher matches not code, but response
+            // header are treated as errors.
+            std::make_tuple(std::string("test4"),
+                            OutlierDetectionIntegrationTest::consecutive_5xx_only,
+                            OutlierDetectionIntegrationTest::error_3xx_and_header, 200,
+                            "treat-as-error"))),
     OutlierDetectionIntegrationTest::protocolTestParamsToString);
 
 } // namespace
