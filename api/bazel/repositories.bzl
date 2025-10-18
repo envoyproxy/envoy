@@ -24,6 +24,8 @@ def api_dependencies():
     )
     external_http_archive(
         name = "com_github_bufbuild_protovalidate_cc",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:protovalidate_cc.patch"],
     )
     external_http_archive(
         name = "com_google_googleapis",
