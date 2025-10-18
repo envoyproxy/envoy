@@ -1,7 +1,6 @@
 #include "source/extensions/tracers/opentelemetry/config.h"
 
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
-#include "envoy/config/trace/v3/opentelemetry.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/logger.h"

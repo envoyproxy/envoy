@@ -14,7 +14,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
-#include "envoy/service/runtime/v3/rtds.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"

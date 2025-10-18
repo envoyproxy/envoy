@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/cors/v3/cors.pb.h"
-#include "envoy/extensions/filters/http/cors/v3/cors.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

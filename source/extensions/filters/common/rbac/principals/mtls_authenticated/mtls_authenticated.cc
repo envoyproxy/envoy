@@ -1,6 +1,5 @@
 #include "source/extensions/filters/common/rbac/principals/mtls_authenticated/mtls_authenticated.h"
 
-#include "envoy/extensions/rbac/principals/mtls_authenticated/v3/mtls_authenticated.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

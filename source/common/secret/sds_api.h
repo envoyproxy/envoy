@@ -8,7 +8,6 @@
 #include "envoy/config/subscription_factory.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.validate.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"

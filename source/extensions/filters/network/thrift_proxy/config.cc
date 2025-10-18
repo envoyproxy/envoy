@@ -6,7 +6,6 @@
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 

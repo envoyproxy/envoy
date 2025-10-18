@@ -10,7 +10,6 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
-#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_validator.h"
 #include "envoy/server/filter_config.h"

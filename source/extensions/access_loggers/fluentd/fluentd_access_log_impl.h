@@ -3,7 +3,6 @@
 #include <chrono>
 
 #include "envoy/extensions/access_loggers/fluentd/v3/fluentd.pb.h"
-#include "envoy/extensions/access_loggers/fluentd/v3/fluentd.pb.validate.h"
 
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"

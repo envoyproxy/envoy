@@ -2,7 +2,6 @@
 
 #include "envoy/common/hashable.h"
 #include "envoy/common/optref.h"
-#include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/scalar_to_byte_vector.h"

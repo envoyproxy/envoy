@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
-#include "envoy/extensions/access_loggers/file/v3/file.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 

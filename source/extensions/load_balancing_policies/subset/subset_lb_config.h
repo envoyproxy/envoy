@@ -2,9 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/load_balancing_policies/common/v3/common.pb.h"
-#include "envoy/extensions/load_balancing_policies/common/v3/common.pb.validate.h"
 #include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
-#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.validate.h"
 #include "envoy/upstream/load_balancer.h"
 
 namespace Envoy {

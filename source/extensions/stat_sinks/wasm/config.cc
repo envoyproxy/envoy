@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "envoy/extensions/stat_sinks/wasm/v3/wasm.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 

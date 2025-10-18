@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.h"
-#include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/extensions/http/injected_credentials/common/credential.h"

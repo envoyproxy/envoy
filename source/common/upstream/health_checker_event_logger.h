@@ -3,7 +3,6 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/callback.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
-#include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/event/timer.h"

@@ -1,7 +1,6 @@
 #include "source/extensions/stat_sinks/metrics_service/config.h"
 
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
-#include "envoy/config/metrics/v3/metrics_service.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/assert.h"

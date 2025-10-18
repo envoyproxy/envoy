@@ -9,7 +9,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/type/v3/percent.pb.h"
-#include "envoy/type/v3/percent.pb.validate.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"

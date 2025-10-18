@@ -10,7 +10,6 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/extensions/upstreams/tcp/v3/tcp_protocol_options.pb.h"
-#include "envoy/extensions/upstreams/tcp/v3/tcp_protocol_options.pb.validate.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 

@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
-#include "envoy/config/endpoint/v3/endpoint_components.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/stats/scope.h"

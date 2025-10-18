@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/generic_proxy/router/v3/router.pb.h"
-#include "envoy/extensions/filters/network/generic_proxy/router/v3/router.pb.validate.h"
 
 #include "source/extensions/filters/network/generic_proxy/interface/filter.h"
 #include "source/extensions/filters/network/generic_proxy/router/router.h"

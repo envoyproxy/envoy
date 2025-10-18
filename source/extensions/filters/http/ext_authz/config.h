@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
-#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/http/common/factory_base.h"

@@ -11,7 +11,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
-#include "source/extensions/tracers/xray/daemon.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

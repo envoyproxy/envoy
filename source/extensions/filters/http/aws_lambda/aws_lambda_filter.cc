@@ -18,7 +18,6 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/const_singleton.h"
-#include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
