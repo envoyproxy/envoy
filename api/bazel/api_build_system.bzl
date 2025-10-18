@@ -67,7 +67,6 @@ def api_cc_py_proto_library(
         visibility = ["//visibility:private"],
         srcs = [],
         deps = [],
-        linkstatic = 0,
         has_services = 0,
         java = True):
     relative_name = ":" + name
@@ -91,7 +90,6 @@ def api_cc_py_proto_library(
     cc_proto_library_name = name + _CC_PROTO_SUFFIX
     cc_proto_library(
         name = cc_proto_library_name,
-        linkstatic = linkstatic,
         deps = [relative_name],
         visibility = ["//visibility:public"],
     )
