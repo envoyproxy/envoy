@@ -113,8 +113,10 @@ public:
    * @param socket UDP socket used to send packets.
    * @return the UdpPacketWriter created.
    */
-  virtual UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
-                                                   Stats::Scope& scope) PURE;
+  virtual UdpPacketWriterPtr
+  createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope,
+                        Envoy::Event::Dispatcher& dispatcher,
+                        absl::AnyInvocable<void() &&> on_can_write_cb) PURE;
 };
 
 using UdpPacketWriterFactoryPtr = std::unique_ptr<UdpPacketWriterFactory>;

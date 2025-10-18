@@ -8237,7 +8237,8 @@ address:
           .udpListenerConfig()
           ->packetWriterFactory()
           .createUdpPacketWriter(listen_socket->ioHandle(),
-                                 manager_->listeners()[0].get().listenerScope());
+                                 manager_->listeners()[0].get().listenerScope(),
+                                 server_.dispatcher_, []() {});
   EXPECT_FALSE(udp_packet_writer->isBatchMode());
 }
 

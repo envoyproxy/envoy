@@ -176,7 +176,8 @@ filter_chain_matcher:
           .udpListenerConfig()
           ->packetWriterFactory()
           .createUdpPacketWriter(listen_socket->ioHandle(),
-                                 manager_->listeners()[0].get().listenerScope());
+                                 manager_->listeners()[0].get().listenerScope(),
+                                 server_.dispatcher_, []() {});
   EXPECT_EQ(udp_packet_writer->isBatchMode(), Api::OsSysCallsSingleton::get().supportsUdpGso());
 
   // No filter chain found with non-matching transport protocol.
@@ -267,7 +268,8 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
   Network::UdpPacketWriterFactory& udp_packet_writer_factory =
       manager_->listeners().front().get().udpListenerConfig()->packetWriterFactory();
   Network::UdpPacketWriterPtr udp_packet_writer = udp_packet_writer_factory.createUdpPacketWriter(
-      listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
+      listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope(),
+      server_.dispatcher_, []() {});
   // Even though GSO is enabled, the default writer should be used.
   EXPECT_EQ(false, udp_packet_writer->isBatchMode());
 }

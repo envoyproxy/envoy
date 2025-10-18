@@ -472,7 +472,9 @@ public:
   MockUdpPacketWriterFactory() = default;
 
   MOCK_METHOD(Network::UdpPacketWriterPtr, createUdpPacketWriter,
-              (Network::IoHandle&, Stats::Scope&), ());
+              (Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
+               absl::AnyInvocable<void() &&>),
+              ());
 };
 
 class MockUdpListenerConfig : public UdpListenerConfig {

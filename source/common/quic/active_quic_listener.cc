@@ -97,10 +97,13 @@ ActiveQuicListener::ActiveQuicListener(
       per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
       *connection_id_generator_, debug_visitor_factory);
 
+  absl::AnyInvocable<void() &&> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
+
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
       listener_config.udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
-          listen_socket_.ioHandle(), listener_config.listenerScope());
+          listen_socket_.ioHandle(), listener_config.listenerScope(), dispatcher,
+          std::move(on_can_write_cb));
   udp_packet_writer_ = udp_packet_writer.get();
 
   // Some packet writers (like `UdpGsoBatchWriter`) already directly implement

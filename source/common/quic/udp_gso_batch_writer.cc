@@ -103,7 +103,9 @@ UdpGsoBatchWriterStats UdpGsoBatchWriter::generateStats(Stats::Scope& scope) {
 }
 
 Network::UdpPacketWriterPtr
-UdpGsoBatchWriterFactory::createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope) {
+UdpGsoBatchWriterFactory::createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope,
+                                                Envoy::Event::Dispatcher&,
+                                                absl::AnyInvocable<void() &&>) {
   return std::make_unique<UdpGsoBatchWriter>(io_handle, scope);
 }
 

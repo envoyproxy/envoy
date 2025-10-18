@@ -98,7 +98,8 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
 
   // Create udp_packet_writer
   udp_packet_writer_ = config_->udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
-      listen_socket_.ioHandle(), config.listenerScope());
+      listen_socket_.ioHandle(), config.listenerScope(), /*dispatcher=*/udp_listener_->dispatcher(),
+      /*on_can_write_cb=*/[]() {});
 }
 
 void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {

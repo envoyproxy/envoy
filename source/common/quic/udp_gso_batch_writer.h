@@ -92,8 +92,10 @@ private:
 
 class UdpGsoBatchWriterFactory : public Network::UdpPacketWriterFactory {
 public:
-  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
-                                                    Stats::Scope& scope) override;
+  Network::UdpPacketWriterPtr
+  createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope,
+                        Envoy::Event::Dispatcher& dispatcher,
+                        absl::AnyInvocable<void() &&> on_can_write_cb) override;
 
 private:
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
