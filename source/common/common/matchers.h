@@ -400,7 +400,7 @@ public:
 
 private:
   const std::string key_;
-  const FilterStateObjectMatcherPtr object_matcher_;
+  FilterStateObjectMatcherPtr object_matcher_;
 };
 
 using FilterStateMatcherPtr = std::unique_ptr<FilterStateMatcher>;

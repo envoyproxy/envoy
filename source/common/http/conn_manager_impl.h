@@ -250,11 +250,15 @@ private:
       informational_headers_ = std::move(informational_headers);
     }
     void setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) override {
-      // We'll overwrite the headers in the case where we fail the stream after upstream headers
-      // have begun filter processing but before they have been sent downstream.
+      if (response_headers_ != nullptr) {
+        overwritten_headers_.emplace_back(std::move(response_headers_));
+      }
       response_headers_ = std::move(response_headers);
     }
     void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override {
+      if (response_trailers_ != nullptr) {
+        overwritten_headers_.emplace_back(std::move(response_trailers_));
+      }
       response_trailers_ = std::move(response_trailers);
     }
     void chargeStats(const ResponseHeaderMap& headers) override;
@@ -342,36 +346,30 @@ private:
 
     // All state for the stream. Put here for readability.
     struct State {
-      State()
-          : codec_saw_local_complete_(false), codec_encode_complete_(false),
-            on_reset_stream_called_(false), is_zombie_stream_(false), successful_upgrade_(false),
-            is_internally_destroyed_(false), is_internally_created_(false), is_tunneling_(false),
-            decorated_propagate_(true), deferred_to_next_io_iteration_(false),
-            deferred_end_stream_(false) {}
-
       // It's possibly for the codec to see the completed response but not fully
       // encode it.
-      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as the completed
-                                          // response has made its way to the codec.
-      bool codec_encode_complete_ : 1;    // This indicates that the codec has
-                                          // completed encoding the response.
-      bool on_reset_stream_called_ : 1;   // Whether the stream has been reset.
-      bool is_zombie_stream_ : 1;         // Whether stream is waiting for signal
-                                          // the underlying codec to be destroyed.
-      bool successful_upgrade_ : 1;
+      bool codec_saw_local_complete_ : 1 = false; // This indicates that local is complete
+                                                  // as the completed
+                                                  // response has made its way to the codec.
+      bool codec_encode_complete_ : 1 = false;    // This indicates that the codec has
+                                                  // completed encoding the response.
+      bool on_reset_stream_called_ : 1 = false;   // Whether the stream has been reset.
+      bool is_zombie_stream_ : 1 = false;         // Whether stream is waiting for signal
+                                                  // the underlying codec to be destroyed.
+      bool successful_upgrade_ : 1 = false;
 
       // True if this stream was the original externally created stream, but was
       // destroyed as part of internal redirect.
-      bool is_internally_destroyed_ : 1;
+      bool is_internally_destroyed_ : 1 = false;
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
-      bool is_internally_created_ : 1;
+      bool is_internally_created_ : 1 = false;
 
       // True if the response headers indicate a successful upgrade or connect
       // response.
-      bool is_tunneling_ : 1;
+      bool is_tunneling_ : 1 = false;
 
-      bool decorated_propagate_ : 1;
+      bool decorated_propagate_ : 1 = true;
 
       // True if the decorator operation is overridden by the request header.
       bool decorator_overriden_ : 1 = false;
@@ -381,8 +379,8 @@ private:
       // they are deferred too.
       // TODO(yanavlasov): encapsulate the entire state of deferred streams into a separate
       // structure, so it can be atomically created and cleared.
-      bool deferred_to_next_io_iteration_ : 1;
-      bool deferred_end_stream_ : 1;
+      bool deferred_to_next_io_iteration_ : 1 = false;
+      bool deferred_end_stream_ : 1 = false;
     };
 
     bool canDestroyStream() const {
@@ -447,6 +445,13 @@ private:
     ResponseHeaderMapPtr informational_headers_;
     ResponseHeaderMapSharedPtr response_headers_;
     ResponseTrailerMapSharedPtr response_trailers_;
+
+    // Keep track all the historical headers to avoid potential lifetime issues.
+    // For example,
+    // when Envoy processing a response, if we send a local reply, then the local reply
+    // headers will overwrite the original response and result in the previous response
+    // being dangling. To avoid this, we store the original headers.
+    std::vector<std::shared_ptr<HeaderMap>> overwritten_headers_;
 
     // Note: The FM must outlive the above headers, as they are possibly accessed during filter
     // destruction.

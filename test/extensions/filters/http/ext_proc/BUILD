@@ -319,6 +319,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc:mutation_utils_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
     ],

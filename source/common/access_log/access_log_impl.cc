@@ -48,6 +48,8 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
     return lhs == value;
   case envoy::config::accesslog::v3::ComparisonFilter::LE:
     return lhs <= value;
+  case envoy::config::accesslog::v3::ComparisonFilter::NE:
+    return lhs != value;
   }
   IS_ENVOY_BUG("unexpected comparison op enum");
   return false;
@@ -213,7 +215,8 @@ HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& con
 
 bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
                             const StreamInfo::StreamInfo&) const {
-  return header_data_->matchesHeaders(context.requestHeaders());
+  return header_data_->matchesHeaders(
+      context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers));
 }
 
 ResponseFlagFilter::ResponseFlagFilter(
@@ -261,8 +264,9 @@ bool GrpcStatusFilter::evaluate(const Formatter::HttpFormatterContext& context,
                                 const StreamInfo::StreamInfo& info) const {
 
   Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
-  const auto& optional_status =
-      Grpc::Common::getGrpcStatus(context.responseTrailers(), context.responseHeaders(), info);
+  const auto optional_status = Grpc::Common::getGrpcStatus(
+      context.responseTrailers().value_or(*Http::StaticEmptyHeaders::get().response_trailers),
+      context.responseHeaders().value_or(*Http::StaticEmptyHeaders::get().response_headers), info);
   if (optional_status.has_value()) {
     status = optional_status.value();
   }
