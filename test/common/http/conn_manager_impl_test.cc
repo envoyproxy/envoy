@@ -1201,6 +1201,17 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
 
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        auto test_req_headers = Http::TestRequestHeaderMapImpl{{":authority", "www.choice.com"},
+                                                               {":path", "/new_endpoint/foo"},
+                                                               {":method", "GET"},
+                                                               {"x-forwarded-proto", "http"}};
+
+        Formatter::HttpFormatterContext formatter_context;
+
+        // Coverage for finalizeRequestHeaders
+        NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+        formatter_context.setRequestHeaders(test_req_headers);
+
         // Check that cached_route was correctly set to the delegating route.
         EXPECT_EQ(delegating_route_foo, decoder_filters_[1]->callbacks_->route());
 
@@ -1213,12 +1224,10 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         EXPECT_EQ(default_route->routeEntry()->corsPolicy(),
                   delegating_route_foo->routeEntry()->corsPolicy());
 
-        auto test_req_headers = Http::TestRequestHeaderMapImpl{{":authority", "www.choice.com"},
-                                                               {":path", "/new_endpoint/foo"},
-                                                               {":method", "GET"},
-                                                               {"x-forwarded-proto", "http"}};
-        EXPECT_EQ(default_route->routeEntry()->currentUrlPathAfterRewrite(test_req_headers),
-                  delegating_route_foo->routeEntry()->currentUrlPathAfterRewrite(test_req_headers));
+        EXPECT_EQ(default_route->routeEntry()->currentUrlPathAfterRewrite(
+                      test_req_headers, formatter_context, stream_info),
+                  delegating_route_foo->routeEntry()->currentUrlPathAfterRewrite(
+                      test_req_headers, formatter_context, stream_info));
 
         EXPECT_EQ(default_route->routeEntry()->hashPolicy(),
                   delegating_route_foo->routeEntry()->hashPolicy());
@@ -1322,11 +1331,6 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
 
         EXPECT_EQ(default_route->routeName(), delegating_route_foo->routeName());
 
-        Formatter::HttpFormatterContext formatter_context;
-
-        // Coverage for finalizeRequestHeaders
-        NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-        formatter_context.setRequestHeaders(test_req_headers);
         delegating_route_foo->routeEntry()->finalizeRequestHeaders(
             test_req_headers, formatter_context, stream_info, true);
         EXPECT_EQ("/new_endpoint/foo", test_req_headers.get_(Http::Headers::get().Path));

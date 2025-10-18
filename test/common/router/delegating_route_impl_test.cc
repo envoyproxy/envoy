@@ -57,7 +57,7 @@ TEST(DelegatingRouteEntry, DelegatingRouteEntryTest) {
   TEST_METHOD(clusterName);
   TEST_METHOD(clusterNotFoundResponseCode);
   TEST_METHOD(corsPolicy);
-  TEST_METHOD(currentUrlPathAfterRewrite, request_headers);
+  TEST_METHOD(currentUrlPathAfterRewrite, request_headers, formatter_context, stream_info);
   TEST_METHOD(finalizeRequestHeaders, request_headers, formatter_context, stream_info, true);
   TEST_METHOD(requestHeaderTransforms, stream_info);
   TEST_METHOD(hashPolicy);

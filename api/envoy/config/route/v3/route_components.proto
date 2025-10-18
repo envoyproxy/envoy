@@ -805,7 +805,7 @@ message CorsPolicy {
   google.protobuf.BoolValue forward_not_matching_preflights = 13;
 }
 
-// [#next-free-field: 43]
+// [#next-free-field: 46]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -1181,9 +1181,11 @@ message RouteAction {
   // place the original path before rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
-  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`
+  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
   // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`,
-  // or :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>` may be specified.
+  // :ref:`path_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite>`,
+  // or :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`
+  // may be specified.
   //
   // .. attention::
   //
@@ -1219,8 +1221,9 @@ message RouteAction {
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
   // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
-  // :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`, or
-  // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`]
+  // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`,
+  // :ref:`path_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite>`,
+  // or :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`
   // may be specified.
   //
   // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
@@ -1243,6 +1246,33 @@ message RouteAction {
 
   // [#extension-category: envoy.path.rewrite]
   core.v3.TypedExtensionConfig path_rewrite_policy = 41;
+
+  // Rewrites the whole path (without query parameters) with the given path value.
+  // The router filter will
+  // place the original path before rewrite into the :ref:`x-envoy-original-path
+  // <config_http_filters_router_x-envoy-original-path>` header.
+  //
+  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
+  // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`,
+  // :ref:`path_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite>`,
+  // or :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`
+  // may be specified.
+  //
+  // The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
+  // For example, with the following config:
+  //
+  //   .. code-block:: yaml
+  //
+  //     path_rewrite: "/new_path_prefix%REQ(custom-path-header-name)%"
+  //
+  // Would rewrite the path to ``/new_path_prefix/some_value`` given the header
+  // ``custom-path-header-name: some_value``. If the header is not present, the path will be
+  // rewritten to ``/new_path_prefix``.
+  //
+  //
+  // If the final output of the path rewrite is empty, then the update will be ignored and the
+  // original path will be preserved.
+  string path_rewrite = 45;
 
   // If one of the host rewrite specifiers is set and the
   // :ref:`suppress_envoy_headers
@@ -1302,6 +1332,25 @@ message RouteAction {
     //
     // Would rewrite the host header to ``envoyproxy.io`` given the path ``/envoyproxy.io/some/path``.
     type.matcher.v3.RegexMatchAndSubstitute host_rewrite_path_regex = 35;
+
+    // Rewrites the host header with the value of this field. The router filter will
+    // place the original host header value before rewriting into the :ref:`x-envoy-original-host
+    // <config_http_filters_router_x-envoy-original-host>` header.
+    //
+    // The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
+    // For example, with the following config:
+    //
+    //   .. code-block:: yaml
+    //
+    //     host_rewrite: "prefix-%REQ(custom-host-header-name)%"
+    //
+    // Would rewrite the host header to ``prefix-some_value`` given the header
+    // ``custom-host-header-name: some_value``. If the header is not present, the host header will
+    // be rewritten to an value of ``prefix-``.
+    //
+    // If the final output of the host rewrite is empty, then the update will be ignored and the
+    // original host header will be preserved.
+    string host_rewrite = 44;
   }
 
   // If set, then a host rewrite action (one of

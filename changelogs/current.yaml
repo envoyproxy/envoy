@@ -5,6 +5,16 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: router
+  change: |
+    Added :ref:`host_rewrite
+    <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite>` to
+    :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` to support substitution
+    formatting for host header rewriting.
+    Added :ref:`path_rewrite
+    <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite>` to
+    :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` to support substitution
+    formatting for path header rewriting.
 - area: ext_proc
   change: |
     Use one of a hard-coded set of error messages when a :ref:`HeaderMutation
