@@ -201,6 +201,7 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntimeProto) {
 // - basic (legacy) outlier detection config snippet
 // - outlier detection extension config snippet to be added to the cluster
 // - response code to be sent from upstream
+// - optional response header value
 class OutlierDetectionIntegrationTest
     : public HttpProtocolIntegrationTestWithParams<std::tuple<
           std::string, absl::string_view, absl::string_view, uint32_t, absl::string_view>> {
@@ -211,12 +212,7 @@ public:
   static constexpr size_t RESPONSE_CODE = 3;
   static constexpr size_t OPTIONAL_HEADER = 4;
 
-  // TODO: can I define a type in the template and here just use that type instead of repeating
-  // whole thing?
-  static std::string protocolTestParamsToString(
-      const ::testing::TestParamInfo<std::tuple<
-          HttpProtocolTestParams, std::tuple<std::string, absl::string_view, absl::string_view,
-                                             uint32_t, absl::string_view>>>& params) {
+  static std::string protocolTestParamsToString(const ::testing::TestParamInfo<ParamType>& params) {
 
     return absl::StrCat(
         HttpProtocolIntegrationTestBase::testNameFromTestParams(std::get<0>(params.param)), "_",
@@ -347,8 +343,7 @@ INSTANTIATE_TEST_SUITE_P(
             // Regression test. Test verifies that empty outlier detection setting in protocol
             // options do not interfere with existing outlier detection.
             std::make_tuple(std::string("test1"),
-                            OutlierDetectionIntegrationTest::consecutive_5xx_only, std::string(""),
-                            500, ""),
+                            OutlierDetectionIntegrationTest::consecutive_5xx_only, "", 500, ""),
             // In this test, outlier extensions define 3xx codes as errors.
             std::make_tuple(std::string("test2"),
                             OutlierDetectionIntegrationTest::consecutive_5xx_only,
