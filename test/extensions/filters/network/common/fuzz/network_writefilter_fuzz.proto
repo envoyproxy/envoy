@@ -16,7 +16,7 @@ message AdvanceTime {
 
 message WriteAction {
   oneof action_selector {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
     // Call onWrite()
     OnWrite on_write = 2;
     // Advance time_source_

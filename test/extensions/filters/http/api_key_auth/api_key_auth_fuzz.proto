@@ -8,10 +8,10 @@ import "buf/validate/validate.proto";
 
 message ApiKeyAuthFuzzInput {
   envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuth filter_config = 1
-      [(buf.validate.field).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute route_config = 2;
 
   // HTTP request data.
-  test.fuzz.HttpData request_data = 3 [(buf.validate.field).message = {required: true}];
+  test.fuzz.HttpData request_data = 3 [(buf.validate.field).required = true];
 }

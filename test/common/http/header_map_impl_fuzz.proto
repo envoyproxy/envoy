@@ -72,7 +72,7 @@ message Get {
 
 message Action {
   oneof action_selector {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
     AddReference add_reference = 1;
     AddReferenceKey add_reference_key = 2;
     AddCopy add_copy = 3;

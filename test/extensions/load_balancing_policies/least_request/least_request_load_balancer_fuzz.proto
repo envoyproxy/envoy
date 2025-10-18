@@ -9,7 +9,7 @@ import "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_
 
 message LeastRequestLoadBalancerTestCase {
   test.common.upstream.ZoneAwareLoadBalancerTestCase zone_aware_load_balancer_test_case = 1
-      [(buf.validate.field).message.required = true];
+      [(buf.validate.field).required = true];
   envoy.config.cluster.v3.Cluster.LeastRequestLbConfig least_request_lb_config = 2;
   // This is used to determine the requests for each host - will wrap around if runs out of space
   bytes random_bytestring_for_requests = 3 [(buf.validate.field).bytes = {min_len: 1, max_len: 2048}];

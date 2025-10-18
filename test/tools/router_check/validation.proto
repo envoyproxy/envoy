@@ -25,10 +25,10 @@ message ValidationItem {
   string test_name = 1 [(buf.validate.field).string.min_len = 1];
 
   // The input constraints of the test case.
-  ValidationInput input = 2 [(buf.validate.field).message.required = true];
+  ValidationInput input = 2 [(buf.validate.field).required = true];
 
   // The validations that need to be performed on the resultant route.
-  ValidationAssert validate = 3 [(buf.validate.field).message.required = true];
+  ValidationAssert validate = 3 [(buf.validate.field).required = true];
 }
 
 // Input values sent to the router that determine the returned route.

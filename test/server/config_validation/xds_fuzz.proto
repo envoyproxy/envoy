@@ -25,7 +25,7 @@ message RemoveListener {
 
 message Action {
   oneof action_selector {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     AddListener add_listener = 1;
     AddRoute add_route = 2;

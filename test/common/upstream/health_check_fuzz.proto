@@ -35,7 +35,7 @@ message GrpcRespondUnstructuredBytes {
 
 message GrpcRespondBytes {
   oneof grpc_respond_bytes_selector {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
     //Structured response, which will get converted to raw bytes
     ServingStatus status = 1 [(buf.validate.field).enum.defined_only = true];
     GrpcRespondUnstructuredBytes grpc_respond_unstructured_bytes = 2;
@@ -46,11 +46,11 @@ message GrpcRespondBytes {
 }
 
 message GrpcRespondTrailers {
-  test.fuzz.Headers trailers = 1 [(buf.validate.field).message.required = true];
+  test.fuzz.Headers trailers = 1 [(buf.validate.field).required = true];
 }
 
 message GrpcRespond {
-  GrpcRespondHeaders grpc_respond_headers = 1 [(buf.validate.field).message.required = true];
+  GrpcRespondHeaders grpc_respond_headers = 1 [(buf.validate.field).required = true];
   GrpcRespondBytes grpc_respond_bytes = 2;
   //Having this as a message allows the scenario with no trailers
   GrpcRespondTrailers grpc_respond_trailers = 3;
@@ -62,9 +62,9 @@ stream across all three. However, the main difference comes from the type of dat
 health checker type allows the fuzzer to choose the correct action sequence.
 */
 message Respond {
-  HttpRespond http_respond = 1 [(buf.validate.field).message.required = true];
-  TcpRespond tcp_respond = 2 [(buf.validate.field).message.required = true];
-  GrpcRespond grpc_respond = 3 [(buf.validate.field).message.required = true];
+  HttpRespond http_respond = 1 [(buf.validate.field).required = true];
+  TcpRespond tcp_respond = 2 [(buf.validate.field).required = true];
+  GrpcRespond grpc_respond = 3 [(buf.validate.field).required = true];
 }
 
 enum RaiseEvent {
@@ -80,7 +80,7 @@ enum RaiseGoAway {
 
 message Action {
   oneof action_selector {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
     Respond respond = 1;
     google.protobuf.Empty trigger_interval_timer = 2;
     //TODO: respondBody, respondTrailers
@@ -92,7 +92,7 @@ message Action {
 
 message HealthCheckTestCase {
   envoy.config.core.v3.HealthCheck health_check_config = 1
-      [(buf.validate.field).message.required = true];
+      [(buf.validate.field).required = true];
   repeated Action actions = 2;
   bool http_verify_cluster = 3; //Determines if verify cluster setting is on
   bool start_failed = 4;

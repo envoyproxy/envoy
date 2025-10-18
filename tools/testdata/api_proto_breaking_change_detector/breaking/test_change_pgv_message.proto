@@ -4,7 +4,12 @@ package test.protos.breaking;
 import "buf/validate/validate.proto";
 
 message ChangePGVMessageMessage {
-  option (validate.disabled) = true;
+  // Note: The 'disabled' option no longer exists in protovalidate.
+  // This test now uses a cel validation rule instead.
+  option (buf.validate.message).cel = {
+    id: "test.disabled_check"
+    expression: "true"
+  };
 
   ChangePGVMessageMessage q = 543;
 }

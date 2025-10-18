@@ -9,6 +9,6 @@ import "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_
 
 message RoundRobinLoadBalancerTestCase {
   test.common.upstream.ZoneAwareLoadBalancerTestCase zone_aware_load_balancer_test_case = 1
-      [(buf.validate.field).message.required = true];
+      [(buf.validate.field).required = true];
   envoy.config.cluster.v3.Cluster.RoundRobinLbConfig round_robin_lb_config = 2;
 }

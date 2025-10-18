@@ -7,5 +7,5 @@ import "test/extensions/load_balancing_policies/common/load_balancer_fuzz.proto"
 
 //This has no specific logic needed for initialization
 message RandomLoadBalancerTestCase {
-  LoadBalancerTestCase load_balancer_test_case = 1 [(buf.validate.field).message.required = true];
+  LoadBalancerTestCase load_balancer_test_case = 1 [(buf.validate.field).required = true];
 }

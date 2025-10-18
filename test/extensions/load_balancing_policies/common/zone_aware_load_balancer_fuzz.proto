@@ -7,7 +7,7 @@ import "test/extensions/load_balancing_policies/common/load_balancer_fuzz.proto"
 
 message ZoneAwareLoadBalancerTestCase {
   test.common.upstream.LoadBalancerTestCase load_balancer_test_case = 1
-      [(buf.validate.field).message.required = true];
+      [(buf.validate.field).required = true];
   // This determines whether ZoneAwareLoadBalancerFuzzBase will generate a local priority set to
   // pass into Zone Aware constructor
   bool need_local_priority_set = 2;

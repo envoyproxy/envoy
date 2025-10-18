@@ -42,7 +42,7 @@ message UtilityTestCase {
     string percent_decoding_string = 7;
     Parameter parse_parameters = 8;
     string find_query_string = 9
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE, strict: false}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE, strict: false}];
     CookieValue make_set_cookie_value = 10;
     string parse_authority_string = 11;
     envoy.config.core.v3.Http2ProtocolOptions initialize_and_validate = 12;

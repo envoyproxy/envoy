@@ -11,5 +11,5 @@ import "buf/validate/validate.proto";
 message Config {
   // The underlying transport socket being wrapped.
   envoy.config.core.v3.TransportSocket transport_socket = 1
-      [(buf.validate.field).message = {required: true}];
+      [(buf.validate.field).required = true];
 }

@@ -5,7 +5,7 @@ import "buf/validate/validate.proto";
 
 message ChangePGVOneofMessage {
   oneof test_oneof {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
     string name = 4;
     string sub_message = 9;
   }

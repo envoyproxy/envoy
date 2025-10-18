@@ -23,7 +23,7 @@ message UpdateHealthFlags {
 
 message LbAction {
   oneof action_selector {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
     // This updates the health flags of hosts at a certain priority level. The number of hosts in each priority level/in localities is static,
     // as untrusted upstreams cannot change that, and can only change their health flags.
     UpdateHealthFlags update_health_flags = 1;
@@ -50,7 +50,7 @@ message SetupPriorityLevel {
 // and can be used in a modular way at the highest level for each load balancer.
 message LoadBalancerTestCase {
   envoy.config.cluster.v3.Cluster.CommonLbConfig common_lb_config = 1
-      [(buf.validate.field).message.required = true];
+      [(buf.validate.field).required = true];
   repeated LbAction actions = 2;
 
   // Each generated integer will cause the fuzzer to initialize hosts at a certain priority level, each integer generated adding a priority

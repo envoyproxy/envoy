@@ -8,6 +8,6 @@ import "buf/validate/validate.proto";
 // We only fuzz a single request per iteration.
 message RbacTestCase {
   envoy.extensions.filters.http.rbac.v3.RBAC config = 1
-      [(buf.validate.field).message = {required: true}];
-  test.fuzz.HttpData request_data = 2 [(buf.validate.field).message = {required: true}];
+      [(buf.validate.field).required = true];
+  test.fuzz.HttpData request_data = 2 [(buf.validate.field).required = true];
 }

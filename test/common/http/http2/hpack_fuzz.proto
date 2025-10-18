@@ -9,6 +9,6 @@ import "buf/validate/validate.proto";
 // Structured input for hpack_fuzz_test.
 
 message HpackTestCase {
-  test.fuzz.Headers headers = 1 [(buf.validate.field).message.required = true];
+  test.fuzz.Headers headers = 1 [(buf.validate.field).required = true];
   bool end_headers = 2;
 }

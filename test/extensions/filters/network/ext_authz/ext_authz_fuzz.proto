@@ -7,7 +7,7 @@ import "buf/validate/validate.proto";
 
 message Result {
   oneof result_selector {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
     // Authorization check status
     google.protobuf.Empty check_status_error = 1;
     google.protobuf.Empty check_status_denied = 2;
@@ -24,7 +24,7 @@ message OnData {
 
 message Action {
   oneof action_selector {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
     // Call onNewConnection().
     google.protobuf.Empty on_new_connection = 1;
     // Call onData().
@@ -36,6 +36,6 @@ message Action {
 }
 message ExtAuthzTestCase {
   envoy.extensions.filters.network.ext_authz.v3.ExtAuthz config = 1
-      [(buf.validate.field).message = {required: true}];
+      [(buf.validate.field).required = true];
   repeated Action actions = 2;
 }

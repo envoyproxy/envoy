@@ -12,7 +12,7 @@ message OnData {
 
 message Action {
   oneof action_selector {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
     // Call onNewConnection().
     google.protobuf.Empty on_new_connection = 1;
     // Call onData().
@@ -23,6 +23,6 @@ message Action {
 }
 message LocalRateLimitTestCase {
   envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit config = 1
-      [(buf.validate.field).message = {required: true}];
+      [(buf.validate.field).required = true];
   repeated Action actions = 2;
 }

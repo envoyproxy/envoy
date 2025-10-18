@@ -1,10 +1,15 @@
 syntax = "proto3";
 package test.protos.breaking;
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 message ChangePGVMessageMessage {
-    option (validate.disabled) = false;
+    // Note: The 'disabled' option no longer exists in protovalidate.
+    // This test now uses a cel validation rule with a different expression.
+    option (buf.validate.message).cel = {
+      id: "test.disabled_check"
+      expression: "false"
+    };
 
     ChangePGVMessageMessage q = 543;
 }

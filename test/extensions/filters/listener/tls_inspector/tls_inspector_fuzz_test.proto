@@ -8,8 +8,8 @@ import "buf/validate/validate.proto";
 
 message TlsInspectorTestCase {
   envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector config = 1
-      [(buf.validate.field).message.required = true];
+      [(buf.validate.field).required = true];
   uint32 max_size = 2 [(buf.validate.field).uint32.lte = 65536];
   test.extensions.filters.listener.FilterFuzzWithDataTestCase fuzzed = 3
-      [(buf.validate.field).message.required = true];
+      [(buf.validate.field).required = true];
 }

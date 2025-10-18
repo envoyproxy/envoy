@@ -8,10 +8,10 @@ import "buf/validate/validate.proto";
 
 message JwtAuthnFuzzInput {
   envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication config = 1
-      [(buf.validate.field).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   // HTTP request data.
-  test.fuzz.HttpData request_data = 2 [(buf.validate.field).message = {required: true}];
+  test.fuzz.HttpData request_data = 2 [(buf.validate.field).required = true];
 
   // If empty, remote_jwks_fetch fails.
   string remote_jwks = 3;

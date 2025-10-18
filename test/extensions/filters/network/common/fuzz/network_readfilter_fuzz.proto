@@ -17,7 +17,7 @@ message AdvanceTime {
 
 message Action {
   oneof action_selector {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
     // Call onNewConnection()
     google.protobuf.Empty on_new_connection = 1;
     // Call onData()

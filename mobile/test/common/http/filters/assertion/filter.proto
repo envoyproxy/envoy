@@ -12,5 +12,5 @@ message Assertion {
   // intervening frames). Otherwise, it will send a local reply with Http::Code::BadRequest.
   // TODO: update upstream MatchPredicate proto to require at least one matcher.
   envoy.config.common.matcher.v3.MatchPredicate match_config = 1
-      [(buf.validate.field).message = {required: true}];
+      [(buf.validate.field).required = true];
 }
