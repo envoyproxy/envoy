@@ -6,7 +6,7 @@ import "envoy/extensions/common/tap/v3/common.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.tap.v3";
 option java_outer_classname = "TapProto";
@@ -25,7 +25,7 @@ message Tap {
 
   // Common configuration for the HTTP tap filter.
   common.tap.v3.CommonExtensionConfig common_config = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   // Indicates whether HTTP tap filter records the time stamp for request/response headers.
   // Request headers time stamp is stored after receiving request headers.

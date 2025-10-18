@@ -31,7 +31,7 @@ from google.protobuf import text_format
 from envoy.annotations import deprecation_pb2
 from udpa.annotations import migrate_pb2, status_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
-from validate import validate_pb2
+from buf.validate import validate_pb2
 
 import envoy_repo
 

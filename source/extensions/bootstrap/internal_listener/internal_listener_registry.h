@@ -2,7 +2,6 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/extensions/bootstrap/internal_listener/v3/internal_listener.pb.h"
-#include "envoy/extensions/bootstrap/internal_listener/v3/internal_listener.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 

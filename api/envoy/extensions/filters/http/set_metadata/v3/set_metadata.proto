@@ -7,7 +7,7 @@ import "google/protobuf/struct.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.set_metadata.v3";
 option java_outer_classname = "SetMetadataProto";
@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message Metadata {
   // The metadata namespace.
-  string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
+  string metadata_namespace = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Allow the filter to overwrite or merge with an existing value in the namespace.
   bool allow_overwrite = 2;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/resource_monitors/cgroup_memory/v3/cgroup_memory.pb.h"
-#include "envoy/extensions/resource_monitors/cgroup_memory/v3/cgroup_memory.pb.validate.h"
 #include "envoy/server/resource_monitor_config.h"
 
 #include "source/extensions/resource_monitors/common/factory_base.h"

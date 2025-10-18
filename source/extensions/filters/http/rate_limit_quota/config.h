@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
-#include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"

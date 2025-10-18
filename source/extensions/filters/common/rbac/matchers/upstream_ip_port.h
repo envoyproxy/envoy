@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/extensions/rbac/matchers/upstream_ip_port/v3/upstream_ip_port_matcher.pb.validate.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/network/cidr_range.h"

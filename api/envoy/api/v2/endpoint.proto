@@ -10,7 +10,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "EndpointProto";
@@ -39,7 +39,7 @@ message ClusterLoadAssignment {
     // [#not-implemented-hide:]
     message DropOverload {
       // Identifier for the policy specifying the drop.
-      string category = 1 [(validate.rules).string = {min_bytes: 1}];
+      string category = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
       // Percentage of traffic that should be dropped for the category.
       type.FractionalPercent drop_percentage = 2;
@@ -83,13 +83,13 @@ message ClusterLoadAssignment {
     //
     // Read more at :ref:`priority levels <arch_overview_load_balancing_priority_levels>` and
     // :ref:`localities <arch_overview_load_balancing_locality_weighted_lb>`.
-    google.protobuf.UInt32Value overprovisioning_factor = 3 [(validate.rules).uint32 = {gt: 0}];
+    google.protobuf.UInt32Value overprovisioning_factor = 3 [(buf.validate.field).uint32 = {gt: 0}];
 
     // The max time until which the endpoints from this assignment can be used.
     // If no new assignments are received before this time expires the endpoints
     // are considered stale and should be marked unhealthy.
     // Defaults to 0 which means endpoints never go stale.
-    google.protobuf.Duration endpoint_stale_after = 4 [(validate.rules).duration = {gt {}}];
+    google.protobuf.Duration endpoint_stale_after = 4 [(buf.validate.field).duration = {gt {}}];
 
     // The flag to disable overprovisioning. If it is set to true,
     // :ref:`overprovisioning factor
@@ -106,7 +106,7 @@ message ClusterLoadAssignment {
   // <envoy_api_field_Cluster.EdsClusterConfig.service_name>` value if specified
   // in the cluster :ref:`EdsClusterConfig
   // <envoy_api_msg_Cluster.EdsClusterConfig>`.
-  string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string cluster_name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
   // List of endpoints to load balance to.
   repeated endpoint.LocalityLbEndpoints endpoints = 2;

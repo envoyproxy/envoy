@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
-#include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.validate.h"
 #include "envoy/server/resource_monitor_config.h"
 
 #include "source/extensions/resource_monitors/common/factory_base.h"

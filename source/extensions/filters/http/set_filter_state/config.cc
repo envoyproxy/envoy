@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/set_filter_state/v3/set_filter_state.pb.h"
-#include "envoy/extensions/filters/http/set_filter_state/v3/set_filter_state.pb.validate.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/registry/registry.h"
 

@@ -51,8 +51,8 @@ build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
 # Disable global index store to work around https://github.com/buildbuddy-io/rules_xcodeproj/issues/1878
 build:rules_xcodeproj --features=-swift.use_global_index_store
 
-# Override PGV validation with NOP functions for binary size savings.
-build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
+# Note: protovalidate (the successor to protoc-gen-validate) performs runtime validation
+# and does not require compile-time code generation or build flags.
 
 build:mobile-dbg-common --compilation_mode=dbg
 # Enable source map for debugging in IDEs

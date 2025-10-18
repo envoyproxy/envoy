@@ -1,11 +1,9 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
-#include "envoy/extensions/filters/http/composite/v3/composite.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
-#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"

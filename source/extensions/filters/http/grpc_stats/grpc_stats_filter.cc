@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/grpc_stats/grpc_stats_filter.h"
 
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.h"
-#include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.validate.h"
 #include "envoy/grpc/context.h"
 #include "envoy/registry/registry.h"
 

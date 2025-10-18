@@ -10,7 +10,7 @@ import "google/protobuf/struct.proto";
 import "envoy/annotations/resource.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.discovery.v2";
 option java_outer_classname = "RtdsProto";
@@ -48,7 +48,7 @@ message RtdsDummy {
 message Runtime {
   // Runtime resource name. This makes the Runtime a self-describing xDS
   // resource.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
   google.protobuf.Struct layer = 2;
 }

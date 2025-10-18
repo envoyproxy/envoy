@@ -1,0 +1,10 @@
+--- a/REPO.bazel
++++ b/REPO.bazel
+@@ -12,7 +12,3 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-ignore_directories([
+-    ".build*",
+-    "cmake-build-*",
+-])

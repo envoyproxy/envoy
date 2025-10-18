@@ -16,7 +16,7 @@ import yaml
 
 from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
-from validate import validate_pb2
+from buf.validate import validate_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
 
 from tools.api_proto_plugin import annotations, constants, plugin, visitor

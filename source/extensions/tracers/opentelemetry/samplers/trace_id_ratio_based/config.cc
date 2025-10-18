@@ -1,7 +1,6 @@
 #include "source/extensions/tracers/opentelemetry/samplers/trace_id_ratio_based/config.h"
 
 #include "envoy/extensions/tracers/opentelemetry/samplers/v3/trace_id_ratio_based_sampler.pb.h"
-#include "envoy/extensions/tracers/opentelemetry/samplers/v3/trace_id_ratio_based_sampler.pb.validate.h"
 #include "envoy/server/tracer_config.h"
 
 #include "source/common/config/utility.h"

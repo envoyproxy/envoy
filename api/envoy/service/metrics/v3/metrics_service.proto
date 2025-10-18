@@ -8,7 +8,7 @@ import "io/prometheus/client/metrics.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.metrics.v3";
 option java_outer_classname = "MetricsServiceProto";
@@ -41,7 +41,7 @@ message StreamMetricsMessage {
         "envoy.service.metrics.v2.StreamMetricsMessage.Identifier";
 
     // The node sending metrics over the stream.
-    config.core.v3.Node node = 1 [(validate.rules).message = {required: true}];
+    config.core.v3.Node node = 1 [(buf.validate.field).required = true];
   }
 
   // Identifier data effectively is a structured metadata. As a performance optimization this will

@@ -5,7 +5,7 @@ package envoy.extensions.health_checkers.thrift.v3;
 import "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.health_checkers.thrift.v3";
 option java_outer_classname = "ThriftProto";
@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Thrift {
   // Specifies the method name that will be set on each health check request dispatched to an upstream host.
   // Note that method name is case sensitive.
-  string method_name = 1 [(validate.rules).string = {min_len: 1}];
+  string method_name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Configures the transport type to be used with the health checks. Note that
   // :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`
@@ -28,7 +28,7 @@ message Thrift {
   // since it's possible to set to :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`.
   // [#extension-category: envoy.filters.network]
   filters.network.thrift_proxy.v3.TransportType transport = 2
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum = {defined_only: true}];
 
   // Configures the protocol type to be used with the health checks. Note that
   // :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`
@@ -37,5 +37,5 @@ message Thrift {
   // since it's possible to set to :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`
   // or :ref:`TWITTER<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>`.
   filters.network.thrift_proxy.v3.ProtocolType protocol = 3
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum = {defined_only: true}];
 }

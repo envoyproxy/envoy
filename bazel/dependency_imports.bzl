@@ -196,6 +196,14 @@ def envoy_dependency_imports(
         build_external = "external",
     )
 
+    go_repository(
+        name = "build_buf_gen_go_bufbuild_protovalidate_protocolbuffers_go",
+        importpath = "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go",
+        sum = "h1:31on4W/yPcV4nZHL4+UCiCvLPsMqe/vJcNg8Rci0scc=",
+        version = "v1.36.10-20250912141014-52f32327d4b0.1",
+        build_external = "external",
+    )
+
     protoc_gen_jsonschema_go_dependencies()
     rules_proto_grpc_toolchains()
 

@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/extensions/stat_sinks/open_telemetry/v3/open_telemetry.pb.h"
-#include "envoy/extensions/stat_sinks/open_telemetry/v3/open_telemetry.pb.validate.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/matcher/matcher.h"

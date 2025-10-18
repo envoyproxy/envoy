@@ -10,7 +10,7 @@ import "google/protobuf/struct.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.endpoint";
 option java_outer_classname = "LoadReportProto";
@@ -120,14 +120,14 @@ message EndpointLoadMetricStats {
 message ClusterStats {
   message DroppedRequests {
     // Identifier for the policy specifying the drop.
-    string category = 1 [(validate.rules).string = {min_bytes: 1}];
+    string category = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
     // Total number of deliberately dropped requests for the category.
     uint64 dropped_count = 2;
   }
 
   // The name of the cluster.
-  string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string cluster_name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
   // The eds_cluster_config service_name of the cluster.
   // It's possible that two clusters send the same service_name to EDS,
@@ -136,7 +136,7 @@ message ClusterStats {
 
   // Need at least one.
   repeated UpstreamLocalityStats upstream_locality_stats = 2
-      [(validate.rules).repeated = {min_items: 1}];
+      [(buf.validate.field).repeated = {min_items: 1}];
 
   // Cluster-level stats such as total_successful_requests may be computed by
   // summing upstream_locality_stats. In addition, below there are additional

@@ -12,7 +12,7 @@ import "xds/type/matcher/v3/matcher.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.rbac.v3";
 option java_outer_classname = "RbacProto";
@@ -81,7 +81,7 @@ message RBAC {
   string shadow_rules_stat_prefix = 5;
 
   // The prefix to use when emitting statistics.
-  string stat_prefix = 3 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 3 [(buf.validate.field).string = {min_len: 1}];
 
   // RBAC enforcement strategy. By default RBAC will be enforced only once
   // when the first byte of data arrives from the downstream. When used in
