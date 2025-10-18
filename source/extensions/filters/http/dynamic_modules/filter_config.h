@@ -36,6 +36,10 @@ using OnHttpFilterDestroyType = decltype(&envoy_dynamic_module_on_http_filter_de
 using OnHttpFilterHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_http_filter_http_callout_done);
 using OnHttpFilterScheduled = decltype(&envoy_dynamic_module_on_http_filter_scheduled);
+using OnHttpFilterDownstreamAboveWriteBufferHighWatermark =
+    decltype(&envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark);
+using OnHttpFilterDownstreamBelowWriteBufferLowWatermark =
+    decltype(&envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark);
 
 /**
  * A config to create http filters based on a dynamic module. This will be owned by multiple
@@ -76,6 +80,10 @@ public:
   OnHttpFilterDestroyType on_http_filter_destroy_ = nullptr;
   OnHttpFilterHttpCalloutDoneType on_http_filter_http_callout_done_ = nullptr;
   OnHttpFilterScheduled on_http_filter_scheduled_ = nullptr;
+  OnHttpFilterDownstreamAboveWriteBufferHighWatermark
+      on_http_filter_downstream_above_write_buffer_high_watermark_ = nullptr;
+  OnHttpFilterDownstreamBelowWriteBufferLowWatermark
+      on_http_filter_downstream_below_write_buffer_low_watermark_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
   const Stats::ScopeSharedPtr stats_scope_;
@@ -84,6 +92,8 @@ public:
   // and not later during request handling, so that we don't have to wrap the stat storage in a
   // lock.
   bool stat_creation_frozen_ = false;
+
+  bool terminal_filter_ = false;
 
   class ModuleCounterHandle {
   public:
@@ -314,8 +324,8 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
  */
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
-    Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-    Server::Configuration::ServerFactoryContext& context);
+    const bool terminal_filter, Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+    Stats::Scope& stats_scope, Server::Configuration::ServerFactoryContext& context);
 
 } // namespace HttpFilters
 } // namespace DynamicModules
