@@ -9,9 +9,9 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Extensions {
