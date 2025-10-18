@@ -20,7 +20,7 @@ API_BUILD_SYSTEM_IMPORT_PREFIXES = [
     'google/api/annotations.proto',
     'google/protobuf/',
     'google/rpc/status.proto',
-    'validate/validate.proto',
+    'buf/validate/validate.proto',
 ]
 
 # Each of the following contrib extensions are allowed to be in the v3 namespace. Indicate why.
