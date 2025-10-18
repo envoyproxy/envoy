@@ -421,7 +421,7 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     Upstream::HostSharedPtr new_host{THROW_OR_RETURN_VALUE(
         Upstream::HostImpl::create(
             cluster_->info(), "", address_ptr, nullptr, nullptr, 1,
-            envoy::config::core::v3::Locality(),
+            std::make_shared<const envoy::config::core::v3::Locality>(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
             envoy::config::core::v3::UNKNOWN),
         std::unique_ptr<Upstream::HostImpl>)};

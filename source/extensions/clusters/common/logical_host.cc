@@ -32,8 +32,11 @@ LogicalHost::LogicalHost(
           std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
           std::make_shared<const envoy::config::core::v3::Metadata>(
               locality_lb_endpoint.metadata()),
-          locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
-          locality_lb_endpoint.priority(), creation_status),
+          // TODO(adisuissa): Create through localities shared pool.
+          std::make_shared<const envoy::config::core::v3::Locality>(
+              locality_lb_endpoint.locality()),
+          lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
+          creation_status),
       override_transport_socket_options_(override_transport_socket_options), address_(address),
       address_list_or_null_(makeAddressListOrNull(address, address_list)) {
   health_check_address_ =

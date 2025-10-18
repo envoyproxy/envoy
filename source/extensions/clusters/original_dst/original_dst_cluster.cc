@@ -76,7 +76,7 @@ HostSelectionResponse OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerC
         HostSharedPtr host(std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
             HostImpl::create(
                 info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, nullptr,
-                1, envoy::config::core::v3::Locality().default_instance(),
+                1, std::make_shared<envoy::config::core::v3::Locality>(),
                 envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
                 envoy::config::core::v3::UNKNOWN),
             std::unique_ptr<HostImpl>)));
