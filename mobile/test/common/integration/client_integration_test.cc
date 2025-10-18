@@ -80,6 +80,8 @@ public:
   }
 
   void initialize() override {
+    // Integration test starts upstreams before Envoy which can cause a data race.
+    builder_.enableLogger(false);
     builder_.setLogLevel(Logger::Logger::trace);
     builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
     builder_.addRuntimeGuard("quic_no_tcp_delay", true);
@@ -267,14 +269,13 @@ TEST_P(ClientIntegrationTest, Basic) {
 #if not defined(__APPLE__)
 TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   std::atomic<bool> found_cache_miss{false};
-  auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
-    if (msg.find("ignoring failed address cache hit for miss for host 'doesnotexist") !=
-        std::string::npos) {
-      found_cache_miss = true;
-    }
-  };
-  builder_.setLogger(std::move(logger));
+  LogExpectation log_expect(
+      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
+        if (msg.find("ignoring failed address cache hit for miss for host 'doesnotexist") !=
+            std::string::npos) {
+          found_cache_miss = true;
+        }
+      });
   builder_.setDisableDnsRefreshOnFailure(true);
   initialize();
 
@@ -295,13 +296,12 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
 
 TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
   std::atomic<bool> found_force_dns_refresh{false};
-  auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
-    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
-      found_force_dns_refresh = true;
-    }
-  };
-  builder_.setLogger(std::move(logger));
+  LogExpectation log_expect(
+      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
+        if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+          found_force_dns_refresh = true;
+        }
+      });
   builder_.setDisableDnsRefreshOnNetworkChange(true);
   initialize();
 
@@ -314,15 +314,14 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
   std::atomic<bool> found_force_dns_refresh{false};
   std::vector<absl::Notification> handled_network_changes(5);
   std::atomic<int> current_change_event{0};
-  auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
-    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
-      found_force_dns_refresh = true;
-    } else if (msg.find("Finished the network changed callback") != std::string::npos) {
-      handled_network_changes[current_change_event].Notify();
-    }
-  };
-  builder_.setLogger(std::move(logger));
+  LogExpectation log_expect(
+      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
+        if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+          found_force_dns_refresh = true;
+        } else if (msg.find("Finished the network changed callback") != std::string::npos) {
+          handled_network_changes[current_change_event].Notify();
+        }
+      });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
   initialize();
 
@@ -373,17 +372,16 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
 TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
   absl::Notification found_force_dns_refresh;
   std::atomic<bool> handled_network_change{false};
-  auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
-    if (msg.find("Default network state has been changed. Current net configuration key") !=
-        std::string::npos) {
-      handled_network_change = true;
-    }
-    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
-      found_force_dns_refresh.Notify();
-    }
-  };
-  builder_.setLogger(std::move(logger));
+  LogExpectation log_expect(
+      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
+        if (msg.find("Default network state has been changed. Current net configuration key") !=
+            std::string::npos) {
+          handled_network_change = true;
+        }
+        if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+          found_force_dns_refresh.Notify();
+        }
+      });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
 
   initialize();
