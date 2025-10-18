@@ -166,7 +166,7 @@ TEST_F(PeakEwmaConfigTest, InvalidConfigType) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   // Try to load a different proto type
-  Envoy::Protobuf::Empty wrong_proto;
+  Envoy::ProtobufWkt::Empty wrong_proto;
 
   // dynamic_cast will throw std::bad_cast for wrong proto type
   EXPECT_THROW(
