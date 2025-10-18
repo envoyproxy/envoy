@@ -13,12 +13,36 @@
 #include "absl/status/status.h"
 #include "contrib/peak_ewma/load_balancing_policies/source/cost.h"
 #include "contrib/peak_ewma/load_balancing_policies/source/host_data.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/observability.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace PeakEwma {
+
+// GlobalHostStats implementation.
+
+GlobalHostStats::GlobalHostStats(Upstream::HostConstSharedPtr host, Stats::Scope& scope)
+    : cost_stat_(scope.gaugeFromString("peak_ewma." + host->address()->asString() + ".cost",
+                                       Stats::Gauge::ImportMode::NeverImport)),
+      ewma_rtt_stat_(
+          scope.gaugeFromString("peak_ewma." + host->address()->asString() + ".ewma_rtt_ms",
+                                Stats::Gauge::ImportMode::NeverImport)),
+      active_requests_stat_(
+          scope.gaugeFromString("peak_ewma." + host->address()->asString() + ".active_requests",
+                                Stats::Gauge::ImportMode::NeverImport)),
+      host_(host) {}
+
+void GlobalHostStats::setComputedCostStat(double cost) {
+  cost_stat_.set(static_cast<uint64_t>(cost));
+}
+
+void GlobalHostStats::setEwmaRttStat(double ewma_rtt_ms) {
+  ewma_rtt_stat_.set(static_cast<uint64_t>(ewma_rtt_ms));
+}
+
+void GlobalHostStats::setActiveRequestsStat(double active_requests) {
+  active_requests_stat_.set(static_cast<uint64_t>(active_requests));
+}
 
 // Peak EWMA Load Balancer Implementation.
 
@@ -33,12 +57,8 @@ PeakEwmaLoadBalancer::PeakEwmaLoadBalancer(
                        PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
                            cluster_info.lbConfig(), healthy_panic_threshold, 100, 50)),
       priority_set_(priority_set), config_proto_(config), random_(random),
-      time_source_(time_source),
+      time_source_(time_source), stats_scope_(cluster_info.statsScope()),
       cost_(config.has_penalty_value() ? config.penalty_value().value() : 1000000.0),
-      observability_(cluster_info.statsScope(), time_source, cost_,
-                     config.has_default_rtt()
-                         ? DurationUtil::durationToMilliseconds(config.default_rtt())
-                         : kDefaultRttMilliseconds),
       main_dispatcher_(main_dispatcher),
       aggregation_interval_(config_proto_.has_aggregation_interval()
                                 ? std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
@@ -229,7 +249,7 @@ void PeakEwmaLoadBalancer::aggregateWorkerData() {
         // Create stats object if it doesn't exist.
         auto it = all_host_stats_.find(host);
         if (it == all_host_stats_.end()) {
-          all_host_stats_[host] = observability_.createHostStats(host);
+          all_host_stats_[host] = std::make_unique<GlobalHostStats>(host, stats_scope_);
           it = all_host_stats_.find(host);
         }
 

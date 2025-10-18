@@ -22,7 +22,6 @@
 #include "contrib/envoy/extensions/load_balancing_policies/peak_ewma/v3alpha/peak_ewma.pb.h"
 #include "contrib/peak_ewma/load_balancing_policies/source/cost.h"
 #include "contrib/peak_ewma/load_balancing_policies/source/host_data.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/observability.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,7 +41,24 @@ class PeakEwmaTestPeer;
 class PeakEwmaLoadBalancerFactory;
 class PeakEwmaLoadBalancer;
 class Cost;
-struct GlobalHostStats;
+
+/**
+ * Manages stats for a single host, publishing EWMA RTT, active requests, and computed cost
+ * to the admin interface for observability.
+ */
+struct GlobalHostStats {
+  GlobalHostStats(Upstream::HostConstSharedPtr host, Stats::Scope& scope);
+
+  void setComputedCostStat(double cost);
+  void setEwmaRttStat(double ewma_rtt_ms);
+  void setActiveRequestsStat(double active_requests);
+
+private:
+  Stats::Gauge& cost_stat_;
+  Stats::Gauge& ewma_rtt_stat_;
+  Stats::Gauge& active_requests_stat_;
+  Upstream::HostConstSharedPtr host_;
+};
 
 /**
  * Peak EWMA Load Balancer Implementation.
@@ -100,10 +116,10 @@ private:
   const envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma config_proto_;
   Random::RandomGenerator& random_;
   TimeSource& time_source_;
+  Stats::Scope& stats_scope_;
 
   // Business logic components.
   Cost cost_;
-  Observability observability_;
 
   // Timer infrastructure for periodic EWMA calculation.
   Event::Dispatcher& main_dispatcher_;

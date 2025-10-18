@@ -14,13 +14,11 @@ envoy_cc_library(
     srcs = [
         "cost.cc",
         "host_data.cc",
-        "observability.cc",
         "peak_ewma_lb.cc",
     ],
     hdrs = [
         "cost.h",
         "host_data.h",
-        "observability.h",
         "peak_ewma_lb.h",
     ],
     repository = "@envoy",
