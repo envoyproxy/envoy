@@ -55,18 +55,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "observability_test",
-    srcs = ["observability_test.cc"],
-    deps = [
-        "//contrib/peak_ewma/load_balancing_policies/source:peak_ewma_lb_lib",
-        "//source/common/network:address_lib",
-        "//test/common/stats:stat_test_utility_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/upstream:upstream_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "peak_ewma_lb_comprehensive_test",
     srcs = ["peak_ewma_lb_comprehensive_test.cc"],
     deps = [
