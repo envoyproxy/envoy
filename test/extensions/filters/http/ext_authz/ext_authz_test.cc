@@ -5272,6 +5272,223 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
             new_filter->decodeHeaders(request_headers_, false));
 }
 
+// Verifies that the filter stops adding headers from `response_headers_to_add` once the header
+// limit is reached.
+TEST_F(HttpFilterTest, EncodeHeadersToAddExceedsLimit) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_add.push_back({"key1", "value1"});
+  response.response_headers_to_add.push_back({"key2", "value2"});
+  response.response_headers_to_add.push_back({"key3", "value3"});
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+
+  Http::TestResponseHeaderMapImpl response_headers(
+      {{":status", "200"}, {"existing-header", "value"}}, /*max_headers_kb=*/99999,
+      /*max_headers_count=*/3);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+
+  EXPECT_EQ(response_headers.size(), 3);
+  EXPECT_TRUE(response_headers.has("key1"));
+  EXPECT_FALSE(response_headers.has("key2"));
+  EXPECT_FALSE(response_headers.has("key3"));
+  EXPECT_EQ(1U, config_->stats().omitted_response_headers_.value());
+}
+
+// Verifies that the filter stops adding new headers from `response_headers_to_set` once the header
+// limit is reached, but still allows overwriting existing ones.
+TEST_F(HttpFilterTest, EncodeHeadersToSetExceedsLimit) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_set.push_back({"existing-header-to-overwrite", "new-value"});
+  response.response_headers_to_set.push_back({"new-header-to-add", "value"});
+  response.response_headers_to_set.push_back({"another-new-header", "value"});
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+
+  Http::TestResponseHeaderMapImpl response_headers(
+      {{":status", "200"}, {"existing-header-to-overwrite", "old-value"}}, /*max_headers_kb=*/99999,
+      /*max_headers_count=*/2);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+
+  EXPECT_EQ(response_headers.size(), 2);
+  EXPECT_EQ(response_headers.get(LowerCaseString("existing-header-to-overwrite"))[0]
+                ->value()
+                .getStringView(),
+            "new-value");
+  EXPECT_FALSE(response_headers.has("new-header-to-add"));
+  EXPECT_FALSE(response_headers.has("another-new-header"));
+  EXPECT_EQ(1U, config_->stats().omitted_response_headers_.value());
+}
+
+// Verifies that the filter stops adding headers from `response_headers_to_add_if_absent` once the
+// header limit is reached.
+TEST_F(HttpFilterTest, EncodeHeadersToAddIfAbsentExceedsLimit) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_add_if_absent.push_back({"key1", "value1"});
+  response.response_headers_to_add_if_absent.push_back({"key2", "value2"});
+  response.response_headers_to_add_if_absent.push_back({"existing-header", "value"});
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+
+  Http::TestResponseHeaderMapImpl response_headers(
+      {{":status", "200"}, {"existing-header", "value"}}, /*max_headers_kb=*/99999,
+      /*max_headers_count=*/3);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+
+  EXPECT_EQ(response_headers.size(), 3);
+  EXPECT_TRUE(response_headers.has("key1"));
+  EXPECT_FALSE(response_headers.has("key2"));
+  EXPECT_EQ(1U, config_->stats().omitted_response_headers_.value());
+}
+
+// Verifies that `response_headers_to_overwrite_if_exists` can still modify headers even when the
+// limit is reached, as it does not add new headers.
+TEST_F(HttpFilterTest, EncodeHeadersToOverwriteIfExistsNotLimited) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_overwrite_if_exists.push_back(
+      {"existing-header-to-overwrite", "new-value"});
+  response.response_headers_to_overwrite_if_exists.push_back({"non-existing-header", "value"});
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+
+  Http::TestResponseHeaderMapImpl response_headers({{":status", "200"},
+                                                    {"existing-header", "value"},
+                                                    {"existing-header-to-overwrite", "old-value"}},
+                                                   /*max_headers_kb=*/99999,
+                                                   /*max_headers_count=*/3);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+
+  EXPECT_EQ(response_headers.size(), 3);
+  EXPECT_EQ(response_headers.get(LowerCaseString("existing-header-to-overwrite"))[0]
+                ->value()
+                .getStringView(),
+            "new-value");
+  EXPECT_FALSE(response_headers.has("non-existing-header"));
+  EXPECT_EQ(0U, config_->stats().omitted_response_headers_.value());
+}
+
+// Verifies that the filter stops adding headers to a local reply (when the ext_authz sends a
+// Denied response) once the header limit is reached.
+TEST_F(HttpFilterTest, DeniedResponseLocalReplyExceedsLimit) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Unauthorized;
+  response.headers_to_set.push_back({"key1", "value1"});
+  response.headers_to_set.push_back({"key2", "value2"});
+  response.headers_to_set.push_back({"key3", "value3"});
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(
+          Invoke([&](Http::Code, absl::string_view,
+                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                     const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+            Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
+            if (modify_headers) {
+              modify_headers(response_headers);
+            }
+            EXPECT_EQ(response_headers.size(), 2);
+            EXPECT_TRUE(response_headers.has("key1"));
+            EXPECT_TRUE(response_headers.has("key2"));
+            EXPECT_FALSE(response_headers.has("key3"));
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(1U, config_->stats().omitted_response_headers_.value());
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters

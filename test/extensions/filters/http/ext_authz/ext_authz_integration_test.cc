@@ -2090,6 +2090,149 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamRequestFailsOnHeaderSizeLimit) {
   cleanup();
 }
 
+// Verifies that response header mutations are bound by the response header map header count limit.
+TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAddExceedsLimit) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        // The same value is used for request and response, I chose a huge number to make sure the
+        // request is unaffected.
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
+      });
+
+  initializeConfig();
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  Headers response_headers_to_append{};
+  for (size_t i = 0; i < 120; ++i) {
+    response_headers_to_append.push_back(std::make_pair(absl::StrCat("new-header-", i), "value"));
+  }
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  sendExtAuthzResponse({}, {}, {}, {}, {},
+                       /*response_headers_to_append*/ response_headers_to_append, {}, {});
+
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+  // NB: Something else adds headers to the response between the ext_authz filter and the downstream
+  // client so the header count is greater than you might expect (100), but we can at least be sure
+  // that all the ext_authz response headers didn't get added.
+  EXPECT_LT(response_->headers().size(), 120);
+  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("new-header-99")).empty());
+  cleanup();
+}
+
+// Test that response headers are not added if they would exceed the header count limit, but
+// existing headers can still be modified.
+TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToSetExceedsLimit) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
+      });
+
+  initializeConfig();
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+
+  Headers response_headers_to_set{};
+  for (size_t i = 0; i < 120; ++i) {
+    response_headers_to_set.push_back(std::make_pair(absl::StrCat("new-header-", i), "value"));
+  }
+  response_headers_to_set.push_back(std::make_pair("upstream-header", "new-value"));
+
+  sendExtAuthzResponse({}, {}, {}, {}, {}, {}, /*response_headers_to_set=*/response_headers_to_set,
+                       {});
+
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"upstream-header", "old-value"}}, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  EXPECT_LT(response_->headers().size(), 120);
+  // The last new headers shouldn't get added to the header map, but the
+  // existing upstream header will be overridden.
+  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("new-header-99")).empty());
+  EXPECT_EQ("new-value", response_->headers()
+                             .get(Http::LowerCaseString("upstream-header"))[0]
+                             ->value()
+                             .getStringView());
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAppendIfAbsentExceedsLimit) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
+      });
+
+  initializeConfig();
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+
+  Headers response_headers_to_append_if_absent{};
+  for (size_t i = 0; i < 120; ++i) {
+    response_headers_to_append_if_absent.push_back(
+        std::make_pair(absl::StrCat("new-header-", i), "value"));
+  }
+
+  sendExtAuthzResponse(
+      {}, {}, {}, {}, {}, {}, {},
+      /*response_headers_to_append_if_absent=*/response_headers_to_append_if_absent);
+
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  EXPECT_LT(response_->headers().size(), 120);
+  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("new-header-99")).empty());
+  cleanup();
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/17344
 TEST(ExtConfigValidateTest, Validate) {
   Server::TestComponentFactory component_factory;
