@@ -86,6 +86,55 @@ Rate limit filter :ref:`configuration <envoy_v3_api_msg_extensions.filters.http.
 at the virtual host or route levels using the :ref:`RateLimitQuotaOverride <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride>`
 configuration. The more specific configuration fully overrides less specific configuration.
 
+gRPC Status Configuration
+-------------------------
+
+The rate limit quota filter supports customizing the response when requests exceed quota limits through the
+:ref:`deny_response_settings <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.deny_response_settings>`
+configuration.
+
+For HTTP requests, you can configure the HTTP status code via ``http_status`` (defaults to 429).
+
+For gRPC requests, you have two options to control the gRPC status code returned:
+
+1. **Simple Configuration**: Set ``rate_limited_as_resource_exhausted: true`` to return ``RESOURCE_EXHAUSTED`` instead of the default ``UNAVAILABLE`` gRPC status code.
+
+2. **Advanced Configuration**: Set ``grpc_status`` to specify the exact gRPC status code and message.
+
+If both are configured, the explicit ``grpc_status`` takes precedence over the boolean flag.
+
+**Example: Using the boolean flag**
+
+.. code-block:: yaml
+
+  deny_response_settings:
+    http_status:
+      code: 429
+    rate_limited_as_resource_exhausted: true
+
+**Example: Using explicit gRPC status**
+
+.. code-block:: yaml
+
+  deny_response_settings:
+    http_status:
+      code: 429
+    grpc_status:
+      code: 8  # RESOURCE_EXHAUSTED
+      message: "Quota exhausted"
+
+**Example: Precedence (explicit takes priority)**
+
+.. code-block:: yaml
+
+  deny_response_settings:
+    http_status:
+      code: 429
+    grpc_status:
+      code: 14  # UNAVAILABLE - this takes precedence
+      message: "Service temporarily unavailable"
+    rate_limited_as_resource_exhausted: true  # This is ignored
+
 Matcher extensions
 ------------------
 
