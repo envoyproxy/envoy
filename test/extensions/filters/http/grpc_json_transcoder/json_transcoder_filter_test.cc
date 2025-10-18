@@ -1395,6 +1395,30 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamSSE) {
   }
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamSSEUnary) {
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config =
+      bookstoreProtoConfig();
+  proto_config.mutable_print_options()->set_stream_newline_delimited(true);
+  proto_config.mutable_print_options()->set_stream_sse_style_delimited(true);
+
+  auto config = std::make_shared<JsonTranscoderConfig>(proto_config, *api_);
+  auto filter = JsonTranscoderFilter(config, stats_);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/shelves/1/books:unary"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(request_headers, false));
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                                   {":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter.encodeHeaders(response_headers, false));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+}
+
 // Streaming requests with HTTP bodies do not internally buffer any data.
 // The configured buffer limits will not apply.
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBodyNoBuffer) {
