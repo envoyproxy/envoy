@@ -196,117 +196,44 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntimeProto) {
 #endif
 }
 
-class OutlierDetectionIntegrationTest : public HttpProtocolIntegrationTest {
+// Parameterized integration test. The parameters in the tupple are:
+// - name of the test
+// - basic (legacy) outlier detection config snippet
+// - outlier detection extension config snippet to be added to the cluster
+// - response code to be sent from upstream 
+class OutlierDetectionIntegrationTest : public HttpProtocolIntegrationTestWithParams<std::tuple<std::string, absl::string_view, absl::string_view, uint32_t, absl::string_view>> {
 public:
-  void initialize() override { HttpProtocolIntegrationTest::initialize(); }
-};
+  static constexpr size_t TEST_NAME = 0;
+  static constexpr size_t BASIC_OD_CONFIG = 1;
+  static constexpr size_t EXT_OD_CONFIG = 2;
+  static constexpr size_t RESPONSE_CODE = 3;
+  static constexpr size_t OPTIONAL_HEADER = 4;
 
-INSTANTIATE_TEST_SUITE_P(
-    Protocols, OutlierDetectionIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
-
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
-
-// Test verifies that empty outlier detection setting in protocol options
-// do not interfere with existing outlier detection.
-TEST_P(OutlierDetectionIntegrationTest, NoClusterOverwrite) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->mutable_clusters(0);
-
-    cluster->mutable_common_lb_config()->mutable_healthy_panic_threshold()->set_value(0);
-
-    auto* outlier_detection = cluster->mutable_outlier_detection();
-
-    TestUtility::loadFromYaml(R"EOF(
+    // TODO: can I define a type in the template and here just use that type instead of repeating whole thing?
+    static std::string protocolTestParamsToString(
+const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, std::tuple<std::string, absl::string_view, absl::string_view, uint32_t, absl::string_view>>>& params) {
+        
+        return absl::StrCat(HttpProtocolIntegrationTestBase::testNameFromTestParams(std::get<0>(params.param)), "_",
+               std::get<TEST_NAME>(std::get<1>(params.param)));
+    }
+    // Set of basic outlier detection configs. 
+    static constexpr absl::string_view consecutive_5xx_only = R"EOF(
       consecutive_5xx: 2
       max_ejection_percent: 100
-        )EOF",
-                              *outlier_detection);
-
-    ConfigHelper::HttpProtocolOptions protocol_options;
-    std::string protocol_options_yaml;
-    if (absl::StrContains(::testing::UnitTest::GetInstance()->current_test_info()->name(),
-                          "Http2Upstream")) {
-      protocol_options_yaml += R"EOF(
-         explicit_http_config:
-           http2_protocol_options: {}
     )EOF";
-    } else {
-      ASSERT(absl::StrContains(::testing::UnitTest::GetInstance()->current_test_info()->name(),
-                               "HttpUpstream"));
-      protocol_options_yaml += R"EOF(
-         explicit_http_config:
-           http_protocol_options: {}
-    )EOF";
-    }
-    TestUtility::loadFromYaml(protocol_options_yaml, protocol_options);
-    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
-                                     protocol_options);
-  });
 
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  // return en error from upstream server.
-  default_response_headers_.setStatus(500);
-  for (auto i = 1; i <= 2; i++) {
-    auto response =
-        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
-
-    ASSERT_TRUE(response->waitForEndStream());
-    // 500 error should be propagated to downstream client.
-    EXPECT_EQ("500", response->headers().getStatusValue());
-  }
-
-  // Send another request. It should not reach upstream and should be handled by envoy.
-  // The only existing endpoint in the cluster has been marked as unhealthy.
-  IntegrationStreamDecoderPtr response =
-      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
-
-  codec_client_->close();
-}
-
-// Test verifies that non-5xx codes defined in cluster's protocol options
-// are thread as errors and cause outlier detection to mark a host as unhealthy.
-TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteNon5xxAsErrors) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->mutable_clusters(0);
-
-    cluster->mutable_common_lb_config()->mutable_healthy_panic_threshold()->set_value(0);
-
-    auto* outlier_detection = cluster->mutable_outlier_detection();
-
-    TestUtility::loadFromYaml(R"EOF(
-      consecutive_5xx: 2
+    static constexpr absl::string_view gateway_only = R"EOF(
+      consecutive_5xx: 0
+      consecutive_gateway_failure: 2
+      enforcing_consecutive_gateway_failure: 100
       max_ejection_percent: 100
-        )EOF",
-                              *outlier_detection);
+        )EOF";
 
-    ConfigHelper::HttpProtocolOptions protocol_options;
-    std::string protocol_options_yaml;
-    if (absl::StrContains(::testing::UnitTest::GetInstance()->current_test_info()->name(),
-                          "Http2Upstream")) {
-      protocol_options_yaml += R"EOF(
-         explicit_http_config:
-           http2_protocol_options: {}
-    )EOF";
-    } else {
-      ASSERT(absl::StrContains(::testing::UnitTest::GetInstance()->current_test_info()->name(),
-                               "HttpUpstream"));
-      protocol_options_yaml += R"EOF(
-         explicit_http_config:
-           http_protocol_options: {}
-    )EOF";
-    }
 
+    // set of different outlier detection extension configs.
     // Configure any response with code 300-305 or response test-header containing
     // string "treat-as-error" to be treated as 5xx code.
-    protocol_options_yaml += R"EOF(
+    static constexpr absl::string_view error_3xx_and_header = R"EOF(
          outlier_detection:
            error_matcher:
              or_match:
@@ -322,46 +249,25 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteNon5xxAsErrors) {
                      - name: "test-header"
                        string_match:
                          contains: "treat-as-error"
-    )EOF",
+    )EOF";
 
-        TestUtility::loadFromYaml(protocol_options_yaml, protocol_options);
-    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
-                                     protocol_options);
-  });
+    static constexpr absl::string_view gateway_error = R"EOF(
+         outlier_detection:
+           error_matcher:
+               http_response_headers_match:
+                 headers:
+                   - name: ":status"
+                     range_match:
+                       start: 502
+                       end: 503
+    )EOF";
+};
 
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // respond with status code 301. It should be treated as error.
-  default_response_headers_.setStatus(301);
-  auto response =
-      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("301", response->headers().getStatusValue());
-
-  // Respond with status code 200 with "test-header".
-  // It should be treated as error.
-  default_response_headers_.setStatus(200);
-  default_response_headers_.appendCopy(Http::LowerCaseString("test-header"), "treat-as-error");
-
-  response =
-      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-
-  // Now send a request. It will be captured by Envoy and 503 will be returned as the only upstream
-  // is unhealthy now..
-  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
-
-  codec_client_->close();
-}
-// Test verifies that 5xx gateway errors configured in cluster protocol options are
-// forwarded to outlier detection in the original form and are not converted to code 500.
-TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
+// Test configures outlier detection extensions in cluster.
+// Then it sends several http requests and responses.
+// Responses match configured outlier extensions and cause the endpoint to be marked
+// as unhealthy.
+TEST_P(OutlierDetectionIntegrationTest, ExtensionsTest) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
@@ -370,12 +276,7 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
 
     auto* outlier_detection = cluster->mutable_outlier_detection();
 
-    TestUtility::loadFromYaml(R"EOF(
-      consecutive_5xx: 0
-      consecutive_gateway_failure: 2
-      enforcing_consecutive_gateway_failure: 100
-      max_ejection_percent: 100
-        )EOF",
+    TestUtility::loadFromYaml(std::string(std::get<BASIC_OD_CONFIG>(std::get<1>(GetParam()))),
                               *outlier_detection);
 
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -395,16 +296,8 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
     )EOF";
     }
 
-    protocol_options_yaml += R"EOF(
-         outlier_detection:
-           error_matcher:
-               http_response_headers_match:
-                 headers:
-                   - name: ":status"
-                     range_match:
-                       start: 502
-                       end: 503
-    )EOF",
+    // Add config outlier detection extensionconfig
+    protocol_options_yaml += std::get<EXT_OD_CONFIG>(std::get<1>(GetParam()));
 
         TestUtility::loadFromYaml(protocol_options_yaml, protocol_options);
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
@@ -414,17 +307,23 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_response_headers_.setStatus(502);
+  // Set the response code.
+  const uint32_t response_code = std::get<RESPONSE_CODE>(std::get<1>(GetParam()));
+  default_response_headers_.setStatus(response_code);
+  // Add header if test parameter includes one.
+  if (!std::get<OPTIONAL_HEADER>(std::get<1>(GetParam())).empty()) {
+  default_response_headers_.appendCopy(Http::LowerCaseString("test-header"), std::get<OPTIONAL_HEADER>(std::get<1>(GetParam())));
+    }
   for (auto i = 1; i <= 2; i++) {
     auto response =
         sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
 
     ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_EQ("502", response->headers().getStatusValue());
+    EXPECT_EQ(std::to_string(response_code), response->headers().getStatusValue());
   }
 
   // Now send a request. It will be captured by Envoy and 503 will be returned as the only upstream
-  // is unhealthy now..
+  // is unhealthy now.
   IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
@@ -434,32 +333,26 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
   codec_client_->close();
 }
 
-
-class OutlierDetectionTemplateIntegrationTest : public HttpProtocolIntegrationTestWithParams<std::tuple<bool, bool>> {
-public:
-#if 0
-  void initialize() override { 
-    ASSERT_TRUE(HttpProtocolIntegrationTestWithParams::GetParam());
-    //HttpProtocolIntegrationTestWithParams<bool>::initialize(); }
-#endif
-};
-
-
-TEST_P(OutlierDetectionTemplateIntegrationTest, ClusterOverwriteGatewayErrors) {
-    //ASSERT_FALSE(std::get<1>(GetParam()));
-    ASSERT_TRUE(std::get<1>(std::get<1>(GetParam())));
-}
-
 INSTANTIATE_TEST_SUITE_P(
-    Protocols, OutlierDetectionTemplateIntegrationTest,
-    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()), 
-                     testing::Values(std::make_tuple(true, true), std::make_tuple(true, true))));
-    //testing::Values(std::make_tuple(
-      //      HttpProtocolTestParams{Network::Address::IpVersion::v4, Http::CodecType::HTTP2, Http::CodecType::HTTP2,
-       //                                          Http2Impl::Nghttp2, false}, true)));
-    //testing::Values(std::tuple<HttpProtocolTestParams, bool>(Http::CodecType::HTTP1, true)));
-
-    //HttpProtocolIntegrationTest::protocolTestParamsToString);
+    Protocols, OutlierDetectionIntegrationTest,
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTestBase::getProtocolTestParamsWithoutHTTP3()), 
+                     testing::Values(
+                        // Regression test.  Test verifies that empty outlier detection setting in protocol options
+                        // do not interfere with existing outlier detection.
+                        std::make_tuple(std::string("test1"), OutlierDetectionIntegrationTest::consecutive_5xx_only, std::string(""), 500, ""),
+                        // In this test, outlier extentions define 3xx codes as errors.
+                        std::make_tuple(std::string("test2"), OutlierDetectionIntegrationTest::consecutive_5xx_only, 
+                        OutlierDetectionIntegrationTest::error_3xx_and_header, 301, ""),
+                        // Test verifies that when outlier extensions include gateway code 502, that code
+                        // is forwarded in original form and is not converted to generic code 500.
+                        std::make_tuple(std::string("test3"), OutlierDetectionIntegrationTest::gateway_only, 
+                        OutlierDetectionIntegrationTest::gateway_error, 502, ""),
+                        // Test verifies that responses where a matcher matches not code, but response
+                        // header are treated as errors.
+                        std::make_tuple(std::string("test4"), OutlierDetectionIntegrationTest::consecutive_5xx_only, 
+                        OutlierDetectionIntegrationTest::error_3xx_and_header, 200, "treat-as-error")
+                        )),
+    OutlierDetectionIntegrationTest::protocolTestParamsToString);
 
 } // namespace
 } // namespace Envoy

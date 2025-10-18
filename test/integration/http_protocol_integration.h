@@ -63,6 +63,8 @@ public:
 
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
+static std::string testNameFromTestParams(
+    const HttpProtocolTestParams& params);
   static std::string
   protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
 
@@ -100,19 +102,22 @@ protected:
   bool async_lb_ = true;
 };
 
+
+// Variadic template used to add additional test params to Http protocol integration tests.
 template <typename... T>
 class HttpProtocolIntegrationTestWithParams : 
                                 public testing::WithParamInterface<typename std::conditional<(sizeof...(T) > 0), std::tuple<HttpProtocolTestParams, T...>, HttpProtocolTestParams>::type>,
                                 public HttpProtocolIntegrationTestBase {
+static const HttpProtocolTestParams&
+getTestBaseParam() {
+    if constexpr (sizeof...(T) > 0) {
+        return std::get<0>(testing::TestWithParam<std::tuple<HttpProtocolTestParams, T...>>::GetParam());
+    } else {
+        return testing::TestWithParam<HttpProtocolTestParams>::GetParam();
+    }
+}
 public:
-    // Constructor when there is no extra params.
-    template<bool with_params = false>
-    HttpProtocolIntegrationTestWithParams() : HttpProtocolIntegrationTestBase(testing::TestWithParam<HttpProtocolTestParams>::GetParam()) {
-    }
-    // Constructor when there are extra params.
-    template<std::enable_if<(sizeof...(T) > 0), bool> = true>
-    HttpProtocolIntegrationTestWithParams() : HttpProtocolIntegrationTestBase(std::get<0>(testing::TestWithParam<std::tuple<HttpProtocolTestParams, T...>>::GetParam())) {
-    }
+    HttpProtocolIntegrationTestWithParams() : HttpProtocolIntegrationTestBase(getTestBaseParam()) {}
 };
 
 // Basic class used for testing without additional parameters.

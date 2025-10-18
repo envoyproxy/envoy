@@ -54,13 +54,18 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTestBase::getProtocol
   return ret;
 }
 
+std::string HttpProtocolIntegrationTestBase::testNameFromTestParams(
+    const HttpProtocolTestParams& params) {
+  return absl::StrCat((params.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+                      downstreamToString(params.downstream_protocol),
+                      upstreamToString(params.upstream_protocol),
+                      http2ImplementationToString(params.http2_implementation),
+                      params.use_universal_header_validator ? "Uhv" : "Legacy");
+    }
+
 std::string HttpProtocolIntegrationTestBase::protocolTestParamsToString(
     const ::testing::TestParamInfo<HttpProtocolTestParams>& params) {
-  return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
-                      downstreamToString(params.param.downstream_protocol),
-                      upstreamToString(params.param.upstream_protocol),
-                      http2ImplementationToString(params.param.http2_implementation),
-                      params.param.use_universal_header_validator ? "Uhv" : "Legacy");
+  return testNameFromTestParams(params.param);
 }
 
 void HttpProtocolIntegrationTestBase::setUpstreamOverrideStreamErrorOnInvalidHttpMessage() {
