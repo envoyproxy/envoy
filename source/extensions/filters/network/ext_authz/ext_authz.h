@@ -57,6 +57,7 @@ public:
         include_peer_certificate_(config.include_peer_certificate()),
         include_tls_session_(config.include_tls_session()),
         send_tls_alert_on_denial_(config.send_tls_alert_on_denial()),
+        check_on_new_connection_(config.check_on_new_connection()),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
                 ? absl::optional<Matchers::MetadataMatcher>(
@@ -77,6 +78,7 @@ public:
   bool includePeerCertificate() const { return include_peer_certificate_; }
   bool includeTLSSession() const { return include_tls_session_; }
   bool sendTlsAlertOnDenial() const { return send_tls_alert_on_denial_; }
+  bool checkOnNewConnection() const { return check_on_new_connection_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
   bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
     return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
@@ -90,6 +92,7 @@ private:
   const bool include_peer_certificate_;
   const bool include_tls_session_;
   const bool send_tls_alert_on_denial_;
+  const bool check_on_new_connection_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
 };
 
