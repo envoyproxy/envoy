@@ -26,6 +26,13 @@ public:
   }
 
   void initializeConfig() {
+    // Add Peak EWMA HTTP filter to record RTT samples.
+    config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.peak_ewma
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.peak_ewma.v3alpha.PeakEwmaConfig
+)EOF");
+
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
       ASSERT(cluster_0->name() == "cluster_0");
@@ -54,7 +61,7 @@ public:
       TestUtility::loadFromYaml(
           fmt::format(endpoints_yaml, local_address, local_address, local_address), *endpoint);
 
-      // Configure Peak EWMA load balancing policy
+      // Configure Peak EWMA load balancing policy.
       auto* policy = cluster_0->mutable_load_balancing_policy();
 
       const std::string policy_yaml = R"EOF(
@@ -102,8 +109,8 @@ public:
   }
 
   void runLatencySensitiveRouting() {
-    // Warm up EWMA measurements
-    for (int i = 0; i < 6; i++) {
+    // Warm up EWMA measurements with initial requests to establish latency baseline.
+    for (int i = 0; i < 10; i++) {
       codec_client_ = makeHttpConnection(lookupPort("http"));
 
       Http::TestRequestHeaderMapImpl request_headers{
@@ -114,9 +121,9 @@ public:
       auto upstream_index = waitForNextUpstreamRequest({0, 1, 2});
       ASSERT(upstream_index.has_value());
 
-      // Simulate different response times by delaying some upstreams
+      // Simulate different response times by delaying some upstreams.
       if (upstream_index.value() == 1) {
-        // Add artificial delay for upstream 1 to make it "slower"
+        // Add artificial delay for upstream 1 to make it "slower".
         timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
       }
 
@@ -129,10 +136,11 @@ public:
       cleanupUpstreamAndDownstream();
     }
 
-    // Now send more requests and check if the faster upstreams (0, 2) are preferred
+    // Now send more requests and verify Peak EWMA strongly avoids the slow upstream.
+    // Peak EWMA should route < 10% traffic to slow server (vs 33% with round robin).
     std::map<int, int> upstream_counts;
 
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 100; i++) {
       codec_client_ = makeHttpConnection(lookupPort("http"));
 
       Http::TestRequestHeaderMapImpl request_headers{
@@ -144,7 +152,7 @@ public:
       ASSERT(upstream_index.has_value());
       upstream_counts[upstream_index.value()]++;
 
-      // Continue to simulate delay for upstream 1
+      // Continue to simulate delay for upstream 1.
       if (upstream_index.value() == 1) {
         timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
       }
@@ -159,12 +167,16 @@ public:
     }
 
     int slow_upstream_requests = upstream_counts[1];
-    int total_requests = 20;
+    int total_requests = 100;
     double slow_upstream_ratio = static_cast<double>(slow_upstream_requests) / total_requests;
 
-    EXPECT_LT(slow_upstream_ratio, 0.5)
-        << "Should reduce traffic to slower upstream. Got " << slow_upstream_requests << "/"
-        << total_requests << " requests";
+    // Peak EWMA should strongly avoid slow servers (< 10% traffic vs 33% with round robin).
+    // The HTTP filter records RTT samples, enabling the load balancer to make cost-based
+    // decisions. This threshold validates the core performance characteristic and provides
+    // regression protection.
+    EXPECT_LT(slow_upstream_ratio, 0.10)
+        << "Peak EWMA should strongly avoid slow upstream. Got " << slow_upstream_requests << "/"
+        << total_requests << " (" << (slow_upstream_ratio * 100) << "%) requests to slow server";
   }
 
   void runConfigValidation() {
