@@ -63,6 +63,19 @@ TEST_P(AdminInstanceTest, Memory) {
                                   Property(&envoy::admin::v3::Memory::total_thread_cache, Ge(0))));
 }
 
+TEST_P(AdminInstanceTest, MemoryTcmalloc) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  auto result_code = getCallback("/memory/tcmalloc", header_map, response);
+#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
+  EXPECT_EQ(Http::Code::OK, result_code);
+  EXPECT_THAT(response.toString(), HasSubstr("Bytes in use by application"));
+#else
+  EXPECT_EQ(Http::Code::NotImplemented, result_code);
+  EXPECT_EQ("Envoy was not built with tcmalloc.\n", response.toString());
+#endif
+}
+
 TEST_P(AdminInstanceTest, GetReadyRequest) {
   NiceMock<Init::MockManager> initManager;
   ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));

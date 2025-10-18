@@ -107,6 +107,20 @@ void Stats::dumpStatsToLog() {
 #endif
 }
 
+absl::optional<std::string> Stats::dumpStats() {
+#if defined(TCMALLOC)
+  return tcmalloc::MallocExtension::GetStats();
+#elif defined(GPERFTOOLS_TCMALLOC)
+  constexpr int buffer_size = 100000;
+  std::string buffer(buffer_size, '\0');
+  MallocExtension::instance()->GetStats(buffer.data(), buffer_size);
+  buffer.resize(strlen(buffer.c_str()));
+  return buffer;
+#else
+  return absl::nullopt;
+#endif
+}
+
 AllocatorManager::AllocatorManager(
     Api::Api& api, Envoy::Stats::Scope& scope,
     const envoy::config::bootstrap::v3::MemoryAllocatorManager& config)

@@ -343,6 +343,10 @@ modify different aspects of the server:
 
   Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all ``/stats`` and filtering to get the memory-related statistics.
 
+.. http:get:: /memory/tcmalloc
+
+  Dumps the current `TCMalloc stats <https://github.com/google/tcmalloc/tree/master/docs/stats.md>`_.
+
 .. http:post:: /quitquitquit
 
   Cleanly exit the server.
