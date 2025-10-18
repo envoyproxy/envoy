@@ -6,7 +6,7 @@ import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "BackoffProto";
@@ -23,7 +23,7 @@ message BackoffStrategy {
   // The base interval to be used for the next back off computation. It should
   // be greater than zero and less than or equal to :ref:`max_interval
   // <envoy_v3_api_field_config.core.v3.BackoffStrategy.max_interval>`.
-  google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+  google.protobuf.Duration base_interval = 1 [(buf.validate.field).duration = {
     required: true
     gte {nanos: 1000000}
   }];
@@ -33,5 +33,5 @@ message BackoffStrategy {
   // <envoy_v3_api_field_config.core.v3.BackoffStrategy.base_interval>` if set. The default
   // is 10 times the :ref:`base_interval
   // <envoy_v3_api_field_config.core.v3.BackoffStrategy.base_interval>`.
-  google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration max_interval = 2 [(buf.validate.field).duration = {gt {}}];
 }

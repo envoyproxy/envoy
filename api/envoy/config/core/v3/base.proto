@@ -18,7 +18,7 @@ import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "BaseProto";
@@ -246,7 +246,7 @@ message Metadata {
   // fields are present in the metadata with same keys,
   // only ``typed_filter_metadata`` field will be parsed.
   map<string, google.protobuf.Struct> filter_metadata = 1
-      [(validate.rules).map = {keys {string {min_len: 1}}}];
+      [(buf.validate.field).map = {keys {string {min_len: 1}}}];
 
   // Key is the reverse DNS filter name, e.g. com.acme.widget. The ``envoy.*``
   // namespace is reserved for Envoy's built-in filters.
@@ -255,7 +255,7 @@ message Metadata {
   // and ``typed_filter_metadata`` fields are present in the metadata with same keys,
   // only ``typed_filter_metadata`` field will be parsed.
   map<string, google.protobuf.Any> typed_filter_metadata = 2
-      [(validate.rules).map = {keys {string {min_len: 1}}}];
+      [(buf.validate.field).map = {keys {string {min_len: 1}}}];
 }
 
 // Runtime derived uint32 with a default when not specified.
@@ -295,7 +295,7 @@ message RuntimeFeatureFlag {
       "envoy.api.v2.core.RuntimeFeatureFlag";
 
   // Default value if runtime value is not available.
-  google.protobuf.BoolValue default_value = 1 [(validate.rules).message = {required: true}];
+  google.protobuf.BoolValue default_value = 1 [(buf.validate.field).required = true];
 
   // Runtime key to get value for comparison. This value is used if defined. The boolean value must
   // be represented via its
@@ -309,7 +309,7 @@ message KeyValue {
   // The key of the key/value pair.
   string key = 1 [
     deprecated = true,
-    (validate.rules).string = {min_len: 1 max_bytes: 16384},
+    (buf.validate.field).string = {min_len: 1 max_bytes: 16384},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
@@ -324,7 +324,7 @@ message KeyValue {
 
 message KeyValuePair {
   // The key of the key/value pair.
-  string key = 1 [(validate.rules).string = {min_len: 1 max_bytes: 16384}];
+  string key = 1 [(buf.validate.field).string = {min_len: 1 max_bytes: 16384}];
 
   // The value of the key/value pair.
   google.protobuf.Value value = 2;
@@ -367,13 +367,13 @@ message KeyValueAppend {
   // [#not-implemented-hide:]
   KeyValue entry = 1 [
     deprecated = true,
-    (validate.rules).message = {skip: true},
+    (buf.validate.field).message = {skip: true},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
   // Describes the action taken to append/overwrite the given value for an existing
   // key or to only add this key if it's absent.
-  KeyValueAppendAction action = 2 [(validate.rules).enum = {defined_only: true}];
+  KeyValueAppendAction action = 2 [(buf.validate.field).enum = {defined_only: true}];
 }
 
 // Key/value pair to append or remove.
@@ -384,13 +384,13 @@ message KeyValueMutation {
 
   // Key to remove. Only one of ``append`` or ``remove`` can be set or the configuration will be
   // rejected.
-  string remove = 2 [(validate.rules).string = {max_bytes: 16384}];
+  string remove = 2 [(buf.validate.field).string = {max_bytes: 16384}];
 }
 
 // Query parameter name/value pair.
 message QueryParameter {
   // The key of the query parameter. Case sensitive.
-  string key = 1 [(validate.rules).string = {min_len: 1}];
+  string key = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // The value of the query parameter.
   string value = 2;
@@ -402,7 +402,7 @@ message HeaderValue {
 
   // Header name.
   string key = 1
-      [(validate.rules).string =
+      [(buf.validate.field).string =
            {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // Header value.
@@ -413,14 +413,14 @@ message HeaderValue {
   // Header value is encoded as string. This does not work for non-utf8 characters.
   // Only one of ``value`` or ``raw_value`` can be set.
   string value = 2 [
-    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false},
+    (buf.validate.field).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false},
     (udpa.annotations.field_migrate).oneof_promotion = "value_type"
   ];
 
   // Header value is encoded as bytes which can support non-utf8 characters.
   // Only one of ``value`` or ``raw_value`` can be set.
   bytes raw_value = 3 [
-    (validate.rules).bytes = {min_len: 0 max_len: 16384},
+    (buf.validate.field).bytes = {min_len: 0 max_len: 16384},
     (udpa.annotations.field_migrate).oneof_promotion = "value_type"
   ];
 }
@@ -455,7 +455,7 @@ message HeaderValueOption {
   }
 
   // Header name/value pair that this option applies to.
-  HeaderValue header = 1 [(validate.rules).message = {required: true}];
+  HeaderValue header = 1 [(buf.validate.field).required = true];
 
   // Should the value be appended? If true (default), the value is appended to
   // existing values. Otherwise it replaces any existing values.
@@ -473,7 +473,7 @@ message HeaderValueOption {
   // or to only add this header if it's absent.
   // Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD
   // <envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
-  HeaderAppendAction append_action = 3 [(validate.rules).enum = {defined_only: true}];
+  HeaderAppendAction append_action = 3 [(buf.validate.field).enum = {defined_only: true}];
 
   // Is the header value allowed to be empty? If false (default), custom headers with empty values are dropped,
   // otherwise they are added.
@@ -492,7 +492,7 @@ message HeaderMap {
 // events inside this directory trigger the watch.
 message WatchedDirectory {
   // Directory path to watch.
-  string path = 1 [(validate.rules).string = {min_len: 1}];
+  string path = 1 [(buf.validate.field).string = {min_len: 1}];
 }
 
 // Data source consisting of a file, an inline value, or an environment variable.
@@ -504,7 +504,7 @@ message DataSource {
     option (validate.required) = true;
 
     // Local filesystem data source.
-    string filename = 1 [(validate.rules).string = {min_len: 1}];
+    string filename = 1 [(buf.validate.field).string = {min_len: 1}];
 
     // Bytes inlined in the configuration.
     bytes inline_bytes = 2;
@@ -513,7 +513,7 @@ message DataSource {
     string inline_string = 3;
 
     // Environment variable data source.
-    string environment_variable = 4 [(validate.rules).string = {min_len: 1}];
+    string environment_variable = 4 [(buf.validate.field).string = {min_len: 1}];
   }
 
   // Watched directory that is watched for file changes. If this is set explicitly, the file
@@ -540,7 +540,7 @@ message RetryPolicy {
 
   // See :ref:`RetryPriority <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>`.
   message RetryPriority {
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
     oneof config_type {
       google.protobuf.Any typed_config = 2;
@@ -549,7 +549,7 @@ message RetryPolicy {
 
   // See :ref:`RetryHostPredicate <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_host_predicate>`.
   message RetryHostPredicate {
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
     oneof config_type {
       google.protobuf.Any typed_config = 2;
@@ -584,10 +584,10 @@ message RemoteDataSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RemoteDataSource";
 
   // The HTTP URI to fetch the remote data.
-  HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
+  HttpUri http_uri = 1 [(buf.validate.field).required = true];
 
   // SHA256 string for verifying data.
-  string sha256 = 2 [(validate.rules).string = {min_len: 1}];
+  string sha256 = 2 [(buf.validate.field).string = {min_len: 1}];
 
   // Retry policy for fetching remote data.
   RetryPolicy retry_policy = 3;
@@ -621,7 +621,7 @@ message TransportSocket {
 
   // The name of the transport socket to instantiate. The name must match a supported transport
   // socket implementation.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Implementation specific configuration which depends on the implementation being instantiated.
   // See the supported transport socket implementations for further documentation.
@@ -645,7 +645,7 @@ message RuntimeFractionalPercent {
       "envoy.api.v2.core.RuntimeFractionalPercent";
 
   // Default value if the runtime value's for the numerator/denominator keys are not available.
-  type.v3.FractionalPercent default_value = 1 [(validate.rules).message = {required: true}];
+  type.v3.FractionalPercent default_value = 1 [(buf.validate.field).required = true];
 
   // Runtime key for a YAML representation of a FractionalPercent.
   string runtime_key = 2;

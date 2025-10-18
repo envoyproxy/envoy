@@ -7,7 +7,7 @@ import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.common.matcher.v3";
 option java_outer_classname = "MatcherProto";
@@ -64,7 +64,7 @@ message Matcher {
       message SinglePredicate {
         // Protocol-specific specification of input field to match on.
         // [#extension-category: envoy.matching.common_inputs]
-        core.v3.TypedExtensionConfig input = 1 [(validate.rules).message = {required: true}];
+        core.v3.TypedExtensionConfig input = 1 [(buf.validate.field).required = true];
 
         oneof matcher {
           option (validate.required) = true;
@@ -80,7 +80,7 @@ message Matcher {
 
       // A list of two or more matchers. Used to allow using a list within a oneof.
       message PredicateList {
-        repeated Predicate predicate = 1 [(validate.rules).repeated = {min_items: 2}];
+        repeated Predicate predicate = 1 [(buf.validate.field).repeated = {min_items: 2}];
       }
 
       oneof match_type {
@@ -103,24 +103,24 @@ message Matcher {
     // An individual matcher.
     message FieldMatcher {
       // Determines if the match succeeds.
-      Predicate predicate = 1 [(validate.rules).message = {required: true}];
+      Predicate predicate = 1 [(buf.validate.field).required = true];
 
       // What to do if the match succeeds.
-      OnMatch on_match = 2 [(validate.rules).message = {required: true}];
+      OnMatch on_match = 2 [(buf.validate.field).required = true];
     }
 
     // A list of matchers. First match wins.
-    repeated FieldMatcher matchers = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated FieldMatcher matchers = 1 [(buf.validate.field).repeated = {min_items: 1}];
   }
 
   message MatcherTree {
     // A map of configured matchers. Used to allow using a map within a oneof.
     message MatchMap {
-      map<string, OnMatch> map = 1 [(validate.rules).map = {min_pairs: 1}];
+      map<string, OnMatch> map = 1 [(buf.validate.field).map = {min_pairs: 1}];
     }
 
     // Protocol-specific specification of input field to match on.
-    core.v3.TypedExtensionConfig input = 1 [(validate.rules).message = {required: true}];
+    core.v3.TypedExtensionConfig input = 1 [(buf.validate.field).required = true];
 
     // Exact or prefix match maps in which to look up the input value.
     // If the lookup succeeds, the match is considered successful, and
@@ -162,7 +162,7 @@ message MatchPredicate {
   // A set of match configurations used for logical operations.
   message MatchSet {
     // The list of rules that make up the set.
-    repeated MatchPredicate rules = 1 [(validate.rules).repeated = {min_items: 2}];
+    repeated MatchPredicate rules = 1 [(buf.validate.field).repeated = {min_items: 2}];
   }
 
   oneof rule {
@@ -180,7 +180,7 @@ message MatchPredicate {
     MatchPredicate not_match = 3;
 
     // The match configuration will always match.
-    bool any_match = 4 [(validate.rules).bool = {const: true}];
+    bool any_match = 4 [(buf.validate.field).bool = {const: true}];
 
     // HTTP request headers match configuration.
     HttpHeadersMatch http_request_headers_match = 5;
@@ -224,10 +224,10 @@ message HttpGenericBodyMatch {
       option (validate.required) = true;
 
       // Text string to be located in HTTP body.
-      string string_match = 1 [(validate.rules).string = {min_len: 1}];
+      string string_match = 1 [(buf.validate.field).string = {min_len: 1}];
 
       // Sequence of bytes to be located in HTTP body.
-      bytes binary_match = 2 [(validate.rules).bytes = {min_len: 1}];
+      bytes binary_match = 2 [(buf.validate.field).bytes = {min_len: 1}];
     }
   }
 
@@ -235,5 +235,5 @@ message HttpGenericBodyMatch {
   uint32 bytes_limit = 1;
 
   // List of patterns to match.
-  repeated GenericTextMatch patterns = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated GenericTextMatch patterns = 2 [(buf.validate.field).repeated = {min_items: 1}];
 }

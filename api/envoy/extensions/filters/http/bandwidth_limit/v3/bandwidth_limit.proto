@@ -8,7 +8,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_limit.v3";
 option java_outer_classname = "BandwidthLimitProto";
@@ -39,11 +39,11 @@ message BandwidthLimit {
   }
 
   // The human readable prefix to use when emitting stats.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // The enable mode for the bandwidth limit filter.
   // Default is Disabled.
-  EnableMode enable_mode = 2 [(validate.rules).enum = {defined_only: true}];
+  EnableMode enable_mode = 2 [(buf.validate.field).enum = {defined_only: true}];
 
   // The limit supplied in KiB/s.
   //
@@ -55,11 +55,11 @@ message BandwidthLimit {
   // .. note::
   //   When using per route configuration, the limit becomes unique to that route.
   //
-  google.protobuf.UInt64Value limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
+  google.protobuf.UInt64Value limit_kbps = 3 [(buf.validate.field).uint64 = {gte: 1}];
 
   // Optional Fill interval in milliseconds for the token refills. Defaults to 50ms.
   // It must be at least 20ms to avoid too aggressive refills.
-  google.protobuf.Duration fill_interval = 4 [(validate.rules).duration = {
+  google.protobuf.Duration fill_interval = 4 [(buf.validate.field).duration = {
     lte {seconds: 1}
     gte {nanos: 20000000}
   }];
@@ -84,5 +84,5 @@ message BandwidthLimit {
 
   // Optional The prefix for the response trailers.
   string response_trailer_prefix = 7
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 }

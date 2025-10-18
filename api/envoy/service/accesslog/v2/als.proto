@@ -6,7 +6,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/data/accesslog/v2/accesslog.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.accesslog.v2";
 option java_outer_classname = "AlsProto";
@@ -37,23 +37,23 @@ message StreamAccessLogsResponse {
 message StreamAccessLogsMessage {
   message Identifier {
     // The node sending the access log messages over the stream.
-    api.v2.core.Node node = 1 [(validate.rules).message = {required: true}];
+    api.v2.core.Node node = 1 [(buf.validate.field).required = true];
 
     // The friendly name of the log configured in :ref:`CommonGrpcAccessLogConfig
     // <envoy_api_msg_config.accesslog.v2.CommonGrpcAccessLogConfig>`.
-    string log_name = 2 [(validate.rules).string = {min_bytes: 1}];
+    string log_name = 2 [(buf.validate.field).string = {min_bytes: 1}];
   }
 
   // Wrapper for batches of HTTP access log entries.
   message HTTPAccessLogEntries {
     repeated data.accesslog.v2.HTTPAccessLogEntry log_entry = 1
-        [(validate.rules).repeated = {min_items: 1}];
+        [(buf.validate.field).repeated = {min_items: 1}];
   }
 
   // Wrapper for batches of TCP access log entries.
   message TCPAccessLogEntries {
     repeated data.accesslog.v2.TCPAccessLogEntry log_entry = 1
-        [(validate.rules).repeated = {min_items: 1}];
+        [(buf.validate.field).repeated = {min_items: 1}];
   }
 
   // Identifier data that will only be sent in the first message on the stream. This is effectively

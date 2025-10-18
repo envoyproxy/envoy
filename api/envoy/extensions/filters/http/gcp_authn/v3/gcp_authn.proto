@@ -10,7 +10,7 @@ import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.gcp_authn.v3";
 option java_outer_classname = "GcpAuthnProto";
@@ -55,7 +55,7 @@ message GcpAuthnFilterConfig {
 
   // Timeout for fetching the tokens from the GCE metadata server.
   // Not supported by all data planes.
-  google.protobuf.Duration timeout = 6 [(validate.rules).duration = {
+  google.protobuf.Duration timeout = 6 [(buf.validate.field).duration = {
     lt {seconds: 4294967296}
     gte {}
   }];
@@ -64,24 +64,24 @@ message GcpAuthnFilterConfig {
 // Audience is the URL of the receiving service that performs token authentication.
 // It will be provided to the filter through cluster's typed_filter_metadata.
 message Audience {
-  string url = 1 [(validate.rules).string = {min_len: 1}];
+  string url = 1 [(buf.validate.field).string = {min_len: 1}];
 }
 
 // Token Cache configuration.
 message TokenCacheConfig {
   // The number of cache entries. The maximum number of entries is INT64_MAX as it is constrained by underlying cache implementation.
   // Default value 0 (i.e., proto3 defaults) disables the cache by default. Other default values will enable the cache.
-  google.protobuf.UInt64Value cache_size = 1 [(validate.rules).uint64 = {lte: 9223372036854775807}];
+  google.protobuf.UInt64Value cache_size = 1 [(buf.validate.field).uint64 = {lte: 9223372036854775807}];
 }
 
 message TokenHeader {
   // The HTTP header's name.
   string name = 1
-      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // The header's prefix. The format is "value_prefix<token>"
   // For example, for "Authorization: Bearer <token>", value_prefix="Bearer " with a space at the
   // end.
   string value_prefix = 2
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 }

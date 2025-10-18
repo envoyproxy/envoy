@@ -6,7 +6,7 @@ import "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.cluster.dynamic_forward_proxy.v2alpha";
 option java_outer_classname = "ClusterProto";
@@ -26,5 +26,5 @@ message ClusterConfig {
   // match that of associated :ref:`dynamic forward proxy HTTP filter configuration
   // <envoy_api_field_config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig.dns_cache_config>`.
   common.dynamic_forward_proxy.v2alpha.DnsCacheConfig dns_cache_config = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 }

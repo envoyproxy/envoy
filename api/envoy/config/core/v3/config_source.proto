@@ -15,7 +15,7 @@ import "xds/core/v3/authority.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "ConfigSourceProto";
@@ -76,11 +76,11 @@ message ApiConfigSource {
   }
 
   // API type (gRPC, REST, delta gRPC)
-  ApiType api_type = 1 [(validate.rules).enum = {defined_only: true}];
+  ApiType api_type = 1 [(buf.validate.field).enum = {defined_only: true}];
 
   // API version for xDS transport protocol. This describes the xDS gRPC/REST
   // endpoint and version of [Delta]DiscoveryRequest/Response used on the wire.
-  ApiVersion transport_api_version = 8 [(validate.rules).enum = {defined_only: true}];
+  ApiVersion transport_api_version = 8 [(buf.validate.field).enum = {defined_only: true}];
 
   // Cluster names should be used only with REST. If > 1
   // cluster is defined, clusters will be cycled through if any kind of failure
@@ -100,7 +100,7 @@ message ApiConfigSource {
   google.protobuf.Duration refresh_delay = 3;
 
   // For REST APIs, the request timeout. If not set, a default value of 1s will be used.
-  google.protobuf.Duration request_timeout = 5 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration request_timeout = 5 [(buf.validate.field).duration = {gt {}}];
 
   // For GRPC APIs, the rate limit settings. If present, discovery requests made by Envoy will be
   // rate limited.
@@ -137,7 +137,7 @@ message SelfConfigSource {
 
   // API version for xDS transport protocol. This describes the xDS gRPC/REST
   // endpoint and version of [Delta]DiscoveryRequest/Response used on the wire.
-  ApiVersion transport_api_version = 1 [(validate.rules).enum = {defined_only: true}];
+  ApiVersion transport_api_version = 1 [(buf.validate.field).enum = {defined_only: true}];
 }
 
 // Rate Limit settings to be applied for discovery requests made by Envoy.
@@ -152,7 +152,7 @@ message RateLimitSettings {
   // Rate at which tokens will be filled per second. If not set, a default fill rate of 10 tokens
   // per second will be used. The minimal fill rate is once per year. Lower
   // fill rates will be set to once per year.
-  google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double = {gt: 0.0}];
+  google.protobuf.DoubleValue fill_rate = 2 [(buf.validate.field).double = {gt: 0.0}];
 }
 
 // Local filesystem path configuration source.
@@ -173,7 +173,7 @@ message PathConfigSource {
   //   used here also. If ``watched_directory`` is configured, no watch will be placed directly on
   //   this path. Instead, the configured ``watched_directory`` will be used to trigger reloads of
   //   this path. This is required in certain deployment scenarios. See below for more information.
-  string path = 1 [(validate.rules).string = {min_len: 1}];
+  string path = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // If configured, this directory will be watched for *moves*. When an entry in this directory is
   // moved to, the ``path`` will be reloaded. This is required in certain deployment scenarios.
@@ -249,7 +249,7 @@ message ConfigSource {
   // API version for xDS resources. This implies the type URLs that the client
   // will request for resources and the resource type that the client will in
   // turn expect to be delivered.
-  ApiVersion resource_api_version = 6 [(validate.rules).enum = {defined_only: true}];
+  ApiVersion resource_api_version = 6 [(buf.validate.field).enum = {defined_only: true}];
 }
 
 // Configuration source specifier for a late-bound extension configuration. The
@@ -264,7 +264,7 @@ message ConfigSource {
 // behavior of a disabled extension depends on the context. For example, a
 // filter chain with a disabled extension filter rejects all incoming streams.
 message ExtensionConfigSource {
-  ConfigSource config_source = 1 [(validate.rules).any = {required: true}];
+  ConfigSource config_source = 1 [(buf.validate.field).required = true];
 
   // Optional default configuration to use as the initial configuration if
   // there is a failure to receive the initial extension configuration or if
@@ -279,5 +279,5 @@ message ExtensionConfigSource {
   // A set of permitted extension type URLs for the type encoded inside of the
   // :ref:`TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`. Extension
   // configuration updates are rejected if they do not match any type URL in the set.
-  repeated string type_urls = 4 [(validate.rules).repeated = {min_items: 1}];
+  repeated string type_urls = 4 [(buf.validate.field).repeated = {min_items: 1}];
 }

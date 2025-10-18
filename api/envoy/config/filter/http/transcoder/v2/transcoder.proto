@@ -4,7 +4,7 @@ package envoy.config.filter.http.transcoder.v2;
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.transcoder.v2";
 option java_outer_classname = "TranscoderProto";
@@ -61,7 +61,7 @@ message GrpcJsonTranscoder {
   // the transcoder will translate. If the service name doesn't exist in ``proto_descriptor``,
   // Envoy will fail at startup. The ``proto_descriptor`` may contain more services than
   // the service names specified here, but they won't be translated.
-  repeated string services = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated string services = 2 [(buf.validate.field).repeated = {min_items: 1}];
 
   // Control options for response JSON. These options are passed directly to
   // `JsonPrintOptions <https://developers.google.com/protocol-buffers/docs/reference/cpp/

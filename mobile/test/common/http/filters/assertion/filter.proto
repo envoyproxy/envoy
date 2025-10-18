@@ -4,7 +4,7 @@ package envoymobile.extensions.filters.http.assertion;
 
 import "envoy/config/common/matcher/v3/matcher.proto";
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 message Assertion {
   // The match configuration. If the configuration matches the request frames the filter will send
@@ -12,5 +12,5 @@ message Assertion {
   // intervening frames). Otherwise, it will send a local reply with Http::Code::BadRequest.
   // TODO: update upstream MatchPredicate proto to require at least one matcher.
   envoy.config.common.matcher.v3.MatchPredicate match_config = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).message = {required: true}];
 }

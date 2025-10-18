@@ -4,7 +4,7 @@ package envoy.config.filter.http.header_to_metadata.v2;
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.header_to_metadata.v2";
 option java_outer_classname = "HeaderToMetadataProto";
@@ -50,7 +50,7 @@ message Config {
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
-    string key = 2 [(validate.rules).string = {min_bytes: 1}];
+    string key = 2 [(buf.validate.field).string = {min_bytes: 1}];
 
     // The value to pair with the given key.
     //
@@ -73,7 +73,7 @@ message Config {
   message Rule {
     // The header that triggers this rule — required.
     string header = 1
-        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(buf.validate.field).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     // If the header is present, apply this metadata KeyValuePair.
     //

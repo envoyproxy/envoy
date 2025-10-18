@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package test.common.upstream;
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 import "test/fuzz/common.proto";
 
 message OrcaParserTestCase {
-  test.fuzz.Headers response_headers = 1 [(validate.rules).message.required = true];
+  test.fuzz.Headers response_headers = 1 [(buf.validate.field).message.required = true];
 }

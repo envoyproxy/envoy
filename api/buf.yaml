@@ -5,7 +5,7 @@ deps:
 - buf.build/opentelemetry/opentelemetry
 - buf.build/gogo/protobuf
 - buf.build/cncf/xds
-- buf.build/envoyproxy/protoc-gen-validate
+- buf.build/bufbuild/protovalidate
 breaking:
   ignore_unstable_packages: true
   use:

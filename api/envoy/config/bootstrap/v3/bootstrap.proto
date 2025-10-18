@@ -27,7 +27,7 @@ import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.bootstrap.v3";
 option java_outer_classname = "BootstrapProto";
@@ -138,7 +138,7 @@ message Bootstrap {
     // Optional field to set the expiration time for the cached gRPC client object.
     // The minimal value is 5s and the default is 50s.
     google.protobuf.Duration max_cached_entry_idle_duration = 1
-        [(validate.rules).duration = {gte {seconds: 5}}];
+        [(buf.validate.field).duration = {gte {seconds: 5}}];
   }
 
   reserved 10, 11;
@@ -216,7 +216,7 @@ message Bootstrap {
   // can be set.
   // Duration must be at least 1ms and at most 5 min.
   google.protobuf.Duration stats_flush_interval = 7 [
-    (validate.rules).duration = {
+    (buf.validate.field).duration = {
       lt {seconds: 300}
       gte {nanos: 1000000}
     },
@@ -227,7 +227,7 @@ message Bootstrap {
     // Flush stats to sinks only when queried for on the admin interface. If set,
     // a flush timer is not created. Only one of ``stats_flush_on_admin`` or
     // ``stats_flush_interval`` can be set.
-    bool stats_flush_on_admin = 29 [(validate.rules).bool = {const: true}];
+    bool stats_flush_on_admin = 29 [(buf.validate.field).bool = {const: true}];
   }
 
   oneof stats_eviction {
@@ -235,7 +235,7 @@ message Bootstrap {
     // the unused metrics are removed from the worker caches and the used metrics
     // are marked as unused. Must be a multiple of the ``stats_flush_interval``.
     google.protobuf.Duration stats_eviction_interval = 42
-        [(validate.rules).duration = {gte {nanos: 1000000}}];
+        [(buf.validate.field).duration = {gte {nanos: 1000000}}];
   }
 
   // Optional watchdog configuration.
@@ -542,7 +542,7 @@ message Watchdog {
     // Extension specific configuration for the action.
     core.v3.TypedExtensionConfig config = 1;
 
-    WatchdogEvent event = 2 [(validate.rules).enum = {defined_only: true}];
+    WatchdogEvent event = 2 [(buf.validate.field).enum = {defined_only: true}];
   }
 
   // Register actions that will fire on given WatchDog events.
@@ -567,7 +567,7 @@ message Watchdog {
   // enabled. Enabling this feature would help to reduce risk of synchronized
   // watchdog kill events across proxies due to external triggers. Set to 0 to
   // disable. If not specified the default is 0 (disabled).
-  google.protobuf.Duration max_kill_timeout_jitter = 6 [(validate.rules).duration = {gte {}}];
+  google.protobuf.Duration max_kill_timeout_jitter = 6 [(buf.validate.field).duration = {gte {}}];
 
   // If ``max(2, ceil(registered_threads * Fraction(*multikill_threshold*)))``
   // threads have been nonresponsive for at least this duration kill the entire
@@ -676,7 +676,7 @@ message RuntimeLayer {
 
   // Descriptive name for the runtime layer. This is only used for the runtime
   // :http:get:`/runtime` output.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   oneof layer_specifier {
     option (validate.required) = true;
@@ -739,10 +739,10 @@ message CustomInlineHeader {
 
   // The name of the header that is expected to be set as the inline header.
   string inline_header_name = 1
-      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // The type of the header that is expected to be set as the inline header.
-  InlineHeaderType inline_header_type = 2 [(validate.rules).enum = {defined_only: true}];
+  InlineHeaderType inline_header_type = 2 [(buf.validate.field).enum = {defined_only: true}];
 }
 
 message MemoryAllocatorManager {

@@ -7,7 +7,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.data.cluster.v2alpha";
 option java_outer_classname = "OutlierDetectionEventProto";
@@ -78,7 +78,7 @@ enum Action {
 // [#next-free-field: 12]
 message OutlierDetectionEvent {
   // In case of eject represents type of ejection that took place.
-  OutlierEjectionType type = 1 [(validate.rules).enum = {defined_only: true}];
+  OutlierEjectionType type = 1 [(buf.validate.field).enum = {defined_only: true}];
 
   // Timestamp for event.
   google.protobuf.Timestamp timestamp = 2;
@@ -87,13 +87,13 @@ message OutlierDetectionEvent {
   google.protobuf.UInt64Value secs_since_last_action = 3;
 
   // The :ref:`cluster <envoy_api_msg_Cluster>` that owns the ejected host.
-  string cluster_name = 4 [(validate.rules).string = {min_bytes: 1}];
+  string cluster_name = 4 [(buf.validate.field).string = {min_bytes: 1}];
 
   // The URL of the ejected host. E.g., ``tcp://1.2.3.4:80``.
-  string upstream_url = 5 [(validate.rules).string = {min_bytes: 1}];
+  string upstream_url = 5 [(buf.validate.field).string = {min_bytes: 1}];
 
   // The action that took place.
-  Action action = 6 [(validate.rules).enum = {defined_only: true}];
+  Action action = 6 [(buf.validate.field).enum = {defined_only: true}];
 
   // If ``action`` is ``eject``, specifies the number of times the host has been ejected (local to
   // that Envoy and gets reset if the host gets removed from the upstream cluster for any reason and
@@ -117,14 +117,14 @@ message OutlierDetectionEvent {
 
 message OutlierEjectSuccessRate {
   // Host’s success rate at the time of the ejection event on a 0-100 range.
-  uint32 host_success_rate = 1 [(validate.rules).uint32 = {lte: 100}];
+  uint32 host_success_rate = 1 [(buf.validate.field).uint32 = {lte: 100}];
 
   // Average success rate of the hosts in the cluster at the time of the ejection event on a 0-100
   // range.
-  uint32 cluster_average_success_rate = 2 [(validate.rules).uint32 = {lte: 100}];
+  uint32 cluster_average_success_rate = 2 [(buf.validate.field).uint32 = {lte: 100}];
 
   // Success rate ejection threshold at the time of the ejection event.
-  uint32 cluster_success_rate_ejection_threshold = 3 [(validate.rules).uint32 = {lte: 100}];
+  uint32 cluster_success_rate_ejection_threshold = 3 [(buf.validate.field).uint32 = {lte: 100}];
 }
 
 message OutlierEjectConsecutive {
@@ -132,5 +132,5 @@ message OutlierEjectConsecutive {
 
 message OutlierEjectFailurePercentage {
   // Host's success rate at the time of the ejection event on a 0-100 range.
-  uint32 host_success_rate = 1 [(validate.rules).uint32 = {lte: 100}];
+  uint32 host_success_rate = 1 [(buf.validate.field).uint32 = {lte: 100}];
 }

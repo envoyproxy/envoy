@@ -5,7 +5,7 @@ package envoy.extensions.http.original_ip_detection.custom_header.v3;
 import "envoy/type/v3/http_status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.original_ip_detection.custom_header.v3";
 option java_outer_classname = "CustomHeaderProto";
@@ -29,7 +29,7 @@ message CustomHeaderConfig {
   //
   // Note: in the case of a multi-valued header, only the first value is tried and the rest are ignored.
   string header_name = 1
-      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: true}];
+      [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: true}];
 
   // If set to true, the extension could decide that the detected address should be treated as
   // trusted by the HCM. If the address is considered :ref:`trusted<config_http_conn_man_headers_x-forwarded-for_trusted_client_address>`,

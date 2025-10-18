@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.config.trace.v2;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v2";
 option java_outer_classname = "LightstepProto";
@@ -32,13 +32,13 @@ message LightstepConfig {
   }
 
   // The cluster manager cluster that hosts the LightStep collectors.
-  string collector_cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+  string collector_cluster = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
   // File containing the access token to the `LightStep
   // <https://lightstep.com/>`_ API.
-  string access_token_file = 2 [(validate.rules).string = {min_bytes: 1}];
+  string access_token_file = 2 [(buf.validate.field).string = {min_bytes: 1}];
 
   // Propagation modes to use by LightStep's tracer.
   repeated PropagationMode propagation_modes = 3
-      [(validate.rules).repeated = {items {enum {defined_only: true}}}];
+      [(buf.validate.field).repeated = {items {enum {defined_only: true}}}];
 }

@@ -8,7 +8,7 @@ import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.ring_hash.v3";
 option java_outer_classname = "RingHashProto";
@@ -40,19 +40,19 @@ message RingHash {
 
   // The hash function used to hash hosts onto the ketama ring. The value defaults to
   // :ref:`XX_HASH<envoy_v3_api_enum_value_config.cluster.v3.Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
-  HashFunction hash_function = 1 [(validate.rules).enum = {defined_only: true}];
+  HashFunction hash_function = 1 [(buf.validate.field).enum = {defined_only: true}];
 
   // Minimum hash ring size. The larger the ring is (that is, the more hashes there are for each
   // provided host) the better the request distribution will reflect the desired weights. Defaults
   // to 1024 entries, and limited to 8M entries. See also
   // :ref:`maximum_ring_size<envoy_v3_api_field_config.cluster.v3.Cluster.RingHashLbConfig.maximum_ring_size>`.
   google.protobuf.UInt64Value minimum_ring_size = 2
-      [(validate.rules).uint64 = {lte: 8388608 gte: 1}];
+      [(buf.validate.field).uint64 = {lte: 8388608 gte: 1}];
 
   // Maximum hash ring size. Defaults to 8M entries, and limited to 8M entries, but can be lowered
   // to further constrain resource use. See also
   // :ref:`minimum_ring_size<envoy_v3_api_field_config.cluster.v3.Cluster.RingHashLbConfig.minimum_ring_size>`.
-  google.protobuf.UInt64Value maximum_ring_size = 3 [(validate.rules).uint64 = {lte: 8388608}];
+  google.protobuf.UInt64Value maximum_ring_size = 3 [(buf.validate.field).uint64 = {lte: 8388608}];
 
   // If set to ``true``, the cluster will use hostname instead of the resolved
   // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
@@ -85,7 +85,7 @@ message RingHash {
   //   <envoy_v3_api_field_extensions.load_balancing_policies.ring_hash.v3.RingHash.consistent_hashing_lb_config>` instead.
   google.protobuf.UInt32Value hash_balance_factor = 5 [
     deprecated = true,
-    (validate.rules).uint32 = {gte: 100},
+    (buf.validate.field).uint32 = {gte: 100},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 

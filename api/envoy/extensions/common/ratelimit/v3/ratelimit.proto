@@ -9,7 +9,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.common.ratelimit.v3";
 option java_outer_classname = "RatelimitProto";
@@ -101,12 +101,12 @@ message RateLimitDescriptor {
         "envoy.api.v2.ratelimit.RateLimitDescriptor.Entry";
 
     // Descriptor key.
-    string key = 1 [(validate.rules).string = {min_len: 1}];
+    string key = 1 [(buf.validate.field).string = {min_len: 1}];
 
     // Descriptor value. Blank value is treated as wildcard to create dynamic token buckets for each unique value.
     // Blank Values as wild card is currently supported only with envoy server instance level HTTP local rate limiting
     // and will not work if HTTP local rate limiting is enabled per connection level.
-    string value = 2 [(validate.rules).string = {min_len: 0}];
+    string value = 2 [(buf.validate.field).string = {min_len: 0}];
   }
 
   // Override rate limit to apply to this descriptor instead of the limit
@@ -117,11 +117,11 @@ message RateLimitDescriptor {
     uint32 requests_per_unit = 1;
 
     // The unit of time.
-    type.v3.RateLimitUnit unit = 2 [(validate.rules).enum = {defined_only: true}];
+    type.v3.RateLimitUnit unit = 2 [(buf.validate.field).enum = {defined_only: true}];
   }
 
   // Descriptor entries.
-  repeated Entry entries = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated Entry entries = 1 [(buf.validate.field).repeated = {min_items: 1}];
 
   // Optional rate limit override to supply to the ratelimit service.
   RateLimitOverride limit = 2;
@@ -140,10 +140,10 @@ message RateLimitDescriptor {
 //
 message LocalRateLimitDescriptor {
   // Descriptor entries.
-  repeated v3.RateLimitDescriptor.Entry entries = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated v3.RateLimitDescriptor.Entry entries = 1 [(buf.validate.field).repeated = {min_items: 1}];
 
   // Token Bucket algorithm for local ratelimiting.
-  type.v3.TokenBucket token_bucket = 2 [(validate.rules).message = {required: true}];
+  type.v3.TokenBucket token_bucket = 2 [(buf.validate.field).required = true];
 }
 
 // Configuration used to enable local cluster level rate limiting where the token buckets

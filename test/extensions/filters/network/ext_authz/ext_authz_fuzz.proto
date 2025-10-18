@@ -3,7 +3,7 @@ package envoy.extensions.filters.network.ext_authz;
 
 import "envoy/extensions/filters/network/ext_authz/v3/ext_authz.proto";
 import "google/protobuf/empty.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 message Result {
   oneof result_selector {
@@ -36,6 +36,6 @@ message Action {
 }
 message ExtAuthzTestCase {
   envoy.extensions.filters.network.ext_authz.v3.ExtAuthz config = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).message = {required: true}];
   repeated Action actions = 2;
 }

@@ -9,7 +9,7 @@ import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.least_request.v3";
 option java_outer_classname = "LeastRequestProto";
@@ -51,7 +51,7 @@ message LeastRequest {
   // The number of random healthy hosts from which the host with the fewest active requests will
   // be chosen. Defaults to 2 so that we perform two-choice selection if the field is not set.
   // Only applies to the ``N_CHOICES`` selection method.
-  google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32 = {gte: 2}];
+  google.protobuf.UInt32Value choice_count = 1 [(buf.validate.field).uint32 = {gte: 2}];
 
   // The following formula is used to calculate the dynamic weights when hosts have different load
   // balancing weights:
@@ -93,5 +93,5 @@ message LeastRequest {
   // Method for selecting the host set from which to return the host with the fewest active requests.
   //
   // Defaults to ``N_CHOICES``.
-  SelectionMethod selection_method = 6 [(validate.rules).enum = {defined_only: true}];
+  SelectionMethod selection_method = 6 [(buf.validate.field).enum = {defined_only: true}];
 }

@@ -2,18 +2,18 @@ syntax = "proto3";
 
 package test.integration.filters;
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 message TestNetworkFilterConfig {
 }
 
 message TestDrainerNetworkFilterConfig {
   bool is_terminal_filter = 1;
-  uint32 bytes_to_drain = 2 [(validate.rules).uint32 = {gte: 2}];
+  uint32 bytes_to_drain = 2 [(buf.validate.field).uint32 = {gte: 2}];
   string direct_response = 3;
   bool drain_all_data = 4;
 }
 
 message TestDrainerUpstreamNetworkFilterConfig {
-  uint32 bytes_to_drain = 1 [(validate.rules).uint32 = {gte: 2}];
+  uint32 bytes_to_drain = 1 [(buf.validate.field).uint32 = {gte: 2}];
 }

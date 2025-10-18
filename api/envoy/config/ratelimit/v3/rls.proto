@@ -7,7 +7,7 @@ import "envoy/config/core/v3/grpc_service.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.ratelimit.v3";
 option java_outer_classname = "RlsProto";
@@ -27,9 +27,9 @@ message RateLimitServiceConfig {
   // Specifies the gRPC service that hosts the rate limit service. The client
   // will connect to this cluster when it needs to make rate limit service
   // requests.
-  core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
+  core.v3.GrpcService grpc_service = 2 [(buf.validate.field).required = true];
 
   // API version for rate limit transport protocol. This describes the rate limit gRPC endpoint and
   // version of messages used on the wire.
-  core.v3.ApiVersion transport_api_version = 4 [(validate.rules).enum = {defined_only: true}];
+  core.v3.ApiVersion transport_api_version = 4 [(buf.validate.field).enum = {defined_only: true}];
 }

@@ -9,7 +9,7 @@ import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.overload.v3";
 option java_outer_classname = "OverloadProto";
@@ -35,7 +35,7 @@ message ResourceMonitor {
   // The name of the resource monitor to instantiate. Must match a registered
   // resource monitor type.
   // See the :ref:`extensions listed in typed_config below <extension_category_envoy.resource_monitors>` for the default list of available resource monitor.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Configuration for the resource monitor being instantiated.
   // [#extension-category: envoy.resource_monitors]
@@ -50,17 +50,17 @@ message ThresholdTrigger {
 
   // If the resource pressure is greater than or equal to this value, the trigger
   // will enter saturation.
-  double value = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+  double value = 1 [(buf.validate.field).double = {lte: 1.0 gte: 0.0}];
 }
 
 message ScaledTrigger {
   // If the resource pressure is greater than this value, the trigger will be in the
   // :ref:`scaling <arch_overview_overload_manager-triggers-state>` state with value
   // ``(pressure - scaling_threshold) / (saturation_threshold - scaling_threshold)``.
-  double scaling_threshold = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+  double scaling_threshold = 1 [(buf.validate.field).double = {lte: 1.0 gte: 0.0}];
 
   // If the resource pressure is greater than this value, the trigger will enter saturation.
-  double saturation_threshold = 2 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+  double saturation_threshold = 2 [(buf.validate.field).double = {lte: 1.0 gte: 0.0}];
 }
 
 message Trigger {
@@ -68,7 +68,7 @@ message Trigger {
       "envoy.config.overload.v2alpha.Trigger";
 
   // The name of the resource this is a trigger for.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   oneof trigger_oneof {
     option (validate.required) = true;
@@ -120,7 +120,7 @@ message ScaleTimersOverloadActionConfig {
 
   message ScaleTimer {
     // The type of timer this minimum applies to.
-    TimerType timer = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+    TimerType timer = 1 [(buf.validate.field).enum = {defined_only: true not_in: 0}];
 
     oneof overload_adjust {
       option (validate.required) = true;
@@ -134,7 +134,7 @@ message ScaleTimersOverloadActionConfig {
   }
 
   // A set of timer scaling rules to be applied.
-  repeated ScaleTimer timer_scale_factors = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated ScaleTimer timer_scale_factors = 1 [(buf.validate.field).repeated = {min_items: 1}];
 }
 
 message OverloadAction {
@@ -151,7 +151,7 @@ message OverloadAction {
   // - envoy.overload_actions.shrink_heap
   // - envoy.overload_actions.reduce_timeouts
   // - envoy.overload_actions.reset_high_memory_stream
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // A set of triggers for this action. The state of the action is the maximum
   // state of all triggers, which can be scalar values between 0 and 1 or
@@ -160,7 +160,7 @@ message OverloadAction {
   // e.g. :ref:`Trigger.name
   // <envoy_v3_api_field_config.overload.v3.Trigger.name>` must be unique
   // in this list.
-  repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated Trigger triggers = 2 [(buf.validate.field).repeated = {min_items: 1}];
 
   // Configuration for the action being instantiated if applicable.
   google.protobuf.Any typed_config = 3;
@@ -174,7 +174,7 @@ message LoadShedPoint {
   // Deployment specific LoadShedPoints e.g. within a custom extension should
   // be prefixed by the company / deployment name to avoid colliding with any
   // open source LoadShedPoints.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // A set of triggers for this LoadShedPoint. The LoadShedPoint will use the
   // the maximum state of all triggers, which can be scalar values between 0 and
@@ -182,7 +182,7 @@ message LoadShedPoint {
   // resource e.g. :ref:`Trigger.name
   // <envoy_v3_api_field_config.overload.v3.Trigger.name>` must be unique in
   // this list.
-  repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated Trigger triggers = 2 [(buf.validate.field).repeated = {min_items: 1}];
 }
 
 // Configuration for which accounts the WatermarkBuffer Factories should
@@ -202,7 +202,7 @@ message BufferFactoryConfig {
   // we don't expect the proxy to be holding 2^56 bytes.
   //
   // If omitted, Envoy should not do any tracking.
-  uint32 minimum_account_to_track_power_of_two = 1 [(validate.rules).uint32 = {lte: 56 gte: 10}];
+  uint32 minimum_account_to_track_power_of_two = 1 [(buf.validate.field).uint32 = {lte: 56 gte: 10}];
 }
 
 // [#next-free-field: 6]
@@ -214,7 +214,7 @@ message OverloadManager {
   google.protobuf.Duration refresh_interval = 1;
 
   // The set of resources to monitor.
-  repeated ResourceMonitor resource_monitors = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated ResourceMonitor resource_monitors = 2 [(buf.validate.field).repeated = {min_items: 1}];
 
   // The set of overload actions.
   repeated OverloadAction actions = 3;

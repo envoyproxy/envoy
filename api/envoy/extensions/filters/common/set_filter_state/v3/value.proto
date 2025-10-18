@@ -5,7 +5,7 @@ package envoy.extensions.filters.common.set_filter_state.v3;
 import "envoy/config/core/v3/substitution_format_string.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.common.set_filter_state.v3";
 option java_outer_classname = "ValueProto";
@@ -35,7 +35,7 @@ message FilterStateValue {
     // Filter state object key. The key is used to lookup the object factory, unless :ref:`factory_key
     // <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>` is set. See
     // :ref:`the well-known filter state keys <well_known_filter_state>` for a list of valid object keys.
-    string object_key = 1 [(validate.rules).string = {min_len: 1}];
+    string object_key = 1 [(buf.validate.field).string = {min_len: 1}];
   }
 
   // Optional filter object factory lookup key. See :ref:`the well-known filter state keys <well_known_filter_state>`

@@ -9,7 +9,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.sip_proxy.v3alpha";
 option java_outer_classname = "SipProxyProto";
@@ -73,7 +73,7 @@ message SipProxy {
   }
 
   // The human readable prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // The route table for the connection manager is static and is specified in this property.
   RouteConfiguration route_config = 2;
@@ -93,7 +93,7 @@ message SipFilter {
   // The name of the filter to instantiate. The name must match a supported
   // filter. The built-in filters are:
   //
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.

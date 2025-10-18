@@ -11,7 +11,7 @@ import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ratelimit.v3";
 option java_outer_classname = "RateLimitProto";
@@ -40,7 +40,7 @@ message RateLimit {
   }
 
   // The rate limit domain to use when calling the rate limit service.
-  string domain = 1 [(validate.rules).string = {min_len: 1}];
+  string domain = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Specifies the rate limit configurations to be applied with the same
   // stage number. If not set, the default stage number is 0.
@@ -48,7 +48,7 @@ message RateLimit {
   // .. note::
   //
   //  The filter supports a range of 0 - 10 inclusively for stage numbers.
-  uint32 stage = 2 [(validate.rules).uint32 = {lte: 10}];
+  uint32 stage = 2 [(buf.validate.field).uint32 = {lte: 10}];
 
   // The type of requests the filter should apply to. The supported
   // types are ``internal``, ``external`` or ``both``. A request is considered internal if
@@ -57,7 +57,7 @@ message RateLimit {
   // request is considered external. The filter defaults to ``both``, and it will apply to all request
   // types.
   string request_type = 3
-      [(validate.rules).string = {in: "internal" in: "external" in: "both" in: ""}];
+      [(buf.validate.field).string = {in: "internal" in: "external" in: "both" in: ""}];
 
   // The timeout in milliseconds for the rate limit service RPC. If not
   // set, this defaults to 20ms.
@@ -77,7 +77,7 @@ message RateLimit {
   // specified, any calls to the rate limit service will immediately return
   // success.
   config.ratelimit.v3.RateLimitServiceConfig rate_limit_service = 7
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   // Defines the standard version to use for X-RateLimit headers emitted by the filter:
   //
@@ -105,7 +105,7 @@ message RateLimit {
   //
   // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.XRateLimitHeadersRFCVersion instead.]
   XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 8
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum = {defined_only: true}];
 
   // Disables emitting the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header
   // in case of rate limiting (i.e. 429 responses).
@@ -123,7 +123,7 @@ message RateLimit {
   // Specifies a list of HTTP headers that should be added to each response for requests that
   // have been rate limited.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 11
-      [(validate.rules).repeated = {max_items: 10}];
+      [(buf.validate.field).repeated = {max_items: 10}];
 
   // Sets the HTTP status that is returned to the client when the ratelimit server returns an error
   // or cannot be reached. The default status is 500.
@@ -219,11 +219,11 @@ message RateLimitPerRoute {
 
   // Specifies if the rate limit filter should include the virtual host rate limits.
   // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.VhRateLimitsOptions instead.]
-  VhRateLimitsOptions vh_rate_limits = 1 [(validate.rules).enum = {defined_only: true}];
+  VhRateLimitsOptions vh_rate_limits = 1 [(buf.validate.field).enum = {defined_only: true}];
 
   // Specifies if the rate limit filter should include the lower levels (route level, virtual host level or cluster weight level) rate limits override options.
   // [#not-implemented-hide:]
-  OverrideOptions override_option = 2 [(validate.rules).enum = {defined_only: true}];
+  OverrideOptions override_option = 2 [(buf.validate.field).enum = {defined_only: true}];
 
   // Rate limit configuration that is used to generate a list of descriptor entries based on
   // the request context. The generated entries will be used to find one or multiple matched rate

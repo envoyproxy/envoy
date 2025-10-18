@@ -7,7 +7,7 @@ import "envoy/type/matcher/v3/regex.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.header_to_metadata.v3";
 option java_outer_classname = "HeaderToMetadataProto";
@@ -62,7 +62,7 @@ message Config {
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
-    string key = 2 [(validate.rules).string = {min_len: 1}];
+    string key = 2 [(buf.validate.field).string = {min_len: 1}];
 
     // The value to pair with the given key.
     //
@@ -87,7 +87,7 @@ message Config {
         [(udpa.annotations.field_migrate).oneof_promotion = "value_type"];
 
     // The value's type — defaults to string.
-    ValueType type = 4 [(validate.rules).enum = {defined_only: true}];
+    ValueType type = 4 [(buf.validate.field).enum = {defined_only: true}];
 
     // How is the value encoded, default is NONE (not encoded).
     // The value will be decoded accordingly before storing to metadata.
@@ -104,13 +104,13 @@ message Config {
     //
     // The header to be extracted.
     string header = 1 [
-      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
       (udpa.annotations.field_migrate).oneof_promotion = "header_cookie_specifier"
     ];
 
     // The cookie to be extracted.
     string cookie = 5 [
-      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
       (udpa.annotations.field_migrate).oneof_promotion = "header_cookie_specifier"
     ];
 

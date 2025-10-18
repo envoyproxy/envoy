@@ -18,7 +18,7 @@ import "google/protobuf/wrappers.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "HealthCheckProto";
@@ -60,7 +60,7 @@ enum HealthStatus {
 message HealthStatusSet {
   // An order-independent set of health status.
   repeated HealthStatus statuses = 1
-      [(validate.rules).repeated = {items {enum {defined_only: true}}}];
+      [(buf.validate.field).repeated = {items {enum {defined_only: true}}}];
 }
 
 // [#next-free-field: 27]
@@ -76,7 +76,7 @@ message HealthCheck {
       option (validate.required) = true;
 
       // Hex encoded payload. E.g., "000000FF".
-      string text = 1 [(validate.rules).string = {min_len: 1}];
+      string text = 1 [(buf.validate.field).string = {min_len: 1}];
 
       // Binary payload.
       bytes binary = 2;
@@ -96,11 +96,11 @@ message HealthCheck {
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used. The host header can be customized for a specific endpoint by setting the
     // :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
-    string host = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE}];
+    string host = 1 [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE}];
 
     // Specifies the HTTP path that will be requested during health checking. For example
     // ``/healthcheck``.
-    string path = 2 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE}];
+    string path = 2 [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE}];
 
     // HTTP specific payload to be sent as the request body during health checking.
     // If specified, the method should support a request body (POST, PUT, PATCH, etc.).
@@ -119,18 +119,18 @@ message HealthCheck {
 
     // Specifies the size of response buffer in bytes that is used to Payload match.
     // The default value is 1024. Setting to 0 implies that the Payload will be matched against the entire response.
-    google.protobuf.UInt64Value response_buffer_size = 14 [(validate.rules).uint64 = {gte: 0}];
+    google.protobuf.UInt64Value response_buffer_size = 14 [(buf.validate.field).uint64 = {gte: 0}];
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
     // health checked cluster. For more information, including details on header value syntax, see
     // the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
     repeated HeaderValueOption request_headers_to_add = 6
-        [(validate.rules).repeated = {max_items: 1000}];
+        [(buf.validate.field).repeated = {max_items: 1000}];
 
     // Specifies a list of HTTP headers that should be removed from each request that is sent to the
     // health checked cluster.
-    repeated string request_headers_to_remove = 8 [(validate.rules).repeated = {
+    repeated string request_headers_to_remove = 8 [(buf.validate.field).repeated = {
       items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
     }];
 
@@ -153,7 +153,7 @@ message HealthCheck {
     repeated type.v3.Int64Range retriable_statuses = 12;
 
     // Use specified application protocol for health checks.
-    type.v3.CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
+    type.v3.CodecClientType codec_client_type = 10 [(buf.validate.field).enum = {defined_only: true}];
 
     // An optional service name parameter which is used to validate the identity of
     // the health checked cluster using a :ref:`StringMatcher
@@ -166,7 +166,7 @@ message HealthCheck {
     // Request body payloads are supported for POST, PUT, PATCH, and OPTIONS methods only.
     // CONNECT method is disallowed because it is not appropriate for health check request.
     // If a non-200 response is expected by the method, it needs to be set in :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`.
-    RequestMethod method = 13 [(validate.rules).enum = {defined_only: true not_in: 6}];
+    RequestMethod method = 13 [(buf.validate.field).enum = {defined_only: true not_in: 6}];
   }
 
   message TcpHealthCheck {
@@ -220,13 +220,13 @@ message HealthCheck {
     // with will be used. The authority header can be customized for a specific endpoint by setting
     // the :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
     string authority = 2
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Specifies a list of key-value pairs that should be added to the metadata of each GRPC call
     // that is sent to the health checked cluster. For more information, including details on header value syntax,
     // see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
-    repeated HeaderValueOption initial_metadata = 3 [(validate.rules).repeated = {max_items: 1000}];
+    repeated HeaderValueOption initial_metadata = 3 [(buf.validate.field).repeated = {max_items: 1000}];
   }
 
   // Custom health check.
@@ -239,7 +239,7 @@ message HealthCheck {
     reserved "config";
 
     // The registered name of the custom health checker.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
     // A custom health checker specific configuration which depends on the custom health checker
     // being instantiated. See :api:`envoy/config/health_checker` for reference.
@@ -268,13 +268,13 @@ message HealthCheck {
 
   // The time to wait for a health check response. If the timeout is reached the
   // health check attempt will be considered a failure.
-  google.protobuf.Duration timeout = 1 [(validate.rules).duration = {
+  google.protobuf.Duration timeout = 1 [(buf.validate.field).duration = {
     required: true
     gt {}
   }];
 
   // The interval between health checks.
-  google.protobuf.Duration interval = 2 [(validate.rules).duration = {
+  google.protobuf.Duration interval = 2 [(buf.validate.field).duration = {
     required: true
     gt {}
   }];
@@ -301,12 +301,12 @@ message HealthCheck {
   // :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
   // or :ref:`retriable_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses>`,
   // this threshold is ignored and the host is considered immediately unhealthy.
-  google.protobuf.UInt32Value unhealthy_threshold = 4 [(validate.rules).message = {required: true}];
+  google.protobuf.UInt32Value unhealthy_threshold = 4 [(buf.validate.field).required = true];
 
   // The number of healthy health checks required before a host is marked
   // healthy. Note that during startup, only a single successful health check is
   // required to mark a host healthy.
-  google.protobuf.UInt32Value healthy_threshold = 5 [(validate.rules).message = {required: true}];
+  google.protobuf.UInt32Value healthy_threshold = 5 [(buf.validate.field).required = true];
 
   // [#not-implemented-hide:] Non-serving port for health checking.
   google.protobuf.UInt32Value alt_port = 6;
@@ -338,7 +338,7 @@ message HealthCheck {
   // any other.
   //
   // The default value for "no traffic interval" is 60 seconds.
-  google.protobuf.Duration no_traffic_interval = 12 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration no_traffic_interval = 12 [(buf.validate.field).duration = {gt {}}];
 
   // The "no traffic healthy interval" is a special health check interval that
   // is used for hosts that are currently passing active health checking
@@ -353,14 +353,14 @@ message HealthCheck {
   //
   // If no_traffic_healthy_interval is not set, it will default to the
   // no traffic interval and send that interval regardless of health state.
-  google.protobuf.Duration no_traffic_healthy_interval = 24 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration no_traffic_healthy_interval = 24 [(buf.validate.field).duration = {gt {}}];
 
   // The "unhealthy interval" is a health check interval that is used for hosts that are marked as
   // unhealthy. As soon as the host is marked as healthy, Envoy will shift back to using the
   // standard health check interval that is defined.
   //
   // The default value for "unhealthy interval" is the same as "interval".
-  google.protobuf.Duration unhealthy_interval = 14 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration unhealthy_interval = 14 [(buf.validate.field).duration = {gt {}}];
 
   // The "unhealthy edge interval" is a special health check interval that is used for the first
   // health check right after a host is marked as unhealthy. For subsequent health checks
@@ -368,14 +368,14 @@ message HealthCheck {
   // check interval that is defined.
   //
   // The default value for "unhealthy edge interval" is the same as "unhealthy interval".
-  google.protobuf.Duration unhealthy_edge_interval = 15 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration unhealthy_edge_interval = 15 [(buf.validate.field).duration = {gt {}}];
 
   // The "healthy edge interval" is a special health check interval that is used for the first
   // health check right after a host is marked as healthy. For subsequent health checks
   // Envoy will shift back to using the standard health check interval that is defined.
   //
   // The default value for "healthy edge interval" is the same as the default interval.
-  google.protobuf.Duration healthy_edge_interval = 16 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration healthy_edge_interval = 16 [(buf.validate.field).duration = {gt {}}];
 
   // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
   //

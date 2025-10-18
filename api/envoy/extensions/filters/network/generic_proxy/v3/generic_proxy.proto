@@ -11,7 +11,7 @@ import "envoy/extensions/filters/network/http_connection_manager/v3/http_connect
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.generic_proxy.v3";
 option java_outer_classname = "GenericProxyProto";
@@ -27,12 +27,12 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#next-free-field: 8]
 message GenericProxy {
   // The human readable prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // The codec which encodes and decodes the application protocol.
   // [#extension-category: envoy.generic_proxy.codecs]
   config.core.v3.TypedExtensionConfig codec_config = 2
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   oneof route_specifier {
     option (validate.required) = true;
@@ -59,9 +59,9 @@ message GenericProxy {
 
 message GenericRds {
   // Configuration source specifier for RDS.
-  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.ConfigSource config_source = 1 [(buf.validate.field).required = true];
 
   // The name of the route configuration. This name will be passed to the RDS API. This allows an
   // Envoy configuration with multiple generic proxies to use different route configurations.
-  string route_config_name = 2 [(validate.rules).string = {min_len: 1}];
+  string route_config_name = 2 [(buf.validate.field).string = {min_len: 1}];
 }

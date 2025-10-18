@@ -9,7 +9,7 @@ import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.aws_request_signing.v3";
 option java_outer_classname = "AwsRequestSigningProto";
@@ -39,7 +39,7 @@ message AwsRequestSigning {
     // Optional expiration time for the query string parameters. As query string parameter based requests are replayable, in effect representing
     // an API call that has already been authenticated, it is recommended to keep this expiration time as short as feasible.
     // This value will default to 5 seconds and has a maximum value of 3600 seconds (1 hour).
-    google.protobuf.Duration expiration_time = 1 [(validate.rules).duration = {
+    google.protobuf.Duration expiration_time = 1 [(buf.validate.field).duration = {
       lte {seconds: 3600}
       gte {seconds: 1}
     }];
@@ -50,7 +50,7 @@ message AwsRequestSigning {
   // of the HTTP endpoint.
   //
   // Example: s3
-  string service_name = 1 [(validate.rules).string = {min_len: 1}];
+  string service_name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Optional region string. If region is not provided, the region will be retrieved from the environment
   // or AWS configuration files. See :ref:`config_http_filters_aws_request_signing_region` for more details.
@@ -120,5 +120,5 @@ message AwsRequestSigningPerRoute {
   AwsRequestSigning aws_request_signing = 1;
 
   // The human readable prefix to use when emitting stats.
-  string stat_prefix = 2 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 2 [(buf.validate.field).string = {min_len: 1}];
 }

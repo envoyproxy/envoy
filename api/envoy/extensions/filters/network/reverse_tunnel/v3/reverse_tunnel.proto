@@ -7,7 +7,7 @@ import "envoy/config/core/v3/base.proto";
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.reverse_tunnel.v3";
 option java_outer_classname = "ReverseTunnelProto";
@@ -43,7 +43,7 @@ message Validation {
   //
   //    node_id_format: "%DYNAMIC_METADATA(envoy.reverse_tunnel.allowlist:expected_node_id)%"
   //
-  string node_id_format = 1 [(validate.rules).string = {max_len: 1024}];
+  string node_id_format = 1 [(buf.validate.field).string = {max_len: 1024}];
 
   // Format string to extract the expected cluster identifier for validation.
   // The formatted value is compared against the ``x-envoy-reverse-tunnel-cluster-id`` header
@@ -61,7 +61,7 @@ message Validation {
   //
   //    cluster_id_format: "%FILTER_STATE(expected_cluster_id)%"
   //
-  string cluster_id_format = 2 [(validate.rules).string = {max_len: 1024}];
+  string cluster_id_format = 2 [(buf.validate.field).string = {max_len: 1024}];
 
   // Whether to emit validation results as dynamic metadata.
   // When enabled, the filter emits metadata under the namespace specified by
@@ -77,7 +77,7 @@ message Validation {
 
   // Namespace for emitted dynamic metadata when ``emit_dynamic_metadata`` is ``true``.
   // If not specified, defaults to ``envoy.filters.network.reverse_tunnel``.
-  string dynamic_metadata_namespace = 4 [(validate.rules).string = {max_len: 255}];
+  string dynamic_metadata_namespace = 4 [(buf.validate.field).string = {max_len: 255}];
 }
 
 // Configuration for the reverse tunnel network filter.
@@ -87,7 +87,7 @@ message Validation {
 message ReverseTunnel {
   // Ping interval for health checks on established reverse tunnel connections.
   // If not specified, defaults to ``2 seconds``.
-  google.protobuf.Duration ping_interval = 1 [(validate.rules).duration = {
+  google.protobuf.Duration ping_interval = 1 [(buf.validate.field).duration = {
     lte {seconds: 300}
     gte {nanos: 1000000}
   }];
@@ -102,11 +102,11 @@ message ReverseTunnel {
 
   // HTTP path to match for reverse tunnel requests.
   // If not specified, defaults to ``/reverse_connections/request``.
-  string request_path = 3 [(validate.rules).string = {min_len: 1 max_len: 255 ignore_empty: true}];
+  string request_path = 3 [(buf.validate.field).string = {min_len: 1 max_len: 255 ignore_empty: true}];
 
   // HTTP method to match for reverse tunnel requests.
   // If not specified (``METHOD_UNSPECIFIED``), this defaults to ``GET``.
-  config.core.v3.RequestMethod request_method = 4 [(validate.rules).enum = {defined_only: true}];
+  config.core.v3.RequestMethod request_method = 4 [(buf.validate.field).enum = {defined_only: true}];
 
   // Optional validation configuration for node and cluster identifiers.
   // If specified, the filter validates the ``x-envoy-reverse-tunnel-node-id`` and

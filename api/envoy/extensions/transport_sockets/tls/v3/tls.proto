@@ -13,7 +13,7 @@ import "google/protobuf/wrappers.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.v3";
 option java_outer_classname = "TlsProto";
@@ -39,7 +39,7 @@ message UpstreamTlsContext {
   CommonTlsContext common_tls_context = 1;
 
   // SNI string to use when creating TLS backend connections.
-  string sni = 2 [(validate.rules).string = {max_bytes: 255}];
+  string sni = 2 [(buf.validate.field).string = {max_bytes: 255}];
 
   // If true, replaces the SNI for the connection with the hostname of the upstream host, if
   // the hostname is known due to either a DNS cluster type or the
@@ -144,7 +144,7 @@ message DownstreamTlsContext {
   //
   // This serves as a hint for the `TLS session ticket lifetime (for TLSv1.2) <https://tools.ietf.org/html/rfc5077#section-5.6>`_.
   // Only whole seconds are considered; fractional seconds are ignored.
-  google.protobuf.Duration session_timeout = 6 [(validate.rules).duration = {
+  google.protobuf.Duration session_timeout = 6 [(buf.validate.field).duration = {
     lt {seconds: 4294967296}
     gte {}
   }];
@@ -152,7 +152,7 @@ message DownstreamTlsContext {
   // Configuration for handling certificates without an OCSP response or with expired responses.
   //
   // Defaults to ``LENIENT_STAPLING``
-  OcspStaplePolicy ocsp_staple_policy = 8 [(validate.rules).enum = {defined_only: true}];
+  OcspStaplePolicy ocsp_staple_policy = 8 [(buf.validate.field).enum = {defined_only: true}];
 
   // Multiple certificates are allowed in Downstream transport socket to serve different SNI.
   // This option controls the behavior when no matching certificate is found for the received SNI value,
@@ -174,7 +174,7 @@ message DownstreamTlsContext {
 // The key log file format is "format used by NSS for its SSLKEYLOGFILE debugging output" (text taken from openssl man page)
 message TlsKeyLog {
   // Path to save the TLS key log.
-  string path = 1 [(validate.rules).string = {min_len: 1}];
+  string path = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Local IP address ranges to filter connections for TLS key logging. If not set, matches any local IP address.
   repeated config.core.v3.CidrRange local_address_range = 2;
@@ -199,7 +199,7 @@ message CommonTlsContext {
   message CertificateProvider {
     // opaque name used to specify certificate instances or types. For example, "ROOTCA" to specify
     // a root-certificate (validation context) or "TLS" to specify a new tls-certificate.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
     // Provider specific config.
     // Note: an implementation is expected to dedup multiple instances of the same config
@@ -245,12 +245,12 @@ message CommonTlsContext {
 
     // How to validate peer certificates.
     CertificateValidationContext default_validation_context = 1
-        [(validate.rules).message = {required: true}];
+        [(buf.validate.field).required = true];
 
     // Config for fetching validation context via SDS API. Note SDS API allows certificates to be
     // fetched/refreshed over the network asynchronously with respect to the TLS handshake.
     SdsSecretConfig validation_context_sds_secret_config = 2
-        [(validate.rules).message = {required: true}];
+        [(buf.validate.field).required = true];
 
     // Certificate provider for fetching CA certs. This will populate the
     // ``default_validation_context.trusted_ca`` field.

@@ -1,7 +1,7 @@
 syntax = "proto3";
 package test.protos.breaking;
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 message ChangePGVMessageMessage {
   option (validate.disabled) = true;

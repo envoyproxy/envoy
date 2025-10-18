@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package test.extensions.filters.network;
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 import "envoy/config/listener/v3/listener_components.proto";
 
 message OnWrite {
@@ -11,7 +11,7 @@ message OnWrite {
 
 message AdvanceTime {
   // Advance the system time by (0,24] hours.
-  uint32 milliseconds = 1 [(validate.rules).uint32 = {gt: 0 lt: 86400000}];
+  uint32 milliseconds = 1 [(buf.validate.field).uint32 = {gt: 0 lt: 86400000}];
 }
 
 message WriteAction {

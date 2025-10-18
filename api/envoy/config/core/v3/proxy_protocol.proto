@@ -5,7 +5,7 @@ package envoy.config.core.v3;
 import "envoy/config/core/v3/substitution_format_string.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "ProxyProtocolProto";
@@ -31,13 +31,13 @@ message ProxyProtocolPassThroughTLVs {
   // The TLV types that are applied based on match_type.
   // TLV type is defined as uint8_t in proxy protocol. See `the spec
   // <https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt>`_ for details.
-  repeated uint32 tlv_type = 2 [(validate.rules).repeated = {items {uint32 {lt: 256}}}];
+  repeated uint32 tlv_type = 2 [(buf.validate.field).repeated = {items {uint32 {lt: 256}}}];
 }
 
 // Represents a single Type-Length-Value (TLV) entry.
 message TlvEntry {
   // The type of the TLV. Must be a uint8 (0-255) as per the Proxy Protocol v2 specification.
-  uint32 type = 1 [(validate.rules).uint32 = {lt: 256}];
+  uint32 type = 1 [(buf.validate.field).uint32 = {lt: 256}];
 
   // The static value of the TLV.
   // Only one of ``value`` or ``format_string`` may be set.

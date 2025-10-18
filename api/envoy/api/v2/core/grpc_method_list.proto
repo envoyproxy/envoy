@@ -4,7 +4,7 @@ package envoy.api.v2.core;
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "GrpcMethodListProto";
@@ -19,10 +19,10 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 message GrpcMethodList {
   message Service {
     // The name of the gRPC service.
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
     // The names of the gRPC methods in this service.
-    repeated string method_names = 2 [(validate.rules).repeated = {min_items: 1}];
+    repeated string method_names = 2 [(buf.validate.field).repeated = {min_items: 1}];
   }
 
   repeated Service services = 1;

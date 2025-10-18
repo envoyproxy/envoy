@@ -9,7 +9,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.tracers.fluentd.v3";
 option java_outer_classname = "FluentdProto";
@@ -28,19 +28,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 7]
 message FluentdConfig {
   // The upstream cluster to connect to for streaming the Fluentd messages.
-  string cluster = 1 [(validate.rules).string = {min_len: 1}];
+  string cluster = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // A tag is a string separated with ``.`` (e.g. ``log.type``) to categorize events.
   // See: https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#message-modes
-  string tag = 2 [(validate.rules).string = {min_len: 1}];
+  string tag = 2 [(buf.validate.field).string = {min_len: 1}];
 
   // The prefix to use when emitting tracer stats.
-  string stat_prefix = 3 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 3 [(buf.validate.field).string = {min_len: 1}];
 
   // Interval for flushing traces to the TCP stream. Tracer will flush requests every time
   // this interval is elapsed, or when batch size limit is hit, whichever comes first. Defaults to
   // 1 second.
-  google.protobuf.Duration buffer_flush_interval = 4 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration buffer_flush_interval = 4 [(buf.validate.field).duration = {gt {}}];
 
   // Soft size limit in bytes for access log entries buffer. The logger will buffer requests until
   // this limit it hit, or every time flush interval is elapsed, whichever comes first. When the buffer

@@ -20,7 +20,7 @@ import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.bootstrap.v2";
 option java_outer_classname = "BootstrapProto";
@@ -110,7 +110,7 @@ message Bootstrap {
   // gauges at a periodic interval. If not specified the default is 5000ms (5
   // seconds).
   // Duration must be at least 1ms and at most 5 min.
-  google.protobuf.Duration stats_flush_interval = 7 [(validate.rules).duration = {
+  google.protobuf.Duration stats_flush_interval = 7 [(buf.validate.field).duration = {
     lt {seconds: 300}
     gte {nanos: 1000000}
   }];
@@ -326,7 +326,7 @@ message RuntimeLayer {
 
   // Descriptive name for the runtime layer. This is only used for the runtime
   // :http:get:`/runtime` output.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
   oneof layer_specifier {
     option (validate.required) = true;

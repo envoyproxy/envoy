@@ -7,7 +7,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "ProtocolProto";
@@ -82,7 +82,7 @@ message HttpProtocolOptions {
   // The maximum number of headers. If unconfigured, the default
   // maximum number of request headers allowed is 100. Requests that exceed this limit will receive
   // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
-  google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value max_headers_count = 2 [(buf.validate.field).uint32 = {gte: 1}];
 
   // Total duration to keep alive an HTTP request/response stream. If the time limit is reached the stream will be
   // reset independent of any other timeouts. If not specified, this value is not set.
@@ -152,12 +152,12 @@ message Http2ProtocolOptions {
   message SettingsParameter {
     // The 16 bit parameter identifier.
     google.protobuf.UInt32Value identifier = 1 [
-      (validate.rules).uint32 = {lte: 65536 gte: 1},
-      (validate.rules).message = {required: true}
+      (buf.validate.field).uint32 = {lte: 65536 gte: 1},
+      (buf.validate.field).required = true
     ];
 
     // The 32 bit parameter value.
-    google.protobuf.UInt32Value value = 2 [(validate.rules).message = {required: true}];
+    google.protobuf.UInt32Value value = 2 [(buf.validate.field).required = true];
   }
 
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
@@ -174,7 +174,7 @@ message Http2ProtocolOptions {
   // on a single connection. If the limit is reached, Envoy may queue requests or establish
   // additional connections (as allowed per circuit breaker limits).
   google.protobuf.UInt32Value max_concurrent_streams = 2
-      [(validate.rules).uint32 = {lte: 2147483647 gte: 1}];
+      [(buf.validate.field).uint32 = {lte: 2147483647 gte: 1}];
 
   // `Initial stream-level flow-control window
   // <https://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2>`_ size. Valid values range from 65535
@@ -188,12 +188,12 @@ message Http2ProtocolOptions {
   // HTTP/2 codec buffers. Once the buffer reaches this pointer, watermark callbacks will fire to
   // stop the flow of data to the codec buffers.
   google.protobuf.UInt32Value initial_stream_window_size = 3
-      [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
+      [(buf.validate.field).uint32 = {lte: 2147483647 gte: 65535}];
 
   // Similar to *initial_stream_window_size*, but for connection-level flow-control
   // window. Currently, this has the same minimum/maximum/default as *initial_stream_window_size*.
   google.protobuf.UInt32Value initial_connection_window_size = 4
-      [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
+      [(buf.validate.field).uint32 = {lte: 2147483647 gte: 65535}];
 
   // Allows proxying Websocket and other upgrades over H2 connect.
   bool allow_connect = 5;
@@ -211,7 +211,7 @@ message Http2ProtocolOptions {
   // terminated. The ``http2.outbound_flood`` stat tracks the number of terminated connections due
   // to flood mitigation. The default limit is 10000.
   // [#comment:TODO: implement same limits for upstream outbound frames as well.]
-  google.protobuf.UInt32Value max_outbound_frames = 7 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value max_outbound_frames = 7 [(buf.validate.field).uint32 = {gte: 1}];
 
   // Limit the number of pending outbound downstream frames of types PING, SETTINGS and RST_STREAM,
   // preventing high memory utilization when receiving continuous stream of these frames. Exceeding
@@ -219,7 +219,7 @@ message Http2ProtocolOptions {
   // ``http2.outbound_control_flood`` stat tracks the number of terminated connections due to flood
   // mitigation. The default limit is 1000.
   // [#comment:TODO: implement same limits for upstream outbound frames as well.]
-  google.protobuf.UInt32Value max_outbound_control_frames = 8 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value max_outbound_control_frames = 8 [(buf.validate.field).uint32 = {gte: 1}];
 
   // Limit the number of consecutive inbound frames of types HEADERS, CONTINUATION and DATA with an
   // empty payload and no end stream flag. Those frames have no legitimate use and are abusive, but
@@ -254,7 +254,7 @@ message Http2ProtocolOptions {
   // but more complex implementations that try to estimate available bandwidth require at least 2.
   // [#comment:TODO: implement same limits for upstream inbound frames as well.]
   google.protobuf.UInt32Value max_inbound_window_update_frames_per_data_frame_sent = 11
-      [(validate.rules).uint32 = {gte: 1}];
+      [(buf.validate.field).uint32 = {gte: 1}];
 
   // Allows invalid HTTP messaging and headers. When this option is disabled (default), then
   // the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,

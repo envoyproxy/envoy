@@ -17,7 +17,7 @@ import "google/protobuf/wrappers.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.route";
 option java_outer_classname = "RouteComponentsProto";
@@ -54,7 +54,7 @@ message VirtualHost {
 
   // The logical name of the virtual host. This is used when emitting certain
   // statistics but is not relevant for routing.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
   // A list of domains (host/authority header) that will be matched to this
   // virtual host. Wildcard hosts are supported in the suffix or prefix form.
@@ -74,7 +74,7 @@ message VirtualHost {
   //   must be unique across all virtual hosts or the config will fail to load.
   //
   // Domains cannot contain control characters. This is validated by the well_known_regex HTTP_HEADER_VALUE.
-  repeated string domains = 2 [(validate.rules).repeated = {
+  repeated string domains = 2 [(buf.validate.field).repeated = {
     min_items: 1
     items {string {well_known_regex: HTTP_HEADER_VALUE strict: false}}
   }];
@@ -85,7 +85,7 @@ message VirtualHost {
 
   // Specifies the type of TLS enforcement the virtual host expects. If this option is not
   // specified, there is no TLS requirement for the virtual host.
-  TlsRequirementType require_tls = 4 [(validate.rules).enum = {defined_only: true}];
+  TlsRequirementType require_tls = 4 [(buf.validate.field).enum = {defined_only: true}];
 
   // A list of virtual clusters defined for this virtual host. Virtual clusters
   // are used for additional statistics gathering.
@@ -102,7 +102,7 @@ message VirtualHost {
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption request_headers_to_add = 7
-      [(validate.rules).repeated = {max_items: 1000}];
+      [(buf.validate.field).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each request
   // handled by this virtual host.
@@ -115,7 +115,7 @@ message VirtualHost {
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption response_headers_to_add = 10
-      [(validate.rules).repeated = {max_items: 1000}];
+      [(buf.validate.field).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // handled by this virtual host.
@@ -203,7 +203,7 @@ message Route {
   string name = 14;
 
   // Route matching parameters.
-  RouteMatch match = 1 [(validate.rules).message = {required: true}];
+  RouteMatch match = 1 [(buf.validate.field).required = true];
 
   oneof action {
     option (validate.required) = true;
@@ -254,7 +254,7 @@ message Route {
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption request_headers_to_add = 9
-      [(validate.rules).repeated = {max_items: 1000}];
+      [(buf.validate.field).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each request
   // matching this route.
@@ -267,7 +267,7 @@ message Route {
   // details on header value syntax, see the documentation on
   // :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption response_headers_to_add = 10
-      [(validate.rules).repeated = {max_items: 1000}];
+      [(buf.validate.field).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
@@ -296,7 +296,7 @@ message WeightedCluster {
 
     // Name of the upstream cluster. The cluster must exist in the
     // :ref:`cluster manager configuration <config_cluster_manager>`.
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
     // An integer between 0 and :ref:`total_weight
     // <envoy_api_field_route.WeightedCluster.total_weight>`. When a request matches the route,
@@ -319,7 +319,7 @@ message WeightedCluster {
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
     repeated core.HeaderValueOption request_headers_to_add = 4
-        [(validate.rules).repeated = {max_items: 1000}];
+        [(buf.validate.field).repeated = {max_items: 1000}];
 
     // Specifies a list of HTTP headers that should be removed from each request when
     // this cluster is selected through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
@@ -333,7 +333,7 @@ message WeightedCluster {
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
     repeated core.HeaderValueOption response_headers_to_add = 5
-        [(validate.rules).repeated = {max_items: 1000}];
+        [(buf.validate.field).repeated = {max_items: 1000}];
 
     // Specifies a list of headers to be removed from responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
@@ -355,11 +355,11 @@ message WeightedCluster {
   }
 
   // Specifies one or more upstream clusters associated with the route.
-  repeated ClusterWeight clusters = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated ClusterWeight clusters = 1 [(buf.validate.field).repeated = {min_items: 1}];
 
   // Specifies the total weight across all clusters. The sum of all cluster weights must equal this
   // value, which must be greater than 0. Defaults to 100.
-  google.protobuf.UInt32Value total_weight = 3 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value total_weight = 3 [(buf.validate.field).uint32 = {gte: 1}];
 
   // Specifies the runtime key prefix that should be used to construct the
   // runtime keys associated with each cluster. When the *runtime_key_prefix* is
@@ -418,7 +418,7 @@ message RouteMatch {
     //   untrusted input in all cases.
     string regex = 3 [
       deprecated = true,
-      (validate.rules).string = {max_bytes: 1024},
+      (buf.validate.field).string = {max_bytes: 1024},
       (envoy.annotations.disallowed_by_default) = true
     ];
 
@@ -434,7 +434,7 @@ message RouteMatch {
     // path_specifier entirely and just rely on a set of header matchers which can already match
     // on :path, etc. The issue with that is it is unclear how to generically deal with query string
     // stripping. This needs more thought.]
-    type.matcher.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
+    type.matcher.RegexMatcher safe_regex = 10 [(buf.validate.field).required = true];
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
@@ -504,7 +504,7 @@ message CorsPolicy {
   //   This field has been deprecated in favor of `allow_origin_string_match` as it is not safe for
   //   use with untrusted input in all cases.
   repeated string allow_origin_regex = 8
-      [deprecated = true, (validate.rules).repeated = {items {string {max_bytes: 1024}}}];
+      [deprecated = true, (buf.validate.field).repeated = {items {string {max_bytes: 1024}}}];
 
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
   // string matchers match.
@@ -587,7 +587,7 @@ message RouteAction {
   message RequestMirrorPolicy {
     // Specifies the cluster that requests will be mirrored to. The cluster must
     // exist in the cluster manager configuration.
-    string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+    string cluster = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
     // If not specified, all requests to the target cluster will be mirrored. If
     // specified, Envoy will lookup the runtime key to get the % of requests to
@@ -628,7 +628,7 @@ message RouteAction {
       // The name of the request header that will be used to obtain the hash
       // key. If the request header is not present, no hash will be produced.
       string header_name = 1 [
-        (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
+        (buf.validate.field).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
       ];
     }
 
@@ -650,7 +650,7 @@ message RouteAction {
       // The name of the cookie that will be used to obtain the hash key. If the
       // cookie is not present and ttl below is not set, no hash will be
       // produced.
-      string name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
       // If specified, a cookie with the TTL will be generated if the cookie is
       // not present. If the TTL is present and zero, the generated cookie will
@@ -671,14 +671,14 @@ message RouteAction {
       // The name of the URL query parameter that will be used to obtain the hash
       // key. If the parameter is not present, no hash will be produced. Query
       // parameter names are case-sensitive.
-      string name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string name = 1 [(buf.validate.field).string = {min_bytes: 1}];
     }
 
     message FilterState {
       // The name of the Object in the per-request filterState, which is an
       // Envoy::Hashable object. If there is no data associated with the key,
       // or the stored object is not Envoy::Hashable, no hash will be produced.
-      string key = 1 [(validate.rules).string = {min_bytes: 1}];
+      string key = 1 [(buf.validate.field).string = {min_bytes: 1}];
     }
 
     oneof policy_specifier {
@@ -733,7 +733,7 @@ message RouteAction {
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
     string upgrade_type = 1
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
@@ -746,7 +746,7 @@ message RouteAction {
 
     // Indicates the upstream cluster to which the request should be routed
     // to.
-    string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+    string cluster = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
     // Envoy will determine the cluster to route to by reading the value of the
     // HTTP header named by cluster_header from the request headers. If the
@@ -762,7 +762,7 @@ message RouteAction {
     //
     //   If the header appears multiple times only the first value is used.
     string cluster_header = 2
-        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(buf.validate.field).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
@@ -775,7 +775,7 @@ message RouteAction {
   // The HTTP status code to use when configured cluster is not found.
   // The default response code is 503 Service Unavailable.
   ClusterNotFoundResponseCode cluster_not_found_response_code = 20
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum = {defined_only: true}];
 
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints
   // in the upstream cluster with metadata matching what's set in this field will be considered
@@ -816,7 +816,7 @@ message RouteAction {
   //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
   //   requests to */prefix/etc* will be stripped to */etc*.
   string prefix_rewrite = 5
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // Indicates that during forwarding, portions of the path that match the
   // pattern should be rewritten, even allowing the substitution of capture
@@ -852,7 +852,7 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.
     string host_rewrite = 6 [
-      (validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false},
+      (buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false},
       (udpa.annotations.field_migrate).rename = "host_rewrite_literal"
     ];
 
@@ -877,7 +877,7 @@ message RouteAction {
     //
     //   If the header appears multiple times only the first value is used.
     string auto_host_rewrite_header = 29 [
-      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
       (udpa.annotations.field_migrate).rename = "host_rewrite_header"
     ];
   }
@@ -938,7 +938,7 @@ message RouteAction {
   repeated RequestMirrorPolicy request_mirror_policies = 30;
 
   // Optionally specifies the :ref:`routing priority <arch_overview_http_routing_priority>`.
-  core.RoutingPriority priority = 11 [(validate.rules).enum = {defined_only: true}];
+  core.RoutingPriority priority = 11 [(buf.validate.field).enum = {defined_only: true}];
 
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
@@ -1027,7 +1027,7 @@ message RouteAction {
 // [#next-free-field: 11]
 message RetryPolicy {
   message RetryPriority {
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
     oneof config_type {
       google.protobuf.Struct config = 2 [deprecated = true];
@@ -1037,7 +1037,7 @@ message RetryPolicy {
   }
 
   message RetryHostPredicate {
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
     oneof config_type {
       google.protobuf.Struct config = 2 [deprecated = true];
@@ -1051,7 +1051,7 @@ message RetryPolicy {
     // than zero. Values less than 1 ms are rounded up to 1 ms.
     // See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion of Envoy's
     // back-off algorithm.
-    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+    google.protobuf.Duration base_interval = 1 [(buf.validate.field).duration = {
       required: true
       gt {}
     }];
@@ -1060,7 +1060,7 @@ message RetryPolicy {
     // greater than or equal to the `base_interval` if set. The default is 10 times the
     // `base_interval`. See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion
     // of Envoy's back-off algorithm.
-    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
+    google.protobuf.Duration max_interval = 2 [(buf.validate.field).duration = {gt {}}];
   }
 
   // Specifies the conditions under which retry takes place. These are the same
@@ -1127,7 +1127,7 @@ message HedgePolicy {
   // Must be at least 1.
   // Defaults to 1.
   // [#not-implemented-hide:]
-  google.protobuf.UInt32Value initial_requests = 1 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value initial_requests = 1 [(buf.validate.field).uint32 = {gte: 1}];
 
   // Specifies a probability that an additional upstream request should be sent
   // on top of what is specified by initial_requests.
@@ -1185,7 +1185,7 @@ message RedirectAction {
 
   // The host portion of the URL will be swapped with this value.
   string host_redirect = 1
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // The port value of the URL will be swapped with this value.
   uint32 port_redirect = 8;
@@ -1208,7 +1208,7 @@ message RedirectAction {
     // 2. if request uri is "/old-path-2?bar=1", users will be redirected to "/new-path-2"
     // 3. if request uri is "/old-path-3?bar=1", users will be redirected to "/new-path-3?foo=1"
     string path_redirect = 2
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during redirection, the matched prefix (or path)
     // should be swapped with this value. This option allows redirect URLs be dynamically created
@@ -1219,12 +1219,12 @@ message RedirectAction {
     //   Pay attention to the use of trailing slashes as mentioned in
     //   :ref:`RouteAction's prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`.
     string prefix_rewrite = 5
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
 
   // The HTTP status code to use in the redirect response. The default response
   // code is MOVED_PERMANENTLY (301).
-  RedirectResponseCode response_code = 3 [(validate.rules).enum = {defined_only: true}];
+  RedirectResponseCode response_code = 3 [(buf.validate.field).enum = {defined_only: true}];
 
   // Indicates that during redirection, the query portion of the URL will
   // be removed. Default value is false.
@@ -1233,7 +1233,7 @@ message RedirectAction {
 
 message DirectResponseAction {
   // Specifies the HTTP response status to be returned.
-  uint32 status = 1 [(validate.rules).uint32 = {lt: 600 gte: 100}];
+  uint32 status = 1 [(buf.validate.field).uint32 = {lt: 600 gte: 100}];
 
   // Specifies the content of the response body. If this setting is omitted,
   // no body is included in the generated response.
@@ -1255,7 +1255,7 @@ message Decorator {
   //   For ingress (inbound) requests, or egress (outbound) responses, this value may be overridden
   //   by the :ref:`x-envoy-decorator-operation
   //   <config_http_filters_router_x-envoy-decorator-operation>` header.
-  string operation = 1 [(validate.rules).string = {min_bytes: 1}];
+  string operation = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
   // Whether the decorated details should be propagated to the other party. The default is true.
   google.protobuf.BoolValue propagate = 2;
@@ -1329,7 +1329,7 @@ message VirtualCluster {
   //   untrusted input in all cases.
   string pattern = 1 [
     deprecated = true,
-    (validate.rules).string = {max_bytes: 1024},
+    (buf.validate.field).string = {max_bytes: 1024},
     (envoy.annotations.disallowed_by_default) = true
   ];
 
@@ -1341,7 +1341,7 @@ message VirtualCluster {
   // Specifies the name of the virtual cluster. The virtual cluster name as well
   // as the virtual host name are used when emitting statistics. The statistics are emitted by the
   // router filter and are documented :ref:`here <config_http_filters_router_stats>`.
-  string name = 2 [(validate.rules).string = {min_bytes: 1}];
+  string name = 2 [(buf.validate.field).string = {min_bytes: 1}];
 
   // Optionally specifies the HTTP method to match on. For example GET, PUT,
   // etc.
@@ -1396,11 +1396,11 @@ message RateLimit {
       // value is used to populate the value of the descriptor entry for the
       // descriptor_key.
       string header_name = 1 [
-        (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
+        (buf.validate.field).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
       ];
 
       // The key to use in the descriptor entry.
-      string descriptor_key = 2 [(validate.rules).string = {min_bytes: 1}];
+      string descriptor_key = 2 [(buf.validate.field).string = {min_bytes: 1}];
     }
 
     // The following descriptor entry is appended to the descriptor and is populated using the
@@ -1419,7 +1419,7 @@ message RateLimit {
     //   ("generic_key", "<descriptor_value>")
     message GenericKey {
       // The value to use in the descriptor entry.
-      string descriptor_value = 1 [(validate.rules).string = {min_bytes: 1}];
+      string descriptor_value = 1 [(buf.validate.field).string = {min_bytes: 1}];
     }
 
     // The following descriptor entry is appended to the descriptor:
@@ -1429,7 +1429,7 @@ message RateLimit {
     //   ("header_match", "<descriptor_value>")
     message HeaderValueMatch {
       // The value to use in the descriptor entry.
-      string descriptor_value = 1 [(validate.rules).string = {min_bytes: 1}];
+      string descriptor_value = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
       // If set to true, the action will append a descriptor entry when the
       // request matches the headers. If set to false, the action will append a
@@ -1442,7 +1442,7 @@ message RateLimit {
       // specified headers in the config. A match will happen if all the
       // headers in the config are present in the request with the same values
       // (or based on presence if the value field is not in the config).
-      repeated HeaderMatcher headers = 3 [(validate.rules).repeated = {min_items: 1}];
+      repeated HeaderMatcher headers = 3 [(buf.validate.field).repeated = {min_items: 1}];
     }
 
     oneof action_specifier {
@@ -1475,7 +1475,7 @@ message RateLimit {
   // .. note::
   //
   //   The filter supports a range of 0 - 10 inclusively for stage numbers.
-  google.protobuf.UInt32Value stage = 1 [(validate.rules).uint32 = {lte: 10}];
+  google.protobuf.UInt32Value stage = 1 [(buf.validate.field).uint32 = {lte: 10}];
 
   // The key to be set in runtime to disable this rate limit configuration.
   string disable_key = 2;
@@ -1486,7 +1486,7 @@ message RateLimit {
   // cannot append a descriptor entry, no descriptor is generated for the
   // configuration. See :ref:`composing actions
   // <config_http_filters_rate_limit_composing_actions>` for additional documentation.
-  repeated Action actions = 3 [(validate.rules).repeated = {min_items: 1}];
+  repeated Action actions = 3 [(buf.validate.field).repeated = {min_items: 1}];
 }
 
 // .. attention::
@@ -1519,7 +1519,7 @@ message HeaderMatcher {
 
   // Specifies the name of the header in the request.
   string name = 1
-      [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {
@@ -1542,7 +1542,7 @@ message HeaderMatcher {
     //   with untrusted input in all cases.
     string regex_match = 5 [
       deprecated = true,
-      (validate.rules).string = {max_bytes: 1024},
+      (buf.validate.field).string = {max_bytes: 1024},
       (envoy.annotations.disallowed_by_default) = true
     ];
 
@@ -1574,7 +1574,7 @@ message HeaderMatcher {
     // Examples:
     //
     // * The prefix *abcd* matches the value *abcdxyz*, but not for *abcxyz*.
-    string prefix_match = 9 [(validate.rules).string = {min_bytes: 1}];
+    string prefix_match = 9 [(buf.validate.field).string = {min_bytes: 1}];
 
     // If specified, header match will be performed based on the suffix of the header value.
     // Note: empty suffix is not allowed, please use present_match instead.
@@ -1582,7 +1582,7 @@ message HeaderMatcher {
     // Examples:
     //
     // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
-    string suffix_match = 10 [(validate.rules).string = {min_bytes: 1}];
+    string suffix_match = 10 [(buf.validate.field).string = {min_bytes: 1}];
   }
 
   // If specified, the match result will be inverted before checking. Defaults to false.
@@ -1600,7 +1600,7 @@ message HeaderMatcher {
 message QueryParameterMatcher {
   // Specifies the name of a key that must be present in the requested
   // *path*'s query string.
-  string name = 1 [(validate.rules).string = {min_bytes: 1 max_bytes: 1024}];
+  string name = 1 [(buf.validate.field).string = {min_bytes: 1 max_bytes: 1024}];
 
   // Specifies the value of the key. If the value is absent, a request
   // that contains the key in its query string will match, whether the
@@ -1622,7 +1622,7 @@ message QueryParameterMatcher {
 
   oneof query_parameter_match_specifier {
     // Specifies whether a query parameter value should match against a string.
-    type.matcher.StringMatcher string_match = 5 [(validate.rules).message = {required: true}];
+    type.matcher.StringMatcher string_match = 5 [(buf.validate.field).required = true];
 
     // Specifies whether a query parameter should be present.
     bool present_match = 6;

@@ -12,7 +12,7 @@ import "google/protobuf/duration.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.udp.dns_filter.v3";
 option java_outer_classname = "DnsFilterProto";
@@ -54,7 +54,7 @@ message DnsFilterConfig {
     // We allow 5s for the upstream resolution to complete, so the minimum
     // value here is 1. Note that the total latency for a failed query is the
     // number of retries multiplied by the resolver_timeout.
-    google.protobuf.Duration resolver_timeout = 1 [(validate.rules).duration = {gte {seconds: 1}}];
+    google.protobuf.Duration resolver_timeout = 1 [(buf.validate.field).duration = {gte {seconds: 1}}];
 
     // This field was used for `dns_resolution_config` in Envoy 1.19.0 and
     // 1.19.1.
@@ -90,11 +90,11 @@ message DnsFilterConfig {
     // Controls how many outstanding external lookup contexts the filter tracks.
     // The context structure allows the filter to respond to every query even if the external
     // resolution times out or is otherwise unsuccessful
-    uint64 max_pending_lookups = 3 [(validate.rules).uint64 = {gte: 1}];
+    uint64 max_pending_lookups = 3 [(buf.validate.field).uint64 = {gte: 1}];
   }
 
   // The stat prefix used when emitting DNS filter statistics
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Server context configuration contains the data that the filter uses to respond
   // to DNS requests.

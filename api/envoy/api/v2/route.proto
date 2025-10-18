@@ -10,7 +10,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "RouteProto";
@@ -47,7 +47,7 @@ message RouteConfiguration {
   // prior to filter invocation. See :ref:`config_http_conn_man_headers_x-envoy-internal` for more
   // information.
   repeated string internal_only_headers = 3 [
-    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+    (buf.validate.field).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
   ];
 
   // Specifies a list of HTTP headers that should be added to each response that
@@ -57,12 +57,12 @@ message RouteConfiguration {
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption response_headers_to_add = 4
-      [(validate.rules).repeated = {max_items: 1000}];
+      [(buf.validate.field).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // that the connection manager encodes.
   repeated string response_headers_to_remove = 5 [
-    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+    (buf.validate.field).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
   ];
 
   // Specifies a list of HTTP headers that should be added to each request
@@ -72,12 +72,12 @@ message RouteConfiguration {
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption request_headers_to_add = 6
-      [(validate.rules).repeated = {max_items: 1000}];
+      [(buf.validate.field).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each request
   // routed by the HTTP connection manager.
   repeated string request_headers_to_remove = 8 [
-    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+    (buf.validate.field).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
   ];
 
   // By default, headers that should be added/removed are evaluated from most to least specific:
@@ -110,5 +110,5 @@ message RouteConfiguration {
 
 message Vhds {
   // Configuration source specifier for VHDS.
-  core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+  core.ConfigSource config_source = 1 [(buf.validate.field).required = true];
 }

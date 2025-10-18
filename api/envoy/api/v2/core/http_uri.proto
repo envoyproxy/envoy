@@ -6,7 +6,7 @@ import "google/protobuf/duration.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "HttpUriProto";
@@ -27,7 +27,7 @@ message HttpUri {
   //
   //    uri: https://www.googleapis.com/oauth2/v1/certs
   //
-  string uri = 1 [(validate.rules).string = {min_bytes: 1}];
+  string uri = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
   // Specify how `uri` is to be fetched. Today, this requires an explicit
   // cluster, but in the future we may support dynamic cluster creation or
@@ -45,11 +45,11 @@ message HttpUri {
     //
     //    cluster: jwks_cluster
     //
-    string cluster = 2 [(validate.rules).string = {min_bytes: 1}];
+    string cluster = 2 [(buf.validate.field).string = {min_bytes: 1}];
   }
 
   // Sets the maximum duration in milliseconds that a response can take to arrive upon request.
-  google.protobuf.Duration timeout = 3 [(validate.rules).duration = {
+  google.protobuf.Duration timeout = 3 [(buf.validate.field).duration = {
     required: true
     gte {}
   }];

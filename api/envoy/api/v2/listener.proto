@@ -15,7 +15,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "ListenerProto";
@@ -84,7 +84,7 @@ message Listener {
   // The address that the listener should listen on. In general, the address must be unique, though
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
   // Linux as the actual port will be allocated by the OS.
-  core.Address address = 2 [(validate.rules).message = {required: true}];
+  core.Address address = 2 [(buf.validate.field).required = true];
 
   // A list of filter chains to consider for this listener. The
   // :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` with the most specific

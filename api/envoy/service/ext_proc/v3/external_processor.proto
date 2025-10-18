@@ -13,7 +13,7 @@ import "xds/annotations/v3/status.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.ext_proc.v3";
 option java_outer_classname = "ExternalProcessorProto";
@@ -67,12 +67,12 @@ message ProtocolConfiguration {
   // Specify the filter configuration :ref:`request_body_mode
   // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ProcessingMode.request_body_mode>`
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode request_body_mode = 1
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum = {defined_only: true}];
 
   // Specify the filter configuration :ref:`response_body_mode
   // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ProcessingMode.response_body_mode>`
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode response_body_mode = 2
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum = {defined_only: true}];
 
   // Specify the filter configuration :ref:`send_body_without_waiting_for_header_response
   // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`
@@ -336,7 +336,7 @@ message CommonResponse {
 
   // If set, provide additional direction on how the data plane should
   // handle the rest of the HTTP filter chain.
-  ResponseStatus status = 1 [(validate.rules).enum = {defined_only: true}];
+  ResponseStatus status = 1 [(buf.validate.field).enum = {defined_only: true}];
 
   // Instructions on how to manipulate the headers. When responding to an
   // HttpBody request, header mutations will only take effect if
@@ -376,7 +376,7 @@ message CommonResponse {
 // [#next-free-field: 6]
 message ImmediateResponse {
   // The response code to return.
-  type.v3.HttpStatus status = 1 [(validate.rules).message = {required: true}];
+  type.v3.HttpStatus status = 1 [(buf.validate.field).required = true];
 
   // Apply changes to the default headers, which will include content-type.
   HeaderMutation headers = 2;

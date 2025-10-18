@@ -3,7 +3,7 @@ package envoy.extensions.filters.network.local_ratelimit;
 
 import "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.proto";
 import "google/protobuf/empty.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 message OnData {
   bytes data = 1;
@@ -23,6 +23,6 @@ message Action {
 }
 message LocalRateLimitTestCase {
   envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit config = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).message = {required: true}];
   repeated Action actions = 2;
 }

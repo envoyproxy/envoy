@@ -4,7 +4,7 @@ package test.common.http;
 
 import "google/protobuf/empty.proto";
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 import "test/fuzz/common.proto";
 
 // Structured input for H2 codec_impl_fuzz_test.
@@ -13,7 +13,7 @@ message NewStream {
   // Optional metadata  before request headers.
   // Metadata sent after request headers can be send via a directional action.
   test.fuzz.Metadata metadata = 3;
-  test.fuzz.Headers request_headers = 1 [(validate.rules).message.required = true];
+  test.fuzz.Headers request_headers = 1 [(buf.validate.field).message.required = true];
   bool end_stream = 2;
 }
 

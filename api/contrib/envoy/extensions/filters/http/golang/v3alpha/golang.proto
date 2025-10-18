@@ -9,7 +9,7 @@ import "google/protobuf/any.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.golang.v3alpha";
 option java_outer_classname = "GolangProto";
@@ -39,13 +39,13 @@ message Config {
   }
 
   // Globally unique ID for a dynamic library file.
-  string library_id = 1 [(validate.rules).string = {min_len: 1}];
+  string library_id = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Path to a dynamic library implementing the
   // :repo:`StreamFilter API <contrib/golang/common/go/api.StreamFilter>`
   // interface.
   // [#comment:TODO(wangfakang): Support for downloading libraries from remote repositories.]
-  string library_path = 2 [(validate.rules).string = {min_len: 1}];
+  string library_path = 2 [(buf.validate.field).string = {min_len: 1}];
 
   // Globally unique name of the Go plugin.
   //
@@ -53,7 +53,7 @@ message Config {
   // and can be used to associate :ref:`route and virtualHost plugin configuration
   // <envoy_v3_api_field_extensions.filters.http.golang.v3alpha.ConfigsPerRoute.plugins_config>`.
   //
-  string plugin_name = 3 [(validate.rules).string = {min_len: 1}];
+  string plugin_name = 3 [(buf.validate.field).string = {min_len: 1}];
 
   // Configuration for the Go plugin.
   //
@@ -75,7 +75,7 @@ message Config {
   // * The filter's :ref:`plugin_config <envoy_v3_api_field_extensions.filters.http.golang.v3alpha.Config.plugin_config>`
   //
   // [#not-implemented-hide:]
-  MergePolicy merge_policy = 5 [(validate.rules).enum = {defined_only: true}];
+  MergePolicy merge_policy = 5 [(buf.validate.field).enum = {defined_only: true}];
 
   // Generic secret list available to the plugin.
   // Looks into SDS or static bootstrap configuration.
@@ -92,7 +92,7 @@ message RouterPlugin {
     // [#not-implemented-hide:]
     // Disable the filter for this particular vhost or route.
     // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
-    bool disabled = 1 [(validate.rules).bool = {const: true}];
+    bool disabled = 1 [(buf.validate.field).bool = {const: true}];
 
     // The config field is used for setting per-route and per-virtualhost plugin config.
     google.protobuf.Any config = 2;

@@ -25,7 +25,7 @@ import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.http_connection_manager.v3";
 option java_outer_classname = "HttpConnectionManagerProto";
@@ -389,7 +389,7 @@ message HttpConnectionManager {
     // string.
     // The interval must be at least 1 millisecond.
     google.protobuf.Duration access_log_flush_interval = 1
-        [(validate.rules).duration = {gte {nanos: 1000000}}];
+        [(buf.validate.field).duration = {gte {nanos: 1000000}}];
 
     // If set to true, HCM will flush an access log when a new HTTP request is received, after request
     // headers have been evaluated, before iterating through the HTTP filter chain.
@@ -408,12 +408,12 @@ message HttpConnectionManager {
   reserved "idle_timeout";
 
   // Supplies the type of codec that the connection manager should use.
-  CodecType codec_type = 1 [(validate.rules).enum = {defined_only: true}];
+  CodecType codec_type = 1 [(buf.validate.field).enum = {defined_only: true}];
 
   // The human readable prefix to use when emitting statistics for the
   // connection manager. See the :ref:`statistics documentation <config_http_conn_man_stats>` for
   // more information.
-  string stat_prefix = 2 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 2 [(buf.validate.field).string = {min_len: 1}];
 
   oneof route_specifier {
     option (validate.required) = true;
@@ -482,13 +482,13 @@ message HttpConnectionManager {
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is ``envoy``.
   string server_name = 10
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // Defines the action to be applied to the Server header on the response path.
   // By default, Envoy will overwrite the header with the value specified in
   // server_name.
   ServerHeaderTransformation server_header_transformation = 34
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum = {defined_only: true}];
 
   // Allows for explicit transformation of the :scheme header on the request path.
   // If not set, Envoy's default :ref:`scheme  <config_http_conn_man_headers_scheme>`
@@ -508,7 +508,7 @@ message HttpConnectionManager {
   //   * HTTP/3 limits a single header to around 1024kb.
   //
   google.protobuf.UInt32Value max_request_headers_kb = 29
-      [(validate.rules).uint32 = {lte: 8192 gt: 0}];
+      [(buf.validate.field).uint32 = {lte: 8192 gt: 0}];
 
   // The stream idle timeout for connections managed by the connection manager.
   // If not specified, this defaults to 5 minutes. The default value was selected
@@ -573,7 +573,7 @@ message HttpConnectionManager {
   // activated when the first byte of the headers is received, and is disarmed when the last byte of
   // the headers has been received. If not specified or set to 0, this timeout is disabled.
   google.protobuf.Duration request_headers_timeout = 41 [
-    (validate.rules).duration = {gte {}},
+    (buf.validate.field).duration = {gte {}},
     (udpa.annotations.security).configure_for_untrusted_downstream = true
   ];
 
@@ -640,7 +640,7 @@ message HttpConnectionManager {
   //   are specified, the former (deprecated field) is ignored.
   google.protobuf.Duration access_log_flush_interval = 54 [
     deprecated = true,
-    (validate.rules).duration = {gte {nanos: 1000000}},
+    (buf.validate.field).duration = {gte {nanos: 1000000}},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
@@ -751,7 +751,7 @@ message HttpConnectionManager {
 
   // Via header value to append to request and response headers. If this is
   // empty, no via header will be appended.
-  string via = 22 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+  string via = 22 [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // Whether the connection manager will generate the :ref:`x-request-id
   // <config_http_conn_man_headers_x-request-id>` header if it does not exist. This defaults to
@@ -773,7 +773,7 @@ message HttpConnectionManager {
   // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
   // header.
   ForwardClientCertDetails forward_client_cert_details = 16
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum = {defined_only: true}];
 
   // This field is valid only when :ref:`forward_client_cert_details
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
@@ -1022,10 +1022,10 @@ message LocalReplyConfig {
 // [#next-free-field: 6]
 message ResponseMapper {
   // Filter to determine if this mapper should apply.
-  config.accesslog.v3.AccessLogFilter filter = 1 [(validate.rules).message = {required: true}];
+  config.accesslog.v3.AccessLogFilter filter = 1 [(buf.validate.field).required = true];
 
   // The new response status code if specified.
-  google.protobuf.UInt32Value status_code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+  google.protobuf.UInt32Value status_code = 2 [(buf.validate.field).uint32 = {lt: 600 gte: 200}];
 
   // The new local reply body text if specified. It will be used in the ``%LOCAL_REPLY_BODY%``
   // command operator in the ``body_format``.
@@ -1038,7 +1038,7 @@ message ResponseMapper {
   // HTTP headers to add to a local reply. This allows the response mapper to append, to add
   // or to override headers of any local reply before it is sent to a downstream client.
   repeated config.core.v3.HeaderValueOption headers_to_add = 5
-      [(validate.rules).repeated = {max_items: 1000}];
+      [(buf.validate.field).repeated = {max_items: 1000}];
 }
 
 message Rds {
@@ -1061,7 +1061,7 @@ message ScopedRouteConfigurationsList {
       "envoy.config.filter.network.http_connection_manager.v2.ScopedRouteConfigurationsList";
 
   repeated config.route.v3.ScopedRouteConfiguration scoped_route_configurations = 1
-      [(validate.rules).repeated = {min_items: 1}];
+      [(buf.validate.field).repeated = {min_items: 1}];
 }
 
 // [#next-free-field: 6]
@@ -1121,10 +1121,10 @@ message ScopedRoutes {
           // If an element contains no separator, the whole element is parsed as key and the
           // fragment value is an empty string.
           // If there are multiple values for a matched key, the first value is returned.
-          string separator = 1 [(validate.rules).string = {min_len: 1}];
+          string separator = 1 [(buf.validate.field).string = {min_len: 1}];
 
           // The key to match on.
-          string key = 2 [(validate.rules).string = {min_len: 1}];
+          string key = 2 [(buf.validate.field).string = {min_len: 1}];
         }
 
         // The name of the header field to extract the value from.
@@ -1133,7 +1133,7 @@ message ScopedRoutes {
         //
         //   If the header appears multiple times only the first value is used.
         string name = 1 [
-          (validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
+          (buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
         ];
 
         // The element separator (e.g., ';' separates 'a;b;c;d').
@@ -1164,14 +1164,14 @@ message ScopedRoutes {
     // The final(built) scope key consists of the ordered union of these fragments, which are compared in order with the
     // fragments of a :ref:`ScopedRouteConfiguration<envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`.
     // A missing fragment during comparison will make the key invalid, i.e., the computed key doesn't match any key.
-    repeated FragmentBuilder fragments = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated FragmentBuilder fragments = 1 [(buf.validate.field).repeated = {min_items: 1}];
   }
 
   // The name assigned to the scoped routing configuration.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // The algorithm to use for constructing a scope key for each request.
-  ScopeKeyBuilder scope_key_builder = 2 [(validate.rules).message = {required: true}];
+  ScopeKeyBuilder scope_key_builder = 2 [(buf.validate.field).required = true];
 
   // Configuration source specifier for RDS.
   // This config source is used to subscribe to RouteConfiguration resources specified in
@@ -1203,7 +1203,7 @@ message ScopedRds {
 
   // Configuration source specifier for scoped RDS.
   config.core.v3.ConfigSource scoped_rds_config_source = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   // xdstp:// resource locator for scoped RDS collection.
   // [#not-implemented-hide:]
@@ -1220,7 +1220,7 @@ message HttpFilter {
   reserved "config";
 
   // The name of the filter configuration. It also serves as a resource name in ExtensionConfigDS.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   oneof config_type {
     // Filter specific configuration which depends on the filter being instantiated. See the supported

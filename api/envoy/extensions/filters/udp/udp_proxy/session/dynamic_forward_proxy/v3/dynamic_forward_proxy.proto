@@ -7,7 +7,7 @@ import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3";
 option java_outer_classname = "DynamicForwardProxyProto";
@@ -38,14 +38,14 @@ message FilterConfig {
   }
 
   // The prefix to use when emitting :ref:`statistics <config_udp_session_filters_dynamic_forward_proxy_stats>`.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string = {min_len: 1}];
 
   oneof implementation_specifier {
     // The DNS cache configuration that the filter will attach to. Note this
     // configuration must match that of associated :ref:`dynamic forward proxy cluster configuration
     // <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
     common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 2
-        [(validate.rules).message = {required: true}];
+        [(buf.validate.field).required = true];
   }
 
   // If configured, the filter will buffer datagrams in case that it is waiting for a DNS response.

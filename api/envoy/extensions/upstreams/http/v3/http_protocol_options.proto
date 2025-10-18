@@ -8,7 +8,7 @@ import "envoy/config/core/v3/protocol.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.v3";
 option java_outer_classname = "HttpProtocolOptionsProto";
@@ -134,7 +134,7 @@ message HttpProtocolOptions {
     // If specified, only responses matching the matcher will be treated by outlier detection as errors.
     // If not specified, only 5xx codes are treated by outlier detection as errors.
     config.common.matcher.v3.MatchPredicate error_matcher = 1
-        [(validate.rules).message = {required: true}];
+        [(buf.validate.field).required = true];
   }
 
   // This contains options common across HTTP/1 and HTTP/2

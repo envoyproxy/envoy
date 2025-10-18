@@ -6,7 +6,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_json_transcoder.v3";
 option java_outer_classname = "TranscoderProto";
@@ -242,7 +242,7 @@ message GrpcJsonTranscoder {
   // For example, in case of ``/foo/{x=*}/bar/{y=prefix/*}/{z=**}`` ``x`` variable is single segment and ``y`` and ``z`` are multiple segments.
   // For a path with ``/foo/first/bar/prefix/second/third/fourth``, ``x=first``, ``y=prefix/second``, ``z=third/fourth``.
   // If this setting is not specified, the value defaults to :ref:`ALL_CHARACTERS_EXCEPT_RESERVED<envoy_v3_api_enum_value_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.UrlUnescapeSpec.ALL_CHARACTERS_EXCEPT_RESERVED>`.
-  UrlUnescapeSpec url_unescape_spec = 10 [(validate.rules).enum = {defined_only: true}];
+  UrlUnescapeSpec url_unescape_spec = 10 [(buf.validate.field).enum = {defined_only: true}];
 
   // If true, unescape '+' to space when extracting variables in query parameters.
   // This is to support `HTML 2.0 <https://tools.ietf.org/html/rfc1866#section-8.2.1>`_
@@ -285,7 +285,7 @@ message GrpcJsonTranscoder {
   // Large values may cause envoy to use a lot of memory if there are many concurrent requests.
   //
   // If unset, the current stream buffer size is used.
-  google.protobuf.UInt32Value max_request_body_size = 15 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value max_request_body_size = 15 [(buf.validate.field).uint32 = {gt: 0}];
 
   // The maximum size of a response body to be transcoded, in bytes. A body exceeding this size will
   // provoke a ``HTTP 500 Internal Server Error`` response.
@@ -293,7 +293,7 @@ message GrpcJsonTranscoder {
   // Large values may cause envoy to use a lot of memory if there are many concurrent requests.
   //
   // If unset, the current stream buffer size is used.
-  google.protobuf.UInt32Value max_response_body_size = 16 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value max_response_body_size = 16 [(buf.validate.field).uint32 = {gt: 0}];
 
   // If true, query parameters that cannot be mapped to a corresponding
   // protobuf field are captured in an HttpBody extension of UnknownQueryParams.

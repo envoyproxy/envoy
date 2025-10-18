@@ -8,7 +8,7 @@ import "envoy/extensions/access_loggers/grpc/v3/als.proto";
 import "opentelemetry/proto/common/v1/common.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.access_loggers.open_telemetry.v3";
 option java_outer_classname = "LogsServiceProto";
@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 8]
 message OpenTelemetryAccessLogConfig {
   // [#comment:TODO(itamarkam): add 'filter_state_objects_to_log' to logs.]
-  grpc.v3.CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
+  grpc.v3.CommonGrpcAccessLogConfig common_config = 1 [(buf.validate.field).required = true];
 
   // If specified, Envoy will not generate built-in resource labels
   // like ``log_name``, ``zone_name``, ``cluster_name``, ``node_name``.

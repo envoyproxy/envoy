@@ -1,4 +1,4 @@
-load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
+load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@com_github_grpc_grpc//bazel:python_rules.bzl", _py_proto_library = "py_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
@@ -36,7 +36,7 @@ _COMMON_PROTO_DEPS = [
     "@com_google_googleapis//google/api:httpbody_proto",
     "@com_google_googleapis//google/api:annotations_proto",
     "@com_google_googleapis//google/rpc:status_proto",
-    "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
+    "@com_github_bufbuild_protovalidate//proto/protovalidate/buf/validate:validate_proto",
 ]
 
 def _proto_mapping(dep, proto_dep_map, proto_suffix):
@@ -89,15 +89,9 @@ def api_cc_py_proto_library(
     )
 
     cc_proto_library_name = name + _CC_PROTO_SUFFIX
-    pgv_cc_proto_library(
+    cc_proto_library(
         name = cc_proto_library_name,
         linkstatic = linkstatic,
-        cc_deps = [_cc_proto_mapping(dep) for dep in deps] + [
-            "@com_google_googleapis//google/api:http_cc_proto",
-            "@com_google_googleapis//google/api:httpbody_cc_proto",
-            "@com_google_googleapis//google/api:annotations_cc_proto",
-            "@com_google_googleapis//google/rpc:status_cc_proto",
-        ],
         deps = [relative_name],
         visibility = ["//visibility:public"],
     )

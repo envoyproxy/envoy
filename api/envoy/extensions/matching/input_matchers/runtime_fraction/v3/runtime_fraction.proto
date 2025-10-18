@@ -5,7 +5,7 @@ package envoy.extensions.matching.input_matchers.runtime_fraction.v3;
 import "envoy/config/core/v3/base.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.matching.input_matchers.runtime_fraction.v3";
 option java_outer_classname = "RuntimeFractionProto";
@@ -27,7 +27,7 @@ message RuntimeFraction {
   // Match the input against the given runtime key. The specified default value is used if key is not
   // present in the runtime configuration.
   config.core.v3.RuntimeFractionalPercent runtime_fraction = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   // Optional seed passed through the hash function. This allows using additional information when computing
   // the hash value: by changing the seed value, a potentially different outcome can be achieved for the same input.

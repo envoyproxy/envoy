@@ -4,7 +4,7 @@ package envoy.config.core.v3;
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "SocketOptionProto";
@@ -96,7 +96,7 @@ message SocketOption {
 
   // The state in which the option will be applied. When used in BindConfig
   // STATE_PREBIND is currently the only valid value.
-  SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
+  SocketState state = 6 [(buf.validate.field).enum = {defined_only: true}];
 
   // Apply the socket option to the specified `socket type <https://linux.die.net/man/2/socket>`_.
   // If not specified, the socket option will be applied to all socket types.

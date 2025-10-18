@@ -5,7 +5,7 @@ package envoy.config.core.v3;
 import "envoy/config/core/v3/address.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "ResolverProto";
@@ -29,7 +29,7 @@ message DnsResolutionConfig {
   // A list of dns resolver addresses. If specified, the DNS client library will perform resolution
   // via the underlying DNS resolvers. Otherwise, the default system resolvers
   // (e.g., /etc/resolv.conf) will be used.
-  repeated Address resolvers = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated Address resolvers = 1 [(buf.validate.field).repeated = {min_items: 1}];
 
   // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
   DnsResolverOptions dns_resolver_options = 2;

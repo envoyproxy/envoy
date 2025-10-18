@@ -6,7 +6,7 @@ import "envoy/config/cluster/v3/cluster.proto";
 import "envoy/type/metadata/v3/metadata.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.override_host.v3";
 option java_outer_classname = "OverrideHostProto";
@@ -54,7 +54,7 @@ message OverrideHost {
     //
     // Only one of the header or metadata field could be set.
     string header = 1
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // The metadata key to get the override host addresses from the request dynamic metadata. If
     // set this field then it will take precedence over the header field.
@@ -70,10 +70,10 @@ message OverrideHost {
   // skipped and the next found address is used. If there are not enough overridden addresses to
   // satisfy all retry attempts the fallback load balancing policy is used to pick a host.
   repeated OverrideHostSource override_host_sources = 1
-      [(validate.rules).repeated = {min_items: 1}];
+      [(buf.validate.field).repeated = {min_items: 1}];
 
   // The child LB policy to use in case neither header nor metadata with selected
   // hosts is present.
   config.cluster.v3.LoadBalancingPolicy fallback_policy = 3
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 }

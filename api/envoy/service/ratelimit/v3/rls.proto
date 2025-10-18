@@ -11,7 +11,7 @@ import "google/protobuf/timestamp.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.ratelimit.v3";
 option java_outer_classname = "RlsProto";
@@ -126,7 +126,7 @@ message RateLimitResponse {
   // [#not-implemented-hide:]
   message Quota {
     // Number of matching requests granted in quota. Must be 1 or more.
-    uint32 requests = 1 [(validate.rules).uint32 = {gt: 0}];
+    uint32 requests = 1 [(buf.validate.field).uint32 = {gt: 0}];
 
     oneof expiration_specifier {
       // Point in time at which the quota expires.

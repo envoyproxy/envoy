@@ -4,7 +4,7 @@ package test.common.http;
 
 import "google/protobuf/empty.proto";
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 // Structured input for header_map_impl_fuzz_test.
 
