@@ -480,6 +480,13 @@ TEST_F(CELFormatterTest, TestFailingStringConcatenation) {
 
 TEST_F(CELFormatterTest, TestFilterStateConditional) {
   // WORKING VERSION: Same logic but using template-level concatenation
+  // Set up mock expectations to avoid warnings (our expression checks filter state multiple times)
+  // Need to handle both const and non-const versions of filterState()
+  EXPECT_CALL(stream_info_, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info_.filter_state_));
+  EXPECT_CALL(testing::Const(stream_info_), filterState())
+      .WillRepeatedly(testing::ReturnRef(*stream_info_.filter_state_));
+
   const std::string yaml = createYamlConfig(getFilterStateExpression());
   TestUtility::loadFromYaml(yaml, config_);
 
@@ -491,6 +498,12 @@ TEST_F(CELFormatterTest, TestFilterStateConditional) {
 
 TEST_F(CELFormatterTest, TestFilterStateConditionalWithKey) {
   // WORKING VERSION: Same logic with filter state key present
+  // Set up mock expectations to avoid warnings
+  EXPECT_CALL(stream_info_, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info_.filter_state_));
+  EXPECT_CALL(testing::Const(stream_info_), filterState())
+      .WillRepeatedly(testing::ReturnRef(*stream_info_.filter_state_));
+
   const std::string yaml = createYamlConfig(getFilterStateExpression());
   TestUtility::loadFromYaml(yaml, config_);
 
@@ -507,6 +520,12 @@ TEST_F(CELFormatterTest, TestFilterStateConditionalWithKey) {
 
 TEST_F(CELFormatterTest, TestFilterStateConditionalWithKeyNoPort) {
   // Test working version with authority header without port when filter state key does NOT exist
+  // Set up mock expectations to avoid warnings
+  EXPECT_CALL(stream_info_, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info_.filter_state_));
+  EXPECT_CALL(testing::Const(stream_info_), filterState())
+      .WillRepeatedly(testing::ReturnRef(*stream_info_.filter_state_));
+
   Http::TestRequestHeaderMapImpl request_headers_no_port{
       {":method", "GET"},
       {":path", "/request/path?secret=parameter"},
