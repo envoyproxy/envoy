@@ -31,9 +31,6 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Respons
     etag_handle(Http::CustomHeaders::get().Etag);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     vary_handle(Http::CustomHeaders::get().Vary);
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    compression_status_handle(Http::Headers::get().EnvoyCompressionStatus);
-
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     request_content_encoding_handle(Http::CustomHeaders::get().ContentEncoding);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
@@ -795,8 +792,7 @@ void CompressorFilter::insertEnvoyCompressionStatusHeader(
     absl::string_view status_to_set, absl::optional<absl::string_view> original_length) {
   std::string status_value =
       createEnvoyCompressionStatusHeaderValue(encoding_type, status_to_set, original_length);
-  headers.appendInline(compression_status_handle.handle(), status_value,
-                       Http::Headers::get().EnvoyCompressionStatusValues.ValueSeparator);
+  headers.addReferenceKey(Http::Headers::get().EnvoyCompressionStatus, status_value);
 }
 
 void CompressorFilter::insertVaryHeader(Http::ResponseHeaderMap& headers) {
