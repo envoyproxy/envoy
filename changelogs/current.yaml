@@ -39,6 +39,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
 
 new_features:
+- area: http filter
+  change: |
+    Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request
+    and response bodies in any position of HTTP filter chain.
+    This also make it possible to refresh routes based on the attributes in the request body.
 - area: logging
   change: |
     Added support for not-equal operator for access log filter rules, in
