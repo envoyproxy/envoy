@@ -684,6 +684,9 @@ def _com_google_protobuf():
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+        },
     )
 
     # Needed by grpc, jwt_verify_lib, maybe others.

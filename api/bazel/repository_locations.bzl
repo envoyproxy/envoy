@@ -54,16 +54,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     com_github_cncf_xds = dict(
         project_name = "xDS API",
         project_desc = "xDS API Working Group (xDS-WG)",
-        project_url = "https://github.com/cncf/xds",
+        project_url = "https://github.com/mmorel-35/xds",
         # During the UDPA -> xDS migration, we aren't working with releases.
-        version = "006306971edc85a646b0888eba1992e4f57f38c9",
-        sha256 = "5b1dd7422d684c69c85f2b3dbe7cdf50916e657b5edb3a29b04cd7dc6a4141de",
+        version = "dc55ea33097c5b576d6f39d9b13a9419813a9e76",
+        sha256 = "154c2473d7ad7c17a679f68e9bc268874b729181b08557e64a9ae190ee48c23a",
         release_date = "2025-10-18",
         strip_prefix = "xds-{version}",
-        urls = ["https://github.com/cncf/xds/archive/{version}.tar.gz"],
+        urls = ["https://github.com/mmorel-35/xds/archive/{version}.tar.gz"],
         use_category = ["api"],
         license = "Apache-2.0",
-        license_url = "https://github.com/cncf/xds/blob/{version}/LICENSE",
+        license_url = "https://github.com/mmorel-35/xds/blob/{version}/LICENSE",
     ),
     com_github_openzipkin_zipkinapi = dict(
         project_name = "Zipkin API",

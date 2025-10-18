@@ -93,66 +93,70 @@ def envoy_dependency_imports(
     # These dependencies, like most of the Go in this repository, exist only for the API.
     # These repos also have transient dependencies - `build_external` allows them to use them.
     # TODO(phlax): remove `build_external` and pin all transients
+    # Updated to v1.72.0 to match xds/go/go.mod and ensure compatibility with protobuf v1.36.10
     go_repository(
         name = "org_golang_google_grpc",
         build_file_proto_mode = "disable",
         importpath = "google.golang.org/grpc",
-        sum = "h1:raiipEjMOIC/TO2AvyTxP25XFdLxNIBwzDh3FM3XztI=",
-        version = "v1.34.0",
+        sum = "h1:S7UkcVa60b5AAQTaO6ZKamFp1zMZSU0fGDK2WZLbBnM=",
+        version = "v1.72.0",
         build_external = "external",
         # project_url = "https://pkg.go.dev/google.golang.org/grpc",
-        # last_update = "2020-12-02"
+        # last_update = "2025-04-23"
         # use_category = ["api"],
         # cpe = "cpe:2.3:a:grpc:grpc:*",
     )
+    # Updated to v0.35.0 to match xds/go/go.mod
     go_repository(
         name = "org_golang_x_net",
         importpath = "golang.org/x/net",
-        sum = "h1:0mm1VjtFUOIlE1SbDlwjYaDxZVDP2S5ou6y0gSgXHu8=",
-        version = "v0.0.0-20200226121028-0de0cce0169b",
+        sum = "h1:T5GQRQb2y08kTAByq9L4/bz8cipCdA8FbRTXewonqY8=",
+        version = "v0.35.0",
         build_external = "external",
         # project_url = "https://pkg.go.dev/golang.org/x/net",
-        # last_update = "2020-02-26"
+        # last_update = "2025-01-15"
         # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L129-L134"
     )
+    # Updated to v0.22.0 to match xds/go/go.mod
     go_repository(
         name = "org_golang_x_text",
         importpath = "golang.org/x/text",
-        sum = "h1:cokOdA+Jmi5PJGXLlLllQSgYigAEfHXJAERHVMaCc2k=",
-        version = "v0.3.3",
+        sum = "h1:bofq7m3/HAFvbF51jz3Q9wLg3jkvSPuiZu/pD1XwgtM=",
+        version = "v0.22.0",
         build_external = "external",
         # project_url = "https://pkg.go.dev/golang.org/x/text",
-        # last_update = "2021-06-16"
+        # last_update = "2025-01-15"
         # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L148-L153"
     )
+    # Updated to match xds/go/go.mod
     go_repository(
         name = "org_golang_google_genproto_googleapis_api",
         importpath = "google.golang.org/genproto/googleapis/api",
-        sum = "h1:DoPTO70H+bcDXcd39vOqb2viZxgqeBeSGtZ55yZU4/Q=",
-        version = "v0.0.0-20230822172742-b8732ec3820d",
+        sum = "h1:nwKuGPlUAt+aR+pcrkfFRrTU1BVrSmYyYMxYbUIVHr0=",
+        version = "v0.0.0-20250218202821-56aae31c358a",
         build_external = "external",
     )
+    # Updated to match xds/go/go.mod
     go_repository(
         name = "org_golang_google_genproto_googleapis_rpc",
         importpath = "google.golang.org/genproto/googleapis/rpc",
-        sum = "h1:uvYuEyMHKNt+lT4K3bN6fGswmK8qSvcreM3BwjDh+y4=",
-        version = "v0.0.0-20230822172742-b8732ec3820d",
+        sum = "h1:51aaUVRocpvUOSQKM6Q7VuoaktNIaMCLuhZB6DKksq4=",
+        version = "v0.0.0-20250218202821-56aae31c358a",
         build_external = "external",
     )
     go_repository(
         name = "org_golang_google_protobuf",
         importpath = "google.golang.org/protobuf",
-        sum = "h1:d0NfwRgPtno5B1Wa6L2DAG+KivqkdutMf1UhdNx175w=",
-        version = "v1.28.1",
+        sum = "h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=",
+        version = "v1.36.10",
         build_external = "external",
     )
     go_repository(
         name = "com_github_cncf_xds_go",
         importpath = "github.com/cncf/xds/go",
-        sum = "h1:B/lvg4tQ5hfFZd4V2hcSfFVfUvAK6GSFKxIIzwnkv8g=",
-        version = "v0.0.0-20220520190051-1e77728a1eaa",
+        remote = "https://github.com/mmorel-35/xds",
+        vcs = "git",
+        commit = "dc55ea33097c5b576d6f39d9b13a9419813a9e76",
         build_external = "external",
     )
     go_repository(
