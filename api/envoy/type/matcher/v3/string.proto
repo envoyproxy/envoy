@@ -28,7 +28,7 @@ message StringMatcher {
   reserved "regex";
 
   oneof match_pattern {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The input string must match exactly the string specified here.
     //

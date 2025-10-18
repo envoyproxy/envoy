@@ -47,7 +47,7 @@ message HealthCheckEvent {
   string cluster_name = 3 [(buf.validate.field).string = {min_len: 1}];
 
   oneof event {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Host ejection.
     HealthCheckEjectUnhealthy eject_unhealthy_event = 4;

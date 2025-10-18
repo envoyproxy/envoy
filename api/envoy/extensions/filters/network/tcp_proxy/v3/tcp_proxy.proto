@@ -190,7 +190,7 @@ message TcpProxy {
   string stat_prefix = 1 [(buf.validate.field).string = {min_len: 1}];
 
   oneof cluster_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The upstream cluster to connect to.
     string cluster = 2;

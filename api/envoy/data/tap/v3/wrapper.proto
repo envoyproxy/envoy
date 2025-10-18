@@ -24,7 +24,7 @@ message TraceWrapper {
       "envoy.data.tap.v2alpha.TraceWrapper";
 
   oneof trace {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // An HTTP buffered tap trace.
     HttpBufferedTrace http_buffered_trace = 1;

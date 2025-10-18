@@ -93,5 +93,5 @@ message RegexMatchAndSubstitute {
   // capture group. E.g., ``\1`` refers to capture group 1, and ``\2`` refers
   // to capture group 2.
   string substitution = 2
-      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 }

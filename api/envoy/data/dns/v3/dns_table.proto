@@ -44,7 +44,7 @@ message DnsTable {
   // Specify the service protocol using a numeric or string value
   message DnsServiceProtocol {
     oneof protocol_config {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Specify the protocol number for the service. Envoy will try to resolve the number to
       // the protocol name. For example, 6 will resolve to "tcp". Refer to:
@@ -53,7 +53,7 @@ message DnsTable {
       uint32 number = 1 [(buf.validate.field).uint32 = {lt: 255}];
 
       // Specify the protocol name for the service.
-      string name = 2 [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+      string name = 2 [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
     }
   }
 
@@ -62,15 +62,15 @@ message DnsTable {
   message DnsServiceTarget {
     // Specify the name of the endpoint for the Service. The name is a hostname or a cluster
     oneof endpoint_type {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Use a resolvable hostname as the endpoint for a service.
       string host_name = 1
-          [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+          [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
       // Use a cluster name as the endpoint for a service.
       string cluster_name = 2
-          [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+          [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
     }
 
     // The priority of the service record target
@@ -89,7 +89,7 @@ message DnsTable {
   message DnsService {
     // The name of the service without the protocol or domain name
     string service_name = 1
-        [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+        [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
     // The service protocol. This can be specified as a string or the numeric value of the protocol
     DnsServiceProtocol protocol = 2;
@@ -111,7 +111,7 @@ message DnsTable {
         "envoy.data.dns.v2alpha.DnsTable.DnsEndpoint";
 
     oneof endpoint_config {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Define a list of addresses to return for the specified endpoint
       AddressList address_list = 1;
@@ -137,7 +137,7 @@ message DnsTable {
     // wildcard records, the longest wildcard match will be used, e.g. if there are wildcard records for
     // ``*.example.com`` and ``*.foo.example.com`` and the query is for ``bar.foo.example.com``, the latter will be used.
     // Specific records will always take precedence over wildcard records.
-    string name = 1 [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+    string name = 1 [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
     // The configuration containing the method to determine the address of this endpoint
     DnsEndpoint endpoint = 2;

@@ -60,7 +60,7 @@ message RedisProxy {
     // The only exception to this behavior is when a connection to a backend is not yet established.
     // In that case, the connect timeout on the cluster will govern the timeout until the connection
     // is ready.
-    google.protobuf.Duration op_timeout = 1 [(buf.validate.field).duration = {required: true}];
+    google.protobuf.Duration op_timeout = 1 [(buf.validate.field).required = true];
 
     // Use hash tagging on every redis key to guarantee that keys with the same hash tag will be
     // forwarded to the same upstream. The hash key used for determining the upstream in a

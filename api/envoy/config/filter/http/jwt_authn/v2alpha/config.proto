@@ -81,7 +81,7 @@ message JwtProvider {
   // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
   // validate signature of a JWT. This field specifies where to fetch JWKS.
   oneof jwks_source_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // JWKS can be fetched from remote server via HTTP/HTTPS. This field specifies the remote HTTP
     // URI and how the fetched JWKS should be cached.

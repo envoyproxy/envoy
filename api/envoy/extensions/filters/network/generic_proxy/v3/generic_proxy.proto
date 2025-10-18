@@ -35,7 +35,7 @@ message GenericProxy {
       [(buf.validate.field).required = true];
 
   oneof route_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The generic proxies route table will be dynamically loaded via the meta RDS API.
     GenericRds generic_rds = 3;

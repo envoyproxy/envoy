@@ -149,7 +149,7 @@ message StatsMatcher {
   //
 
   oneof stats_matcher {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If `reject_all` is true, then all stats are disabled. If `reject_all` is false, then all
     // stats are enabled.
@@ -251,7 +251,7 @@ message TagSpecifier {
 // [#extension: envoy.stat_sinks.statsd]
 message StatsdSink {
   oneof statsd_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The UDP address of a running `statsd <https://github.com/etsy/statsd>`_
     // compliant listener. If specified, statistics will be flushed to this
@@ -302,7 +302,7 @@ message DogStatsdSink {
   reserved 2;
 
   oneof dog_statsd_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The UDP address of a running DogStatsD compliant listener. If specified,
     // statistics will be flushed to this address.

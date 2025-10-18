@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // Specifies the way to match a double value.
 message DoubleMatcher {
   oneof match_pattern {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If specified, the input double value must be in the range specified here.
     // Note: The range is using half-open interval semantics [start, end).

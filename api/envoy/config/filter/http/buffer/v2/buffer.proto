@@ -30,7 +30,7 @@ message Buffer {
 
 message BufferPerRoute {
   oneof override {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Disable the buffer filter for this particular vhost or route.
     bool disabled = 1 [(buf.validate.field).bool = {const: true}];

@@ -41,7 +41,7 @@ message Route {
 
 message RouteMatch {
   oneof match_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If specified, the route must exactly match the request method name. As a special case, an
     // empty string matches any request method name.
@@ -78,7 +78,7 @@ message RouteMatch {
 // [#next-free-field: 7]
 message RouteAction {
   oneof cluster_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Indicates a single upstream cluster to which the request should be routed
     // to.

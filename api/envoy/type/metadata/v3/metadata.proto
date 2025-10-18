@@ -47,7 +47,7 @@ message MetadataKey {
         "envoy.type.metadata.v2.MetadataKey.PathSegment";
 
     oneof segment {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, use this key to retrieve the value in a Struct.
       string key = 1 [(buf.validate.field).string = {min_len: 1}];
@@ -100,7 +100,7 @@ message MetadataKind {
   }
 
   oneof kind {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Request kind of metadata.
     Request request = 1;

@@ -349,7 +349,7 @@ message DynamicParameterConstraints {
     string key = 1;
 
     oneof constraint_type {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Matches this exact value.
       string value = 2;

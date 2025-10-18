@@ -76,7 +76,7 @@ message IPTagging {
     // :ref:`action <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.action>`
     // rather than the defaults for x-envoy prefixed headers.
     string header = 1
-        [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
     // Control if the :ref:`header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.header>`
     // will be sanitized, or be appended to.

@@ -42,7 +42,7 @@ message RegexMatcher {
   }
 
   oneof engine_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Google's RE2 regex engine.
     GoogleRE2 google_re2 = 1 [(buf.validate.field).required = true];

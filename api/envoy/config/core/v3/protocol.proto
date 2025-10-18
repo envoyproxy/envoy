@@ -153,7 +153,7 @@ message UpstreamHttpProtocolOptions {
   // If none of these fields are set then setting this would be a no-op.
   // Does nothing if a filter before the http router filter sets the corresponding metadata.
   string override_auto_sni_header = 3
-      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+      [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 }
 
 // Configures the alternate protocols cache which tracks alternate protocols that can be used to
@@ -174,7 +174,7 @@ message AlternateProtocolsCacheOptions {
   message AlternateProtocolsCacheEntry {
     // The host name for the alternate protocol entry.
     string hostname = 1
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
     // The port for the alternate protocol entry.
     uint32 port = 2 [(buf.validate.field).uint32 = {lt: 65535 gt: 0}];
@@ -337,7 +337,7 @@ message Http1ProtocolOptions {
     }
 
     oneof header_format {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Formats the header by proper casing words: the first character and any character following
       // a special character will be capitalized if it's an alpha character. For example,
@@ -452,10 +452,10 @@ message KeepaliveSettings {
   // time period, the connection will be aborted. Note that in order to prevent the influence of
   // Head-of-line (HOL) blocking the timeout period is extended when *any* frame is received on
   // the connection, under the assumption that if a frame is received the connection is healthy.
-  google.protobuf.Duration timeout = 2 [(buf.validate.field).duration = {
-    required: true
-    gte {nanos: 1000000}
-  }];
+  google.protobuf.Duration timeout = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {gte {nanos: 1000000}}
+  ];
 
   // A random jitter amount as a percentage of interval that will be added to each interval.
   // A value of zero means there will be no jitter.

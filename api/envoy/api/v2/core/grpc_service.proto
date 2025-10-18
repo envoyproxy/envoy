@@ -57,7 +57,7 @@ message GrpcService {
     // credential types.
     message ChannelCredentials {
       oneof credential_specifier {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         SslCredentials ssl_credentials = 1;
 
@@ -135,7 +135,7 @@ message GrpcService {
       }
 
       oneof credential_specifier {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         // Access token credentials.
         // https://grpc.io/grpc/cpp/namespacegrpc.html#ad3a80da696ffdaea943f0f858d7a360d.
@@ -204,7 +204,7 @@ message GrpcService {
   reserved 4;
 
   oneof target_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Envoy's in-built gRPC client.
     // See the :ref:`gRPC services overview <arch_overview_grpc_services>`

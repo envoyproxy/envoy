@@ -32,7 +32,7 @@ message Route {
 
 message RouteMatch {
   oneof match_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The domain from Request URI or Route Header.
     string domain = 1;
@@ -47,7 +47,7 @@ message RouteMatch {
 
 message RouteAction {
   oneof cluster_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Indicates a single upstream cluster to which the request should be routed
     // to.

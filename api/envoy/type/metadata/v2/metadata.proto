@@ -43,7 +43,7 @@ message MetadataKey {
   // Currently it is only supported to specify the key, i.e. field name, as one segment of a path.
   message PathSegment {
     oneof segment {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, use the key to retrieve the value in a Struct.
       string key = 1 [(buf.validate.field).string = {min_bytes: 1}];
@@ -83,7 +83,7 @@ message MetadataKind {
   }
 
   oneof kind {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Request kind of metadata.
     Request request = 1;

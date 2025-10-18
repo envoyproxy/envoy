@@ -35,7 +35,7 @@ message BufferPerRoute {
       "envoy.config.filter.http.buffer.v2.BufferPerRoute";
 
   oneof override {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Disable the buffer filter for this particular vhost or route.
     bool disabled = 1 [(buf.validate.field).bool = {const: true}];

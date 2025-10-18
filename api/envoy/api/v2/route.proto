@@ -47,7 +47,7 @@ message RouteConfiguration {
   // prior to filter invocation. See :ref:`config_http_conn_man_headers_x-envoy-internal` for more
   // information.
   repeated string internal_only_headers = 3 [
-    (buf.validate.field).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+    (buf.validate.field).repeated = {items {string {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}}}
   ];
 
   // Specifies a list of HTTP headers that should be added to each response that
@@ -62,7 +62,7 @@ message RouteConfiguration {
   // Specifies a list of HTTP headers that should be removed from each response
   // that the connection manager encodes.
   repeated string response_headers_to_remove = 5 [
-    (buf.validate.field).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+    (buf.validate.field).repeated = {items {string {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}}}
   ];
 
   // Specifies a list of HTTP headers that should be added to each request
@@ -77,7 +77,7 @@ message RouteConfiguration {
   // Specifies a list of HTTP headers that should be removed from each request
   // routed by the HTTP connection manager.
   repeated string request_headers_to_remove = 8 [
-    (buf.validate.field).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+    (buf.validate.field).repeated = {items {string {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}}}
   ];
 
   // By default, headers that should be added/removed are evaluated from most to least specific:

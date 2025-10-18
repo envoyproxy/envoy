@@ -298,7 +298,7 @@ message ListenerFilterChainMatchPredicate {
   }
 
   oneof rule {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A set that describes a logical OR. If any member of the set matches, the match configuration
     // matches.

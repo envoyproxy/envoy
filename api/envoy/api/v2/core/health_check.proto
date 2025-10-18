@@ -61,7 +61,7 @@ message HealthCheck {
   // Describes the encoding of the payload bytes in the payload.
   message Payload {
     oneof payload {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Hex encoded payload. E.g., "000000FF".
       string text = 1 [(buf.validate.field).string = {min_bytes: 1}];
@@ -198,16 +198,16 @@ message HealthCheck {
 
   // The time to wait for a health check response. If the timeout is reached the
   // health check attempt will be considered a failure.
-  google.protobuf.Duration timeout = 1 [(buf.validate.field).duration = {
-    required: true
-    gt {}
-  }];
+  google.protobuf.Duration timeout = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {gt {}}
+  ];
 
   // The interval between health checks.
-  google.protobuf.Duration interval = 2 [(buf.validate.field).duration = {
-    required: true
-    gt {}
-  }];
+  google.protobuf.Duration interval = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {gt {}}
+  ];
 
   // An optional jitter amount in milliseconds. If specified, Envoy will start health
   // checking after for a random time in ms between 0 and initial_jitter. This only
@@ -243,7 +243,7 @@ message HealthCheck {
   google.protobuf.BoolValue reuse_connection = 7;
 
   oneof health_checker {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // HTTP health check.
     HttpHealthCheck http_health_check = 8;

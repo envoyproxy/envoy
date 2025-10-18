@@ -102,7 +102,7 @@ message Bootstrap {
   message ApplicationLogConfig {
     message LogFormat {
       oneof log_format {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         // Flush application logs in JSON format. The configured JSON struct can
         // support all the format flags specified in the :option:`--log-format`
@@ -679,7 +679,7 @@ message RuntimeLayer {
   string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   oneof layer_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // :ref:`Static runtime <config_runtime_bootstrap>` layer.
     // This follows the :ref:`runtime protobuf JSON representation encoding
@@ -739,7 +739,7 @@ message CustomInlineHeader {
 
   // The name of the header that is expected to be set as the inline header.
   string inline_header_name = 1
-      [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
   // The type of the header that is expected to be set as the inline header.
   InlineHeaderType inline_header_type = 2 [(buf.validate.field).enum = {defined_only: true}];

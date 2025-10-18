@@ -31,7 +31,7 @@ message KillRequest {
 
   // The name of the kill request header. If this field is not empty, it will override the :ref:`default header <config_http_filters_kill_request_http_header>` name. Otherwise the default header name will be used.
   string kill_request_header = 2
-      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
   Direction direction = 3 [(buf.validate.field).enum = {defined_only: true}];
 }

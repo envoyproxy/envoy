@@ -98,7 +98,7 @@ message KeySource {
   // If set, takes precedence over ``query`` and ``cookie``.
   string header = 1
       [(buf.validate.field).string =
-           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
+           {max_len: 1024 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
   // The query parameter name to fetch the key. If multiple query values are present, the first one
   // will be used.
@@ -111,7 +111,7 @@ message KeySource {
   // The field will be used if the ``header`` and ``query`` are not set.
   string cookie = 3
       [(buf.validate.field).string =
-           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
+           {max_len: 1024 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 }
 
 message Forwarding {
@@ -119,7 +119,7 @@ message Forwarding {
   // the client string associated with the matched credential will be injected into
   // the request before forwarding upstream.
   string header = 1
-      [(buf.validate.field).string = {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string = {max_len: 1024 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
   // If true, remove the API key from the request before forwarding upstream.
   //

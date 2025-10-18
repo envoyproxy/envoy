@@ -34,7 +34,7 @@ message HttpUri {
   // inline DNS resolution. See `issue
   // <https://github.com/envoyproxy/envoy/issues/1606>`_.
   oneof http_upstream_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A cluster is created in the Envoy "cluster_manager" config
     // section. This field specifies the cluster name.
@@ -49,8 +49,8 @@ message HttpUri {
   }
 
   // Sets the maximum duration in milliseconds that a response can take to arrive upon request.
-  google.protobuf.Duration timeout = 3 [(buf.validate.field).duration = {
-    required: true
-    gte {}
-  }];
+  google.protobuf.Duration timeout = 3 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {gte {}}
+  ];
 }

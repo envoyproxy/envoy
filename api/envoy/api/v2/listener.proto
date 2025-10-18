@@ -67,7 +67,7 @@ message Listener {
     }
 
     oneof balance_type {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, the listener will use the exact connection balancer.
       ExactBalance exact_balance = 1;

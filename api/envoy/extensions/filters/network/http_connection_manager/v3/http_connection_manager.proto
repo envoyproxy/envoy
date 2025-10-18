@@ -416,7 +416,7 @@ message HttpConnectionManager {
   string stat_prefix = 2 [(buf.validate.field).string = {min_len: 1}];
 
   oneof route_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The connection manager’s route table will be dynamically loaded via the RDS API.
     Rds rds = 3;
@@ -482,7 +482,7 @@ message HttpConnectionManager {
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is ``envoy``.
   string server_name = 10
-      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
   // Defines the action to be applied to the Server header on the response path.
   // By default, Envoy will overwrite the header with the value specified in
@@ -751,7 +751,7 @@ message HttpConnectionManager {
 
   // Via header value to append to request and response headers. If this is
   // empty, no via header will be appended.
-  string via = 22 [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+  string via = 22 [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
   // Whether the connection manager will generate the :ref:`x-request-id
   // <config_http_conn_man_headers_x-request-id>` header if it does not exist. This defaults to
@@ -1133,7 +1133,7 @@ message ScopedRoutes {
         //
         //   If the header appears multiple times only the first value is used.
         string name = 1 [
-          (buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
+          (buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}
         ];
 
         // The element separator (e.g., ';' separates 'a;b;c;d').
@@ -1154,7 +1154,7 @@ message ScopedRoutes {
       }
 
       oneof type {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         // Specifies how a header field's value should be extracted.
         HeaderValueExtractor header_value_extractor = 1;
@@ -1179,7 +1179,7 @@ message ScopedRoutes {
   config.core.v3.ConfigSource rds_config_source = 3;
 
   oneof config_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The set of routing scopes corresponding to the HCM. A scope is assigned to a request by
     // matching a key constructed from the request's attributes according to the algorithm specified

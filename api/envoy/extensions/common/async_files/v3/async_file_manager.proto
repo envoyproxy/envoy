@@ -33,7 +33,7 @@ message AsyncFileManagerConfig {
   string id = 1;
 
   oneof manager_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Configuration for a thread-pool based async file manager.
     ThreadPool thread_pool = 2;

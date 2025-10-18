@@ -42,7 +42,7 @@ message DnsTable {
   // endpoint
   message DnsEndpoint {
     oneof endpoint_config {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       AddressList address_list = 1;
     }
@@ -50,7 +50,7 @@ message DnsTable {
 
   message DnsVirtualDomain {
     // The domain name for which Envoy will respond to query requests
-    string name = 1 [(buf.validate.field).string = {min_len: 2 well_known_regex: HTTP_HEADER_NAME}];
+    string name = 1 [(buf.validate.field).string = {min_len: 2 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
     // The configuration containing the method to determine the address
     // of this endpoint

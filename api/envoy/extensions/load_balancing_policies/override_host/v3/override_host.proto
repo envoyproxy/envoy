@@ -54,7 +54,7 @@ message OverrideHost {
     //
     // Only one of the header or metadata field could be set.
     string header = 1
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
     // The metadata key to get the override host addresses from the request dynamic metadata. If
     // set this field then it will take precedence over the header field.

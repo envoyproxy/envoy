@@ -73,31 +73,31 @@ message OAuth2Credentials {
     // is set to true the filter will send over the bearer token as a cookie with this name to the
     // upstream. Defaults to ``BearerToken``.
     string bearer_token = 1
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
     // Cookie name to hold OAuth HMAC value. Defaults to ``OauthHMAC``.
     string oauth_hmac = 2
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
     // Cookie name to hold OAuth expiry value. Defaults to ``OauthExpires``.
     string oauth_expires = 3
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
     // Cookie name to hold the id token. Defaults to ``IdToken``.
     string id_token = 4
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
     // Cookie name to hold the refresh token. Defaults to ``RefreshToken``.
     string refresh_token = 5
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
     // Cookie name to hold the nonce value. Defaults to ``OauthNonce``.
     string oauth_nonce = 6
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
     // Cookie name to hold the PKCE code verifier. Defaults to ``OauthCodeVerifier``.
     string code_verifier = 7
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
   }
 
   // The client_id to be used in the authorize calls. This value will be URL encoded when sent to the OAuth server.
@@ -109,7 +109,7 @@ message OAuth2Credentials {
 
   // Configures how the secret token should be created.
   oneof token_formation {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If present, the secret token will be a HMAC using the provided secret.
     transport_sockets.tls.v3.SdsSecretConfig hmac_secret = 3

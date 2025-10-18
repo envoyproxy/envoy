@@ -30,7 +30,7 @@ message FilterStateValue {
   }
 
   oneof key {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Filter state object key. The key is used to lookup the object factory, unless :ref:`factory_key
     // <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>` is set. See
@@ -43,7 +43,7 @@ message FilterStateValue {
   string factory_key = 6;
 
   oneof value {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Uses the :ref:`format string <config_access_log_format_strings>` to
     // instantiate the filter state object value.

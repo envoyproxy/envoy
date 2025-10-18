@@ -240,7 +240,7 @@ message HttpConnectionManager {
   string stat_prefix = 2 [(buf.validate.field).string = {min_bytes: 1}];
 
   oneof route_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The connection manager’s route table will be dynamically loaded via the RDS API.
     Rds rds = 3;
@@ -601,7 +601,7 @@ message ScopedRoutes {
       }
 
       oneof type {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         // Specifies how a header field's value should be extracted.
         HeaderValueExtractor header_value_extractor = 1;
@@ -626,7 +626,7 @@ message ScopedRoutes {
   api.v2.core.ConfigSource rds_config_source = 3 [(buf.validate.field).required = true];
 
   oneof config_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The set of routing scopes corresponding to the HCM. A scope is assigned to a request by
     // matching a key constructed from the request's attributes according to the algorithm specified

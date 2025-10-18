@@ -60,7 +60,7 @@ message RateLimitStrategy {
   }
 
   oneof strategy {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Allow or Deny the requests.
     // If unset, allow all.

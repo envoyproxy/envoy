@@ -81,7 +81,7 @@ message HeaderToMetadata {
     //
     // The header to be extracted.
     string header = 1
-        [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
     // If the header is present, apply this metadata KeyValuePair.
     //

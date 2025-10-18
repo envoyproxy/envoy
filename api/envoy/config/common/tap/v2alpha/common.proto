@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // Common configuration for all tap extensions.
 message CommonExtensionConfig {
   oneof config_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If specified, the tap filter will be configured via an admin handler.
     AdminConfig admin_config = 1;

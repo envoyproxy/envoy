@@ -29,7 +29,7 @@ message Matcher {
   // What to do if a match is successful.
   message OnMatch {
     oneof on_match {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Nested matcher to evaluate.
       // If the nested matcher does not match and does not specify
@@ -67,7 +67,7 @@ message Matcher {
         core.v3.TypedExtensionConfig input = 1 [(buf.validate.field).required = true];
 
         oneof matcher {
-          option (validate.required) = true;
+          option (buf.validate.oneof).required = true;
 
           // Built-in string matcher.
           type.matcher.v3.StringMatcher value_match = 2;
@@ -84,7 +84,7 @@ message Matcher {
       }
 
       oneof match_type {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         // A single predicate to evaluate.
         SinglePredicate single_predicate = 1;
@@ -126,7 +126,7 @@ message Matcher {
     // If the lookup succeeds, the match is considered successful, and
     // the corresponding OnMatch is used.
     oneof tree_type {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       MatchMap exact_match_map = 2;
 
@@ -139,7 +139,7 @@ message Matcher {
   }
 
   oneof matcher_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A linear list of matchers to evaluate.
     MatcherList matcher_list = 1;
@@ -166,7 +166,7 @@ message MatchPredicate {
   }
 
   oneof rule {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A set that describes a logical OR. If any member of the set matches, the match configuration
     // matches.
@@ -221,7 +221,7 @@ message HttpHeadersMatch {
 message HttpGenericBodyMatch {
   message GenericTextMatch {
     oneof rule {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Text string to be located in HTTP body.
       string string_match = 1 [(buf.validate.field).string = {min_len: 1}];

@@ -53,7 +53,7 @@ message SocketAddress {
   string address = 2 [(buf.validate.field).string = {min_bytes: 1}];
 
   oneof port_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     uint32 port_value = 3 [(buf.validate.field).uint32 = {lte: 65535}];
 
@@ -116,7 +116,7 @@ message BindConfig {
 // management servers.
 message Address {
   oneof address {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     SocketAddress socket_address = 1;
 

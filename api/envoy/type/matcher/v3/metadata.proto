@@ -89,7 +89,7 @@ message MetadataMatcher {
         "envoy.type.matcher.MetadataMatcher.PathSegment";
 
     oneof segment {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, use the key to retrieve the value in a ``Struct``.
       string key = 1 [(buf.validate.field).string = {min_len: 1}];

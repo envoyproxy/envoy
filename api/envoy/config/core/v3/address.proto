@@ -37,7 +37,7 @@ message Pipe {
 // [#comment: TODO(asraa): When address available, remove workaround from test/server/server_fuzz_test.cc:30.]
 message EnvoyInternalAddress {
   oneof address_name_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Specifies the :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the
     // internal listener.
@@ -75,7 +75,7 @@ message SocketAddress {
   string address = 2 [(buf.validate.field).string = {min_len: 1}];
 
   oneof port_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     uint32 port_value = 3 [(buf.validate.field).uint32 = {lte: 65535}];
 
@@ -187,7 +187,7 @@ message Address {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Address";
 
   oneof address {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     SocketAddress socket_address = 1;
 

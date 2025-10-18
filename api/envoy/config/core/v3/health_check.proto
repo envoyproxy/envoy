@@ -73,7 +73,7 @@ message HealthCheck {
         "envoy.api.v2.core.HealthCheck.Payload";
 
     oneof payload {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Hex encoded payload. E.g., "000000FF".
       string text = 1 [(buf.validate.field).string = {min_len: 1}];
@@ -96,11 +96,11 @@ message HealthCheck {
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used. The host header can be customized for a specific endpoint by setting the
     // :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
-    string host = 1 [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE}];
+    string host = 1 [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE}];
 
     // Specifies the HTTP path that will be requested during health checking. For example
     // ``/healthcheck``.
-    string path = 2 [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE}];
+    string path = 2 [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE}];
 
     // HTTP specific payload to be sent as the request body during health checking.
     // If specified, the method should support a request body (POST, PUT, PATCH, etc.).
@@ -131,7 +131,7 @@ message HealthCheck {
     // Specifies a list of HTTP headers that should be removed from each request that is sent to the
     // health checked cluster.
     repeated string request_headers_to_remove = 8 [(buf.validate.field).repeated = {
-      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+      items {string {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}}
     }];
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
@@ -220,7 +220,7 @@ message HealthCheck {
     // with will be used. The authority header can be customized for a specific endpoint by setting
     // the :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
     string authority = 2
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
     // Specifies a list of key-value pairs that should be added to the metadata of each GRPC call
     // that is sent to the health checked cluster. For more information, including details on header value syntax,
@@ -268,16 +268,16 @@ message HealthCheck {
 
   // The time to wait for a health check response. If the timeout is reached the
   // health check attempt will be considered a failure.
-  google.protobuf.Duration timeout = 1 [(buf.validate.field).duration = {
-    required: true
-    gt {}
-  }];
+  google.protobuf.Duration timeout = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {gt {}}
+  ];
 
   // The interval between health checks.
-  google.protobuf.Duration interval = 2 [(buf.validate.field).duration = {
-    required: true
-    gt {}
-  }];
+  google.protobuf.Duration interval = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {gt {}}
+  ];
 
   // An optional jitter amount in milliseconds. If specified, Envoy will start health
   // checking after for a random time in ms between 0 and initial_jitter. This only
@@ -315,7 +315,7 @@ message HealthCheck {
   google.protobuf.BoolValue reuse_connection = 7;
 
   oneof health_checker {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // HTTP health check.
     HttpHealthCheck http_health_check = 8;

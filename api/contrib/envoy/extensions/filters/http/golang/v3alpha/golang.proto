@@ -87,7 +87,7 @@ message Config {
 
 message RouterPlugin {
   oneof override {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // [#not-implemented-hide:]
     // Disable the filter for this particular vhost or route.

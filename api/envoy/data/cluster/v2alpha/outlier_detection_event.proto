@@ -105,7 +105,7 @@ message OutlierDetectionEvent {
   bool enforced = 8;
 
   oneof event {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     OutlierEjectSuccessRate eject_success_rate_event = 9;
 

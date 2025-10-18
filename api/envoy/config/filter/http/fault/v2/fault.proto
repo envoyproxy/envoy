@@ -33,7 +33,7 @@ message FaultAbort {
   reserved 1;
 
   oneof error_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // HTTP status code to use to abort the HTTP request.
     uint32 http_status = 2 [(buf.validate.field).uint32 = {lt: 600 gte: 200}];

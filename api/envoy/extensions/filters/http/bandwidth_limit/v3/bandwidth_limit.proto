@@ -84,5 +84,5 @@ message BandwidthLimit {
 
   // Optional The prefix for the response trailers.
   string response_trailer_prefix = 7
-      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 }

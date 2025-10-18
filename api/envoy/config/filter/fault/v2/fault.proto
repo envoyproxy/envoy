@@ -41,7 +41,7 @@ message FaultDelay {
   FaultDelayType type = 1 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   oneof fault_delay_secifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Add a fixed delay before forwarding the operation upstream. See
     // https://developers.google.com/protocol-buffers/docs/proto3#json for
@@ -74,7 +74,7 @@ message FaultRateLimit {
   }
 
   oneof limit_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A fixed rate limit.
     FixedLimit fixed_limit = 1;

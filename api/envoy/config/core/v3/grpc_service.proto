@@ -43,7 +43,7 @@ message GrpcService {
     // Note that this authority does not override the SNI. The SNI is provided by the transport socket of the cluster.
     string authority = 2
         [(buf.validate.field).string =
-             {min_len: 0 max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+             {min_len: 0 max_bytes: 16384 well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
     // Indicates the retry policy for re-establishing the gRPC stream
     // This field is optional. If max interval is not provided, it will be set to ten times the provided base interval.
@@ -98,7 +98,7 @@ message GrpcService {
           "envoy.api.v2.core.GrpcService.GoogleGrpc.ChannelCredentials";
 
       oneof credential_specifier {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         SslCredentials ssl_credentials = 1;
 
@@ -196,7 +196,7 @@ message GrpcService {
       }
 
       oneof credential_specifier {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         // Access token credentials.
         // https://grpc.io/grpc/cpp/namespacegrpc.html#ad3a80da696ffdaea943f0f858d7a360d.
@@ -236,7 +236,7 @@ message GrpcService {
         // Pointer values are not supported, since they don't make any sense when
         // delivered via the API.
         oneof value_specifier {
-          option (validate.required) = true;
+          option (buf.validate.oneof).required = true;
 
           string string_value = 1;
 
@@ -305,7 +305,7 @@ message GrpcService {
   reserved 4;
 
   oneof target_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Envoy's in-built gRPC client.
     // See the :ref:`gRPC services overview <arch_overview_grpc_services>`

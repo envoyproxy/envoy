@@ -29,8 +29,8 @@ message TokenBucket {
   // The fill interval that tokens are added to the bucket. During each fill interval
   // `tokens_per_fill` are added to the bucket. The bucket will never contain more than
   // `max_tokens` tokens.
-  google.protobuf.Duration fill_interval = 3 [(buf.validate.field).duration = {
-    required: true
-    gt {}
-  }];
+  google.protobuf.Duration fill_interval = 3 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {gt {}}
+  ];
 }

@@ -71,7 +71,7 @@ message Trigger {
   string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   oneof trigger_oneof {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     ThresholdTrigger threshold = 2;
 
@@ -123,7 +123,7 @@ message ScaleTimersOverloadActionConfig {
     TimerType timer = 1 [(buf.validate.field).enum = {defined_only: true not_in: 0}];
 
     oneof overload_adjust {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Sets the minimum duration as an absolute value.
       google.protobuf.Duration min_timeout = 2;

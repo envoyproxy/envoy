@@ -104,13 +104,13 @@ message Config {
     //
     // The header to be extracted.
     string header = 1 [
-      (buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false},
       (udpa.annotations.field_migrate).oneof_promotion = "header_cookie_specifier"
     ];
 
     // The cookie to be extracted.
     string cookie = 5 [
-      (buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false},
       (udpa.annotations.field_migrate).oneof_promotion = "header_cookie_specifier"
     ];
 

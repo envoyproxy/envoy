@@ -62,7 +62,7 @@ message OAuth2 {
   repeated string scopes = 2;
 
   oneof flow_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Client Credentials Grant.
     // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-4.4) for details.

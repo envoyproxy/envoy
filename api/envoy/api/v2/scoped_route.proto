@@ -84,7 +84,7 @@ message ScopedRouteConfiguration {
   message Key {
     message Fragment {
       oneof type {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         // A string to match against.
         string string_key = 1;

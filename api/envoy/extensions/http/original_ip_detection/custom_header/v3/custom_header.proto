@@ -29,7 +29,7 @@ message CustomHeaderConfig {
   //
   // Note: in the case of a multi-valued header, only the first value is tried and the rest are ignored.
   string header_name = 1
-      [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: true}];
+      [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: true}];
 
   // If set to true, the extension could decide that the detected address should be treated as
   // trusted by the HCM. If the address is considered :ref:`trusted<config_http_conn_man_headers_x-forwarded-for_trusted_client_address>`,

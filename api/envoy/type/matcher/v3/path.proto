@@ -21,7 +21,7 @@ message PathMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.PathMatcher";
 
   oneof rule {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The ``path`` must match the URL path portion of the :path header. The query and fragment
     // string (if present) are removed in the URL path portion.

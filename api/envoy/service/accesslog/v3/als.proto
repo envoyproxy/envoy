@@ -78,7 +78,7 @@ message StreamAccessLogsMessage {
   // Batches of log entries of a single type. Generally speaking, a given stream should only
   // ever include one type of log entry.
   oneof log_entries {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     HTTPAccessLogEntries http_logs = 2;
 

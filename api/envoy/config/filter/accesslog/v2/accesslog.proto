@@ -53,7 +53,7 @@ message AccessLog {
 // [#next-free-field: 12]
 message AccessLogFilter {
   oneof filter_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Status code filter.
     StatusCodeFilter status_code_filter = 1;

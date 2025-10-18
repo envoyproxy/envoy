@@ -102,7 +102,7 @@ message ReverseTunnel {
 
   // HTTP path to match for reverse tunnel requests.
   // If not specified, defaults to ``/reverse_connections/request``.
-  string request_path = 3 [(buf.validate.field).string = {min_len: 1 max_len: 255 ignore_empty: true}];
+  string request_path = 3 [(buf.validate.field).string = {min_len: 1 max_len: 255}];
 
   // HTTP method to match for reverse tunnel requests.
   // If not specified (``METHOD_UNSPECIFIED``), this defaults to ``GET``.

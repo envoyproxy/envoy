@@ -42,7 +42,7 @@ message StatefulSession {
 
 message StatefulSessionPerRoute {
   oneof override {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Disable the stateful session filter for this particular vhost or route. If disabled is
     // specified in multiple per-filter-configs, the most specific one will be used.

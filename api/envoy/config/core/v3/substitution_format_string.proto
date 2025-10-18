@@ -35,7 +35,7 @@ message JsonFormatOptions {
 // [#next-free-field: 8]
 message SubstitutionFormatString {
   oneof format {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Specify a format with command operators to form a text string.
     // Its details is described in :ref:`format string<config_access_log_format_strings>`.
@@ -124,7 +124,7 @@ message SubstitutionFormatString {
   //   content_type: "text/html; charset=UTF-8"
   //
   string content_type = 4
-      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
   // Specifies a collection of Formatter plugins that can be called from the access log configuration.
   // See the formatters extensions documentation for details.

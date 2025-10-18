@@ -98,11 +98,11 @@ message HeaderMutation {
   }
 
   oneof action {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Remove the specified header if it exists.
     string remove = 1
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
     // Append new header by the specified HeaderValueOption.
     core.v3.HeaderValueOption append = 2;

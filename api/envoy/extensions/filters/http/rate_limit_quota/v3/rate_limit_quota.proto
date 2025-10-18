@@ -171,7 +171,7 @@ message RateLimitQuotaBucketSettings {
   // the RLQS server returns the first quota assignment.
   message NoAssignmentBehavior {
     oneof no_assignment_behavior {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Apply pre-configured rate limiting strategy until the server sends the first assignment.
       type.v3.RateLimitStrategy fallback_rate_limit = 1;
@@ -207,7 +207,7 @@ message RateLimitQuotaBucketSettings {
         [(buf.validate.field).duration = {gt {}}];
 
     oneof expired_assignment_behavior {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Apply the rate limiting strategy to all requests matched into the bucket until the RLQS
       // server sends a new assignment, or the :ref:`expired_assignment_behavior_timeout
@@ -264,7 +264,7 @@ message RateLimitQuotaBucketSettings {
     // <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` map.
     message ValueBuilder {
       oneof value_specifier {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         // Static string value — becomes the value in the :ref:`BucketId
         // <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` map as is.
@@ -395,10 +395,10 @@ message RateLimitQuotaBucketSettings {
   // <envoy_v3_api_file_envoy/service/rate_limit_quota/v3/rlqs.proto>`.
   //
   // [#comment: 100000000 nanoseconds = 0.1 seconds]
-  google.protobuf.Duration reporting_interval = 2 [(buf.validate.field).duration = {
-    required: true
-    gt {nanos: 100000000}
-  }];
+  google.protobuf.Duration reporting_interval = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {gt {nanos: 100000000}}
+  ];
 
   // Customize the deny response to the requests over the rate limit.
   // If not set, the filter will be configured as if an empty message is set,

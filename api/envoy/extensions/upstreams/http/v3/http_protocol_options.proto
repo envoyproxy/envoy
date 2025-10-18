@@ -66,7 +66,7 @@ message HttpProtocolOptions {
   // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
   message ExplicitHttpConfig {
     oneof protocol_config {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       config.core.v3.Http1ProtocolOptions http_protocol_options = 1;
 
@@ -145,7 +145,7 @@ message HttpProtocolOptions {
 
   // This controls the actual protocol to be used upstream.
   oneof upstream_protocol_options {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // To explicitly configure either HTTP/1 or HTTP/2 (but not both!) use ``explicit_http_config``.
     ExplicitHttpConfig explicit_http_config = 3;

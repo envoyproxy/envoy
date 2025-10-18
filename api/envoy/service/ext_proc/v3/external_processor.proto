@@ -93,7 +93,7 @@ message ProcessingRequest {
   // ones are set for a particular HTTP request/response depend on the
   // processing mode.
   oneof request {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Information about the HTTP request headers, as well as peer info and additional
     // properties. Unless ``observability_mode`` is ``true``, the server must send back a
@@ -168,7 +168,7 @@ message ProcessingRequest {
 message ProcessingResponse {
   // The response type that is sent by the server.
   oneof response {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The server must send back this message in response to a message with the
     // ``request_headers`` field set.

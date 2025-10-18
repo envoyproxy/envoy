@@ -51,7 +51,7 @@ message Trigger {
   string name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
   oneof trigger_oneof {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     ThresholdTrigger threshold = 2;
   }

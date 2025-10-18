@@ -30,5 +30,5 @@ message Generic {
   // The header that will be injected to the HTTP request with the provided credential.
   // If not set, filter will default to: ``Authorization``
   string header = 2
-      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+      [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 }

@@ -34,7 +34,7 @@ message HashPolicy {
   }
 
   oneof policy_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     SourceIp source_ip = 1;
 

@@ -67,7 +67,7 @@ message RouteMatch {
       "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteMatch";
 
   oneof match_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If specified, the route must exactly match the request method name. As a special case, an
     // empty string matches any request method name.
@@ -129,7 +129,7 @@ message RouteAction {
   }
 
   oneof cluster_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Indicates a single upstream cluster to which the request should be routed
     // to.
@@ -146,7 +146,7 @@ message RouteAction {
     // respond with an unknown method exception or an internal error exception,
     // respectively.
     string cluster_header = 6
-        [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
   }
 
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in

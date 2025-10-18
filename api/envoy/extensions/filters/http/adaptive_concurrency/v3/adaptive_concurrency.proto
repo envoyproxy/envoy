@@ -40,10 +40,10 @@ message GradientControllerConfig {
     google.protobuf.UInt32Value max_concurrency_limit = 2 [(buf.validate.field).uint32 = {gt: 0}];
 
     // The period of time samples are taken to recalculate the concurrency limit.
-    google.protobuf.Duration concurrency_update_interval = 3 [(buf.validate.field).duration = {
-      required: true
-      gt {}
-    }];
+    google.protobuf.Duration concurrency_update_interval = 3 [
+      (buf.validate.field).required = true,
+      (buf.validate.field).duration = {gt {}}
+    ];
   }
 
   // Parameters controlling the periodic minRTT recalculation.
@@ -97,7 +97,7 @@ message AdaptiveConcurrency {
       "envoy.config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency";
 
   oneof concurrency_controller_config {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Gradient concurrency control will be used.
     GradientControllerConfig gradient_controller_config = 1

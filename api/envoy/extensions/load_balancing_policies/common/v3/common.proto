@@ -90,7 +90,7 @@ message LocalityLbConfig {
   }
 
   oneof locality_config_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Configuration for local zone aware load balancing.
     ZoneAwareLbConfig zone_aware_lb_config = 1;

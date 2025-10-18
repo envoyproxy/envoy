@@ -33,8 +33,8 @@ message QatPrivateKeyMethodConfig {
   // quicker answers from the hardware but causes more polling loop
   // spins, leading to potentially larger CPU usage. The duration needs
   // to be set to a value greater than or equal to 1 millisecond.
-  google.protobuf.Duration poll_delay = 2 [(buf.validate.field).duration = {
-    required: true
-    gte {nanos: 1000000}
-  }];
+  google.protobuf.Duration poll_delay = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {gte {nanos: 1000000}}
+  ];
 }

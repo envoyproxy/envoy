@@ -22,7 +22,7 @@ message CommonExtensionConfig {
       "envoy.config.common.tap.v2alpha.CommonExtensionConfig";
 
   oneof config_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If specified, the tap filter will be configured via an admin handler.
     AdminConfig admin_config = 1;

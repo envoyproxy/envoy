@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // Configuration of the event reporting service endpoint.
 message EventServiceConfig {
   oneof config_source_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Specifies the gRPC service that hosts the event reporting service.
     GrpcService grpc_service = 1;

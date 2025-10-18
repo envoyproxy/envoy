@@ -74,10 +74,10 @@ message RateLimitQuotaUsageReports {
     BucketId bucket_id = 1 [(buf.validate.field).required = true];
 
     // Time elapsed since the last report.
-    google.protobuf.Duration time_elapsed = 2 [(buf.validate.field).duration = {
-      required: true
-      gt {}
-    }];
+    google.protobuf.Duration time_elapsed = 2 [
+      (buf.validate.field).required = true,
+      (buf.validate.field).duration = {gt {}}
+    ];
 
     // Requests the data plane has allowed through.
     uint64 num_requests_allowed = 3;
@@ -203,7 +203,7 @@ message RateLimitQuotaResponse {
     BucketId bucket_id = 1 [(buf.validate.field).required = true];
 
     oneof bucket_action {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Apply the quota assignment to the bucket.
       //

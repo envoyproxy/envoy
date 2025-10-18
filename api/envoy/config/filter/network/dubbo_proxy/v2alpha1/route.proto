@@ -61,7 +61,7 @@ message RouteMatch {
 
 message RouteAction {
   oneof cluster_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Indicates the upstream cluster to which the request should be routed.
     string cluster = 1;

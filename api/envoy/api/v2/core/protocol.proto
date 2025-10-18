@@ -101,7 +101,7 @@ message Http1ProtocolOptions {
     }
 
     oneof header_format {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Formats the header by proper casing words: the first character and any character following
       // a special character will be capitalized if it's an alpha character. For example,

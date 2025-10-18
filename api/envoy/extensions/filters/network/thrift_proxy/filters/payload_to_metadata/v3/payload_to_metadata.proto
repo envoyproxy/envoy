@@ -59,7 +59,7 @@ message PayloadToMetadata {
   // [#next-free-field: 6]
   message Rule {
     oneof match_specifier {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, the route must exactly match the request method name. As a special case,
       // an empty string matches any request method name.

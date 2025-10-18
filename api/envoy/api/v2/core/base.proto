@@ -257,7 +257,7 @@ message HeaderValue {
   // Header name.
   string key = 1
       [(buf.validate.field).string =
-           {min_bytes: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+           {min_bytes: 1 max_bytes: 16384 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
   // Header value.
   //
@@ -265,7 +265,7 @@ message HeaderValue {
   // :ref:`HTTP access logging <config_access_log>` applies here, however
   // unknown header values are replaced with the empty string instead of `-`.
   string value = 2 [
-    (buf.validate.field).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
+    (buf.validate.field).string = {max_bytes: 16384 well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}
   ];
 }
 
@@ -287,7 +287,7 @@ message HeaderMap {
 // Data source consisting of either a file or an inline value.
 message DataSource {
   oneof specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Local filesystem data source.
     string filename = 1 [(buf.validate.field).string = {min_bytes: 1}];
@@ -327,7 +327,7 @@ message RemoteDataSource {
 // Async data source which support async data fetch.
 message AsyncDataSource {
   oneof specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Local async data source.
     DataSource local = 1;

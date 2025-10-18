@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // [#next-free-field: 7]
 message StringMatcher {
   oneof match_pattern {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The input string must match exactly the string specified here.
     //

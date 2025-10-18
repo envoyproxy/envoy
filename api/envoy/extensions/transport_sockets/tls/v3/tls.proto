@@ -208,7 +208,7 @@ message CommonTlsContext {
     // certificate providers of a cluster.
     // This config could be supplied inline or (in future) a named xDS resource.
     oneof config {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       config.core.v3.TypedExtensionConfig typed_config = 2;
     }

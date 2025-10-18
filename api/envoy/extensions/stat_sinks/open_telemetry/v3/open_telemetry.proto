@@ -38,7 +38,7 @@ message SinkConfig {
   }
 
   oneof protocol_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The upstream gRPC cluster that implements the OTLP/gRPC collector.
     config.core.v3.GrpcService grpc_service = 1 [(buf.validate.field).required = true];

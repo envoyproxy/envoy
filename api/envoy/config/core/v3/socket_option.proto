@@ -85,7 +85,7 @@ message SocketOption {
   int64 name = 3;
 
   oneof value {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Because many sockopts take an int value.
     int64 int_value = 4;

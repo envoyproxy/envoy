@@ -191,7 +191,7 @@ message CompressorOverrides {
 
 message CompressorPerRoute {
   oneof override {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If set, the filter will operate as a pass-through filter.
     // Overrides ``Compressor.runtime_enabled`` and ``CommonDirectionConfig.enabled``.

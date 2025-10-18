@@ -31,7 +31,7 @@ message DnsFilterConfig {
   // associated addresses with which Envoy will respond to queries
   message ServerContextConfig {
     oneof config_source {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Load the configuration specified from the control plane
       data.dns.v3.DnsTable inline_dns_table = 1;

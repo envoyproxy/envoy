@@ -38,8 +38,8 @@ message CryptoMbPrivateKeyMethodConfig {
   // already in the queue are processed, even if the queue is not full.
   // In effect, this value controls the balance between latency and
   // throughput. The duration needs to be set to a value greater than or equal to 1 millisecond.
-  google.protobuf.Duration poll_delay = 2 [(buf.validate.field).duration = {
-    required: true
-    gte {nanos: 1000000}
-  }];
+  google.protobuf.Duration poll_delay = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {gte {nanos: 1000000}}
+  ];
 }

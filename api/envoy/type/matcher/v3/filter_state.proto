@@ -22,7 +22,7 @@ message FilterStateMatcher {
   string key = 1 [(buf.validate.field).string = {min_len: 1}];
 
   oneof matcher {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Matches the filter state object as a string value.
     StringMatcher string_match = 2;

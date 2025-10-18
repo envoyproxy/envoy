@@ -55,7 +55,7 @@ message MatchPredicate {
   }
 
   oneof rule {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A set that describes a logical OR. If any member of the set matches, the match configuration
     // matches.
@@ -162,7 +162,7 @@ message OutputSink {
   Format format = 1 [(buf.validate.field).enum = {defined_only: true}];
 
   oneof output_sink_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Tap output will be streamed out the :http:post:`/tap` admin endpoint.
     //

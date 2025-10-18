@@ -329,7 +329,7 @@ message RuntimeLayer {
   string name = 1 [(buf.validate.field).string = {min_bytes: 1}];
 
   oneof layer_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // :ref:`Static runtime <config_runtime_bootstrap>` layer.
     // This follows the :ref:`runtime protobuf JSON representation encoding

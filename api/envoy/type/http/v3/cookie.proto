@@ -38,10 +38,10 @@ message CookieAttribute {
   // The name of the cookie attribute.
   string name = 1
       [(buf.validate.field).string =
-           {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+           {min_len: 1 max_bytes: 16384 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
   // The optional value of the cookie attribute.
   string value = 2 [
-    (buf.validate.field).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
+    (buf.validate.field).string = {max_bytes: 16384 well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}
   ];
 }

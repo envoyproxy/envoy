@@ -43,7 +43,7 @@ message GrpcJsonTranscoder {
   }
 
   oneof descriptor_set {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Supplies the filename of
     // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC

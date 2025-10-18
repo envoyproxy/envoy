@@ -237,7 +237,7 @@ message Permission {
   }
 
   oneof rule {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A set of rules that all must match in order to define the action.
     Set and_rules = 1;
@@ -351,7 +351,7 @@ message Principal {
   }
 
   oneof identifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A set of identifiers that all must match in order to define the downstream.
     Set and_ids = 1;

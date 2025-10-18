@@ -108,8 +108,8 @@ message LatencyThresholdOverride {
   Opcode opcode = 1 [(buf.validate.field).enum = {defined_only: true}];
 
   // The latency threshold override of certain opcode.
-  google.protobuf.Duration threshold = 2 [(buf.validate.field).duration = {
-    required: true
-    gte {nanos: 1000000}
-  }];
+  google.protobuf.Duration threshold = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {gte {nanos: 1000000}}
+  ];
 }

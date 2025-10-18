@@ -367,7 +367,7 @@ message KeyValueAppend {
   // [#not-implemented-hide:]
   KeyValue entry = 1 [
     deprecated = true,
-    (buf.validate.field).message = {skip: true},
+    (buf.validate.field).ignore = IGNORE_ALWAYS,
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
@@ -403,7 +403,7 @@ message HeaderValue {
   // Header name.
   string key = 1
       [(buf.validate.field).string =
-           {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+           {min_len: 1 max_bytes: 16384 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
   // Header value.
   //
@@ -413,7 +413,7 @@ message HeaderValue {
   // Header value is encoded as string. This does not work for non-utf8 characters.
   // Only one of ``value`` or ``raw_value`` can be set.
   string value = 2 [
-    (buf.validate.field).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false},
+    (buf.validate.field).string = {max_bytes: 16384 well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false},
     (udpa.annotations.field_migrate).oneof_promotion = "value_type"
   ];
 
@@ -501,7 +501,7 @@ message DataSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.DataSource";
 
   oneof specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Local filesystem data source.
     string filename = 1 [(buf.validate.field).string = {min_len: 1}];
@@ -598,7 +598,7 @@ message AsyncDataSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.AsyncDataSource";
 
   oneof specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Local async data source.
     DataSource local = 1;

@@ -40,7 +40,7 @@ message BufferBehavior {
   }
 
   oneof behavior {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Don't inject ``content-length`` header.
     // Output immediately, buffer only if output is slower than input.

@@ -87,7 +87,7 @@ message VirtualHost {
   // Domains cannot contain control characters. This is validated by the well_known_regex HTTP_HEADER_VALUE.
   repeated string domains = 2 [(buf.validate.field).repeated = {
     min_items: 1
-    items {string {well_known_regex: HTTP_HEADER_VALUE strict: false}}
+    items {string {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}}
   }];
 
   // The list of routes that will be matched, in order, for incoming requests.
@@ -124,7 +124,7 @@ message VirtualHost {
   // Specifies a list of HTTP headers that should be removed from each request
   // handled by this virtual host.
   repeated string request_headers_to_remove = 13 [(buf.validate.field).repeated = {
-    items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+    items {string {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}}
   }];
 
   // Specifies a list of HTTP headers that should be added to each response
@@ -139,7 +139,7 @@ message VirtualHost {
   // Specifies a list of HTTP headers that should be removed from each response
   // handled by this virtual host.
   repeated string response_headers_to_remove = 11 [(buf.validate.field).repeated = {
-    items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+    items {string {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}}
   }];
 
   // Indicates that the virtual host has a CORS policy. This field is ignored if related cors policy is
@@ -241,8 +241,7 @@ message VirtualHost {
   //
   // Only one of :ref:`per_request_buffer_limit_bytes <envoy_v3_api_field_config.route.v3.VirtualHost.per_request_buffer_limit_bytes>`
   // and ``request_body_buffer_limit`` could be set.
-  google.protobuf.UInt64Value request_body_buffer_limit = 25
-      [(buf.validate.field).message = {required: false}];
+  google.protobuf.UInt64Value request_body_buffer_limit = 25;
 
   // Specify a set of default request mirroring policies for every route under this virtual host.
   // It takes precedence over the route config mirror policy entirely.
@@ -293,7 +292,7 @@ message Route {
   RouteMatch match = 1 [(buf.validate.field).required = true];
 
   oneof action {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Route request to some upstream cluster.
     RouteAction route = 2;
@@ -350,7 +349,7 @@ message Route {
   // Specifies a list of HTTP headers that should be removed from each request
   // matching this route.
   repeated string request_headers_to_remove = 12 [(buf.validate.field).repeated = {
-    items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+    items {string {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}}
   }];
 
   // Specifies a set of headers that will be added to responses to requests
@@ -365,7 +364,7 @@ message Route {
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
   repeated string response_headers_to_remove = 11 [(buf.validate.field).repeated = {
-    items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+    items {string {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}}
   }];
 
   // Presence of the object defines whether the connection manager's tracing configuration
@@ -460,7 +459,7 @@ message WeightedCluster {
     //
     //   If the header appears multiple times only the first value is used.
     string cluster_header = 12 [
-      (buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false},
       (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
     ];
 
@@ -491,7 +490,7 @@ message WeightedCluster {
     // Specifies a list of HTTP headers that should be removed from each request when
     // this cluster is selected through the enclosing :ref:`envoy_v3_api_msg_config.route.v3.RouteAction`.
     repeated string request_headers_to_remove = 9 [(buf.validate.field).repeated = {
-      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+      items {string {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}}
     }];
 
     // Specifies a list of headers to be added to responses when this cluster is selected
@@ -507,7 +506,7 @@ message WeightedCluster {
     // Specifies a list of headers to be removed from responses when this cluster is selected
     // through the enclosing :ref:`envoy_v3_api_msg_config.route.v3.RouteAction`.
     repeated string response_headers_to_remove = 6 [(buf.validate.field).repeated = {
-      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+      items {string {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}}
     }];
 
     // This field can be used to provide weighted cluster specific per filter config. The key should match the
@@ -524,7 +523,7 @@ message WeightedCluster {
       // Indicates that during forwarding, the host header will be swapped with
       // this value.
       string host_rewrite_literal = 11
-          [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+          [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
     }
   }
 
@@ -555,7 +554,7 @@ message WeightedCluster {
     // This header is expected to be single-valued header as we only want to have one selected value throughout
     // the process for the consistency. And the value is a unsigned number between 0 and UINT64_MAX.
     string header_name = 4
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
     // When set to true, the hash policies will be used to generate the random value for weighted cluster selection.
     // This could ensure consistent cluster picking across multiple proxy levels for weighted traffic.
@@ -619,7 +618,7 @@ message RouteMatch {
   reserved "regex";
 
   oneof path_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If specified, the route is a prefix rule meaning that the prefix must
     // match the beginning of the ``:path`` header.
@@ -875,7 +874,7 @@ message RouteAction {
     //
     //   If the header appears multiple times only the first value is used.
     string cluster_header = 5 [
-      (buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false},
       (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
     ];
 
@@ -912,7 +911,7 @@ message RouteAction {
     // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
     // is implicitly enabled if this field is set.
     string host_rewrite_literal = 8
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
@@ -929,7 +928,7 @@ message RouteAction {
       // The name of the request header that will be used to obtain the hash
       // key. If the request header is not present, no hash will be produced.
       string header_name = 1
-          [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+          [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
       // If specified, the request header value will be rewritten and used
       // to produce the hash key.
@@ -941,11 +940,11 @@ message RouteAction {
       // The name of the cookie attribute.
       string name = 1
           [(buf.validate.field).string =
-               {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+               {min_len: 1 max_bytes: 16384 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
       // The optional value of the cookie attribute.
       string value = 2 [(buf.validate.field).string =
-                            {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+                            {max_bytes: 16384 well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
     }
 
     // Envoy supports two types of cookie affinity:
@@ -1014,7 +1013,7 @@ message RouteAction {
     }
 
     oneof policy_specifier {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Header hash policy.
       Header header = 1;
@@ -1078,7 +1077,7 @@ message RouteAction {
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
     string upgrade_type = 1
-        [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
     // Determines if upgrades are available on this route.
     //
@@ -1123,7 +1122,7 @@ message RouteAction {
   reserved "request_mirror_policy";
 
   oneof cluster_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Indicates the upstream cluster to which the request should be routed
     // to.
@@ -1143,7 +1142,7 @@ message RouteAction {
     //
     //   If the header appears multiple times only the first value is used.
     string cluster_header = 2
-        [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
@@ -1207,7 +1206,7 @@ message RouteAction {
   //   Having above entries in the config, requests to ``/prefix`` will be stripped to ``/``, while
   //   requests to ``/prefix/etc`` will be stripped to ``/etc``.
   string prefix_rewrite = 5
-      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
   // Indicates that during forwarding, portions of the path that match the
   // pattern should be rewritten, even allowing the substitution of capture
@@ -1260,7 +1259,7 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.
     string host_rewrite_literal = 6
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
@@ -1284,7 +1283,7 @@ message RouteAction {
     //
     //   If the header appears multiple times only the first value is used.
     string host_rewrite_header = 29
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
     // Indicates that during forwarding, the host header will be swapped with
     // the result of the regex substitution executed on path value with query and fragment removed.
@@ -1557,10 +1556,10 @@ message RetryPolicy {
     // than zero. Values less than 1 ms are rounded up to 1 ms.
     // See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion of Envoy's
     // back-off algorithm.
-    google.protobuf.Duration base_interval = 1 [(buf.validate.field).duration = {
-      required: true
-      gt {}
-    }];
+    google.protobuf.Duration base_interval = 1 [
+      (buf.validate.field).required = true,
+      (buf.validate.field).duration = {gt {}}
+    ];
 
     // Specifies the maximum interval between retries. This parameter is optional, but must be
     // greater than or equal to the ``base_interval`` if set. The default is 10 times the
@@ -1576,7 +1575,7 @@ message RetryPolicy {
     //
     //   If the header appears multiple times only the first value is used.
     string name = 1
-        [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
     // The format of the reset header.
     ResetHeaderFormat format = 2 [(buf.validate.field).enum = {defined_only: true}];
@@ -1806,7 +1805,7 @@ message RedirectAction {
 
   // The host portion of the URL will be swapped with this value.
   string host_redirect = 1
-      [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
   // The port value of the URL will be swapped with this value.
   uint32 port_redirect = 8;
@@ -1829,7 +1828,7 @@ message RedirectAction {
     // 2. if request uri is "/old-path-2?bar=1", users will be redirected to "/new-path-2"
     // 3. if request uri is "/old-path-3?bar=1", users will be redirected to "/new-path-3?foo=1"
     string path_redirect = 2
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during redirection, the matched prefix (or path)
     // should be swapped with this value. This option allows redirect URLs be dynamically created
@@ -1840,7 +1839,7 @@ message RedirectAction {
     //   Pay attention to the use of trailing slashes as mentioned in
     //   :ref:`RouteAction's prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`.
     string prefix_rewrite = 5
-        [(buf.validate.field).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during redirect, portions of the path that match the
     // pattern should be rewritten, even allowing the substitution of capture
@@ -2046,7 +2045,7 @@ message RateLimit {
       // value is used to populate the value of the descriptor entry for the
       // descriptor_key.
       string header_name = 1
-          [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+          [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
       // The key to use in the descriptor entry.
       string descriptor_key = 2 [(buf.validate.field).string = {min_len: 1}];
@@ -2279,7 +2278,7 @@ message RateLimit {
     }
 
     oneof action_specifier {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Rate limit on source cluster.
       SourceCluster source_cluster = 1;
@@ -2344,7 +2343,7 @@ message RateLimit {
     }
 
     oneof override_specifier {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Limit override from dynamic metadata.
       DynamicMetadata dynamic_metadata = 1;
@@ -2375,7 +2374,7 @@ message RateLimit {
     // received in the request.
     //
     // One of the ``number`` or ``format`` fields should be set but not both.
-    string format = 2 [(buf.validate.field).string = {prefix: "%" suffix: "%" ignore_empty: true}];
+    string format = 2 [(buf.validate.field).string = {prefix: "%" suffix: "%"}];
   }
 
   // Refers to the stage set in the filter. The rate limit configuration only
@@ -2482,7 +2481,7 @@ message HeaderMatcher {
 
   // Specifies the name of the header in the request.
   string name = 1
-      [(buf.validate.field).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}];
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {
@@ -2681,7 +2680,7 @@ message InternalRedirectPolicy {
   // the subsequent request.
   repeated string response_headers_to_copy = 5 [(buf.validate.field).repeated = {
     unique: true
-    items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+    items {string {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME strict: false}}
   }];
 }
 

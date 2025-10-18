@@ -21,7 +21,7 @@ message EventServiceConfig {
       "envoy.api.v2.core.EventServiceConfig";
 
   oneof config_source_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Specifies the gRPC service that hosts the event reporting service.
     GrpcService grpc_service = 1;
