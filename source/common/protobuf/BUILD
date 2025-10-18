@@ -223,6 +223,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:visitor_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@com_github_bufbuild_protovalidate_cc//buf/validate:validator",
         "@com_github_cncf_xds//udpa/annotations:pkg_cc_proto",
         "@com_google_protobuf//:protobuf",
         "@envoy_api//envoy/annotations:pkg_cc_proto",

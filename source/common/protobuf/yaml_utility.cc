@@ -18,7 +18,6 @@
 #include "udpa/annotations/sensitive.pb.h"
 #include "udpa/annotations/status.pb.h"
 #include "utf8_validity.h"
-#include "validate/validate.h"
 #include "xds/annotations/v3/status.pb.h"
 #include "yaml-cpp/yaml.h"
 

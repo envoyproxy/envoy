@@ -23,6 +23,9 @@ def api_dependencies():
         name = "com_github_bufbuild_protovalidate",
     )
     external_http_archive(
+        name = "com_github_bufbuild_protovalidate_cc",
+    )
+    external_http_archive(
         name = "com_google_googleapis",
     )
     external_http_archive(

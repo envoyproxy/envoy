@@ -5,7 +5,6 @@
 #include "test/config/utility.h"
 #include "test/extensions/filters/network/common/fuzz/network_readfilter_fuzz.pb.validate.h"
 #include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
-#include "test/extensions/filters/network/common/fuzz/validated_input_generator_any_map_extensions.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/test_runtime.h"
 
@@ -100,10 +99,8 @@ static void TestOneProtoInput(const test::extensions::filters::network::FilterFu
         // Replaying a corpus through the fuzzer will not be affected by the
         // post-processor mutation.
         ensuredValidFilter(seed, input->mutable_config());
-
-        ProtobufMessage::ValidatedInputGenerator generator(
-            seed, ProtobufMessage::composeFiltersAnyMap(), 20);
-        ProtobufMessage::traverseMessage(generator, *input, true);
+        // Note: ValidatedInputGenerator removed as part of protovalidate migration.
+        // Fuzzer now relies solely on libprotobuf-mutator for input generation.
       }};
 
   try {
