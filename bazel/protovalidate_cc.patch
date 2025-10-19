@@ -8,3 +8,23 @@
 -    ".build*",
 -    "cmake-build-*",
 -])
+--- a/buf/validate/internal/lib/ipv6.cc
++++ b/buf/validate/internal/lib/ipv6.cc
+@@ -71,7 +71,7 @@ class IPv6Parser {
+     // Use a loop to extract up to 8 groups of 16-bit hexadecimal values
+     // separated by a colon, stopping on a double colon (::) or at the end of
+     // input
+-    while (index < hexadecatets_count) {
++    while (static_cast<size_t>(index) < hexadecatets_count) {
+       // Extract the value of this group of hexadecimal digits
+       uint16_t digit{};
+       if (!parseHexadecatet(digit)) {
+@@ -87,7 +87,7 @@ class IPv6Parser {
+           return false;
+         }
+         // Double colon can't be at the end, nor can there be two of them
+-        if (index > hexadecatets_count - 1 || doubleColonFound) {
++        if (static_cast<size_t>(index) > hexadecatets_count - 1 || doubleColonFound) {
+           return false;
+         }
+         doubleColonFound = true;
