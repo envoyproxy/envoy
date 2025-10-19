@@ -28,9 +28,11 @@ const CorsPolicy* DelegatingRouteEntry::corsPolicy() const {
   return base_route_entry_->corsPolicy();
 }
 
-absl::optional<std::string>
-DelegatingRouteEntry::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
-  return base_route_entry_->currentUrlPathAfterRewrite(headers);
+std::string
+DelegatingRouteEntry::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                                                 const Formatter::HttpFormatterContext& context,
+                                                 const StreamInfo::StreamInfo& stream_info) const {
+  return base_route_entry_->currentUrlPathAfterRewrite(headers, context, stream_info);
 }
 
 void DelegatingRouteEntry::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
