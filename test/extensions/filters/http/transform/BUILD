@@ -44,3 +44,20 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "integration_test",
+    size = "large",
+    srcs = ["integration_test.cc"],
+    extension_names = ["envoy.filters.http.transform"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/extensions/filters/http/transform:config",
+        "//test/integration:http_integration_lib",
+        "//test/mocks/server:instance_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings:str_format",
+    ],
+)

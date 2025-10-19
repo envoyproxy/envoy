@@ -10,11 +10,11 @@ namespace HttpFilters {
 namespace Transform {
 
 absl::StatusOr<Http::FilterFactoryCb> TransformFactoryConfig::createFilterFactoryFromProtoTyped(
-    const ProtoConfig& proto_config, const std::string&,
+    const ProtoConfig& proto_config, const std::string& stat_prefix,
     Server::Configuration::FactoryContext& context) {
   absl::Status creation_status = absl::OkStatus();
-  auto filter_config = std::make_shared<TransformConfig>(
-      proto_config, context.serverFactoryContext(), creation_status);
+  auto filter_config =
+      std::make_shared<FilterConfig>(proto_config, stat_prefix, context, creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

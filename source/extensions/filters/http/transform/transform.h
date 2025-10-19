@@ -30,8 +30,42 @@ using ProtoTransform = envoy::extensions::filters::http::transform::v3::Transfor
  */
 class BodyContextExtension : public Formatter::Context::Extension {
 public:
-  google::protobuf::Struct request_body;
-  google::protobuf::Struct response_body;
+  Protobuf::Struct request_body;
+  Protobuf::Struct response_body;
+};
+
+/**
+ * All stats for the Stateful Session filter. @see stats_macros.h
+ */
+#define ALL_STATEFUL_SESSION_FILTER_STATS(COUNTER)                                                 \
+  COUNTER(rq_transformed)                                                                          \
+  COUNTER(rs_transformed)
+
+/**
+ * Wrapper struct for Transform filter stats. @see stats_macros.h
+ */
+struct TransformFilterStats {
+  ALL_STATEFUL_SESSION_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * BodyFormatterProvider implements FormatterProvider to extract values from request or response
+ * body stored in BodyContextExtension.
+ */
+class BodyFormatterProvider : public Formatter::FormatterProvider {
+public:
+  BodyFormatterProvider(absl::string_view path, bool request_body)
+      : path_(absl::StrSplit(path, ':')), request_body_(request_body) {}
+
+  // FormatterProvider
+  absl::optional<std::string> formatWithContext(const Formatter::Context& context,
+                                                const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValueWithContext(const Formatter::Context& context,
+                                         const StreamInfo::StreamInfo&) const override;
+
+private:
+  const std::vector<std::string> path_;
+  const bool request_body_{};
 };
 
 /**
@@ -107,6 +141,24 @@ private:
 
 using TransformConfigSharedPtr = std::shared_ptr<TransformConfig>;
 
+class FilterConfig : public TransformConfig {
+public:
+  FilterConfig(const ProtoConfig& config, const std::string& stats_prefix,
+               Server::Configuration::FactoryContext& context, absl::Status& creation_status)
+      : TransformConfig(config, context.serverFactoryContext(), creation_status),
+        stats_(generateStats(stats_prefix, context.scope())) {}
+
+  TransformFilterStats& stats() { return stats_; }
+
+private:
+  TransformFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    const std::string final_prefix = prefix + ".http_transform";
+    return {ALL_STATEFUL_SESSION_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  }
+  TransformFilterStats stats_;
+};
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+
 /**
  * TransformFilter implements a HTTP filter that can transform request and response body
  * and headers.
@@ -114,7 +166,7 @@ using TransformConfigSharedPtr = std::shared_ptr<TransformConfig>;
 class TransformFilter : public Http::PassThroughFilter,
                         public Logger::Loggable<Logger::Id::filter> {
 public:
-  TransformFilter(TransformConfigSharedPtr config) : config_(std::move(config)) {
+  TransformFilter(FilterConfigSharedPtr config) : config_(std::move(config)) {
     ASSERT(config_ != nullptr);
   }
 
@@ -139,15 +191,19 @@ private:
   void handleCompleteRequestBody();
   void handleCompleteResponseBody();
 
-  absl::optional<std::string> handleCompleteBody(const Transform& transform,
-                                                 const Formatter::Context& context,
-                                                 const Buffer::Instance& body_buffer,
-                                                 google::protobuf::Struct& body_struct,
-                                                 Http::HeaderMap& headers);
+  struct TransformResult {
+    std::string buffer;
+    bool transform_buffer{false};
+    bool transform_header{false};
+  };
+
+  TransformResult handleCompleteBody(const Transform& transform, const Formatter::Context& context,
+                                     const Buffer::Instance& body_buffer,
+                                     Protobuf::Struct& body_struct, Http::HeaderMap& headers);
 
   BodyContextExtension body_extension_;
 
-  TransformConfigSharedPtr config_;
+  FilterConfigSharedPtr config_;
   const TransformConfig* effective_config_ = nullptr;
   bool route_configs_initialized_ = false;
 

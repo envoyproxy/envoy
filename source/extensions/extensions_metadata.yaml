@@ -672,7 +672,6 @@ envoy.filters.http.transform:
   - envoy.filters.http
   security_posture: unknown
   status: alpha
-  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.transform.v3.TransformConfig
 envoy.filters.listener.http_inspector:

@@ -12,56 +12,43 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_utility.h"
-
-#include "google/protobuf/struct.pb.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Transform {
 
-/**
- * BodyFormatterProvider implements FormatterProvider to extract values from request or response
- * body stored in BodyContextExtension.
- */
-class BodyFormatterProvider : public Formatter::FormatterProvider {
-public:
-  BodyFormatterProvider(absl::string_view path, bool request_body)
-      : path_(absl::StrSplit(path, ':')), request_body_(request_body) {}
-
-  // FormatterProvider
-  absl::optional<std::string> formatWithContext(const Formatter::Context& context,
-                                                const StreamInfo::StreamInfo&) const override {
-    const auto extension = context.typedExtension<BodyContextExtension>();
-    if (!extension.has_value()) {
-      return absl::nullopt;
-    }
-    const auto& body = request_body_ ? extension->request_body : extension->response_body;
-    const auto& value = Config::Metadata::structValue(body, path_);
-    if (value.kind_case() == Protobuf::Value::kNullValue) {
-      return absl::nullopt;
-    }
-    if (value.kind_case() == Protobuf::Value::kStringValue) {
-      return value.string_value();
-    }
-    std::string str;
-    Json::Utility::appendValueToString(value, str);
-    return str;
+absl::optional<std::string>
+BodyFormatterProvider::formatWithContext(const Formatter::Context& context,
+                                         const StreamInfo::StreamInfo&) const {
+  const auto extension = context.typedExtension<BodyContextExtension>();
+  if (!extension.has_value()) {
+    return absl::nullopt;
   }
-  google::protobuf::Value formatValueWithContext(const Formatter::Context& context,
-                                                 const StreamInfo::StreamInfo&) const override {
-    const auto extension = context.typedExtension<BodyContextExtension>();
-    if (!extension.has_value()) {
-      return Protobuf::Value::default_instance();
-    }
-    const auto& body = request_body_ ? extension->request_body : extension->response_body;
-    return Config::Metadata::structValue(body, path_);
+  const auto& body = request_body_ ? extension->request_body : extension->response_body;
+  const auto& value = Config::Metadata::structValue(body, path_);
+  if (value.kind_case() == Protobuf::Value::kNullValue ||
+      value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+    return absl::nullopt;
   }
+  if (value.kind_case() == Protobuf::Value::kStringValue) {
+    return value.string_value();
+  }
+  std::string str;
+  Json::Utility::appendValueToString(value, str);
+  return str;
+}
 
-private:
-  const std::vector<std::string> path_;
-  const bool request_body_{};
-};
+Protobuf::Value BodyFormatterProvider::formatValueWithContext(const Formatter::Context& context,
+                                                              const StreamInfo::StreamInfo&) const {
+  const auto extension = context.typedExtension<BodyContextExtension>();
+  if (!extension.has_value()) {
+    return Protobuf::Value::default_instance();
+  }
+  const auto& body = request_body_ ? extension->request_body : extension->response_body;
+  return Config::Metadata::structValue(body, path_);
+}
 
 /**
  * CommandParser for BodyFormatterProvider.
@@ -252,51 +239,58 @@ Http::FilterTrailersStatus TransformFilter::encodeTrailers(Http::ResponseTrailer
   return Http::FilterTrailersStatus::Continue;
 }
 
-absl::optional<std::string>
+TransformFilter::TransformResult
 TransformFilter::handleCompleteBody(const Transform& transform, const Formatter::Context& context,
                                     const Buffer::Instance& body_buffer,
-                                    google::protobuf::Struct& body_struct,
-                                    Http::HeaderMap& headers) {
+                                    Protobuf::Struct& body_struct, Http::HeaderMap& headers) {
   uint64_t body_size = body_buffer.length();
-  absl::Status status = Protobuf::util::JsonStringToMessage(body_buffer.toString(), &body_struct);
+  absl::Status status = MessageUtil::loadFromJsonNoThrow(body_buffer.toString(), body_struct);
   if (!status.ok()) {
     ENVOY_LOG(info, "Failed to parse request/response body as JSON: {}", status.message());
     // Failed to parse the body, continue without transformation.
-    return absl::nullopt;
+    return {};
   }
 
-  // Apply header mutations if configured.
+  std::string new_buffer;
+  Protobuf::Struct new_struct;
+  bool transform_buffer = false;
+  bool transform_header = false;
+
+  // Transform the body if configured and validate the result is valid JSON if patch
+  // mode is enabled.
+  if (transform.bodyFormatter().has_value()) {
+    new_buffer =
+        transform.bodyFormatter()->formatWithContext(context, decoder_callbacks_->streamInfo());
+    if (transform.patchFormatString()) {
+      if (auto s = MessageUtil::loadFromJsonNoThrow(new_buffer, new_struct); !s.ok()) {
+        ENVOY_LOG(error, "Failed to parse transformed body as JSON: {}", s.message());
+        return {};
+      }
+    }
+    transform_buffer = true;
+  }
+
+  // Now there should no longer be any body transformation errors.
+
+  // Apply header mutations first if configured.
   if (transform.headerMutations().has_value()) {
     transform.headerMutations()->evaluateHeaders(headers, context,
                                                  decoder_callbacks_->streamInfo());
+    transform_header = true;
   }
 
-  if (!transform.bodyFormatter().has_value()) {
-    // No body transformation configured, return directly.
-    return absl::nullopt;
-  }
-
-  std::string new_body =
-      transform.bodyFormatter()->formatWithContext(context, decoder_callbacks_->streamInfo());
-  if (transform.patchFormatString()) {
-    google::protobuf::Struct patch_struct;
-    if (!new_body.empty()) {
-      absl::Status status = Protobuf::util::JsonStringToMessage(new_body, &patch_struct);
-      if (!status.ok()) {
-        ENVOY_LOG(info, "Failed to parse transformed body as JSON: {}", status.message());
-        // Failed to parse the transformed body, continue without transformation.
-        return absl::nullopt;
-      }
+  // Merge the new struct into the original response body if in patch mode.
+  if (transform.bodyFormatter().has_value()) {
+    if (transform.patchFormatString()) {
+      body_struct.MergeFrom(new_struct);
+      body_size += new_buffer.size();
+      new_buffer.clear();
+      new_buffer.reserve(body_size + 64); // 64 bytes for safety margin.
+      Json::Utility::appendStructToString(body_struct, new_buffer);
     }
-    // Merge the patch struct into the original response body.
-    body_struct.MergeFrom(patch_struct);
-    body_size += new_body.size();
-    new_body.clear();
-    new_body.reserve(body_size + 64); // 64 bytes for safety margin.
-    Json::Utility::appendStructToString(body_struct, new_body);
   }
 
-  return new_body;
+  return {std::move(new_buffer), transform_buffer, transform_header};
 }
 
 void TransformFilter::handleCompleteRequestBody() {
@@ -316,21 +310,25 @@ void TransformFilter::handleCompleteRequestBody() {
   Formatter::Context formatter_context(headers.ptr());
   formatter_context.setExtension(body_extension_);
 
-  const absl::optional<std::string> new_body = handleCompleteBody(
-      *transform, formatter_context, *decoding_buffer, body_extension_.request_body, *headers);
+  const auto result = handleCompleteBody(*transform, formatter_context, *decoding_buffer,
+                                         body_extension_.request_body, *headers);
 
-  if (new_body.has_value()) {
+  if (result.transform_buffer || result.transform_header) {
+    config_->stats().rq_transformed_.inc();
+  }
+
+  if (result.transform_buffer) {
     headers->removeContentLength();
     if (!transform->contentType().empty()) {
       headers->setContentType(transform->contentType());
     }
-    decoder_callbacks_->modifyDecodingBuffer([&new_body](Buffer::Instance& data) {
+    decoder_callbacks_->modifyDecodingBuffer([&result](Buffer::Instance& data) {
       data.drain(data.length());
-      data.add(*new_body);
+      data.add(result.buffer);
     });
   }
 
-  if (transform->headerMutations().has_value()) {
+  if (result.transform_header) {
     if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {
       if (effective_config_->clearClusterCache()) {
         cb->refreshRouteCluster();
@@ -358,16 +356,21 @@ void TransformFilter::handleCompleteResponseBody() {
   Formatter::Context formatter_context(decoder_callbacks_->requestHeaders().ptr(), headers.ptr());
   formatter_context.setExtension(body_extension_);
 
-  const absl::optional<std::string> new_body = handleCompleteBody(
-      *transform, formatter_context, *encoding_buffer, body_extension_.response_body, *headers);
-  if (new_body.has_value()) {
+  const auto result = handleCompleteBody(*transform, formatter_context, *encoding_buffer,
+                                         body_extension_.response_body, *headers);
+
+  if (result.transform_buffer || result.transform_header) {
+    config_->stats().rs_transformed_.inc();
+  }
+
+  if (result.transform_buffer) {
     headers->removeContentLength();
     if (!transform->contentType().empty()) {
       headers->setContentType(transform->contentType());
     }
-    encoder_callbacks_->modifyEncodingBuffer([&new_body](Buffer::Instance& data) {
+    encoder_callbacks_->modifyEncodingBuffer([&result](Buffer::Instance& data) {
       data.drain(data.length());
-      data.add(*new_body);
+      data.add(result.buffer);
     });
   }
 }
