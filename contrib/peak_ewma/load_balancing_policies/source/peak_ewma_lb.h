@@ -131,7 +131,7 @@ private:
       all_host_stats_;
 
   // Priority set callback for adding atomic data to new hosts.
-  Common::CallbackHandlePtr priority_update_cb_;
+  ::Envoy::Common::CallbackHandlePtr priority_update_cb_;
 
   // EWMA calculation constants.
   const int64_t tau_nanos_;  // Decay time in nanoseconds.
