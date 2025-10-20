@@ -1,12 +1,12 @@
 #include <sys/types.h>
 
+#include "source/common/http/header_utility.h"
 #include "source/extensions/filters/http/compressor/compressor_filter.h"
 
 #include "test/extensions/filters/http/compressor/compressor_filter_testing_peer.h"
 #include "test/mocks/compression/compressor/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "source/common/http/header_utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
