@@ -34,8 +34,9 @@ struct PeakEwmaCreator : public Logger::Loggable<Logger::Id::upstream> {
       Runtime::Loader& runtime, Envoy::Random::RandomGenerator& random, TimeSource& time_source);
 };
 
-class Factory : public ::Envoy::Extensions::LoadBalancingPolices::Common::FactoryBase<
-                           PeakEwmaLbProto, PeakEwmaCreator> {
+class Factory
+    : public ::Envoy::Extensions::LoadBalancingPolicies::Common::FactoryBase<PeakEwmaLbProto,
+                                                                             PeakEwmaCreator> {
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.peak_ewma") {}
 
