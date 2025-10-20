@@ -24,6 +24,11 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http2
+  change: |
+    Fixed a bug where Envoy will leak memory if the HTTP2 stream is reset before the request headers are
+    sent. For example, if one upstream http filter send a local reply after the connection is established but
+    before the request headers are sent, the memory allocated for the stream will not be released.
 - area: lua
   change: |
     Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
