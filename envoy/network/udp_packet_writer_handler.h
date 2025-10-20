@@ -110,7 +110,11 @@ public:
 
   /**
    * Creates an UdpPacketWriter object for the given Udp Socket
-   * @param socket UDP socket used to send packets.
+   * @param io_handle The udp socket used for network I/O operations.
+   * @param scope Recording statistics associated with the writer.
+   * @param dispatcher Envoy dispatcher to schedule write block events.
+   * @param on_can_write_cb Callback to signal when the underlying socket
+   * becomes writable.
    * @return the UdpPacketWriter created.
    */
   virtual UdpPacketWriterPtr
