@@ -25,9 +25,10 @@ message Transform {
   // The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
   // And except the commonly used format specifiers, there are some additional format specifiers
   // provided by the transform filter:
-  // - ``%RQ_BODY(X)%``: the request body. And ``X`` is the JSON pointer to extract a specific
+  //
+  // * ``%RQ_BODY(X)%``: the request body. And ``X`` is the JSON pointer to extract a specific
   //   field from the JSON body. If ``X`` is empty, the whole body will be used.
-  // - ``%RS_BODY(X)%``: the response body. And ``X`` is the JSON pointer to extract a specific
+  // * ``%RS_BODY(X)%``: the response body. And ``X`` is the JSON pointer to extract a specific
   //   field from the JSON body. If ``X`` is empty, the whole body will be used.
   repeated config.common.mutation_rules.v3.HeaderMutation headers_mutations = 1;
 

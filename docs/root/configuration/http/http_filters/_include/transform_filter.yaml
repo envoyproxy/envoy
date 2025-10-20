@@ -16,7 +16,8 @@ static_resources:
             name: local_route
             virtual_hosts:
             - name: local_service
-              domains: [ "*" ]
+              domains:
+              - "*"
               routes:
               - match:
                   prefix: "/route/override"
