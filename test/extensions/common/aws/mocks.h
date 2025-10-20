@@ -190,7 +190,7 @@ public:
   void refresh() { return provider_->refresh(); }
   bool needsRefresh() { return provider_->needsRefresh(); }
   void setExpirationTime(SystemTime time) { provider_->expiration_time_ = time; }
-  
+
   X509Credentials getCredentials() { return provider_->getCredentials(); }
 
   std::unique_ptr<IAMRolesAnywhereX509CredentialsProvider> provider_;
