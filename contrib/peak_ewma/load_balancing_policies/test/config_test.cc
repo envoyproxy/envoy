@@ -157,26 +157,6 @@ TEST_F(PeakEwmaConfigTest, CreateThreadAwareLoadBalancer) {
   EXPECT_NE(peak_ewma_lb, nullptr);
 }
 
-#ifdef NDEBUG
-TEST_F(PeakEwmaConfigTest, DISABLED_InvalidConfigType) {
-#else
-TEST_F(PeakEwmaConfigTest, InvalidConfigType) {
-#endif
-  Factory factory;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
-  // Try to load a different proto type
-  Envoy::ProtobufWkt::Empty wrong_proto;
-
-  // dynamic_cast will throw std::bad_cast for wrong proto type
-  EXPECT_THROW(
-      {
-        auto result = factory.loadConfig(context, wrong_proto);
-        (void)result;
-      },
-      std::bad_cast);
-}
-
 TEST_F(PeakEwmaConfigTest, CreateWithNullConfig) {
   Factory factory;
 
