@@ -28,6 +28,11 @@ bug_fixes:
   change: |
     Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
     larger payload (greater than the body buffer limit).
+- area: bootstrap
+  change: |
+    Fixed an issue where the custom
+    :ref:`header_prefix <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.header_prefix>`
+    will result in crash at startup.
 - area: connection pool
   change: |
     Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
