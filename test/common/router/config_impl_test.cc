@@ -2981,6 +2981,40 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, AlternateHostHeaderMatching) {
+  const std::string yaml = R"EOF(
+vhost_header: "alternate"
+virtual_hosts:
+- name: default_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: default_service
+- name: local_service
+  domains:
+  - "foo.example.org"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: local_service
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"local_service", "default_service"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  std::pair<std::string, std::string> alternate_host = {"alternate", "foo.example.org"};
+  OptionalGenHeadersArg optional_arg;
+  optional_arg.random_value_pair = alternate_host;
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("example.com", "/", "GET", optional_arg);
+  EXPECT_EQ("local_service", config.route(headers, 0)->routeEntry()->clusterName());
+}
+
 TEST_F(RouteMatcherTest, DynamicMetadataMatchedRouting) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -3781,8 +3815,8 @@ TEST_F(RouteMatcherTest, WeightedClusterHeader) {
                         creation_status_);
 
   Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
-  // The configured cluster header isn't present in the request headers, therefore cluster selection
-  // fails and we get the empty string
+  // The configured cluster header isn't present in the request headers, therefore cluster
+  // selection fails and we get the empty string
   EXPECT_EQ("", config.route(headers, 115)->routeEntry()->clusterName());
   // Modify the header mapping.
   headers.addCopy("some_header", "some_cluster");
@@ -3818,8 +3852,8 @@ TEST_F(RouteMatcherTest, WeightedClusterWithProvidedRandomValue) {
   OptionalGenHeadersArg optional_arg;
   optional_arg.random_value_pair = random_value_pair;
   Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET", optional_arg);
-  // Here we expect `cluster1` is selected even though random value passed to `route()` function is
-  // 60 because the overridden weight specified in `random_value_pair` is 10.
+  // Here we expect `cluster1` is selected even though random value passed to `route()` function
+  // is 60 because the overridden weight specified in `random_value_pair` is 10.
   EXPECT_EQ("cluster1", config.route(headers, 60)->routeEntry()->clusterName());
 
   headers = genHeaders("www1.lyft.com", "/foo", "GET");
@@ -5660,10 +5694,9 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www2", "www2_staging"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_EQ(
-      creation_status_.message(),
-      "Only unique values for domains are permitted. Duplicate entry of domain *.lyft.com in route "
-      "foo");
+  EXPECT_EQ(creation_status_.message(), "Only unique values for domains are permitted. Duplicate "
+                                        "entry of domain *.lyft.com in route "
+                                        "foo");
 }
 
 TEST_F(RouteMatcherTest, TestDuplicatePrefixWildcardDomainConfig) {
@@ -5685,9 +5718,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www2", "www2_staging"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_EQ(
-      creation_status_.message(),
-      "Only unique values for domains are permitted. Duplicate entry of domain bar.* in route foo");
+  EXPECT_EQ(creation_status_.message(), "Only unique values for domains are permitted. Duplicate "
+                                        "entry of domain bar.* in route foo");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInPrefixRewrites) {

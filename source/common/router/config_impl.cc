@@ -1831,7 +1831,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
                            absl::Status& creation_status)
     : vhost_scope_(factory_context.scope().scopeFromStatName(
           factory_context.routerContext().virtualClusterStatNames().vhost_)),
-      ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()) {
+      ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()),
+      vhost_header_(route_config.vhost_header()) {
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostImplSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
         virtual_host_config, global_route_config, factory_context, *vhost_scope_, validator,
@@ -1877,13 +1878,23 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
     return default_virtual_host_.get();
   }
 
-  // There may be no authority in early reply paths in the HTTP connection manager.
-  if (headers.Host() == nullptr) {
-    return nullptr;
+  absl::string_view host_header_value;
+  if (!vhost_header_.get().empty()) {
+    auto result = headers.get(vhost_header_);
+    // If using an alternate header, it must not be empty.
+    if (result.empty()) {
+      return nullptr;
+    }
+    host_header_value = result[0]->value().getStringView();
+  } else {
+    // There may be no authority in early reply paths in the HTTP connection manager.
+    if (headers.Host() == nullptr) {
+      return nullptr;
+    }
+    host_header_value = headers.getHostValue();
   }
 
   // If 'ignore_port_in_host_matching' is set, ignore the port number in the host header(if any).
-  absl::string_view host_header_value = headers.getHostValue();
   if (ignorePortInHostMatching()) {
     if (const absl::string_view::size_type port_start =
             Http::HeaderUtility::getPortStart(host_header_value);

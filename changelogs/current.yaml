@@ -52,6 +52,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    Added ``vhost_header`` to the RouteConfiguration, allowing use of a different header for vhost matching.
 - area: logging
   change: |
     Added support for not-equal operator for access log filter rules, in
