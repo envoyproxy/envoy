@@ -28,6 +28,7 @@ checks:
     on-run:
     - check-build
     - check-coverage
+    - check-runtime
     - check-san
     required: true
   macos:
@@ -170,6 +171,12 @@ run:
   check-coverage:
     paths:
     - "**/*"
+  check-runtime:
+    paths:
+    - source/server/cgroup_cpu_util.*
+    - test/server/*cgroup*
+    # this can be switched to always run once related ci lands.
+    push: paths
   check-san:
     paths:
     - "**/*"
