@@ -1220,12 +1220,6 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   // local reply.
   mergePerRouteConfig();
 
-  // If there is no external processing configured in the encoding path,
-  // closing the gRPC stream if it is still open.
-  if (encoding_state_.noExternalProcess()) {
-    closeStreamMaybeGraceful();
-  }
-
   if (encoding_state_.sendHeaders() && config_->observabilityMode()) {
     return sendHeadersInObservabilityMode(headers, encoding_state_, end_stream);
   }
@@ -1250,6 +1244,13 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   if (!processing_complete_ && encoding_state_.shouldRemoveContentLength()) {
     headers.removeContentLength();
   }
+
+  // If there is no external processing configured in the encoding path,
+  // closing the gRPC stream if it is still open.
+  if (encoding_state_.noExternalProcess()) {
+    closeStreamMaybeGraceful();
+  }
+
   return status;
 }
 
