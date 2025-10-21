@@ -43,7 +43,7 @@ jobs:
           cat /proc/self/cgroup || true
       
       - name: Cache Bazel artifacts
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cache/bazel
@@ -73,7 +73,7 @@ jobs:
       
       - name: Upload test logs on failure
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cgroup-test-logs
           path: |
