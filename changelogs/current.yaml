@@ -95,5 +95,8 @@ new_features:
     This can avoid unnecessary load shedding or overload actions.
     To enable, set ``envoy.reloadable_features.fixed_heap_use_allocated`` to true.
     The default algorithm (heap_size - pageheap_unmapped - pageheap_free) does not discount for free memory in TCMalloc caches.
+- area: admin
+  change: |
+    Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.
 
 deprecated:
