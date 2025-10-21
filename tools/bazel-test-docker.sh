@@ -46,8 +46,12 @@ EOF
 . "${SCRIPT_DIR}"/../ci/envoy_build_sha.sh
 IMAGE=envoyproxy/envoy-build:${ENVOY_BUILD_SHA}
 
+# Pass through DOCKER_EXTRA_ARGS if set (for tests that need specific Docker flags like --cpus)
+# Use "NONE" as placeholder if not set to maintain argument positions
+DOCKER_ARGS_TO_PASS="${DOCKER_EXTRA_ARGS:-NONE}"
+
 # Note docker_wrapper.sh is tightly coupled to the order of arguments here due to where the test
 # name is passed in.
 "${BAZEL}" test "$@" --strategy=TestRunner=standalone --cache_test_results=no \
   --test_output=summary --run_under="${SCRIPT_DIR}/docker_wrapper.sh ${IMAGE} ${RUN_REMOTE} \
-   ${LOCAL_MOUNT} ${DOCKER_ENV}"
+   ${LOCAL_MOUNT} ${DOCKER_ENV} ${DOCKER_ARGS_TO_PASS}"

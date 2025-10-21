@@ -4,7 +4,6 @@
 #endif
 
 #include "source/common/filesystem/filesystem_impl.h"
-#include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
 
@@ -17,8 +16,7 @@ namespace {
 // CI-only simple tests for cgroup CPU detection functionality.
 // These run only in EngFlow 'RBE' environments with linux_x64_small pool (2 CPUs).
 // Tests basic cgroup detection without heavy server integration dependencies.
-class CgroupCpuSimpleIntegrationTest : public testing::Test {
-};
+class CgroupCpuSimpleIntegrationTest : public testing::Test {};
 
 // Test basic cgroup CPU detection functionality - MUST have 'cgroups' in CI
 TEST_F(CgroupCpuSimpleIntegrationTest, CgroupDetectionBasicFunctionality) {

@@ -300,11 +300,14 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cgroup_cpu_simple_integration_test",
     srcs = ["cgroup_cpu_simple_integration_test.cc"],
-    rbe_pool = "linux_x64_small",
-    tags = ["engflow_only"],
+    tags = [
+        "containerized",
+        # This test requires Docker with CPU limits (--cpus=2) to properly test cgroup detection.
+        # Run locally with: tools/bazel-test-cgroup.sh //test/server:cgroup_cpu_simple_integration_test
+        # Excluded from default test runs - requires privileged Docker container with --cpus flag.
+    ],
     deps = [
         "//source/server:cgroup_cpu_util_lib",
-        "//test/test_common:environment_lib",
     ],
 )
 

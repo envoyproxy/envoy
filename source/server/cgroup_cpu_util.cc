@@ -303,6 +303,7 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_fil
 
   // Parse "quota period" format
   const std::vector<std::string> parts = absl::StrSplit(content, ' ');
+
   if (parts.size() != 2) {
     ENVOY_LOG_MISC(warn, "Malformed cgroup v2 cpu.max: expected 'quota period', got '{}'", content);
     return absl::nullopt;
