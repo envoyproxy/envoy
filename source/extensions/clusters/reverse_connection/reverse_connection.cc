@@ -154,6 +154,54 @@ BootstrapReverseConnection::UpstreamSocketManager* RevConCluster::getUpstreamSoc
   return tls_registry->socketManager();
 }
 
+void RevConCluster::markHostUnhealthy(const std::string& node_id) {
+  ENVOY_LOG(debug, "RevConCluster: markHostUnhealthy called for node_id: {}", node_id);
+
+  absl::ReaderMutexLock rlock(&host_map_lock_);
+
+  auto host_it = host_map_.find(node_id);
+  if (host_it == host_map_.end()) {
+    ENVOY_LOG(debug, "RevConCluster: node_id {} not found in host_map_", node_id);
+    return;
+  }
+
+  auto host = host_it->second;
+
+  // Mark the host as failed due to active health check failure.
+  // This will cause connection pools to drain and eventually release handles.
+  host->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+
+  ENVOY_LOG(warn,
+            "RevConCluster: Marked host {} as unhealthy due to underlying socket death. "
+            "The host will be removed once connection pools release their handles.",
+            *host);
+
+  // The host will be removed by the cleanup() method once host->used() becomes false.
+}
+
+void RevConCluster::setupSocketDeathCallback() {
+  auto* socket_manager = getUpstreamSocketManager();
+  if (socket_manager == nullptr) {
+    ENVOY_LOG(debug,
+              "RevConCluster: Cannot setup socket death callback - socket manager not found");
+    return;
+  }
+
+  // Register callback with the socket manager.
+  // Note: We capture 'this' directly here. The callback is stored in the socket manager
+  // which is thread-local and will be destroyed when the thread terminates.
+  // The cluster is guaranteed to outlive the socket manager since clusters are destroyed
+  // during server shutdown, which happens after worker threads are stopped.
+  socket_manager->setSocketDeathCallback(
+      [this](const std::string& node_id, const std::string& cluster_id) {
+        ENVOY_LOG(debug, "RevConCluster: Socket death callback invoked for node: {} cluster: {}",
+                  node_id, cluster_id);
+        this->markHostUnhealthy(node_id);
+      });
+
+  ENVOY_LOG(debug, "RevConCluster: Socket death callback registered successfully");
+}
+
 RevConCluster::RevConCluster(
     const envoy::config::cluster::v3::Cluster& config, Upstream::ClusterFactoryContext& context,
     absl::Status& creation_status,
@@ -172,6 +220,19 @@ RevConCluster::RevConCluster(
 
   // Schedule periodic cleanup.
   cleanup_timer_->enableTimer(cleanup_interval_);
+
+  // Setup callback to be notified when sockets die.
+  // This needs to be done after construction is complete, so we defer it.
+  // Note: We try to get the socket manager first to avoid crashes when TLS isn't ready yet
+  // (e.g., in tests where mock dispatcher executes callbacks immediately).
+  dispatcher_.post([this]() {
+    auto* socket_manager = getUpstreamSocketManager();
+    if (socket_manager != nullptr) {
+      setupSocketDeathCallback();
+    } else {
+      ENVOY_LOG(debug, "RevConCluster: Skipping socket death callback setup - TLS not ready yet");
+    }
+  });
 }
 
 absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>

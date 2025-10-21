@@ -117,6 +117,24 @@ public:
    */
   std::string getNodeID(const std::string& key);
 
+  /**
+   * Callback type for socket death notifications.
+   * Called when a used socket dies (e.g., due to HTTP/2 keepalive timeout).
+   * @param node_id the node ID whose socket died.
+   * @param cluster_id the cluster ID associated with the node.
+   */
+  using SocketDeathCallback = std::function<void(const std::string& node_id, const std::string& cluster_id)>;
+
+  /**
+   * Register callback for socket death events.
+   * This allows the reverse connection cluster to be notified when a socket dies
+   * so it can mark the corresponding host as unhealthy.
+   * @param callback the callback to invoke when a used socket dies.
+   */
+  void setSocketDeathCallback(SocketDeathCallback callback) {
+    socket_death_callback_ = std::move(callback);
+  }
+
 private:
   // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
@@ -128,6 +146,9 @@ private:
 
   // Map from file descriptor to node ID.
   absl::flat_hash_map<int, std::string> fd_to_node_map_;
+
+  // Map from file descriptor to cluster ID (needed when socket dies after node mapping is cleaned).
+  absl::flat_hash_map<int, std::string> fd_to_cluster_map_;
 
   // Map of node ID to cluster.
   absl::flat_hash_map<std::string, std::string> node_to_cluster_map_;
@@ -150,6 +171,9 @@ private:
 
   // Upstream extension for stats integration.
   ReverseTunnelAcceptorExtension* extension_;
+
+  // Callback to notify when a used socket dies.
+  SocketDeathCallback socket_death_callback_;
 };
 
 } // namespace ReverseConnection

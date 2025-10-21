@@ -172,6 +172,21 @@ public:
     const std::shared_ptr<RevConCluster> parent_;
   };
 
+  // Get the upstream socket manager from the thread-local registry.
+  BootstrapReverseConnection::UpstreamSocketManager* getUpstreamSocketManager() const;
+
+  // Mark a host as unhealthy when its underlying socket dies.
+  // This is called when a socket dies (e.g., due to HTTP/2 keepalive timeout)
+  // while it is in use by a connection pool.
+  void markHostUnhealthy(const std::string& node_id);
+
+  // Setup socket death callback with the UpstreamSocketManager.
+  // This registers a callback to be notified when sockets die so we can
+  // mark the corresponding hosts as unhealthy.
+  void setupSocketDeathCallback();
+
+  absl::flat_hash_map<std::string, Upstream::HostSharedPtr> host_map_;
+
 private:
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
     LoadBalancerFactory(const std::shared_ptr<RevConCluster>& cluster) : cluster_(cluster) {}
@@ -201,9 +216,6 @@ private:
   // Checks if a host exists for a given host identifier and if not creates and caches it.
   Upstream::HostSelectionResponse checkAndCreateHost(absl::string_view host_id);
 
-  // Get the upstream socket manager from the thread-local registry.
-  BootstrapReverseConnection::UpstreamSocketManager* getUpstreamSocketManager() const;
-
   // No pre-initialize work needs to be completed by REVERSE CONNECTION cluster.
   void startPreInit() override { onPreInitComplete(); }
 
@@ -211,7 +223,6 @@ private:
   std::chrono::milliseconds cleanup_interval_;
   Event::TimerPtr cleanup_timer_;
   absl::Mutex host_map_lock_;
-  absl::flat_hash_map<std::string, Upstream::HostSharedPtr> host_map_;
   // Formatter for computing host identifier from request context.
   Envoy::Formatter::FormatterPtr host_id_formatter_;
   friend class RevConClusterFactory;

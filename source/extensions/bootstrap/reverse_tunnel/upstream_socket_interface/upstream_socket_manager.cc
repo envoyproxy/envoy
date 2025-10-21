@@ -53,6 +53,7 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   }
 
   fd_to_node_map_[fd] = node_id;
+  fd_to_cluster_map_[fd] = cluster_id;
   // Initialize the ping timer before adding the socket to accepted_reverse_connections_.
   // This is to prevent a race condition between pingConnections() and addConnectionSocket()
   // where the timer is not initialized when pingConnections() tries to enable it.
@@ -132,7 +133,12 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
   fd_to_event_map_.erase(fd);
   fd_to_timer_map_.erase(fd);
 
-  cleanStaleNodeEntry(node_id);
+  // Clean up node-to-cluster mappings if this was the last idle socket for the node.
+  // We can safely clean up now because we track cluster_id per FD in fd_to_cluster_map_,
+  // which will be used if the socket dies later.
+  if (node_sockets_it->second.empty()) {
+    cleanStaleNodeEntry(node_id);
+  }
 
   return socket;
 }
@@ -179,9 +185,16 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   const std::string node_id = node_it->second; // Make a COPY, not a reference
   ENVOY_LOG(trace, "UpstreamSocketManager: found node '{}' for fd {}.", node_id, fd);
 
-  std::string cluster_id = (node_to_cluster_map_.find(node_id) != node_to_cluster_map_.end())
-                               ? node_to_cluster_map_[node_id]
-                               : "";
+  // Get cluster_id from fd_to_cluster_map_ (preferred) or fall back to node_to_cluster_map_
+  std::string cluster_id;
+  auto cluster_it = fd_to_cluster_map_.find(fd);
+  if (cluster_it != fd_to_cluster_map_.end()) {
+    cluster_id = cluster_it->second;
+    fd_to_cluster_map_.erase(cluster_it);
+  } else if (node_to_cluster_map_.find(node_id) != node_to_cluster_map_.end()) {
+    cluster_id = node_to_cluster_map_[node_id];
+  }
+
   fd_to_node_map_.erase(fd); // Now it's safe to erase since node_id is a copy
 
   // Check if this is a used connection by looking for node_id in accepted_reverse_connections_
@@ -192,6 +205,18 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     ENVOY_LOG(debug,
               "UpstreamSocketManager: marking used socket dead. node: {} cluster: {} fd: {}.",
               node_id, cluster_id, fd);
+
+    // Notify the reverse connection cluster that this node's socket died.
+    // This allows the cluster to mark the corresponding host as unhealthy.
+    if (socket_death_callback_) {
+      ENVOY_LOG(debug, "UpstreamSocketManager: Invoking socket death callback for node: {}", node_id);
+
+      // Post to dispatcher to ensure thread safety and avoid re-entrancy issues.
+      dispatcher_.post([callback = socket_death_callback_, node_id, cluster_id]() {
+        callback(node_id, cluster_id);
+      });
+    }
+
     // Update Envoy's stats system for production multi-tenant tracking
     // This ensures stats are decremented when connections are removed
     if (auto extension = getUpstreamExtension()) {
@@ -200,6 +225,9 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
                 "UpstreamSocketManager: decremented stats registry for node '{}' cluster '{}'.",
                 node_id, cluster_id);
     }
+
+    // Clean up node-to-cluster mappings since this used socket is now dead
+    cleanStaleNodeEntry(node_id);
 
     return;
   }
@@ -435,6 +463,10 @@ UpstreamSocketManager::~UpstreamSocketManager() {
     ENVOY_LOG(trace, "UpstreamSocketManager: marking socket dead in destructor. fd: {}.", fd);
     markSocketDead(fd); // false = not used, just cleanup
   }
+
+  // Clear any remaining fd mappings (should be empty after markSocketDead calls)
+  fd_to_node_map_.clear();
+  fd_to_cluster_map_.clear();
 
   // Clear the ping timer
   if (ping_timer_) {

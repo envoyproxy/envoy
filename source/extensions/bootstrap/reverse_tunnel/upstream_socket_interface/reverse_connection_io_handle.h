@@ -12,6 +12,8 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
+class ReverseTunnelAcceptor;
+
 /**
  * Custom IoHandle for upstream reverse connections that manages ConnectionSocket lifetime.
  * This class implements RAII principles to ensure proper socket cleanup and provides
@@ -24,9 +26,11 @@ public:
    *
    * @param socket the reverse connection socket to own and manage.
    * @param cluster_name the name of the cluster this connection belongs to.
+   * @param acceptor pointer to the ReverseTunnelAcceptor for accessing socket manager.
    */
   UpstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket,
-                                    const std::string& cluster_name);
+                                    const std::string& cluster_name,
+                                    ReverseTunnelAcceptor* acceptor);
 
   ~UpstreamReverseConnectionIOHandle() override;
 
@@ -70,6 +74,8 @@ private:
   std::string cluster_name_;
   // The socket that this IOHandle owns and manages lifetime for.
   Network::ConnectionSocketPtr owned_socket_;
+  // Pointer to the acceptor for accessing socket manager, avoiding dynamic_cast.
+  ReverseTunnelAcceptor* acceptor_;
 };
 
 } // namespace ReverseConnection

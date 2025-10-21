@@ -56,8 +56,8 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
     if (socket) {
       ENVOY_LOG(debug, "reverse_tunnel: reusing cached socket for node: {}", node_id);
       // Create IOHandle that owns the socket using RAII.
-      auto io_handle =
-          std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket), node_id);
+      auto io_handle = std::make_unique<UpstreamReverseConnectionIOHandle>(
+          std::move(socket), node_id, const_cast<ReverseTunnelAcceptor*>(this));
       return io_handle;
     }
   }
