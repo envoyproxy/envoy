@@ -44,7 +44,7 @@ EOF
 
 # shellcheck source=ci/envoy_build_sha.sh
 . "${SCRIPT_DIR}"/../ci/envoy_build_sha.sh
-IMAGE=envoyproxy/envoy-build:${ENVOY_BUILD_SHA}
+IMAGE=envoyproxy/envoy-build-ubuntu:${ENVOY_BUILD_SHA}
 
 # Pass through DOCKER_EXTRA_ARGS if set (for tests that need specific Docker flags like --cpus)
 # Use "NONE" as placeholder if not set to maintain argument positions
