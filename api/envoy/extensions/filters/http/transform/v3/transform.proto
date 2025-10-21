@@ -64,6 +64,6 @@ message TransformConfig {
   // the current request and force re-evaluation of the route. This is more expensive and
   // should only be used when the route match criteria depends on the transformed headers.
   //
-  // One one of ``clear_cluster_cache`` and ``clear_route_cache`` can be true.
+  // Only one of ``clear_cluster_cache`` and ``clear_route_cache`` can be true.
   bool clear_route_cache = 4;
 }
