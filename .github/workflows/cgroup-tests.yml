@@ -3,14 +3,14 @@ name: Cgroup CPU Detection Tests
 on:
   pull_request:
     paths:
-      - 'source/server/cgroup_cpu_util.*'
-      - 'test/server/*cgroup*'
-      - 'tools/bazel-test-*.sh'
-      - 'tools/docker_wrapper.sh'
+    - 'source/server/cgroup_cpu_util.*'
+    - 'test/server/*cgroup*'
+    - 'tools/bazel-test-*.sh'
+    - 'tools/docker_wrapper.sh'
   push:
     branches:
-      - main
-      - cgroup-cpu-detection
+    - main
+    - cgroup-cpu-detection
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
@@ -19,77 +19,77 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history for Bazel
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for Bazel
 
-      - name: Free up disk space
-        run: |
-          # GitHub Actions runners have limited disk space
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          df -h
+    - name: Free up disk space
+      run: |
+        # GitHub Actions runners have limited disk space
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        df -h
 
-      - name: Setup Docker
-        run: |
-          # Verify Docker is running and supports cgroups v2
-          docker --version
-          docker info
-          # Check cgroup version
-          mount | grep cgroup
-          cat /proc/self/cgroup || true
+    - name: Setup Docker
+      run: |
+        # Verify Docker is running and supports cgroups v2
+        docker --version
+        docker info
+        # Check cgroup version
+        mount | grep cgroup
+        cat /proc/self/cgroup || true
 
-      - name: Cache Bazel artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/bazel
-          key: ${{ runner.os }}-bazel-cgroup-${{ hashFiles('WORKSPACE', '.bazelrc', 'bazel/**') }}
-          restore-keys: |
-            ${{ runner.os }}-bazel-cgroup-
-            ${{ runner.os }}-bazel-
+    - name: Cache Bazel artifacts
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/bazel
+        key: ${{ runner.os }}-bazel-cgroup-${{ hashFiles('WORKSPACE', '.bazelrc', 'bazel/**') }}
+        restore-keys: |
+          ${{ runner.os }}-bazel-cgroup-
+          ${{ runner.os }}-bazel-
 
-      - name: Setup Bazel
-        run: |
-          # Use Bazelisk for automatic Bazel version management
-          # (usually already installed on GitHub Actions runners)
-          bazel --version
+    - name: Setup Bazel
+      run: |
+        # Use Bazelisk for automatic Bazel version management
+        # (usually already installed on GitHub Actions runners)
+        bazel --version
 
-      - name: Run cgroup CPU detection test
-        run: |
-          # Make scripts executable
-          chmod +x tools/bazel-test-cgroup.sh
-          chmod +x tools/bazel-test-docker.sh
-          chmod +x tools/docker_wrapper.sh
+    - name: Run cgroup CPU detection test
+      run: |
+        # Make scripts executable
+        chmod +x tools/bazel-test-cgroup.sh
+        chmod +x tools/bazel-test-docker.sh
+        chmod +x tools/docker_wrapper.sh
 
-          # Run the test with Docker CPU limits
-          ./tools/bazel-test-cgroup.sh //test/server:cgroup_cpu_simple_integration_test
-        env:
-          # These are automatically available in the container
-          DOCKER_EXTRA_ARGS: "--cpus=2"
+        # Run the test with Docker CPU limits
+        ./tools/bazel-test-cgroup.sh //test/server:cgroup_cpu_simple_integration_test
+      env:
+        # These are automatically available in the container
+        DOCKER_EXTRA_ARGS: "--cpus=2"
 
-      - name: Upload test logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cgroup-test-logs
-          path: |
-            bazel-testlogs/test/server/cgroup_cpu_simple_integration_test/test.log
-            bazel-testlogs/test/server/cgroup_cpu_simple_integration_test/test.xml
-          retention-days: 7
+    - name: Upload test logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cgroup-test-logs
+        path: |
+          bazel-testlogs/test/server/cgroup_cpu_simple_integration_test/test.log
+          bazel-testlogs/test/server/cgroup_cpu_simple_integration_test/test.xml
+        retention-days: 7
 
-      - name: Show test output on failure
-        if: failure()
-        run: |
-          echo "=== Test Log ==="
-          cat bazel-out/k8-fastbuild/testlogs/test/server/cgroup_cpu_simple_integration_test/test.log || true
-          echo ""
-          echo "=== Docker Info ==="
-          docker ps -a || true
-          echo ""
-          echo "=== Cgroup Info ==="
-          cat /proc/self/cgroup || true
-          mount | grep cgroup || true
+    - name: Show test output on failure
+      if: failure()
+      run: |
+        echo "=== Test Log ==="
+        cat bazel-out/k8-fastbuild/testlogs/test/server/cgroup_cpu_simple_integration_test/test.log || true
+        echo ""
+        echo "=== Docker Info ==="
+        docker ps -a || true
+        echo ""
+        echo "=== Cgroup Info ==="
+        cat /proc/self/cgroup || true
+        mount | grep cgroup || true
