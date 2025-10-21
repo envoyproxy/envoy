@@ -21,6 +21,10 @@ minor_behavior_changes:
     <envoy_v3_api_msg_service.ext_proc.v3.HeaderMutation>` fails. Removing
     request-specific details allows grouping by similar failure types. Detailed
     messages remain available in debug logs.
+- area: mobile
+  change: |
+    Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
+    setting the runtime guard ``envoy.reloadable_features.mobile_use_network_observer_registry``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
