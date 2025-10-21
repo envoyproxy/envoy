@@ -17,13 +17,13 @@ jobs:
   cgroup-tests:
     name: Test Cgroup CPU Detection
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history for Bazel
-      
+
       - name: Free up disk space
         run: |
           # GitHub Actions runners have limited disk space
@@ -32,7 +32,7 @@ jobs:
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           df -h
-      
+
       - name: Setup Docker
         run: |
           # Verify Docker is running and supports cgroups v2
@@ -41,7 +41,7 @@ jobs:
           # Check cgroup version
           mount | grep cgroup
           cat /proc/self/cgroup || true
-      
+
       - name: Cache Bazel artifacts
         uses: actions/cache@v4
         with:
@@ -51,26 +51,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bazel-cgroup-
             ${{ runner.os }}-bazel-
-      
+
       - name: Setup Bazel
         run: |
           # Use Bazelisk for automatic Bazel version management
           # (usually already installed on GitHub Actions runners)
           bazel --version
-      
+
       - name: Run cgroup CPU detection test
         run: |
           # Make scripts executable
           chmod +x tools/bazel-test-cgroup.sh
           chmod +x tools/bazel-test-docker.sh
           chmod +x tools/docker_wrapper.sh
-          
+
           # Run the test with Docker CPU limits
           ./tools/bazel-test-cgroup.sh //test/server:cgroup_cpu_simple_integration_test
         env:
           # These are automatically available in the container
           DOCKER_EXTRA_ARGS: "--cpus=2"
-      
+
       - name: Upload test logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -80,7 +80,7 @@ jobs:
             bazel-testlogs/test/server/cgroup_cpu_simple_integration_test/test.log
             bazel-testlogs/test/server/cgroup_cpu_simple_integration_test/test.xml
           retention-days: 7
-      
+
       - name: Show test output on failure
         if: failure()
         run: |

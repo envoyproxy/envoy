@@ -60,16 +60,16 @@ if [ "${RUN_REMOTE}" != "yes" ]; then
 
   # Add CPU limits for cgroup tests if requested
   DOCKER_EXTRA_ARGS="${DOCKER_EXTRA_ARGS:-}"
-  
-  docker run --rm --privileged ${DOCKER_EXTRA_ARGS} -v "${TEST_PATH}:/test" "${LIB_MOUNTS[@]}" -i -v "${ENVFILE}:/env" \
+
+  docker run --rm --privileged "${DOCKER_EXTRA_ARGS}" -v "${TEST_PATH}:/test" "${LIB_MOUNTS[@]}" -i -v "${ENVFILE}:/env" \
     "${IMAGE}" bash -c "${CMDLINE}"
 else
   # In this case, we need to create the container, then make new layers on top of it, since we
   # can't mount everything into it.
   # Add CPU limits for cgroup tests if requested
   DOCKER_EXTRA_ARGS="${DOCKER_EXTRA_ARGS:-}"
-  
-  docker create -t --privileged ${DOCKER_EXTRA_ARGS} --name "${CONTAINER_NAME}" "${IMAGE}" \
+
+  docker create -t --privileged "${DOCKER_EXTRA_ARGS}" --name "${CONTAINER_NAME}" "${IMAGE}" \
     bash -c "${CMDLINE}"
   docker cp "$TEST_PATH" "${CONTAINER_NAME}:/test"
   docker cp "$ENVFILE" "${CONTAINER_NAME}:/env"
