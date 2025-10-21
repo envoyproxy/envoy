@@ -27,7 +27,7 @@ def _envoy_repo_impl(repository_ctx):
     Project and repo data can be accessed in JSON format using `@envoy_repo//:project`, eg:
 
     ```starlark
-    load("@aspect_bazel_lib//lib:jq.bzl", "jq")
+    load("@jq.bzl", "jq")
 
     jq(
         name = "project_version",

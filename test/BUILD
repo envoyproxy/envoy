@@ -1,4 +1,4 @@
-load("@aspect_bazel_lib//lib:yq.bzl", "yq")
+load("@yq.bzl", "yq")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",

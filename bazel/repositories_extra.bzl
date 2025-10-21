@@ -1,4 +1,4 @@
-load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
+load("@bazel_lib//lib:repositories.bzl", "bazel_lib_dependencies")
 load("@bazel_features//:deps.bzl", "bazel_features_deps")
 load("@com_google_protobuf//bazel/private:proto_bazel_features.bzl", "proto_bazel_features")
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
@@ -31,7 +31,7 @@ def envoy_dependencies_extra(
         ignore_root_user_error = ignore_root_user_error,
     )
 
-    aspect_bazel_lib_dependencies()
+    bazel_lib_dependencies()
 
     if not native.existing_rule("proto_bazel_features"):
         proto_bazel_features(name = "proto_bazel_features")

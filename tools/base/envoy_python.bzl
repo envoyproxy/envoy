@@ -1,8 +1,8 @@
-load("@aspect_bazel_lib//lib:jq.bzl", "jq")
-load("@aspect_bazel_lib//lib:yq.bzl", "yq")
 load("@base_pip3//:requirements.bzl", "requirement")
+load("@jq.bzl", "jq")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
+load("@yq.bzl", "yq")
 
 ENVOY_PYTOOL_NAMESPACE = [
     ":py-init",

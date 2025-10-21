@@ -1,5 +1,5 @@
-load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
+load("@jq.bzl", "jq")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data", "envoy_pytool_binary")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")

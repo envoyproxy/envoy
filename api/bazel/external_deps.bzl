@@ -35,6 +35,9 @@ DEPENDENCY_ANNOTATIONS = [
     # This attribute is mandatory for each dependecy.
     "use_category",
 
+    # Use the project name rather than the starlark key as the repo name.
+    "use_project_name",
+
     # The dependency version. This may be either a tagged release (preferred)
     # or git SHA (as an exception when no release tagged version is suitable).
     "version",
@@ -81,13 +84,17 @@ def load_repository_locations(repository_locations_spec):
     locations = {}
     for key, location in load_repository_locations_spec(repository_locations_spec).items():
         mutable_location = dict(location)
-        locations[key] = mutable_location
-
-        if "sha256" not in location or len(location["sha256"]) == 0:
-            _fail_missing_attribute("sha256", key)
 
         if "project_name" not in location:
             _fail_missing_attribute("project_name", key)
+
+        if location.get("use_project_name", False):
+            locations[location["project_name"]] = mutable_location
+        else:
+            locations[key] = mutable_location
+
+        if "sha256" not in location or len(location["sha256"]) == 0:
+            _fail_missing_attribute("sha256", key)
 
         if "project_desc" not in location:
             _fail_missing_attribute("project_desc", key)

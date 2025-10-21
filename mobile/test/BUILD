@@ -1,4 +1,4 @@
-load("@aspect_bazel_lib//lib:yq.bzl", "yq")
+load("@yq.bzl", "yq")
 
 licenses(["notice"])  # Apache 2
 
