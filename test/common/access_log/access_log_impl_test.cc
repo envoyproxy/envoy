@@ -832,6 +832,31 @@ typed_config:
   log->log(formatter_context_, stream_info_);
 }
 
+TEST_F(AccessLogImplTest, StatusCodeNotEqual) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  status_code_filter:
+    comparison:
+      op: NE
+      value:
+        default_value: 499
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  stream_info_.setResponseCode(499);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(formatter_context_, stream_info_);
+
+  stream_info_.setResponseCode(500);
+  EXPECT_CALL(*file_, write(_));
+  log->log(formatter_context_, stream_info_);
+}
+
 TEST_F(AccessLogImplTest, HeaderPresence) {
   const std::string yaml = R"EOF(
 name: accesslog

@@ -33,6 +33,7 @@ envoy_cc_library(
         ":declare_property_cc_proto",
         ":set_envoy_filter_state_cc_proto",
         ":verify_signature_cc_proto",
+        ":sign_cc_proto",
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -50,6 +51,7 @@ cc_library(
         ":node_subset_cc_proto",
         ":set_envoy_filter_state_cc_proto",
         ":verify_signature_cc_proto",
+        ":sign_cc_proto",
         "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
     ],
     alwayslink = 1,
@@ -116,4 +118,16 @@ proto_library(
 cc_proto_library(
     name = "set_envoy_filter_state_cc_proto",
     deps = [":set_envoy_filter_state_proto"],
+)
+
+# NB: this target is compiled both to native code and to Wasm. Hence the generic rule.
+proto_library(
+    name = "sign_proto",
+    srcs = ["sign.proto"],
+)
+
+# NB: this target is compiled both to native code and to Wasm. Hence the generic rule.
+cc_proto_library(
+    name = "sign_cc_proto",
+    deps = [":sign_proto"],
 )
