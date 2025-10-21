@@ -87,6 +87,7 @@ constexpr absl::string_view UpstreamLocality = "locality";
 constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_reason";
 constexpr absl::string_view UpstreamRequestAttemptCount = "request_attempt_count";
 constexpr absl::string_view UpstreamConnectionPoolReadyDuration = "cx_pool_ready_duration";
+constexpr absl::string_view UpstreamNumEndpoints = "num_endpoints";
 
 // xDS configuration context properties
 constexpr absl::string_view XDS = "xds";

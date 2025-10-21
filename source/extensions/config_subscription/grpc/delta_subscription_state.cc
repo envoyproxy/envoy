@@ -151,9 +151,7 @@ UpdateAck DeltaSubscriptionState::handleResponse(
   UpdateAck ack(message.nonce(), type_url_);
   TRY_ASSERT_MAIN_THREAD { handleGoodResponse(message); }
   END_TRY
-  catch (const EnvoyException& e) {
-    handleBadResponse(e, ack);
-  }
+  CATCH(const EnvoyException& e, { handleBadResponse(e, ack); });
   return ack;
 }
 
@@ -193,7 +191,7 @@ void DeltaSubscriptionState::handleGoodResponse(
 
   for (const auto& resource : message.resources()) {
     if (!names_added_removed.insert(resource.name()).second) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("duplicate name {} found among added/updated resources", resource.name()));
     }
     if (isHeartbeatResponse(resource)) {
@@ -204,15 +202,15 @@ void DeltaSubscriptionState::handleGoodResponse(
       continue;
     }
     if (message.type_url() != resource.resource().type_url()) {
-      throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
-                                       "the message-wide type URL {} in DeltaDiscoveryResponse {}",
-                                       resource.resource().type_url(), message.type_url(),
-                                       message.DebugString()));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("type URL {} embedded in an individual Any does not match "
+                      "the message-wide type URL {} in DeltaDiscoveryResponse {}",
+                      resource.resource().type_url(), message.type_url(), message.DebugString()));
     }
   }
   for (const auto& name : message.removed_resources()) {
     if (!names_added_removed.insert(name).second) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("duplicate name {} found in the union of added+removed resources", name));
     }
   }

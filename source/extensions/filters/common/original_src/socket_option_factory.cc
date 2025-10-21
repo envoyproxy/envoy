@@ -31,12 +31,9 @@ buildOriginalSrcOptions(Network::Address::InstanceConstSharedPtr source, uint32_
   options_to_add->insert(options_to_add->end(), transparent_options->begin(),
                          transparent_options->end());
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.original_src_fix_port_exhaustion")) {
-    const auto addr_bind_options = Network::SocketOptionFactory::buildBindAddressNoPort();
-    options_to_add->insert(options_to_add->end(), addr_bind_options->begin(),
-                           addr_bind_options->end());
-  }
+  const auto addr_bind_options = Network::SocketOptionFactory::buildBindAddressNoPort();
+  options_to_add->insert(options_to_add->end(), addr_bind_options->begin(),
+                         addr_bind_options->end());
 
   return options_to_add;
 }

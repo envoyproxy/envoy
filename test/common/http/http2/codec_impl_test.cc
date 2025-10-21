@@ -252,6 +252,7 @@ public:
     driveToCompletion();
 
     EXPECT_CALL(server_callbacks_, newStream(_, _))
+        .Times(AnyNumber())
         .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
@@ -1007,6 +1008,14 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   }
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
   driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ResetBeforeHeadersSent) {
+  initialize();
+
+  EXPECT_EQ(1, TestUtility::findGauge(client_stats_store_, "http2.streams_active")->value());
+  request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  EXPECT_EQ(0, TestUtility::findGauge(client_stats_store_, "http2.streams_active")->value());
 }
 
 TEST_P(Http2CodecImplTest, InvalidHeadersFrameMissing) {
