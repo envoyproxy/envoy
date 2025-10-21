@@ -57,7 +57,7 @@ message TransformConfig {
   // cluster in the same route. Please ensure the cluster specifier in the route supports
   // dynamic evaluation, e.g., ``envoy.router.cluster_specifier_plugin.matcher``.
   //
-  // One one of ``clear_cluster_cache`` and ``clear_route_cache`` can be true.
+  // Only one of ``clear_cluster_cache`` and ``clear_route_cache`` can be true.
   bool clear_cluster_cache = 3;
 
   // If true and the request headers are transformed, Envoy will clear the route cache for
