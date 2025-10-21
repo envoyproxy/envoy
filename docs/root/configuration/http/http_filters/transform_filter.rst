@@ -24,7 +24,7 @@ fields from the JSON response body and add them as response headers.
 
 .. literalinclude:: _include/transform_filter.yaml
     :language: yaml
-    :lines: 42-68
+    :lines: 42-69
     :lineno-start: 42
     :linenos:
     :caption: :download:`transform_filter.yaml <_include/transform_filter.yaml>`

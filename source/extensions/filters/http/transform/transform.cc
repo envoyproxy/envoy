@@ -6,6 +6,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/filters/http/transform/v3/transform.pb.h"
+
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/formatter/substitution_format_string.h"
@@ -79,20 +81,25 @@ const std::vector<Formatter::CommandParserPtr>& bodyCommandParsers() {
   return instance;
 }
 
-Transform::Transform(const ProtoTransform& config,
-                     Server::Configuration::ServerFactoryContext& context,
-                     absl::Status& creation_status)
-    : patch_format_string_(config.has_patch_format_string() ? config.patch_format_string().value()
-                                                            : true) {
-  if (config.has_body_format_string()) {
-    std::vector<Formatter::CommandParserPtr> v;
-    v.emplace_back(std::make_unique<BodyFormatterCommandParser>());
-    Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
-    auto formatter_or = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-        config.body_format_string(), generic_context, std::move(v));
-    SET_AND_RETURN_IF_NOT_OK(formatter_or.status(), creation_status);
-    body_formatter_ = std::move(formatter_or.value());
-    content_type_ = config.body_format_string().content_type();
+Transformation::Transformation(const ProtoTransformation& config,
+                               Server::Configuration::ServerFactoryContext& context,
+                               absl::Status& creation_status) {
+  if (config.has_body_transformation()) {
+    if (config.body_transformation().has_body_format()) {
+      std::vector<Formatter::CommandParserPtr> v;
+      v.emplace_back(std::make_unique<BodyFormatterCommandParser>());
+      Server::GenericFactoryContextImpl generic_context(context,
+                                                        context.messageValidationVisitor());
+      auto formatter_or = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+          config.body_transformation().body_format(), generic_context, std::move(v));
+      SET_AND_RETURN_IF_NOT_OK(formatter_or.status(), creation_status);
+      body_formatter_ = std::move(formatter_or.value());
+      content_type_ = config.body_transformation().body_format().content_type();
+
+      merge_format_string_ =
+          config.body_transformation().action() ==
+          envoy::extensions::filters::http::transform::v3::BodyTransformation::MERGE;
+    }
   }
 
   if (config.headers_mutations().size() > 0) {
@@ -108,11 +115,11 @@ TransformConfig::TransformConfig(const ProtoConfig& config,
                                  absl::Status& creation_status)
     : clear_route_cache_(config.clear_route_cache()),
       clear_cluster_cache_(config.clear_cluster_cache()) {
-  if (config.has_request_transform()) {
-    request_transform_.emplace(config.request_transform(), context, creation_status);
+  if (config.has_request_transformation()) {
+    request_transformation_.emplace(config.request_transformation(), context, creation_status);
   }
-  if (config.has_response_transform()) {
-    response_transform_.emplace(config.response_transform(), context, creation_status);
+  if (config.has_response_transformation()) {
+    response_transformation_.emplace(config.response_transformation(), context, creation_status);
   }
 
   if (clear_cluster_cache_ && clear_route_cache_) {
@@ -154,7 +161,7 @@ Http::FilterHeadersStatus TransformFilter::decodeHeaders(Http::RequestHeaderMap&
   maybeInitializeRouteConfigs(decoder_callbacks_);
   ASSERT(effective_config_ != nullptr);
 
-  if (!effective_config_->requestTransform().has_value()) {
+  if (!effective_config_->requestTransformation().has_value()) {
     // No request transform configured, continue.
     return Http::FilterHeadersStatus::Continue;
   }
@@ -200,7 +207,7 @@ Http::FilterHeadersStatus TransformFilter::encodeHeaders(Http::ResponseHeaderMap
   maybeInitializeRouteConfigs(encoder_callbacks_);
   ASSERT(effective_config_ != nullptr);
 
-  if (!effective_config_->responseTransform().has_value()) {
+  if (!effective_config_->responseTransformation().has_value()) {
     // No response transform configured, continue.
     return Http::FilterHeadersStatus::Continue;
   }
@@ -239,10 +246,9 @@ Http::FilterTrailersStatus TransformFilter::encodeTrailers(Http::ResponseTrailer
   return Http::FilterTrailersStatus::Continue;
 }
 
-TransformFilter::TransformResult
-TransformFilter::handleCompleteBody(const Transform& transform, const Formatter::Context& context,
-                                    const Buffer::Instance& body_buffer,
-                                    Protobuf::Struct& body_struct, Http::HeaderMap& headers) {
+TransformFilter::TransformResult TransformFilter::handleCompleteBody(
+    const Transformation& transformation, const Formatter::Context& context,
+    const Buffer::Instance& body_buffer, Protobuf::Struct& body_struct, Http::HeaderMap& headers) {
   uint64_t body_size = body_buffer.length();
   absl::Status status = MessageUtil::loadFromJsonNoThrow(body_buffer.toString(), body_struct);
   if (!status.ok()) {
@@ -258,10 +264,10 @@ TransformFilter::handleCompleteBody(const Transform& transform, const Formatter:
 
   // Transform the body if configured and validate the result is valid JSON if patch
   // mode is enabled.
-  if (transform.bodyFormatter().has_value()) {
-    new_buffer =
-        transform.bodyFormatter()->formatWithContext(context, decoder_callbacks_->streamInfo());
-    if (transform.patchFormatString()) {
+  if (transformation.bodyFormatter().has_value()) {
+    new_buffer = transformation.bodyFormatter()->formatWithContext(
+        context, decoder_callbacks_->streamInfo());
+    if (transformation.mergeFormatString()) {
       if (auto s = MessageUtil::loadFromJsonNoThrow(new_buffer, new_struct); !s.ok()) {
         ENVOY_LOG(error, "Failed to parse transformed body as JSON: {}", s.message());
         return {};
@@ -273,15 +279,15 @@ TransformFilter::handleCompleteBody(const Transform& transform, const Formatter:
   // Now there should no longer be any body transformation errors.
 
   // Apply header mutations first if configured.
-  if (transform.headerMutations().has_value()) {
-    transform.headerMutations()->evaluateHeaders(headers, context,
-                                                 decoder_callbacks_->streamInfo());
+  if (transformation.headerMutations().has_value()) {
+    transformation.headerMutations()->evaluateHeaders(headers, context,
+                                                      decoder_callbacks_->streamInfo());
     transform_header = true;
   }
 
-  // Merge the new struct into the original response body if in patch mode.
-  if (transform.bodyFormatter().has_value()) {
-    if (transform.patchFormatString()) {
+  // Merge the new struct into the original response body if in merge mode.
+  if (transformation.bodyFormatter().has_value()) {
+    if (transformation.mergeFormatString()) {
       body_struct.MergeFrom(new_struct);
       body_size += new_buffer.size();
       new_buffer.clear();
@@ -303,14 +309,14 @@ void TransformFilter::handleCompleteRequestBody() {
     return;
   }
 
-  const auto transform = effective_config_->requestTransform();
-  ASSERT(transform.has_value());
+  const auto transformation = effective_config_->requestTransformation();
+  ASSERT(transformation.has_value());
   Http::RequestHeaderMapOptRef headers = decoder_callbacks_->requestHeaders();
   ASSERT(headers.has_value());
   Formatter::Context formatter_context(headers.ptr());
   formatter_context.setExtension(body_extension_);
 
-  const auto result = handleCompleteBody(*transform, formatter_context, *decoding_buffer,
+  const auto result = handleCompleteBody(*transformation, formatter_context, *decoding_buffer,
                                          body_extension_.request_body, *headers);
 
   if (result.transform_buffer || result.transform_header) {
@@ -319,8 +325,8 @@ void TransformFilter::handleCompleteRequestBody() {
 
   if (result.transform_buffer) {
     headers->removeContentLength();
-    if (!transform->contentType().empty()) {
-      headers->setContentType(transform->contentType());
+    if (!transformation->contentType().empty()) {
+      headers->setContentType(transformation->contentType());
     }
     decoder_callbacks_->modifyDecodingBuffer([&result](Buffer::Instance& data) {
       data.drain(data.length());
@@ -349,14 +355,14 @@ void TransformFilter::handleCompleteResponseBody() {
     // body in the future. But for now I cannot figure out a meaningful use case.
     return;
   }
-  const auto transform = effective_config_->responseTransform();
-  ASSERT(transform.has_value());
+  const auto transformation = effective_config_->responseTransformation();
+  ASSERT(transformation.has_value());
   Http::ResponseHeaderMapOptRef headers = encoder_callbacks_->responseHeaders();
   ASSERT(headers.has_value());
   Formatter::Context formatter_context(decoder_callbacks_->requestHeaders().ptr(), headers.ptr());
   formatter_context.setExtension(body_extension_);
 
-  const auto result = handleCompleteBody(*transform, formatter_context, *encoding_buffer,
+  const auto result = handleCompleteBody(*transformation, formatter_context, *encoding_buffer,
                                          body_extension_.response_body, *headers);
 
   if (result.transform_buffer || result.transform_header) {
@@ -365,8 +371,8 @@ void TransformFilter::handleCompleteResponseBody() {
 
   if (result.transform_buffer) {
     headers->removeContentLength();
-    if (!transform->contentType().empty()) {
-      headers->setContentType(transform->contentType());
+    if (!transformation->contentType().empty()) {
+      headers->setContentType(transformation->contentType());
     }
     encoder_callbacks_->modifyEncodingBuffer([&result](Buffer::Instance& data) {
       data.drain(data.length());

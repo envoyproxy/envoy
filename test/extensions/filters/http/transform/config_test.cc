@@ -24,28 +24,32 @@ TEST(FactoryTest, FactoryTest) {
 
   {
     const std::string config = R"EOF(
-response_transform:
+request_transformation:
+  headers_mutations:
+  - append:
+      header:
+        key: "x-new-header-from-body"
+        value: "%RQ_BODY(body-key)%"
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%REQ(header-key)%"
+        new-body-key: "%RQ_BODY(body-key)%"
+    action: REPLACE
+response_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RS_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%RESP(header-key)%"
-      new-body-key: "%RS_BODY(body-key)%"
-  patch_format_string: false
-response_transform:
-  headers_mutations:
-  - append:
-      header:
-        key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
-  body_format_string:
-    text_format_source:
-      inline_string: "%RESP(header-key)%"
-  patch_format_string: true
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%RESP(header-key)%"
+        new-body-key: "%RS_BODY(body-key)%"
+    action: MERGE
 clear_route_cache: true
   )EOF";
 
@@ -69,18 +73,19 @@ clear_route_cache: true
 
   {
     const std::string config = R"EOF(
-response_transform:
+response_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RS_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%RESP(header-key)%"
-      new-body-key: "%RS_BODY(body-key)%"
-  patch_format_string: false
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%RESP(header-key)%"
+        new-body-key: "%RS_BODY(body-key)%"
+    action: MERGE
 clear_route_cache: true
 clear_cluster_cache: true
   )EOF";

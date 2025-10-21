@@ -8,6 +8,7 @@ import "envoy/config/core/v3/substitution_format_string.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.transform.v3";
 option java_outer_classname = "TransformProto";
@@ -20,42 +21,23 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP header and body transformations.
 // [#extension: envoy.filters.http.transform]
 
-message Transform {
-  // The header mutations to perform.
-  // The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
-  // And except the commonly used format specifiers, there are some additional format specifiers
-  // provided by the transform filter:
-  //
-  // * ``%RQ_BODY(X)%``: the request body. And ``X`` is the JSON pointer to extract a specific
-  //   field from the JSON body. If ``X`` is empty, the whole body will be used.
-  // * ``%RS_BODY(X)%``: the response body. And ``X`` is the JSON pointer to extract a specific
-  //   field from the JSON body. If ``X`` is empty, the whole body will be used.
-  repeated config.common.mutation_rules.v3.HeaderMutation headers_mutations = 1;
-
-  // Body transformation configuration. If not set, no body transformation will be performed.
-  // NOTE the ``RQ_BODY`` and ``RS_BODY`` format specifiers can also be used here.
-  config.core.v3.SubstitutionFormatString body_format_string = 3;
-
-  // If set the result of ``body_format_string`` will be treated as a patch and will be merged
-  // to the existing body. If not set, the result of ``body_format_string`` will replace
-  // the existing body.
-  // True by default.
-  google.protobuf.BoolValue patch_format_string = 4;
-}
-
 // Configuration for the transform filter. The request and response transformations are
 // independent and could be configured separately.
 // Only JSON body transformation is supported for now.
 message TransformConfig {
-  // Configuration for transforming request.
-  Transform request_transform = 1;
+  // Configuration for transforming request. If set then the request will be buffered
+  // until the entire body is received and transformed for JSON request bodies.
+  Transformation request_transformation = 1;
 
-  // Configuration for transforming response.
-  Transform response_transform = 2;
+  // Configuration for transforming response. If set then the response will be buffered
+  // until the entire body is received and transformed for JSON response bodies.
+  Transformation response_transformation = 2;
 
   // If true and the request headers are transformed, Envoy will re-evaluate the target
   // cluster in the same route. Please ensure the cluster specifier in the route supports
-  // dynamic evaluation, e.g., ``envoy.router.cluster_specifier_plugin.matcher``.
+  // dynamic evaluation or this flag will have no effect, e.g.
+  // :ref:`matcher cluster specifier
+  // <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`.
   //
   // Only one of ``clear_cluster_cache`` and ``clear_route_cache`` can be true.
   bool clear_cluster_cache = 3;
@@ -66,4 +48,38 @@ message TransformConfig {
   //
   // Only one of ``clear_cluster_cache`` and ``clear_route_cache`` can be true.
   bool clear_route_cache = 4;
+}
+
+message Transformation {
+  // The header mutations to perform.
+  // The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
+  // And except the commonly used format specifiers, there are some additional format specifiers
+  // provided by the transform filter:
+  //
+  // * ``%RQ_BODY(KEY*)%``: the request body. And ``Key`` KEY is an optional
+  //   lookup key in the namespace with the option of specifying nested keys separated by ':'.
+  // * ``%RS_BODY(KEY*)%``: the response body. And ``Key`` KEY is an optional
+  //   lookup key in the namespace with the option of specifying nested keys separated by ':'.
+  repeated config.common.mutation_rules.v3.HeaderMutation headers_mutations = 1;
+
+  // The body transformation configuration. If not set, no body transformation will be performed.
+  BodyTransformation body_transformation = 2;
+}
+
+message BodyTransformation {
+  enum TransformAction {
+    // Merge the transformed body with the original body. This is the default action.
+    MERGE = 0;
+
+    // Replace the original body with the transformed body.
+    REPLACE = 1;
+  }
+
+  // Body transformation configuration. If not set, no body transformation will be performed.
+  // NOTE the ``RQ_BODY`` and ``RS_BODY`` format specifiers can also be used here.
+  config.core.v3.SubstitutionFormatString body_format = 3
+      [(validate.rules).message = {required: true}];
+
+  // The action to perform for body transformation. Default is ``MERGE``.
+  TransformAction action = 4;
 }

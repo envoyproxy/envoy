@@ -154,18 +154,19 @@ protected:
 
 TEST_F(TransformTest, TransformRequestNonJsonBody) {
   const std::string yaml_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RQ_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%REQ(header-key)%"
-      new-body-key: "%RQ_BODY(body-key)%"
-  patch_format_string: true
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%REQ(header-key)%"
+        new-body-key: "%RQ_BODY(body-key)%"
+    action: MERGE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -184,18 +185,19 @@ request_transform:
 
 TEST_F(TransformTest, TransformRequestHeadersOnlyRequest) {
   const std::string yaml_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RQ_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%REQ(header-key)%"
-      new-body-key: "%RQ_BODY(body-key)%"
-  patch_format_string: true
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%REQ(header-key)%"
+        new-body-key: "%RQ_BODY(body-key)%"
+    action: MERGE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -207,17 +209,18 @@ request_transform:
 
 TEST_F(TransformTest, TransformRequestNoBodyButHasTrailers) {
   const std::string yaml_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RQ_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%REQ(header-key)%"
-      new-body-key: "%RQ_BODY(body-key)%"
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%REQ(header-key)%"
+        new-body-key: "%RQ_BODY(body-key)%"
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -235,7 +238,7 @@ request_transform:
 
 TEST_F(TransformTest, TransformRequestNoRequestTransformConfigured) {
   const std::string yaml_config = R"EOF(
-response_transform: {}
+response_transformation: {}
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -254,18 +257,19 @@ response_transform: {}
 
 TEST_F(TransformTest, TransformRequestBodyAndHeadersAndClearRouteCache) {
   const std::string yaml_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RQ_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%REQ(header-key)%"
-      new-body-key: "%RQ_BODY(body-key)%"
-  patch_format_string: true
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%REQ(header-key)%"
+        new-body-key: "%RQ_BODY(body-key)%"
+    action: MERGE
 clear_route_cache: true
 )EOF";
 
@@ -309,17 +313,19 @@ clear_route_cache: true
 
 TEST_F(TransformTest, TransformRequestBodyAndHeadersAndClearClusterCache) {
   const std::string yaml_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RQ_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%REQ(header-key)%"
-      new-body-key: "%RQ_BODY(body-key)%"
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%REQ(header-key)%"
+        new-body-key: "%RQ_BODY(body-key)%"
+    action: MERGE
 clear_cluster_cache: true
 )EOF";
 
@@ -363,19 +369,19 @@ clear_cluster_cache: true
 
 TEST_F(TransformTest, TransformRequestBodyAndHeadersAndNonBodyMergeMode) {
   const std::string yaml_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RQ_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%REQ(header-key)%"
-      new-body-key: "%RQ_BODY(body-key)%"
-    content_type: application/json
-  patch_format_string: false
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%REQ(header-key)%"
+        new-body-key: "%RQ_BODY(body-key)%"
+    action: REPLACE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -416,17 +422,19 @@ request_transform:
 
 TEST_F(TransformTest, TransformRequestBodyAndHeadersWithTrailers) {
   const std::string yaml_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RQ_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%REQ(header-key)%"
-      new-body-key: "%RQ_BODY(body-key)%"
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%REQ(header-key)%"
+        new-body-key: "%RQ_BODY(body-key)%"
+    action: MERGE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -469,22 +477,24 @@ request_transform:
 
 TEST_F(TransformTest, TransformRequestHeadersAndRouteOverride) {
   const std::string yaml_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RQ_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%REQ(header-key)%"
-      new-body-key: "%RQ_BODY(body-key)%"
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%REQ(header-key)%"
+        new-body-key: "%RQ_BODY(body-key)%"
+    action: MERGE
 )EOF";
 
   // Only header mutation is used in the route config to override the filter level config.
   const std::string route_yaml_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
@@ -521,7 +531,7 @@ request_transform:
 
 TEST_F(TransformTest, TransformRequestBodyParsingError) {
   const std::string yaml_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
@@ -552,16 +562,17 @@ request_transform:
 
 TEST_F(TransformTest, TransformRequestPatchBodyParsingError) {
   const std::string yaml_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RQ_BODY(body-key)%"
-  body_format_string:
-    text_format_source:
-      inline_string: "%REQ(header-key)%"
-  patch_format_string: true
+  body_transformation:
+    body_format:
+      text_format_source:
+        inline_string: "%REQ(header-key)%"
+    action: MERGE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -588,18 +599,19 @@ request_transform:
 
 TEST_F(TransformTest, TransformResponseNonJsonBody) {
   const std::string yaml_config = R"EOF(
-response_transform:
+response_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RS_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%RESP(header-key)%"
-      new-body-key: "%RS_BODY(body-key)%"
-  patch_format_string: true
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%RESP(header-key)%"
+        new-body-key: "%RS_BODY(body-key)%"
+    action: MERGE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -618,18 +630,19 @@ response_transform:
 
 TEST_F(TransformTest, TransformResponseHeadersOnlyResponse) {
   const std::string yaml_config = R"EOF(
-response_transform:
+response_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RS_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%RESP(header-key)%"
-      new-body-key: "%RS_BODY(body-key)%"
-  patch_format_string: true
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%RESP(header-key)%"
+        new-body-key: "%RS_BODY(body-key)%"
+    action: MERGE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -641,17 +654,19 @@ response_transform:
 
 TEST_F(TransformTest, TransformResponseNoBodyButHasTrailers) {
   const std::string yaml_config = R"EOF(
-response_transform:
+response_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RS_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%RESP(header-key)%"
-      new-body-key: "%RS_BODY(body-key)%"
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%RESP(header-key)%"
+        new-body-key: "%RS_BODY(body-key)%"
+    action: MERGE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -668,7 +683,7 @@ response_transform:
 
 TEST_F(TransformTest, TransformResponseNoResponseTransformConfigured) {
   const std::string yaml_config = R"EOF(
-request_transform: {}
+request_transformation: {}
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -684,18 +699,19 @@ request_transform: {}
 
 TEST_F(TransformTest, TransformResponseBodyAndHeaders) {
   const std::string yaml_config = R"EOF(
-response_transform:
+response_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RS_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%RESP(header-key)%"
-      new-body-key: "%RS_BODY(body-key)%"
-    content_type: "application/json"
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%RESP(header-key)%"
+        new-body-key: "%RS_BODY(body-key)%"
+    action: MERGE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -739,18 +755,19 @@ response_transform:
 
 TEST_F(TransformTest, TransformResponseBodyAndHeadersNonBodyMergeMode) {
   const std::string yaml_config = R"EOF(
-response_transform:
+response_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RS_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%RESP(header-key)%"
-      new-body-key: "%RS_BODY(body-key)%"
-  patch_format_string: false
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%RESP(header-key)%"
+        new-body-key: "%RS_BODY(body-key)%"
+    action: REPLACE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -790,17 +807,19 @@ response_transform:
 
 TEST_F(TransformTest, TransformResponseBodyAndHeadersWithTrailers) {
   const std::string yaml_config = R"EOF(
-response_transform:
+response_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RS_BODY(body-key)%"
-  body_format_string:
-    json_format:
-      raw-key: "raw-value"
-      header-key: "%RESP(header-key)%"
-      new-body-key: "%RS_BODY(body-key)%"
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%RESP(header-key)%"
+        new-body-key: "%RS_BODY(body-key)%"
+    action: MERGE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -843,7 +862,7 @@ response_transform:
 
 TEST_F(TransformTest, TransformResponseBodyParsingError) {
   const std::string yaml_config = R"EOF(
-response_transform:
+response_transformation:
   headers_mutations:
   - append:
       header:
@@ -877,16 +896,17 @@ response_transform:
 
 TEST_F(TransformTest, TransformResponsePatchBodyParsingError) {
   const std::string yaml_config = R"EOF(
-response_transform:
+response_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RS_BODY(body-key)%"
-  body_format_string:
-    text_format_source:
-      inline_string: "%RESP(header-key)%"
-  patch_format_string: true
+  body_transformation:
+    body_format:
+      text_format_source:
+        inline_string: "%RESP(header-key)%"
+    action: MERGE
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -913,16 +933,19 @@ response_transform:
 
 TEST_F(TransformTest, TransformResponseSkipForLocalReply) {
   const std::string yaml_config = R"EOF(
-response_transform:
+response_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
         value: "%RS_BODY(body-key)%"
-  body_format_string:
-    text_format_source:
-      inline_string: "%RESP(header-key)%"
-  patch_format_string: true
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%RESP(header-key)%"
+        new-body-key: "%RS_BODY(body-key)%"
+    action: MERGE
 )EOF";
 
   initializeFilter(yaml_config, "");

@@ -22,7 +22,7 @@ namespace HttpFilters {
 namespace Transform {
 
 using ProtoConfig = envoy::extensions::filters::http::transform::v3::TransformConfig;
-using ProtoTransform = envoy::extensions::filters::http::transform::v3::Transform;
+using ProtoTransformation = envoy::extensions::filters::http::transform::v3::Transformation;
 
 /**
  * BodyContextExtension which holds request and response body as Struct. The substitution
@@ -69,12 +69,13 @@ private:
 };
 
 /**
- * Transform holds the configuration for request or response transformation.
+ * Transformation holds the configuration for request or response transformation.
  */
-class Transform {
+class Transformation {
 public:
-  Transform(const ProtoTransform& config, Server::Configuration::ServerFactoryContext& context,
-            absl::Status& creation_status);
+  Transformation(const ProtoTransformation& config,
+                 Server::Configuration::ServerFactoryContext& context,
+                 absl::Status& creation_status);
 
   /**
    * Get the header mutations configuration if any.
@@ -93,7 +94,7 @@ public:
    * Whether to patch the body using the patch_format_string field in the config or
    * completely replace the body using the body_format_string field in the config.
    */
-  bool patchFormatString() const { return patch_format_string_; }
+  bool mergeFormatString() const { return merge_format_string_; }
 
   /**
    * Get the content type to set in the Content-Type header if body transformation is
@@ -105,7 +106,8 @@ private:
   Formatter::FormatterPtr body_formatter_;
   std::string content_type_;
   std::unique_ptr<Http::HeaderMutations> headers_mutations_;
-  const bool patch_format_string_{};
+  // TODO(wbpcode): consider enum if more modes are added in the future.
+  bool merge_format_string_{};
 };
 
 /**
@@ -116,15 +118,15 @@ public:
   TransformConfig(const ProtoConfig& config, Server::Configuration::ServerFactoryContext& context,
                   absl::Status& creation_status);
 
-  OptRef<const Transform> requestTransform() const {
-    if (request_transform_.has_value()) {
-      return request_transform_.value();
+  OptRef<const Transformation> requestTransformation() const {
+    if (request_transformation_.has_value()) {
+      return request_transformation_.value();
     }
     return {};
   }
-  OptRef<const Transform> responseTransform() const {
-    if (response_transform_.has_value()) {
-      return response_transform_.value();
+  OptRef<const Transformation> responseTransformation() const {
+    if (response_transformation_.has_value()) {
+      return response_transformation_.value();
     }
     return {};
   }
@@ -133,8 +135,8 @@ public:
   bool clearClusterCache() const { return clear_cluster_cache_; }
 
 private:
-  absl::optional<Transform> request_transform_;
-  absl::optional<Transform> response_transform_;
+  absl::optional<Transformation> request_transformation_;
+  absl::optional<Transformation> response_transformation_;
   const bool clear_route_cache_{};
   const bool clear_cluster_cache_{};
 };
@@ -197,7 +199,8 @@ private:
     bool transform_header{false};
   };
 
-  TransformResult handleCompleteBody(const Transform& transform, const Formatter::Context& context,
+  TransformResult handleCompleteBody(const Transformation& transformation,
+                                     const Formatter::Context& context,
                                      const Buffer::Instance& body_buffer,
                                      Protobuf::Struct& body_struct, Http::HeaderMap& headers);
 

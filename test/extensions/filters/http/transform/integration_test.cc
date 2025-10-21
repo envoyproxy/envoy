@@ -47,18 +47,19 @@ const std::string default_filter_config = R"EOF(
 name: transform
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.transform.v3.TransformConfig
-  request_transform:
+  request_transformation:
     headers_mutations:
     - append:
         header:
           key: "model-header"
           value: "%RQ_BODY(model)%"
         append_action: OVERWRITE_IF_EXISTS_OR_ADD
-    body_format_string:
-      json_format:
-        model: "new-model"
-    patch_format_string: true
-  response_transform:
+    body_transformation:
+      body_format:
+        json_format:
+          model: "new-model"
+      action: MERGE
+  response_transformation:
     headers_mutations:
     - append:
         header:
@@ -79,7 +80,7 @@ typed_config:
 )EOF";
 
 const std::string per_route_override_config = R"EOF(
-request_transform:
+request_transformation:
   headers_mutations:
   - append:
       header:
