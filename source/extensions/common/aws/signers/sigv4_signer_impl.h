@@ -39,10 +39,11 @@ public:
   SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
                   const CredentialsProviderChainSharedPtr& credentials_provider,
                   Server::Configuration::CommonFactoryContext& context,
-                  const AwsSigningHeaderExclusionVector& matcher_config,
+                  const AwsSigningHeaderExclusionVector& exclude_matcher_config,
+                  const AwsSigningHeaderExclusionVector& include_matcher_config,
                   const bool query_string = false,
                   const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
-      : SignerBaseImpl(service_name, region, credentials_provider, context, matcher_config,
+      : SignerBaseImpl(service_name, region, credentials_provider, context, exclude_matcher_config, include_matcher_config,
                        query_string, expiration_time) {}
 
 private:

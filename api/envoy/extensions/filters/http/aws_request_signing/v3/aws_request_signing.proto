@@ -125,7 +125,6 @@ message AwsRequestSigning {
   // - exact: bar
   // When applied, all headers that start with "x-envoy" and headers "foo" and "bar" will be signed and all other headers will be excluded from signing except required headers.
   repeated type.matcher.v3.StringMatcher match_included_headers = 9;
-
 }
 
 message AwsRequestSigningPerRoute {
