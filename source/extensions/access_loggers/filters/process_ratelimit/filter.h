@@ -4,7 +4,7 @@
 #include "envoy/extensions/access_loggers/filters/process_ratelimit/v3/process_ratelimit.pb.h"
 
 #include "source/common/init/target_impl.h"
-#include "source/extensions/filters/common/local_ratelimit/provider_singleton.h"
+#include "source/extensions/access_loggers/filters/process_ratelimit/provider_singleton.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -31,21 +31,3 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
     ],
 )
-
-envoy_cc_library(
-    name = "provider_singleton_lib",
-    srcs = ["provider_singleton.cc"],
-    hdrs = ["provider_singleton.h"],
-    deps = [
-        ":local_ratelimit_lib",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/event:timer_interface",
-        "//envoy/ratelimit:ratelimit_interface",
-        "//source/common/common:thread_synchronizer_lib",
-        "//source/common/common:token_bucket_impl_lib",
-        "//source/common/config:subscription_base_interface",
-        "//source/common/grpc:common_lib",
-        "//source/common/init:target_lib",
-        "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
-)
