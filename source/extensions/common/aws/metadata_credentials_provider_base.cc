@@ -1,5 +1,7 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 
+#include <chrono>
+
 #include "envoy/server/factory_context.h"
 
 namespace Envoy {
@@ -107,8 +109,11 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
           cache_duration_ = std::chrono::duration_cast<std::chrono::seconds>(time_until_expiration -
                                                                              grace_period);
         } else {
-          cache_duration_ =
-              std::chrono::seconds(1); // Refresh immediately if too close to expiration
+          ENVOY_LOG(warn,
+                    "Credential expiration time is within grace period {} seconds, refreshing now. "
+                    "Minimum expiration time should be 900 seconds (15 minutes).",
+                    REFRESH_GRACE_PERIOD.count());
+          cache_duration_ = std::chrono::seconds(1);
         }
 
         ENVOY_LOG(debug,
