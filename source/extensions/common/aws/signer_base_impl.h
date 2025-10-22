@@ -69,7 +69,6 @@ public:
                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
       : service_name_(service_name), region_(region),
         excluded_header_matchers_(defaultMatchers(context)),
-        included_header_matchers_(defaultMatchers(context)),
         credentials_provider_chain_(credentials_provider_chain), query_string_(query_string),
         expiration_time_(expiration_time), time_source_(context.timeSource()),
         long_date_formatter_(std::string(SignatureConstants::LongDateFormat)),

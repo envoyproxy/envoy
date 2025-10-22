@@ -26,5 +26,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` and legacy code paths.
 
 new_features:
+- area: aws
+  change: |
+    Added new feature ``match_included_headers`` to the request signing extension, that allows for a positive header match and
+    excludes all other non-SigV4-required headers.
 
 deprecated:

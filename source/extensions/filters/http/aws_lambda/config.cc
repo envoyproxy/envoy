@@ -74,7 +74,7 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
       service_name, region, std::move(credentials_provider), server_context,
       // TODO: extend API to allow specifying header exclusion. ref:
       // https://github.com/envoyproxy/envoy/pull/18998
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{},Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
 
   auto filter_settings = std::make_shared<FilterSettingsImpl>(
       *arn, getInvocationMode(proto_config), proto_config.payload_passthrough(),
@@ -106,7 +106,7 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
       service_name, region, std::move(credentials_provider), server_context,
       // TODO: extend API to allow specifying header exclusion. ref:
       // https://github.com/envoyproxy/envoy/pull/18998
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
 
   auto filter_settings = std::make_shared<FilterSettingsImpl>(
       *arn, getInvocationMode(per_route_config.invoke_config()),
