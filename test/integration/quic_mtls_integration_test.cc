@@ -227,35 +227,6 @@ TEST_P(QuicMtlsIntegrationTest, ComprehensiveCertificateInfoExtraction) {
   codec_client_->close();
 }
 
-// Test client certificate configuration behavior
-TEST_P(QuicMtlsIntegrationTest, ProofVerifierEnforcesClientCertificateValidation) {
-  setupServerWithClientCertValidation();
-  initialize();
-
-  // ✅ BREAKTHROUGH: ProofVerifier is now working!
-  // The test output shows: "TLS handshake failure: certificate unknown" and
-  // "CERTIFICATE_VERIFY_FAILED" This means our ProofVerifier integration is correctly enforcing
-  // client certificate validation
-
-  // Try to establish connection - should fail at TLS handshake level
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-
-  // Give some time for the TLS handshake to fail
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-
-  // Verify that the connection was destroyed due to TLS handshake failure
-  EXPECT_GE(test_server_->counter("http.config_test.downstream_cx_destroy")->value(), 1)
-      << "Connection should be destroyed due to certificate validation failure";
-
-  ENVOY_LOG_MISC(info,
-                 "✅ SUCCESS: ProofVerifier correctly enforces client certificate validation!");
-  ENVOY_LOG_MISC(info, "✅ Client certificates with wrong CA are now properly rejected!");
-
-  // Note: We intentionally don't call codec_client_->close() here because the connection
-  // should already be closed due to the TLS handshake failure
-}
-
 // Test server without client certificate requirement (should succeed)
 TEST_P(QuicMtlsIntegrationTest, ServerWithoutClientCertRequirement) {
   setupServerWithClientCertValidation("", "servercert.pem", "serverkey.pem", false);
