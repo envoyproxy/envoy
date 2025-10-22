@@ -13,12 +13,13 @@ namespace {
 
 #ifdef __linux__
 
-// CI-only simple tests for cgroup CPU detection functionality.
-// These run only in EngFlow 'RBE' environments with linux_x64_small pool (2 CPUs).
+// This test runs in CI with Docker CPU limits (--cpus=2) to verify 'cgroups' detection.
+// Tagged 'runtime-cpu' to run only in controlled environments with CPU limits.
 // Tests basic cgroup detection without heavy server integration dependencies.
 class CgroupCpuSimpleIntegrationTest : public testing::Test {};
 
-// Test basic cgroup CPU detection functionality - MUST have 'cgroups' in CI
+// Test basic cgroup CPU detection functionality
+// In CI environment with Docker CPU limits (--cpus=2), we expect to detect 'cgroups' limits
 TEST_F(CgroupCpuSimpleIntegrationTest, CgroupDetectionBasicFunctionality) {
   CgroupDetectorImpl detector;
   Filesystem::InstanceImpl fs;

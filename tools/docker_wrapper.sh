@@ -7,14 +7,8 @@ IMAGE=$1
 RUN_REMOTE=$2
 LOCAL_MOUNT=$3
 DOCKER_ENV=$4
-DOCKER_EXTRA_ARGS_ARG=$5
-TEST_PATH=$(realpath "$6")
-shift 6
-
-# Use passed argument if provided, otherwise fall back to environment variable
-if [ -n "${DOCKER_EXTRA_ARGS_ARG}" ] && [ "${DOCKER_EXTRA_ARGS_ARG}" != "NONE" ]; then
-  DOCKER_EXTRA_ARGS="${DOCKER_EXTRA_ARGS_ARG}"
-fi
+TEST_PATH=$(realpath "$5")
+shift 5
 
 if [ "${RUN_REMOTE}" == "yes" ]; then
   echo "Using docker environment from ${DOCKER_ENV}:"
@@ -34,14 +28,10 @@ function cleanup() {
 
 trap cleanup EXIT
 
-# Create environment file for test execution
-# Propagate test environment variables from Bazel's --test_env flags into the Docker container
-# Provide defaults for common test environment variables if not set
 cat > "${ENVFILE}" <<EOF
 TEST_WORKSPACE=/tmp/workspace
 TEST_SRCDIR=/tmp/src
-NORUNFILES=${NORUNFILES}
-ENVOY_IP_TEST_VERSIONS=${ENVOY_IP_TEST_VERSIONS:-v4only}
+ENVOY_IP_TEST_VERSIONS=v4only
 EOF
 
 CMDLINE="set -a && . /env && env && /test $*"
@@ -58,18 +48,12 @@ if [ "${RUN_REMOTE}" != "yes" ]; then
       done
   fi
 
-  # Add CPU limits for cgroup tests if requested
-  DOCKER_EXTRA_ARGS="${DOCKER_EXTRA_ARGS:-}"
-
-  docker run --rm --privileged "${DOCKER_EXTRA_ARGS}" -v "${TEST_PATH}:/test" "${LIB_MOUNTS[@]}" -i -v "${ENVFILE}:/env" \
+  docker run --rm --privileged  -v "${TEST_PATH}:/test" "${LIB_MOUNTS[@]}" -i -v "${ENVFILE}:/env" \
     "${IMAGE}" bash -c "${CMDLINE}"
 else
   # In this case, we need to create the container, then make new layers on top of it, since we
   # can't mount everything into it.
-  # Add CPU limits for cgroup tests if requested
-  DOCKER_EXTRA_ARGS="${DOCKER_EXTRA_ARGS:-}"
-
-  docker create -t --privileged "${DOCKER_EXTRA_ARGS}" --name "${CONTAINER_NAME}" "${IMAGE}" \
+  docker create -t --privileged  --name "${CONTAINER_NAME}" "${IMAGE}" \
     bash -c "${CMDLINE}"
   docker cp "$TEST_PATH" "${CONTAINER_NAME}:/test"
   docker cp "$ENVFILE" "${CONTAINER_NAME}:/env"
