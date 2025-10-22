@@ -56,6 +56,7 @@ public:
                             chain_,
                             context_,
                             Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+                            Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
                             query_string,
                             expiration_time};
   }
@@ -533,6 +534,7 @@ TEST_F(SigV4ASignerImplTest, QueryStringDefault5s) {
   headers.addCopy(Http::LowerCaseString("host"), "example.service.zz");
   headers.addCopy("testheader", "value1");
   SigV4ASignerImpl querysigner("service", "region", chain_, context_,
+                               Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
                                Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, true);
 
   auto status = querysigner.signUnsignedPayload(headers);
@@ -602,6 +604,7 @@ TEST_F(SigV4ASignerImplTest, FailKeyDerivation) {
       .WillOnce(Return(absl::InvalidArgumentError("invalid")));
   SigV4ASignerImpl querysigner(
       "service", "region", chain_, context_,
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
       Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, true,
       SignatureQueryParameterValues::DefaultExpiration,
       std::unique_ptr<SigV4AKeyDerivationBase>(mock_key_derivation.release()));

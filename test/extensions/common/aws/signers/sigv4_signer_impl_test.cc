@@ -30,6 +30,7 @@ public:
     chain_->add(credentials_provider_);
     signer_ =
         std::make_shared<SigV4SignerImpl>("service", "region", chain_, context_,
+                                          Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
                                           Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
   }
 
@@ -55,6 +56,7 @@ public:
     headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
     chain_->add(credentials_provider_);
     SigV4SignerImpl signer(service_name, "region", chain_, context_,
+                           Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
                            Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, false, 5);
     if (use_unsigned_payload) {
       status = signer.signUnsignedPayload(headers, override_region);
@@ -85,6 +87,7 @@ public:
     }
 
     SigV4SignerImpl signer(service_name, "region", chain_, context_,
+                           Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
                            Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, true, 5);
 
     auto status = signer.signUnsignedPayload(extra_headers, override_region);
@@ -341,6 +344,7 @@ TEST_F(SigV4SignerImplTest, QueryStringDefault5s) {
   headers.addCopy("testheader", "value1");
   chain_->add(credentials_provider);
   SigV4SignerImpl querysigner("service", "region", chain_, context_,
+                              Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
                               Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, true, 5);
 
   auto status = querysigner.signUnsignedPayload(headers);
