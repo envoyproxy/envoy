@@ -55,5 +55,4 @@ jobs:
         include:
         - target: cpu-detection
           name: CPU detection
-          diskspace-hack: true
           docker-cpus: 2
