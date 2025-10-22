@@ -7,7 +7,7 @@ import "envoy/type/matcher/string.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v2";
 option java_outer_classname = "CsrfProto";
@@ -32,7 +32,7 @@ message CsrfPolicy {
   //   This field defaults to 100/:ref:`HUNDRED
   //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
   api.v2.core.RuntimeFractionalPercent filter_enabled = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   // Specifies that CSRF policies will be evaluated and tracked, but not enforced.
   //

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/extensions/http/stateful_session/cookie/v3/cookie.pb.validate.h"
 
 #include "source/extensions/http/stateful_session/cookie/cookie.h"
 

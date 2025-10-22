@@ -6,7 +6,7 @@ import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.generic_proxy.v3";
 option java_outer_classname = "RouteProto";
@@ -19,7 +19,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 message VirtualHost {
   // The name of the virtual host.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // A list of hosts that will be matched to this virtual host. Wildcard hosts are supported in
   // the suffix or prefix form.
@@ -37,10 +37,10 @@ message VirtualHost {
   //   The longest wildcards match first.
   //   Only a single virtual host in the entire route configuration can match on ``*``. A domain
   //   must be unique across all virtual hosts or the config will fail to load.
-  repeated string hosts = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated string hosts = 2 [(buf.validate.field).repeated = {min_items: 1}];
 
   // The match tree to use when resolving route actions for incoming requests.
-  xds.type.matcher.v3.Matcher routes = 3 [(validate.rules).message = {required: true}];
+  xds.type.matcher.v3.Matcher routes = 3 [(buf.validate.field).required = true];
 }
 
 // The generic proxy makes use of the xDS matching API for routing configurations.
@@ -91,7 +91,7 @@ message VirtualHost {
 message RouteConfiguration {
   // The name of the route configuration. For example, it might match route_config_name in
   // envoy.extensions.filters.network.generic_proxy.v3.Rds.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // The match tree to use when resolving route actions for incoming requests.
   // If no any virtual host is configured in the ``virtual_hosts`` field or no special wildcard

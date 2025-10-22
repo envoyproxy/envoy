@@ -1,7 +1,6 @@
 #include "source/extensions/transport_sockets/tls/downstream_config.h"
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/tls/server_context_config_impl.h"

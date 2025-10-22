@@ -5,7 +5,6 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/extensions/http/custom_response/redirect_policy/v3/redirect_policy.pb.h"
-#include "envoy/extensions/http/custom_response/redirect_policy/v3/redirect_policy.pb.validate.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 

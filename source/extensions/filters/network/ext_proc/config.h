@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/ext_proc/v3/ext_proc.pb.h"
-#include "envoy/extensions/filters/network/ext_proc/v3/ext_proc.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"

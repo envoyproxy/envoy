@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/connect_grpc_bridge/v3/config.pb.h"
-#include "envoy/extensions/filters/http/connect_grpc_bridge/v3/config.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"

@@ -17,9 +17,9 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
+#include "buf/validate/validator.h"
 #include "udpa/annotations/sensitive.pb.h"
 #include "udpa/annotations/status.pb.h"
-#include "validate/validate.h"
 #include "xds/annotations/v3/status.pb.h"
 
 using namespace std::chrono_literals;
@@ -364,32 +364,55 @@ void MessageUtil::validateDurationFields(const Protobuf::Message& message, bool 
 
 namespace {
 
-class PgvCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
+class ProtovalidateCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
+  ProtovalidateCheckVisitor() {
+    // Initialize the validator factory once
+    auto factory_result = buf::validate::ValidatorFactory::New();
+    if (!factory_result.ok()) {
+      PANIC(fmt::format("Failed to create protovalidate ValidatorFactory: {}",
+                        factory_result.status().ToString()));
+    }
+    factory_ = std::move(factory_result.value());
+  }
+
   absl::Status onMessage(const Protobuf::Message& message,
                          absl::Span<const Protobuf::Message* const>,
                          bool was_any_or_top_level) override {
-    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
-    std::string err;
-    // PGV verification is itself recursive up to the point at which it hits an Any message. As
-    // such, to avoid N^2 checking of the tree, we only perform an additional check at the point
-    // at which PGV would have stopped because it does not itself check within Any messages.
-    if (was_any_or_top_level &&
-        !pgv::BaseValidator::AbstractCheckMessage(*reflectable_message, &err)) {
-      std::string error = fmt::format("{}: Proto constraint validation failed ({})",
-                                      reflectable_message->DebugString(), err);
-      return absl::InvalidArgumentError(error);
+    // Protovalidate validation is recursive, similar to PGV. We only perform an additional
+    // check at the top level or when encountering Any messages to avoid N^2 checking.
+    if (was_any_or_top_level) {
+      google::protobuf::Arena arena;
+      auto validator = factory_->NewValidator(&arena, false);
+      auto result = validator.Validate(message);
+      if (!result.ok()) {
+        return absl::InvalidArgumentError(
+            fmt::format("Proto constraint validation failed: {}", result.status().ToString()));
+      }
+      const auto& violations = result.value();
+      if (violations.violations_size() > 0) {
+        std::string error_msg = "Proto constraint validation failed:";
+        for (int i = 0; i < violations.violations_size(); ++i) {
+          const auto& violation = violations.violations(i);
+          error_msg += fmt::format("\n  - Field '{}': {}", violation.field_path(),
+                                   violation.message());
+        }
+        return absl::InvalidArgumentError(error_msg);
+      }
     }
     return absl::OkStatus();
   }
 
   void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
+
+private:
+  std::unique_ptr<buf::validate::ValidatorFactory> factory_;
 };
 
 } // namespace
 
 void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
-  PgvCheckVisitor visitor;
+  ProtovalidateCheckVisitor visitor;
   THROW_IF_NOT_OK(ProtobufMessage::traverseMessage(visitor, message, true));
 }
 

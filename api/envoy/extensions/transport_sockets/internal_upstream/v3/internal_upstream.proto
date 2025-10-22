@@ -6,7 +6,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/type/metadata/v3/metadata.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.internal_upstream.v3";
 option java_outer_classname = "InternalUpstreamProto";
@@ -31,10 +31,10 @@ message InternalUpstreamTransport {
   // then no metadata is passed through for this particular instance.
   message MetadataValueSource {
     // Specifies what kind of metadata.
-    type.metadata.v3.MetadataKind kind = 1 [(validate.rules).message = {required: true}];
+    type.metadata.v3.MetadataKind kind = 1 [(buf.validate.field).required = true];
 
     // Name is the filter namespace used in the dynamic metadata.
-    string name = 2 [(validate.rules).string = {min_len: 1}];
+    string name = 2 [(buf.validate.field).string = {min_len: 1}];
   }
 
   // Specifies the metadata namespaces and values to insert into the downstream
@@ -45,5 +45,5 @@ message InternalUpstreamTransport {
   repeated MetadataValueSource passthrough_metadata = 1;
 
   // The underlying transport socket being wrapped.
-  config.core.v3.TransportSocket transport_socket = 3 [(validate.rules).message = {required: true}];
+  config.core.v3.TransportSocket transport_socket = 3 [(buf.validate.field).required = true];
 }

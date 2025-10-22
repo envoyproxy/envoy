@@ -6,7 +6,7 @@ import "envoy/config/core/v3/proxy_protocol.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.listener.proxy_protocol.v3";
 option java_outer_classname = "ProxyProtocolProto";
@@ -28,7 +28,7 @@ message ProxyProtocol {
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
-    string key = 2 [(validate.rules).string = {min_len: 1}];
+    string key = 2 [(buf.validate.field).string = {min_len: 1}];
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.
@@ -36,7 +36,7 @@ message ProxyProtocol {
     // The type that triggers the rule - required
     // TLV type is defined as uint8_t in proxy protocol. See `the spec
     // <https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt>`_ for details.
-    uint32 tlv_type = 1 [(validate.rules).uint32 = {lt: 256}];
+    uint32 tlv_type = 1 [(buf.validate.field).uint32 = {lt: 256}];
 
     // If the TLV type is present, apply this metadata KeyValuePair.
     KeyValuePair on_tlv_present = 2;

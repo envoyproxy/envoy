@@ -12,7 +12,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.access_loggers.grpc.v3";
 option java_outer_classname = "AlsProto";
@@ -31,7 +31,7 @@ message HttpGrpcAccessLogConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.HttpGrpcAccessLogConfig";
 
-  CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
+  CommonGrpcAccessLogConfig common_config = 1 [(buf.validate.field).required = true];
 
   // Additional request headers to log in :ref:`HTTPRequestProperties.request_headers
   // <envoy_v3_api_field_data.accesslog.v3.HTTPRequestProperties.request_headers>`.
@@ -53,7 +53,7 @@ message TcpGrpcAccessLogConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.TcpGrpcAccessLogConfig";
 
-  CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
+  CommonGrpcAccessLogConfig common_config = 1 [(buf.validate.field).required = true];
 }
 
 // Common configuration for gRPC access logs.
@@ -65,20 +65,20 @@ message CommonGrpcAccessLogConfig {
   // The friendly name of the access log to be returned in :ref:`StreamAccessLogsMessage.Identifier
   // <envoy_v3_api_msg_service.accesslog.v3.StreamAccessLogsMessage.Identifier>`. This allows the
   // access log server to differentiate between different access logs coming from the same Envoy.
-  string log_name = 1 [(validate.rules).string = {min_len: 1}];
+  string log_name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // The gRPC service for the access log service.
-  config.core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
+  config.core.v3.GrpcService grpc_service = 2 [(buf.validate.field).required = true];
 
   // API version for access logs service transport protocol. This describes the access logs service
   // gRPC endpoint and version of messages used on the wire.
   config.core.v3.ApiVersion transport_api_version = 6
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum = {defined_only: true}];
 
   // Interval for flushing access logs to the gRPC stream. Logger will flush requests every time
   // this interval is elapsed, or when batch size limit is hit, whichever comes first. Defaults to
   // 1 second.
-  google.protobuf.Duration buffer_flush_interval = 3 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration buffer_flush_interval = 3 [(buf.validate.field).duration = {gt {}}];
 
   // Soft size limit in bytes for access log entries buffer. Logger will buffer requests until
   // this limit it hit, or every time flush interval is elapsed, whichever comes first. Setting it

@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.http.stateful_session.envelope.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.stateful_session.envelope.v3";
 option java_outer_classname = "EnvelopeProto";
@@ -44,9 +44,9 @@ message EnvelopeSessionState {
     // If this mode is used then Envoy will assume that the header in the request will also be in the
     // same format and will contain the ``UV`` part. This extension will parse the upstream host
     // address and update the ``name`` field specified header in the request to the ``UV`` part.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(buf.validate.field).string = {min_len: 1}];
   }
 
   // Set the header config to track the session state.
-  Header header = 1 [(validate.rules).message = {required: true}];
+  Header header = 1 [(buf.validate.field).required = true];
 }

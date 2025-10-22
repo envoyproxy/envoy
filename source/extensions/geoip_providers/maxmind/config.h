@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
-#include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.validate.h"
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/geoip_providers/common/factory_base.h"

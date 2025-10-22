@@ -9,7 +9,7 @@ import "google/protobuf/duration.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.ext_proc.v3";
 option java_outer_classname = "ExtProcProto";
@@ -55,12 +55,12 @@ message NetworkExternalProcessor {
   // the proxy sends a message on the stream that requires a response, it will
   // reset this timer, and will stop processing and return an error (subject
   // to the processing mode) if the timer expires. Default is 200 ms.
-  google.protobuf.Duration message_timeout = 4 [(validate.rules).duration = {
+  google.protobuf.Duration message_timeout = 4 [(buf.validate.field).duration = {
     lte {seconds: 3600}
     gte {}
   }];
 
-  string stat_prefix = 5 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 5 [(buf.validate.field).string = {min_len: 1}];
 
   // Options related to the sending and receiving of dynamic metadata.
   MetadataOptions metadata_options = 6;

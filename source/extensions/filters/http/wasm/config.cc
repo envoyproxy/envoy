@@ -1,6 +1,5 @@
 #include "source/extensions/filters/http/wasm/config.h"
 
-#include "envoy/extensions/filters/http/wasm/v3/wasm.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 namespace Envoy {

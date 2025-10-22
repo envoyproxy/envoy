@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.common.dependency.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.common.dependency.v3";
 option java_outer_classname = "DependencyProto";
@@ -25,7 +25,7 @@ message Dependency {
   DependencyType type = 1;
 
   // The string identifier for the dependency.
-  string name = 2 [(validate.rules).string = {min_len: 1}];
+  string name = 2 [(buf.validate.field).string = {min_len: 1}];
 }
 
 // Dependency specification for a filter. For a filter chain to be valid, any

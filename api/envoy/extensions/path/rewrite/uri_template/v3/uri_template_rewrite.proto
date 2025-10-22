@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.path.rewrite.uri_template.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.path.rewrite.uri_template.v3";
 option java_outer_classname = "UriTemplateRewriteProto";
@@ -54,5 +54,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   string of ``/{lang}/{format}/{file}.vtt`` would transform ``/content/hls/en-us/12345/en_193913.vtt``
 //   into ``/en-us/hls/en_193913.vtt``.
 message UriTemplateRewriteConfig {
-  string path_template_rewrite = 1 [(validate.rules).string = {min_len: 1 max_len: 256}];
+  string path_template_rewrite = 1 [(buf.validate.field).string = {min_len: 1 max_len: 256}];
 }

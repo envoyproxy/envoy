@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.h"
-#include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/common/aws/credential_provider_chains.h"

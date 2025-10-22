@@ -1,7 +1,6 @@
 #include "source/extensions/http/original_ip_detection/xff/config.h"
 
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
-#include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.validate.h"
 #include "envoy/http/original_ip_detection.h"
 
 #include "source/common/config/utility.h"

@@ -6,7 +6,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.listener.tls_inspector.v3";
 option java_outer_classname = "TlsInspectorProto";
@@ -36,7 +36,7 @@ message TlsInspector {
   // If this size is not defined, defaults to maximum 16KiB that the
   // tls inspector will consume.
   google.protobuf.UInt32Value initial_read_buffer_size = 2
-      [(validate.rules).uint32 = {lt: 65537 gt: 255}];
+      [(buf.validate.field).uint32 = {lt: 65537 gt: 255}];
 
   // Close connection when TLS ClientHello message could not be parsed.
   // This flag should be enabled only if it is known that incoming connections are expected to use

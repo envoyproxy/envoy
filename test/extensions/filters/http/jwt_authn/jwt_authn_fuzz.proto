@@ -4,14 +4,14 @@ package envoy.extensions.filters.http.jwt_authn;
 
 import "envoy/extensions/filters/http/jwt_authn/v3/config.proto";
 import "test/fuzz/common.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 message JwtAuthnFuzzInput {
   envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication config = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   // HTTP request data.
-  test.fuzz.HttpData request_data = 2 [(validate.rules).message = {required: true}];
+  test.fuzz.HttpData request_data = 2 [(buf.validate.field).required = true];
 
   // If empty, remote_jwks_fetch fails.
   string remote_jwks = 3;
@@ -26,5 +26,5 @@ message JwtAuthnFuzzInput {
   bool filter_on_destroy = 8;
 
   // number of times to make the call, 0 < x < 5
-  uint32 num_calls = 5 [(validate.rules).uint32 = {gt: 0 lt: 5}];
+  uint32 num_calls = 5 [(buf.validate.field).uint32 = {gt: 0 lt: 5}];
 }

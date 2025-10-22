@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/local_info/local_info.h"
 
 #include "source/common/protobuf/protobuf.h"

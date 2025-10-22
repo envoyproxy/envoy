@@ -6,7 +6,6 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.h"
-#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"

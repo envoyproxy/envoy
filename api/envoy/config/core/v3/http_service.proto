@@ -6,7 +6,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "HttpServiceProto";
@@ -31,5 +31,5 @@ message HttpService {
   // Specifies a list of HTTP headers that should be added to each request
   // handled by this virtual host.
   repeated HeaderValueOption request_headers_to_add = 2
-      [(validate.rules).repeated = {max_items: 1000}];
+      [(buf.validate.field).repeated = {max_items: 1000}];
 }

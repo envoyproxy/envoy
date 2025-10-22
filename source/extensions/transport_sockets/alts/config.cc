@@ -1,7 +1,6 @@
 #include "source/extensions/transport_sockets/alts/config.h"
 
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
-#include "envoy/extensions/transport_sockets/alts/v3/alts.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 

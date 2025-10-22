@@ -7,7 +7,6 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
-#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/local_info/local_info.h"
