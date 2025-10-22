@@ -49,7 +49,7 @@ public:
   static constexpr absl::string_view AuthorizationCredentialFormat = "{}/{}";
 };
 
-using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
+using AwsSigningHeaderMatcherVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
 /**
  * Implementation of the Signature V4 signing process.
@@ -63,8 +63,8 @@ public:
   SignerBaseImpl(absl::string_view service_name, absl::string_view region,
                  const CredentialsProviderChainSharedPtr& credentials_provider_chain,
                  Server::Configuration::CommonFactoryContext& context,
-                 const AwsSigningHeaderExclusionVector& exclude_matcher_config,
-                 const AwsSigningHeaderExclusionVector& include_matcher_config,
+                 const AwsSigningHeaderMatcherVector& exclude_matcher_config,
+                 const AwsSigningHeaderMatcherVector& include_matcher_config,
                  const bool query_string = false,
                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
       : service_name_(service_name), region_(region),

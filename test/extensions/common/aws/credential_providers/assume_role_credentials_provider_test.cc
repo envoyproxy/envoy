@@ -94,7 +94,7 @@ public:
 
     auto signer = std::make_unique<SigV4SignerImpl>(
         STS_SERVICE_NAME, "region", credentials_provider_chain, context_,
-        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+        Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
 
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<AssumeRoleCredentialsProvider>(
@@ -691,7 +691,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
                                                                                 defaults);
   auto signer = std::make_unique<SigV4SignerImpl>(
       STS_SERVICE_NAME, "region", credentials_provider_chain, context_,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
 
   provider_ = std::make_shared<AssumeRoleCredentialsProvider>(
       context_, mock_manager_, cluster_name,
@@ -859,7 +859,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, CredentialsPendingReturn) {
 
   auto signer = std::make_unique<SigV4SignerImpl>(
       STS_SERVICE_NAME, "region", credentials_provider_chain, context_,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
 
   provider_ = std::make_shared<AssumeRoleCredentialsProvider>(
       context_, mock_manager_, cluster_name,
@@ -942,7 +942,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithExternalId) {
                                                                                 defaults);
   auto signer = std::make_unique<SigV4SignerImpl>(
       STS_SERVICE_NAME, "region", credentials_provider_chain, context_,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
 
   provider_ = std::make_shared<AssumeRoleCredentialsProvider>(
       context_, mock_manager_, cluster_name,

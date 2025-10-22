@@ -126,10 +126,10 @@ AwsRequestSigningFilterFactory::createSigner(
     return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
   }
 
-  const auto include_matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
+  const auto include_matcher_config = Extensions::Common::Aws::AwsSigningHeaderMatcherVector(
       config.match_included_headers().begin(), config.match_included_headers().end());
 
-  const auto exclude_matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
+  const auto exclude_matcher_config = Extensions::Common::Aws::AwsSigningHeaderMatcherVector(
       config.match_excluded_headers().begin(), config.match_excluded_headers().end());
 
   const bool query_string = config.has_query_string();

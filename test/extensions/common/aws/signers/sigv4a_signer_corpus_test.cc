@@ -39,7 +39,7 @@ public:
     chain_->add(credentials_provider_);
     signer_ = std::make_shared<SigV4ASignerImpl>(
         "service", "region", chain_, context_,
-        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+        Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
   };
 
   void addMethod(const std::string& method) { message_.headers().setMethod(method); }
@@ -286,7 +286,7 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusHeaderSigning) {
   addBodySigningIfRequired();
 
   SigV4ASignerImpl headersigner_(service_, region_, chain_, context_,
-                                 Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false,
+                                 Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, false,
                                  expiration_);
 
   auto signer_friend = SigV4ASignerImplFriend(&headersigner_);
@@ -347,7 +347,7 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusQueryStringSigning) {
   const auto calculated_canonical_headers = Utility::canonicalizeHeaders(message_.headers(), {});
 
   SigV4ASignerImpl querysigner_(service_, region_, chain_, context_,
-                                Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
+                                Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, true,
                                 expiration_);
 
   auto signer_friend = SigV4ASignerImplFriend(&querysigner_);

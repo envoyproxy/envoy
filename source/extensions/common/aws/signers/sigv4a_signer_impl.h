@@ -29,9 +29,8 @@ public:
       absl::string_view service_name, absl::string_view region,
       const CredentialsProviderChainSharedPtr& credentials_provider,
       Server::Configuration::CommonFactoryContext& context,
-      const AwsSigningHeaderExclusionVector& exclude_matcher_config,
-      const AwsSigningHeaderExclusionVector& include_matcher_config,
-      const bool query_string = false,
+      const AwsSigningHeaderMatcherVector& exclude_matcher_config,
+      const AwsSigningHeaderMatcherVector& include_matcher_config, const bool query_string = false,
       const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration,
       std::unique_ptr<SigV4AKeyDerivationBase> key_derivation_ptr =
           std::make_unique<SigV4AKeyDerivation>())
