@@ -245,6 +245,11 @@ jobs:
              "job-started": ${{ steps.started.outputs.value }}}
           | . * {$config, $check}
 
+    - name: Free diskspace
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.26
+      if: inputs.diskspace-hack
+      with:
+        to_remove: ${{ inputs.diskspace-hack-paths }}
 
     - run: |
         sudo mkdir -p /etc/docker
@@ -365,8 +370,6 @@ jobs:
         container-command: ${{ env.CONTAINER_COMMAND || inputs.container-command }}
         container-output: ${{ inputs.container-output }}
         context: ${{ steps.context.outputs.value }}
-        diskspace-hack: ${{ inputs.diskspace-hack }}
-        diskspace-hack-paths: ${{ inputs.diskspace-hack-paths }}
         downloads: ${{ inputs.downloads }}
         entrypoint: ${{ inputs.entrypoint }}
         error-match: ${{ inputs.error-match }}
