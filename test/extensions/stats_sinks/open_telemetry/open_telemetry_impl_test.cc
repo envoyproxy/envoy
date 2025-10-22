@@ -1089,18 +1089,26 @@ TEST_F(OtlpMetricsFlusherTests, DropMetrics) {
 
   addCounterToSnapshot("test_counter", 1, 1);
   addCounterToSnapshot("drop_counter", 1, 1);
+  addHostCounterToSnapshot("test_host_counter", 1, 1);
+  addHostCounterToSnapshot("drop_host_counter", 1, 1);
   addGaugeToSnapshot("test_gauge", 1);
   addGaugeToSnapshot("drop_gauge", 1);
+  addHostGaugeToSnapshot("test_host_gauge", 4);
+  addHostGaugeToSnapshot("drop_host_gauge", 4);
   addHistogramToSnapshot("test_histogram");
   addHistogramToSnapshot("drop_histogram");
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
-  expectMetricsCount(metrics, 3);
+  expectMetricsCount(metrics, 5);
 
   EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_counter")));
   EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_counter")));
+  EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_host_counter")));
+  EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_host_counter")));
   EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_gauge")));
   EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_gauge")));
+  EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_host_gauge")));
+  EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_host_gauge")));
   EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_histogram")));
   EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_histogram")));
 }
