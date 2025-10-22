@@ -15,6 +15,7 @@ class EnvoyQuicServerProofVerifierFactoryImpl
     : public EnvoyQuicServerProofVerifierFactoryInterface {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    // Reuse ProofSourceConfig since it's an empty proto and serves a similar purpose.
     return std::make_unique<envoy::extensions::quic::proof_source::v3::ProofSourceConfig>();
   }
 
