@@ -51,7 +51,7 @@ public:
     parse_status_formatter_ = parser->parse("PARSE_STATUS", "", absl::nullopt);
   }
 
-  void log(const Formatter::HttpFormatterContext& context,
+  void log(const Formatter::Context& context,
            const StreamInfo::StreamInfo& stream_info) override {
     log_count_++;
 
@@ -68,20 +68,6 @@ public:
     local_address_ = stream_info.downstreamAddressProvider().localAddress()->asString();
   }
 
-  size_t logCount() const { return log_count_; }
-
-  // Accessors for formatted values using custom commands
-  const absl::optional<std::string>& queryName() const { return query_name_; }
-  const absl::optional<std::string>& queryType() const { return query_type_; }
-  const absl::optional<std::string>& queryClass() const { return query_class_; }
-  const absl::optional<std::string>& answerCount() const { return answer_count_; }
-  const absl::optional<std::string>& responseCode() const { return response_code_; }
-  const absl::optional<std::string>& parseStatus() const { return parse_status_; }
-
-  // Accessors for address information
-  const std::string& remoteAddress() const { return remote_address_; }
-  const std::string& localAddress() const { return local_address_; }
-
   void reset() {
     log_count_ = 0;
     query_name_ = absl::nullopt;
@@ -94,7 +80,6 @@ public:
     local_address_.clear();
   }
 
-private:
   size_t log_count_ = 0;
 
   // Formatters using DNS custom commands
@@ -254,15 +239,15 @@ server_config:
   sendQueryFromClient("192.168.1.100:54321", query);
 
   // Verify access log was called
-  ASSERT_EQ(test_access_log_->logCount(), 1);
+  ASSERT_EQ(test_access_log_->log_count_, 1);
 
   // Verify DNS custom command formatters extracted correct information
-  EXPECT_EQ(test_access_log_->queryName().value(), "www.example.com");
-  EXPECT_EQ(test_access_log_->queryType().value(), "1");  // DNS_RECORD_TYPE_A
-  EXPECT_EQ(test_access_log_->queryClass().value(), "1"); // DNS_RECORD_CLASS_IN
-  EXPECT_EQ(test_access_log_->answerCount().value(), "2");
-  EXPECT_EQ(test_access_log_->responseCode().value(), "0"); // DNS_RESPONSE_CODE_NO_ERROR
-  EXPECT_EQ(test_access_log_->parseStatus().value(), "true");
+  EXPECT_EQ(test_access_log_->query_name_.value(), "www.example.com");
+  EXPECT_EQ(test_access_log_->query_type_.value(), "1");  // DNS_RECORD_TYPE_A
+  EXPECT_EQ(test_access_log_->query_class_.value(), "1"); // DNS_RECORD_CLASS_IN
+  EXPECT_EQ(test_access_log_->answer_count_.value(), "2");
+  EXPECT_EQ(test_access_log_->response_code_.value(), "0"); // DNS_RESPONSE_CODE_NO_ERROR
+  EXPECT_EQ(test_access_log_->parse_status_.value(), "true");
 }
 
 // Test access logging with AAAA query using custom formatters
@@ -287,10 +272,10 @@ server_config:
 
   sendQueryFromClient("192.168.1.100:54321", query);
 
-  ASSERT_EQ(test_access_log_->logCount(), 1);
+  ASSERT_EQ(test_access_log_->log_count_, 1);
 
-  EXPECT_EQ(test_access_log_->queryType().value(), "28"); // quad-A record type
-  EXPECT_EQ(test_access_log_->answerCount().value(), "1");
+  EXPECT_EQ(test_access_log_->query_type_.value(), "28"); // quad-A record type
+  EXPECT_EQ(test_access_log_->answer_count_.value(), "1");
 }
 
 // Test access logging for NXDOMAIN using custom formatters
@@ -315,11 +300,11 @@ server_config:
 
   sendQueryFromClient("192.168.1.100:54321", query);
 
-  ASSERT_EQ(test_access_log_->logCount(), 1);
+  ASSERT_EQ(test_access_log_->log_count_, 1);
 
-  EXPECT_EQ(test_access_log_->queryName().value(), "nonexistent.example.com");
-  EXPECT_EQ(test_access_log_->responseCode().value(), "3"); // DNS_RESPONSE_CODE_NAME_ERROR
-  EXPECT_EQ(test_access_log_->answerCount().value(), "0");
+  EXPECT_EQ(test_access_log_->query_name_.value(), "nonexistent.example.com");
+  EXPECT_EQ(test_access_log_->response_code_.value(), "3"); // DNS_RESPONSE_CODE_NAME_ERROR
+  EXPECT_EQ(test_access_log_->answer_count_.value(), "0");
 }
 
 // Test that multiple access loggers all get called
@@ -363,8 +348,8 @@ server_config:
   sendQueryFromClient("192.168.1.100:54321", query);
 
   // Both loggers should have been called
-  EXPECT_EQ(test_access_log1->logCount(), 1);
-  EXPECT_EQ(test_access_log2->logCount(), 1);
+  EXPECT_EQ(test_access_log1->log_count_, 1);
+  EXPECT_EQ(test_access_log2->log_count_, 1);
 }
 
 // Test that downstream addresses are captured correctly
@@ -390,10 +375,10 @@ server_config:
   const std::string client_address = "192.168.1.100:54321";
   sendQueryFromClient(client_address, query);
 
-  ASSERT_EQ(test_access_log_->logCount(), 1);
+  ASSERT_EQ(test_access_log_->log_count_, 1);
 
-  EXPECT_EQ(test_access_log_->remoteAddress(), client_address);
-  EXPECT_EQ(test_access_log_->localAddress(), "127.0.0.1:53");
+  EXPECT_EQ(test_access_log_->remote_address_, client_address);
+  EXPECT_EQ(test_access_log_->local_address_, "127.0.0.1:53");
 }
 
 // Test access logging with malformed query (empty queries) using custom formatters
@@ -415,15 +400,15 @@ server_config:
   // Send malformed DNS query (empty buffer)
   sendQueryFromClient("192.168.1.100:54321", "");
 
-  ASSERT_EQ(test_access_log_->logCount(), 1);
+  ASSERT_EQ(test_access_log_->log_count_, 1);
 
   // When queries are empty, custom formatters for query-specific fields should return nullopt
-  EXPECT_FALSE(test_access_log_->queryName().has_value());
-  EXPECT_FALSE(test_access_log_->queryType().has_value());
-  EXPECT_FALSE(test_access_log_->queryClass().has_value());
+  EXPECT_FALSE(test_access_log_->query_name_.has_value());
+  EXPECT_FALSE(test_access_log_->query_type_.has_value());
+  EXPECT_FALSE(test_access_log_->query_class_.has_value());
 
-  EXPECT_EQ(test_access_log_->answerCount().value(), "0");
-  EXPECT_EQ(test_access_log_->parseStatus().value(), "false");
+  EXPECT_EQ(test_access_log_->answer_count_.value(), "0");
+  EXPECT_EQ(test_access_log_->parse_status_.value(), "false");
 }
 
 // Test custom DNS command parser formatters
