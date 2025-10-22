@@ -618,16 +618,6 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  if (!config_->backoffStrategy()) {
-    const uint32_t max_connect_attempts = config_->maxConnectAttempts();
-    if (connect_attempts_ >= max_connect_attempts) {
-      getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
-      cluster->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
-      onInitFailure(UpstreamFailureReason::ConnectFailed);
-      return Network::FilterStatus::StopIteration;
-    }
-  }
-
   auto& downstream_connection = read_callbacks_->connection();
   auto& filter_state = downstream_connection.streamInfo().filterState();
   if (!filter_state->hasData<Network::ProxyProtocolFilterState>(
