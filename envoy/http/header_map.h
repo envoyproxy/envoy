@@ -683,7 +683,7 @@ public:
   RegisterCustomInlineHeader(const LowerCaseString& header)
       : handle_(CustomInlineHeaderRegistry::registerInlineHeader<type>(header)) {}
 
-  typename CustomInlineHeaderRegistry::Handle<type> handle() { return handle_; }
+  typename CustomInlineHeaderRegistry::Handle<type> handle() const { return handle_; }
 
 private:
   const typename CustomInlineHeaderRegistry::Handle<type> handle_;
