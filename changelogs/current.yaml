@@ -46,6 +46,11 @@ bug_fixes:
   change: |
     Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
     or responses trigger flow control.
+- area: http
+  change: |
+    Fixed ``shouldDrainConnectionUponCompletion()`` to properly send ``GOAWAY`` frames for HTTP/2 and HTTP/3
+    instead of aggressively closing connections. This prevents response body transmission interruption and
+    ``ERR_DRAINING`` errors on the client side. HTTP/1.1 behavior remains unchanged.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
