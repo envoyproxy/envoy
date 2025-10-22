@@ -1,5 +1,5 @@
-load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
+load("@jq.bzl", "jq")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 

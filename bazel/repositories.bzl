@@ -228,10 +228,12 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
     external_http_archive(
-        "aspect_bazel_lib",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:aspect.patch"],
+        "bazel_lib",
+        # patch_args = ["-p1"],
+        # patches = ["@envoy//bazel:aspect.patch"],
     )
+    external_http_archive("jq.bzl")
+    external_http_archive("yq.bzl")
 
     _com_github_fdio_vpp_vcl()
 
