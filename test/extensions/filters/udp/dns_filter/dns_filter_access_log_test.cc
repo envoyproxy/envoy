@@ -51,8 +51,7 @@ public:
     parse_status_formatter_ = parser->parse("PARSE_STATUS", "", absl::nullopt);
   }
 
-  void log(const Formatter::Context& context,
-           const StreamInfo::StreamInfo& stream_info) override {
+  void log(const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) override {
     log_count_++;
 
     // Use custom formatters to extract DNS information
