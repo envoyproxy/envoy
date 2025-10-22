@@ -29,10 +29,6 @@ envoy_cc_library(
         ":network_type_socket_option_lib",
         ":network_types_lib",
         ":proxy_settings_lib",
-        "//library/common:engine_types_lib",
-        "//library/common/network:src_addr_socket_option_lib",
-        "//library/common/system:system_helper_lib",
-        "//library/common/types:c_types_lib",
         "@envoy//envoy/network:socket_interface",
         "@envoy//envoy/singleton:manager_interface",
         "@envoy//source/common/common:assert_lib",
@@ -40,6 +36,10 @@ envoy_cc_library(
         "@envoy//source/common/network:addr_family_aware_socket_option_lib",
         "@envoy//source/common/network:socket_option_lib",
         "@envoy//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
+        "@envoy_mobile//library/common:engine_types_lib",
+        "@envoy_mobile//library/common/network:src_addr_socket_option_lib",
+        "@envoy_mobile//library/common/system:system_helper_lib",
+        "@envoy_mobile//library/common/types:c_types_lib",
     ],
 )
 
