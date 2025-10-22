@@ -116,7 +116,8 @@ TEST_F(AsyncCredentialHandlingTest, ReceivePendingTrueWhenPending) {
   chain->add(provider_);
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       "vpc-lattice-svcs", "ap-southeast-2", chain, context_,
-      Common::Aws::AwsSigningHeaderExclusionVector{}, Common::Aws::AwsSigningHeaderExclusionVector{});
+      Common::Aws::AwsSigningHeaderExclusionVector{},
+      Common::Aws::AwsSigningHeaderExclusionVector{});
 
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
@@ -185,7 +186,8 @@ TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) 
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       "vpc-lattice-svcs", "ap-southeast-2", chain, context_,
-      Common::Aws::AwsSigningHeaderExclusionVector{},Common::Aws::AwsSigningHeaderExclusionVector{});
+      Common::Aws::AwsSigningHeaderExclusionVector{},
+      Common::Aws::AwsSigningHeaderExclusionVector{});
   addMethod("GET");
   addPath("/");
 
@@ -255,7 +257,8 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       "vpc-lattice-svcs", "ap-southeast-2", chain, context_,
-      Common::Aws::AwsSigningHeaderExclusionVector{}, Common::Aws::AwsSigningHeaderExclusionVector{});
+      Common::Aws::AwsSigningHeaderExclusionVector{},
+      Common::Aws::AwsSigningHeaderExclusionVector{});
   addMethod("GET");
   addPath("/");
 

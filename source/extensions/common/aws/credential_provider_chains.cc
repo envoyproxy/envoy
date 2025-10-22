@@ -273,7 +273,8 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
   // Create our own signer specifically for signing AssumeRole API call
   auto signer = std::make_unique<SigV4SignerImpl>(
       STS_SERVICE_NAME, region, credentials_provider_chain, context,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{},Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{},
+      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
 
   auto credential_provider = std::make_shared<AssumeRoleCredentialsProvider>(
       context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,

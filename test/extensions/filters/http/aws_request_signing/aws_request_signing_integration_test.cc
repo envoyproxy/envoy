@@ -396,12 +396,12 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationWithIncludedHeaders) {
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                  {":path", "/test/path"},
-                                                  {":scheme", "http"},
-                                                  {":authority", "host"},
-                                                  {"x-custom-header", "custom-value"},
-                                                  {"user-agent", "test-agent"},
-                                                  {"x-other-header", "other-value"}};
+                                                 {":path", "/test/path"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-custom-header", "custom-value"},
+                                                 {"user-agent", "test-agent"},
+                                                 {"x-other-header", "other-value"}};
 
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 

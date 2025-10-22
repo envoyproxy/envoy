@@ -142,8 +142,8 @@ AwsRequestSigningFilterFactory::createSigner(
 
   if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
     return std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
-        config.service_name(), region, credentials_provider.value(), server_context, exclude_matcher_config, include_matcher_config,
-        query_string, expiration_time);
+        config.service_name(), region, credentials_provider.value(), server_context,
+        exclude_matcher_config, include_matcher_config, query_string, expiration_time);
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm
     if (isARegionSet(region)) {
@@ -152,8 +152,8 @@ AwsRequestSigningFilterFactory::createSigner(
           "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     return std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-        config.service_name(), region, credentials_provider.value(), server_context, exclude_matcher_config, include_matcher_config,
-        query_string, expiration_time);
+        config.service_name(), region, credentials_provider.value(), server_context,
+        exclude_matcher_config, include_matcher_config, query_string, expiration_time);
   }
 }
 
