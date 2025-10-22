@@ -2,12 +2,14 @@
 
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/formatter/cel/cel.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -17,13 +19,21 @@ namespace Formatter {
 
 class CELFormatterTest : public ::testing::Test {
 public:
-  CELFormatterTest() { formatter_context_.setRequestHeaders(request_headers_); }
+  CELFormatterTest() {
+    formatter_context_.setRequestHeaders(request_headers_);
+    formatter_context_.setResponseHeaders(response_headers_);
+    formatter_context_.setResponseTrailers(response_trailers_);
+  }
 
   Http::TestRequestHeaderMapImpl request_headers_{
       {":method", "GET"},
       {":path", "/request/path?secret=parameter"},
+      {":authority", "example.com:443"},
       {"x-envoy-original-path", "/original/path?secret=parameter"}};
+  Http::TestResponseHeaderMapImpl response_headers_;
+  Http::TestResponseTrailerMapImpl response_trailers_;
   StreamInfo::MockStreamInfo stream_info_;
+  std::string body_;
 
   Envoy::Formatter::HttpFormatterContext formatter_context_;
 
@@ -31,6 +41,48 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   ScopedThreadLocalServerContextSetter server_context_singleton_setter_{
       context_.server_factory_context_};
+
+  static constexpr const char* kFilterStateKey = "envoy.filters.listener.original_dst.local_ip";
+  static constexpr const char* kFallbackIP = "10.20.0.136";
+  static constexpr const char* kTestIP = "10.20.0.102"; // For basic template concatenation tests
+  static constexpr const char* kPortExtractionRegex = ":([0-9]+)$";
+  static constexpr const char* kPortExtractionReplacement =
+      "\\\\\\\\1"; // Will result in \\\\1 in YAML
+
+  // template-level concatenation
+  // Logic: If filter state key exists, use its value as-is
+  // If filter state key doesn't exist, use fallback IP with extracted port
+  static const std::string getFilterStateExpression() {
+    // More readable approach - let's break it down into logical parts
+    const std::string key_check = fmt::format("'{}' in filter_state", kFilterStateKey);
+    const std::string get_existing_value = fmt::format("filter_state['{}']", kFilterStateKey);
+    const std::string fallback_with_colon = fmt::format("'{}:'", kFallbackIP);
+    const std::string port_extraction =
+        fmt::format("re.extract(request.headers[':authority'], '{}', '{}')", kPortExtractionRegex,
+                    kPortExtractionReplacement);
+
+    // Build the three conditional parts:
+    // Part 1: Use existing filter state value OR empty string
+    const std::string part1 = fmt::format("%CEL({} ? {} : '')%", key_check, get_existing_value);
+
+    // Part 2: Use empty string OR fallback IP with colon
+    const std::string part2 = fmt::format("%CEL({} ? '' : {})%", key_check, fallback_with_colon);
+
+    // Part 3: Use empty string OR extracted port
+    const std::string part3 = fmt::format("%CEL({} ? '' : {})%", key_check, port_extraction);
+
+    // Concatenate all parts at template level
+    return part1 + part2 + part3;
+  }
+
+  // Helper method to create YAML config with given expression
+  std::string createYamlConfig(const std::string& expression) {
+    return fmt::format(R"EOF(
+  text_format_source:
+    inline_string: "{}"
+)EOF",
+                       expression);
+  }
 };
 
 #ifdef USE_CEL_PARSER
@@ -324,6 +376,186 @@ TEST_F(CELFormatterTest, TestMaxLength) {
   auto formatter =
       *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("/original", formatter->formatWithContext(formatter_context_, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestRequestHeaderAuthority) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(request.headers[':authority'])%"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("example.com:443", formatter->formatWithContext(formatter_context_, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestExtractPortFromAuthorityHeader) {
+  const std::string yaml = fmt::format(R"EOF(
+  text_format_source:
+    inline_string: "%CEL(re.extract(request.headers[':authority'], '{}', '{}'))%"
+)EOF",
+                                       kPortExtractionRegex, kPortExtractionReplacement);
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("443", formatter->formatWithContext(formatter_context_, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestExtractPortFromAuthorityHeaderNoPort) {
+  // Test with authority header without port
+  Http::TestRequestHeaderMapImpl request_headers_no_port{
+      {":method", "GET"},
+      {":path", "/request/path?secret=parameter"},
+      {":authority", "example.com"},
+      {"x-envoy-original-path", "/original/path?secret=parameter"}};
+
+  Envoy::Formatter::HttpFormatterContext formatter_context_no_port{
+      &request_headers_no_port, &response_headers_, &response_trailers_, body_};
+
+  const std::string yaml = fmt::format(R"EOF(
+  text_format_source:
+    inline_string: "%CEL(re.extract(request.headers[':authority'], '{}', '{}'))%"
+)EOF",
+                                       kPortExtractionRegex, kPortExtractionReplacement);
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("-", formatter->formatWithContext(formatter_context_no_port, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestExtractPortFromAuthorityHeaderIPv6) {
+  // Test with IPv6 authority header
+  Http::TestRequestHeaderMapImpl request_headers_ipv6{
+      {":method", "GET"},
+      {":path", "/request/path?secret=parameter"},
+      {":authority", "[::1]:8080"},
+      {"x-envoy-original-path", "/original/path?secret=parameter"}};
+
+  Envoy::Formatter::HttpFormatterContext formatter_context_ipv6{
+      &request_headers_ipv6, &response_headers_, &response_trailers_, body_};
+
+  const std::string yaml = fmt::format(R"EOF(
+  text_format_source:
+    inline_string: "%CEL(re.extract(request.headers[':authority'], '{}', '{}'))%"
+)EOF",
+                                       kPortExtractionRegex, kPortExtractionReplacement);
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("8080", formatter->formatWithContext(formatter_context_ipv6, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestWorkingConcatenationWithTemplate) {
+  // WORKING: Use template-level concatenation instead of CEL + operator
+  const std::string yaml = fmt::format(R"EOF(
+  text_format_source:
+    inline_string: "{}:%CEL(re.extract(request.headers[':authority'], '{}', '{}'))%"
+)EOF",
+                                       kTestIP, kPortExtractionRegex, kPortExtractionReplacement);
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("10.20.0.102:443", formatter->formatWithContext(formatter_context_, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestFailingStringConcatenation) {
+  // FAILING: CEL + operator doesn't work for string concatenation
+  const std::string yaml = fmt::format(R"EOF(
+  text_format_source:
+    inline_string: "%CEL('{}:' + '443')%"
+)EOF",
+                                       kTestIP);
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  // This will return "-" because CEL + operator fails for strings
+  EXPECT_EQ("-", formatter->formatWithContext(formatter_context_, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestFilterStateConditional) {
+  // WORKING VERSION: Same logic but using template-level concatenation
+  // Set up mock expectations to avoid warnings (our expression checks filter state multiple times)
+  // Need to handle both const and non-const versions of filterState()
+  EXPECT_CALL(stream_info_, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info_.filter_state_));
+  EXPECT_CALL(testing::Const(stream_info_), filterState())
+      .WillRepeatedly(testing::ReturnRef(*stream_info_.filter_state_));
+
+  const std::string yaml = createYamlConfig(getFilterStateExpression());
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  // With template-level concatenation, this works correctly
+  EXPECT_EQ("10.20.0.136:443", formatter->formatWithContext(formatter_context_, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestFilterStateConditionalWithKey) {
+  // WORKING VERSION: Same logic with filter state key present
+  // Set up mock expectations to avoid warnings
+  EXPECT_CALL(stream_info_, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info_.filter_state_));
+  EXPECT_CALL(testing::Const(stream_info_), filterState())
+      .WillRepeatedly(testing::ReturnRef(*stream_info_.filter_state_));
+
+  const std::string yaml = createYamlConfig(getFilterStateExpression());
+  TestUtility::loadFromYaml(yaml, config_);
+
+  // Add the filter state key to simulate it being set by previous filters
+  stream_info_.filter_state_->setData(
+      kFilterStateKey, std::make_unique<Router::StringAccessorImpl>("192.168.1.100:9443"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  // With filter state key present, it uses that value as-is (no port appending)
+  EXPECT_EQ("192.168.1.100:9443", formatter->formatWithContext(formatter_context_, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestFilterStateConditionalWithKeyNoPort) {
+  // Test working version with authority header without port when filter state key does NOT exist
+  // Set up mock expectations to avoid warnings
+  EXPECT_CALL(stream_info_, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info_.filter_state_));
+  EXPECT_CALL(testing::Const(stream_info_), filterState())
+      .WillRepeatedly(testing::ReturnRef(*stream_info_.filter_state_));
+
+  Http::TestRequestHeaderMapImpl request_headers_no_port{
+      {":method", "GET"},
+      {":path", "/request/path?secret=parameter"},
+      {":authority", "example.com"},
+      {"x-envoy-original-path", "/original/path?secret=parameter"}};
+
+  Envoy::Formatter::HttpFormatterContext formatter_context_no_port{
+      &request_headers_no_port, &response_headers_, &response_trailers_, body_};
+
+  const std::string yaml = createYamlConfig(getFilterStateExpression());
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  // Should use fallback and concatenate with "-" (no port found)
+  EXPECT_EQ("10.20.0.136:-", formatter->formatWithContext(formatter_context_no_port, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestPortExtractionOnly) {
+  // Test just the port extraction part
+  const std::string yaml = fmt::format(R"EOF(
+  text_format_source:
+    inline_string: "%CEL(re.extract(request.headers[':authority'], '{}', '{}'))%"
+)EOF",
+                                       kPortExtractionRegex, kPortExtractionReplacement);
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("443", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
 TEST_F(CELFormatterTest, TestContains) {
