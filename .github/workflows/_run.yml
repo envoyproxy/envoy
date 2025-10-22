@@ -247,7 +247,7 @@ jobs:
 
     - name: Free diskspace
       uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.26
-      if: inputs.diskspace-hack
+      if: inputs.diskspace-hack || github.event.repository.private
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
 
