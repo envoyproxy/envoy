@@ -334,6 +334,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   envoy::config::core::v3::TypedExtensionConfig proof_verifier_config;
   if (!config.has_proof_verifier_config()) {
     proof_verifier_config.set_name("envoy.quic.server.proof_verifier.filter_chain");
+    // Reuse ProofSourceConfig since it's an empty proto and serves a similar purpose.
     envoy::extensions::quic::proof_source::v3::ProofSourceConfig empty_proof_verifier_config;
     proof_verifier_config.mutable_typed_config()->PackFrom(empty_proof_verifier_config);
   } else {
