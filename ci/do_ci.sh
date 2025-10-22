@@ -441,6 +441,20 @@ case $CI_TARGET in
         collect_build_profile coverage
         ;;
 
+    cpu-detection)
+        # this can be removed once the expectation is that the integration test
+        # is present
+        if [[ ! -f "test/server/cgroup_cpu_simple_integration_test.cc" ]]; then
+            echo "CPU detection skipped, no integration test available"
+            exit 0
+        fi
+        setup_clang_toolchain
+        bazel test \
+              --test_tag_filters=runtime-cpu \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              //test/server:cgroup_cpu_simple_integration_test
+        ;;
+
     debug)
         setup_clang_toolchain
         echo "Testing ${TEST_TARGETS[*]}"
