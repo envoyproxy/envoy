@@ -69,13 +69,9 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
         }
       }
     }
-    ENVOY_LOG(
-        trace,
-        "included_headers.empty() = {}, included_headers.size() = {}, "
-        "excluded_headers.empty() = {}, excluded_headers.size() = {}, Canonicalizing header: {}",
-        included_headers.empty(), included_headers.size(), excluded_headers.empty(),
-        excluded_headers.size(), key);
+
     std::string value(entry.value().getStringView());
+
     // Remove leading, trailing, and deduplicate repeated ascii spaces
     absl::RemoveExtraAsciiWhitespace(&value);
     const std::string key_str(key);
