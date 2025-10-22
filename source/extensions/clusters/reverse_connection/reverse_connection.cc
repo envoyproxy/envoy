@@ -103,7 +103,7 @@ Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_v
   auto host_result = Upstream::HostImpl::create(
       info(), absl::StrCat(info()->name(), static_cast<std::string>(node_id)),
       std::move(host_address), nullptr /* endpoint_metadata */, nullptr /* locality_metadata */,
-      1 /* initial_weight */, envoy::config::core::v3::Locality().default_instance(),
+      1 /* initial_weight */, std::make_shared<const envoy::config::core::v3::Locality>(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
       0 /* priority */, envoy::config::core::v3::UNKNOWN);
 

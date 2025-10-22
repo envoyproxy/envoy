@@ -92,6 +92,7 @@ without further review.
 * Thomas Gschwendtner ([tgschwen](https://github.com/tgschwen)) (tgschwen@google.com)
 * Yanjun Xiang ([yanjunxiang-google](https://github.com/yanjunxiang-google)) (yanjunxiang@google.com)
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
+* Kuo-Chung Hsu ([juniorhsu](https://github.com/juniorhsu)) (kuochunghsu@pinterest.com)
 
 # Emeritus maintainers
 
