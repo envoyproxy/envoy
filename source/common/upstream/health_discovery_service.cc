@@ -373,9 +373,12 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
       // Initialize an endpoint host object.
       auto address_or_error = Network::Address::resolveProtoAddress(host.endpoint().address());
       THROW_IF_NOT_OK_REF(address_or_error.status());
+      auto const_locality_shared_pool = LocalityPool::getConstLocalitySharedPool(
+          server_context_.singletonManager(), server_context_.mainThreadDispatcher());
       HostSharedPtr endpoint = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
           HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
-                           locality_endpoints.locality(), host.endpoint().health_check_config(), 0,
+                           const_locality_shared_pool->getObject(locality_endpoints.locality()),
+                           host.endpoint().health_check_config(), 0,
                            envoy::config::core::v3::UNKNOWN),
           std::unique_ptr<HostImpl>));
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
@@ -489,9 +492,12 @@ void HdsCluster::updateHosts(
         auto address_or_error =
             Network::Address::resolveProtoAddress(endpoint.endpoint().address());
         THROW_IF_NOT_OK_REF(address_or_error.status());
+        auto const_locality_shared_pool = LocalityPool::getConstLocalitySharedPool(
+            server_context_.singletonManager(), server_context_.mainThreadDispatcher());
         host = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
             HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
-                             endpoints.locality(), endpoint.endpoint().health_check_config(), 0,
+                             const_locality_shared_pool->getObject(endpoints.locality()),
+                             endpoint.endpoint().health_check_config(), 0,
                              envoy::config::core::v3::UNKNOWN),
             std::unique_ptr<HostImpl>));
 

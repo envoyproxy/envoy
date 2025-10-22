@@ -86,7 +86,7 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
 }
 
 bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
-    const VirtualHostRefVector& added_vhosts, const std::set<std::string>& added_resource_ids,
+    const VirtualHostRefVector& added_vhosts, std::set<std::string>&& added_resource_ids,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
   std::unique_ptr<VirtualHostMap> vhosts_after_this_update;
@@ -110,7 +110,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   base_.updateConfig(std::move(route_config_after_this_update));
   // No exception, route_config_after_this_update is valid, can update the state.
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
-  resource_ids_in_last_update_ = added_resource_ids;
+  resource_ids_in_last_update_ = std::move(added_resource_ids);
   base_.onUpdateCommon(version_info);
 
   return removed || updated || !resource_ids_in_last_update_.empty();
