@@ -79,30 +79,22 @@ ActivationPtr createActivation(const ::Envoy::LocalInfo::LocalInfo* local_info,
                                const ::Envoy::Http::ResponseHeaderMap* response_headers,
                                const ::Envoy::Http::ResponseTrailerMap* response_trailers);
 
-// Forward declaration.
-class BuilderCache;
-
 // Shared expression builder instance.
-class BuilderInstance : public Singleton::Instance {
+class BuilderInstance {
 public:
-  explicit BuilderInstance(BuilderConstPtr builder, std::shared_ptr<BuilderCache> cache)
-      : builder_(std::move(builder)), cache_(std::move(cache)) {}
+  explicit BuilderInstance(BuilderConstPtr builder) : builder_(std::move(builder)) {}
   const Builder& builder() const { return *builder_; }
 
 private:
   const BuilderConstPtr builder_;
-  // Strong reference to BuilderCache to ensure it outlives all BuilderInstances.
-  const std::shared_ptr<BuilderCache> cache_;
 };
 
 using BuilderInstanceSharedPtr = std::shared_ptr<BuilderInstance>;
 using BuilderInstanceSharedConstPtr = std::shared_ptr<const BuilderInstance>;
 
 // Creates an expression builder with the given configuration.
-// The optional arena is used to enable constant folding for intermediate evaluation results.
 // Throws an exception if fails to construct an expression builder.
-BuilderPtr createBuilder(Protobuf::Arena* arena,
-                         OptRef<const envoy::config::core::v3::CelExpressionConfig> config = {});
+BuilderPtr createBuilder(OptRef<const envoy::config::core::v3::CelExpressionConfig> config = {});
 
 // Gets the singleton expression builder with the given configuration (or default if not provided).
 // Creates or reuses a cached builder for the configuration.
@@ -110,21 +102,6 @@ BuilderPtr createBuilder(Protobuf::Arena* arena,
 BuilderInstanceSharedConstPtr
 getBuilder(Server::Configuration::CommonFactoryContext& context,
            OptRef<const envoy::config::core::v3::CelExpressionConfig> config = {});
-
-// Gets an expression builder with the arena optimization.
-// Uses arena-optimized builder when constant folding is enabled and arena is available,
-// otherwise falls back to the cached builder. Must be called on the main thread.
-BuilderInstanceSharedConstPtr
-getBuilderWithArenaOptimization(Server::Configuration::CommonFactoryContext& context,
-                                const envoy::config::core::v3::CelExpressionConfig& config,
-                                Protobuf::Arena* arena);
-
-// Creates an arena-optimized builder for performance-critical scenarios.
-// This bypasses caching to enable constant folding with arena.
-// Must be called on the main thread.
-BuilderInstanceSharedConstPtr
-getArenaOptimizedBuilder(Protobuf::Arena* arena,
-                         const envoy::config::core::v3::CelExpressionConfig& config);
 
 // Compiled CEL expression. This class ensures both the builder and the source expression outlive
 // the compiled expression.
@@ -138,12 +115,6 @@ public:
   static absl::StatusOr<CompiledExpression>
   Create(Server::Configuration::CommonFactoryContext& context, const cel::expr::Expr& expr,
          OptRef<const envoy::config::core::v3::CelExpressionConfig> config = {});
-
-  // Creates an interpretable expression with arena optimization for performance.
-  // Requires enable_constant_folding to be true in the configuration.
-  static absl::StatusOr<CompiledExpression>
-  CreateWithArena(Protobuf::Arena* arena, const cel::expr::Expr& expr,
-                  const envoy::config::core::v3::CelExpressionConfig& config);
 
   // Creates an interpretable expression from xDS CEL expr format, making a copy of it.
   static absl::StatusOr<CompiledExpression> Create(const BuilderInstanceSharedConstPtr& builder,

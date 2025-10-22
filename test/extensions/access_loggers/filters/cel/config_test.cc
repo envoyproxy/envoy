@@ -320,7 +320,6 @@ TEST_F(CELAccessLogFilterConfigTest, ForceHitLines38_39InConfigCC) {
   cel_config->set_enable_string_conversion(true);
   cel_config->set_enable_string_concat(true);
   cel_config->set_enable_string_functions(true);
-  cel_config->set_enable_constant_folding(true);
 
   // Create the ExtensionFilter wrapper.
   envoy::config::accesslog::v3::ExtensionFilter extension_filter;
