@@ -5,15 +5,43 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: router
+  change: |
+    Added :ref:`host_rewrite
+    <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite>` to
+    :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` to support substitution
+    formatting for host header rewriting.
+    Added :ref:`path_rewrite
+    <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite>` to
+    :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` to support substitution
+    formatting for path header rewriting.
 - area: ext_proc
   change: |
     Use one of a hard-coded set of error messages when a :ref:`HeaderMutation
     <envoy_v3_api_msg_service.ext_proc.v3.HeaderMutation>` fails. Removing
     request-specific details allows grouping by similar failure types. Detailed
     messages remain available in debug logs.
+- area: mobile
+  change: |
+    Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
+    setting the runtime guard ``envoy.reloadable_features.mobile_use_network_observer_registry``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http2
+  change: |
+    Fixed a bug where Envoy will leak memory if the HTTP2 stream is reset before the request headers are
+    sent. For example, if one upstream http filter send a local reply after the connection is established but
+    before the request headers are sent, the memory allocated for the stream will not be released.
+- area: lua
+  change: |
+    Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
+    larger payload (greater than the body buffer limit).
+- area: bootstrap
+  change: |
+    Fixed an issue where the custom
+    :ref:`header_prefix <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.header_prefix>`
+    will result in crash at startup.
 - area: connection pool
   change: |
     Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
@@ -21,11 +49,55 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` and legacy code paths.
+- area: tcp
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop`` and legacy code paths.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_cookie`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
+- area: xds
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    Added ``vhost_header`` to the RouteConfiguration, allowing use of a different header for vhost matching.
+- area: logging
+  change: |
+    Added support for not-equal operator for access log filter rules, in
+    :ref:`ComparisonFilter <envoy_v3_api_msg_config.accesslog.v3.ComparisonFilter>`.
+- area: lua
+  change: |
+    Added ``drainConnectionUponCompletion()`` to the Lua filter stream info API. This allows Lua scripts
+    to mark connections for draining, which adds a ``Connection: close`` header for HTTP/1.1 or sends a
+    ``GOAWAY`` frame for HTTP/2 and HTTP/3.
+- area: wasm
+  change: |
+    Added ``sign`` foreign function to create cryptographic signatures.
+    See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
+- area: redis
+  change: |
+    Added cluster-scope command support with flexible response handling framework.
+- area: overload management
+  change: |
+    The fixed heap resource monitor can now calculate memory pressure as currently allocated memory divided by maximum heap size,
+    giving more accurate and lower memory pressure values.
+    This can avoid unnecessary load shedding or overload actions.
+    To enable, set ``envoy.reloadable_features.fixed_heap_use_allocated`` to true.
+    The default algorithm (heap_size - pageheap_unmapped - pageheap_free) does not discount for free memory in TCMalloc caches.
+- area: admin
+  change: |
+    Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.
 - area: aws
   change: |
     Added new feature ``match_included_headers`` to the request signing extension, that allows for a positive header match and

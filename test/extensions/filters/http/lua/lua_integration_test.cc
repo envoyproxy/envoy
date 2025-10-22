@@ -263,6 +263,23 @@ public:
     expectResponseBodyRewrite(code, true, enable_wrap_body);
   }
 
+  IntegrationStreamDecoderPtr initializeAndSendRequest(const std::string& code) {
+    initializeFilter(code);
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                   {":path", "/test/long/url"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "foo.lyft.com"},
+                                                   {"x-forwarded-for", "10.0.0.1"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    Buffer::OwnedImpl request_data("done");
+    encoder_decoder.first.encodeData(request_data, true);
+    waitForNextUpstreamRequest();
+
+    return std::move(encoder_decoder.second);
+  }
+
   void cleanup() {
     codec_client_->close();
     if (fake_lua_connection_ != nullptr) {
@@ -1411,6 +1428,41 @@ typed_config:
   testRewriteResponse(FILTER_AND_CODE);
 }
 
+// Rewrite response buffer to a huge body.
+TEST_P(LuaIntegrationTest, RewriteResponseToHugeBody) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_response(response_handle)
+        -- Default HTTP2 body buffer limit is 16MB for now. To set
+        -- a 16MB+ body to ensure both HTTP1 and HTTP2 will hit the limit.
+        local huge_body = string.rep("a", 1024 * 1024 * 16 + 1) -- 16MB + 1
+        local content_length = response_handle:body():setBytes(huge_body)
+        response_handle:logTrace(content_length)
+      end
+)EOF";
+
+  auto response = initializeAndSendRequest(FILTER_AND_CODE);
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data1("good");
+  upstream_request_->encodeData(response_data1, false);
+  Buffer::OwnedImpl response_data2("bye");
+  upstream_request_->encodeData(response_data2, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  EXPECT_EQ(response->headers().getStatusValue(), "500");
+
+  cleanup();
+}
+
 // Rewrite response buffer, without original upstream response body
 // and always wrap body.
 TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutUpstreamBody) {
@@ -2492,6 +2544,42 @@ virtual_hosts:
   cleanup();
 }
 #endif
+
+// Test drainConnectionUponCompletion triggers connection draining for HTTP/1.1.
+TEST_P(LuaIntegrationTest, DrainConnectionUponCompletion) {
+  const std::string filter_config =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        -- Set drain on every request to test connection closure behavior.
+        request_handle:streamInfo():drainConnectionUponCompletion()
+      end
+)EOF";
+
+  initializeFilter(filter_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Make request.
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // For HTTP/1.1, we should see Connection: close header.
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    EXPECT_EQ("close", response->headers().getConnectionValue());
+  }
+
+  // Connection should be closed after request completes.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  cleanup();
+}
 
 } // namespace
 } // namespace Envoy

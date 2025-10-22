@@ -48,6 +48,8 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
     return lhs == value;
   case envoy::config::accesslog::v3::ComparisonFilter::LE:
     return lhs <= value;
+  case envoy::config::accesslog::v3::ComparisonFilter::NE:
+    return lhs != value;
   }
   IS_ENVOY_BUG("unexpected comparison op enum");
   return false;

@@ -300,7 +300,8 @@ public:
             {"downstreamSslConnection", static_luaDownstreamSslConnection},
             {"requestedServerName", static_luaRequestedServerName},
             {"routeName", static_luaRouteName},
-            {"virtualClusterName", static_luaVirtualClusterName}};
+            {"virtualClusterName", static_luaVirtualClusterName},
+            {"drainConnectionUponCompletion", static_luaDrainConnectionUponCompletion}};
   }
 
 private:
@@ -377,6 +378,14 @@ private:
    * @return matched virtual cluster or an empty string if no virtual cluster was matched
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaVirtualClusterName);
+
+  /**
+   * Drains the connection upon completion of this stream.
+   * For HTTP/1.1 this will add "Connection: close" header.
+   * For HTTP/2 and HTTP/3 this will trigger sending a GOAWAY frame.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDrainConnectionUponCompletion);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {

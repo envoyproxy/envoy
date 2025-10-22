@@ -940,11 +940,15 @@ public:
    * using current values of headers. Note that final path may be different if
    * headers change before finalization.
    * @param headers supplies the request headers.
-   * @return absl::optional<std::string> the value of the URL path after rewrite or absl::nullopt
-   *         if rewrite is not configured.
+   * @param context supplies the formatter context for path generation.
+   * @param stream_info holds additional information about the request.
+   * @return std::string the value of the URL path after rewrite or empty string
+   *         if rewrite is not configured or rewrite failed.
    */
-  virtual absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const PURE;
+  virtual std::string
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                             const Formatter::Context& context,
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For
