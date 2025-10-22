@@ -92,7 +92,7 @@ message AwsRequestSigning {
   //
   // Example:
   //
-  // .. code-block:: json
+  // .. code-block:: yaml
   //
   // match_excluded_headers:
   // - prefix: x-envoy
@@ -124,7 +124,7 @@ message AwsRequestSigning {
   //
   // Example:
   //
-  // .. code-block:: json
+  // .. code-block:: yaml
   //
   // match_included_headers:
   // - prefix: x-envoy
