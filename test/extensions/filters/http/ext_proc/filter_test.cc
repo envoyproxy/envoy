@@ -138,9 +138,9 @@ protected:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, {});
+    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder({});
     builder_ = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-        std::move(builder_ptr), nullptr);
+        std::move(builder_ptr));
     config_ = std::make_shared<FilterConfig>(proto_config, 200ms, 10000, *stats_store_.rootScope(),
                                              "", is_upstream_filter, builder_, factory_context_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
@@ -3484,9 +3484,9 @@ TEST_F(HttpFilterTest, OutOfOrderFailClose) {
 class OverrideTest : public testing::Test {
 protected:
   void SetUp() override {
-    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, {});
+    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder({});
     builder_ = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-        std::move(builder_ptr), nullptr);
+        std::move(builder_ptr));
   }
 
   Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;

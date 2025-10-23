@@ -25,9 +25,9 @@ using testing::ReturnRef;
 class MappedAttributeBuilderTest : public testing::Test {
 protected:
   void SetUp() override {
-    auto builder_ptr = Filters::Common::Expr::createBuilder(nullptr, {});
+    auto builder_ptr = Filters::Common::Expr::createBuilder({});
     expr_builder_ =
-        std::make_shared<Filters::Common::Expr::BuilderInstance>(std::move(builder_ptr), nullptr);
+        std::make_shared<Filters::Common::Expr::BuilderInstance>(std::move(builder_ptr));
   }
 
   void initialize(const std::string& yaml) {

@@ -86,9 +86,9 @@ DEFINE_PROTO_FUZZER(
   ExternalProcessing::FilterConfigSharedPtr config;
 
   try {
-    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, {});
+    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder({});
     auto builder = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-        std::move(builder_ptr), nullptr);
+        std::move(builder_ptr));
     config = std::make_shared<ExternalProcessing::FilterConfig>(
         proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "", false,
         builder, mocks.factory_context_);

@@ -21,18 +21,17 @@ using ::testing::NiceMock;
 class StringFunctionsTest : public testing::Test {
 protected:
   void SetUp() override {
-    // Create configuration with string functions enabled via default_profile.
-    auto* profile = config_.mutable_default_profile();
-    profile->set_enable_string_conversion(true);
-    profile->set_enable_string_concat(true);
-    profile->set_enable_string_functions(true);
+    // Create configuration with string functions enabled.
+    config_.set_enable_string_conversion(true);
+    config_.set_enable_string_concat(true);
+    config_.set_enable_string_functions(true);
 
-    builder_ = createBuilder(nullptr, &config_);
+    builder_ = createBuilder(makeOptRef(config_));
     stream_info_ = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
     activation_ = createActivation(nullptr, *stream_info_, nullptr, nullptr, nullptr);
   }
 
-  envoy::extensions::bootstrap::cel::v3::CelEvaluatorConfig config_;
+  envoy::config::core::v3::CelExpressionConfig config_;
   BuilderPtr builder_;
   std::unique_ptr<NiceMock<StreamInfo::MockStreamInfo>> stream_info_;
   ActivationPtr activation_;
@@ -110,14 +109,13 @@ TEST_F(StringFunctionsTest, SplitWithLimit) {
 }
 
 TEST_F(StringFunctionsTest, StringFunctionsDisabled) {
-  // Create configuration with string functions disabled via default_profile
-  envoy::extensions::bootstrap::cel::v3::CelEvaluatorConfig disabled_config;
-  auto* disabled = disabled_config.mutable_default_profile();
-  disabled->set_enable_string_conversion(false);
-  disabled->set_enable_string_concat(false);
-  disabled->set_enable_string_functions(false);
+  // Create configuration with string functions disabled.
+  envoy::config::core::v3::CelExpressionConfig disabled_config;
+  disabled_config.set_enable_string_conversion(false);
+  disabled_config.set_enable_string_concat(false);
+  disabled_config.set_enable_string_functions(false);
 
-  auto disabled_builder = createBuilder(nullptr, &disabled_config);
+  auto disabled_builder = createBuilder(makeOptRef(disabled_config));
 
   // Create replace expression: "hello".replace("he", "we")
   cel::expr::Expr expr;
@@ -132,8 +130,8 @@ TEST_F(StringFunctionsTest, StringFunctionsDisabled) {
 }
 
 TEST_F(StringFunctionsTest, DefaultConfigurationDisablesStringFunctions) {
-  // Create builder with default configuration (nullptr)
-  auto default_builder = createBuilder(nullptr, nullptr);
+  // Create builder with default configuration.
+  auto default_builder = createBuilder({});
 
   // Create replace expression: "hello".replace("he", "we")
   cel::expr::Expr expr;
