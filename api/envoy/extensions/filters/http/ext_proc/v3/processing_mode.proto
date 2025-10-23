@@ -108,6 +108,25 @@ message ProcessingMode {
     // * The client will stream the body chunks in the responses from the server to the upstream/downstream as they arrive.
 
     FULL_DUPLEX_STREAMED = 4;
+
+    // [#not-implemented-hide:]
+    // A mode for gRPC traffic. This is similar to ``FULL_DUPLEX_STREAMED``,
+    // except that instead of sending raw chunks of the HTTP/2 DATA frames,
+    // the ext_proc client will de-frame the individual gRPC messages inside
+    // the HTTP/2 DATA frames, and as each message is de-framed, it will be
+    // sent to the ext_proc server as a :ref:`request_body
+    // <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest.request_body>`
+    // or :ref:`response_body
+    // <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest.response_body>`.
+    // The ext_proc server will stream back individual gRPC messages in the
+    // :ref:`StreamedBodyResponse <envoy_v3_api_msg_service.ext_proc.v3.StreamedBodyResponse>`
+    // field, but the number of messages sent by the ext_proc server
+    // does not need to equal the number of messages sent by the data
+    // plane.  This allows the ext_proc server to change the number of
+    // messages sent on the stream.
+    // In this mode, the client will send body and trailers to the server as
+    // they arrive.
+    GRPC = 5;
   }
 
   // How to handle the request header. Default is "SEND".
