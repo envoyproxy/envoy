@@ -296,6 +296,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "locality_pool_lib",
+    srcs = ["locality_pool.cc"],
+    hdrs = ["locality_pool.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/singleton:manager_interface",
+        "//envoy/upstream:locality_lib",
+        "//source/common/shared_pool:shared_pool_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "prod_cluster_info_factory_lib",
     srcs = ["prod_cluster_info_factory.cc"],
     hdrs = ["prod_cluster_info_factory.h"],
@@ -437,6 +450,7 @@ envoy_cc_library(
     ],
     deps = [
         ":load_balancer_context_base_lib",
+        ":locality_pool_lib",
         ":resource_manager_lib",
         ":upstream_factory_context_lib",
         "//envoy/event:timer_interface",

@@ -1201,6 +1201,17 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
 
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        auto test_req_headers = Http::TestRequestHeaderMapImpl{{":authority", "www.choice.com"},
+                                                               {":path", "/new_endpoint/foo"},
+                                                               {":method", "GET"},
+                                                               {"x-forwarded-proto", "http"}};
+
+        Formatter::HttpFormatterContext formatter_context;
+
+        // Coverage for finalizeRequestHeaders
+        NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+        formatter_context.setRequestHeaders(test_req_headers);
+
         // Check that cached_route was correctly set to the delegating route.
         EXPECT_EQ(delegating_route_foo, decoder_filters_[1]->callbacks_->route());
 
@@ -1213,12 +1224,10 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         EXPECT_EQ(default_route->routeEntry()->corsPolicy(),
                   delegating_route_foo->routeEntry()->corsPolicy());
 
-        auto test_req_headers = Http::TestRequestHeaderMapImpl{{":authority", "www.choice.com"},
-                                                               {":path", "/new_endpoint/foo"},
-                                                               {":method", "GET"},
-                                                               {"x-forwarded-proto", "http"}};
-        EXPECT_EQ(default_route->routeEntry()->currentUrlPathAfterRewrite(test_req_headers),
-                  delegating_route_foo->routeEntry()->currentUrlPathAfterRewrite(test_req_headers));
+        EXPECT_EQ(default_route->routeEntry()->currentUrlPathAfterRewrite(
+                      test_req_headers, formatter_context, stream_info),
+                  delegating_route_foo->routeEntry()->currentUrlPathAfterRewrite(
+                      test_req_headers, formatter_context, stream_info));
 
         EXPECT_EQ(default_route->routeEntry()->hashPolicy(),
                   delegating_route_foo->routeEntry()->hashPolicy());
@@ -1322,11 +1331,6 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
 
         EXPECT_EQ(default_route->routeName(), delegating_route_foo->routeName());
 
-        Formatter::HttpFormatterContext formatter_context;
-
-        // Coverage for finalizeRequestHeaders
-        NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-        formatter_context.setRequestHeaders(test_req_headers);
         delegating_route_foo->routeEntry()->finalizeRequestHeaders(
             test_req_headers, formatter_context, stream_info, true);
         EXPECT_EQ("/new_endpoint/foo", test_req_headers.get_(Http::Headers::get().Path));
@@ -4781,6 +4785,159 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterAccessLogBeforeConfigAccessLog) 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+}
+
+// Test that setShouldDrainConnectionUponCompletion triggers proper drain sequence for HTTP/2.
+TEST_F(HttpConnectionManagerImplTest, ShouldDrainConnectionUponCompletionHttp2) {
+  setup();
+
+  // Mock codec to return HTTP/2 protocol.
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http2));
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // Set shouldDrainConnectionUponCompletion and encode response headers.
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "403"}}};
+  filter->callbacks_->streamInfo().setShouldDrainConnectionUponCompletion(true);
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+
+  // For HTTP/2, we should call shutdownNotice (send GOAWAY) instead of directly closing.
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  EXPECT_CALL(*codec_, shutdownNotice());
+
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+
+  // Verify drain timer can complete.
+  EXPECT_CALL(*codec_, goAway());
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->invokeCallback();
+}
+
+// Test that setShouldDrainConnectionUponCompletion triggers proper drain sequence for HTTP/3.
+TEST_F(HttpConnectionManagerImplTest, ShouldDrainConnectionUponCompletionHttp3) {
+  setup();
+
+  // Mock codec to return HTTP/3 protocol.
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http3));
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // Set shouldDrainConnectionUponCompletion and encode response headers.
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "403"}}};
+  filter->callbacks_->streamInfo().setShouldDrainConnectionUponCompletion(true);
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+
+  // For HTTP/3, we should call shutdownNotice (send GOAWAY) instead of directly closing.
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  EXPECT_CALL(*codec_, shutdownNotice());
+
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+
+  // Verify drain timer can complete.
+  EXPECT_CALL(*codec_, goAway());
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->invokeCallback();
+}
+
+// Test that setShouldDrainConnectionUponCompletion works correctly for HTTP/1.1.
+TEST_F(HttpConnectionManagerImplTest, ShouldDrainConnectionUponCompletionHttp11) {
+  setup();
+
+  // Mock codec to return HTTP/1.1 protocol.
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // Set shouldDrainConnectionUponCompletion and encode response headers.
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "403"}}};
+  filter->callbacks_->streamInfo().setShouldDrainConnectionUponCompletion(true);
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+
+  // For HTTP/1.1, we should NOT call shutdownNotice. The Connection: close header is added
+  // automatically and the connection goes directly to Closing state.
+  EXPECT_CALL(*codec_, shutdownNotice()).Times(0);
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        // Verify Connection: close header is present.
+        EXPECT_EQ("close", headers.getConnectionValue());
+      }));
+
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 }
 
 } // namespace Http

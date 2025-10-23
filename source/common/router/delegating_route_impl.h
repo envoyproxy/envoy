@@ -89,8 +89,9 @@ public:
   const std::string& clusterName() const override;
   Http::Code clusterNotFoundResponseCode() const override;
   const CorsPolicy* corsPolicy() const override;
-  absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+  std::string currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                                         const Formatter::HttpFormatterContext& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override;
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo& stream_info,
