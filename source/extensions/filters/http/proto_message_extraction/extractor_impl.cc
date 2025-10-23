@@ -95,6 +95,7 @@ absl::Status ExtractorImpl::init() {
   }
 
   for (const auto& it : method_extraction_.response_extraction_by_field()) {
+    // TODO(adh-goog): Allow repeated field extraction in field_value_extractor.
     if (it.second != MethodExtraction::EXTRACT_REPEATED_CARDINALITY) {
       auto extractor = extractor_factory.Create(response_type_url_, it.first);
       if (!extractor.ok()) {
