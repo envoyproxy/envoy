@@ -53,6 +53,9 @@ on:
       diskspace-hack-paths:
         type: string
         default:
+      docker-cpus:
+        type: number
+        default: 0
       docker-ipv6:
         default: true
         type: boolean
@@ -245,6 +248,11 @@ jobs:
              "job-started": ${{ steps.started.outputs.value }}}
           | . * {$config, $check}
 
+    - name: Free diskspace
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.26
+      if: inputs.diskspace-hack || github.event.repository.private
+      with:
+        to_remove: ${{ inputs.diskspace-hack-paths }}
 
     - run: |
         sudo mkdir -p /etc/docker
@@ -365,8 +373,6 @@ jobs:
         container-command: ${{ env.CONTAINER_COMMAND || inputs.container-command }}
         container-output: ${{ inputs.container-output }}
         context: ${{ steps.context.outputs.value }}
-        diskspace-hack: ${{ inputs.diskspace-hack }}
-        diskspace-hack-paths: ${{ inputs.diskspace-hack-paths }}
         downloads: ${{ inputs.downloads }}
         entrypoint: ${{ inputs.entrypoint }}
         error-match: ${{ inputs.error-match }}
@@ -411,4 +417,4 @@ jobs:
         CI_SHA1: ${{ github.sha }}
         CI_TARGET_BRANCH: ${{ fromJSON(inputs.request).request.target-branch }}
         MOUNT_GPG_HOME: ${{ inputs.import-gpg && 1 || '' }}
-        ENVOY_DOCKER_OPTIONS: --network=host --security-opt seccomp=unconfined -v /dev/shm:/tmp/sandbox_base
+        ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}

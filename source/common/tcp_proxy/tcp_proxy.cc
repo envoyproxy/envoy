@@ -618,18 +618,6 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  if (!config_->backoffStrategy() &&
-      !Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop")) {
-    const uint32_t max_connect_attempts = config_->maxConnectAttempts();
-    if (connect_attempts_ >= max_connect_attempts) {
-      getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
-      cluster->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
-      onInitFailure(UpstreamFailureReason::ConnectFailed);
-      return Network::FilterStatus::StopIteration;
-    }
-  }
-
   auto& downstream_connection = read_callbacks_->connection();
   auto& filter_state = downstream_connection.streamInfo().filterState();
   if (!filter_state->hasData<Network::ProxyProtocolFilterState>(
@@ -1093,13 +1081,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         }
       }
       if (!downstream_closed_) {
-        if (!config_->backoffStrategy() &&
-            !Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop")) {
-          onRetryTimer();
-          return;
-        }
-
+        // Always defer retry to a different event loop iteration via the retry timer.
         if (connect_attempts_ >= config_->maxConnectAttempts()) {
           onConnectMaxAttempts();
           return;

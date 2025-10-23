@@ -1,5 +1,6 @@
 #include <sys/types.h>
 
+#include "source/common/http/header_utility.h"
 #include "source/extensions/filters/http/compressor/compressor_filter.h"
 
 #include "test/extensions/filters/http/compressor/compressor_filter_testing_peer.h"
@@ -183,7 +184,7 @@ public:
   std::unique_ptr<CompressorFilter> filter_;
   Buffer::OwnedImpl data_;
   std::string expected_str_;
-  std::string response_stats_prefix_{};
+  std::string response_stats_prefix_;
   Stats::TestUtil::TestStore stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -1373,7 +1374,11 @@ TEST_F(CompressorFilterTest, EnvoyCompressionStatusHeaderContentLength) {
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test, deflate"}});
   Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "10"}};
   doResponse(headers, false, false);
-  EXPECT_EQ(headers.get_("x-envoy-compression-status"), "test;ContentLengthTooSmall");
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(
+                headers.get(Http::Headers::get().EnvoyCompressionStatus))
+                .result()
+                .value(),
+            "test;ContentLengthTooSmall");
 }
 
 TEST_F(CompressorFilterTest, EnvoyCompressionStatusHeaderContentType) {
@@ -1397,7 +1402,11 @@ TEST_F(CompressorFilterTest, EnvoyCompressionStatusHeaderContentType) {
   Http::TestResponseHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {"content-type", "image/jpeg"}};
   doResponse(headers, false, false);
-  EXPECT_EQ(headers.get_("x-envoy-compression-status"), "test;ContentTypeNotAllowed");
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(
+                headers.get(Http::Headers::get().EnvoyCompressionStatus))
+                .result()
+                .value(),
+            "test;ContentTypeNotAllowed");
 }
 
 TEST_F(CompressorFilterTest, EnvoyCompressionStatusHeaderEtag) {
@@ -1421,7 +1430,11 @@ TEST_F(CompressorFilterTest, EnvoyCompressionStatusHeaderEtag) {
   Http::TestResponseHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {"etag", "12345"}};
   doResponse(headers, false, false);
-  EXPECT_EQ(headers.get_("x-envoy-compression-status"), "test;EtagNotAllowed");
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(
+                headers.get(Http::Headers::get().EnvoyCompressionStatus))
+                .result()
+                .value(),
+            "test;EtagNotAllowed");
 }
 
 TEST_F(CompressorFilterTest, EnvoyCompressionStatusHeaderStatusCode) {
@@ -1447,7 +1460,11 @@ TEST_F(CompressorFilterTest, EnvoyCompressionStatusHeaderStatusCode) {
   Http::TestResponseHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {":status", "206"}};
   doResponse(headers, false, false);
-  EXPECT_EQ(headers.get_("x-envoy-compression-status"), "test;StatusCodeNotAllowed");
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(
+                headers.get(Http::Headers::get().EnvoyCompressionStatus))
+                .result()
+                .value(),
+            "test;StatusCodeNotAllowed");
 }
 
 TEST_F(CompressorFilterTest, EnvoyCompressionStatusHeaderCompressed) {
@@ -1469,7 +1486,11 @@ TEST_F(CompressorFilterTest, EnvoyCompressionStatusHeaderCompressed) {
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test, deflate"}});
   Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
   doResponse(headers, true, false);
-  EXPECT_EQ(headers.get_("x-envoy-compression-status"), "test;Compressed;OriginalLength=256");
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(
+                headers.get(Http::Headers::get().EnvoyCompressionStatus))
+                .result()
+                .value(),
+            "test;Compressed;OriginalLength=256");
 }
 
 class IsMinimumContentLengthTest
@@ -1888,7 +1909,10 @@ TEST_F(MultipleFiltersTest, BothFiltersFail) {
   Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "10"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter1_->encodeHeaders(headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter2_->encodeHeaders(headers, false));
-  EXPECT_EQ(headers.get_("x-envoy-compression-status"),
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(
+                headers.get(Http::Headers::get().EnvoyCompressionStatus))
+                .result()
+                .value(),
             "test1;ContentLengthTooSmall,test2;ContentLengthTooSmall");
 }
 
@@ -1938,7 +1962,10 @@ TEST_F(MultipleFiltersTest, OneFilterFailsOneSucceeds) {
       {":method", "get"}, {"content-length", "256"}, {"content-type", "text/plain"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter1_->encodeHeaders(headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter2_->encodeHeaders(headers, false));
-  EXPECT_EQ(headers.get_("x-envoy-compression-status"),
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(
+                headers.get(Http::Headers::get().EnvoyCompressionStatus))
+                .result()
+                .value(),
             "test1;ContentTypeNotAllowed,test2;Compressed;OriginalLength=256");
 }
 
@@ -1958,7 +1985,11 @@ TEST_F(MultipleFiltersTest, FirstFilterSucceedsSecondSkips) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter1_->encodeHeaders(headers, false));
   // The second filter should not compress because the content-encoding header is already set.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter2_->encodeHeaders(headers, false));
-  EXPECT_EQ(headers.get_("x-envoy-compression-status"), "test1;Compressed;OriginalLength=256");
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(
+                headers.get(Http::Headers::get().EnvoyCompressionStatus))
+                .result()
+                .value(),
+            "test1;Compressed;OriginalLength=256");
   EXPECT_EQ(headers.get_("content-encoding"), "test1");
 }
 
@@ -2011,7 +2042,10 @@ TEST_F(MultipleFiltersTest, BothFiltersFailDifferentReasons) {
       {":method", "get"}, {"content-length", "256"}, {"content-type", "text/plain"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter1_->encodeHeaders(headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter2_->encodeHeaders(headers, false));
-  EXPECT_EQ(headers.get_("x-envoy-compression-status"),
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(
+                headers.get(Http::Headers::get().EnvoyCompressionStatus))
+                .result()
+                .value(),
             "test1;ContentLengthTooSmall,test2;ContentTypeNotAllowed");
 }
 
@@ -2060,7 +2094,10 @@ TEST_F(MultipleFiltersTest, BothFiltersFailEtagAndStatusCode) {
       {":method", "get"}, {"content-length", "256"}, {"etag", "12345"}, {":status", "206"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter1_->encodeHeaders(headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter2_->encodeHeaders(headers, false));
-  EXPECT_EQ(headers.get_("x-envoy-compression-status"),
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(
+                headers.get(Http::Headers::get().EnvoyCompressionStatus))
+                .result()
+                .value(),
             "test1;EtagNotAllowed,test2;StatusCodeNotAllowed");
 }
 
@@ -2175,7 +2212,7 @@ protected:
 
   Buffer::OwnedImpl data_;
   std::string expected_str_;
-  std::string response_stats_prefix_{};
+  std::string response_stats_prefix_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 

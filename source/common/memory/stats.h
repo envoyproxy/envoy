@@ -64,6 +64,11 @@ public:
    * Log detailed stats about current memory allocation. Intended for debugging purposes.
    */
   static void dumpStatsToLog();
+
+  /**
+   * Get detailed stats about current memory allocation. Returns nullopt if not supported.
+   */
+  static absl::optional<std::string> dumpStats();
 };
 
 class AllocatorManager {

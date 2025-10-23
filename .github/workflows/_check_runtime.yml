@@ -1,0 +1,58 @@
+name: Check/runtime
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      gcs-cache-key:
+        required: true
+
+    inputs:
+      gcs-cache-bucket:
+        type: string
+        required: true
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-runtime
+  cancel-in-progress: true
+
+
+jobs:
+  runtime:
+    secrets:
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.name ||matrix.target }}
+    with:
+      bazel-extra: '--config=remote-envoy-engflow'
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -${{ matrix.target }}
+      diskspace-hack: ${{ matrix.diskspace-hack || false }}
+      docker-cpus: ${{ matrix.docker-cpus }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
+      request: ${{ inputs.request }}
+      target: ${{ matrix.target }}
+      timeout-minutes: 180
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: cpu-detection
+          name: CPU detection
+          docker-cpus: 2

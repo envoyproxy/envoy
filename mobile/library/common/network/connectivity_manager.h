@@ -12,6 +12,7 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "library/common/engine_types.h"
+#include "library/common/network/envoy_mobile_quic_network_observer_registry_factory.h"
 #include "library/common/network/network_types.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
@@ -41,10 +42,10 @@
  */
 typedef uint16_t envoy_netconf_t;
 
-using NetworkHandle = int64_t;
+namespace Envoy {
+
 constexpr NetworkHandle kInvalidNetworkHandle = -1;
 
-namespace Envoy {
 namespace Network {
 
 /**
@@ -234,16 +235,9 @@ private:
 
 using DefaultNetworkChangeCallback = std::function<void(envoy_netconf_t)>;
 
-class NetworkChangeObserver {
-public:
-  virtual ~NetworkChangeObserver() = default;
-  virtual void onNetworkMadeDefault(NetworkHandle network) PURE;
-  virtual void onNetworkDisconnected(NetworkHandle network) PURE;
-  virtual void onNetworkConnected(NetworkHandle network) PURE;
-};
-
 class ConnectivityManagerImpl : public ConnectivityManager,
                                 public Singleton::Instance,
+                                public Quic::NetworkConnectivityTracker,
                                 public Logger::Loggable<Logger::Id::upstream> {
 public:
   /**
@@ -283,10 +277,14 @@ public:
   void setDefaultNetworkChangeCallback(DefaultNetworkChangeCallback cb) {
     default_network_change_callback_ = cb;
   }
-  void setNetworkChangeObserver(NetworkChangeObserver* observer) { observer_ = observer; }
 
   // Refresh DNS regardless of configuration key change.
   void doRefreshDns(envoy_netconf_t configuration_key, bool drain_connections);
+
+  // Quic::NetworkConnectivityTracker.
+  // Only used on Android.
+  NetworkHandle getDefaultNetwork() override;
+  absl::flat_hash_map<NetworkHandle, ConnectionType> getAllConnectedNetworks() override;
 
 private:
   // The states of the current default network picked by the platform.
@@ -306,6 +304,7 @@ private:
 
   bool enable_interface_binding_{false};
   Upstream::ClusterManager& cluster_manager_;
+  Quic::EnvoyMobileQuicNetworkObserverRegistryFactory quic_observer_registry_factory_;
   // nullptr if draining hosts after refreshing DNS is disabled via setDrainPostDnsRefreshEnabled().
   std::unique_ptr<RefreshDnsWithPostDrainHandler> dns_refresh_handler_;
   DnsCacheManagerSharedPtr dns_cache_manager_;
@@ -318,7 +317,6 @@ private:
   absl::flat_hash_map<NetworkHandle, ConnectionType>
       connected_networks_ ABSL_GUARDED_BY(network_mutex_);
   DefaultNetworkChangeCallback default_network_change_callback_;
-  NetworkChangeObserver* observer_{nullptr};
 };
 
 using ConnectivityManagerImplSharedPtr = std::shared_ptr<ConnectivityManagerImpl>;
