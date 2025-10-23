@@ -22,6 +22,8 @@ startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 common --noenable_bzlmod
 common --enable_workspace
 
+common --incompatible_disallow_empty_glob
+
 fetch --color=yes
 run --color=yes
 
