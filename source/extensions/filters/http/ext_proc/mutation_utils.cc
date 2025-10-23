@@ -2,10 +2,12 @@
 
 #include "envoy/http/header_map.h"
 
+#include "processing_effect.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -109,26 +111,37 @@ absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& hea
 absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                                                  Http::HeaderMap& headers, bool replacing_message,
                                                  const Checker& checker,
-                                                 Counter& rejected_mutations,
+                                                 Counter& rejected_mutations, ProcessingEffect::Effect& effect,
                                                  bool remove_content_length) {
   // Check whether the remove_headers or set_headers size exceed the HTTP connection manager limit.
   // Reject the mutation and return error status if either one does.
   const auto result = responseHeaderSizeCheck(headers, mutation, rejected_mutations);
   if (!result.ok()) {
+    effect = ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded;
     return result;
   }
+
+  // Set default value to None for effect
+  effect = ProcessingEffect::Effect::None;
 
   for (const auto& hdr : mutation.remove_headers()) {
     if (!Http::HeaderUtility::headerNameIsValid(hdr)) {
       ENVOY_LOG(debug, "remove_headers contain invalid character, may not be removed.");
       rejected_mutations.inc();
+      effect = ProcessingEffect::Effect::InvalidMutationRejected;
       return absl::InvalidArgumentError("Invalid character in remove_headers mutation.");
     }
     const LowerCaseString remove_header(hdr);
     switch (checker.check(CheckOperation::REMOVE, remove_header, "")) {
     case CheckResult::OK:
+      {
       ENVOY_LOG(trace, "Removing header {}", remove_header);
-      headers.remove(remove_header);
+      // int removals;
+      int removals = headers.remove(remove_header);
+      if (removals > 0){
+        effect = ProcessingEffect::Effect::MutationApplied;
+      }
+      }
       break;
     case CheckResult::IGNORE:
       ENVOY_LOG(debug, "Header {} may not be removed per rules", remove_header);
@@ -137,6 +150,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     case CheckResult::FAIL:
       ENVOY_LOG(debug, "Header {} may not be removed. Returning error", remove_header);
       rejected_mutations.inc();
+      effect = ProcessingEffect::Effect::MutationFailed;
       return absl::InvalidArgumentError(
           absl::StrCat("Invalid attempt to remove ", remove_header.get()));
     }
@@ -159,6 +173,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       ENVOY_LOG(debug,
                 "set_headers contain invalid character in key or value, may not be appended.");
       rejected_mutations.inc();
+      effect = ProcessingEffect::Effect::InvalidMutationRejected;
       return absl::InvalidArgumentError("Invalid character in set_headers mutation.");
     }
     const LowerCaseString header_name(sh.header().key());
@@ -179,6 +194,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       } else {
         headers.setCopy(header_name, header_value);
       }
+      effect = ProcessingEffect::Effect::MutationApplied;
       break;
     case CheckResult::IGNORE:
       ENVOY_LOG(debug, "Header {} may not be modified per rules", header_name);
@@ -187,33 +203,39 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     case CheckResult::FAIL:
       ENVOY_LOG(debug, "Header {} may not be modified. Returning error", header_name);
       rejected_mutations.inc();
+      effect = ProcessingEffect::Effect::MutationFailed;
       return absl::InvalidArgumentError(
           absl::StrCat("Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
     }
   }
 
   // After header mutation, check the ending headers are not exceeding the HCM limit.
-  return headerMutationResultCheck(headers, rejected_mutations);
+  auto status = headerMutationResultCheck(headers, rejected_mutations);
+  if (!status.ok()){
+    effect = ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded;
+  }
+  return status;
 }
 
-void MutationUtils::applyBodyMutations(const BodyMutation& mutation, Buffer::Instance& buffer) {
+ProcessingEffect::Effect MutationUtils::applyBodyMutations(const BodyMutation& mutation, Buffer::Instance& buffer) {
   switch (mutation.mutation_case()) {
   case BodyMutation::MutationCase::kClearBody:
     if (mutation.clear_body()) {
       ENVOY_LOG(trace, "Clearing HTTP body");
       buffer.drain(buffer.length());
     }
-    break;
+    return ProcessingEffect::Effect::MutationApplied;
   case BodyMutation::MutationCase::kBody:
     ENVOY_LOG(trace, "Replacing body of {} bytes with new body of {} bytes", buffer.length(),
               mutation.body().size());
     buffer.drain(buffer.length());
     buffer.add(mutation.body());
-    break;
+    return ProcessingEffect::Effect::MutationApplied;
   default:
     // Nothing to do on default
     break;
   }
+  return ProcessingEffect::Effect::None;
 }
 
 bool MutationUtils::isValidHttpStatus(int code) { return (code >= 200); }

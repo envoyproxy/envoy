@@ -71,7 +71,7 @@ public:
         : latency_(latency), call_status_(call_status), processing_effect_(processing_effect) {}
     const std::chrono::microseconds latency_;
     const Grpc::Status::GrpcStatus call_status_;
-    const ProcessingEffect::Effect processing_effect_;
+    ProcessingEffect::Effect processing_effect_;
   };
 
   // gRPC call stats for body.
@@ -543,8 +543,7 @@ private:
   void halfCloseAndWaitForRemoteClose();
 
   void onFinishProcessorCalls(
-      Grpc::Status::GrpcStatus call_status,
-      ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None);
+      Grpc::Status::GrpcStatus call_status);
   void clearAsyncState(Grpc::Status::GrpcStatus call_status = Grpc::Status::Aborted);
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 

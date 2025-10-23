@@ -80,6 +80,7 @@ envoy_cc_library(
     srcs = ["mutation_utils.cc"],
     hdrs = ["mutation_utils.h"],
     deps = [
+        ":processing_effect",
         "//envoy/buffer:buffer_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stats:stats_interface",

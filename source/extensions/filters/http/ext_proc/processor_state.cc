@@ -114,12 +114,12 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
   }
 }
 
-absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_response) {
+absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_response, ProcessingEffect::Effect processing_effect) {
   ENVOY_STREAM_LOG(debug, "Applying header mutations", *filter_callbacks_);
   const auto mut_status = MutationUtils::applyHeaderMutations(
       common_response.header_mutation(), *headers_,
       common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-      filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
+      filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_, processing_effect,
       shouldRemoveContentLength());
   return mut_status;
 }
@@ -161,15 +161,13 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
   // Process header mutation if present
   ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None;
   if (common_response.has_header_mutation()) {
-    const auto mut_status = processHeaderMutation(common_response);
+    const auto mut_status = processHeaderMutation(common_response, processing_effect);
     if (!mut_status.ok()) {
       filter_.onProcessHeadersResponse(response, mut_status, trafficDirection());
       return mut_status;
     }
-    processing_effect = ProcessingEffect::Effect::ContentModified;
   }
   if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
-    processing_effect = ProcessingEffect::Effect::ContinueAndReplace;
   }
 
   clearRouteCache(common_response);
@@ -195,14 +193,14 @@ absl::Status ProcessorState::handleHeaderContinueAndReplace(const HeadersRespons
     // the original one.
     headers_->removeContentLength();
     body_replaced_ = true;
-
+    ProcessingEffect::Effect p_effect;
     if (bufferedData() == nullptr) {
       Buffer::OwnedImpl new_body;
-      MutationUtils::applyBodyMutations(common_response.body_mutation(), new_body);
+      p_effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), new_body);
       addBufferedData(new_body);
     } else {
-      modifyBufferedData([&common_response](Buffer::Instance& buf) {
-        MutationUtils::applyBodyMutations(common_response.body_mutation(), buf);
+      modifyBufferedData([&common_response, &p_effect](Buffer::Instance& buf) {
+        p_effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), buf);
       });
     }
   }
@@ -375,7 +373,6 @@ ProcessorState::handleBufferedBodyCallback(const CommonResponse& common_response
     if (!mutation_status.ok()) {
       return mutation_status;
     }
-    processing_effect = ProcessingEffect::Effect::ContentModified;
   }
 
   // Handle body mutations if present
@@ -384,8 +381,7 @@ ProcessorState::handleBufferedBodyCallback(const CommonResponse& common_response
     if (!validation_status.ok()) {
       return validation_status;
     }
-    applyBufferedBodyMutation(common_response);
-    processing_effect = ProcessingEffect::Effect::ContentModified;
+    applyBufferedBodyMutation(common_response, processing_effect);
   }
 
   clearWatermark();
@@ -433,13 +429,11 @@ ProcessorState::handleBufferedPartialBodyCallback(const CommonResponse& common_r
     if (!mutation_status.ok()) {
       return mutation_status;
     }
-    processing_effect = ProcessingEffect::Effect::ContentModified;
   }
 
   // Apply body mutations and process data
   if (common_response.has_body_mutation()) {
-    MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
-    processing_effect = ProcessingEffect::Effect::ContentModified;
+    processing_effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
   }
 
   // Process chunk data
@@ -464,8 +458,9 @@ ProcessorState::handleBufferedPartialBodyCallback(const CommonResponse& common_r
 
 absl::Status
 ProcessorState::processHeaderMutationIfAvailable(const CommonResponse& common_response) {
+  ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None;
   if (headers_ != nullptr) {
-    return processHeaderMutation(common_response);
+    return processHeaderMutation(common_response, processing_effect);
   }
   ENVOY_STREAM_LOG(debug, "Response had header mutations but headers aren't available",
                    *filter_callbacks_);
@@ -490,11 +485,11 @@ absl::Status ProcessorState::validateContentLength(const CommonResponse& common_
   return absl::OkStatus();
 }
 
-void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_response) {
+void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_response, ProcessingEffect::Effect effect) {
   ENVOY_STREAM_LOG(debug, "Applying body response to buffered data. State = {}", *filter_callbacks_,
                    static_cast<int>(callback_state_));
-  modifyBufferedData([&common_response](Buffer::Instance& data) {
-    MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
+  modifyBufferedData([&common_response, &effect](Buffer::Instance& data) {
+    effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
   });
 }
 
@@ -518,12 +513,11 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
     if (response.has_header_mutation() && trailers_ != nullptr) {
       auto mut_status = MutationUtils::applyHeaderMutations(
           response.header_mutation(), *trailers_, false, filter_.config().mutationChecker(),
-          filter_.stats().rejected_header_mutations_);
+          filter_.stats().rejected_header_mutations_, processing_effect);
       if (!mut_status.ok()) {
         filter_.onProcessTrailersResponse(response, mut_status, trafficDirection());
         return mut_status;
       }
-      processing_effect = ProcessingEffect::Effect::ContentModified;
     }
     trailers_ = nullptr;
     onFinishProcessorCall(Grpc::Status::Ok, processing_effect);
@@ -571,12 +565,11 @@ bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_res
   Buffer::OwnedImpl chunk_data;
   QueuedChunkPtr chunk = dequeueStreamingChunk(chunk_data);
   ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");
-  ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None;
+  ProcessingEffect::Effect processing_effect;
   if (common_response.has_body_mutation()) {
     ENVOY_STREAM_LOG(debug, "Applying body response to chunk of data. Size = {}",
                      *filter_callbacks_, chunk->length);
-    MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
-    processing_effect = ProcessingEffect::Effect::ContentModified;
+    processing_effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
   }
   bool should_continue = chunk->end_stream;
   ENVOY_STREAM_LOG(trace, "Injecting {} bytes of data to filter stream", *filter_callbacks_,
@@ -610,12 +603,12 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
   injectDataToFilterChain(buffer, end_of_stream);
 
   if (end_of_stream) {
-    onFinishProcessorCall(Grpc::Status::Ok, ProcessingEffect::Effect::ContentModified);
+    onFinishProcessorCall(Grpc::Status::Ok, ProcessingEffect::Effect::MutationApplied);
   } else {
     // Set the state to CallbackState::StreamedBodyCallback to wait for more bodies.
     // However, this could be the last chunk of body, and trailers are right after it.
     // The function to handle trailers response needs to consider this.
-    onFinishProcessorCall(Grpc::Status::Ok, ProcessingEffect::Effect::ContentModified,
+    onFinishProcessorCall(Grpc::Status::Ok, ProcessingEffect::Effect::MutationApplied,
                           CallbackState::StreamedBodyCallback);
   }
   // If end_of_stream is true, Envoy should continue the filter chain operations.

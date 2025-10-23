@@ -7,6 +7,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 
 #include "absl/status/status.h"
 
@@ -33,10 +34,10 @@ public:
   applyHeaderMutations(const envoy::service::ext_proc::v3::HeaderMutation& mutation,
                        Http::HeaderMap& headers, bool replacing_message,
                        const Filters::Common::MutationRules::Checker& rule_checker,
-                       Stats::Counter& rejected_mutations, bool remove_content_length = false);
+                       Stats::Counter& rejected_mutations, ProcessingEffect::Effect& effect, bool remove_content_length = false);
 
   // Modify a buffer based on a set of mutations from a protobuf
-  static void applyBodyMutations(const envoy::service::ext_proc::v3::BodyMutation& mutation,
+  static ProcessingEffect::Effect applyBodyMutations(const envoy::service::ext_proc::v3::BodyMutation& mutation,
                                  Buffer::Instance& buffer);
 
   // Determine if a particular HTTP status code is valid.

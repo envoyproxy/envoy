@@ -293,8 +293,12 @@ std::string processingEffectToString(ProcessingEffect::Effect processing_effect)
     return "none";
   case ProcessingEffect::Effect::MutationApplied:
     return "mutation_applied";
-  case ProcessingEffect::Effect::MutationRejected:
-    return "mutation_rejected";
+  case ProcessingEffect::Effect::MutationFailed:
+    return "mutation_failed";
+  case ProcessingEffect::Effect::InvalidMutationRejected:
+    return "invalid_mutation_rejected";
+  case ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded:
+    return "mutation_rejected_size_limited_exceeded";
   default:
     return "unknown";
   }
@@ -340,6 +344,21 @@ void ExtProcLoggingInfo::recordGrpcCall(std::chrono::microseconds latency,
     if (latency < body_stats->min_latency_) {
       body_stats->min_latency_ = latency;
     }
+  }
+}
+
+void ExtProcLoggingInfo::updateProcessingEffect(ProcessorState::CallbackState callback_state,
+                                        envoy::config::core::v3::TrafficDirection traffic_direction,
+                                        ProcessingEffect::Effect processing_effect){
+  if (processing_effect == ProcessingEffect::Effect::None){
+    // Nothing to update
+    return;
+  }
+  if (callback_state == ProcessorState::CallbackState::HeadersCallback){
+    if (grpcCalls(traffic_direction).header_stats_ != nullptr && ) {
+      grpcCalls(traffic_direction).header_stats_.processing_effect_ = processing_effect;
+    }
+    return;
   }
 }
 
@@ -1854,9 +1873,10 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
+      ProcessingEffect::Effect effect = ProcessingEffect::Effect::None;
       const absl::Status mut_status = MutationUtils::applyHeaderMutations(
           response.headers(), headers, false, config().mutationChecker(),
-          stats_.rejected_header_mutations_);
+          stats_.rejected_header_mutations_, effect);
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
                               mut_status.message());
