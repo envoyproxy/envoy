@@ -82,6 +82,24 @@ jobs:
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
+  runtime:
+    secrets:
+      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    name: Check (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
+    uses: ./.github/workflows/_check_runtime.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.check-runtime }}
+    needs:
+    - load
+    with:
+      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+
   san:
     secrets:
       gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
