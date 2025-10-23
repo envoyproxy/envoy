@@ -12,6 +12,7 @@
 startup --host_jvm_args=-Xmx3g
 
 common --noenable_bzlmod
+common --enable_workspace
 
 fetch --color=yes
 run --color=yes
