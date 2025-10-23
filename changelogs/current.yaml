@@ -33,6 +33,10 @@ minor_behavior_changes:
     <envoy_v3_api_msg_service.ext_proc.v3.HeaderMutation>` fails. Removing
     request-specific details allows grouping by similar failure types. Detailed
     messages remain available in debug logs.
+- area: ext_authz
+  change: |
+    Check the response header count is < the configured limits before applying mutations and don't
+    add new headers if not.
 - area: mobile
   change: |
     Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
