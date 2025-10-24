@@ -621,6 +621,7 @@ void Filter::onError() {
     // Close the external processing.
     processing_complete_ = true;
     stats_.failure_mode_allowed_.inc();
+    logging_info_->setFailedOpen();
     clearAsyncState();
   } else {
     // Return an error and stop processing the current stream.
@@ -1692,6 +1693,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // ignore it and also ignore the stream for the rest of this filter
       // instance's lifetime to protect us from a malformed server.
       stats_.failure_mode_allowed_.inc();
+      logging_info_->setFailedOpen();
       closeStream();
       clearAsyncState(processing_status.raw_code());
       processing_complete_ = true;
@@ -1719,7 +1721,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
   if (failureModeAllow()) {
     onGrpcCloseWithStatus(status);
     stats_.failure_mode_allowed_.inc();
-
+    logging_info_->setFailedOpen();
   } else {
     processing_complete_ = true;
     // Since the stream failed, there is no need to handle timeouts, so
@@ -1742,6 +1744,7 @@ void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
 
   processing_complete_ = true;
   stats_.streams_closed_.inc();
+  logging_info_->setServerHalfClose();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();
@@ -1760,6 +1763,7 @@ void Filter::onMessageTimeout() {
     processing_complete_ = true;
     closeStream();
     stats_.failure_mode_allowed_.inc();
+    logging_info_->setFailedOpen();
     clearAsyncState(Grpc::Status::DeadlineExceeded);
 
   } else {
