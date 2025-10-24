@@ -97,10 +97,13 @@ ActiveQuicListener::ActiveQuicListener(
       per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
       *connection_id_generator_, debug_visitor_factory);
 
+  absl::AnyInvocable<void() &&> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
+
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
       listener_config.udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
-          listen_socket_.ioHandle(), listener_config.listenerScope());
+          listen_socket_.ioHandle(), listener_config.listenerScope(), dispatcher,
+          std::move(on_can_write_cb));
   udp_packet_writer_ = udp_packet_writer.get();
 
   // Some packet writers (like `UdpGsoBatchWriter`) already directly implement
@@ -129,6 +132,10 @@ ActiveQuicListener::ActiveQuicListener(
       udp_save_cmsg_config_.expected_size = save_cmsg_config.expected_size();
     }
   }
+
+  max_sessions_per_event_loop_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(listener_config.udpListenerConfig()->config().quic_options(),
+                                      max_sessions_per_event_loop, kNumSessionsToCreatePerLoop);
 }
 
 ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
@@ -198,7 +205,7 @@ void ActiveQuicListener::onReadReady() {
     event_loops_with_buffered_chlo_for_test_++;
   }
 
-  quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
+  quic_dispatcher_->ProcessBufferedChlos(max_sessions_per_event_loop_);
 
   // If there were more buffered than the limit, schedule again for the next event loop.
   if (quic_dispatcher_->HasChlosBuffered()) {
