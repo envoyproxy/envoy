@@ -728,6 +728,15 @@ case $CI_TARGET in
         ;;
 
     release|release.server_only|release.test_only)
+        whoami
+
+        ls -alh /build
+
+        touch /build/foo
+
+        echo "access confirmed ..."
+
+
         if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # When testing memory consumption, we want to test against exact byte-counts
             # where possible. As these differ between platforms and compile options, we
