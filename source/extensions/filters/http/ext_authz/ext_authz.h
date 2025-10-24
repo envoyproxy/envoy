@@ -46,7 +46,8 @@ namespace ExtAuthz {
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(invalid)                                                                                 \
   COUNTER(ignored_dynamic_metadata)                                                                \
-  COUNTER(filter_state_name_collision)
+  COUNTER(filter_state_name_collision)                                                             \
+  COUNTER(omitted_response_headers)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
