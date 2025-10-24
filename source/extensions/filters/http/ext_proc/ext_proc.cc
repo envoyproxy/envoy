@@ -73,7 +73,7 @@ constexpr absl::string_view ResponseTrailerLatencyUsField = "response_trailer_la
 constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_call_status";
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
-constexpr absl::string_view ImmediateResonseField = "immediate_response";
+constexpr absl::string_view ImmediateResponseField = "immediate_response";
 constexpr absl::string_view RequestHeaderContinueAndReplaceField =
     "request_header_continue_and_replace";
 constexpr absl::string_view ResponseHeaderContinueAndReplaceField =
@@ -400,7 +400,7 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<double>(bytes_sent_));
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
-  (*struct_msg->mutable_fields())[ImmediateResonseField].set_bool_value(immediate_response_);
+  (*struct_msg->mutable_fields())[ImmediateResponseField].set_bool_value(immediate_response_);
   (*struct_msg->mutable_fields())[RequestHeaderContinueAndReplaceField].set_bool_value(
       decoding_processor_grpc_calls_.continue_and_replace_);
   (*struct_msg->mutable_fields())[ResponseHeaderContinueAndReplaceField].set_bool_value(
@@ -509,7 +509,7 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == BytesReceivedField) {
     return static_cast<int64_t>(bytes_received_);
   }
-  if (field_name == ImmediateResonseField) {
+  if (field_name == ImmediateResponseField) {
     return bool(immediate_response_);
   }
   if (field_name == RequestHeaderContinueAndReplaceField) {
