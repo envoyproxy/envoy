@@ -34,6 +34,7 @@ public:
       request_->cancel();
       ENVOY_LOG(debug, "fetch pubkey [uri = {}]: canceled", remote_jwks_.http_uri().uri());
     }
+    complete_ = true;
     reset();
   }
 
@@ -126,8 +127,10 @@ private:
   Http::AsyncClient::Request* request_{};
 
   void reset() {
-    request_ = nullptr;
-    receiver_ = nullptr;
+    if (complete_) {
+      request_ = nullptr;
+      receiver_ = nullptr;
+    }
   }
 };
 } // namespace
