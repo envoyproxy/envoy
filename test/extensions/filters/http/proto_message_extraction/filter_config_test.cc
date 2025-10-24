@@ -202,6 +202,47 @@ TEST_F(FilterConfigTestOk, RepeatedField) {
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
 
+TEST_F(FilterConfigTestOk, ExtractRepeatedCardinality) {
+  parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        response_extraction_by_field: { key: "repeated_string_field" value: EXTRACT_REPEATED_CARDINALITY }
+      }
+    })pb");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
+  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
+                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
+  EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
+}
+
+TEST_F(FilterConfigTestOk, ExtractRepeatedCardinalityNestedField) {
+  parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.ListApiKeys"
+      value: {
+        response_extraction_by_field: {
+          key: "keys.repeated_string_field"
+          value: EXTRACT_REPEATED_CARDINALITY
+        }
+      }
+    })pb");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
+  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
+                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
+  EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.ListApiKeys"), nullptr);
+}
+
 TEST_F(FilterConfigTestOk, ExtractRedact) {
   parseConfigProto(R"pb(
     mode: FIRST_AND_LAST
@@ -394,6 +435,51 @@ TEST_F(FilterConfigTestException, RedactNonLeafField) {
       EnvoyException,
       testing::HasSubstr(
           R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'key' must be numerical/string or timestamp type)"));
+}
+
+TEST_F(FilterConfigTestException, RequestExtractRepeatedCardinality) {
+  parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        request_extraction_by_field: { key: "repeated_supported_types.string" value: EXTRACT_REPEATED_CARDINALITY }
+      }
+    })pb");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
+
+  EXPECT_THAT_THROWS_MESSAGE(
+      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
+                                     *api_),
+      EnvoyException,
+      testing::HasSubstr(
+          R"(method `apikeys.ApiKeys.CreateApiKey`: EXTRACT_REPEATED_CARDINALITY is not supported for request fields.)"));
+}
+
+TEST_F(FilterConfigTestException, MultipleResponseExtractRepeatedCardinality) {
+  parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        response_extraction_by_field: { key: "repeated_string_field" value: EXTRACT_REPEATED_CARDINALITY }
+        response_extraction_by_field: { key: "another_repeated_field" value: EXTRACT_REPEATED_CARDINALITY }
+      }
+    })pb");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
+
+  EXPECT_THAT_THROWS_MESSAGE(
+      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
+                                     *api_),
+      EnvoyException,
+      testing::HasSubstr(
+          R"(method `apikeys.ApiKeys.CreateApiKey`: only one field can be tagged with EXTRACT_REPEATED_CARDINALITY for response.)"));
 }
 
 TEST(FilterFactoryCreatorTest, Constructor) {
