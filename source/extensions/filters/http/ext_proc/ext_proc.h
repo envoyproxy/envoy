@@ -104,6 +104,9 @@ public:
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction,
                       ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None);
+  void updateProcessingEffect(ProcessorState::CallbackState callback_state,
+                                        envoy::config::core::v3::TrafficDirection traffic_direction,
+                                        ProcessingEffect::Effect processing_effect);
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {

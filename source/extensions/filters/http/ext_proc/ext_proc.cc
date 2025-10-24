@@ -355,10 +355,19 @@ void ExtProcLoggingInfo::updateProcessingEffect(ProcessorState::CallbackState ca
     return;
   }
   if (callback_state == ProcessorState::CallbackState::HeadersCallback){
-    if (grpcCalls(traffic_direction).header_stats_ != nullptr && ) {
-      grpcCalls(traffic_direction).header_stats_.processing_effect_ = processing_effect;
+    if (grpcCalls(traffic_direction).header_stats_ != nullptr) {
+      grpcCalls(traffic_direction).header_stats_->processing_effect_ = processing_effect;
     }
     return;
+  }
+  if (callback_state == ProcessorState::CallbackState::TrailersCallback) {
+    if (grpcCalls(traffic_direction).trailer_stats_ != nullptr) {
+      grpcCalls(traffic_direction).trailer_stats_->processing_effect_ = processing_effect;
+    }
+    return;
+  }
+  if (grpcCalls(traffic_direction).body_stats_ != nullptr){
+    grpcCalls(traffic_direction).body_stats_->processing_effect_ = processing_effect;
   }
 }
 

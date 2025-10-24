@@ -193,14 +193,13 @@ absl::Status ProcessorState::handleHeaderContinueAndReplace(const HeadersRespons
     // the original one.
     headers_->removeContentLength();
     body_replaced_ = true;
-    ProcessingEffect::Effect p_effect;
     if (bufferedData() == nullptr) {
       Buffer::OwnedImpl new_body;
-      p_effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), new_body);
+      MutationUtils::applyBodyMutations(common_response.body_mutation(), new_body);
       addBufferedData(new_body);
     } else {
-      modifyBufferedData([&common_response, &p_effect](Buffer::Instance& buf) {
-        p_effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), buf);
+      modifyBufferedData([&common_response](Buffer::Instance& buf) {
+        MutationUtils::applyBodyMutations(common_response.body_mutation(), buf);
       });
     }
   }
@@ -491,6 +490,10 @@ void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_resp
   modifyBufferedData([&common_response, &effect](Buffer::Instance& data) {
     effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
   });
+  ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
+  if (logging_info != nullptr) {
+    logging_info->updateProcessingEffect(CallbackState::BufferedBodyCallback, traffic_direction_, effect);
+  }
 }
 
 void ProcessorState::finalizeBodyResponse(bool should_continue) {
