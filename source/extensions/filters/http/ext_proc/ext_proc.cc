@@ -1547,12 +1547,12 @@ bool isLastBodyResponse(ProcessorState& state,
   case ProcessingMode::BUFFERED:
   case ProcessingMode::BUFFERED_PARTIAL:
     // TODO: - skip stream closing optimization for BUFFERED and BUFFERED_PARTIAL for now.
-    break;
+    return false;
   case ProcessingMode::STREAMED:
     if (!state.chunkQueue().empty()) {
       return state.chunkQueue().queue().front()->end_stream;
     }
-    break;
+    return false;
   case ProcessingMode::FULL_DUPLEX_STREAMED: {
     if (body_response.has_response() && body_response.response().has_body_mutation()) {
       const auto& body_mutation = body_response.response().body_mutation();
@@ -1560,7 +1560,7 @@ bool isLastBodyResponse(ProcessorState& state,
         return body_mutation.streamed_response().end_of_stream();
       }
     }
-    break;
+    return false;
   }
   default:
     break;
