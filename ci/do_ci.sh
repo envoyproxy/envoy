@@ -736,6 +736,14 @@ case $CI_TARGET in
 
         echo "access confirmed ..."
 
+        ls -alh /build/bazel_root
+
+        bazel --version
+
+
+        echo "bazel confirmed ..."
+
+
 
         if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # When testing memory consumption, we want to test against exact byte-counts
