@@ -58,7 +58,6 @@ jobs:
         --//distribution:x64-release=//distribution:custom/x64/bin/release.tar.zst
         --//distribution:arm64-release=//distribution:custom/arm64/bin/release.tar.zst
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      diskspace-hack: true
       downloads: |
         packages.arm64: envoy/arm64/
         packages.x64: envoy/x64/
