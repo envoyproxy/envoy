@@ -138,6 +138,7 @@ jobs:
     - load
     - build
     - coverage
+    - runtime
     - san
     uses: ./.github/workflows/_finish.yml
     with:
