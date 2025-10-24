@@ -683,7 +683,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           absl::StrCat("Failed to create path rewrite formatter: ", formatter_or.status()));
       return;
     }
-    path_rewrite_formatter_ = std::move(formatter_or).value();
+    path_rewrite_formatter_ = std::move(formatter_or.value());
   }
 
   if (path_rewriter_ != nullptr) {
@@ -699,7 +699,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           absl::StrCat("Failed to create host rewrite formatter: ", formatter_or.status()));
       return;
     }
-    host_rewrite_formatter_ = std::move(formatter_or).value();
+    host_rewrite_formatter_ = std::move(formatter_or.value());
   }
 
   if (redirect_config_ != nullptr && redirect_config_->path_redirect_has_query_ &&

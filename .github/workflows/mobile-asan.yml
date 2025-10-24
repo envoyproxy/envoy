@@ -51,6 +51,7 @@ jobs:
         test
         --config=mobile-remote-ci-linux-asan
         //test/common/...
+      bind-mount: false
       request: ${{ needs.load.outputs.request }}
       target: asan
       timeout-minutes: 180
