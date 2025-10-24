@@ -38,7 +38,6 @@ jobs:
       bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      diskspace-hack: ${{ matrix.diskspace-hack || false }}
       error-match: |
         ERROR
         error:
@@ -59,4 +58,3 @@ jobs:
           name: Compile time options
         - target: gcc
           name: GCC
-          diskspace-hack: true
