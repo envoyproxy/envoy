@@ -29,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -310,4 +310,97 @@ message TcpProxy {
   //   :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`
   //   for details.
   repeated config.core.v3.TlvEntry proxy_protocol_tlvs = 19;
+
+  // Configuration for controlling when to establish the upstream connection.
+  //
+  // When not specified, the filter uses the default ``IMMEDIATE`` mode for backward compatibility.
+  //
+  // .. attention::
+  //   Server-first protocols (e.g., SMTP, MySQL, POP3) require ``IMMEDIATE`` mode. Data-triggered
+  //   modes will cause connection timeouts as the client waits for the server greeting.
+  UpstreamConnectionEstablishmentMode upstream_connection_establishment_mode = 21;
+}
+
+// Configuration for controlling when the TCP proxy establishes the upstream connection.
+message UpstreamConnectionEstablishmentMode {
+  // Specifies when to trigger the upstream connection establishment.
+  enum ConnectionTrigger {
+    // Establish the upstream connection immediately when the downstream connection is accepted.
+    // This is the default behavior and provides the lowest latency.
+    IMMEDIATE = 0;
+
+    // Wait for initial data from the downstream connection before establishing the upstream connection.
+    // This allows preceding filters to inspect the initial data (e.g., extracting SNI from TLS ClientHello)
+    // before the upstream connection is established. The filter buffers downstream data until the
+    // upstream connection is ready.
+    //
+    // .. note::
+    //   When using this mode, ensure that preceding filters limit the amount of data they
+    //   need to inspect to avoid excessive buffering.
+    //
+    // .. warning::
+    //   This mode is not suitable for server-first protocols (e.g., SMTP, FTP, POP3) where the
+    //   server sends the initial greeting. For such protocols, use ``IMMEDIATE`` mode or the
+    //   connection will wait until timeout.
+    ON_DOWNSTREAM_DATA = 1;
+
+    // Wait for the downstream TLS handshake to complete before establishing the upstream connection.
+    // This allows access to the full TLS connection information, including client certificates
+    // and negotiated parameters, which can be used for routing decisions or passed as metadata
+    // to the upstream.
+    //
+    // .. note::
+    //   This mode is only effective when the downstream connection uses TLS. For non-TLS
+    //   connections, it behaves the same as ``IMMEDIATE``.
+    ON_DOWNSTREAM_TLS_HANDSHAKE = 2;
+
+    // Wait for both initial data and TLS handshake completion (whichever occurs last) before
+    // establishing the upstream connection. This provides maximum information about the
+    // downstream connection before connecting upstream.
+    //
+    // .. note::
+    //   Use this mode when you need both the initial data and complete TLS information
+    //   for making routing decisions. For non-TLS connections, this mode behaves the same
+    //   as ``ON_DOWNSTREAM_DATA``.
+    //
+    // .. warning::
+    //   Like ``ON_DOWNSTREAM_DATA``, this mode is not suitable for server-first protocols.
+    ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE = 3;
+  }
+
+  // Configuration for the ``ON_DOWNSTREAM_DATA`` trigger mode.
+  message DownstreamDataConfig {
+    // Maximum bytes to buffer from the downstream connection before forcing the
+    // upstream connection establishment. This prevents excessive memory usage
+    // when the downstream sends large amounts of data.
+    // If not specified, defaults to 64KB.
+    google.protobuf.UInt32Value max_buffered_bytes = 1 [(validate.rules).uint32 = {lte: 1048576}];
+
+    // Whether to forward the buffered downstream data to the upstream connection
+    // after it is established. In most cases, this should be ``true`` to ensure
+    // data is not lost. Set to ``false`` only if the data is used solely for
+    // routing decisions and should not be sent upstream.
+    // Defaults to ``true``.
+    google.protobuf.BoolValue forward_buffered_data = 2;
+  }
+
+  // When to trigger the upstream connection establishment.
+  ConnectionTrigger trigger = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // Maximum time to wait for the trigger condition before forcing the upstream connection.
+  // This prevents indefinite waiting if the trigger condition is never met.
+  // If not specified, the filter uses a default timeout of 30 seconds.
+  //
+  // .. note::
+  //   Setting this to ``0s`` disables the timeout, but this is not recommended as it
+  //   may lead to connection hangs.
+  google.protobuf.Duration max_wait_time = 2 [(validate.rules).duration = {
+    lte {seconds: 300}
+    gte {}
+  }];
+
+  // Configuration specific to the ``ON_DOWNSTREAM_DATA`` trigger.
+  // This field is only used when ``trigger`` is set to ``ON_DOWNSTREAM_DATA`` or
+  // ``ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE``.
+  DownstreamDataConfig downstream_data_config = 3;
 }

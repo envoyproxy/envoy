@@ -1960,4 +1960,580 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
   EXPECT_EQ(downstream_resumes, 1);
 }
 
+// Test ON_DOWNSTREAM_DATA mode delays connection until data is received.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeOnDownstreamData) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
+                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    mode->mutable_max_wait_time()->set_seconds(10);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // No upstream connection should be established yet.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(500)));
+
+  // Send data - this should trigger upstream connection.
+  ASSERT_TRUE(tcp_client->write("trigger", false));
+
+  // Now upstream connection should be established.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // The buffered data should be forwarded.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(7));
+
+  // Send more data both ways.
+  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(12));
+  ASSERT_TRUE(fake_upstream_connection->write("world", true));
+  tcp_client->waitForData("world");
+  tcp_client->waitForHalfClose();
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+// Test ON_DOWNSTREAM_DATA mode with forward_buffered_data=false.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeNoForwardBufferedData) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
+                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    mode->mutable_downstream_data_config()->mutable_forward_buffered_data()->set_value(false);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Send data to trigger connection.
+  ASSERT_TRUE(tcp_client->write("discarded", false));
+
+  // Upstream connection should be established.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // The buffered data should NOT be forwarded - wait a bit to confirm no data arrives.
+  std::string temp_data;
+  ASSERT_FALSE(
+      fake_upstream_connection->waitForData(1, &temp_data, std::chrono::milliseconds(500)));
+
+  // New data should be forwarded normally.
+  ASSERT_TRUE(tcp_client->write("hello", false));
+  std::string received_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5, &received_data));
+  EXPECT_EQ("hello", received_data);
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
+// Test timeout forcing connection when no data is received.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTimeoutForces) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
+                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    mode->mutable_max_wait_time()->set_seconds(0);
+    mode->mutable_max_wait_time()->set_nanos(500000000); // 500ms
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Don't send any data, wait for timeout.
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  // Connection should be established after timeout (within 1 second).
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                       std::chrono::milliseconds(1000)));
+
+  // Send data after connection is established.
+  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
+// Test early data buffering with half-close.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeEarlyDataWithHalfClose) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
+                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Send data with half-close.
+  ASSERT_TRUE(tcp_client->write("final_data", true)); // end_stream = true
+
+  // Upstream connection should be established.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Data should be forwarded with half-close.
+  std::string received_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(10, &received_data));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  EXPECT_EQ("final_data", received_data);
+
+  // Upstream can still send data back.
+  ASSERT_TRUE(fake_upstream_connection->write("response", true));
+  tcp_client->waitForData("response");
+  tcp_client->waitForHalfClose();
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+// Test multiple concurrent connections with ON_DOWNSTREAM_DATA mode.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeMultipleConcurrent) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
+                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  // First connection.
+  IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Second connection.
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // No upstream connections yet.
+  FakeRawConnectionPtr fake_upstream_connection1;
+  FakeRawConnectionPtr fake_upstream_connection2;
+
+  // First client sends data.
+  ASSERT_TRUE(tcp_client1->write("client1", false));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1));
+  ASSERT_TRUE(fake_upstream_connection1->waitForData(7));
+
+  // Second client sends data.
+  ASSERT_TRUE(tcp_client2->write("client2", false));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(7));
+
+  // Verify data isolation.
+  std::string client1_data;
+  std::string client2_data;
+  ASSERT_TRUE(fake_upstream_connection1->waitForData(7, &client1_data));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(7, &client2_data));
+  EXPECT_EQ("client1", client1_data);
+  EXPECT_EQ("client2", client2_data);
+
+  ASSERT_TRUE(fake_upstream_connection1->close());
+  ASSERT_TRUE(fake_upstream_connection2->close());
+  tcp_client1->waitForHalfClose();
+  tcp_client2->waitForHalfClose();
+  tcp_client1->close();
+  tcp_client2->close();
+}
+
+// Test ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE mode simulation.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeOnDownstreamDataAndTls) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(
+        envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectionEstablishmentMode::
+            ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
+    mode->mutable_max_wait_time()->set_seconds(1); // Short timeout for test.
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // For non-TLS connections, this mode behaves as ON_DOWNSTREAM_DATA.
+  // Send data - should trigger connection immediately (no TLS to wait for).
+  ASSERT_TRUE(tcp_client->write("data", false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Buffered data should be forwarded after connection.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(4));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
+// Test downstream close before upstream establishment.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDownstreamCloseBeforeUpstream) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
+                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Close connection before sending data.
+  tcp_client->close();
+
+  // No upstream connection should be established.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(500)));
+}
+
+// Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with non-TLS connection.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeNonTls) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
+                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_TLS_HANDSHAKE);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // For non-TLS connection, should establish upstream immediately despite TLS mode.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send data both ways to verify connection works.
+  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world", true));
+  tcp_client->waitForData("world");
+  tcp_client->waitForHalfClose();
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+// Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with upstream TLS (simpler test).
+// This tests the mode without downstream TLS which should behave as IMMEDIATE.
+// Full TLS downstream testing would require more complex test infrastructure.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeWithUpstreamTls) {
+  upstream_tls_ = true;
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  config_helper_.configureUpstreamTls();
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
+                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    mode->mutable_max_wait_time()->set_seconds(5);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  // Create non-TLS client connection (should connect immediately).
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // The upstream connection should be established immediately (no downstream TLS).
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send data both ways to verify connection works.
+  ASSERT_TRUE(tcp_client->write("hello_tls", false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(9));
+  ASSERT_TRUE(fake_upstream_connection->write("world_tls", true));
+  tcp_client->waitForData("world_tls");
+  tcp_client->waitForHalfClose();
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+// Test ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE. Since TLS setup is complex in tests,
+// this simply verifies the mode works with non-TLS connections (behaves as ON_DOWNSTREAM_DATA).
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDataAndTlsSimple) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(
+        envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectionEstablishmentMode::
+            ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
+    mode->mutable_max_wait_time()->set_seconds(5);
+
+    auto* data_config = mode->mutable_downstream_data_config();
+    data_config->mutable_max_buffered_bytes()->set_value(65536);
+    data_config->mutable_forward_buffered_data()->set_value(true);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  // Create non-TLS client connection (for non-TLS, mode behaves as ON_DOWNSTREAM_DATA).
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // The upstream connection should NOT be established yet (waiting for data).
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(500)));
+
+  // Send data - this should trigger upstream connection.
+  ASSERT_TRUE(tcp_client->write("trigger", false));
+
+  // Now the upstream connection should be established.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(7));
+
+  ASSERT_TRUE(fake_upstream_connection->write("response", true));
+  tcp_client->waitForData("response");
+  tcp_client->waitForHalfClose();
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+// Test TLS handshake timeout. The upstream connection should be established after timeout.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeTimeout) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
+                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    mode->mutable_max_wait_time()->set_seconds(1); // Short timeout for test.
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Don't send data - wait for timeout.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                       std::chrono::milliseconds(2000)));
+
+  // After timeout, connection should work normally.
+  ASSERT_TRUE(tcp_client->write("after_timeout", false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(13));
+
+  // Close connections.
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
+// Test connection close during wait for data trigger.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeConnectionCloseDuringWait) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
+                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    mode->mutable_max_wait_time()->set_seconds(5);
+
+    auto* data_config = mode->mutable_downstream_data_config();
+    data_config->mutable_max_buffered_bytes()->set_value(65536);
+    data_config->mutable_forward_buffered_data()->set_value(true);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  // Create non-TLS client connection.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // The upstream connection should NOT be established yet (waiting for data).
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(500)));
+
+  // Close connection before sending data.
+  tcp_client->close();
+
+  // Verify no upstream connection was made.
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(500)));
+}
+
+// Test ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE mode with non-TLS.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDataAndTlsNonTls) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(
+        envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectionEstablishmentMode::
+            ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // No upstream connection yet (waiting for data, not TLS since non-TLS).
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(500)));
+
+  // Send data - should trigger connection (no TLS to wait for).
+  ASSERT_TRUE(tcp_client->write("trigger", false));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(7));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
+// Test IMMEDIATE mode.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeImmediate) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
+                          UpstreamConnectionEstablishmentMode::IMMEDIATE);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Upstream connection should be established immediately.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send data both ways.
+  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world", true));
+  tcp_client->waitForData("world");
+  tcp_client->waitForHalfClose();
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
 } // namespace Envoy

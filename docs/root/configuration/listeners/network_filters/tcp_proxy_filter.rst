@@ -39,16 +39,90 @@ must happen before ``onNewConnection()`` is called on the ``TcpProxy`` filter to
 
 .. _config_network_filters_tcp_proxy_receive_before_connect:
 
-Early reception and delayed upstream connection establishment
--------------------------------------------------------------
+Delayed upstream connection establishment
+------------------------------------------
 
-``TcpProxy`` filter  normally disables reading on the downstream connection until the upstream connection has been established. In some situations earlier filters in the filter chain (example as in https://github.com/envoyproxy/envoy/issues/9023) may need to read data from the downstream connection before allowing the upstream connection to be established.
-This can be done by setting the ``StreamInfo`` filter state object for the key ``envoy.tcp_proxy.receive_before_connect`` to be `true`. Setting this filter state must happen in ``initializeReadFilterCallbacks()`` callback of the network filter so that it is done before ``TcpProxy`` filter is initialized.
+By default, the TCP proxy filter establishes the upstream connection immediately when a downstream connection is accepted.
+However, in some scenarios it is beneficial to delay upstream connection establishment until certain conditions are met,
+such as:
 
-When the ``envoy.tcp_proxy.receive_before_connect`` filter state is set, it is possible that the ``TcpProxy`` filter receives data before the upstream connection has been established.
-In such a case, ``TcpProxy`` filter now buffers data it receives before the upstream connection has been established and flushes it once the upstream connection is established.
-Filters can also delay the upstream connection setup by returning ``StopIteration`` from their ``onNewConnection`` and ``onData`` callbacks.
-On receiving early data, TCP_PROXY will read disable the connection until the upstream connection is established. This is to protect the early buffer from overflowing.
+* Inspecting initial downstream data. For example, extracting SNI from TLS ``ClientHello``.
+* Waiting for the downstream TLS handshake to complete to access client certificate information.
+* Using the negotiated TLS parameters for routing decisions.
+
+There are two ways to configure delayed upstream connection establishment:
+
+Explicit configuration
+^^^^^^^^^^^^^^^^^^^^^^
+
+The preferred method is to use the :ref:`upstream_connection_establishment_mode
+<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connection_establishment_mode>`
+configuration field. This provides explicit control over when the upstream connection is established.
+
+The following trigger modes are supported:
+
+* ``IMMEDIATE`` (Default): Establish the upstream connection immediately when the downstream connection is accepted.
+  This provides the lowest latency and is the default behavior for backward compatibility.
+* ``ON_DOWNSTREAM_DATA``: Wait for initial data from the downstream connection before establishing the upstream
+  connection. This allows preceding filters to inspect the initial data before the upstream connection is established.
+  The filter buffers downstream data until the upstream connection is ready.
+* ``ON_DOWNSTREAM_TLS_HANDSHAKE``: Wait for the downstream TLS handshake to complete before establishing the upstream
+  connection. This allows access to the full TLS connection information, including client certificates and negotiated
+  parameters. This mode is only effective when the downstream connection uses TLS. For non-TLS connections, it behaves
+  the same as ``IMMEDIATE``.
+* ``ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE``: Wait for both initial data and TLS handshake completion before establishing
+  the upstream connection. This provides maximum information about the downstream connection before connecting upstream.
+  For non-TLS connections, this mode behaves the same as ``ON_DOWNSTREAM_DATA``.
+
+Additional configuration options:
+
+* ``max_wait_time``: Maximum time to wait for the trigger condition before forcing the upstream connection. This prevents
+  indefinite waiting if the trigger condition is never met.
+* ``downstream_data_config``: Configuration specific to data-triggered modes i.e., ``ON_DOWNSTREAM_DATA`` and
+  ``ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE``.
+
+Example configuration:
+
+.. code-block:: yaml
+
+  name: envoy.filters.network.tcp_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+    stat_prefix: tcp
+    cluster: upstream_cluster
+    upstream_connection_establishment_mode:
+      trigger: ON_DOWNSTREAM_DATA
+      max_wait_time: 5s
+      downstream_data_config:
+        max_buffered_bytes: 8192
+        forward_buffered_data: true
+
+.. attention::
+
+  Data-triggered modes (``ON_DOWNSTREAM_DATA`` and ``ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE``) are not suitable for
+  server-first protocols where the server sends the initial greeting (e.g., SMTP, MySQL, POP3). For such protocols,
+  use ``IMMEDIATE`` mode or the connection will wait until timeout.
+
+Filter state configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The legacy method using filter state is still supported for backward compatibility but is not recommended for new
+deployments. This can be done by setting the ``StreamInfo`` filter state object for the key
+``envoy.tcp_proxy.receive_before_connect`` to ``true``. Setting this filter state must happen in the
+``initializeReadFilterCallbacks()`` callback of the network filter so that it is done before the TCP proxy filter
+is initialized.
+
+When the ``envoy.tcp_proxy.receive_before_connect`` filter state is set, the TCP proxy filter receives data before
+the upstream connection has been established. In such a case, the TCP proxy filter buffers data it receives before
+the upstream connection has been established and flushes it once the upstream connection is established. Filters can
+also delay the upstream connection setup by returning ``StopIteration`` from their ``onNewConnection`` and ``onData``
+callbacks. On receiving early data, the TCP proxy will read disable the connection until the upstream connection is
+established. This is to protect the early buffer from overflowing.
+
+.. note::
+
+  When using the explicit configuration method (``upstream_connection_establishment_mode``), the filter state approach
+  is ignored. The two methods are mutually exclusive, with the explicit configuration taking precedence.
 
 .. _config_network_filters_tcp_proxy_tunneling_over_http:
 

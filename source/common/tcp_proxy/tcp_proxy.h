@@ -361,6 +361,12 @@ public:
     return shared_config_->proxyProtocolTLVs();
   }
 
+  const absl::optional<
+      envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectionEstablishmentMode>&
+  upstreamConnectionEstablishmentMode() const {
+    return upstream_connection_establishment_mode_;
+  }
+
 private:
   struct SimpleRouteImpl : public Route {
     SimpleRouteImpl(const Config& parent, absl::string_view cluster_name);
@@ -413,6 +419,9 @@ private:
   Random::RandomGenerator& random_generator_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
   Regex::Engine& regex_engine_; // Static lifetime object, safe to store as a reference
+  absl::optional<
+      envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectionEstablishmentMode>
+      upstream_connection_establishment_mode_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -676,7 +685,14 @@ protected:
   void onRetryTimer();
   void enableRetryTimer();
   void disableRetryTimer();
+  void onEstablishmentTimeout();
+  void checkUpstreamConnectionTrigger();
 
+public:
+  // Public for testing purposes
+  void onDownstreamTlsHandshakeComplete();
+
+protected:
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
@@ -720,6 +736,19 @@ protected:
   bool early_data_end_stream_{false};
   Buffer::OwnedImpl early_data_buffer_{};
   HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
+
+  // Connection establishment mode configuration.
+  using ConnectionTrigger = envoy::extensions::filters::network::tcp_proxy::v3::
+      UpstreamConnectionEstablishmentMode::ConnectionTrigger;
+
+  ConnectionTrigger connection_trigger_{envoy::extensions::filters::network::tcp_proxy::v3::
+                                            UpstreamConnectionEstablishmentMode::IMMEDIATE};
+  Event::TimerPtr establishment_timeout_timer_;
+  bool waiting_for_tls_handshake_{false};
+  bool tls_handshake_complete_{false};
+  bool initial_data_received_{false};
+  uint32_t max_buffered_bytes_{65536}; // Default 64KB.
+  bool forward_buffered_data_{true};
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream

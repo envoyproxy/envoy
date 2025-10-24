@@ -2425,6 +2425,438 @@ TEST(PerConnectionCluster, ObjectFactory) {
   EXPECT_EQ(cluster, object->serializeAsString());
 }
 
+// Test configuration parsing for UpstreamConnectionEstablishmentMode
+TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeImmediateConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connection_establishment_mode:
+      trigger: IMMEDIATE
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
+  EXPECT_EQ(config.upstreamConnectionEstablishmentMode()->trigger(),
+            envoy::extensions::filters::network::tcp_proxy::v3::
+                UpstreamConnectionEstablishmentMode::IMMEDIATE);
+}
+
+TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeOnDownstreamDataConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connection_establishment_mode:
+      trigger: ON_DOWNSTREAM_DATA
+      max_wait_time: 5s
+      downstream_data_config:
+        max_buffered_bytes: 1024
+        forward_buffered_data: true
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
+  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
+  EXPECT_EQ(mode.trigger(), envoy::extensions::filters::network::tcp_proxy::v3::
+                                UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+  EXPECT_EQ(mode.max_wait_time().seconds(), 5);
+  EXPECT_TRUE(mode.has_downstream_data_config());
+  EXPECT_EQ(mode.downstream_data_config().max_buffered_bytes().value(), 1024);
+  EXPECT_TRUE(mode.downstream_data_config().forward_buffered_data().value());
+}
+
+TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeOnDownstreamTlsHandshakeConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connection_establishment_mode:
+      trigger: ON_DOWNSTREAM_TLS_HANDSHAKE
+      max_wait_time: 10s
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
+  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
+  EXPECT_EQ(mode.trigger(), envoy::extensions::filters::network::tcp_proxy::v3::
+                                UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_TLS_HANDSHAKE);
+  EXPECT_EQ(mode.max_wait_time().seconds(), 10);
+}
+
+TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeOnDownstreamDataAndTlsConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connection_establishment_mode:
+      trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
+      max_wait_time: 2s
+      downstream_data_config:
+        max_buffered_bytes: 512
+        forward_buffered_data: false
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
+  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
+  EXPECT_EQ(mode.trigger(),
+            envoy::extensions::filters::network::tcp_proxy::v3::
+                UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
+  EXPECT_EQ(mode.max_wait_time().seconds(), 2);
+  EXPECT_TRUE(mode.has_downstream_data_config());
+  EXPECT_EQ(mode.downstream_data_config().max_buffered_bytes().value(), 512);
+  EXPECT_FALSE(mode.downstream_data_config().forward_buffered_data().value());
+}
+
+TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeDefaultConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  // Should not have the mode configured.
+  EXPECT_FALSE(config.upstreamConnectionEstablishmentMode().has_value());
+}
+
+TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeMillisecondTimeout) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connection_establishment_mode:
+      trigger: ON_DOWNSTREAM_DATA
+      max_wait_time: 0.5s
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
+  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
+  EXPECT_EQ(mode.max_wait_time().seconds(), 0);
+  EXPECT_EQ(mode.max_wait_time().nanos(), 500000000); // 500ms in nanoseconds.
+}
+
+TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeDefaultDownstreamDataConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connection_establishment_mode:
+      trigger: ON_DOWNSTREAM_DATA
+      downstream_data_config: {}
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
+  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
+  EXPECT_TRUE(mode.has_downstream_data_config());
+  // Check that fields are not set (will use defaults in implementation).
+  EXPECT_FALSE(mode.downstream_data_config().has_max_buffered_bytes());
+  EXPECT_FALSE(mode.downstream_data_config().has_forward_buffered_data());
+}
+
+TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeDataConfigIgnoredForTlsMode) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connection_establishment_mode:
+      trigger: ON_DOWNSTREAM_TLS_HANDSHAKE
+      downstream_data_config:
+        max_buffered_bytes: 1024
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  // Config should parse successfully even though downstream_data_config
+  // is not applicable for TLS_HANDSHAKE mode.
+  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
+  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
+  EXPECT_EQ(mode.trigger(), envoy::extensions::filters::network::tcp_proxy::v3::
+                                UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_TLS_HANDSHAKE);
+  // The downstream_data_config is still present in the proto but will be ignored.
+  EXPECT_TRUE(mode.has_downstream_data_config());
+}
+
+// Test TLS handshake completion detection for ON_DOWNSTREAM_TLS_HANDSHAKE mode.
+// Use parameterized testing like the base class.
+class TcpProxyTlsHandshakeTest : public TcpProxyTest {
+public:
+  void setupFilter(const std::string& yaml, bool receive_before_connect = false,
+                   bool expect_initial_read_disable = true) {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+    // Configure without calling the base setup to avoid conflicting expectations.
+    configure(tcp_proxy);
+    mock_access_logger_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+    const_cast<AccessLog::InstanceSharedPtrVector&>(config_->accessLogs())
+        .push_back(mock_access_logger_);
+
+    // Set up upstream connection data.
+    upstream_connections_.push_back(std::make_unique<NiceMock<Network::MockClientConnection>>());
+    upstream_connection_data_.push_back(
+        std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>());
+    ON_CALL(*upstream_connection_data_.back(), connection())
+        .WillByDefault(ReturnRef(*upstream_connections_.back()));
+    upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
+    conn_pool_handles_.push_back(
+        std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
+
+    // Set receive_before_connect filter state.
+    filter_callbacks_.connection().streamInfo().filterState()->setData(
+        TcpProxy::ReceiveBeforeConnectKey,
+        std::make_unique<StreamInfo::BoolAccessorImpl>(receive_before_connect),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+
+    // Create and initialize filter.
+    filter_ = std::make_unique<Filter>(config_,
+                                       factory_context_.server_factory_context_.cluster_manager_);
+    EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
+
+    // For TLS modes with TLS connections, the filter will call readDisable(true)
+    // when waiting for TLS handshake, regardless of receive_before_connect.
+    if (expect_initial_read_disable) {
+      EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+    }
+
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setSslConnection(filter_callbacks_.connection_.ssl());
+  }
+
+  void setupTlsMode() {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: fake_cluster
+      upstream_connection_establishment_mode:
+        trigger: ON_DOWNSTREAM_TLS_HANDSHAKE
+        max_wait_time: 10s
+    )EOF";
+
+    // receive_before_connect=false, expect_initial_read_disable=true
+    setupFilter(yaml, false, true);
+  }
+
+  void setupTlsAndDataMode() {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: fake_cluster
+      upstream_connection_establishment_mode:
+        trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
+        max_wait_time: 10s
+        downstream_data_config:
+          max_buffered_bytes: 1024
+          forward_buffered_data: true
+    )EOF";
+
+    // receive_before_connect=true, expect_initial_read_disable=true for TLS wait
+    setupFilter(yaml, true, true);
+  }
+};
+
+TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeMode_WithTlsConnection_WaitsForHandshake) {
+  // Setup SSL connection before initializing the filter.
+  auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(ssl_connection));
+
+  setupTlsMode();
+
+  // Call onNewConnection() to initialize the filter.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Set up connection pool expectations for when TLS handshake completes.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // Simulate TLS handshake completion.
+  filter_->onDownstreamTlsHandshakeComplete();
+
+  // Verify connection establishment was triggered.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeMode_WithNonTlsConnection_ImmediateConnect) {
+  // No SSL connection.
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(nullptr));
+
+  // Set up connection pool expectations - should be called immediately for non-TLS.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // readDisable(true) is already expected in setupFilter.
+
+  setupTlsMode();
+
+  // Call onNewConnection() to initialize the filter.
+  // Since it's non-TLS, it should connect immediately.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Connection should be established immediately.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+TEST_P(TcpProxyTlsHandshakeTest, TlsAndDataMode_WaitsForBothConditions) {
+  // Setup SSL connection before initializing the filter.
+  auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(ssl_connection));
+
+  // For TLS+Data mode, when receive_before_connect=true, filter does NOT call
+  // readDisable(true) during initialization.
+  setupFilter(R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connection_establishment_mode:
+      trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
+      max_wait_time: 10s
+      downstream_data_config:
+        max_buffered_bytes: 1024
+        forward_buffered_data: true
+  )EOF",
+              true,   // receive_before_connect
+              false); // expect_initial_read_disable
+
+  // Call onNewConnection() to initialize the filter. Even though receive_before_connect=true,
+  // onNewConnection always returns StopIteration for TCP proxy.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // First, receive TLS handshake completion - should NOT connect yet.
+  filter_->onDownstreamTlsHandshakeComplete();
+
+  // Verify no connection yet.
+  EXPECT_TRUE(conn_pool_callbacks_.empty());
+
+  // Set up connection pool expectations for when both conditions are met.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // Now receive data - should trigger connection.
+  Buffer::OwnedImpl data("hello");
+  // The connection should read disable after receiving first data.
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Both conditions met, connection should be established.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+TEST_P(TcpProxyTlsHandshakeTest, TlsAndDataMode_DataFirstThenTls) {
+  // Setup SSL connection before initializing the filter.
+  auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(ssl_connection));
+
+  // For TLS+Data mode, when receive_before_connect=true, filter does NOT call
+  // readDisable(true) during initialization.
+  setupFilter(R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connection_establishment_mode:
+      trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
+      max_wait_time: 10s
+      downstream_data_config:
+        max_buffered_bytes: 1024
+        forward_buffered_data: true
+  )EOF",
+              true,   // receive_before_connect
+              false); // expect_initial_read_disable
+
+  // Call onNewConnection() to initialize the filter. Even though receive_before_connect=true,
+  // onNewConnection always returns StopIteration for TCP proxy.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // First, receive data - should NOT connect yet.
+  Buffer::OwnedImpl data("hello");
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Verify no connection yet.
+  EXPECT_TRUE(conn_pool_callbacks_.empty());
+
+  // Set up connection pool expectations for when both conditions are met.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // Now receive TLS handshake completion - should trigger connection.
+  filter_->onDownstreamTlsHandshakeComplete();
+
+  // Both conditions met, connection should be established.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+// Instantiate parameterized tests with both values of the runtime feature flag.
+INSTANTIATE_TEST_SUITE_P(TcpProxyTlsHandshakeTestParams, TcpProxyTlsHandshakeTest,
+                         testing::Values(false, true));
+
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy
