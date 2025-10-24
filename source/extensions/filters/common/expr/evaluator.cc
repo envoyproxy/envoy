@@ -155,7 +155,7 @@ BuilderPtr createBuilder(OptRef<const envoy::config::core::v3::CelExpressionConf
   return builder;
 }
 
-// Internal: Creates arena-optimized builder for RBAC backward compatibility.
+// Creates arena-optimized builder for RBAC backward compatibility.
 BuilderPtr
 createBuilderForArena(Protobuf::Arena* arena,
                       OptRef<const envoy::config::core::v3::CelExpressionConfig> config) {

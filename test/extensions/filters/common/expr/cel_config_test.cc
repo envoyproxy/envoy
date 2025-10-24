@@ -225,6 +225,79 @@ TEST_F(CelConfigTest, CreateWithConfig) {
   EXPECT_EQ(result.value().StringOrDie().value(), "wello");
 }
 
+// Test createBuilderForArena with null arena.
+TEST_F(CelConfigTest, CreateBuilderForArenaNullArena) {
+  auto builder = createBuilderForArena(nullptr, {});
+  EXPECT_NE(builder, nullptr);
+}
+
+// Test createBuilderForArena with valid arena and default config.
+TEST_F(CelConfigTest, CreateBuilderForArenaWithArena) {
+  Protobuf::Arena arena;
+  auto builder = createBuilderForArena(&arena, {});
+  EXPECT_NE(builder, nullptr);
+}
+
+// Test createBuilderForArena with arena and string functions enabled.
+TEST_F(CelConfigTest, CreateBuilderForArenaStringFunctions) {
+  Protobuf::Arena arena;
+  envoy::config::core::v3::CelExpressionConfig config;
+  config.set_enable_string_functions(true);
+
+  auto builder_ptr = createBuilderForArena(&arena, makeOptRef(config));
+  auto builder = std::make_shared<BuilderInstance>(std::move(builder_ptr), nullptr);
+  ASSERT_NE(builder, nullptr);
+
+  // Create replace expression to verify string functions work.
+  cel::expr::Expr replace_expr;
+  auto* call_expr = replace_expr.mutable_call_expr();
+  call_expr->set_function("replace");
+  call_expr->mutable_target()->mutable_const_expr()->set_string_value("HELLO");
+  call_expr->add_args()->mutable_const_expr()->set_string_value("HE");
+  call_expr->add_args()->mutable_const_expr()->set_string_value("he");
+
+  auto compiled = CompiledExpression::Create(builder, replace_expr);
+  ASSERT_TRUE(compiled.ok());
+
+  Protobuf::Arena eval_arena;
+  auto activation = createActivation(nullptr, *stream_info_, nullptr, nullptr, nullptr);
+  auto result = compiled.value().evaluate(*activation, &eval_arena);
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_TRUE(result.value().IsString());
+  EXPECT_EQ(result.value().StringOrDie().value(), "heLLO");
+}
+
+// Test createBuilderForArena with arena and all features enabled.
+TEST_F(CelConfigTest, CreateBuilderForArenaAllFeatures) {
+  Protobuf::Arena arena;
+  envoy::config::core::v3::CelExpressionConfig config;
+  config.set_enable_string_conversion(true);
+  config.set_enable_string_concat(true);
+  config.set_enable_string_functions(true);
+
+  auto builder_ptr = createBuilderForArena(&arena, makeOptRef(config));
+  auto builder = std::make_shared<BuilderInstance>(std::move(builder_ptr), nullptr);
+  ASSERT_NE(builder, nullptr);
+
+  // Test string concatenation: "foo" + "bar"
+  cel::expr::Expr concat_expr;
+  concat_expr.mutable_call_expr()->set_function("_+_");
+  concat_expr.mutable_call_expr()->add_args()->mutable_const_expr()->set_string_value("foo");
+  concat_expr.mutable_call_expr()->add_args()->mutable_const_expr()->set_string_value("bar");
+
+  auto compiled = CompiledExpression::Create(builder, concat_expr);
+  ASSERT_TRUE(compiled.ok());
+
+  Protobuf::Arena eval_arena;
+  auto activation = createActivation(nullptr, *stream_info_, nullptr, nullptr, nullptr);
+  auto result = compiled.value().evaluate(*activation, &eval_arena);
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_TRUE(result.value().IsString());
+  EXPECT_EQ(result.value().StringOrDie().value(), "foobar");
+}
+
 } // namespace
 } // namespace Expr
 } // namespace Common

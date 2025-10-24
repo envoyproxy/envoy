@@ -100,6 +100,8 @@ using BuilderInstanceSharedConstPtr = std::shared_ptr<const BuilderInstance>;
 // Throws an exception if fails to construct an expression builder.
 BuilderPtr createBuilder(OptRef<const envoy::config::core::v3::CelExpressionConfig> config = {});
 
+// Creates arena-optimized builder for RBAC backward compatibility.
+// This is not exposed in public API but used internally to preserve existing RBAC performance.
 BuilderPtr
 createBuilderForArena(Protobuf::Arena* arena,
                       OptRef<const envoy::config::core::v3::CelExpressionConfig> config = {});
