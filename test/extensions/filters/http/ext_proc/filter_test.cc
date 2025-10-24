@@ -2764,6 +2764,7 @@ TEST_F(HttpFilterTest, ReplaceRequest) {
       {":scheme", "http"}, {":authority", "host"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected_request));
   EXPECT_EQ(req_buffer.toString(), "Hello, World!");
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -2771,6 +2772,7 @@ TEST_F(HttpFilterTest, ReplaceRequest) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
   EXPECT_EQ(response_headers_.getContentLengthValue(), "200");
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 
   Buffer::OwnedImpl resp_data_1;
   TestUtility::feedBufferWithRandomCharacters(resp_data_1, 100);
