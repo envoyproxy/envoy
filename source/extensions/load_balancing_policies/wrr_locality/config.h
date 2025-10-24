@@ -49,7 +49,7 @@ public:
       if (endpoint_picking_policy_factory != nullptr) {
         // Ensure that the endpoint picking policy is a ClientSideWeightedRoundRobin.
         auto* client_side_weighted_round_robin_factory = dynamic_cast<
-            ::Envoy::Extensions::LoadBalancingPolices::ClientSideWeightedRoundRobin::Factory*>(
+            ::Envoy::Extensions::LoadBalancingPolicies::ClientSideWeightedRoundRobin::Factory*>(
             endpoint_picking_policy_factory);
         if (client_side_weighted_round_robin_factory == nullptr) {
           return absl::InvalidArgumentError(
