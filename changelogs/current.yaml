@@ -37,7 +37,7 @@ minor_behavior_changes:
   change: |
     Closing the gRPC stream if Envoy detects no more external processing needed.
     This doesn't apply to BUFFERED and BUFFERED_PARTIAL mode and a few corner cases for now.
-    For those cases, the stream will be closed during the filter destruction. 
+    For those cases, the stream will be closed during the filter destruction.
     This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.ext_proc_stream_close_optimization`` to ``false``.
 - area: ext_authz
