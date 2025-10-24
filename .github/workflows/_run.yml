@@ -26,6 +26,18 @@ on:
       bazel-rbe-jobs:
         type: number
         default: 200
+      bind-mount:
+        type: boolean
+        default: true
+      bind-mounts:
+        type: string
+        default: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/runner
+            target: RUNNER_TEMP/bazel_root
+            chown: "runner:runner"
       cache-build-image:
         type: string
       cache-build-image-key-suffix:
@@ -248,6 +260,10 @@ jobs:
              "job-started": ${{ steps.started.outputs.value }}}
           | . * {$config, $check}
 
+    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.28
+      if: inputs.bind-mount
+      with:
+        mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
       uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.26
       if: inputs.diskspace-hack || github.event.repository.private
