@@ -26,6 +26,9 @@ on:
       bazel-rbe-jobs:
         type: number
         default: 200
+      bind-mount:
+        type: boolean
+        default: true
       bind-mounts:
         type: string
         default: |
@@ -258,6 +261,7 @@ jobs:
           | . * {$config, $check}
 
     - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.28
+      if: inputs.bind-mount
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
