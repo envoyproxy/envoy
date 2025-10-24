@@ -73,6 +73,13 @@ constexpr absl::string_view ResponseTrailerLatencyUsField = "response_trailer_la
 constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_call_status";
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
+constexpr absl::string_view ImmediateResponseField = "immediate_response";
+constexpr absl::string_view RequestHeaderContinueAndReplaceField =
+    "request_header_continue_and_replace";
+constexpr absl::string_view ResponseHeaderContinueAndReplaceField =
+    "response_header_continue_and_replace";
+constexpr absl::string_view FailedOpenField = "failed_open";
+constexpr absl::string_view ServerHalfClosedField = "server_half_closed";
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -277,16 +284,20 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
 }
 
-void ExtProcLoggingInfo::recordGrpcCall(
-    std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
-    ProcessorState::CallbackState callback_state,
-    envoy::config::core::v3::TrafficDirection traffic_direction) {
+void ExtProcLoggingInfo::recordGrpcCall(std::chrono::microseconds latency,
+                                        Grpc::Status::GrpcStatus call_status,
+                                        ProcessorState::CallbackState callback_state,
+                                        envoy::config::core::v3::TrafficDirection traffic_direction,
+                                        bool continue_and_replace) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
 
   // Record the gRPC call stats for the header.
   if (callback_state == ProcessorState::CallbackState::HeadersCallback) {
     if (grpcCalls(traffic_direction).header_stats_ == nullptr) {
       grpcCalls(traffic_direction).header_stats_ = std::make_unique<GrpcCall>(latency, call_status);
+    }
+    if (continue_and_replace) {
+      grpcCalls(traffic_direction).continue_and_replace_ = true;
     }
     return;
   }
@@ -391,6 +402,13 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<double>(bytes_sent_));
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
+  (*struct_msg->mutable_fields())[ImmediateResponseField].set_bool_value(immediate_response_);
+  (*struct_msg->mutable_fields())[RequestHeaderContinueAndReplaceField].set_bool_value(
+      decoding_processor_grpc_calls_.continue_and_replace_);
+  (*struct_msg->mutable_fields())[ResponseHeaderContinueAndReplaceField].set_bool_value(
+      encoding_processor_grpc_calls_.continue_and_replace_);
+  (*struct_msg->mutable_fields())[FailedOpenField].set_bool_value(failed_open_);
+  (*struct_msg->mutable_fields())[ServerHalfClosedField].set_bool_value(server_half_closed_);
   return struct_msg;
 }
 
@@ -495,6 +513,21 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == BytesReceivedField) {
     return static_cast<int64_t>(bytes_received_);
   }
+  if (field_name == ImmediateResponseField) {
+    return bool(immediate_response_);
+  }
+  if (field_name == RequestHeaderContinueAndReplaceField) {
+    return bool(decoding_processor_grpc_calls_.continue_and_replace_);
+  }
+  if (field_name == ResponseHeaderContinueAndReplaceField) {
+    return bool(encoding_processor_grpc_calls_.continue_and_replace_);
+  }
+  if (field_name == FailedOpenField) {
+    return bool(failed_open_);
+  }
+  if (field_name == ServerHalfClosedField) {
+    return bool(server_half_closed_);
+  }
   return {};
 }
 
@@ -598,6 +631,7 @@ void Filter::onError() {
     // Close the external processing.
     processing_complete_ = true;
     stats_.failure_mode_allowed_.inc();
+    logging_info_->setFailedOpen();
     clearAsyncState();
   } else {
     // Return an error and stop processing the current stream.
@@ -1669,6 +1703,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // ignore it and also ignore the stream for the rest of this filter
       // instance's lifetime to protect us from a malformed server.
       stats_.failure_mode_allowed_.inc();
+      logging_info_->setFailedOpen();
       closeStream();
       clearAsyncState(processing_status.raw_code());
       processing_complete_ = true;
@@ -1696,7 +1731,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
   if (failureModeAllow()) {
     onGrpcCloseWithStatus(status);
     stats_.failure_mode_allowed_.inc();
-
+    logging_info_->setFailedOpen();
   } else {
     processing_complete_ = true;
     // Since the stream failed, there is no need to handle timeouts, so
@@ -1719,6 +1754,7 @@ void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
 
   processing_complete_ = true;
   stats_.streams_closed_.inc();
+  logging_info_->setServerHalfClose();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();
@@ -1737,6 +1773,7 @@ void Filter::onMessageTimeout() {
     processing_complete_ = true;
     closeStream();
     stats_.failure_mode_allowed_.inc();
+    logging_info_->setFailedOpen();
     clearAsyncState(Grpc::Status::DeadlineExceeded);
 
   } else {
@@ -1790,6 +1827,9 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   };
 
   sent_immediate_response_ = true;
+  if (logging_info_ != nullptr) {
+    logging_info_->setImmediateResponse();
+  }
   ENVOY_STREAM_LOG(debug, "Sending local reply with status code {}", *decoder_callbacks_,
                    status_code);
   const auto details = StringUtil::replaceAllEmptySpace(response.details());
