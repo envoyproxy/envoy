@@ -76,7 +76,7 @@ message ZipkinConfig {
   //     This field will be deprecated in future releases in favor of
   //     :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`.
   //
-  //     Required when using ``collector_cluste``.
+  //     Required when using ``collector_cluster``.
   string collector_endpoint = 2;
 
   // Determines whether a 128bit trace id will be used when creating a new
