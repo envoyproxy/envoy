@@ -78,6 +78,8 @@ constexpr absl::string_view RequestHeaderContinueAndReplaceField =
     "request_header_continue_and_replace";
 constexpr absl::string_view ResponseHeaderContinueAndReplaceField =
     "response_header_continue_and_replace";
+constexpr absl::string_view FailedOpenField = "failed_open";
+constexpr absl::string_view ServerHalfClosedField = "server_half_closed";
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -405,6 +407,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       decoding_processor_grpc_calls_.continue_and_replace_);
   (*struct_msg->mutable_fields())[ResponseHeaderContinueAndReplaceField].set_bool_value(
       encoding_processor_grpc_calls_.continue_and_replace_);
+  (*struct_msg->mutable_fields())[FailedOpenField].set_bool_value(failed_open_);
+  (*struct_msg->mutable_fields())[ServerHalfClosedField].set_bool_value(server_half_closed_);
   return struct_msg;
 }
 
@@ -517,6 +521,12 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   }
   if (field_name == ResponseHeaderContinueAndReplaceField) {
     return bool(encoding_processor_grpc_calls_.continue_and_replace_);
+  }
+  if (field_name == FailedOpenField) {
+    return bool(failed_open_);
+  }
+  if (field_name == ServerHalfClosedField) {
+    return bool(server_half_closed_);
   }
   return {};
 }

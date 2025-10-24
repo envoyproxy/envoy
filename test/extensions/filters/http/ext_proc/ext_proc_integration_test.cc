@@ -4853,6 +4853,58 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoImmediateResponse) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingFailOpenServerHalfCloseTest) {
+  // Configure ext_proc to send both headers and body
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["fail_open_field"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:failed_open)%");
+    (*json_format->mutable_fields())["server_half_closed_field"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:server_half_closed)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [](const HttpHeaders& headers, HeadersResponse&) {
+                                 EXPECT_FALSE(headers.end_of_stream());
+                                 return true;
+                               });
+
+  // However right after processing headers, half-close the stream indicating that server
+  // is not interested in the request body.
+  processor_stream_->finishGrpcStream(Grpc::Status::Aborted);
+  processor_stream_->encodeResetStream();
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_failed_open = json_log->getString("failed_open_field");
+  auto field_server_half_closed = json_log->getString("server_half_closed_field");
+  EXPECT_EQ(*field_failed_open, "1");
+  EXPECT_EQ(*field_server_half_closed, "1");
+  cleanupUpstreamAndDownstream();
+}
+
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions
