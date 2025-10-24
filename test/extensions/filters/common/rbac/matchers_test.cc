@@ -665,7 +665,7 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
 
   RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
-                              factory_context);
+                              factory_context, nullptr);
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
@@ -1532,7 +1532,7 @@ TEST(PolicyMatcher, PolicyMatcherWithCelConfig) {
     cel_config->set_enable_string_functions(true);
 
     RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
-                                factory_context);
+                                factory_context, nullptr);
 
     Envoy::Network::MockConnection conn;
     Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}};
@@ -1580,7 +1580,7 @@ TEST(PolicyMatcher, PolicyMatcherWithCelConfigStringConversion) {
   cel_config->set_enable_string_conversion(true);
 
   RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
-                              factory_context);
+                              factory_context, nullptr);
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
@@ -1631,7 +1631,7 @@ TEST(PolicyMatcher, PolicyMatcherWithCelConfigStringConcat) {
   cel_config->set_enable_string_concat(true);
 
   RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
-                              factory_context);
+                              factory_context, nullptr);
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/test"}};
@@ -1670,10 +1670,14 @@ TEST(PolicyMatcher, PolicyMatcherWithoutCelConfig) {
   // Right side: "GET"
   call_expr->add_args()->mutable_const_expr()->set_string_value("GET");
 
-  // No cel_config specified - should use default configuration.
+  // No cel_config specified - create arena builder for backward compatibility.
+  Protobuf::Arena constant_arena;
+  auto builder_ptr = Extensions::Filters::Common::Expr::createBuilderForArena(&constant_arena, {});
+  auto arena_builder = std::make_shared<Extensions::Filters::Common::Expr::BuilderInstance>(
+      std::move(builder_ptr), nullptr);
 
   RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
-                              factory_context);
+                              factory_context, arena_builder);
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}};
@@ -1716,7 +1720,7 @@ TEST(PolicyMatcher, PolicyMatcherWithEmptyCelConfig) {
   policy.mutable_cel_config();
 
   RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
-                              factory_context);
+                              factory_context, nullptr);
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}};
@@ -1772,7 +1776,7 @@ TEST(PolicyMatcher, PolicyMatcherWithAllCelFeaturesEnabled) {
   cel_config->set_enable_string_functions(true);
 
   RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
-                              factory_context);
+                              factory_context, nullptr);
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;

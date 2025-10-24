@@ -79,14 +79,18 @@ ActivationPtr createActivation(const ::Envoy::LocalInfo::LocalInfo* local_info,
                                const ::Envoy::Http::ResponseHeaderMap* response_headers,
                                const ::Envoy::Http::ResponseTrailerMap* response_trailers);
 
+class BuilderCache;
+
 // Shared expression builder instance.
 class BuilderInstance {
 public:
-  explicit BuilderInstance(BuilderConstPtr builder) : builder_(std::move(builder)) {}
+  explicit BuilderInstance(BuilderConstPtr builder, std::shared_ptr<BuilderCache> cache = nullptr)
+      : builder_(std::move(builder)), cache_(std::move(cache)) {}
   const Builder& builder() const { return *builder_; }
 
 private:
   const BuilderConstPtr builder_;
+  const std::shared_ptr<BuilderCache> cache_;
 };
 
 using BuilderInstanceSharedPtr = std::shared_ptr<BuilderInstance>;
@@ -95,6 +99,10 @@ using BuilderInstanceSharedConstPtr = std::shared_ptr<const BuilderInstance>;
 // Creates an expression builder with the given configuration.
 // Throws an exception if fails to construct an expression builder.
 BuilderPtr createBuilder(OptRef<const envoy::config::core::v3::CelExpressionConfig> config = {});
+
+BuilderPtr
+createBuilderForArena(Protobuf::Arena* arena,
+                      OptRef<const envoy::config::core::v3::CelExpressionConfig> config = {});
 
 // Gets the singleton expression builder with the given configuration (or default if not provided).
 // Creates or reuses a cached builder for the configuration.

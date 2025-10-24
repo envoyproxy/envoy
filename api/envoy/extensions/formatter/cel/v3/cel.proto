@@ -52,4 +52,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // .. warning::
 //   This extension is treated as built-in extension and will be enabled by default now.
 //   It is unnecessary to configure this extension.
-message Cel {}
+message Cel {
+}

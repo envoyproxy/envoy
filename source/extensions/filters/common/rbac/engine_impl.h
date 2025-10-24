@@ -63,6 +63,12 @@ using ActionValidationVisitor = Envoy::Matcher::MatchTreeValidationVisitor<Http:
 
 void generateLog(StreamInfo::StreamInfo& info, EnforcementMode mode, bool log);
 
+struct ExprBuilderWithArena {
+  Protobuf::Arena constant_arena_;
+  Extensions::Filters::Common::Expr::BuilderPtr builder_ptr_;
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_instance_;
+};
+
 class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine, NonCopyable {
 public:
   RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v3::RBAC& rules,
@@ -78,7 +84,7 @@ public:
                     std::string* effective_policy_id) const override;
 
 private:
-  // Checks whether the request matches any policies
+  // Checks whether the request matches any policies.
   bool checkPolicyMatch(const Network::Connection& connection, const StreamInfo::StreamInfo& info,
                         const Envoy::Http::RequestHeaderMap& headers,
                         std::string* effective_policy_id) const;
@@ -87,6 +93,8 @@ private:
   const EnforcementMode mode_;
 
   std::map<std::string, std::unique_ptr<PolicyMatcher>> policies_;
+  // Arena-based builder for when cel_config is not used.
+  std::unique_ptr<ExprBuilderWithArena> builder_with_arena_;
 };
 
 class RoleBasedAccessControlMatcherEngineImpl : public RoleBasedAccessControlEngine, NonCopyable {

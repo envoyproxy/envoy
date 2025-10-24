@@ -200,24 +200,31 @@ class PolicyMatcher : public Matcher, NonCopyable {
 public:
   PolicyMatcher(const envoy::config::rbac::v3::Policy& policy,
                 ProtobufMessage::ValidationVisitor& validation_visitor,
-                Server::Configuration::CommonFactoryContext& context)
+                Server::Configuration::CommonFactoryContext& context,
+                Expr::BuilderInstanceSharedConstPtr arena_builder)
       : permissions_(policy.permissions(), validation_visitor, context),
         principals_(policy.principals(), context),
         expr_([&]() -> absl::optional<Expr::CompiledExpression> {
           if (policy.has_condition()) {
-            // Use the CEL configuration from the policy if available.
-            auto config_ref =
-                policy.has_cel_config()
-                    ? Envoy::makeOptRef(policy.cel_config())
-                    : Envoy::OptRef<const envoy::config::core::v3::CelExpressionConfig>{};
 
-            auto builder = Expr::getBuilder(context, config_ref);
-            auto compiled = Expr::CompiledExpression::Create(builder, policy.condition());
-            if (!compiled.ok()) {
-              throw Expr::CelException(
-                  absl::StrCat("failed to create an expression: ", compiled.status().message()));
+            if (policy.has_cel_config()) {
+              // Use cached builder without arena optimization.
+              auto builder = Expr::getBuilder(context, Envoy::makeOptRef(policy.cel_config()));
+              auto compiled = Expr::CompiledExpression::Create(builder, policy.condition());
+              if (!compiled.ok()) {
+                throw Expr::CelException(
+                    absl::StrCat("failed to create an expression: ", compiled.status().message()));
+              }
+              return std::move(compiled.value());
+            } else if (arena_builder != nullptr) {
+              // Use arena-based builder for backward compatibility required for RBAC performance.
+              auto compiled = Expr::CompiledExpression::Create(arena_builder, policy.condition());
+              if (!compiled.ok()) {
+                throw Expr::CelException(
+                    absl::StrCat("failed to create an expression: ", compiled.status().message()));
+              }
+              return std::move(compiled.value());
             }
-            return std::move(compiled.value());
           }
           return {};
         }()) {}
