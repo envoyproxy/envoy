@@ -24,3 +24,6 @@ deprecated:
   change: |
     Fixed an issue where SANs of type ``OTHERNAME`` in a TLS cert were truncated if there was
     an embedded null octet, leading to incorrect SAN validation.
+- area: http
+  change: |
+    Fixed a remote ``jwt_auth`` token fetch crash with two or more auth headers when ``allow_missing_or_failed`` is set.
