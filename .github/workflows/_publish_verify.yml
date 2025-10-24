@@ -55,8 +55,8 @@ jobs:
         - name: examples
           target: verify_examples
           downloads: |
-            oci.arm64: build_images
-            oci.x64: build_images
+            oci.arm64: container/build_images
+            oci.x64: container/build_images
           rbe: false
           source: |
             export NO_BUILD_SETUP=1
@@ -75,7 +75,7 @@ jobs:
                 for image in "${IMAGES[@]}"; do
                     src_name="$(echo ${image} | cut -d: -f1)"
                     dest_name="$(echo ${image} | cut -d: -f2)"
-                    src="oci-archive:%{{ runner.temp }}/build_images/${src_name}.amd64.tar"
+                    src="oci-archive:%{{ runner.temp }}/container/build_images/${src_name}.amd64.tar"
                     dest="docker-daemon:envoyproxy/envoy:${dest_name}"
                     echo "Copy image: ${src} ${dest}"
                     skopeo copy -q "${src}" "${dest}"
@@ -110,7 +110,7 @@ jobs:
         - name: distroless
           target: verify-distroless
           downloads: |
-            oci.x64: build_images
+            oci.x64: container/build_images
           rbe: false
           source: |
             export NO_BUILD_SETUP=1
@@ -121,7 +121,7 @@ jobs:
                 for image in "${IMAGES[@]}"; do
                     src_name="$(echo ${image} | cut -d: -f1)"
                     dest_name="$(echo ${image} | cut -d: -f2)"
-                    src="oci-archive:%{{ runner.temp }}/build_images/${src_name}.amd64.tar"
+                    src="oci-archive:%{{ runner.temp }}/container/build_images/${src_name}.amd64.tar"
                     dest="docker-daemon:envoyproxy/envoy:${dest_name}"
                     echo "Copy image: ${src} ${dest}"
                     skopeo copy -q "${src}" "${dest}"
@@ -146,7 +146,7 @@ jobs:
       container-command: ./ci/run_envoy_docker.sh
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
       downloads: |
-        release.signed: release.signed
+        release.signed: container/release.signed
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: ${{ matrix.rbe && matrix.rbe || false }}
       request: ${{ inputs.request }}
@@ -164,14 +164,15 @@ jobs:
           shell: bash
         - run: |
             TEMP_DIR=$(mktemp -d)
-            zstd --stdout -d %{{ runner.temp }}/release.signed/release.signed.tar.zst | tar --warning=no-timestamp -xf - -C "${TEMP_DIR}"
+            zstd --stdout -d %{{ runner.temp }}/container/release.signed/release.signed.tar.zst \
+                | tar --warning=no-timestamp -xf - -C "${TEMP_DIR}"
             mkdir ${TEMP_DIR}/debs
             tar xf ${TEMP_DIR}/bin/debs.tar.gz -C ${TEMP_DIR}/debs
             mkdir -p ${TEMP_DIR}/distribution/deb
             cp -a ${TEMP_DIR}/debs/*_${DEB_ARCH}* ${TEMP_DIR}/distribution/deb
             cp -a ${TEMP_DIR}/signing.key ${TEMP_DIR}/distribution
-            mkdir -p %{{ runner.temp }}/distribution/${ARCH}
-            tar czf %{{ runner.temp }}/distribution/${ARCH}/packages.${ARCH}.tar.gz -C ${TEMP_DIR}/distribution .
+            mkdir -p %{{ runner.temp }}/container/distribution/${ARCH}
+            tar czf %{{ runner.temp }}/container/distribution/${ARCH}/packages.${ARCH}.tar.gz -C ${TEMP_DIR}/distribution .
           shell: bash
 
     strategy:
