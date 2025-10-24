@@ -1031,6 +1031,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
   header->set_value_prefix("Bearer ");
 
   createAuthenticator(nullptr, absl::nullopt, /*allow_failed=*/true);
+  EXPECT_CALL(*raw_fetcher_, cancel());
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .Times(2)
       .WillRepeatedly(Invoke([](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
