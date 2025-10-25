@@ -1705,8 +1705,7 @@ public:
   SampleExtensionFilter(uint32_t sample_rate) : sample_rate_(sample_rate) {}
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::Context&,
-                const StreamInfo::StreamInfo&) const override {
+  bool evaluate(const Formatter::Context&, const StreamInfo::StreamInfo&) const override {
     if (current_++ == 0) {
       return true;
     }

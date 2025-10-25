@@ -362,8 +362,7 @@ TEST_F(CELFormatterTest, TestWithoutMaxLength) {
 
   auto formatter =
       *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  EXPECT_EQ("/original/path?secret=parameter",
-            formatter->format(formatter_context_, stream_info_));
+  EXPECT_EQ("/original/path?secret=parameter", formatter->format(formatter_context_, stream_info_));
 }
 
 TEST_F(CELFormatterTest, TestMaxLength) {
@@ -411,8 +410,8 @@ TEST_F(CELFormatterTest, TestExtractPortFromAuthorityHeaderNoPort) {
       {":authority", "example.com"},
       {"x-envoy-original-path", "/original/path?secret=parameter"}};
 
-  Envoy::Formatter::Context formatter_context_no_port{
-      &request_headers_no_port, &response_headers_, &response_trailers_, body_};
+  Envoy::Formatter::Context formatter_context_no_port{&request_headers_no_port, &response_headers_,
+                                                      &response_trailers_, body_};
 
   const std::string yaml = fmt::format(R"EOF(
   text_format_source:
@@ -434,8 +433,8 @@ TEST_F(CELFormatterTest, TestExtractPortFromAuthorityHeaderIPv6) {
       {":authority", "[::1]:8080"},
       {"x-envoy-original-path", "/original/path?secret=parameter"}};
 
-  Envoy::Formatter::Context formatter_context_ipv6{
-      &request_headers_ipv6, &response_headers_, &response_trailers_, body_};
+  Envoy::Formatter::Context formatter_context_ipv6{&request_headers_ipv6, &response_headers_,
+                                                   &response_trailers_, body_};
 
   const std::string yaml = fmt::format(R"EOF(
   text_format_source:
@@ -532,8 +531,8 @@ TEST_F(CELFormatterTest, TestFilterStateConditionalWithKeyNoPort) {
       {":authority", "example.com"},
       {"x-envoy-original-path", "/original/path?secret=parameter"}};
 
-  Envoy::Formatter::Context formatter_context_no_port{
-      &request_headers_no_port, &response_headers_, &response_trailers_, body_};
+  Envoy::Formatter::Context formatter_context_no_port{&request_headers_no_port, &response_headers_,
+                                                      &response_trailers_, body_};
 
   const std::string yaml = createYamlConfig(getFilterStateExpression());
   TestUtility::loadFromYaml(yaml, config_);

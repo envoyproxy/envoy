@@ -95,8 +95,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtension)
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  EXPECT_EQ("plain text TestFormatter",
-            formatter->format(formatter_context_, stream_info_));
+  EXPECT_EQ("plain text TestFormatter", formatter->format(formatter_context_, stream_info_));
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest,

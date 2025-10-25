@@ -141,14 +141,12 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& hea
   return header_parser;
 }
 
-void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const Formatter::Context& context,
+void HeaderParser::evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                                    const StreamInfo::StreamInfo& stream_info) const {
   evaluateHeaders(headers, context, &stream_info);
 }
 
-void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const Formatter::Context& context,
+void HeaderParser::evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                                    const StreamInfo::StreamInfo* stream_info) const {
   // Removing headers in the headers_to_remove_ list first makes
   // remove-before-add the default behavior as expected by users.

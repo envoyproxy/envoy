@@ -116,8 +116,7 @@ bool StatusCodeFilter::evaluate(const Formatter::Context&,
   return compareAgainstValue(info.responseCode().value());
 }
 
-bool DurationFilter::evaluate(const Formatter::Context&,
-                              const StreamInfo::StreamInfo& info) const {
+bool DurationFilter::evaluate(const Formatter::Context&, const StreamInfo::StreamInfo& info) const {
   absl::optional<std::chrono::nanoseconds> duration = info.currentDuration();
   if (!duration.has_value()) {
     return false;
@@ -313,8 +312,7 @@ MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilte
   }
 }
 
-bool MetadataFilter::evaluate(const Formatter::Context&,
-                              const StreamInfo::StreamInfo& info) const {
+bool MetadataFilter::evaluate(const Formatter::Context&, const StreamInfo::StreamInfo& info) const {
   const auto& value =
       Envoy::Config::Metadata::metadataValue(&info.dynamicMetadata(), filter_, path_);
   // If the key corresponds to a set value in dynamic metadata, return true if the value matches the

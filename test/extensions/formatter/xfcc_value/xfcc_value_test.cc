@@ -48,8 +48,7 @@ TEST_F(XfccValueTest, Test) {
   {
     Envoy::Formatter::Context formatter_context;
     // No headers.
-    EXPECT_TRUE(
-        formatter->formatValue(formatter_context, stream_info_).has_null_value());
+    EXPECT_TRUE(formatter->formatValue(formatter_context, stream_info_).has_null_value());
   }
 
   {
@@ -69,8 +68,7 @@ TEST_F(XfccValueTest, Test) {
   {
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert", R"(By=test;URI="a,b,c;\"e;f;g=x";DNS=example.com)"}};
-    EXPECT_EQ(formatter->formatValue({&headers}, stream_info_).string_value(),
-              R"(a,b,c;"e;f;g=x)");
+    EXPECT_EQ(formatter->formatValue({&headers}, stream_info_).string_value(), R"(a,b,c;"e;f;g=x)");
   }
 
   {
@@ -78,8 +76,7 @@ TEST_F(XfccValueTest, Test) {
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert",
          R"(By=test;DNS=example.com,By=test;URI="a,b,c;\"e;f;g=x";DNS=example.com)"}};
-    EXPECT_EQ(formatter->formatValue({&headers}, stream_info_).string_value(),
-              R"(a,b,c;"e;f;g=x)");
+    EXPECT_EQ(formatter->formatValue({&headers}, stream_info_).string_value(), R"(a,b,c;"e;f;g=x)");
   }
 
   {

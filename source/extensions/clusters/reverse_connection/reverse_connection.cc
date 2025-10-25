@@ -50,8 +50,7 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
                                                   ? *context->requestStreamInfo()
                                                   : context->downstreamConnection()->streamInfo();
 
-  const std::string host_id =
-      parent_->host_id_formatter_->format(formatter_context, stream_info);
+  const std::string host_id = parent_->host_id_formatter_->format(formatter_context, stream_info);
 
   // Treat "-" (formatter default for missing) as empty as well.
   if (host_id.empty() || host_id == "-") {

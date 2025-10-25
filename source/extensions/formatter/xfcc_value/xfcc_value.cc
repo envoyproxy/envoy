@@ -186,7 +186,7 @@ public:
   XfccValueFormatterProvider(Http::LowerCaseString&& key) : key_(key) {}
 
   absl::optional<std::string> format(const Envoy::Formatter::Context& context,
-                                                const StreamInfo::StreamInfo&) const override {
+                                     const StreamInfo::StreamInfo&) const override {
     const auto headers = context.requestHeaders();
     if (!headers.has_value()) {
       return absl::nullopt;
@@ -201,7 +201,7 @@ public:
   }
 
   Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
-                                         const StreamInfo::StreamInfo& stream_info) const override {
+                              const StreamInfo::StreamInfo& stream_info) const override {
     absl::optional<std::string> value = format(context, stream_info);
     if (!value.has_value()) {
       return ValueUtil::nullValue();

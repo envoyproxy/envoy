@@ -27,8 +27,7 @@ public:
   ~MockFilter() override;
 
   // AccessLog::Filter
-  MOCK_METHOD(bool, evaluate,
-              (const Formatter::Context&, const StreamInfo::StreamInfo&), (const));
+  MOCK_METHOD(bool, evaluate, (const Formatter::Context&, const StreamInfo::StreamInfo&), (const));
 };
 
 class MockAccessLogManager : public AccessLogManager {

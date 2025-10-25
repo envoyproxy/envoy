@@ -364,7 +364,7 @@ FormatterImpl::create(absl::string_view format, bool omit_empty_values,
 }
 
 std::string FormatterImpl::format(const Context& context,
-                                             const StreamInfo::StreamInfo& stream_info) const {
+                                  const StreamInfo::StreamInfo& stream_info) const {
   std::string log_line;
   log_line.reserve(256);
 
@@ -415,7 +415,7 @@ JsonFormatterImpl::JsonFormatterImpl(const Protobuf::Struct& struct_format, bool
 }
 
 std::string JsonFormatterImpl::format(const Context& context,
-                                                 const StreamInfo::StreamInfo& info) const {
+                                      const StreamInfo::StreamInfo& info) const {
   std::string log_line;
   log_line.reserve(2048);
   std::string sanitize; // Helper to serialize the value to log line.

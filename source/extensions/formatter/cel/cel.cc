@@ -30,9 +30,8 @@ CELFormatter::CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
       }()),
       typed_(typed) {}
 
-absl::optional<std::string>
-CELFormatter::format(const Envoy::Formatter::Context& context,
-                                const StreamInfo::StreamInfo& stream_info) const {
+absl::optional<std::string> CELFormatter::format(const Envoy::Formatter::Context& context,
+                                                 const StreamInfo::StreamInfo& stream_info) const {
   Protobuf::Arena arena;
   auto eval_status =
       compiled_expr_.evaluate(arena, &local_info_, stream_info, context.requestHeaders().ptr(),
@@ -48,9 +47,8 @@ CELFormatter::format(const Envoy::Formatter::Context& context,
   return result;
 }
 
-Protobuf::Value
-CELFormatter::formatValue(const Envoy::Formatter::Context& context,
-                                     const StreamInfo::StreamInfo& stream_info) const {
+Protobuf::Value CELFormatter::formatValue(const Envoy::Formatter::Context& context,
+                                          const StreamInfo::StreamInfo& stream_info) const {
   if (typed_) {
     Protobuf::Arena arena;
     auto eval_status =

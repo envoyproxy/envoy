@@ -12,7 +12,7 @@ namespace GenericProxy {
 
 absl::optional<std::string>
 StringValueFormatterProvider::format(const FormatterContext& context,
-                                                const StreamInfo::StreamInfo& stream_info) const {
+                                     const StreamInfo::StreamInfo& stream_info) const {
   auto optional_str = value_extractor_(context, stream_info);
   if (!optional_str) {
     return absl::nullopt;
@@ -24,14 +24,15 @@ StringValueFormatterProvider::format(const FormatterContext& context,
   }
   return optional_str;
 }
-Protobuf::Value StringValueFormatterProvider::formatValue(
-    const FormatterContext& context, const StreamInfo::StreamInfo& stream_info) const {
+Protobuf::Value
+StringValueFormatterProvider::formatValue(const FormatterContext& context,
+                                          const StreamInfo::StreamInfo& stream_info) const {
   return ValueUtil::optionalStringValue(format(context, stream_info));
 }
 
 absl::optional<std::string>
 GenericStatusCodeFormatterProvider::format(const FormatterContext& context,
-                                                      const StreamInfo::StreamInfo&) const {
+                                           const StreamInfo::StreamInfo&) const {
   CHECK_DATA_OR_RETURN(context, response_, absl::nullopt);
   const int code = checked_data->response_->status().code();
   return std::to_string(code);
@@ -39,7 +40,7 @@ GenericStatusCodeFormatterProvider::format(const FormatterContext& context,
 
 Protobuf::Value
 GenericStatusCodeFormatterProvider::formatValue(const FormatterContext& context,
-                                                           const StreamInfo::StreamInfo&) const {
+                                                const StreamInfo::StreamInfo&) const {
   CHECK_DATA_OR_RETURN(context, response_, ValueUtil::nullValue());
   const int code = checked_data->response_->status().code();
   return ValueUtil::numberValue(code);

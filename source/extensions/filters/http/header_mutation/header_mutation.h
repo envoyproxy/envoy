@@ -52,8 +52,7 @@ public:
   QueryParameterMutationRemove(absl::string_view key) : key_(key) {}
 
   // QueryParameterMutation
-  void mutateQueryParameter(Http::Utility::QueryParamsMulti& params,
-                            const Formatter::Context&,
+  void mutateQueryParameter(Http::Utility::QueryParamsMulti& params, const Formatter::Context&,
                             const StreamInfo::StreamInfo&) const override {
     params.remove(key_);
   }
@@ -86,17 +85,13 @@ public:
   Mutations(const MutationsProto& config, Server::Configuration::ServerFactoryContext& context,
             absl::Status& creation_status);
 
-  void mutateRequestHeaders(Http::RequestHeaderMap& headers,
-                            const Formatter::Context& context,
+  void mutateRequestHeaders(Http::RequestHeaderMap& headers, const Formatter::Context& context,
                             const StreamInfo::StreamInfo& stream_info) const;
-  void mutateResponseHeaders(Http::ResponseHeaderMap& headers,
-                             const Formatter::Context& context,
+  void mutateResponseHeaders(Http::ResponseHeaderMap& headers, const Formatter::Context& context,
                              const StreamInfo::StreamInfo& stream_info) const;
-  void mutateResponseTrailers(Http::ResponseTrailerMap& trailers,
-                              const Formatter::Context& context,
+  void mutateResponseTrailers(Http::ResponseTrailerMap& trailers, const Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info) const;
-  void mutateRequestTrailers(Http::RequestTrailerMap& trailers,
-                             const Formatter::Context& context,
+  void mutateRequestTrailers(Http::RequestTrailerMap& trailers, const Formatter::Context& context,
                              const StreamInfo::StreamInfo& stream_info) const;
 
 private:

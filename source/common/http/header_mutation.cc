@@ -121,8 +121,7 @@ HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations,
   }
 }
 
-void HeaderMutations::evaluateHeaders(Http::HeaderMap& headers,
-                                      const Formatter::Context& context,
+void HeaderMutations::evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                                       const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& mutation : header_mutations_) {
     mutation->evaluateHeaders(headers, context, stream_info);

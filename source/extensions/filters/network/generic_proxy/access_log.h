@@ -39,11 +39,10 @@ public:
       : value_extractor_(f), max_length_(max_length) {}
 
   // FormatterProvider
-  absl::optional<std::string>
-  format(const FormatterContext& context,
-                    const StreamInfo::StreamInfo& stream_info) const override;
+  absl::optional<std::string> format(const FormatterContext& context,
+                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const FormatterContext& context,
-                                         const StreamInfo::StreamInfo& stream_info) const override;
+                              const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   ValueExtractor value_extractor_;
@@ -56,9 +55,9 @@ public:
 
   // FormatterProvider
   absl::optional<std::string> format(const FormatterContext& context,
-                                                const StreamInfo::StreamInfo&) const override;
+                                     const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const FormatterContext& context,
-                                         const StreamInfo::StreamInfo&) const override;
+                              const StreamInfo::StreamInfo&) const override;
 };
 
 Formatter::CommandParserPtr createGenericProxyCommandParser();
