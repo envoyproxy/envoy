@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -37,6 +38,8 @@ using envoy::type::v3::RateLimitStrategy;
 using NoAssignmentBehavior = RateLimitQuotaBucketSettings::NoAssignmentBehavior;
 using DenyResponseSettings = RateLimitQuotaBucketSettings::DenyResponseSettings;
 
+namespace {
+
 // Returns whether or not to allow a request based on the no-assignment-behavior
 // & populates an action.
 bool noAssignmentBehaviorShouldAllow(const NoAssignmentBehavior& no_assignment_behavior) {
@@ -47,14 +50,37 @@ bool noAssignmentBehaviorShouldAllow(const NoAssignmentBehavior& no_assignment_b
 }
 
 // Translate from the HttpStatus Code enum to the Envoy::Http::Code enum.
-inline Envoy::Http::Code getDenyResponseCode(const DenyResponseSettings& settings) {
+Envoy::Http::Code getDenyResponseCode(const DenyResponseSettings& settings) {
   if (!settings.has_http_status()) {
     return Envoy::Http::Code::TooManyRequests;
   }
   return static_cast<Envoy::Http::Code>(static_cast<uint64_t>(settings.http_status().code()));
 }
 
-inline std::function<void(Http::ResponseHeaderMap&)>
+// Helper function to determine the gRPC status based on settings
+absl::optional<Grpc::Status::GrpcStatus> getGrpcStatus(const DenyResponseSettings& settings) {
+  // If explicit gRPC status is set, use it
+  if (settings.has_grpc_status()) {
+    return static_cast<Grpc::Status::GrpcStatus>(settings.grpc_status().code());
+  }
+
+  // Default behavior - let Envoy determine gRPC status from HTTP status
+  return absl::nullopt;
+}
+
+// Helper function to get the response body text (gRPC message for gRPC requests,
+// HTTP body for HTTP)
+std::string getResponseBodyText(const DenyResponseSettings& settings) {
+  // For gRPC requests with custom message, use the gRPC message as body text
+  if (settings.has_grpc_status() && !settings.grpc_status().message().empty()) {
+    return settings.grpc_status().message();
+  }
+
+  // Otherwise use the configured HTTP body
+  return settings.http_body().value();
+}
+
+std::function<void(Http::ResponseHeaderMap&)>
 addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
   if (settings.response_headers_to_add().empty()) {
     return nullptr;
@@ -70,12 +96,14 @@ addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
 Http::FilterHeadersStatus sendDenyResponse(Http::StreamDecoderFilterCallbacks* cb,
                                            const DenyResponseSettings& settings,
                                            StreamInfo::CoreResponseFlag flag) {
-  cb->sendLocalReply(getDenyResponseCode(settings),
-                     MessageUtil::bytesToString(settings.http_body().value()),
-                     addDenyResponseHeadersCb(settings), absl::nullopt, "");
+  cb->sendLocalReply(
+      getDenyResponseCode(settings), MessageUtil::bytesToString(getResponseBodyText(settings)),
+      addDenyResponseHeadersCb(settings), getGrpcStatus(settings), "rate_limited_by_quota");
   cb->streamInfo().setResponseFlag(flag);
   return Envoy::Http::FilterHeadersStatus::StopIteration;
 }
+
+} // namespace
 
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
