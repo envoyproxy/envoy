@@ -153,7 +153,7 @@ FormatterCustomTag::FormatterCustomTag(absl::string_view tag, absl::string_view 
 
 void FormatterCustomTag::applySpan(Span& span, const CustomTagContext& ctx) const {
   // Apply the formatter to the span
-  auto formatted_value = formatter_->formatWithContext(ctx.formatter_context, ctx.stream_info);
+  auto formatted_value = formatter_->format(ctx.formatter_context, ctx.stream_info);
   if (!formatted_value.empty()) {
     span.setTag(tag_, formatted_value);
   }
@@ -162,7 +162,7 @@ void FormatterCustomTag::applySpan(Span& span, const CustomTagContext& ctx) cons
 void FormatterCustomTag::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
                                   const CustomTagContext& ctx) const {
   // Apply the formatter to the log entry
-  auto formatted_value = formatter_->formatWithContext(ctx.formatter_context, ctx.stream_info);
+  auto formatted_value = formatter_->format(ctx.formatter_context, ctx.stream_info);
   if (!formatted_value.empty()) {
     auto& custom_tags = *entry.mutable_custom_tags();
     custom_tags[tag_] = std::move(formatted_value);
