@@ -192,7 +192,6 @@ def envoy_dependencies(skip_targets = []):
     _dragonbox()
     _fp16()
     _simdutf()
-    _intel_ittapi()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _io_hyperscan()
@@ -738,6 +737,7 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
+            "@envoy//bazel:v8_novtune.patch",
             "@envoy//bazel:v8_ppc64le.patch",
         ],
         patch_args = ["-p1"],
@@ -789,12 +789,6 @@ def _simdutf():
     external_http_archive(
         name = "simdutf",
         build_file = "@envoy//bazel/external:simdutf.BUILD",
-    )
-
-def _intel_ittapi():
-    external_http_archive(
-        name = "intel_ittapi",
-        build_file = "@envoy//bazel/external:intel_ittapi.BUILD",
     )
 
 def _com_github_google_quiche():
