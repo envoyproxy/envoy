@@ -2425,12 +2425,12 @@ TEST(PerConnectionCluster, ObjectFactory) {
   EXPECT_EQ(cluster, object->serializeAsString());
 }
 
-// Test configuration parsing for UpstreamConnectionEstablishmentMode
-TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeImmediateConfig) {
+// Test configuration parsing for UpstreamConnectMode
+TEST(TcpProxyConfigTest, UpstreamConnectModeImmediateConfig) {
   const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fake_cluster
-    upstream_connection_establishment_mode:
+    upstream_connect_mode:
       trigger: IMMEDIATE
   )EOF";
 
@@ -2440,17 +2440,16 @@ TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeImmediateConfig) {
 
   Config config(tcp_proxy, factory_context);
 
-  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
-  EXPECT_EQ(config.upstreamConnectionEstablishmentMode()->trigger(),
-            envoy::extensions::filters::network::tcp_proxy::v3::
-                UpstreamConnectionEstablishmentMode::IMMEDIATE);
+  EXPECT_TRUE(config.upstreamConnectMode().has_value());
+  EXPECT_EQ(config.upstreamConnectMode()->trigger(),
+            envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::IMMEDIATE);
 }
 
-TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeOnDownstreamDataConfig) {
+TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamDataConfig) {
   const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fake_cluster
-    upstream_connection_establishment_mode:
+    upstream_connect_mode:
       trigger: ON_DOWNSTREAM_DATA
       max_wait_time: 5s
       downstream_data_config:
@@ -2464,21 +2463,22 @@ TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeOnDownstreamDataConf
 
   Config config(tcp_proxy, factory_context);
 
-  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
-  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
-  EXPECT_EQ(mode.trigger(), envoy::extensions::filters::network::tcp_proxy::v3::
-                                UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+  EXPECT_TRUE(config.upstreamConnectMode().has_value());
+  const auto& mode = config.upstreamConnectMode().value();
+  EXPECT_EQ(
+      mode.trigger(),
+      envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::ON_DOWNSTREAM_DATA);
   EXPECT_EQ(mode.max_wait_time().seconds(), 5);
   EXPECT_TRUE(mode.has_downstream_data_config());
   EXPECT_EQ(mode.downstream_data_config().max_buffered_bytes().value(), 1024);
   EXPECT_TRUE(mode.downstream_data_config().forward_buffered_data().value());
 }
 
-TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeOnDownstreamTlsHandshakeConfig) {
+TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamTlsHandshakeConfig) {
   const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fake_cluster
-    upstream_connection_establishment_mode:
+    upstream_connect_mode:
       trigger: ON_DOWNSTREAM_TLS_HANDSHAKE
       max_wait_time: 10s
   )EOF";
@@ -2489,18 +2489,18 @@ TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeOnDownstreamTlsHands
 
   Config config(tcp_proxy, factory_context);
 
-  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
-  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
+  EXPECT_TRUE(config.upstreamConnectMode().has_value());
+  const auto& mode = config.upstreamConnectMode().value();
   EXPECT_EQ(mode.trigger(), envoy::extensions::filters::network::tcp_proxy::v3::
-                                UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_TLS_HANDSHAKE);
+                                UpstreamConnectMode::ON_DOWNSTREAM_TLS_HANDSHAKE);
   EXPECT_EQ(mode.max_wait_time().seconds(), 10);
 }
 
-TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeOnDownstreamDataAndTlsConfig) {
+TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamDataAndTlsConfig) {
   const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fake_cluster
-    upstream_connection_establishment_mode:
+    upstream_connect_mode:
       trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
       max_wait_time: 2s
       downstream_data_config:
@@ -2514,18 +2514,17 @@ TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeOnDownstreamDataAndT
 
   Config config(tcp_proxy, factory_context);
 
-  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
-  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
-  EXPECT_EQ(mode.trigger(),
-            envoy::extensions::filters::network::tcp_proxy::v3::
-                UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
+  EXPECT_TRUE(config.upstreamConnectMode().has_value());
+  const auto& mode = config.upstreamConnectMode().value();
+  EXPECT_EQ(mode.trigger(), envoy::extensions::filters::network::tcp_proxy::v3::
+                                UpstreamConnectMode::ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
   EXPECT_EQ(mode.max_wait_time().seconds(), 2);
   EXPECT_TRUE(mode.has_downstream_data_config());
   EXPECT_EQ(mode.downstream_data_config().max_buffered_bytes().value(), 512);
   EXPECT_FALSE(mode.downstream_data_config().forward_buffered_data().value());
 }
 
-TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeDefaultConfig) {
+TEST(TcpProxyConfigTest, UpstreamConnectModeDefaultConfig) {
   const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fake_cluster
@@ -2538,14 +2537,14 @@ TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeDefaultConfig) {
   Config config(tcp_proxy, factory_context);
 
   // Should not have the mode configured.
-  EXPECT_FALSE(config.upstreamConnectionEstablishmentMode().has_value());
+  EXPECT_FALSE(config.upstreamConnectMode().has_value());
 }
 
-TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeMillisecondTimeout) {
+TEST(TcpProxyConfigTest, UpstreamConnectModeMillisecondTimeout) {
   const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fake_cluster
-    upstream_connection_establishment_mode:
+    upstream_connect_mode:
       trigger: ON_DOWNSTREAM_DATA
       max_wait_time: 0.5s
   )EOF";
@@ -2556,17 +2555,17 @@ TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeMillisecondTimeout) 
 
   Config config(tcp_proxy, factory_context);
 
-  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
-  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
+  EXPECT_TRUE(config.upstreamConnectMode().has_value());
+  const auto& mode = config.upstreamConnectMode().value();
   EXPECT_EQ(mode.max_wait_time().seconds(), 0);
   EXPECT_EQ(mode.max_wait_time().nanos(), 500000000); // 500ms in nanoseconds.
 }
 
-TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeDefaultDownstreamDataConfig) {
+TEST(TcpProxyConfigTest, UpstreamConnectModeDefaultDownstreamDataConfig) {
   const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fake_cluster
-    upstream_connection_establishment_mode:
+    upstream_connect_mode:
       trigger: ON_DOWNSTREAM_DATA
       downstream_data_config: {}
   )EOF";
@@ -2577,19 +2576,19 @@ TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeDefaultDownstreamDat
 
   Config config(tcp_proxy, factory_context);
 
-  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
-  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
+  EXPECT_TRUE(config.upstreamConnectMode().has_value());
+  const auto& mode = config.upstreamConnectMode().value();
   EXPECT_TRUE(mode.has_downstream_data_config());
   // Check that fields are not set (will use defaults in implementation).
   EXPECT_FALSE(mode.downstream_data_config().has_max_buffered_bytes());
   EXPECT_FALSE(mode.downstream_data_config().has_forward_buffered_data());
 }
 
-TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeDataConfigIgnoredForTlsMode) {
+TEST(TcpProxyConfigTest, UpstreamConnectModeDataConfigIgnoredForTlsMode) {
   const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fake_cluster
-    upstream_connection_establishment_mode:
+    upstream_connect_mode:
       trigger: ON_DOWNSTREAM_TLS_HANDSHAKE
       downstream_data_config:
         max_buffered_bytes: 1024
@@ -2603,10 +2602,10 @@ TEST(TcpProxyConfigTest, UpstreamConnectionEstablishmentModeDataConfigIgnoredFor
 
   // Config should parse successfully even though downstream_data_config
   // is not applicable for TLS_HANDSHAKE mode.
-  EXPECT_TRUE(config.upstreamConnectionEstablishmentMode().has_value());
-  const auto& mode = config.upstreamConnectionEstablishmentMode().value();
+  EXPECT_TRUE(config.upstreamConnectMode().has_value());
+  const auto& mode = config.upstreamConnectMode().value();
   EXPECT_EQ(mode.trigger(), envoy::extensions::filters::network::tcp_proxy::v3::
-                                UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_TLS_HANDSHAKE);
+                                UpstreamConnectMode::ON_DOWNSTREAM_TLS_HANDSHAKE);
   // The downstream_data_config is still present in the proto but will be ignored.
   EXPECT_TRUE(mode.has_downstream_data_config());
 }
@@ -2663,7 +2662,7 @@ public:
     const std::string yaml = R"EOF(
       stat_prefix: name
       cluster: fake_cluster
-      upstream_connection_establishment_mode:
+      upstream_connect_mode:
         trigger: ON_DOWNSTREAM_TLS_HANDSHAKE
         max_wait_time: 10s
     )EOF";
@@ -2676,7 +2675,7 @@ public:
     const std::string yaml = R"EOF(
       stat_prefix: name
       cluster: fake_cluster
-      upstream_connection_establishment_mode:
+      upstream_connect_mode:
         trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
         max_wait_time: 10s
         downstream_data_config:
@@ -2758,7 +2757,7 @@ TEST_P(TcpProxyTlsHandshakeTest, TlsAndDataMode_WaitsForBothConditions) {
   setupFilter(R"EOF(
     stat_prefix: name
     cluster: fake_cluster
-    upstream_connection_establishment_mode:
+    upstream_connect_mode:
       trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
       max_wait_time: 10s
       downstream_data_config:
@@ -2811,7 +2810,7 @@ TEST_P(TcpProxyTlsHandshakeTest, TlsAndDataMode_DataFirstThenTls) {
   setupFilter(R"EOF(
     stat_prefix: name
     cluster: fake_cluster
-    upstream_connection_establishment_mode:
+    upstream_connect_mode:
       trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
       max_wait_time: 10s
       downstream_data_config:

@@ -1961,7 +1961,7 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
 }
 
 // Test ON_DOWNSTREAM_DATA mode delays connection until data is received.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeOnDownstreamData) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeOnDownstreamData) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -1970,9 +1970,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeOnDownstreamD
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
-                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_DATA);
     mode->mutable_max_wait_time()->set_seconds(10);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
@@ -2008,7 +2008,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeOnDownstreamD
 }
 
 // Test ON_DOWNSTREAM_DATA mode with forward_buffered_data=false.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeNoForwardBufferedData) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeNoForwardBufferedData) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2017,9 +2017,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeNoForwardBuff
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
-                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_DATA);
     mode->mutable_downstream_data_config()->mutable_forward_buffered_data()->set_value(false);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
@@ -2053,7 +2053,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeNoForwardBuff
 }
 
 // Test timeout forcing connection when no data is received.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTimeoutForces) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTimeoutForces) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2062,9 +2062,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTimeoutForces
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
-                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_DATA);
     mode->mutable_max_wait_time()->set_seconds(0);
     mode->mutable_max_wait_time()->set_nanos(500000000); // 500ms
 
@@ -2092,7 +2092,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTimeoutForces
 }
 
 // Test early data buffering with half-close.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeEarlyDataWithHalfClose) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeEarlyDataWithHalfClose) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2101,9 +2101,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeEarlyDataWith
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
-                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_DATA);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2135,7 +2135,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeEarlyDataWith
 }
 
 // Test multiple concurrent connections with ON_DOWNSTREAM_DATA mode.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeMultipleConcurrent) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeMultipleConcurrent) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2144,9 +2144,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeMultipleConcu
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
-                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_DATA);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2182,15 +2182,19 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeMultipleConcu
   EXPECT_EQ("client2", client2_data);
 
   ASSERT_TRUE(fake_upstream_connection1->close());
-  ASSERT_TRUE(fake_upstream_connection2->close());
+  ASSERT_TRUE(fake_upstream_connection1->waitForDisconnect());
   tcp_client1->waitForHalfClose();
+
+  ASSERT_TRUE(fake_upstream_connection2->close());
+  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
   tcp_client2->waitForHalfClose();
+
   tcp_client1->close();
   tcp_client2->close();
 }
 
 // Test ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE mode simulation.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeOnDownstreamDataAndTls) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeOnDownstreamDataAndTls) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2199,10 +2203,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeOnDownstreamD
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(
-        envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectionEstablishmentMode::
-            ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
     mode->mutable_max_wait_time()->set_seconds(1); // Short timeout for test.
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
@@ -2228,7 +2231,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeOnDownstreamD
 }
 
 // Test downstream close before upstream establishment.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDownstreamCloseBeforeUpstream) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeDownstreamCloseBeforeUpstream) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2237,9 +2240,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDownstreamClo
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
-                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_DATA);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2258,7 +2261,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDownstreamClo
 }
 
 // Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with non-TLS connection.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeNonTls) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeNonTls) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2267,9 +2270,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeN
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
-                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_TLS_HANDSHAKE);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2296,7 +2299,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeN
 // Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with upstream TLS (simpler test).
 // This tests the mode without downstream TLS which should behave as IMMEDIATE.
 // Full TLS downstream testing would require more complex test infrastructure.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeWithUpstreamTls) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeWithUpstreamTls) {
   upstream_tls_ = true;
   setUpstreamProtocol(Http::CodecType::HTTP1);
   config_helper_.configureUpstreamTls();
@@ -2309,9 +2312,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeW
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
-                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_TLS_HANDSHAKE);
     mode->mutable_max_wait_time()->set_seconds(5);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
@@ -2339,7 +2342,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeW
 
 // Test ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE. Since TLS setup is complex in tests,
 // this simply verifies the mode works with non-TLS connections (behaves as ON_DOWNSTREAM_DATA).
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDataAndTlsSimple) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeDataAndTlsSimple) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2348,10 +2351,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDataAndTlsSim
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(
-        envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectionEstablishmentMode::
-            ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
     mode->mutable_max_wait_time()->set_seconds(5);
 
     auto* data_config = mode->mutable_downstream_data_config();
@@ -2387,7 +2389,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDataAndTlsSim
 }
 
 // Test TLS handshake timeout. The upstream connection should be established after timeout.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeTimeout) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeTimeout) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2396,9 +2398,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeT
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
-                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_DATA);
     mode->mutable_max_wait_time()->set_seconds(1); // Short timeout for test.
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
@@ -2424,7 +2426,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeTlsHandshakeT
 }
 
 // Test connection close during wait for data trigger.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeConnectionCloseDuringWait) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeConnectionCloseDuringWait) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2433,9 +2435,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeConnectionClo
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
-                          UpstreamConnectionEstablishmentMode::ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_DATA);
     mode->mutable_max_wait_time()->set_seconds(5);
 
     auto* data_config = mode->mutable_downstream_data_config();
@@ -2464,7 +2466,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeConnectionClo
 }
 
 // Test ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE mode with non-TLS.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDataAndTlsNonTls) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeDataAndTlsNonTls) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2473,10 +2475,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDataAndTlsNon
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(
-        envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectionEstablishmentMode::
-            ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
+                          ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2501,7 +2502,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeDataAndTlsNon
 }
 
 // Test IMMEDIATE mode.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeImmediate) {
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeImmediate) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2510,9 +2511,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionEstablishmentModeImmediate) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connection_establishment_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::
-                          UpstreamConnectionEstablishmentMode::IMMEDIATE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
+    mode->set_trigger(
+        envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::IMMEDIATE);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });

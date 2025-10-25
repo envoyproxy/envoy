@@ -241,8 +241,8 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     hash_policy_ = std::make_unique<Network::HashPolicyImpl>(config.hash_policy());
   }
 
-  if (config.has_upstream_connection_establishment_mode()) {
-    upstream_connection_establishment_mode_ = config.upstream_connection_establishment_mode();
+  if (config.has_upstream_connect_mode()) {
+    upstream_connect_mode_ = config.upstream_connect_mode();
   }
 }
 
@@ -401,8 +401,8 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   ASSERT(getStreamInfo().getUpstreamBytesMeter() != nullptr);
 
   // Initialize connection establishment mode.
-  if (config_->upstreamConnectionEstablishmentMode().has_value()) {
-    const auto& mode = config_->upstreamConnectionEstablishmentMode().value();
+  if (config_->upstreamConnectMode().has_value()) {
+    const auto& mode = config_->upstreamConnectMode().value();
     connection_trigger_ = mode.trigger();
 
     // Parse max_wait_time with default of 30 seconds.
@@ -417,8 +417,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
     }
 
     // Parse downstream data config if applicable.
-    using TriggerMode =
-        envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectionEstablishmentMode;
+    using TriggerMode = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode;
 
     if ((connection_trigger_ == TriggerMode::ON_DOWNSTREAM_DATA ||
          connection_trigger_ == TriggerMode::ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE) &&
@@ -1092,11 +1091,9 @@ Network::FilterStatus Filter::onNewConnection() {
   ASSERT(upstream_ == nullptr);
 
   // Check if we should delay upstream connection establishment.
-  using TriggerMode =
-      envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectionEstablishmentMode;
+  using TriggerMode = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode;
 
-  if (connection_trigger_ != TriggerMode::IMMEDIATE &&
-      config_->upstreamConnectionEstablishmentMode().has_value()) {
+  if (connection_trigger_ != TriggerMode::IMMEDIATE && config_->upstreamConnectMode().has_value()) {
     // Delayed connection establishment based on trigger.
     ENVOY_CONN_LOG(debug, "Delaying upstream connection establishment based on trigger mode",
                    read_callbacks_->connection());
@@ -1397,8 +1394,7 @@ void Filter::onEstablishmentTimeout() {
 
 void Filter::checkUpstreamConnectionTrigger() {
   // Check if we should establish the upstream connection based on current state.
-  using TriggerMode =
-      envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectionEstablishmentMode;
+  using TriggerMode = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode;
 
   bool should_connect = false;
 

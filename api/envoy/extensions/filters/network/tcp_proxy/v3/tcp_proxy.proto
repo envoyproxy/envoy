@@ -318,11 +318,11 @@ message TcpProxy {
   // .. attention::
   //   Server-first protocols (e.g., SMTP, MySQL, POP3) require ``IMMEDIATE`` mode. Data-triggered
   //   modes will cause connection timeouts as the client waits for the server greeting.
-  UpstreamConnectionEstablishmentMode upstream_connection_establishment_mode = 21;
+  UpstreamConnectMode upstream_connect_mode = 21;
 }
 
 // Configuration for controlling when the TCP proxy establishes the upstream connection.
-message UpstreamConnectionEstablishmentMode {
+message UpstreamConnectMode {
   // Specifies when to trigger the upstream connection establishment.
   enum ConnectionTrigger {
     // Establish the upstream connection immediately when the downstream connection is accepted.
