@@ -90,6 +90,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: otlp_stat_sink
+  change: |
+    Supported dropping stats
+    :ref:`DropAction
+    <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during custom metric conversion.
 - area: http
   change: |
     Added ``vhost_header`` to the RouteConfiguration, allowing use of a different header for vhost matching.
