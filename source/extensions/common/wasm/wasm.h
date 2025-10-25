@@ -69,7 +69,7 @@ public:
   void getFunctions() override;
 
   // AccessLog::Instance
-  void log(const PluginSharedPtr& plugin, const Formatter::HttpFormatterContext& log_context,
+  void log(const PluginSharedPtr& plugin, const Formatter::Context& log_context,
            const StreamInfo::StreamInfo& info);
 
   void onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot);

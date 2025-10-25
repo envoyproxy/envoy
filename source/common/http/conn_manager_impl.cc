@@ -956,7 +956,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 }
 
 void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
-  const Formatter::HttpFormatterContext log_context{
+  const Formatter::Context log_context{
       request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, type,
       active_span_.get()};
 
@@ -1901,7 +1901,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
       filter_manager_.streamInfo().shouldDrainConnectionUponCompletion()) {
     ENVOY_STREAM_LOG(debug, "closing connection due to connection close header", *this);
-    connection_manager_.drain_state_ = DrainState::Closing;
+    // For HTTP/2 and HTTP/3, send GOAWAY and allow current stream to complete.
+    // For HTTP/1.1, go directly to Closing (Connection: close header will be added below).
+    if (connection_manager_.codec_->protocol() >= Protocol::Http2) {
+      connection_manager_.startDrainSequence();
+    } else {
+      connection_manager_.drain_state_ = DrainState::Closing;
+    }
   }
 
   // If we are destroying a stream before remote is complete and the connection does not support

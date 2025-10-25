@@ -1,5 +1,7 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 
+#include <chrono>
+
 #include "envoy/server/factory_context.h"
 
 namespace Envoy {
@@ -98,11 +100,25 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
       // If our returned token had an expiration time, use that to set the cache duration
       const auto now = context_.api().timeSource().systemTime();
       if (expiration_time_.has_value() && (expiration_time_.value() > now)) {
-        cache_duration_ =
-            std::chrono::duration_cast<std::chrono::seconds>(expiration_time_.value() - now);
+        auto time_until_expiration = expiration_time_.value() - now;
+        auto grace_period =
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(REFRESH_GRACE_PERIOD);
+
+        // Subtract grace period, but ensure we don't go negative
+        if (time_until_expiration > grace_period) {
+          cache_duration_ = std::chrono::duration_cast<std::chrono::seconds>(time_until_expiration -
+                                                                             grace_period);
+        } else {
+          ENVOY_LOG(warn,
+                    "Credential expiration time is within grace period {} seconds, refreshing now. "
+                    "Minimum expiration time should be 900 seconds (15 minutes).",
+                    REFRESH_GRACE_PERIOD.count());
+          cache_duration_ = std::chrono::seconds(1);
+        }
+
         ENVOY_LOG(debug,
                   "Metadata fetcher setting credential refresh to {}, based on "
-                  "credential expiration",
+                  "credential expiration with grace period",
                   std::chrono::seconds(cache_duration_.count()));
       } else {
         cache_duration_ = getCacheDuration();
@@ -110,7 +126,8 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
                   "Metadata fetcher setting credential refresh to {}, based on default expiration",
                   std::chrono::seconds(cache_duration_.count()));
       }
-      cache_duration_timer_->enableTimer(cache_duration_);
+      cache_duration_timer_->enableTimer(
+          std::chrono::duration_cast<std::chrono::milliseconds>(cache_duration_));
     }
   }
 }

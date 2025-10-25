@@ -64,6 +64,8 @@ build --incompatible_enforce_config_setting_visibility
 test --test_verbose_timeout_warnings
 test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 
+test --test_tag_filters=-runtime-cpu
+
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
@@ -143,7 +145,7 @@ build:asan-common --config=sanitizer
 build:asan-common --define signal_trace=disabled
 build:asan-common --define ENVOY_CONFIG_ASAN=1
 build:asan-common --build_tag_filters=-no_san
-build:asan-common --test_tag_filters=-no_san
+build:asan-common --test_tag_filters=-no_san,-runtime-cpu
 build:asan-common --copt -fsanitize=address,undefined
 build:asan-common --linkopt -fsanitize=address,undefined
 # vptr and function sanitizer are enabled in asan if it is set up via bazel/setup_clang.sh.
@@ -194,7 +196,7 @@ build:tsan --copt -fsanitize=thread
 build:tsan --linkopt -fsanitize=thread
 build:tsan --copt -DTHREAD_SANITIZER=1
 build:tsan --build_tag_filters=-no_san,-no_tsan
-build:tsan --test_tag_filters=-no_san,-no_tsan
+build:tsan --test_tag_filters=-no_san,-no_tsan,-runtime-cpu
 # Needed due to https://github.com/libevent/libevent/issues/777
 build:tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 # https://github.com/abseil/abseil-cpp/issues/760
@@ -206,7 +208,7 @@ build:tsan --test_timeout=120,600,1500,4800
 build:msan --action_env=ENVOY_MSAN=1
 build:msan --config=sanitizer
 build:msan --build_tag_filters=-no_san
-build:msan --test_tag_filters=-no_san
+build:msan --test_tag_filters=-no_san,-runtime-cpu
 build:msan --define ENVOY_CONFIG_MSAN=1
 build:msan --copt -fsanitize=memory
 build:msan --linkopt -fsanitize=memory
@@ -267,10 +269,10 @@ build:coverage --coverage_report_generator=@envoy//tools/coverage:report_generat
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
-build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target
+build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target,-runtime-cpu
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
-build:fuzz-coverage --test_tag_filters=-nocoverage
+build:fuzz-coverage --test_tag_filters=-nocoverage,-runtime-cpu
 # Existing fuzz tests don't need a full WASM runtime and in generally we don't really want to
 # fuzz dependencies anyways. On the other hand, disabling WASM reduces the build time and
 # resources required to build and run the tests.
