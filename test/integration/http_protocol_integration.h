@@ -32,8 +32,7 @@ absl::string_view http2ImplementationToString(Http2Impl impl);
 // ....
 // }
 // TODO(#20996) consider switching to SimulatedTimeSystem instead of using real time.
-class HttpProtocolIntegrationTest : public testing::TestWithParam<HttpProtocolTestParams>,
-                                    public HttpIntegrationTest {
+class HttpProtocolIntegrationTestBase : public HttpIntegrationTest, public testing::Test {
 public:
   // By default returns 8 combinations of
   // [HTTP  upstream / HTTP  downstream] x [Ipv4, IPv6]
@@ -64,24 +63,30 @@ public:
 
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
+  static std::string testNameFromTestParams(const HttpProtocolTestParams& params);
   static std::string
   protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
 
-  HttpProtocolIntegrationTest()
-      : HttpProtocolIntegrationTest(ConfigHelper::httpProxyConfig(
-            /*downstream_is_quic=*/GetParam().downstream_protocol == Http::CodecType::HTTP3)) {}
+  HttpProtocolIntegrationTestBase(const HttpProtocolTestParams& test_params)
+      : HttpProtocolIntegrationTestBase(
+            ConfigHelper::httpProxyConfig(
+                /*downstream_is_quic=*/test_params.downstream_protocol == Http::CodecType::HTTP3),
+            test_params) {}
 
-  HttpProtocolIntegrationTest(const std::string config)
-      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, config),
-        use_universal_header_validator_(GetParam().use_universal_header_validator) {
-    setupHttp2ImplOverrides(GetParam().http2_implementation);
+  HttpProtocolIntegrationTestBase(const std::string config,
+                                  const HttpProtocolTestParams& test_params)
+      : HttpIntegrationTest(test_params.downstream_protocol, test_params.version, config),
+        test_params_(test_params),
+        use_universal_header_validator_(test_params.use_universal_header_validator) {
+    setupHttp2ImplOverrides(test_params.http2_implementation);
     config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
-                                      GetParam().use_universal_header_validator ? "true" : "false");
+                                      test_params.use_universal_header_validator ? "true"
+                                                                                 : "false");
   }
 
   void SetUp() override {
-    setDownstreamProtocol(GetParam().downstream_protocol);
-    setUpstreamProtocol(GetParam().upstream_protocol);
+    setDownstreamProtocol(test_params_.downstream_protocol);
+    setUpstreamProtocol(test_params_.upstream_protocol);
   }
 
   void initialize() override {
@@ -95,9 +100,34 @@ public:
   void setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
 
 protected:
+  // Current test params.
+  const HttpProtocolTestParams& test_params_;
   const bool use_universal_header_validator_{false};
   bool async_lb_ = true;
 };
+
+// Variadic template used to add additional test params to Http protocol integration tests.
+template <typename... T>
+class HttpProtocolIntegrationTestWithParams
+    : public testing::WithParamInterface<
+          typename std::conditional<(sizeof...(T) > 0), std::tuple<HttpProtocolTestParams, T...>,
+                                    HttpProtocolTestParams>::type>,
+      public HttpProtocolIntegrationTestBase {
+  static const HttpProtocolTestParams& getTestBaseParam() {
+    if constexpr (sizeof...(T) > 0) {
+      return std::get<0>(
+          testing::TestWithParam<std::tuple<HttpProtocolTestParams, T...>>::GetParam());
+    } else {
+      return testing::TestWithParam<HttpProtocolTestParams>::GetParam();
+    }
+  }
+
+public:
+  HttpProtocolIntegrationTestWithParams() : HttpProtocolIntegrationTestBase(getTestBaseParam()) {}
+};
+
+// Basic class used for testing without additional parameters.
+using HttpProtocolIntegrationTest = HttpProtocolIntegrationTestWithParams<>;
 
 class UpstreamDownstreamIntegrationTest
     : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool>>,

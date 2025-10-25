@@ -3,7 +3,7 @@
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
-std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTestParams(
+std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTestBase::getProtocolTestParams(
     const std::vector<Http::CodecType>& downstream_protocols,
     const std::vector<Http::CodecType>& upstream_protocols) {
   std::vector<HttpProtocolTestParams> ret;
@@ -54,16 +54,21 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
   return ret;
 }
 
-std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
-    const ::testing::TestParamInfo<HttpProtocolTestParams>& params) {
-  return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
-                      downstreamToString(params.param.downstream_protocol),
-                      upstreamToString(params.param.upstream_protocol),
-                      http2ImplementationToString(params.param.http2_implementation),
-                      params.param.use_universal_header_validator ? "Uhv" : "Legacy");
+std::string
+HttpProtocolIntegrationTestBase::testNameFromTestParams(const HttpProtocolTestParams& params) {
+  return absl::StrCat((params.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+                      downstreamToString(params.downstream_protocol),
+                      upstreamToString(params.upstream_protocol),
+                      http2ImplementationToString(params.http2_implementation),
+                      params.use_universal_header_validator ? "Uhv" : "Legacy");
 }
 
-void HttpProtocolIntegrationTest::setUpstreamOverrideStreamErrorOnInvalidHttpMessage() {
+std::string HttpProtocolIntegrationTestBase::protocolTestParamsToString(
+    const ::testing::TestParamInfo<HttpProtocolTestParams>& params) {
+  return testNameFromTestParams(params.param);
+}
+
+void HttpProtocolIntegrationTestBase::setUpstreamOverrideStreamErrorOnInvalidHttpMessage() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -83,7 +88,7 @@ void HttpProtocolIntegrationTest::setUpstreamOverrideStreamErrorOnInvalidHttpMes
   });
 }
 
-void HttpProtocolIntegrationTest::setDownstreamOverrideStreamErrorOnInvalidHttpMessage() {
+void HttpProtocolIntegrationTestBase::setDownstreamOverrideStreamErrorOnInvalidHttpMessage() {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
