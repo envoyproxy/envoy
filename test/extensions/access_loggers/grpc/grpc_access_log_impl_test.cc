@@ -128,6 +128,33 @@ tcp_logs:
   logger_->log(envoy::data::accesslog::v3::TCPAccessLogEntry(tcp_entry));
 }
 
+// Test that logs_written counter is incremented correctly for successful HTTP log flushes.
+TEST_F(GrpcAccessLoggerImplTest, LogHttpWithStatsCounter) {
+  // Log a single HTTP entry and verify logs_written is incremented.
+  grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
+identifier:
+  node:
+    id: node_name
+    cluster: cluster_name
+    locality:
+      zone: zone_name
+  log_name: test_log_name
+http_logs:
+  log_entry:
+    request:
+      path: /test/path1
+)EOF");
+  envoy::data::accesslog::v3::HTTPAccessLogEntry entry;
+  entry.mutable_request()->set_path("/test/path1");
+  logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
+  
+  // Verify logs_written counter is incremented by 1.
+  EXPECT_EQ(1,
+            TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_written")->value());
+  EXPECT_EQ(0,
+            TestUtility::findCounter(stats_store_, "access_logs.grpc_access_log.logs_dropped")->value());
+}
+
 class GrpcAccessLoggerCacheImplTest : public testing::Test {
 public:
   GrpcAccessLoggerCacheImplTest()
