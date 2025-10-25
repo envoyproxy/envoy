@@ -1,0 +1,45 @@
+diff --git a/configure.ac b/configure.ac
+index 39c6c95..099b3a0 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -186,9 +186,30 @@ AS_IF([test ! -z "${ICP_ROOT}"],
+         ]
+     )
+ 
++    # Debug: Manual link test with verbose output
++    AC_MSG_NOTICE([=== Testing libqat link manually ===])
++    AC_MSG_NOTICE([CC: $CC])
++    AC_MSG_NOTICE([LDFLAGS: $LDFLAGS])
++    
++    cat > conftest.c <<EOF
++char cpaDcCompressData2();
++int main() { return cpaDcCompressData2(); }
++EOF
++    
++    AC_MSG_NOTICE([Test program:])
++    cat conftest.c
++    
++    AC_MSG_NOTICE([Attempting compile:])
++    $CC $CFLAGS $LDFLAGS conftest.c -lqat -lusdm -o conftest 2>&1 | tee conftest.err
++    
++    if test -f conftest.err; then
++        AC_MSG_NOTICE([Compile/link errors:])
++        cat conftest.err
++    fi
++    
+     AC_CHECK_LIB(qat, cpaDcCompressData2, ,
+         [ AC_MSG_ERROR([cpaDcCompressData2 not found])],
+-	[-lusdm -lcrypto])
++	[-lusdm])
+ 
+     #check for icp_adf_get_numDevices/icp_sal_userIsQatAvailable
+     AC_CHECK_LIB(qat, icp_adf_get_numDevices,
+@@ -199,7 +220,7 @@ AS_IF([test ! -z "${ICP_ROOT}"],
+                 [SAL_CFLAGS="-DSAL_DEV_API"
+                  AC_SUBST(SAL_CFLAGS)],
+                 [AC_MSG_ERROR([icp_sal_userIsQatAvailable/icp_adf_get_numDevices not found])],
+-		[-lusdm -lcrypto]
++		[-lusdm]
+             )
+         ]
+     )

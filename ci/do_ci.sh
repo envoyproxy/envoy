@@ -185,7 +185,6 @@ function bazel_contrib_binary_build() {
 function bazel_envoy_api_build() {
     setup_clang_toolchain
     export CLANG_TOOLCHAIN_SETUP=1
-    export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
     echo "Run protoxform test"
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
         --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
@@ -729,6 +728,23 @@ case $CI_TARGET in
         ;;
 
     release|release.server_only|release.test_only)
+        whoami
+
+        ls -alh /build
+
+        touch /build/foo
+
+        echo "access confirmed ..."
+
+        ls -alh /build/bazel_root
+
+        bazel --version
+
+
+        echo "bazel confirmed ..."
+
+
+
         if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # When testing memory consumption, we want to test against exact byte-counts
             # where possible. As these differ between platforms and compile options, we

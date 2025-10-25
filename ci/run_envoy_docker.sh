@@ -4,7 +4,6 @@ set -e
 
 # TODO(phlax): Add a check that a usable version of docker compose is available
 
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source build SHA information
