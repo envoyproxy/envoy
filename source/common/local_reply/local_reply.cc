@@ -48,8 +48,8 @@ public:
     // be used. That means the body will be the same as the original body and we don't need
     // to format it.
     if (formatter_ != nullptr) {
-      body = formatter_->formatWithContext(
-          {&request_headers, &response_headers, &response_trailers, body}, stream_info);
+      body = formatter_->format({&request_headers, &response_headers, &response_trailers, body},
+                                stream_info);
     }
     content_type = content_type_;
   }

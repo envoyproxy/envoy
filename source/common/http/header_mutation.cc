@@ -20,9 +20,9 @@ public:
       : HeadersToAddEntry(header_value_option, creation_status),
         header_name_(header_value_option.header().key()) {}
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                        const StreamInfo::StreamInfo& stream_info) const override {
-    const std::string value = formatter_->formatWithContext(context, stream_info);
+    const std::string value = formatter_->format(context, stream_info);
 
     if (!value.empty() || add_if_empty_) {
       switch (append_action_) {
@@ -58,7 +58,7 @@ class RemoveMutation : public HeaderEvaluator {
 public:
   RemoveMutation(const std::string& header_name) : header_name_(header_name) {}
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext&,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context&,
                        const StreamInfo::StreamInfo&) const override {
     headers.remove(header_name_);
   }
@@ -73,7 +73,7 @@ public:
                         Server::Configuration::CommonFactoryContext& context)
       : key_matcher_(key_matcher, context) {}
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext&,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context&,
                        const StreamInfo::StreamInfo&) const override {
     headers.removeIf([this](const Http::HeaderEntry& header) {
       return key_matcher_.match(header.key().getStringView());
@@ -121,8 +121,7 @@ HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations,
   }
 }
 
-void HeaderMutations::evaluateHeaders(Http::HeaderMap& headers,
-                                      const Formatter::HttpFormatterContext& context,
+void HeaderMutations::evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                                       const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& mutation : header_mutations_) {
     mutation->evaluateHeaders(headers, context, stream_info);
