@@ -31,7 +31,8 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                                      GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache)
     : Common::ImplBase(std::move(filter)),
       config_(std::make_shared<const HttpGrpcAccessLogConfig>(std::move(config))),
-      tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
+      tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)),
+      common_properties_config_(config.common_config()) {
   for (const auto& header : config_->additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
   }
@@ -60,9 +61,9 @@ void HttpGrpcAccessLog::emitLog(const Formatter::Context& context,
   const Http::RequestHeaderMap& request_headers =
       context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers);
 
-  GrpcCommon::Utility::extractCommonAccessLogProperties(
-      *log_entry.mutable_common_properties(), request_headers, stream_info,
-      config_->common_config(), context.accessLogType());
+  GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
+                                                        common_properties_config_, request_headers,
+                                                        stream_info, context);
 
   if (stream_info.protocol()) {
     switch (stream_info.protocol().value()) {

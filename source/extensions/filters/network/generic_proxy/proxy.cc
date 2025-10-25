@@ -93,7 +93,10 @@ void ActiveStream::modifySpan(Tracing::Span& span) const {
   ASSERT(conn_manager_tracing_config_.has_value());
 
   const TraceContextBridge trace_context{*request_header_frame_};
-  const Tracing::CustomTagContext ctx{trace_context, stream_info_};
+  const FormatterContextExtension context_extension(request_header_frame_.get(),
+                                                    response_header_frame_.get());
+  Formatter::Context context;
+  const Tracing::CustomTagContext ctx{trace_context, stream_info_, context};
 
   for (const auto& it : conn_manager_tracing_config_->getCustomTags()) {
     it.second->applySpan(span, ctx);

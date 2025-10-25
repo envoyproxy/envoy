@@ -11,7 +11,7 @@ namespace Formatter {
 using AccessLogType = envoy::data::accesslog::v3::AccessLogType;
 
 /**
- * HTTP specific substitution formatter context for HTTP access logs or formatters.
+ * Substitution formatter context for access logs or formatters.
  */
 class Context {
 public:

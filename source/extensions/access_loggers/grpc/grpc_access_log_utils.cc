@@ -37,6 +37,15 @@ TLSProperties_TLSVersion tlsVersionStringToEnum(const std::string& tls_version) 
 
 } // namespace
 
+CommonPropertiesConfig::CommonPropertiesConfig(const ProtoCommonGrpcAccessLogConfig& config)
+    : filter_states_to_log(config.filter_state_objects_to_log().begin(),
+                           config.filter_state_objects_to_log().end()) {
+  for (const auto& custom_tag : config.custom_tags()) {
+    const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag);
+    custom_tags.push_back(tag_applier);
+  }
+}
+
 void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
@@ -160,9 +169,8 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 
 void Utility::extractCommonAccessLogProperties(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
-    const Http::RequestHeaderMap& request_header, const StreamInfo::StreamInfo& stream_info,
-    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    AccessLog::AccessLogType access_log_type) {
+    const CommonPropertiesConfig& config, const Http::RequestHeaderMap& request_header,
+    const StreamInfo::StreamInfo& stream_info, const Formatter::Context& formatter_context) {
   // TODO(mattklein123): Populate sample_rate field.
   if (stream_info.downstreamAddressProvider().remoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
@@ -308,7 +316,7 @@ void Utility::extractCommonAccessLogProperties(
     common_access_log.mutable_metadata()->MergeFrom(stream_info.dynamicMetadata());
   }
 
-  for (const auto& key : config.filter_state_objects_to_log()) {
+  for (const auto& key : config.filter_states_to_log) {
     if (!(extractFilterStateData(stream_info.filterState(), key, common_access_log))) {
       if (stream_info.upstreamInfo().has_value() &&
           stream_info.upstreamInfo()->upstreamFilterState() != nullptr) {
@@ -319,10 +327,9 @@ void Utility::extractCommonAccessLogProperties(
   }
 
   Tracing::ReadOnlyHttpTraceContext trace_context(request_header);
-  Tracing::CustomTagContext ctx{trace_context, stream_info};
-  for (const auto& custom_tag : config.custom_tags()) {
-    const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag);
-    tag_applier->applyLog(common_access_log, ctx);
+  Tracing::CustomTagContext ctx{trace_context, stream_info, formatter_context};
+  for (const auto& custom_tag : config.custom_tags) {
+    custom_tag->applyLog(common_access_log, ctx);
   }
 
   // If the stream is not complete, then this log entry is intermediate log entry.
@@ -348,7 +355,7 @@ void Utility::extractCommonAccessLogProperties(
     common_access_log.set_upstream_wire_bytes_received(bytes_meter->wireBytesReceived());
   }
 
-  common_access_log.set_access_log_type(access_log_type);
+  common_access_log.set_access_log_type(formatter_context.accessLogType());
 }
 
 bool extractFilterStateData(const StreamInfo::FilterState& filter_state, const std::string& key,

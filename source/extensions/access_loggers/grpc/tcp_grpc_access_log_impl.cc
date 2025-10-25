@@ -24,7 +24,8 @@ TcpGrpcAccessLog::TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                                    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache)
     : Common::ImplBase(std::move(filter)),
       config_(std::make_shared<const TcpGrpcAccessLogConfig>(std::move(config))),
-      tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
+      tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)),
+      common_properties_config_(config.common_config()) {
   THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(config_->common_config()));
   tls_slot_->set(
       [config = config_, access_logger_cache = access_logger_cache_](Event::Dispatcher&) {
@@ -38,9 +39,9 @@ void TcpGrpcAccessLog::emitLog(const Formatter::Context& context,
   // Common log properties.
   envoy::data::accesslog::v3::TCPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(
-      *log_entry.mutable_common_properties(),
+      *log_entry.mutable_common_properties(), common_properties_config_,
       context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers),
-      stream_info, config_->common_config(), context.accessLogType());
+      stream_info, context);
 
   envoy::data::accesslog::v3::ConnectionProperties& connection_properties =
       *log_entry.mutable_connection_properties();
