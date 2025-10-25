@@ -90,6 +90,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: udp_sink
+  change: |
+    Enhance UDP sink to handle the tapped message which the size is bigger than 64K.
 - area: otlp_stat_sink
   change: |
     Supported dropping stats
