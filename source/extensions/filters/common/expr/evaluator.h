@@ -79,7 +79,12 @@ ActivationPtr createActivation(const ::Envoy::LocalInfo::LocalInfo* local_info,
                                const ::Envoy::Http::ResponseHeaderMap* response_headers,
                                const ::Envoy::Http::ResponseTrailerMap* response_trailers);
 
+// Forward declarations.
+class BuilderInstance;
 class BuilderCache;
+
+using BuilderInstanceSharedPtr = std::shared_ptr<BuilderInstance>;
+using BuilderInstanceSharedConstPtr = std::shared_ptr<const BuilderInstance>;
 
 // Shared expression builder instance.
 class BuilderInstance {
@@ -93,18 +98,27 @@ private:
   const std::shared_ptr<BuilderCache> cache_;
 };
 
-using BuilderInstanceSharedPtr = std::shared_ptr<BuilderInstance>;
-using BuilderInstanceSharedConstPtr = std::shared_ptr<const BuilderInstance>;
+// Cache to store builders for different configurations.
+class BuilderCache : public Singleton::Instance, public std::enable_shared_from_this<BuilderCache> {
+public:
+  using ConfigHash = size_t;
+
+  // Gets or creates a cached builder for the given configuration.
+  // Returns a shared pointer to the builder instance.
+  // Must be called on the main thread.
+  BuilderInstanceSharedConstPtr
+  getOrCreateBuilder(OptRef<const envoy::config::core::v3::CelExpressionConfig> config);
+
+private:
+  absl::flat_hash_map<ConfigHash, std::weak_ptr<const BuilderInstance>> builders_;
+};
 
 // Creates an expression builder with the given configuration.
+// If arena is provided, enables constant folding optimization for RBAC backward compatibility.
 // Throws an exception if fails to construct an expression builder.
-BuilderPtr createBuilder(OptRef<const envoy::config::core::v3::CelExpressionConfig> config = {});
-
-// Creates arena-optimized builder for RBAC backward compatibility.
-// This is not exposed in public API but used internally to preserve existing RBAC performance.
-BuilderPtr
-createBuilderForArena(Protobuf::Arena* arena,
-                      OptRef<const envoy::config::core::v3::CelExpressionConfig> config = {});
+BuilderConstPtr
+createBuilder(OptRef<const envoy::config::core::v3::CelExpressionConfig> config = {},
+              Protobuf::Arena* arena = nullptr);
 
 // Gets the singleton expression builder with the given configuration (or default if not provided).
 // Creates or reuses a cached builder for the configuration.

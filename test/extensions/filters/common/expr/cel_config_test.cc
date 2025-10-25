@@ -225,26 +225,26 @@ TEST_F(CelConfigTest, CreateWithConfig) {
   EXPECT_EQ(result.value().StringOrDie().value(), "wello");
 }
 
-// Test createBuilderForArena with null arena.
+// Test createBuilder with null arena.
 TEST_F(CelConfigTest, CreateBuilderForArenaNullArena) {
-  auto builder = createBuilderForArena(nullptr, {});
+  auto builder = createBuilder({}, nullptr);
   EXPECT_NE(builder, nullptr);
 }
 
-// Test createBuilderForArena with valid arena and default config.
+// Test createBuilder with valid arena and default config.
 TEST_F(CelConfigTest, CreateBuilderForArenaWithArena) {
   Protobuf::Arena arena;
-  auto builder = createBuilderForArena(&arena, {});
+  auto builder = createBuilder({}, &arena);
   EXPECT_NE(builder, nullptr);
 }
 
-// Test createBuilderForArena with arena and string functions enabled.
+// Test createBuilder with arena and string functions enabled.
 TEST_F(CelConfigTest, CreateBuilderForArenaStringFunctions) {
   Protobuf::Arena arena;
   envoy::config::core::v3::CelExpressionConfig config;
   config.set_enable_string_functions(true);
 
-  auto builder_ptr = createBuilderForArena(&arena, makeOptRef(config));
+  auto builder_ptr = createBuilder(makeOptRef(config), &arena);
   auto builder = std::make_shared<BuilderInstance>(std::move(builder_ptr), nullptr);
   ASSERT_NE(builder, nullptr);
 
@@ -268,7 +268,7 @@ TEST_F(CelConfigTest, CreateBuilderForArenaStringFunctions) {
   EXPECT_EQ(result.value().StringOrDie().value(), "heLLO");
 }
 
-// Test createBuilderForArena with arena and all features enabled.
+// Test createBuilder with arena and all features enabled.
 TEST_F(CelConfigTest, CreateBuilderForArenaAllFeatures) {
   Protobuf::Arena arena;
   envoy::config::core::v3::CelExpressionConfig config;
@@ -276,7 +276,7 @@ TEST_F(CelConfigTest, CreateBuilderForArenaAllFeatures) {
   config.set_enable_string_concat(true);
   config.set_enable_string_functions(true);
 
-  auto builder_ptr = createBuilderForArena(&arena, makeOptRef(config));
+  auto builder_ptr = createBuilder(makeOptRef(config), &arena);
   auto builder = std::make_shared<BuilderInstance>(std::move(builder_ptr), nullptr);
   ASSERT_NE(builder, nullptr);
 

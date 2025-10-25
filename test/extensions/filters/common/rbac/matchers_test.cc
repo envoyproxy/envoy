@@ -1672,7 +1672,7 @@ TEST(PolicyMatcher, PolicyMatcherWithoutCelConfig) {
 
   // No cel_config specified - create arena builder for backward compatibility.
   Protobuf::Arena constant_arena;
-  auto builder_ptr = Extensions::Filters::Common::Expr::createBuilderForArena(&constant_arena, {});
+  auto builder_ptr = Extensions::Filters::Common::Expr::createBuilder({}, &constant_arena);
   auto arena_builder = std::make_shared<Extensions::Filters::Common::Expr::BuilderInstance>(
       std::move(builder_ptr), nullptr);
 

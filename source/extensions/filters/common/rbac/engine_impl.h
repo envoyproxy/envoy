@@ -65,7 +65,7 @@ void generateLog(StreamInfo::StreamInfo& info, EnforcementMode mode, bool log);
 
 struct ExprBuilderWithArena {
   Protobuf::Arena constant_arena_;
-  Extensions::Filters::Common::Expr::BuilderPtr builder_ptr_;
+  Extensions::Filters::Common::Expr::BuilderConstPtr builder_ptr_;
   Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_instance_;
 };
 

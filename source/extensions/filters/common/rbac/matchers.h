@@ -206,25 +206,21 @@ public:
         principals_(policy.principals(), context),
         expr_([&]() -> absl::optional<Expr::CompiledExpression> {
           if (policy.has_condition()) {
-
-            if (policy.has_cel_config()) {
-              // Use cached builder without arena optimization.
-              auto builder = Expr::getBuilder(context, Envoy::makeOptRef(policy.cel_config()));
-              auto compiled = Expr::CompiledExpression::Create(builder, policy.condition());
-              if (!compiled.ok()) {
-                throw Expr::CelException(
-                    absl::StrCat("failed to create an expression: ", compiled.status().message()));
-              }
-              return std::move(compiled.value());
-            } else if (arena_builder != nullptr) {
-              // Use arena-based builder for backward compatibility required for RBAC performance.
-              auto compiled = Expr::CompiledExpression::Create(arena_builder, policy.condition());
-              if (!compiled.ok()) {
-                throw Expr::CelException(
-                    absl::StrCat("failed to create an expression: ", compiled.status().message()));
-              }
-              return std::move(compiled.value());
+            // Use arena-based builder if provided, otherwise use cached builder.
+            auto builder =
+                arena_builder != nullptr
+                    ? arena_builder
+                    : Expr::getBuilder(
+                          context,
+                          policy.has_cel_config()
+                              ? Envoy::makeOptRef(policy.cel_config())
+                              : OptRef<const envoy::config::core::v3::CelExpressionConfig>{});
+            auto compiled = Expr::CompiledExpression::Create(builder, policy.condition());
+            if (!compiled.ok()) {
+              throw Expr::CelException(
+                  absl::StrCat("failed to create an expression: ", compiled.status().message()));
             }
+            return std::move(compiled.value());
           }
           return {};
         }()) {}

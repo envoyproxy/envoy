@@ -51,7 +51,7 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     if (policy.second.has_condition() && !policy.second.has_cel_config()) {
       builder_with_arena_ = std::make_unique<ExprBuilderWithArena>();
       builder_with_arena_->builder_ptr_ =
-          Expr::createBuilderForArena(&builder_with_arena_->constant_arena_, {});
+          Expr::createBuilder({}, &builder_with_arena_->constant_arena_);
       builder_with_arena_->builder_instance_ = std::make_shared<Expr::BuilderInstance>(
           std::move(builder_with_arena_->builder_ptr_), nullptr);
       break;
