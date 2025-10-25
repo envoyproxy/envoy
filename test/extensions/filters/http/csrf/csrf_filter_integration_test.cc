@@ -108,24 +108,24 @@ TEST_P(CsrfFilterIntegrationTest, TestCsrfDisabled) {
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 }
 
-TEST_P(CsrfFilterIntegrationTest, TestNonMutationMethod) {
+TEST_P(CsrfFilterIntegrationTest, TestOriginMismatch) {
   config_helper_.prependFilter(CSRF_FILTER_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{
-      {":method", "GET"},
+      {":method", "PUT"},
       {":path", "/"},
       {":scheme", "http"},
       {"origin", "http://cross-origin"},
       {"host", "test-origin"},
   }};
-  const auto& response = sendRequestAndWaitForResponse(headers);
+  const auto& response = sendRequest(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().getStatusValue(), "200");
+  EXPECT_EQ(response->headers().getStatusValue(), "403");
 }
 
-TEST_P(CsrfFilterIntegrationTest, TestOriginMismatch) {
+TEST_P(CsrfFilterIntegrationTest, TestEnforcesGet) {
   config_helper_.prependFilter(CSRF_FILTER_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{
-      {":method", "PUT"},
+      {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
       {"origin", "http://cross-origin"},
