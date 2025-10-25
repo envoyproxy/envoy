@@ -64,7 +64,8 @@ on:
         default: false
       diskspace-hack-paths:
         type: string
-        default:
+        default: |
+          /opt/hostedtoolcache
       docker-cpus:
         type: number
         default: 0
