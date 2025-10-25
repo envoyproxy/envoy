@@ -240,7 +240,7 @@ void UpstreamRequest::cleanUp() {
 }
 
 void UpstreamRequest::upstreamLog(AccessLog::AccessLogType access_log_type) {
-  const Formatter::HttpFormatterContext log_context{parent_.downstreamHeaders(),
+  const Formatter::Context log_context{parent_.downstreamHeaders(),
                                                     upstream_headers_.get(),
                                                     upstream_trailers_.get(),
                                                     {},

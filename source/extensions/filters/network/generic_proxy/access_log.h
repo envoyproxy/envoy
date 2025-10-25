@@ -40,9 +40,9 @@ public:
 
   // FormatterProvider
   absl::optional<std::string>
-  formatWithContext(const FormatterContext& context,
+  format(const FormatterContext& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValueWithContext(const FormatterContext& context,
+  Protobuf::Value formatValue(const FormatterContext& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
@@ -55,9 +55,9 @@ public:
   GenericStatusCodeFormatterProvider() = default;
 
   // FormatterProvider
-  absl::optional<std::string> formatWithContext(const FormatterContext& context,
+  absl::optional<std::string> format(const FormatterContext& context,
                                                 const StreamInfo::StreamInfo&) const override;
-  Protobuf::Value formatValueWithContext(const FormatterContext& context,
+  Protobuf::Value formatValue(const FormatterContext& context,
                                          const StreamInfo::StreamInfo&) const override;
 };
 

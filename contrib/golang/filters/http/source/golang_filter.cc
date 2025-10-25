@@ -168,7 +168,7 @@ void Filter::onDestroy() {
 }
 
 // access_log is executed before the log of the stream filter
-void Filter::log(const Formatter::HttpFormatterContext& log_context,
+void Filter::log(const Formatter::Context& log_context,
                  const StreamInfo::StreamInfo&) {
   uint64_t req_header_num = 0;
   uint64_t req_header_bytes = 0;

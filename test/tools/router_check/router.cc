@@ -177,7 +177,7 @@ void RouterCheckTool::assignRuntimeFraction(
 void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
                                       Envoy::StreamInfo::StreamInfoImpl stream_info) {
   if (!headers_finalized_ && tool_config.route_ != nullptr) {
-    const Formatter::HttpFormatterContext formatter_context(tool_config.request_headers_.get(),
+    const Formatter::Context formatter_context(tool_config.request_headers_.get(),
                                                             tool_config.response_headers_.get(),
                                                             nullptr, {}, {}, nullptr);
 

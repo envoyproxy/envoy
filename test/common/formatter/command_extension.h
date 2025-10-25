@@ -14,10 +14,10 @@ class TestFormatter : public FormatterProvider {
 public:
   // FormatterProvider
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
 
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 
@@ -41,10 +41,10 @@ class AdditionalFormatter : public FormatterProvider {
 public:
   // FormatterProvider
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
 
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 

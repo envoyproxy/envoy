@@ -28,9 +28,9 @@ public:
 
   // Formatter::format
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 
@@ -43,9 +43,9 @@ public:
 
   // Formatter::format
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 
@@ -77,9 +77,9 @@ public:
   HeadersByteSizeFormatter(const HeaderType header_type);
 
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
@@ -99,9 +99,9 @@ public:
 
   // FormatterProvider
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 
@@ -115,9 +115,9 @@ public:
 
   // FormatterProvider
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 
@@ -131,9 +131,9 @@ public:
 
   // FormatterProvider
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 
@@ -143,9 +143,9 @@ public:
 class TraceIDFormatter : public FormatterProvider {
 public:
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 
@@ -162,9 +162,9 @@ public:
 
   // FormatterProvider
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
   static Format parseFormat(absl::string_view format);
@@ -179,9 +179,9 @@ public:
 
   // FormatterProvider
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
@@ -202,9 +202,9 @@ public:
 
   // FormatterProvider
   absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
+  format(const Context& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
   PathFormatter(bool with_query, PathFormatterOption option, absl::optional<size_t> max_length)

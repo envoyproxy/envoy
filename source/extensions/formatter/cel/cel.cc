@@ -31,7 +31,7 @@ CELFormatter::CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
       typed_(typed) {}
 
 absl::optional<std::string>
-CELFormatter::formatWithContext(const Envoy::Formatter::HttpFormatterContext& context,
+CELFormatter::format(const Envoy::Formatter::Context& context,
                                 const StreamInfo::StreamInfo& stream_info) const {
   Protobuf::Arena arena;
   auto eval_status =
@@ -49,7 +49,7 @@ CELFormatter::formatWithContext(const Envoy::Formatter::HttpFormatterContext& co
 }
 
 Protobuf::Value
-CELFormatter::formatValueWithContext(const Envoy::Formatter::HttpFormatterContext& context,
+CELFormatter::formatValue(const Envoy::Formatter::Context& context,
                                      const StreamInfo::StreamInfo& stream_info) const {
   if (typed_) {
     Protobuf::Arena arena;
@@ -70,7 +70,7 @@ CELFormatter::formatValueWithContext(const Envoy::Formatter::HttpFormatterContex
     }
     return proto_value;
   } else {
-    auto result = formatWithContext(context, stream_info);
+    auto result = format(context, stream_info);
     if (!result.has_value()) {
       return ValueUtil::nullValue();
     }

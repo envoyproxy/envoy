@@ -34,7 +34,7 @@ public:
   Config(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values, LifeSpan life_span,
          Server::Configuration::GenericFactoryContext& context)
       : life_span_(life_span), values_(parse(proto_values, context)) {}
-  void updateFilterState(const Formatter::HttpFormatterContext& context,
+  void updateFilterState(const Formatter::Context& context,
                          StreamInfo::StreamInfo& info) const;
 
 private:

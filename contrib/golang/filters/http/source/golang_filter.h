@@ -271,7 +271,7 @@ public:
   }
 
   // AccessLog::Instance
-  void log(const Formatter::HttpFormatterContext& log_context,
+  void log(const Formatter::Context& log_context,
            const StreamInfo::StreamInfo& info) override;
 
   CAPIStatus clearRouteCache(bool refresh);

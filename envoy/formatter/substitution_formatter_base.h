@@ -27,7 +27,7 @@ public:
    * @param stream_info supplies the stream info.
    * @return std::string string containing the complete formatted substitution line.
    */
-  virtual std::string formatWithContext(const Context& context,
+  virtual std::string format(const Context& context,
                                         const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
@@ -49,7 +49,7 @@ public:
    *         the given context and stream info.
    */
   virtual absl::optional<std::string>
-  formatWithContext(const Context& context, const StreamInfo::StreamInfo& stream_info) const PURE;
+  format(const Context& context, const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * Format the value with the given context and stream info.
@@ -59,7 +59,7 @@ public:
    *         context and stream info.
    */
   virtual Protobuf::Value
-  formatValueWithContext(const Context& context,
+  formatValue(const Context& context,
                          const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 

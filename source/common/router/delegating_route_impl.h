@@ -80,7 +80,7 @@ public:
 
   // Router::ResponseEntry
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
-                               const Formatter::HttpFormatterContext& context,
+                               const Formatter::Context& context,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;
@@ -90,10 +90,10 @@ public:
   Http::Code clusterNotFoundResponseCode() const override;
   const CorsPolicy* corsPolicy() const override;
   std::string currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
-                                         const Formatter::HttpFormatterContext& context,
+                                         const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
-                              const Formatter::HttpFormatterContext& context,
+                              const Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,

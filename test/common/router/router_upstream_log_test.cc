@@ -534,7 +534,7 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
   EXPECT_CALL(*mock_upstream_log_, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+      .WillOnce(Invoke([](const Formatter::Context& log_context,
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamPeriodic);
 
@@ -553,7 +553,7 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
   EXPECT_CALL(*mock_upstream_log_, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+      .WillOnce(Invoke([](const Formatter::Context& log_context,
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamPeriodic);
 
@@ -580,7 +580,7 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
                   .host_->outlier_detector_,
               putResult(_, absl::optional<uint64_t>(200)));
   EXPECT_CALL(*mock_upstream_log_, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+      .WillOnce(Invoke([](const Formatter::Context& log_context,
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
 

@@ -23,10 +23,10 @@ class StreamInfoFormatterProvider : public FormatterProvider {
 public:
   // FormatterProvider
   absl::optional<std::string>
-  formatWithContext(const Context&, const StreamInfo::StreamInfo& stream_info) const override {
+  format(const Context&, const StreamInfo::StreamInfo& stream_info) const override {
     return format(stream_info);
   }
-  Protobuf::Value formatValueWithContext(const Context&,
+  Protobuf::Value formatValue(const Context&,
                                          const StreamInfo::StreamInfo& stream_info) const override {
     return formatValue(stream_info);
   }

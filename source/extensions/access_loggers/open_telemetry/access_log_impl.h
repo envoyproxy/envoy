@@ -50,7 +50,7 @@ private:
   };
 
   // Common::ImplBase
-  void emitLog(const Formatter::HttpFormatterContext& context,
+  void emitLog(const Formatter::Context& context,
                const StreamInfo::StreamInfo& info) override;
 
   const ThreadLocal::SlotPtr tls_slot_;

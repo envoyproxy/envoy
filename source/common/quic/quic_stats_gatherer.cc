@@ -42,7 +42,7 @@ void QuicStatsGatherer::maybeDoDeferredLog(bool record_ack_timing) {
   stream_info_->addBytesRetransmitted(retransmitted_bytes_);
   stream_info_->addPacketsRetransmitted(retransmitted_packets_);
 
-  const Formatter::HttpFormatterContext log_context{request_header_map_.get(),
+  const Formatter::Context log_context{request_header_map_.get(),
                                                     response_header_map_.get(),
                                                     response_trailer_map_.get(),
                                                     {},

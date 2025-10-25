@@ -61,7 +61,7 @@ public:
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::string body_;
 
-  Envoy::Formatter::HttpFormatterContext formatter_context_{&request_headers_, &response_headers_,
+  Envoy::Formatter::Context formatter_context_{&request_headers_, &response_headers_,
                                                             &response_trailers_, body_};
 
   envoy::config::core::v3::SubstitutionFormatString config_;
@@ -88,7 +88,7 @@ TEST_F(MetadataFormatterTest, DynamicMetadata) {
   EXPECT_CALL(testing::Const(stream_info_), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(*metadata_));
 
-  EXPECT_EQ("test_value", getTestMetadataFormatter("DYNAMIC")->formatWithContext(formatter_context_,
+  EXPECT_EQ("test_value", getTestMetadataFormatter("DYNAMIC")->format(formatter_context_,
                                                                                  stream_info_));
 }
 
@@ -97,7 +97,7 @@ TEST_F(MetadataFormatterTest, DynamicMetadataWithLegacyConfiguration) {
   EXPECT_CALL(testing::Const(stream_info_), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(*metadata_));
 
-  EXPECT_EQ("test_value", getTestMetadataFormatterLegacy("DYNAMIC")->formatWithContext(
+  EXPECT_EQ("test_value", getTestMetadataFormatterLegacy("DYNAMIC")->format(
                               formatter_context_, stream_info_));
 }
 
@@ -112,7 +112,7 @@ TEST_F(MetadataFormatterTest, ClusterMetadata) {
   EXPECT_CALL(**cluster, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
   EXPECT_CALL(stream_info_, upstreamClusterInfo()).WillRepeatedly(testing::ReturnPointee(cluster));
 
-  EXPECT_EQ("test_value", getTestMetadataFormatter("CLUSTER")->formatWithContext(formatter_context_,
+  EXPECT_EQ("test_value", getTestMetadataFormatter("CLUSTER")->format(formatter_context_,
                                                                                  stream_info_));
 }
 
@@ -132,7 +132,7 @@ TEST_F(MetadataFormatterTest, UpstreamHostMetadata) {
   EXPECT_CALL(*mock_host_description, metadata()).WillRepeatedly(testing::Return(metadata_));
 
   EXPECT_EQ("test_value", getTestMetadataFormatter("UPSTREAM_HOST")
-                              ->formatWithContext(formatter_context_, stream_info_));
+                              ->format(formatter_context_, stream_info_));
 }
 
 // Test that METADATA(ROUTE accesses stream_info's Route.
@@ -142,7 +142,7 @@ TEST_F(MetadataFormatterTest, RouteMetadata) {
   EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(route));
 
   EXPECT_EQ("test_value",
-            getTestMetadataFormatter("ROUTE")->formatWithContext(formatter_context_, stream_info_));
+            getTestMetadataFormatter("ROUTE")->format(formatter_context_, stream_info_));
 }
 
 // Make sure that code handles nullptr returned for stream_info::route().
@@ -150,7 +150,7 @@ TEST_F(MetadataFormatterTest, NonExistentRouteMetadata) {
   EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(nullptr));
 
   EXPECT_EQ("-",
-            getTestMetadataFormatter("ROUTE")->formatWithContext(formatter_context_, stream_info_));
+            getTestMetadataFormatter("ROUTE")->format(formatter_context_, stream_info_));
 }
 
 // Test that METADATA(LISTENER accesses stream_info listener metadata.
@@ -160,14 +160,14 @@ TEST_F(MetadataFormatterTest, ListenerMetadata) {
   stream_info_.downstream_connection_info_provider_->setListenerInfo(listener_info);
   EXPECT_EQ(
       "test_value",
-      getTestMetadataFormatter("LISTENER")->formatWithContext(formatter_context_, stream_info_));
+      getTestMetadataFormatter("LISTENER")->format(formatter_context_, stream_info_));
 }
 
 // Test that METADATA(LISTENER handles no listener info.
 TEST_F(MetadataFormatterTest, NoListenerMetadata) {
   EXPECT_EQ(
       "-",
-      getTestMetadataFormatter("LISTENER")->formatWithContext(formatter_context_, stream_info_));
+      getTestMetadataFormatter("LISTENER")->format(formatter_context_, stream_info_));
 }
 
 // Test that METADATA(VIRTUAL_HOST accesses selected virtual host metadata.
@@ -177,12 +177,12 @@ TEST_F(MetadataFormatterTest, VirtualHostMetadata) {
   EXPECT_CALL(*mock_virtual_host, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
 
   EXPECT_EQ("test_value", getTestMetadataFormatter("VIRTUAL_HOST")
-                              ->formatWithContext(formatter_context_, stream_info_));
+                              ->format(formatter_context_, stream_info_));
 }
 
 TEST_F(MetadataFormatterTest, VirtualHostMetadataNoVirtualHost) {
   EXPECT_EQ("-", getTestMetadataFormatter("VIRTUAL_HOST")
-                     ->formatWithContext(formatter_context_, stream_info_));
+                     ->format(formatter_context_, stream_info_));
 }
 
 } // namespace Formatter

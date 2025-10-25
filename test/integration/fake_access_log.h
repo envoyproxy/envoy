@@ -9,13 +9,13 @@
 namespace Envoy {
 
 using LogSignature =
-    std::function<void(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&)>;
+    std::function<void(const Formatter::Context&, const StreamInfo::StreamInfo&)>;
 
 class FakeAccessLog : public AccessLog::Instance {
 public:
   FakeAccessLog(LogSignature cb) : log_cb_(cb) {}
 
-  void log(const Formatter::HttpFormatterContext& context,
+  void log(const Formatter::Context& context,
            const StreamInfo::StreamInfo& info) override {
     if (log_cb_) {
       log_cb_(context, info);

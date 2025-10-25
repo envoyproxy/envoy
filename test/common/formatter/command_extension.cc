@@ -5,15 +5,15 @@
 namespace Envoy {
 namespace Formatter {
 
-absl::optional<std::string> TestFormatter::formatWithContext(const HttpFormatterContext&,
+absl::optional<std::string> TestFormatter::format(const Context&,
                                                              const StreamInfo::StreamInfo&) const {
   return "TestFormatter";
 }
 
 Protobuf::Value
-TestFormatter::formatValueWithContext(const HttpFormatterContext& context,
+TestFormatter::formatValue(const Context& context,
                                       const StreamInfo::StreamInfo& stream_info) const {
-  return ValueUtil::stringValue(formatWithContext(context, stream_info).value());
+  return ValueUtil::stringValue(format(context, stream_info).value());
 }
 
 FormatterProviderPtr TestCommandParser::parse(absl::string_view command, absl::string_view,
@@ -43,15 +43,15 @@ ProtobufTypes::MessagePtr TestCommandFactory::createEmptyConfigProto() {
 std::string TestCommandFactory::name() const { return "envoy.formatter.TestFormatter"; }
 
 absl::optional<std::string>
-AdditionalFormatter::formatWithContext(const HttpFormatterContext&,
+AdditionalFormatter::format(const Context&,
                                        const StreamInfo::StreamInfo&) const {
   return "AdditionalFormatter";
 }
 
 Protobuf::Value
-AdditionalFormatter::formatValueWithContext(const HttpFormatterContext& context,
+AdditionalFormatter::formatValue(const Context& context,
                                             const StreamInfo::StreamInfo& stream_info) const {
-  return ValueUtil::stringValue(formatWithContext(context, stream_info).value());
+  return ValueUtil::stringValue(format(context, stream_info).value());
 }
 
 FormatterProviderPtr AdditionalCommandParser::parse(absl::string_view command, absl::string_view,

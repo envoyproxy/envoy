@@ -33,11 +33,11 @@ public:
   PlainStringFormatter(absl::string_view str) { str_.set_string_value(str); }
 
   // FormatterProvider
-  absl::optional<std::string> formatWithContext(const Context&,
+  absl::optional<std::string> format(const Context&,
                                                 const StreamInfo::StreamInfo&) const override {
     return str_.string_value();
   }
-  Protobuf::Value formatValueWithContext(const Context&,
+  Protobuf::Value formatValue(const Context&,
                                          const StreamInfo::StreamInfo&) const override {
     return str_;
   }
@@ -54,12 +54,12 @@ public:
   PlainNumberFormatter(double num) { num_.set_number_value(num); }
 
   // FormatterProvider
-  absl::optional<std::string> formatWithContext(const Context&,
+  absl::optional<std::string> format(const Context&,
                                                 const StreamInfo::StreamInfo&) const override {
     std::string str = absl::StrFormat("%g", num_.number_value());
     return str;
   }
-  Protobuf::Value formatValueWithContext(const Context&,
+  Protobuf::Value formatValue(const Context&,
                                          const StreamInfo::StreamInfo&) const override {
     return num_;
   }
@@ -91,7 +91,7 @@ public:
          const CommandParsers& command_parsers = {});
 
   // Formatter
-  std::string formatWithContext(const Context& context,
+  std::string format(const Context& context,
                                 const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
@@ -118,7 +118,7 @@ public:
                     const CommandParsers& commands = {});
 
   // Formatter
-  std::string formatWithContext(const Context& context,
+  std::string format(const Context& context,
                                 const StreamInfo::StreamInfo& info) const override;
 
 private:

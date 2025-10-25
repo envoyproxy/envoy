@@ -1039,7 +1039,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
 
   EXPECT_CALL(*access_log_, log(_, _))
       .WillOnce(Invoke(
-          [&](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+          [&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
           }));
   connection->close(Network::ConnectionCloseType::NoFlush);
@@ -1108,7 +1108,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirectWithMultiAddrs) {
 
   EXPECT_CALL(*access_log_, log(_, _))
       .WillOnce(Invoke(
-          [&](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+          [&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
           }));
   connection->close(Network::ConnectionCloseType::NoFlush);

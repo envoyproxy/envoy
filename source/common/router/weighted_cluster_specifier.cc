@@ -134,7 +134,7 @@ public:
   }
 
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
-                              const Formatter::HttpFormatterContext& context,
+                              const Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override {
     requestHeaderParser().evaluateHeaders(headers, context, stream_info);
@@ -152,7 +152,7 @@ public:
     return transforms;
   }
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
-                               const Formatter::HttpFormatterContext& context,
+                               const Formatter::Context& context,
                                const StreamInfo::StreamInfo& stream_info) const override {
     responseHeaderParser().evaluateHeaders(headers, context, stream_info);
     DynamicRouteEntry::finalizeResponseHeaders(headers, context, stream_info);

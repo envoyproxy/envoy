@@ -27,7 +27,7 @@ ReqWithoutQuery::ReqWithoutQuery(absl::string_view main_header,
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
 absl::optional<std::string>
-ReqWithoutQuery::formatWithContext(const Envoy::Formatter::HttpFormatterContext& context,
+ReqWithoutQuery::format(const Envoy::Formatter::Context& context,
                                    const StreamInfo::StreamInfo&) const {
   const Http::HeaderEntry* header = findHeader(context.requestHeaders());
   if (!header) {
@@ -41,7 +41,7 @@ ReqWithoutQuery::formatWithContext(const Envoy::Formatter::HttpFormatterContext&
 }
 
 Protobuf::Value
-ReqWithoutQuery::formatValueWithContext(const Envoy::Formatter::HttpFormatterContext& context,
+ReqWithoutQuery::formatValue(const Envoy::Formatter::Context& context,
                                         const StreamInfo::StreamInfo&) const {
   const Http::HeaderEntry* header = findHeader(context.requestHeaders());
   if (!header) {

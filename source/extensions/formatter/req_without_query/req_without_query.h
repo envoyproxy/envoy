@@ -18,9 +18,9 @@ public:
                   absl::optional<size_t> max_length);
 
   absl::optional<std::string>
-  formatWithContext(const Envoy::Formatter::HttpFormatterContext& context,
+  format(const Envoy::Formatter::Context& context,
                     const StreamInfo::StreamInfo&) const override;
-  Protobuf::Value formatValueWithContext(const Envoy::Formatter::HttpFormatterContext& context,
+  Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
                                          const StreamInfo::StreamInfo&) const override;
 
 private:

@@ -278,7 +278,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAccessLog) {
 
   EXPECT_CALL(*handler, log(_, _))
       .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+          [](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_FALSE(stream_info.responseCode());
             EXPECT_TRUE(stream_info.hasAnyResponseFlag());
             EXPECT_TRUE(
@@ -312,7 +312,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAfterHeadersAcc
 
   EXPECT_CALL(*handler, log(_, _))
       .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+          [](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_FALSE(stream_info.responseCode());
             EXPECT_TRUE(stream_info.hasAnyResponseFlag());
             EXPECT_TRUE(
@@ -354,7 +354,7 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
 
   EXPECT_CALL(*log_handler, log(_, _))
       .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+          [](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
             ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
             EXPECT_EQ("codec_error:too_many_outbound_frames",
                       stream_info.responseCodeDetails().value());
@@ -389,7 +389,7 @@ TEST_F(HttpConnectionManagerImplTest, EnvoyOverloadError) {
 
   EXPECT_CALL(*log_handler, log(_, _))
       .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+          [](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
             ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
             EXPECT_EQ("overload_error:Envoy_Overloaded", stream_info.responseCodeDetails().value());
           }));
@@ -1704,7 +1704,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
 
   EXPECT_CALL(*log_handler_, log(_, _))
       .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+          [](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_TRUE(stream_info.hasAnyResponseFlag());
             EXPECT_TRUE(stream_info.hasResponseFlag(
                 StreamInfo::CoreResponseFlag::DownstreamConnectionTermination));
@@ -1746,7 +1746,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamConnectionTermination) {
   setup();
   EXPECT_CALL(*handler, log(_, _))
       .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+          [](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_FALSE(stream_info.responseCode());
             EXPECT_TRUE(stream_info.hasAnyResponseFlag());
             EXPECT_TRUE(stream_info.hasResponseFlag(
@@ -2025,7 +2025,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetConnectError) {
   codec_->protocol_ = Protocol::Http2;
   EXPECT_CALL(*handler, log(_, _))
       .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+          [](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_FALSE(stream_info.responseCode());
             EXPECT_TRUE(stream_info.hasAnyResponseFlag());
             EXPECT_TRUE(
@@ -2054,7 +2054,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteReset) {
   codec_->protocol_ = Protocol::Http2;
   EXPECT_CALL(*handler, log(_, _))
       .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+          [](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_FALSE(stream_info.responseCode());
             EXPECT_TRUE(stream_info.hasAnyResponseFlag());
             EXPECT_TRUE(
@@ -2083,7 +2083,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetRefused) {
   codec_->protocol_ = Protocol::Http2;
   EXPECT_CALL(*handler, log(_, _))
       .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+          [](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_FALSE(stream_info.responseCode());
             EXPECT_TRUE(stream_info.hasAnyResponseFlag());
             EXPECT_TRUE(
