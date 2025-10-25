@@ -2852,6 +2852,91 @@ TEST_P(TcpProxyTlsHandshakeTest, TlsAndDataMode_DataFirstThenTls) {
   EXPECT_FALSE(conn_pool_callbacks_.empty());
 }
 
+TEST_P(TcpProxyTlsHandshakeTest, EarlyDataBufferExceedsMaxSize) {
+  // Setup SSL connection before initializing the filter.
+  auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(ssl_connection));
+
+  // Configure with small max_buffered_bytes to trigger the overflow.
+  setupFilter(R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode:
+      trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
+      max_wait_time: 10s
+      downstream_data_config:
+        max_buffered_bytes: 10
+        forward_buffered_data: true
+  )EOF",
+              true,   // receive_before_connect
+              false); // expect_initial_read_disable
+
+  // Call onNewConnection() to initialize the filter.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // First, send small amount of data. We should buffer it and call readDisable(true).
+  Buffer::OwnedImpl small_data("hello");
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(small_data, false));
+
+  // Verify no connection yet.
+  EXPECT_TRUE(conn_pool_callbacks_.empty());
+
+  // Now send more data that will exceed max_buffered_bytes (10 bytes total).
+  // Current buffer has 5 bytes, adding 10 more = 15 bytes > 10 max.
+  Buffer::OwnedImpl more_data("more data!");
+
+  // Set up connection pool expectations for forced connection due to buffer overflow.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // When buffer is exceeded, readDisable is NOT called - connection is forced immediately.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(more_data, false));
+
+  // Connection should be established due to buffer overflow.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeViaConnectedEvent) {
+  // Setup SSL connection before initializing the filter.
+  auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(ssl_connection));
+
+  setupTlsMode();
+
+  // Call onNewConnection() to initialize the filter.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Set up connection pool expectations for when TLS handshake completes.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // Simulate TLS handshake completion via Connected event (the actual production path).
+  // This triggers the DownstreamCallbacks which calls onDownstreamEvent internally.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Verify connection establishment was triggered.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
 // Instantiate parameterized tests with both values of the runtime feature flag.
 INSTANTIATE_TEST_SUITE_P(TcpProxyTlsHandshakeTestParams, TcpProxyTlsHandshakeTest,
                          testing::Values(false, true));

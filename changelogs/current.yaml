@@ -100,8 +100,8 @@ new_features:
     <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during custom metric conversion.
 - area: tcp_proxy
   change: |
-    Added :ref:`upstream_connection_establishment_mode
-    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connection_establishment_mode>`
+    Added :ref:`upstream_connect_mode
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`
     to control when upstream connections are established. This enables use cases like extracting
     TLS certificate information or SNI before establishing upstream connections.
 - area: http

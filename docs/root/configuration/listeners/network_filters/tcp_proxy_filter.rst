@@ -55,8 +55,8 @@ There are two ways to configure delayed upstream connection establishment:
 Explicit configuration
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The preferred method is to use the :ref:`upstream_connection_establishment_mode
-<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connection_establishment_mode>`
+The preferred method is to use the :ref:`upstream_connect_mode
+<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`
 configuration field. This provides explicit control over when the upstream connection is established.
 
 The following trigger modes are supported:
@@ -90,7 +90,7 @@ Example configuration:
     "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
     stat_prefix: tcp
     cluster: upstream_cluster
-    upstream_connection_establishment_mode:
+    upstream_connect_mode:
       trigger: ON_DOWNSTREAM_DATA
       max_wait_time: 5s
       downstream_data_config:
@@ -121,7 +121,7 @@ established. This is to protect the early buffer from overflowing.
 
 .. note::
 
-  When using the explicit configuration method (``upstream_connection_establishment_mode``), the filter state approach
+  When using the explicit configuration method (``upstream_connect_mode``), the filter state approach
   is ignored. The two methods are mutually exclusive, with the explicit configuration taking precedence.
 
 .. _config_network_filters_tcp_proxy_tunneling_over_http:
