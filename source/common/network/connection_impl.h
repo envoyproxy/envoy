@@ -62,6 +62,8 @@ public:
   void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 
+  const ConnectionSocketPtr& getSocket() const override { return socket_; }
+
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;

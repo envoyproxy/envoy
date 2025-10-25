@@ -7,6 +7,7 @@ PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy
 
 WINDOWS_SKIP_TARGETS = [
     "envoy.extensions.http.cache.file_system_http_cache",
+    "envoy.extensions.http.cache_v2.file_system_http_cache",
     "envoy.filters.http.file_system_buffer",
     "envoy.filters.http.language",
     "envoy.filters.http.sxg",
@@ -282,7 +283,7 @@ def _boringssl_fips():
         name = "fips_cmake_linux_aarch64",
         build_file_content = CMAKE_BUILD_CONTENT,
     )
-    GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % BUILD_ALL_CONTENT
+    GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % _build_all_content(["test/**"])
     external_http_archive(
         name = "fips_go_linux_amd64",
         build_file_content = GO_BUILD_CONTENT,
@@ -766,6 +767,10 @@ def _fast_float():
 def _highway():
     external_http_archive(
         name = "highway",
+        patches = [
+            "@envoy//bazel:highway-ppc64le.patch",
+        ],
+        patch_args = ["-p1"],
     )
 
 def _dragonbox():
@@ -1021,6 +1026,7 @@ def _com_github_fdio_vpp_vcl():
         name = "com_github_fdio_vpp_vcl",
         build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
+        patch_args = ["-p1"],
     )
 
 def _rules_ruby():

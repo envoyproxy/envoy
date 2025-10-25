@@ -42,15 +42,16 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       respect_dns_ttl_(dns_cluster.respect_dns_ttl()),
       dns_lookup_family_(
           Envoy::DnsUtils::getDnsLookupFamilyFromEnum(dns_cluster.dns_lookup_family())) {
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+
   failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
       dns_cluster, dns_refresh_rate_ms_.count(),
       context.serverFactoryContext().api().randomGenerator());
 
   std::list<ResolveTargetPtr> resolve_targets;
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
+  THROW_IF_NOT_OK(validateEndpoints(locality_lb_endpoints, {}));
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
-    THROW_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
-
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
       if (!socket_address.resolver_name().empty()) {
@@ -83,7 +84,7 @@ void StrictDnsClusterImpl::startPreInit() {
 void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
                                           const HostVector& hosts_removed,
                                           uint32_t current_priority) {
-  PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
+  PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
   // At this point we know that we are different so make a new host list and notify.
   //
   // TODO(dio): The uniqueness of a host address resolved in STRICT_DNS cluster per priority is not
@@ -156,16 +157,17 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
             }
 
             new_hosts.emplace_back(THROW_OR_RETURN_VALUE(
-                HostImpl::create(parent_.info_, hostname_, address,
-                                 // TODO(zyfjeff): Created through metadata shared pool
-                                 std::make_shared<const envoy::config::core::v3::Metadata>(
-                                     lb_endpoint_.metadata()),
-                                 std::make_shared<const envoy::config::core::v3::Metadata>(
-                                     locality_lb_endpoints_.metadata()),
-                                 lb_endpoint_.load_balancing_weight().value(),
-                                 locality_lb_endpoints_.locality(),
-                                 lb_endpoint_.endpoint().health_check_config(),
-                                 locality_lb_endpoints_.priority(), lb_endpoint_.health_status()),
+                HostImpl::create(
+                    parent_.info_, hostname_, address,
+                    // TODO(zyfjeff): Created through metadata shared pool
+                    std::make_shared<const envoy::config::core::v3::Metadata>(
+                        lb_endpoint_.metadata()),
+                    std::make_shared<const envoy::config::core::v3::Metadata>(
+                        locality_lb_endpoints_.metadata()),
+                    lb_endpoint_.load_balancing_weight().value(),
+                    parent_.constLocalitySharedPool()->getObject(locality_lb_endpoints_.locality()),
+                    lb_endpoint_.endpoint().health_check_config(),
+                    locality_lb_endpoints_.priority(), lb_endpoint_.health_status()),
                 std::unique_ptr<HostImpl>));
             all_new_hosts.emplace(address->asString());
             ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);

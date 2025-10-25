@@ -26,6 +26,7 @@ build --verbose_failures
 build --workspace_status_command=../bazel/get_workspace_status
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
+build --define=envoy_mobile_xds=disabled
 build --define=google_grpc=disabled
 build --define=nghttp2=disabled
 build --define=envoy_yaml=disabled
@@ -203,15 +204,6 @@ test:mobile-remote-ci-linux-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################
 # Clang environment variables (keep in sync with //third_party/rbe_configs)
 # Coverage environment variables (keep in sync with //third_party/rbe_configs)
-build:mobile-ci-linux-coverage --action_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:mobile-ci-linux-coverage --test_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:mobile-ci-linux-coverage --repo_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:mobile-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
-build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
-build:mobile-ci-linux-coverage --repo_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
-build:mobile-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
-build:mobile-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
-build:mobile-ci-linux-coverage --repo_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --build_tests_only
 build:mobile-ci-linux-coverage --@envoy//tools/coverage:config=@envoy_mobile//test:coverage_config
 
@@ -255,6 +247,10 @@ test:mobile-remote-ci-android --config=mobile-android
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
+
+build:mobile-remote-ci-cc-xds-enabled --config=mobile-remote-ci-cc
+test:mobile-remote-ci-cc-xds-enabled --config=mobile-remote-ci-cc
+test:mobile-remote-ci-cc-xds-enabled --define=envoy_mobile_xds=enabled
 
 build:mobile-remote-ci-core --config=mobile-remote-ci
 test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH

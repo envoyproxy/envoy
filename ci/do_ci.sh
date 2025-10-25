@@ -388,7 +388,7 @@ case $CI_TARGET in
             --define wasm=wamr \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips \
+            --test_tag_filters=-nofips,-runtime-cpu \
             --build_tests_only
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
@@ -398,7 +398,7 @@ case $CI_TARGET in
             --define admin_functionality=disabled \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips \
+            --test_tag_filters=-nofips,-runtime-cpu \
             --build_tests_only
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
@@ -441,6 +441,20 @@ case $CI_TARGET in
         collect_build_profile coverage
         ;;
 
+    cpu-detection)
+        # this can be removed once the expectation is that the integration test
+        # is present
+        if [[ ! -f "test/server/cgroup_cpu_simple_integration_test.cc" ]]; then
+            echo "CPU detection skipped, no integration test available"
+            exit 0
+        fi
+        setup_clang_toolchain
+        bazel test \
+              --test_tag_filters=runtime-cpu \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              //test/server:cgroup_cpu_simple_integration_test
+        ;;
+
     debug)
         setup_clang_toolchain
         echo "Testing ${TEST_TARGETS[*]}"
@@ -475,12 +489,8 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/tools/check_repositories.sh"
         echo "check dependencies..."
         # Using todays date as an action_env expires the NIST cache daily, which is the update frequency
-        TODAY_DATE=$(date -u -I"date")
-        export TODAY_DATE
         # TODO(phlax): Re-enable cve tests
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
-              --//tools/dependency:preload_cve_data \
-              --action_env=TODAY_DATE \
               -- -v warn \
                  -c release_dates releases
         # Run dependabot tests
@@ -668,14 +678,14 @@ case $CI_TARGET in
         CONFIG="${CONFIG_PREFIX}gcc"
         BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
         echo "gcc toolchain configured: ${CONFIG}"
+        echo "bazel fastbuild build with gcc..."
+        bazel_envoy_binary_build fastbuild
         echo "Testing ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             -c fastbuild  \
             --remote_download_minimal \
             -- "${TEST_TARGETS[@]}"
-        echo "bazel release build with gcc..."
-        bazel_envoy_binary_build fastbuild
         ;;
 
     info)

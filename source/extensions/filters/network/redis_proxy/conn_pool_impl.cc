@@ -170,10 +170,9 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>& hosts_added,
-             const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> absl::Status {
+             const std::vector<Upstream::HostSharedPtr>& hosts_removed) {
         onHostsAdded(hosts_added);
         onHostsRemoved(hosts_removed);
-        return absl::OkStatus();
       });
 
   ASSERT(host_address_map_.empty());
@@ -422,7 +421,7 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     Upstream::HostSharedPtr new_host{THROW_OR_RETURN_VALUE(
         Upstream::HostImpl::create(
             cluster_->info(), "", address_ptr, nullptr, nullptr, 1,
-            envoy::config::core::v3::Locality(),
+            std::make_shared<const envoy::config::core::v3::Locality>(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
             envoy::config::core::v3::UNKNOWN),
         std::unique_ptr<Upstream::HostImpl>)};

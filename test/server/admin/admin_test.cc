@@ -173,6 +173,7 @@ TEST_P(AdminInstanceTest, Help) {
       paths: Change multiple logging levels by setting to <logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>. If fine grain logging is enabled, use __FILE__ or a glob experision as the logger name. For example, source/common*:warning
       level: desired logging level, this will change all loggers's level; One of (, trace, debug, info, warning, error, critical, off)
   /memory: print current allocation/heap usage
+  /memory/tcmalloc: print TCMalloc stats
   /quitquitquit (POST): exit the server
   /ready: print server state, return 200 if LIVE, otherwise return 503
   /reopen_logs (POST): reopen access logs

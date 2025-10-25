@@ -17,6 +17,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
+#include "envoy/http/header_evaluator.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/router/path_matcher.h"
@@ -197,6 +198,9 @@ public:
 };
 
 using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
+
+class RetryPolicy;
+using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;
 
 /**
  * Route level retry policy.
@@ -545,6 +549,16 @@ public:
    * @return true if host name should be suffixed with "-shadow".
    */
   virtual bool disableShadowHostSuffixAppend() const PURE;
+
+  /**
+   * @return the header evaluator for manipulating headers in mirrored requests.
+   */
+  virtual const Http::HeaderEvaluator& headerEvaluator() const PURE;
+
+  /**
+   * @return the literal value to rewrite the host header with, or empty if no rewrite.
+   */
+  virtual absl::string_view hostRewriteLiteral() const PURE;
 };
 
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
@@ -926,11 +940,15 @@ public:
    * using current values of headers. Note that final path may be different if
    * headers change before finalization.
    * @param headers supplies the request headers.
-   * @return absl::optional<std::string> the value of the URL path after rewrite or absl::nullopt
-   *         if rewrite is not configured.
+   * @param context supplies the formatter context for path generation.
+   * @param stream_info holds additional information about the request.
+   * @return std::string the value of the URL path after rewrite or empty string
+   *         if rewrite is not configured or rewrite failed.
    */
-  virtual absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const PURE;
+  virtual std::string
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                             const Formatter::Context& context,
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For
@@ -983,7 +1001,7 @@ public:
    * @return const RetryPolicy& the retry policy for the route. All routes have a retry policy even
    *         if it is empty and does not allow retries.
    */
-  virtual const RetryPolicy& retryPolicy() const PURE;
+  virtual const RetryPolicyConstSharedPtr& retryPolicy() const PURE;
 
   /**
    * @return const InternalRedirectPolicy& the internal redirect policy for the route. All routes

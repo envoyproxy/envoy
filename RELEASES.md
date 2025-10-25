@@ -68,6 +68,7 @@ actual mechanics of the release itself.
 | 2024 Q2 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
 | 2024 Q3 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
 | 2025 Q1 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
+| 2025 Q3 | Ryan Northey ([phlax](https://github.com/phlax))               | Yan Avlasov ([yanavlasov](https://github.com/yanavlasov))                |
 
 ## Major release schedule
 
@@ -101,7 +102,8 @@ deadline of 3 weeks.
 | 1.33.0  | 2025/01/14 | 2025/01/14 |    0 days  | 2026/01/14  |
 | 1.34.0  | 2025/04/15 | 2025/04/15 |    0 days  | 2026/04/15  |
 | 1.35.0  | 2025/07/15 | 2025/07/23 |    8 days  | 2026/07/23  |
-| 1.36.0  | 2025/10/14 |            |            |             |
+| 1.36.0  | 2025/10/14 | 2025/10/14 |    0 days  | 2026/10/14  |
+| 1.37.0  | 2026/01/13 |
 
 ### Cutting a major release
 
@@ -148,6 +150,7 @@ Security releases are published on a 3-monthly cycle, around the mid point betwe
 | 2024 Q4 | 2024/12/03 | 2024/12/18 |  15 days   |
 | 2025 Q1 | 2025/03/04 | 2025/03/20 |  16 days   |
 | 2025 Q2 | 2025/06/03 |     --     |     --     |
-| 2025 Q3 | 2025/09/02 |            |            |
+| 2025 Q3 | 2025/09/02 | 2025/09/03 |   1 day    |
+| 2025 Q4 | 2025/12/02 |
 
 NOTE: Zero-day vulnerabilities, and upstream vulnerabilities disclosed to us under embargo, may necessitate an emergency release with little or no warning.

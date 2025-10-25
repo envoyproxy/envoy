@@ -164,7 +164,8 @@ Ipv4Instance::Ipv4Instance(absl::Status& status, const sockaddr_in* address,
 bool Ipv4Instance::operator==(const Instance& rhs) const {
   const Ipv4Instance* rhs_casted = dynamic_cast<const Ipv4Instance*>(&rhs);
   return (rhs_casted && (ip_.ipv4_.address() == rhs_casted->ip_.ipv4_.address()) &&
-          (ip_.port() == rhs_casted->ip_.port()));
+          (ip_.port() == rhs_casted->ip_.port()) &&
+          (InstanceBase::networkNamespace() == rhs.networkNamespace()));
 }
 
 std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
@@ -313,7 +314,8 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
   const auto* rhs_casted = dynamic_cast<const Ipv6Instance*>(&rhs);
   return (rhs_casted && (ip_.ipv6_.address() == rhs_casted->ip_.ipv6_.address()) &&
           (ip_.port() == rhs_casted->ip_.port()) &&
-          (ip_.ipv6_.scopeId() == rhs_casted->ip_.ipv6_.scopeId()));
+          (ip_.ipv6_.scopeId() == rhs_casted->ip_.ipv6_.scopeId()) &&
+          (InstanceBase::networkNamespace() == rhs.networkNamespace()));
 }
 
 Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bool v6only,

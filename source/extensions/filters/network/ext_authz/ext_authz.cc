@@ -7,8 +7,11 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/tls/connection_info_impl_base.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
+
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -106,6 +109,22 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       (response->status == Filters::Common::ExtAuthz::CheckStatus::Error &&
        !config_->failureModeAllow())) {
     config_->stats().cx_closed_.inc();
+
+    if (config_->sendTlsAlertOnDenial()) {
+      auto ssl_info = filter_callbacks_->connection().ssl();
+      if (ssl_info != nullptr) {
+        auto* ssl_conn_info =
+            dynamic_cast<const Extensions::TransportSockets::Tls::ConnectionInfoImplBase*>(
+                ssl_info.get());
+        if (ssl_conn_info != nullptr) {
+          SSL* ssl = ssl_conn_info->ssl();
+          if (ssl != nullptr) {
+            SSL_send_fatal_alert(ssl, SSL_AD_ACCESS_DENIED);
+          }
+        }
+      }
+    }
+
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "ext_authz_close");
     filter_callbacks_->connection().streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::UnauthorizedExternalService);

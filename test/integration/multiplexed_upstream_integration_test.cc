@@ -43,6 +43,16 @@ INSTANTIATE_TEST_SUITE_P(Protocols, MultiplexedUpstreamIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(MultiplexedUpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_response_decoder_handle",
+                                    "true");
+  testRouterRequestAndResponseWithBody(1024, 512, false);
+}
+
+// Needed for test coverage.
+TEST_P(MultiplexedUpstreamIntegrationTest,
+       RouterRequestAndResponseWithBodyNoBufferWithoutDecoderHandle) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_response_decoder_handle",
+                                    "false");
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
@@ -640,6 +650,37 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response2->waitForEndStream());
   cleanupUpstreamAndDownstream();
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamFilterSendLocalReply) {
+  if (upstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  envoy::config::core::v3::Http2ProtocolOptions config;
+  config.mutable_max_concurrent_streams()->set_value(20000);
+  mergeOptions(config);
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: local-reply-during-decode
+)EOF"),
+                               false);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start sending the request, but ensure no end stream will be sent, so the
+  // stream will stay in use.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"wait-upstream-connection", "true"}});
+  // Wait until the response is sent to ensure the SETTINGS frame has been read
+  // by Envoy.
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.http2.streams_active")->value());
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/13933

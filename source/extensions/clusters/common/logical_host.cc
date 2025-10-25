@@ -32,8 +32,11 @@ LogicalHost::LogicalHost(
           std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
           std::make_shared<const envoy::config::core::v3::Metadata>(
               locality_lb_endpoint.metadata()),
-          locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
-          locality_lb_endpoint.priority(), creation_status),
+          // TODO(adisuissa): Create through localities shared pool.
+          std::make_shared<const envoy::config::core::v3::Locality>(
+              locality_lb_endpoint.locality()),
+          lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
+          creation_status),
       override_transport_socket_options_(override_transport_socket_options), address_(address),
       address_list_or_null_(makeAddressListOrNull(address, address_list)) {
   health_check_address_ =
@@ -41,7 +44,7 @@ LogicalHost::LogicalHost(
 }
 
 Network::Address::InstanceConstSharedPtr LogicalHost::healthCheckAddress() const {
-  absl::MutexLock lock(&address_lock_);
+  absl::MutexLock lock(address_lock_);
   return health_check_address_;
 }
 
@@ -57,7 +60,7 @@ void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr
     ASSERT(*address_list.front() == *address);
   }
   {
-    absl::MutexLock lock(&address_lock_);
+    absl::MutexLock lock(address_lock_);
     address_ = address;
     address_list_or_null_ = std::move(shared_address_list);
     health_check_address_ = std::move(health_check_address);
@@ -65,12 +68,12 @@ void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr
 }
 
 HostDescription::SharedConstAddressVector LogicalHost::addressListOrNull() const {
-  absl::MutexLock lock(&address_lock_);
+  absl::MutexLock lock(address_lock_);
   return address_list_or_null_;
 }
 
 Network::Address::InstanceConstSharedPtr LogicalHost::address() const {
-  absl::MutexLock lock(&address_lock_);
+  absl::MutexLock lock(address_lock_);
   return address_;
 }
 
@@ -80,7 +83,7 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
   Network::Address::InstanceConstSharedPtr address;
   SharedConstAddressVector address_list_or_null;
   {
-    absl::MutexLock lock(&address_lock_);
+    absl::MutexLock lock(address_lock_);
     address = address_;
     address_list_or_null = address_list_or_null_;
   }

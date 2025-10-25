@@ -24,7 +24,7 @@ constexpr char EXPIRATION[] = "Expiration";
 constexpr char CREDENTIALS[] = "Credentials";
 constexpr char STS_SERVICE_NAME[] = "sts";
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
-constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
+constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{60};
 constexpr std::chrono::seconds MAX_CACHE_JITTER{30};
 
 /**

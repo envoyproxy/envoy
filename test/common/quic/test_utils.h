@@ -48,12 +48,12 @@ public:
       quic::QuicPacketWriter& writer, quic::QuicSocketAddress self_address,
       quic::QuicSocketAddress peer_address, const quic::ParsedQuicVersionVector& supported_versions,
       Network::Socket& listen_socket, quic::ConnectionIdGeneratorInterface& generator)
-      : EnvoyQuicServerConnection(
-            quic::test::TestConnectionId(), self_address, peer_address, helper, alarm_factory,
-            &writer, /*owns_writer=*/false, supported_versions,
-            createServerConnectionSocket(listen_socket.ioHandle(), self_address, peer_address,
-                                         "example.com", "h3-29"),
-            generator, nullptr) {}
+      : EnvoyQuicServerConnection(quic::test::TestConnectionId(), self_address, peer_address,
+                                  helper, alarm_factory, &writer, supported_versions,
+                                  createServerConnectionSocket(listen_socket.ioHandle(),
+                                                               self_address, peer_address,
+                                                               "example.com", "h3-29"),
+                                  generator, nullptr) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return QuicNetworkConnection::connectionStats();
@@ -378,15 +378,36 @@ REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory,
 
 class TestNetworkObserverRegistry : public Quic::EnvoyQuicNetworkObserverRegistry {
 public:
-  void onNetworkChanged() {
+  void onNetworkMadeDefault(NetworkHandle network) {
     std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
     for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
       existing_observers.push_back(observer);
     }
     for (auto* observer : existing_observers) {
-      observer->onNetworkChanged();
+      observer->onNetworkMadeDefault(network);
     }
   }
+
+  void onNetworkDisconnected(NetworkHandle network) {
+    std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
+    for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
+      existing_observers.push_back(observer);
+    }
+    for (auto* observer : existing_observers) {
+      observer->onNetworkDisconnected(network);
+    }
+  }
+
+  void onNetworkConnected(NetworkHandle network) {
+    std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
+    for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
+      existing_observers.push_back(observer);
+    }
+    for (auto* observer : existing_observers) {
+      observer->onNetworkConnected(network);
+    }
+  }
+
   using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;
 };
 

@@ -22,10 +22,23 @@ envoy_cc_extension(
 )
 
 envoy_cc_library(
+    name = "payload_extractor_lib",
+    srcs = ["payload_extractor.cc"],
+    hdrs = ["payload_extractor.h"],
+    deps = [
+        "//source/extensions/filters/network/thrift_proxy:auto_protocol_lib",
+        "//source/extensions/filters/network/thrift_proxy:auto_transport_lib",
+        "//source/extensions/filters/network/thrift_proxy:decoder_lib",
+        "//source/extensions/filters/network/thrift_proxy/filters:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "payload_to_metadata_filter_lib",
     srcs = ["payload_to_metadata_filter.cc"],
     hdrs = ["payload_to_metadata_filter.h"],
     deps = [
+        "payload_extractor_lib",
         "//envoy/server:filter_config_interface",
         "//source/common/common:matchers_lib",
         "//source/common/network:utility_lib",

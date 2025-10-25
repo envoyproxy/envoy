@@ -76,7 +76,7 @@ HostSelectionResponse OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerC
         HostSharedPtr host(std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
             HostImpl::create(
                 info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, nullptr,
-                1, envoy::config::core::v3::Locality().default_instance(),
+                1, std::make_shared<envoy::config::core::v3::Locality>(),
                 envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
                 envoy::config::core::v3::UNKNOWN),
             std::unique_ptr<HostImpl>)));
@@ -240,9 +240,9 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   HostVectorSharedPtr all_hosts(new HostVector(first_host_set.hosts()));
   all_hosts->emplace_back(host);
-  priority_set_.updateHosts(
-      0, HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()), {},
-      {std::move(host)}, {}, random_.random(), absl::nullopt, absl::nullopt);
+  priority_set_.updateHosts(0,
+                            HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
+                            {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
 }
 
 void OriginalDstCluster::cleanup() {

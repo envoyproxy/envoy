@@ -184,13 +184,10 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
       return;
     }
   } else { // Strict DNS
-    for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
-      // Strict DNS clusters must ensure that the priority for all localities
-      // are set to zero when using zone-aware routing. Zone-aware routing only
-      // works for localities with priority zero (the highest).
-      SET_AND_RETURN_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint),
-                               creation_status);
-    }
+    // Strict DNS clusters must ensure that the priority for all localities
+    // are set to zero when using zone-aware routing. Zone-aware routing only
+    // works for localities with priority zero (the highest).
+    SET_AND_RETURN_IF_NOT_OK(validateEndpoints(locality_lb_endpoints, {}), creation_status);
   }
 
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
@@ -229,7 +226,7 @@ void DnsClusterImpl::startPreInit() {
 
 void DnsClusterImpl::updateAllHosts(const HostVector& hosts_added, const HostVector& hosts_removed,
                                     uint32_t current_priority) {
-  PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
+  PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
   // At this point we know that we are different so make a new host list and notify.
   //
   // TODO(dio): The uniqueness of a host address resolved in STRICT_DNS cluster per priority is not
@@ -324,7 +321,8 @@ DnsClusterImpl::ResolveTarget::createStrictDnsHosts(
         std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
         std::make_shared<const envoy::config::core::v3::Metadata>(
             locality_lb_endpoints_.metadata()),
-        lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
+        lb_endpoint_.load_balancing_weight().value(),
+        parent_.constLocalitySharedPool()->getObject(locality_lb_endpoints_.locality()),
         lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
         lb_endpoint_.health_status());
 

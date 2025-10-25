@@ -40,6 +40,7 @@ load(
     _envoy_select_enable_http_datagrams = "envoy_select_enable_http_datagrams",
     _envoy_select_enable_yaml = "envoy_select_enable_yaml",
     _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
+    _envoy_select_envoy_mobile_xds = "envoy_select_envoy_mobile_xds",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
     _envoy_select_nghttp2 = "envoy_select_nghttp2",
@@ -138,7 +139,7 @@ def envoy_cmake(
         if pdb_name == "":
             pdb_name = name
 
-        copy_command = "cp {cmake_files_dir}/{pdb_name}.dir/{pdb_name}.pdb $INSTALLDIR/lib/{pdb_name}.pdb".format(cmake_files_dir = cmake_files_dir, pdb_name = pdb_name)
+        copy_command = "cp {cmake_files_dir}/{pdb_name}.dir/{pdb_name}.pdb $$INSTALLDIR/lib/{pdb_name}.pdb".format(cmake_files_dir = cmake_files_dir, pdb_name = pdb_name)
         if postfix_script != "":
             copy_command = copy_command + " && " + postfix_script
 
@@ -236,6 +237,7 @@ envoy_select_admin_no_html = _envoy_select_admin_no_html
 envoy_select_admin_functionality = _envoy_select_admin_functionality
 envoy_select_static_extension_registration = _envoy_select_static_extension_registration
 envoy_select_envoy_mobile_listener = _envoy_select_envoy_mobile_listener
+envoy_select_envoy_mobile_xds = _envoy_select_envoy_mobile_xds
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_disable_logging = _envoy_select_disable_logging
 envoy_select_google_grpc = _envoy_select_google_grpc

@@ -12,6 +12,7 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_evaluator.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
@@ -157,6 +158,7 @@ public:
 private:
   const Http::ResponseTrailerMapPtr response_trailers_;
 };
+
 class Config;
 class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
                                   protected Logger::Loggable<Logger::Id::filter> {
@@ -169,6 +171,9 @@ public:
   bool usePost() const override { return !post_path_.empty(); }
   const std::string& postPath() const override { return post_path_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
+  const Envoy::Http::RequestIDExtensionSharedPtr& requestIDExtension() const override {
+    return request_id_extension_;
+  }
 
   const Envoy::Router::FilterConfig& routerFilterConfig() const override { return router_config_; }
   void
@@ -180,6 +185,8 @@ public:
   Server::Configuration::ServerFactoryContext& serverFactoryContext() const override {
     return server_factory_context_;
   }
+  const std::string& requestIDHeader() const override { return request_id_header_; }
+  const std::string& requestIDMetadataKey() const override { return request_id_metadata_key_; }
 
 private:
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
@@ -187,6 +194,11 @@ private:
   const bool propagate_response_headers_;
   const bool propagate_response_trailers_;
   std::string post_path_;
+  // Request ID extension for tunneling requests. If null, no request ID is generated.
+  Envoy::Http::RequestIDExtensionSharedPtr request_id_extension_;
+  // Optional overrides for request ID header name and metadata key.
+  std::string request_id_header_;
+  std::string request_id_metadata_key_;
   Stats::StatNameManagedStorage route_stat_name_storage_;
   const Router::FilterConfig router_config_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;
@@ -235,6 +247,9 @@ public:
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
     }
+    const absl::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
+      return max_downstream_connection_duration_jitter_percentage_;
+    }
     const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
       return access_log_flush_interval_;
     }
@@ -249,11 +264,23 @@ public:
       return proxy_protocol_tlvs_;
     }
 
+    // Evaluate dynamic TLV formatters and combine with static TLVs.
+    Network::ProxyProtocolTLVVector
+    evaluateDynamicTLVs(const StreamInfo::StreamInfo& stream_info) const;
+
   private:
+    // Structure to hold TLV formatter information.
+    struct TlvFormatter {
+      uint8_t type;
+      Formatter::FormatterPtr formatter;
+    };
+
     static TcpProxyStats generateStats(Stats::Scope& scope);
 
     static Network::ProxyProtocolTLVVector
-    parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs);
+    parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs,
+              Server::Configuration::GenericFactoryContext& context,
+              std::vector<TlvFormatter>& dynamic_tlvs);
 
     // Hold a Scope for the lifetime of the configuration because connections in
     // the UpstreamDrainManager can live longer than the listener.
@@ -263,11 +290,13 @@ public:
     bool flush_access_log_on_connected_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
+    absl::optional<double> max_downstream_connection_duration_jitter_percentage_;
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
     BackOffStrategyPtr backoff_strategy_;
     Network::ProxyProtocolTLVVector proxy_protocol_tlvs_;
+    std::vector<TlvFormatter> dynamic_tlv_formatters_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -295,6 +324,11 @@ public:
   const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
     return shared_config_->maxDownstreamConnectionDuration();
   }
+  const absl::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
+    return shared_config_->maxDownstreamConnectionDurationJitterPercentage();
+  }
+  const absl::optional<std::chrono::milliseconds>
+  calculateMaxDownstreamConnectionDurationWithJitter();
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
     return shared_config_->accessLogFlushInterval();
   }

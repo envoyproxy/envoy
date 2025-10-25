@@ -44,21 +44,19 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_beh
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_generic_proxy_codec_buffer_limit);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
-RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_allow_cr_or_lf_at_request_start);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_delay_reset);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_extension);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_propagate_reset_events);
 RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
-RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_cookie);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
-RUNTIME_GUARD(envoy_reloadable_features_jwt_fetcher_use_scheme_from_uri);
+RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_cleanup_cookies);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_encrypt_tokens);
+RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
-RUNTIME_GUARD(envoy_reloadable_features_original_src_fix_port_exhaustion);
 RUNTIME_GUARD(envoy_reloadable_features_prefix_map_matcher_resume_after_subtree_miss);
 RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_defer_logging_miss_for_half_closed_stream);
@@ -69,21 +67,24 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_signal_headers_only_to_http1_backen
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_for_read);
 RUNTIME_GUARD(envoy_reloadable_features_reject_empty_trusted_ca_file);
-RUNTIME_GUARD(envoy_reloadable_features_report_load_with_rq_issued);
 RUNTIME_GUARD(envoy_reloadable_features_router_filter_resetall_on_local_reply);
+RUNTIME_GUARD(envoy_reloadable_features_safe_http2_options);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_ext_proc_on_local_reply);
-RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_retry_on_different_event_loop);
+RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_set_idle_timer_immediately_on_new_connection);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_trace_refresh_after_route_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_match_on_asterisk);
+RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_chain);
+RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 
+RUNTIME_GUARD(envoy_restart_features_move_locality_schedulers_to_lb);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
 RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
@@ -135,6 +136,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
 // TODO(abeyad): Evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_srtt);
+// TODO(abeyad): Evaluate and make this a config knob or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_initial_rtt_estimate);
 // TODO(fredyw): Remove after done with debugging.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_log_ip_families_on_network_error);
 // TODO(abeyad): Flip to true after prod testing. Simple filtering applies to link-local addresses
@@ -162,6 +165,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 
+// Flag to remove legacy route formatter support in header parser
+// Flip to true after two release periods.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_route_formatter);
+
 // TODO(grnmeira):
 // Enables the new DNS implementation, a merged implementation of
 // strict and logical DNS clusters. This new implementation will
@@ -170,6 +177,16 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 // Force a local reply from upstream envoy for reverse connections.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_conn_force_local_reply);
+// RELEASE_ASSERT when upstream stream detects UAF of downstream response decoder instance.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_abort_when_accessing_dead_decoder);
+// TODO(pradeepcrao): Create a config option to enable this instead after
+// testing.
+FALSE_RUNTIME_GUARD(envoy_restart_features_use_cached_grpc_client_for_xds);
+// Runtime guard to revert back to old non-RFC-compliant CONNECT behavior without Host header.
+// TODO(vinaykul): Drop this false-runtime-guard when deemed safe with RFC 9110 compliant CONNECT.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_11_proxy_connect_legacy_format);
+// TODO(tsaarni): Flip to true after prod testing or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

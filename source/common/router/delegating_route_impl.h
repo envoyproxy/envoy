@@ -89,8 +89,9 @@ public:
   const std::string& clusterName() const override;
   Http::Code clusterNotFoundResponseCode() const override;
   const CorsPolicy* corsPolicy() const override;
-  absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+  std::string currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                                         const Formatter::HttpFormatterContext& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override;
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo& stream_info,
@@ -102,7 +103,7 @@ public:
   const HedgePolicy& hedgePolicy() const override;
   Upstream::ResourcePriority priority() const override;
   const RateLimitPolicy& rateLimitPolicy() const override;
-  const RetryPolicy& retryPolicy() const override;
+  const RetryPolicyConstSharedPtr& retryPolicy() const override;
   const Router::PathMatcherSharedPtr& pathMatcher() const override;
   const Router::PathRewriterSharedPtr& pathRewriter() const override;
   const InternalRedirectPolicy& internalRedirectPolicy() const override;
