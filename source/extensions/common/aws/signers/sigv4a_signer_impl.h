@@ -29,12 +29,13 @@ public:
       absl::string_view service_name, absl::string_view region,
       const CredentialsProviderChainSharedPtr& credentials_provider,
       Server::Configuration::CommonFactoryContext& context,
-      const AwsSigningHeaderExclusionVector& matcher_config, const bool query_string = false,
+      const AwsSigningHeaderMatcherVector& exclude_matcher_config,
+      const AwsSigningHeaderMatcherVector& include_matcher_config, const bool query_string = false,
       const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration,
       std::unique_ptr<SigV4AKeyDerivationBase> key_derivation_ptr =
           std::make_unique<SigV4AKeyDerivation>())
-      : SignerBaseImpl(service_name, region, credentials_provider, context, matcher_config,
-                       query_string, expiration_time),
+      : SignerBaseImpl(service_name, region, credentials_provider, context, exclude_matcher_config,
+                       include_matcher_config, query_string, expiration_time),
         key_derivation_ptr_(std::move(key_derivation_ptr)) {}
 
 private:
