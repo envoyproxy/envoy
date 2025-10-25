@@ -61,6 +61,31 @@ message XffConfig {
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.skip_xff_append>`
   // applies.
   google.protobuf.BoolValue skip_xff_append = 3;
+
+  // Extension-level use_remote_address configuration. If set to true, this extension will use the real remote address
+  // of the client connection when determining internal versus external origin and manipulating
+  // various headers. If set to false or absent, the extension will use the
+  // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header for client IP determination.
+  //
+  // This option provides complete header manipulation functionality equivalent to the HCM's use_remote_address
+  // including XFF appending, x-forwarded-proto/port handling, and internal/external request determination.
+  //
+  // When true:
+  // - The trusted client address is the Nth address from the right end of XFF (using xff_num_trusted_hops)
+  // - XFF header is appended with the downstream connection IP
+  // - x-forwarded-proto/port headers are set based on connection properties
+  // - Internal/external determination uses the real connection IP
+  //
+  // When false:  
+  // - The trusted client address is the (N+1)th address from the right end of XFF
+  // - XFF header is not modified (transparent mode)
+  // - x-forwarded-proto/port headers are preserved from downstream
+  // - Internal/external determination uses XFF header contents
+  google.protobuf.BoolValue use_remote_address = 4;
+
+  // Whether to append the x-forwarded-port header with the port value client used to connect.
+  // This only applies when use_remote_address is true.
+  bool append_x_forwarded_port = 5;
 }
 
 message XffTrustedCidrs {
