@@ -51,7 +51,7 @@ ProcessRateLimitFilter::~ProcessRateLimitFilter() {
       });
 }
 
-bool ProcessRateLimitFilter::evaluate(const Formatter::HttpFormatterContext&,
+bool ProcessRateLimitFilter::evaluate(const Formatter::Context&,
                                       const StreamInfo::StreamInfo&) const {
   ENVOY_BUG(rate_limiter_->getLimiter() != nullptr,
             "rate_limiter_.limiter_ should be already set in init callback.");

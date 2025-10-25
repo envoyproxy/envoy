@@ -18,8 +18,8 @@ public:
                          const envoy::extensions::access_loggers::filters::process_ratelimit::v3::
                              ProcessRateLimitFilter& config);
 
-  bool evaluate(const Formatter::HttpFormatterContext&,
-                const StreamInfo::StreamInfo&) const override;
+  bool evaluate(const Formatter::Context& log_context,
+                const StreamInfo::StreamInfo& stream_info) const override;
 
   ~ProcessRateLimitFilter() override;
 
