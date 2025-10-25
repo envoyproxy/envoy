@@ -15,6 +15,7 @@ import "envoy/config/trace/v3/http_tracer.proto";
 import "envoy/type/http/v3/path_transformation.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
+import "envoy/extensions/transport_sockets/tls/v3/common.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -37,7 +38,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 60]
+// [#next-free-field: 61]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -97,6 +98,13 @@ message HttpConnectionManager {
     // Always forward the XFCC header in the request, regardless of whether the
     // client connection is mTLS.
     ALWAYS_FORWARD_ONLY = 4;
+
+    // When the client connection is mTLS, reset the XFCC header with the client or
+    // append the client certificate information to the request’s XFCC header and send it to the next hop
+    // based on :ref:`append_forward_matcher
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_forward_matcher>. 
+    // This is useful when we want to control the XFCC header based on whether the client is a trusted client or not.
+    SANITIZE_SET_OR_APPEND_FORWARD = 5;
   }
 
   // Determines the action for request that contain ``%2F``, ``%2f``, ``%5C`` or ``%5c`` sequences in the URI path.
@@ -783,6 +791,12 @@ message HttpConnectionManager {
   // ``By`` is always set when the client certificate presents the URI type Subject Alternative Name
   // value.
   SetCurrentClientCertDetails set_current_client_cert_details = 17;
+
+  // This field is valid only when :ref:`forward_client_cert_details
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
+  // is SANITIZE_SET_OR_APPEND_FORWARD and the client connection is mTLS. If the client certificate matches the matcher,
+  // the client certificate information will be appended to the request’s XFCC header. Otherwise, the XFCC header will be sanitized.
+  SubjectAltNameMatcher append_forward_matcher = 60;
 
   // If proxy_100_continue is true, Envoy will proxy incoming "Expect:
   // 100-continue" headers upstream, and forward "100 Continue" responses
