@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: QUIC listener config]
 
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
@@ -67,6 +67,12 @@ message QuicProtocolOptions {
   // [#extension-category: envoy.quic.proof_source]
   core.v3.TypedExtensionConfig proof_source_config = 7;
 
+  // Configure which implementation of ``quic::ProofVerifier`` to be used for this listener
+  // for client certificate verification in mTLS scenarios.
+  // If not specified, the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.proof_source.v3.ProofSourceConfig>` will be used.
+  // [#extension-category: envoy.quic.server.proof_verifier]
+  core.v3.TypedExtensionConfig proof_verifier_config = 14;
+
   // Config which implementation of ``quic::ConnectionIdGeneratorInterface`` to be used for this listener.
   // If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.connection_id_generator.v3.DeterministicConnectionIdGeneratorConfig>` will be used.
   // [#extension-category: envoy.quic.connection_id_generator]
@@ -104,5 +110,5 @@ message QuicProtocolOptions {
   // If not specified, the default value is 16.
   // This is an equivalent of the TCP listener option
   // max_connections_to_accept_per_socket_event.
-  google.protobuf.UInt32Value max_sessions_per_event_loop = 14 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value max_sessions_per_event_loop = 15 [(validate.rules).uint32 = {gt: 0}];
 }

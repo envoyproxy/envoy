@@ -33,6 +33,7 @@ envoy_cc_test(
         "@envoy//source/common/quic:quic_server_transport_socket_factory_lib",
         "@envoy//source/common/quic:quic_transport_socket_factory_lib",
         "@envoy//source/common/quic:udp_gso_batch_writer_lib",
+        "@envoy//source/extensions/quic/proof_verifier:envoy_quic_default_server_proof_verifier",
         "@envoy//source/extensions/udp_packet_writer/gso:config",
         "@envoy//test/extensions/filters/http/dynamic_forward_proxy:test_resolver_lib",
         "@envoy//test/test_common:test_random_generator_lib",
