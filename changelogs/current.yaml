@@ -90,6 +90,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: access_log
+  change: |
+    Support process-level rate limiting on access log emission by
+    :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
 - area: udp_sink
   change: |
     Enhance UDP sink to handle the tapped message which the size is bigger than 64K.

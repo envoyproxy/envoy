@@ -154,6 +154,15 @@ public:
 
   // Enable the listener access log
   void useListenerAccessLog(absl::string_view format = "");
+
+  // Returns all log entries after the nth access log entry, defaulting to log entry 0.
+  // By default will trigger an expect failure if more than one entry is returned.
+  // If client_connection is provided, flush pending acks to enable deferred logging.
+  std::vector<std::string>
+  waitForAccessLogEntries(const std::string& filename,
+                          Network::ClientConnection* client_connection = nullptr,
+                          absl::optional<uint32_t> min_entries = std::nullopt);
+
   // Returns all log entries after the nth access log entry, defaulting to log entry 0.
   // By default will trigger an expect failure if more than one entry is returned.
   // If client_connection is provided, flush pending acks to enable deferred logging.

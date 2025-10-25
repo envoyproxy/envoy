@@ -535,25 +535,19 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
   listener_access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
   ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
 }
-
-std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
-                                                  bool allow_excess_entries,
-                                                  Network::ClientConnection* client_connection) {
-
+std::vector<std::string>
+BaseIntegrationTest::waitForAccessLogEntries(const std::string& filename,
+                                             Network::ClientConnection* client_connection,
+                                             absl::optional<uint32_t> min_entries) {
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
+  std::vector<std::string> entries;
   const int num_iterations = TIMEOUT_FACTOR * 1000;
   for (int i = 0; i < num_iterations; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
-    std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
-    if (entries.size() >= entry + 1) {
-      // Often test authors will waitForAccessLog() for multiple requests, and
-      // not increment the entry number for the second wait. Guard against that.
-      EXPECT_TRUE(allow_excess_entries || entries.size() == entry + 1)
-          << "Waiting for entry index " << entry << " but it was not the last entry as there were "
-          << entries.size() << "\n"
-          << contents;
-      return entries[entry];
+    entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
+    if (min_entries.has_value() && entries.size() >= min_entries.value()) {
+      return entries;
     }
     if (i % 25 == 0 && client_connection != nullptr) {
       // The QUIC default delayed ack timer is 25ms. Wait for any pending ack timers to expire,
@@ -562,8 +556,26 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
-  RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: '", contents, "'"));
-  return "";
+  if (min_entries.has_value()) {
+    RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: '", contents, "'"));
+  }
+  return entries;
+}
+
+std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
+                                                  bool allow_excess_entries,
+                                                  Network::ClientConnection* client_connection) {
+  std::vector<std::string> entries =
+      waitForAccessLogEntries(filename, client_connection, entry + 1);
+
+  // Often test authors will waitForAccessLog() for multiple requests, and
+  // not increment the entry number for the second wait. Guard against that.
+  EXPECT_TRUE(allow_excess_entries || entries.size() == entry + 1)
+      << "Waiting for entry index " << entry << " but it was not the last entry as there were "
+      << entries.size() << "\n"
+      << absl::StrJoin(entries, "\n");
+  RELEASE_ASSERT(entries.size() > entry, absl::StrCat("Log entry ", entry, " not found."));
+  return entries[entry];
 }
 
 void BaseIntegrationTest::createXdsUpstream() {
