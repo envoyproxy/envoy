@@ -40,7 +40,7 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
   }
 
   // Format the host identifier using the configured formatter.
-  const Envoy::Formatter::HttpFormatterContext formatter_context{
+  const Envoy::Formatter::Context formatter_context{
       context->downstreamHeaders(),     nullptr /* response_headers */,
       nullptr /* response_trailers */,  "" /* local_reply_body */,
       AccessLog::AccessLogType::NotSet, nullptr /* active_span */};
@@ -50,8 +50,7 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
                                                   ? *context->requestStreamInfo()
                                                   : context->downstreamConnection()->streamInfo();
 
-  const std::string host_id =
-      parent_->host_id_formatter_->formatWithContext(formatter_context, stream_info);
+  const std::string host_id = parent_->host_id_formatter_->format(formatter_context, stream_info);
 
   // Treat "-" (formatter default for missing) as empty as well.
   if (host_id.empty() || host_id == "-") {
