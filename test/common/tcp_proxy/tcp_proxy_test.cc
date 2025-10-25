@@ -2899,7 +2899,7 @@ TEST_P(TcpProxyTlsHandshakeTest, EarlyDataBufferExceedsMaxSize) {
                 .get();
           }));
 
-  // When buffer is exceeded, readDisable is NOT called - connection is forced immediately.
+  // When buffer is exceeded, readDisable is not called and connection is forced immediately.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(more_data, false));
 
   // Connection should be established due to buffer overflow.
@@ -2929,7 +2929,7 @@ TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeViaConnectedEvent) {
                 .get();
           }));
 
-  // Simulate TLS handshake completion via Connected event (the actual production path).
+  // Simulate TLS handshake completion via Connected event.
   // This triggers the DownstreamCallbacks which calls onDownstreamEvent internally.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
 
