@@ -920,7 +920,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Set up stats.
 #if defined(__APPLE__) || defined(__ANDROID_API__)
-  // On iOS and Android, reject all stats to minimize memory usage, since they are not being exported anyway.
+  // On iOS and Android, reject all stats to minimize memory usage, since they are not being
+  // exported anyway.
   bootstrap->mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
 #else
   auto* list = bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
