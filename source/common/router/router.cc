@@ -1961,6 +1961,19 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
 
       code_stats.chargeResponseTiming(info);
     }
+
+    // Record time to first upstream DATA byte if available.
+    // This is useful for measuring time-to-first-token in streaming scenarios.
+    StreamInfo::TimingUtility timing(upstream_request.streamInfo());
+    auto first_data_time = timing.firstUpstreamDataRxByteReceived();
+    if (first_data_time.has_value()) {
+      const uint64_t first_data_ms =
+          std::chrono::duration_cast<std::chrono::milliseconds>(first_data_time.value()).count();
+      cluster_->statsScope()
+          .histogramFromString("upstream_rq_first_upstream_data_ms",
+                               Stats::Histogram::Unit::Milliseconds)
+          .recordValue(first_data_ms);
+    }
   }
 
   // Defer deletion as this is generally called under the stack of the upstream

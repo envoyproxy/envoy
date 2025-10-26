@@ -841,6 +841,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return timing.firstUpstreamRxByteReceived();
                   });
             }}},
+          {"RESPONSE_FIRST_UPSTREAM_DATA_DURATION",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoDurationFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    StreamInfo::TimingUtility timing(stream_info);
+                    return timing.firstUpstreamDataRxByteReceived();
+                  });
+            }}},
           {"RESPONSE_TX_DURATION",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {

@@ -82,6 +82,7 @@ public:
   private:
     void maybeEndDecode(bool end_stream);
     bool seen_1xx_headers_{};
+    bool first_data_rx_recorded_{};
     UpstreamCodecFilter& filter_;
   };
   Http::StreamDecoderFilterCallbacks* callbacks_;

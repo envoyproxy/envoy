@@ -176,6 +176,14 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamRxByteReceiv
   return duration(timing.value().get().last_upstream_rx_byte_received_, stream_info_);
 }
 
+absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamDataRxByteReceived() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().first_upstream_data_rx_byte_received_, stream_info_);
+}
+
 absl::optional<std::chrono::nanoseconds> TimingUtility::upstreamHandshakeComplete() {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {

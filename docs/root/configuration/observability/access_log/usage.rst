@@ -506,6 +506,20 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%RESPONSE_FIRST_UPSTREAM_DATA_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the start time to the first DATA frame byte
+    received from the upstream host. For HTTP/2 and HTTP/3, this is distinct from RESPONSE_DURATION
+    because the upstream may send HEADERS frames before DATA frames. This metric is particularly useful
+    for measuring time-to-first-token (TTFT) in streaming scenarios such as gRPC streaming or
+    Server-Sent Events, where the initial headers are sent immediately but the first chunk of actual
+    response data may arrive later after processing.
+
+  TCP/UDP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 %ROUNDTRIP_DURATION%
   HTTP/3 (QUIC)
     Total duration in milliseconds of the request from the start time to receiving the final ack from

@@ -346,6 +346,23 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter response_first_data_duration_format("RESPONSE_FIRST_UPSTREAM_DATA_DURATION");
+    EXPECT_EQ(absl::nullopt, response_first_data_duration_format.format({}, stream_info));
+    EXPECT_THAT(response_first_data_duration_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter response_first_data_duration_format("RESPONSE_FIRST_UPSTREAM_DATA_DURATION");
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(20000000))));
+    upstream_timing.onFirstUpstreamDataRxByteReceived(time_system);
+    EXPECT_EQ("20", response_first_data_duration_format.format({}, stream_info));
+    EXPECT_THAT(response_first_data_duration_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::numberValue(20.0)));
+  }
+
+  {
     StreamInfoFormatter ttlb_duration_format("RESPONSE_TX_DURATION");
 
     EXPECT_EQ(absl::nullopt, ttlb_duration_format.format({}, stream_info));

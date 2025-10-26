@@ -85,6 +85,10 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   upstream_timing.onFirstUpstreamRxByteReceived(test_time_.timeSystem());
   dur = checkDuration(dur, timing.firstUpstreamRxByteReceived());
 
+  EXPECT_FALSE(timing.firstUpstreamDataRxByteReceived());
+  upstream_timing.onFirstUpstreamDataRxByteReceived(test_time_.timeSystem());
+  dur = checkDuration(dur, timing.firstUpstreamDataRxByteReceived());
+
   EXPECT_FALSE(timing.lastUpstreamRxByteReceived());
   upstream_timing.onLastUpstreamRxByteReceived(test_time_.timeSystem());
   dur = checkDuration(dur, timing.lastUpstreamRxByteReceived());

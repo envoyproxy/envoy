@@ -55,6 +55,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
+using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -5965,6 +5967,131 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
   EXPECT_EQ(upstream_timing.last_upstream_tx_byte_sent_.value() -
                 upstream_timing.first_upstream_tx_byte_sent_.value(),
             std::chrono::milliseconds(32));
+  // Verify that first_upstream_data_rx_byte_received_ is set when DATA arrives.
+  EXPECT_TRUE(upstream_timing.first_upstream_data_rx_byte_received_.has_value());
+}
+// Verify that first upstream DATA timing and histogram are recorded correctly.
+TEST_F(RouterTest, UpstreamFirstDataTimingAndHistogram) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+  ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  Http::TestRequestHeaderMapImpl headers{};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  test_time_.advanceTimeWait(std::chrono::milliseconds(10));
+  Buffer::OwnedImpl data;
+  router_->decodeData(data, true);
+
+  // Allow any histogram calls (there are many timing-related histograms).
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+              deliverHistogramToSinks(_, _))
+      .Times(testing::AnyNumber());
+  // Specifically expect our histogram to be called at least once.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "upstream_rq_first_upstream_data_ms"), _))
+      .Times(testing::AtLeast(1));
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  // Advance time before sending data to create measurable duration.
+  test_time_.advanceTimeWait(std::chrono::milliseconds(50));
+  // This triggers the DATA timing to be recorded.
+  response_decoder->decodeData(data, true);
+
+  // Verify timing was recorded.
+  auto& upstream_timing = stream_info.upstreamInfo()->upstreamTiming();
+  EXPECT_TRUE(upstream_timing.first_upstream_data_rx_byte_received_.has_value());
+
+  // Verify the DATA timing is after header timing.
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_byte_received_.has_value());
+  EXPECT_GE(upstream_timing.first_upstream_data_rx_byte_received_.value(),
+            upstream_timing.first_upstream_rx_byte_received_.value());
+}
+
+// Verify HTTP/2 streaming scenario where HEADERS and DATA frames arrive separately.
+// This tests the gRPC streaming use case for time-to-first-token (TTFT) measurement.
+TEST_F(RouterTest, Http2UpstreamFirstDataTimingForStreaming) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http2);
+  expectResponseTimerCreate();
+
+  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+  ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  // Simulate a gRPC streaming request.
+  Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  test_time_.advanceTimeWait(std::chrono::milliseconds(10));
+  Buffer::OwnedImpl data("request_data");
+  router_->decodeData(data, true);
+
+  // Simulate upstream sending HEADERS frame immediately (server accepting stream).
+  test_time_.advanceTimeWait(std::chrono::milliseconds(5));
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                          {"content-type", "application/grpc"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+
+  // Verify first byte received timing is set (from HEADERS).
+  auto& upstream_timing = stream_info.upstreamInfo()->upstreamTiming();
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_byte_received_.has_value());
+  EXPECT_FALSE(upstream_timing.first_upstream_data_rx_byte_received_.has_value());
+
+  // Simulate delay before first DATA frame arrives (time to first token in gRPC streaming).
+  // This represents the model/service processing time before generating first response.
+  test_time_.advanceTimeWait(std::chrono::milliseconds(100));
+
+  // Allow any histogram calls (there are many timing-related histograms).
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+              deliverHistogramToSinks(_, _))
+      .Times(testing::AnyNumber());
+
+  // Specifically expect our histogram to be called at least once.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "upstream_rq_first_upstream_data_ms"), _))
+      .Times(testing::AtLeast(1));
+
+  // First DATA frame arrives - this is the "time to first token" event.
+  Buffer::OwnedImpl response_data("first_response_chunk");
+  response_decoder->decodeData(response_data, false);
+
+  // Verify DATA timing is now set and is significantly after headers.
+  EXPECT_TRUE(upstream_timing.first_upstream_data_rx_byte_received_.has_value());
+
+  // The key assertion: DATA arrived later than headers (representing TTFT).
+  EXPECT_GT(upstream_timing.first_upstream_data_rx_byte_received_.value(),
+            upstream_timing.first_upstream_rx_byte_received_.value());
+
+  // Verify the duration is approximately the time we waited (100ms).
+  auto data_delay = upstream_timing.first_upstream_data_rx_byte_received_.value() -
+                    upstream_timing.first_upstream_rx_byte_received_.value();
+  EXPECT_GE(data_delay, std::chrono::milliseconds(100));
+  EXPECT_LT(data_delay, std::chrono::milliseconds(110));
+
+  // Continue streaming more data chunks.
+  test_time_.advanceTimeWait(std::chrono::milliseconds(20));
+  response_decoder->decodeData(response_data, false);
+
+  // End the stream with trailers (gRPC pattern).
+  Http::ResponseTrailerMapPtr response_trailers(
+      new Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}});
+  response_decoder->decodeTrailers(std::move(response_trailers));
 }
 
 // Verify that upstream timing information is set into the StreamInfo when a
