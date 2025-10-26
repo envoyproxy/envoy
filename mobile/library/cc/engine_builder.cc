@@ -340,7 +340,7 @@ EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
 
 EngineBuilder& EngineBuilder::addRuntimeGuard(std::string guard, bool value) {
   runtime_guards_.emplace_back(std::move(guard), value);
-  return *this;
+  return *this;validate_http3_pseudo_headers
 }
 
 EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool value) {
@@ -919,6 +919,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Set up stats.
+#if defined(__APPLE__) || defined(__ANDROID_API__)
+  // On iOS and Android, reject all stats to minimize memory usage, since they are not being exported anyway.
+  bootstrap->mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
+#else
   auto* list = bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
   list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
   list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
@@ -937,6 +941,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       "total)");
   list->add_patterns()->set_contains("quic_connection_close_error_code");
   list->add_patterns()->set_contains("quic_reset_stream_error_code");
+#endif
   bootstrap->mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
 
   // Set up watchdog
