@@ -105,8 +105,8 @@ envoy_cert_validation_result verify_cert(const std::vector<std::string>& certs,
 
   envoy_cert_validation_result result;
   if (!verified) {
-    result = make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
-                         "validation couldn't be conducted.");
+    result =
+        make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN, "validation couldn't be conducted.");
   } else {
     result = make_result(ENVOY_SUCCESS, 0, "");
   }
