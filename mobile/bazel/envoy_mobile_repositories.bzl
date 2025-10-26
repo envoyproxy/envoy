@@ -44,6 +44,17 @@ def swift_repos():
         url = "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/1.2.0/release.tar.gz",
     )
 
+    http_archive(
+        name = "xctestrunner",
+        urls = [
+            "https://github.com/google/xctestrunner/archive/b7698df3d435b6491b4b4c0f9fc7a63fbed5e3a6.tar.gz",
+        ],
+        strip_prefix = "xctestrunner-b7698df3d435b6491b4b4c0f9fc7a63fbed5e3a6",
+        sha256 = "ae3a063c985a8633cb7eb566db21656f8db8eb9a0edb8c182312c7f0db53730d",
+        patch_args = ["-p1"],
+        patches = ["@envoy_mobile//bazel:xctestrunner.patch"],
+    )
+
 def kotlin_repos():
     http_archive(
         name = "rules_java",
