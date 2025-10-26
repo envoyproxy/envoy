@@ -89,9 +89,9 @@ def kotlin_repos():
 
     http_archive(
         name = "robolectric",
-        sha256 = "5bcde5db598f6938c9887a140a0a1249f95d3c16274d40869503d0c322a20d5d",
-        urls = ["https://github.com/robolectric/robolectric-bazel/archive/4.8.2.tar.gz"],
-        strip_prefix = "robolectric-bazel-4.8.2",
+        sha256 = "cf04b4206b9d21b385e8dbee478fac619fc1344e8e46935dcec2d64939dd0525",
+        urls = ["https://github.com/robolectric/robolectric-bazel/releases/download/4.16/robolectric-bazel-4.16.tar.gz"],
+        strip_prefix = "robolectric-bazel-4.16",
     )
 
 def android_repos():
