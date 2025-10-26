@@ -340,7 +340,7 @@ EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
 
 EngineBuilder& EngineBuilder::addRuntimeGuard(std::string guard, bool value) {
   runtime_guards_.emplace_back(std::move(guard), value);
-  return *this;validate_http3_pseudo_headers
+  return *this;
 }
 
 EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool value) {
