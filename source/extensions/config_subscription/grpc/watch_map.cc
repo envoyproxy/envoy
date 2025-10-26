@@ -105,9 +105,9 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
   // only happen for glob collections. TODO(htuch): It should be possible to have much more
   // efficient matchers here.
   if (watches_interested == watch_interest_.end()) {
-    if (use_namespace_matching_) {
+    if (!is_xdstp) {
       watches_interested = watch_interest_.find(namespaceFromName(resource_name));
-    } else if (is_xdstp) {
+    } else {
       // Replace resource name component with glob for purpose of matching.
       const auto pos = xdstp_resource.id().find_last_of('/');
       xdstp_resource.set_id(pos == std::string::npos ? "*"

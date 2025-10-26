@@ -169,4 +169,7 @@ message Vhds {
 
   // Configuration source specifier for VHDS.
   core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // Pass the route name in the initial subscription request instead of a wildcard subscription.
+  bool use_singleton_subscription = 2;
 }

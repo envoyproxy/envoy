@@ -154,5 +154,34 @@ TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
+TEST_P(VhdsInitializationTest, SingletonVhdsSubscription) {
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Update RouteConfig to include VHDS config with use_singleton_subscription.
+  sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TestTypeUrl::get().RouteConfiguration,
+      {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+          RdsConfigWithSingletonVhds)},
+      "2");
+
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  vhds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {"my_route"}, {},
+                                           vhds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          fmt::format(VhostTemplate, "my_route/vhost_0", "vhost.first"))},
+      {}, "1", vhds_stream_.get());
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "vhost.first");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 } // namespace
 } // namespace Envoy
