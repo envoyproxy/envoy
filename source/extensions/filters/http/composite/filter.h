@@ -47,7 +47,7 @@ public:
   }
 
 private:
-  std::unique_ptr<ProtobufWkt::Struct> buildProtoStruct() const;
+  std::unique_ptr<Protobuf::Struct> buildProtoStruct() const;
 
   absl::flat_hash_map<std::string, std::string> actions_;
 };
@@ -57,8 +57,7 @@ class Filter : public Http::StreamFilter,
                Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(FilterStats& stats, Event::Dispatcher& dispatcher, bool is_upstream)
-      : dispatcher_(dispatcher), decoded_headers_(false), stats_(stats), is_upstream_(is_upstream) {
-  }
+      : dispatcher_(dispatcher), stats_(stats), is_upstream_(is_upstream) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -103,8 +102,7 @@ public:
   void onMatchCallback(const Matcher::Action& action) override;
 
   // AccessLog::Instance
-  void log(const Formatter::HttpFormatterContext& log_context,
-           const StreamInfo::StreamInfo& info) override {
+  void log(const Formatter::Context& log_context, const StreamInfo::StreamInfo& info) override {
     for (const auto& log : access_loggers_) {
       log->log(log_context, info);
     }
@@ -119,12 +117,6 @@ private:
                          const std::string& action_name);
 
   Event::Dispatcher& dispatcher_;
-  // Use these to track whether we are allowed to insert a specific kind of filter. These mainly
-  // serve to surface an easier to understand error, as attempting to insert a filter at a later
-  // time will result in various FM assertions firing.
-  // We should be protected against this by the match tree validation that only allows request
-  // headers, this just provides some additional sanity checking.
-  bool decoded_headers_ : 1;
 
   // Wraps a stream encoder OR a stream decoder filter into a stream filter, making it easier to
   // delegate calls.

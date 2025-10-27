@@ -36,6 +36,7 @@ public:
   State state() const override;
   void add(const Target& target) override;
   void initialize(const Watcher& watcher) override;
+  void updateWatcher(const Watcher& watcher) override;
   void dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& dumps) override;
 
 private:

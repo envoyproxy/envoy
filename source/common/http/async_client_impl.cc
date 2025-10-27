@@ -28,13 +28,12 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Http::Context& http_context, Router::Context& router_context)
     : factory_context_(factory_context), cluster_(cluster),
       config_(std::make_shared<Router::FilterConfig>(
-          factory_context, http_context.asyncClientStatPrefix(), factory_context.localInfo(),
-          *stats_store.rootScope(), cm, factory_context.runtime(),
-          factory_context.api().randomGenerator(), std::move(shadow_writer), true, false, false,
-          false, false, false, Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(),
-          http_context, router_context)),
-      dispatcher_(dispatcher), runtime_(factory_context.runtime()),
-      local_reply_(LocalReply::Factory::createDefault()) {}
+          factory_context, http_context.asyncClientStatPrefix(), *stats_store.rootScope(), cm,
+          factory_context.runtime(), factory_context.api().randomGenerator(),
+          std::move(shadow_writer), true, false, false, false, false, false,
+          Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(), http_context,
+          router_context)),
+      dispatcher_(dispatcher), local_reply_(LocalReply::Factory::createDefault()) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -91,23 +90,19 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
   return active_streams_.front().get();
 }
 
-std::unique_ptr<const Router::RetryPolicy>
-createRetryPolicy(AsyncClientImpl& parent, const AsyncClient::StreamOptions& options,
+Router::RetryPolicyConstSharedPtr
+createRetryPolicy(const AsyncClient::StreamOptions& options,
                   Server::Configuration::CommonFactoryContext& context,
                   absl::Status& creation_status) {
   if (options.retry_policy.has_value()) {
-    Upstream::RetryExtensionFactoryContextImpl factory_context(
-        parent.factory_context_.singletonManager());
     auto policy_or_error = Router::RetryPolicyImpl::create(
-        options.retry_policy.value(), ProtobufMessage::getNullValidationVisitor(), factory_context,
-        context);
+        options.retry_policy.value(), ProtobufMessage::getNullValidationVisitor(), context);
     creation_status = policy_or_error.status();
-    return policy_or_error.status().ok() ? std::move(policy_or_error.value()) : nullptr;
+    return policy_or_error.status().ok() ? std::move(policy_or_error.value())
+                                         : Router::RetryPolicyImpl::DefaultRetryPolicy;
   }
-  if (options.parsed_retry_policy == nullptr) {
-    return std::make_unique<Router::RetryPolicyImpl>();
-  }
-  return nullptr;
+  return options.parsed_retry_policy != nullptr ? options.parsed_retry_policy
+                                                : Router::RetryPolicyImpl::DefaultRetryPolicy;
 }
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
@@ -123,9 +118,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                        : std::make_shared<StreamInfo::FilterStateImpl>(
                              StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()), local_reply_(*parent.local_reply_),
-      retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_, creation_status)),
       account_(options.account_), buffer_limit_(options.buffer_limit_), send_xff_(options.send_xff),
-      send_internal_(options.send_internal) {
+      send_internal_(options.send_internal),
+      upstream_override_host_(options.upstream_override_host_) {
+  auto retry_policy = createRetryPolicy(options, parent.factory_context_, creation_status);
+
   // A field initialization may set the creation-status as unsuccessful.
   // In that case return immediately.
   if (!creation_status.ok()) {
@@ -135,9 +132,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   const Router::MetadataMatchCriteria* metadata_matching_criteria = nullptr;
   if (options.parent_context.stream_info != nullptr) {
     stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
-    const auto route = options.parent_context.stream_info->route();
-    if (route != nullptr) {
-      const auto* route_entry = route->routeEntry();
+    // Keep the parent root to ensure the metadata_matching_criteria will not become
+    // dangling pointer once the parent downstream request is gone.
+    parent_route_ = options.parent_context.stream_info->route();
+    if (parent_route_ != nullptr) {
+      const auto* route_entry = parent_route_->routeEntry();
       if (route_entry != nullptr) {
         metadata_matching_criteria = route_entry->metadataMatchCriteria();
       }
@@ -145,10 +144,8 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   }
 
   auto route_or_error = NullRouteImpl::create(
-      parent_.cluster_->name(),
-      retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
-      parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy,
-      metadata_matching_criteria);
+      parent_.cluster_->name(), std::move(retry_policy), parent_.factory_context_.regexEngine(),
+      options.timeout, options.hash_policy, metadata_matching_criteria);
   SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
   route_ = std::move(*route_or_error);
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
@@ -247,7 +244,7 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
   }
 
   if (send_xff_) {
-    Utility::appendXff(headers, *parent_.config_->local_info_.address());
+    Utility::appendXff(headers, *parent_.config_->factory_context_.localInfo().address());
   }
 
   router_.decodeHeaders(headers, end_stream);
@@ -375,7 +372,7 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
                                                const AsyncClient::RequestOptions& options,
                                                absl::Status& creation_status)
     : AsyncStreamImpl(parent, *this, options, creation_status), callbacks_(callbacks),
-      response_buffer_limit_(parent.runtime_.snapshot().getInteger(
+      response_buffer_limit_(parent.config_->runtime_.snapshot().getInteger(
           AsyncClientImpl::ResponseBufferLimit, kBufferLimitForResponse)) {
   if (!creation_status.ok()) {
     return;

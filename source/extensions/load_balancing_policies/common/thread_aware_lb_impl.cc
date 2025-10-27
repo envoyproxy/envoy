@@ -3,6 +3,10 @@
 #include <memory>
 #include <random>
 
+#include "source/common/common/hex.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -10,18 +14,17 @@ namespace Upstream {
 //                      HostSetImpl::effectiveLocalityWeight.
 namespace {
 
-absl::Status normalizeHostWeights(const HostVector& hosts, double normalized_locality_weight,
-                                  NormalizedHostWeightVector& normalized_host_weights,
-                                  double& min_normalized_weight, double& max_normalized_weight) {
+void normalizeHostWeights(const HostVector& hosts, double normalized_locality_weight,
+                          NormalizedHostWeightVector& normalized_host_weights,
+                          double& min_normalized_weight, double& max_normalized_weight) {
   // sum should be at most uint32_t max value, so we can validate it by accumulating into unit64_t
   // and making sure there was no overflow
   uint64_t sum = 0;
   for (const auto& host : hosts) {
     sum += host->weight();
     if (sum > std::numeric_limits<uint32_t>::max()) {
-      return absl::InvalidArgumentError(
-          fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
-                      std::numeric_limits<uint32_t>::max()));
+      IS_ENVOY_BUG("weights should have been previously validated in validateEndpoints()");
+      return;
     }
   }
 
@@ -31,14 +34,12 @@ absl::Status normalizeHostWeights(const HostVector& hosts, double normalized_loc
     min_normalized_weight = std::min(min_normalized_weight, weight);
     max_normalized_weight = std::max(max_normalized_weight, weight);
   }
-  return absl::OkStatus();
 }
 
-absl::Status normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
-                                      const LocalityWeights& locality_weights,
-                                      NormalizedHostWeightVector& normalized_host_weights,
-                                      double& min_normalized_weight,
-                                      double& max_normalized_weight) {
+void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
+                              const LocalityWeights& locality_weights,
+                              NormalizedHostWeightVector& normalized_host_weights,
+                              double& min_normalized_weight, double& max_normalized_weight) {
   ASSERT(locality_weights.size() == hosts_per_locality.get().size());
 
   // sum should be at most uint32_t max value, so we can validate it by accumulating into unit64_t
@@ -47,15 +48,13 @@ absl::Status normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality
   for (const auto weight : locality_weights) {
     sum += weight;
     if (sum > std::numeric_limits<uint32_t>::max()) {
-      return absl::InvalidArgumentError(
-          fmt::format("The sum of weights of all localities at the same priority exceeds {}",
-                      std::numeric_limits<uint32_t>::max()));
+      IS_ENVOY_BUG("locality weights should have been validated in validateEndpoints");
     }
   }
 
   // Locality weights (unlike host weights) may be 0. If _all_ locality weights were 0, bail out.
   if (sum == 0) {
-    return absl::OkStatus();
+    return;
   }
 
   // Compute normalized weights for all hosts in each locality. If a locality was assigned zero
@@ -64,33 +63,58 @@ absl::Status normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality
     if (locality_weights[i] != 0) {
       const HostVector& hosts = hosts_per_locality.get()[i];
       const double normalized_locality_weight = static_cast<double>(locality_weights[i]) / sum;
-      RETURN_IF_NOT_OK(normalizeHostWeights(hosts, normalized_locality_weight,
-                                            normalized_host_weights, min_normalized_weight,
-                                            max_normalized_weight));
+      normalizeHostWeights(hosts, normalized_locality_weight, normalized_host_weights,
+                           min_normalized_weight, max_normalized_weight);
     }
   }
-  return absl::OkStatus();
 }
 
-absl::Status normalizeWeights(const HostSet& host_set, bool in_panic,
-                              NormalizedHostWeightVector& normalized_host_weights,
-                              double& min_normalized_weight, double& max_normalized_weight,
-                              bool locality_weighted_balancing) {
+void normalizeWeights(const HostSet& host_set, bool in_panic,
+                      NormalizedHostWeightVector& normalized_host_weights,
+                      double& min_normalized_weight, double& max_normalized_weight,
+                      bool locality_weighted_balancing) {
   if (!locality_weighted_balancing || host_set.localityWeights() == nullptr ||
       host_set.localityWeights()->empty()) {
     // If we're not dealing with locality weights, just normalize weights for the flat set of hosts.
     const auto& hosts = in_panic ? host_set.hosts() : host_set.healthyHosts();
-    RETURN_IF_NOT_OK(normalizeHostWeights(hosts, 1.0, normalized_host_weights,
-                                          min_normalized_weight, max_normalized_weight));
+    normalizeHostWeights(hosts, 1.0, normalized_host_weights, min_normalized_weight,
+                         max_normalized_weight);
   } else {
     // Otherwise, normalize weights across all localities.
     const auto& hosts_per_locality =
         in_panic ? host_set.hostsPerLocality() : host_set.healthyHostsPerLocality();
-    RETURN_IF_NOT_OK(normalizeLocalityWeights(hosts_per_locality, *(host_set.localityWeights()),
-                                              normalized_host_weights, min_normalized_weight,
-                                              max_normalized_weight));
+    normalizeLocalityWeights(hosts_per_locality, *(host_set.localityWeights()),
+                             normalized_host_weights, min_normalized_weight, max_normalized_weight);
   }
-  return absl::OkStatus();
+}
+
+std::string generateCookie(LoadBalancerContext* context, absl::string_view name,
+                           absl::string_view path, std::chrono::seconds ttl,
+                           absl::Span<const Http::CookieAttribute> attributes) {
+  ASSERT(context != nullptr);
+  const StreamInfo::StreamInfo* stream_info = context->requestStreamInfo();
+  if (stream_info == nullptr) {
+    return {};
+  }
+
+  const auto& conn = stream_info->downstreamAddressProvider();
+  const auto& remote_address = conn.remoteAddress();
+  const auto& local_address = conn.localAddress();
+  if (remote_address == nullptr || local_address == nullptr) {
+    return {};
+  }
+
+  const std::string value = remote_address->asString() + local_address->asString();
+  std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
+
+  std::string cookie_header_value =
+      Http::Utility::makeSetCookieValue(name, cookie_value, path, ttl, true, attributes);
+  context->setHeadersModifier(
+      [h = std::move(cookie_header_value)](Http::ResponseHeaderMap& headers) {
+        headers.addReferenceKey(Http::Headers::get().SetCookie, h);
+      });
+
+  return cookie_value;
 }
 
 } // namespace
@@ -103,12 +127,13 @@ absl::Status ThreadAwareLoadBalancerBase::initialize() {
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector&) -> absl::Status { return refresh(); });
+      [this](uint32_t, const HostVector&, const HostVector&) { refresh(); });
 
-  return refresh();
+  refresh();
+  return absl::OkStatus();
 }
 
-absl::Status ThreadAwareLoadBalancerBase::refresh() {
+void ThreadAwareLoadBalancerBase::refresh() {
   auto per_priority_state_vector = std::make_shared<std::vector<PerPriorityStatePtr>>(
       priority_set_.hostSetsPerPriority().size());
   auto healthy_per_priority_load =
@@ -128,10 +153,8 @@ absl::Status ThreadAwareLoadBalancerBase::refresh() {
     NormalizedHostWeightVector normalized_host_weights;
     double min_normalized_weight = 1.0;
     double max_normalized_weight = 0.0;
-    absl::Status status = normalizeWeights(*host_set, per_priority_state->global_panic_,
-                                           normalized_host_weights, min_normalized_weight,
-                                           max_normalized_weight, locality_weighted_balancing_);
-    RETURN_IF_NOT_OK(status);
+    normalizeWeights(*host_set, per_priority_state->global_panic_, normalized_host_weights,
+                     min_normalized_weight, max_normalized_weight, locality_weighted_balancing_);
     per_priority_state->current_lb_ = createLoadBalancer(
         std::move(normalized_host_weights), min_normalized_weight, max_normalized_weight);
   }
@@ -142,7 +165,6 @@ absl::Status ThreadAwareLoadBalancerBase::refresh() {
     factory_->degraded_per_priority_load_ = degraded_per_priority_load;
     factory_->per_priority_state_ = per_priority_state_vector;
   }
-  return absl::OkStatus();
 }
 
 HostSelectionResponse
@@ -159,8 +181,20 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   // computeHashKey() may be computed on demand, so get it only once.
   absl::optional<uint64_t> hash;
   if (context) {
-    hash = context->computeHashKey();
+    // If there is a hash policy, use the hash policy in the load balancer first.
+    if (hash_policy_ != nullptr) {
+      hash = hash_policy_->generateHash(
+          makeOptRefFromPtr(context->downstreamHeaders()),
+          makeOptRefFromPtr(context->requestStreamInfo()),
+          [context](absl::string_view name, absl::string_view path, std::chrono::seconds ttl,
+                    absl::Span<const Http::CookieAttribute> attributes) -> std::string {
+            return generateCookie(context, name, path, ttl, attributes);
+          });
+    } else {
+      hash = context->computeHashKey();
+    }
   }
+
   const uint64_t h = hash ? hash.value() : random_.random();
 
   const uint32_t priority =
@@ -186,7 +220,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
 }
 
 LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(LoadBalancerParams) {
-  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_);
+  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_, hash_policy_);
 
   // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
   // threads. All complex processing has already been precalculated however.
@@ -312,6 +346,46 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
   }
 
   return least_overloaded_host;
+}
+
+TypedHashLbConfigBase::TypedHashLbConfigBase(absl::Span<const HashPolicyProto* const> hash_policy,
+                                             Regex::Engine& regex_engine,
+                                             absl::Status& creation_status) {
+  if (hash_policy.empty()) {
+    return;
+  }
+  auto hash_policy_or = Http::HashPolicyImpl::create(hash_policy, regex_engine);
+  SET_AND_RETURN_IF_NOT_OK(hash_policy_or.status(), creation_status);
+  hash_policy_ = std::move(hash_policy_or).value();
+}
+
+absl::Status TypedHashLbConfigBase::validateEndpoints(const PriorityState& priorities) const {
+
+  for (const auto& [hosts, locality_weights_map] : priorities) {
+    // Sum should be at most uint32_t max value, so we can validate it by accumulating into uint64_t
+    // and making sure there was no overflow.
+    uint64_t host_sum = 0;
+    for (const auto& host : *hosts) {
+      host_sum += host->weight();
+      if (host_sum > std::numeric_limits<uint32_t>::max()) {
+        return absl::InvalidArgumentError(
+            fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
+                        std::numeric_limits<uint32_t>::max()));
+      }
+    }
+
+    uint64_t locality_sum = 0;
+    for (const auto& [_, weight] : locality_weights_map) {
+      locality_sum += weight;
+      if (locality_sum > std::numeric_limits<uint32_t>::max()) {
+        return absl::InvalidArgumentError(
+            fmt::format("The sum of weights of all localities at the same priority exceeds {}",
+                        std::numeric_limits<uint32_t>::max()));
+      }
+    }
+  }
+
+  return absl::OkStatus();
 }
 
 } // namespace Upstream

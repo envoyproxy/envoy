@@ -26,8 +26,10 @@ TEST(EnvironmentResourceDetectorFactoryTest, Basic) {
   )EOF";
   TestUtility::loadFromYaml(yaml, typed_config);
 
-  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-  EXPECT_NE(factory->createResourceDetector(typed_config.typed_config(), context), nullptr);
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+
+  EXPECT_NE(factory->createResourceDetector(typed_config.typed_config(), server_factory_context),
+            nullptr);
 }
 
 } // namespace OpenTelemetry

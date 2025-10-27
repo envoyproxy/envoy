@@ -1,7 +1,7 @@
 OpenTelemetry Resource Detectors
 ================================
 
-Resource detectors that can be configured with the OpenTelemetry Tracer:
+Resource detectors that can be configured with the OpenTelemetry Tracer and the OpenTelemetry StatSink:
 
 .. toctree::
   :glob:

@@ -17,6 +17,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/listener_manager/filter_chain_factory_context_callback.h"
 #include "source/common/network/cidr_range.h"
@@ -37,7 +38,8 @@ public:
    */
   virtual absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
-                   FilterChainFactoryContextCreator& context_creator) const PURE;
+                   FilterChainFactoryContextCreator& context_creator,
+                   bool added_via_api) const PURE;
 };
 
 // PerFilterChainFactoryContextImpl is supposed to be used by network filter chain.
@@ -84,15 +86,50 @@ using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFi
 using FilterChainsByMatcher = absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch,
                                                   std::string, MessageUtil, MessageUtil>;
 
+class FilterChainTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
+
+using FilterChainMetadataPack = Envoy::Config::MetadataPack<FilterChainTypedMetadataFactory>;
+using FilterChainMetadataPackPtr = Envoy::Config::MetadataPackPtr<FilterChainTypedMetadataFactory>;
+using DefaultFilterChainMetadataPack = ConstSingleton<FilterChainMetadataPack>;
+
+class FilterChainInfoImpl : public Network::FilterChainInfo {
+public:
+  FilterChainInfoImpl(const envoy::config::listener::v3::FilterChain& filter_chain)
+      : name_(filter_chain.name()) {
+    if (filter_chain.has_metadata()) {
+      metadata_ = std::make_unique<FilterChainMetadataPack>(filter_chain.metadata());
+    }
+  }
+
+  // Network::FilterChainInfo
+  absl::string_view name() const override { return name_; }
+
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return metadata_ != nullptr ? metadata_->proto_metadata_
+                                : DefaultFilterChainMetadataPack::get().proto_metadata_;
+  }
+
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return metadata_ != nullptr ? metadata_->typed_metadata_
+                                : DefaultFilterChainMetadataPack::get().typed_metadata_;
+  }
+
+private:
+  const std::string name_;
+  FilterChainMetadataPackPtr metadata_;
+};
+
 class FilterChainImpl : public Network::DrainableFilterChain {
 public:
   FilterChainImpl(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                   Filter::NetworkFilterFactoriesList&& filters_factory,
-                  std::chrono::milliseconds transport_socket_connect_timeout,
-                  absl::string_view name)
+                  std::chrono::milliseconds transport_socket_connect_timeout, bool added_via_api,
+                  const envoy::config::listener::v3::FilterChain& filter_chain)
       : transport_socket_factory_(std::move(transport_socket_factory)),
         filters_factory_(std::move(filters_factory)),
-        transport_socket_connect_timeout_(transport_socket_connect_timeout), name_(name) {}
+        transport_socket_connect_timeout_(transport_socket_connect_timeout),
+        added_via_api_(added_via_api),
+        filter_chain_info_(std::make_shared<FilterChainInfoImpl>(filter_chain)) {}
 
   // Network::FilterChain
   const Network::DownstreamTransportSocketFactory& transportSocketFactory() const override {
@@ -112,14 +149,21 @@ public:
     factory_context_ = std::move(filter_chain_factory_context);
   }
 
-  absl::string_view name() const override { return name_; }
+  absl::string_view name() const override { return filter_chain_info_->name(); }
+
+  bool addedViaApi() const override { return added_via_api_; }
+
+  const Network::FilterChainInfoSharedPtr& filterChainInfo() const override {
+    return filter_chain_info_;
+  }
 
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
   const Network::DownstreamTransportSocketFactoryPtr transport_socket_factory_;
   const Filter::NetworkFilterFactoriesList filters_factory_;
   const std::chrono::milliseconds transport_socket_connect_timeout_;
-  const std::string name_;
+  const bool added_via_api_;
+  const Network::FilterChainInfoSharedPtr filter_chain_info_;
 };
 
 /**
@@ -159,6 +203,10 @@ public:
       FilterChainFactoryContextCreator& context_creator);
 
   static bool isWildcardServerName(const std::string& name);
+
+  const std::vector<Network::DrainableFilterChainSharedPtr>& drainingFilterChains() const {
+    return draining_filter_chains_;
+  }
 
   // Return the current view of filter chains, keyed by filter chain message. Used by the owning
   // listener to calculate the intersection of filter chains with another listener.
@@ -345,6 +393,9 @@ private:
 
   // Index filter chains by name, used by the matcher actions.
   FilterChainsByName filter_chains_by_name_;
+
+  // Used to hint listener which filter chains it should drain.
+  mutable std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chains_;
 };
 
 namespace FilterChain {

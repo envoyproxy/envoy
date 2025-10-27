@@ -148,8 +148,7 @@ public:
                                      const std::shared_ptr<PluginBase>& plugin); // deprecated
 
   // AccessLog::Instance
-  void log(const Formatter::HttpFormatterContext& log_context,
-           const StreamInfo::StreamInfo& info) override;
+  void log(const Formatter::Context& log_context, const StreamInfo::StreamInfo& info) override;
 
   uint32_t getLogLevel() override;
 
@@ -422,8 +421,8 @@ protected:
   // Only available during onHttpCallResponse.
   Envoy::Http::ResponseMessagePtr* http_call_response_{};
 
-  Http::HeaderMapPtr grpc_receive_initial_metadata_{};
-  Http::HeaderMapPtr grpc_receive_trailing_metadata_{};
+  Http::HeaderMapPtr grpc_receive_initial_metadata_;
+  Http::HeaderMapPtr grpc_receive_trailing_metadata_;
 
   // Only available (non-nullptr) during onGrpcReceive.
   ::Envoy::Buffer::InstancePtr grpc_receive_buffer_;
@@ -443,7 +442,7 @@ protected:
   bool buffering_request_body_ = false;
   bool buffering_response_body_ = false;
   bool end_of_stream_ = false;
-  bool local_reply_sent_ = false;
+  bool failure_local_reply_sent_ = false;
 
   // MB: must be a node-type map as we take persistent references to the entries.
   std::map<uint32_t, AsyncClientHandler> http_request_;

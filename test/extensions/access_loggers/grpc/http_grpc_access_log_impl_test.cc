@@ -170,8 +170,8 @@ response: {{}}
 class TestSerializedFilterState : public StreamInfo::FilterState::Object {
 public:
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto any = std::make_unique<ProtobufWkt::Any>();
-    ProtobufWkt::Duration value;
+    auto any = std::make_unique<Protobuf::Any>();
+    Protobuf::Duration value;
     value.set_seconds(10);
     any->PackFrom(value);
     return any;
@@ -195,7 +195,7 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     ASSERT(timing.lastDownstreamTxByteSent().has_value());
     stream_info.downstream_connection_info_provider_->setLocalAddress(
         *Network::Address::PipeInstance::create("/foo"));
-    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
+    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = Protobuf::Struct();
     stream_info.filter_state_->setData("string_accessor",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
                                        StreamInfo::FilterState::StateType::ReadOnly,
@@ -765,7 +765,7 @@ response: {}
     ASSERT(timing.lastDownstreamTxByteSent().has_value());
     stream_info.downstream_connection_info_provider_->setLocalAddress(
         *Network::Address::PipeInstance::create("/foo"));
-    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
+    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = Protobuf::Struct();
     stream_info.filter_state_->setData("string_accessor",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
                                        StreamInfo::FilterState::StateType::ReadOnly,
@@ -1080,7 +1080,7 @@ metadata:
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, Protobuf::Struct>(
       "foo", MessageUtil::keyValueStruct("bar", "baz")));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
   stream_info.upstreamInfo()->setUpstreamHost(host);

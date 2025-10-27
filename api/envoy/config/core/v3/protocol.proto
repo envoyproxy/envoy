@@ -77,7 +77,7 @@ message QuicProtocolOptions {
       [(validate.rules).uint32 = {lte: 16777216 gte: 1}];
 
   // Similar to ``initial_stream_window_size``, but for connection-level
-  // flow-control. Valid values rage from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults
+  // flow-control. Valid values range from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults
   // to 25165824 (24 * 1024 * 1024).
   //
   // .. note::
@@ -111,10 +111,9 @@ message QuicProtocolOptions {
   // default 600s will be applied.
   // For internal corporate network, a long timeout is often fine.
   // But for client facing network, 30s is usually a good choice.
-  google.protobuf.Duration idle_network_timeout = 8 [(validate.rules).duration = {
-    lte {seconds: 600}
-    gte {seconds: 1}
-  }];
+  // Do not add an upper bound here. A long idle timeout is useful for maintaining warm connections at non-front-line proxy for low QPS services."
+  google.protobuf.Duration idle_network_timeout = 8
+      [(validate.rules).duration = {gte {seconds: 1}}];
 
   // Maximum packet length for QUIC connections. It refers to the largest size of a QUIC packet that can be transmitted over the connection.
   // If not specified, one of the `default values in QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/quic_constants.h>`_ is used.
@@ -276,7 +275,7 @@ message HttpProtocolOptions {
   // The default value for responses can be overridden by setting runtime key ``envoy.reloadable_features.max_response_headers_count``.
   // Downstream requests that exceed this limit will receive a 431 response for HTTP/1.x and cause a stream
   // reset for HTTP/2.
-  // Upstream responses that exceed this limit will result in a 503 response.
+  // Upstream responses that exceed this limit will result in a 502 response.
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
 
   // The maximum size of response headers.
@@ -420,7 +419,7 @@ message Http1ProtocolOptions {
   // envoy.reloadable_features.http1_use_balsa_parser.
   // See issue #21245.
   google.protobuf.BoolValue use_balsa_parser = 9
-      [(xds.annotations.v3.field_status).work_in_progress = true];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // [#not-implemented-hide:] Hiding so that field can be removed.
   // If true, and BalsaParser is used (either `use_balsa_parser` above is true,
@@ -503,7 +502,7 @@ message Http2ProtocolOptions {
 
   // `Maximum concurrent streams <https://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2>`_
   // allowed for peer on one HTTP/2 connection. Valid values range from 1 to 2147483647 (2^31 - 1)
-  // and defaults to 2147483647.
+  // and defaults to 1024 for safety and should be sufficient for most use cases.
   //
   // For upstream connections, this also limits how many streams Envoy will initiate concurrently
   // on a single connection. If the limit is reached, Envoy may queue requests or establish
@@ -517,8 +516,8 @@ message Http2ProtocolOptions {
 
   // `Initial stream-level flow-control window
   // <https://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2>`_ size. Valid values range from 65535
-  // (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to 268435456
-  // (256 * 1024 * 1024).
+  // (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to
+  // 16MiB (16 * 1024 * 1024).
   //
   // .. note::
   //
@@ -532,7 +531,7 @@ message Http2ProtocolOptions {
       [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
 
   // Similar to ``initial_stream_window_size``, but for connection-level flow-control
-  // window. Currently, this has the same minimum/maximum/default as ``initial_stream_window_size``.
+  // window. The default is 24MiB (24 * 1024 * 1024).
   google.protobuf.UInt32Value initial_connection_window_size = 4
       [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
 
@@ -674,7 +673,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -709,6 +708,10 @@ message Http3ProtocolOptions {
   // No huffman encoding, zero dynamic table capacity and no cookie crumbing.
   // This can be useful for trading off CPU vs bandwidth when an upstream HTTP/3 connection multiplexes multiple downstream connections.
   bool disable_qpack = 7;
+
+  // Disables connection level flow control for HTTP/3 streams. This is useful in situations where the streams share the same connection
+  // but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
+  bool disable_connection_flow_control_for_streams = 8;
 }
 
 // A message to control transformations to the :scheme header

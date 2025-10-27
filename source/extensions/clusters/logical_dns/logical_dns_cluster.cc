@@ -157,11 +157,11 @@ void LogicalDnsCluster::startResolve() {
           if (!logical_host_) {
             logical_host_ = THROW_OR_RETURN_VALUE(
                 LogicalHost::create(info_, hostname_, new_address, address_list,
-                                    localityLbEndpoint(), lbEndpoint(), nullptr, time_source_),
+                                    localityLbEndpoint(), lbEndpoint(), nullptr),
                 std::unique_ptr<LogicalHost>);
 
             const auto& locality_lb_endpoint = localityLbEndpoint();
-            PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
+            PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
             priority_state_manager.initializePriorityFor(locality_lb_endpoint);
             priority_state_manager.registerHostForPriority(logical_host_, locality_lb_endpoint);
 
@@ -180,6 +180,8 @@ void LogicalDnsCluster::startResolve() {
             // Make sure that we have an updated address for admin display, health
             // checking, and creating real host connections.
             logical_host_->setNewAddresses(new_address, address_list, lbEndpoint());
+          } else {
+            info_->configUpdateStats().update_no_rebuild_.inc();
           }
 
           // reset failure backoff strategy because there was a success.
@@ -212,27 +214,6 @@ void LogicalDnsCluster::startResolve() {
         resolve_timer_->enableTimer(final_refresh_rate);
       });
 }
-
-absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-LogicalDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                            ClusterFactoryContext& context) {
-  auto dns_resolver_or_error = selectDnsResolver(cluster, context);
-  THROW_IF_NOT_OK_REF(dns_resolver_or_error.status());
-
-  absl::StatusOr<std::unique_ptr<LogicalDnsCluster>> cluster_or_error;
-  envoy::extensions::clusters::dns::v3::DnsCluster proto_config_legacy{};
-  createDnsClusterFromLegacyFields(cluster, proto_config_legacy);
-  cluster_or_error = LogicalDnsCluster::create(cluster, proto_config_legacy, context,
-                                               std::move(*dns_resolver_or_error));
-
-  RETURN_IF_NOT_OK(cluster_or_error.status());
-  return std::make_pair(std::shared_ptr<LogicalDnsCluster>(std::move(*cluster_or_error)), nullptr);
-}
-
-/**
- * Static registration for the strict dns cluster factory. @see RegisterFactory.
- */
-REGISTER_FACTORY(LogicalDnsClusterFactory, ClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

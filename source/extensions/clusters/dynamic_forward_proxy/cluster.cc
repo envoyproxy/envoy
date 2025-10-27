@@ -75,8 +75,10 @@ Cluster::Cluster(
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       orig_cluster_config_(cluster),
       allow_coalesced_connections_(config.allow_coalesced_connections()),
-      cm_(context.clusterManager()), max_sub_clusters_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                                         config.sub_clusters_config(), max_sub_clusters, 1024)),
+      time_source_(context.serverFactoryContext().timeSource()),
+      cm_(context.serverFactoryContext().clusterManager()),
+      max_sub_clusters_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.sub_clusters_config(), max_sub_clusters, 1024)),
       sub_cluster_ttl_(
           PROTOBUF_GET_MS_OR_DEFAULT(config.sub_clusters_config(), sub_cluster_ttl, 300000)),
       sub_cluster_lb_policy_(config.sub_clusters_config().lb_policy()),
@@ -98,14 +100,12 @@ Cluster::~Cluster() {
   }
   // Should remove all sub clusters, otherwise, might be memory leaking.
   // This lock is useless, just make compiler happy.
-  absl::WriterMutexLock lock{&cluster_map_lock_};
+  absl::WriterMutexLock lock{cluster_map_lock_};
   for (auto it = cluster_map_.cbegin(); it != cluster_map_.cend();) {
     auto cluster_name = it->first;
     ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
     cluster_map_.erase(it++);
-    cm_.removeCluster(cluster_name,
-                      Runtime::runtimeFeatureEnabled(
-                          "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"));
+    cm_.removeCluster(cluster_name, true);
   }
 }
 
@@ -126,7 +126,7 @@ void Cluster::startPreInit() {
 }
 
 bool Cluster::touch(const std::string& cluster_name) {
-  absl::ReaderMutexLock lock{&cluster_map_lock_};
+  absl::ReaderMutexLock lock{cluster_map_lock_};
   const auto cluster_it = cluster_map_.find(cluster_name);
   if (cluster_it != cluster_map_.end()) {
     cluster_it->second->touch();
@@ -140,15 +140,13 @@ void Cluster::checkIdleSubCluster() {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
   {
     // TODO: try read lock first.
-    absl::WriterMutexLock lock{&cluster_map_lock_};
+    absl::WriterMutexLock lock{cluster_map_lock_};
     for (auto it = cluster_map_.cbegin(); it != cluster_map_.cend();) {
       if (it->second->checkIdle()) {
         auto cluster_name = it->first;
         ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
         cluster_map_.erase(it++);
-        cm_.removeCluster(cluster_name,
-                          Runtime::runtimeFeatureEnabled(
-                              "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"));
+        cm_.removeCluster(cluster_name, true);
       } else {
         ++it;
       }
@@ -161,7 +159,7 @@ std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
 Cluster::createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                                 const int port) {
   {
-    absl::WriterMutexLock lock{&cluster_map_lock_};
+    absl::WriterMutexLock lock{cluster_map_lock_};
     const auto cluster_it = cluster_map_.find(cluster_name);
     if (cluster_it != cluster_map_.end()) {
       cluster_it->second->touch();
@@ -261,7 +259,7 @@ absl::Status Cluster::addOrUpdateHost(
     std::unique_ptr<Upstream::HostVector>& hosts_added) {
   Upstream::LogicalHostSharedPtr emplaced_host;
   {
-    absl::WriterMutexLock lock{&host_map_lock_};
+    absl::WriterMutexLock lock{host_map_lock_};
 
     // NOTE: Right now we allow a DNS cache to be shared between multiple clusters. Though we have
     // connection/request circuit breakers on the cluster, we don't have any way to control the
@@ -297,7 +295,7 @@ absl::Status Cluster::addOrUpdateHost(
     ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
     auto host_or_error = Upstream::LogicalHost::create(
         info(), std::string{host}, host_info->address(), host_info->addressList(/*filtered=*/true),
-        dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr, time_source_);
+        dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr);
     RETURN_IF_NOT_OK_REF(host_or_error.status());
 
     emplaced_host =
@@ -331,10 +329,10 @@ absl::Status Cluster::onDnsHostAddOrUpdate(
 
 void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
                                   const Upstream::HostVector& hosts_removed) {
-  Upstream::PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
+  Upstream::PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
   priority_state_manager.initializePriorityFor(dummy_locality_lb_endpoint_);
   {
-    absl::ReaderMutexLock lock{&host_map_lock_};
+    absl::ReaderMutexLock lock{host_map_lock_};
     for (const auto& host : host_map_) {
       priority_state_manager.registerHostForPriority(host.second.logical_host_,
                                                      dummy_locality_lb_endpoint_);
@@ -348,7 +346,7 @@ void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
 void Cluster::onDnsHostRemove(const std::string& host) {
   Upstream::HostVector hosts_removed;
   {
-    absl::WriterMutexLock lock{&host_map_lock_};
+    absl::WriterMutexLock lock{host_map_lock_};
     const auto host_map_it = host_map_.find(host);
     ASSERT(host_map_it != host_map_.end());
     hosts_removed.emplace_back(host_map_it->second.logical_host_);
@@ -364,22 +362,6 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
-  const Router::StringAccessor* dynamic_host_filter_state = nullptr;
-  if (context->requestStreamInfo()) {
-    dynamic_host_filter_state =
-        context->requestStreamInfo()->filterState()->getDataReadOnly<Router::StringAccessor>(
-            DynamicHostFilterStateKey);
-  }
-
-  absl::string_view raw_host;
-  if (dynamic_host_filter_state) {
-    raw_host = dynamic_host_filter_state->asString();
-  } else if (context->downstreamHeaders()) {
-    raw_host = context->downstreamHeaders()->getHostValue();
-  } else if (context->downstreamConnection()) {
-    raw_host = context->downstreamConnection()->requestedServerName();
-  }
-
   // For host lookup, we need to make sure to match the host of any DNS cache
   // insert. Two code points currently do DNS cache insert: the http DFP filter,
   // which inserts for HTTP traffic, and sets port based on the cluster's
@@ -389,11 +371,47 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
                              ->transportSocketMatcher()
                              .resolve(nullptr, nullptr)
                              .factory_.implementsSecureTransport();
-  uint32_t port = is_secure ? 443 : 80;
-  if (context->requestStreamInfo()) {
+  const uint32_t default_port = is_secure ? 443 : 80;
+
+  const auto* stream_info = context->requestStreamInfo();
+  const Router::StringAccessor* dynamic_host_filter_state = nullptr;
+  if (stream_info) {
+    dynamic_host_filter_state = stream_info->filterState().getDataReadOnly<Router::StringAccessor>(
+        DynamicHostFilterStateKey);
+  }
+
+  absl::string_view raw_host;
+  uint32_t port = default_port;
+
+  if (dynamic_host_filter_state) {
+    // Use dynamic host from filter state if available.
+    raw_host = dynamic_host_filter_state->asString();
+
+    // Try to get port from filter state first.
     const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
-        context->requestStreamInfo()->filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
+        stream_info->filterState().getDataReadOnly<StreamInfo::UInt32Accessor>(
             DynamicPortFilterStateKey);
+
+    if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
+        dynamic_port_filter_state->value() <= 65535) {
+      // Use dynamic port from filter state if available.
+      port = dynamic_port_filter_state->value();
+    }
+    // If no dynamic port is in filter state, we just use the default_port.
+  } else if (context->downstreamHeaders()) {
+    raw_host = context->downstreamHeaders()->getHostValue();
+    // When no filter state is used, we let ``normalizeHostForDfp()`` handle the port parsing.
+  } else if (context->downstreamConnection()) {
+    raw_host = context->downstreamConnection()->requestedServerName();
+  }
+
+  // We always check for dynamic port from filter state, even if the host is not from filter state.
+  // This is to maintain the backward compatibility with the existing SNI filter behavior.
+  if (stream_info && !dynamic_host_filter_state) {
+    const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
+        stream_info->filterState().getDataReadOnly<StreamInfo::UInt32Accessor>(
+            DynamicPortFilterStateKey);
+
     if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
         dynamic_port_filter_state->value() <= 65535) {
       port = dynamic_port_filter_state->value();
@@ -404,6 +422,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     ENVOY_LOG(debug, "host empty");
     return {nullptr, "empty_host_header"};
   }
+
   std::string hostname =
       Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 
@@ -420,7 +439,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {host};
   }
 
-  // If the host is not found, the DFP cluster cluster can now do asynchronous lookup.
+  // If the host is not found, the DFP cluster can now do asynchronous lookup.
   Upstream::ResourceAutoIncDecPtr handle = cluster_.dns_cache_->canCreateDnsRequest();
 
   // Return an immediate failure if there's too many requests already.
@@ -459,7 +478,7 @@ Upstream::HostConstSharedPtr Cluster::LoadBalancer::findHostByName(const std::st
 
 Upstream::HostConstSharedPtr Cluster::findHostByName(const std::string& host) const {
   {
-    absl::ReaderMutexLock lock{&host_map_lock_};
+    absl::ReaderMutexLock lock{host_map_lock_};
     const auto host_it = host_map_.find(host);
     if (host_it == host_map_.end()) {
       ENVOY_LOG(debug, "host {} not found", host);

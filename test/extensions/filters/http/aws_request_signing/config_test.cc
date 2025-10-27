@@ -1,7 +1,6 @@
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
 
-#include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 #include "source/extensions/filters/http/aws_request_signing/config.h"
 
 #include "test/mocks/server/factory_context.h"

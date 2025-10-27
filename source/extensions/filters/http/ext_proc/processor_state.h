@@ -210,7 +210,7 @@ public:
 
   virtual void continueProcessing() const PURE;
   void continueIfNecessary();
-  void clearAsyncState();
+  void clearAsyncState(Grpc::Status::GrpcStatus call_status = Grpc::Status::Aborted);
 
   virtual envoy::service::ext_proc::v3::HttpHeaders*
   mutableHeaders(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
@@ -225,7 +225,7 @@ public:
 
   void setSentAttributes(bool sent) { attributes_sent_ = sent; }
 
-  virtual ProtobufWkt::Struct
+  virtual Protobuf::Struct
   evaluateAttributes(const ExpressionManager& mgr,
                      const Filters::Common::Expr::Activation& activation) const PURE;
 
@@ -313,43 +313,36 @@ private:
    * Routes to appropriate handler based on body state and processing mode
    * (none, buffered, streamed, partial, or full-duplex).
    *
-   * @param response HeadersResponse with continue action
    * @return Status of the operation
    */
-  absl::Status handleHeaderContinue(const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status handleHeaderContinue();
 
   /**
    * Handle the body when the complete body is already available.
    * Sends buffered body to processor based on callback state,
    * manages streamed data, and continues filter chain when appropriate.
    *
-   * @param response HeadersResponse from processor
    * @return Status of the operation
    */
-  absl::Status
-  handleCompleteBodyAvailable(const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status handleCompleteBodyAvailable();
 
   /**
    * Handle partial body buffering with watermark control when geting a header response.
    * Enqueues buffered data, sends chunks when high watermark is reached,
    * and holds headers during buffering phase.
    *
-   * @param response HeadersResponse from processor
    * @return Status of the operation
    */
-  absl::Status
-  handleBufferedPartialMode(const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status handleBufferedPartialMode();
 
   /**
    * Finalizes processing by handling trailers and cleanup.
    * Either sends available trailers to processor or cleans up resources
    * by clearing headers, notifying filter, and continuing the chain.
    *
-   * @param response HeadersResponse from processor
    * @return Status of the operation
    */
-  absl::Status
-  handleTrailersAndCleanup(const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status handleTrailersAndCleanup();
 
   /**
    * Validates if the current callback state is valid for processing body responses.
@@ -502,7 +495,7 @@ public:
   }
 
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return nullptr; }
-  ProtobufWkt::Struct
+  Protobuf::Struct
   evaluateAttributes(const ExpressionManager& mgr,
                      const Filters::Common::Expr::Activation& activation) const override {
     return mgr.evaluateRequestAttributes(activation);
@@ -594,7 +587,7 @@ public:
 
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return headers_; }
 
-  ProtobufWkt::Struct
+  Protobuf::Struct
   evaluateAttributes(const ExpressionManager& mgr,
                      const Filters::Common::Expr::Activation& activation) const override {
     return mgr.evaluateResponseAttributes(activation);

@@ -58,7 +58,7 @@ public:
   }
 
   std::string childLoadBalancerName() const { return lb_config_.childLoadBalancerName(); }
-  using SubsetMetadata = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
+  using SubsetMetadata = std::vector<std::pair<std::string, Protobuf::Value>>;
   static std::string describeMetadata(const SubsetMetadata& kvs);
 
 private:
@@ -86,7 +86,7 @@ private:
           scale_locality_weight_(scale_locality_weight) {}
 
     void update(const HostHashSet& matching_hosts, const HostVector& hosts_added,
-                const HostVector& hosts_removed, uint64_t seed);
+                const HostVector& hosts_removed);
     LocalityWeightsConstSharedPtr
     determineLocalityWeights(const HostsPerLocality& hosts_per_locality) const;
 
@@ -103,22 +103,21 @@ private:
                        bool scale_locality_weight);
 
     void update(uint32_t priority, const HostHashSet& matching_hosts, const HostVector& hosts_added,
-                const HostVector& hosts_removed, uint64_t seed);
+                const HostVector& hosts_removed);
 
     bool empty() const { return empty_; }
 
     void triggerCallbacks() {
       for (size_t i = 0; i < hostSetsPerPriority().size(); ++i) {
-        THROW_IF_NOT_OK(runReferenceUpdateCallbacks(i, {}, {}));
+        runReferenceUpdateCallbacks(i, {}, {});
       }
     }
 
     void updateSubset(uint32_t priority, const HostHashSet& matching_hosts,
-                      const HostVector& hosts_added, const HostVector& hosts_removed,
-                      uint64_t seed) {
+                      const HostVector& hosts_added, const HostVector& hosts_removed) {
       reinterpret_cast<HostSubsetImpl*>(host_sets_[priority].get())
-          ->update(matching_hosts, hosts_added, hosts_removed, seed);
-      THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
+          ->update(matching_hosts, hosts_added, hosts_removed);
+      runUpdateCallbacks(hosts_added, hosts_removed);
     }
 
     // Thread aware LB if applicable.
@@ -149,7 +148,7 @@ private:
   using ValueSubsetMap = absl::node_hash_map<HashedValue, LbSubsetEntryPtr>;
   using LbSubsetMap = absl::node_hash_map<std::string, ValueSubsetMap>;
   using SubsetSelectorFallbackParamsRef = std::reference_wrapper<SubsetSelectorFallbackParams>;
-  using MetadataFallbacks = ProtobufWkt::RepeatedPtrField<ProtobufWkt::Value>;
+  using MetadataFallbacks = Protobuf::RepeatedPtrField<Protobuf::Value>;
 
 public:
   class LoadBalancerContextWrapper : public LoadBalancerContext {
@@ -162,7 +161,7 @@ public:
         : wrapped_(wrapped), metadata_match_(std::move(metadata_match_criteria)) {}
 
     LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
-                               const ProtobufWkt::Struct& metadata_match_criteria_override);
+                               const Protobuf::Struct& metadata_match_criteria_override);
     // LoadBalancerContext
     absl::optional<uint64_t> computeHashKey() override { return wrapped_->computeHashKey(); }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
@@ -226,7 +225,7 @@ private:
     virtual ~LbSubset() = default;
     virtual HostSelectionResponse chooseHost(LoadBalancerContext* context) const PURE;
     virtual void pushHost(uint32_t priority, HostSharedPtr host) PURE;
-    virtual void finalize(uint32_t priority, uint64_t seed) PURE;
+    virtual void finalize(uint32_t priority) PURE;
     virtual bool active() const PURE;
   };
   using LbSubsetPtr = std::unique_ptr<LbSubset>;
@@ -249,7 +248,7 @@ private:
     }
     // Called after pushHost. Update subset by the hosts that pushed in the pushHost. If no any host
     // is pushed then subset_ will be set to empty.
-    void finalize(uint32_t priority, uint64_t seed) override;
+    void finalize(uint32_t priority) override;
 
     bool active() const override { return !subset_.empty(); }
 
@@ -266,7 +265,7 @@ private:
     }
     // Called after pushHost. Update subset by the host that pushed in the pushHost. If no any host
     // is pushed then subset_ will be set to nullptr.
-    void finalize(uint32_t priority, uint64_t) override {
+    void finalize(uint32_t priority) override {
       if (auto iter = new_hosts_.find(priority); iter == new_hosts_.end()) {
         // No any host for current subset and priority. Try remove record in the hosts_.
         hosts_.erase(priority);
@@ -341,7 +340,7 @@ private:
                                                     const Host& host);
   HostConstSharedPtr chooseHostWithMetadataFallbacks(LoadBalancerContext* context,
                                                      const MetadataFallbacks& metadata_fallbacks);
-  const ProtobufWkt::Value* getMetadataFallbackList(LoadBalancerContext* context) const;
+  const Protobuf::Value* getMetadataFallbackList(LoadBalancerContext* context) const;
   LoadBalancerContextWrapper removeMetadataFallbackList(LoadBalancerContext* context);
 
   const SubsetLoadBalancerConfig& lb_config_;

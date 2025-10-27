@@ -39,13 +39,22 @@ public:
   // Http::ConnectionCallbacks
   void onMaxStreamsChanged(uint32_t num_streams) override;
 
-  RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
+  void updateQuicheCapacity() {
     ASSERT(quiche_capacity_ != 0);
     has_created_stream_ = true;
     // Each time a quic stream is allocated the quic capacity needs to get
     // decremented. See comments by quiche_capacity_.
     updateCapacity(quiche_capacity_ - 1);
+  }
+
+  RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
+    updateQuicheCapacity();
     return MultiplexedActiveClientBase::newStreamEncoder(response_decoder);
+  }
+
+  RequestEncoder& newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) override {
+    updateQuicheCapacity();
+    return MultiplexedActiveClientBase::newStreamEncoder(std::move(response_decoder_handle));
   }
 
   uint32_t effectiveConcurrentStreamLimit() const override {
@@ -157,6 +166,18 @@ public:
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks,
                                          const Instance::StreamOptions& options) override;
+
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
+    if (drain_behavior ==
+            Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections &&
+        quic_info_.migration_config_.migrate_session_on_network_change) {
+      // If connection migration is enabled, don't drain existing connections.
+      // Each connection will observe network change signals and decide whether
+      // to migrate or drain.
+      return;
+    }
+    FixedHttpConnPoolImpl::drainConnections(drain_behavior);
+  }
 
   // For HTTP/3 the base connection pool does not track stream capacity, rather
   // the HTTP3 active client does.

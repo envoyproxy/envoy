@@ -90,7 +90,7 @@ paths:
     - source/common/filter/config_discovery_impl.h
     - source/common/config/utility.h
     - source/common/matcher/matcher.h
-    - source/extensions/common/matcher/trie_matcher.h
+    - source/extensions/common/matcher/ip_range_matcher.h
     - envoy/common/exception.h
     - source/common/protobuf/utility.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
@@ -117,6 +117,7 @@ paths:
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
+    - source/common/router/weighted_cluster_specifier.cc
     - source/common/router/scoped_config_impl.cc
     - source/common/common/utility.cc
     - source/exe/stripped_main_base.cc
@@ -314,6 +315,7 @@ paths:
     - source/common/protobuf/utility.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc
     - source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.cc
+    - source/extensions/http/cache_v2/file_system_http_cache/cache_file_header_proto_util.cc
     - test/common/grpc/codec_fuzz_test.cc
     - test/common/grpc/codec_test.cc
     - test/common/protobuf/utility_test.cc
@@ -322,13 +324,14 @@ paths:
     - test/extensions/filters/common/expr/context_test.cc
     - test/extensions/filters/http/common/fuzz/uber_filter.h
     - test/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util_test.cc
+    - test/extensions/http/cache_v2/file_system_http_cache/cache_file_header_proto_util_test.cc
     - test/tools/router_check/router_check.cc
+    - source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.cc
+    - test/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper_test.cc
 
   # Files in these paths can use std::regex
   std_regex:
     include:
-    - contrib/squash/filters/http/source/squash_filter.h
-    - contrib/squash/filters/http/source/squash_filter.cc
     - source/common/common/regex.h
     - source/common/common/regex.cc
     - source/common/common/utility.cc
@@ -378,7 +381,6 @@ re:
   codeowners_contrib: (/contrib/[^@]*\s+)(@.*)
   codeowners_extensions: .*(extensions[^@]*\s+)(@.*)
   comment: //|\*
-  designated_initializer: \{\s*\.\w+\s*\=
   # Check for punctuation in a terminal ref clause, e.g.
   # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
   dot_multi_space: \. +
@@ -415,17 +417,6 @@ replacements:
     "absl::make_unique<": "std::make_unique<"
 
   protobuf_type_errors:
-    # Well-known types should be referenced from the ProtobufWkt namespace.
-    "Protobuf::Any": "ProtobufWkt::Any"
-    "Protobuf::Empty": "ProtobufWkt::Empty"
-    "Protobuf::ListValue": "ProtobufWkt::ListValue"
-    "Protobuf::NULL_VALUE": "ProtobufWkt::NULL_VALUE"
-    "Protobuf::StringValue": "ProtobufWkt::StringValue"
-    "Protobuf::Struct": "ProtobufWkt::Struct"
-    "Protobuf::Value": "ProtobufWkt::Value"
-    # Other common mis-namespacing of protobuf types.
-    "ProtobufWkt::Map": "Protobuf::Map"
-    "ProtobufWkt::MapPair": "Protobuf::MapPair"
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 
 include_angle: "#include <"

@@ -273,6 +273,7 @@ public:
   MOCK_METHOD(void, destroy_, ());
   MOCK_METHOD(Network::FilterStatus, onAccept, (ListenerFilterCallbacks&));
   MOCK_METHOD(Network::FilterStatus, onData, (Network::ListenerFilterBuffer&));
+  MOCK_METHOD(void, onClose, ());
 
   size_t listener_filter_max_read_bytes_{0};
 };
@@ -334,6 +335,11 @@ public:
   MOCK_METHOD(const NetworkFilterFactoriesList&, networkFilterFactories, (), (const));
   MOCK_METHOD(void, startDraining, ());
   MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(bool, addedViaApi, (), (const));
+  MOCK_METHOD(const FilterChainInfoSharedPtr&, filterChainInfo, (), (const));
+
+  envoy::config::core::v3::Metadata metadata_{};
+  FilterChainInfoSharedPtr filter_chain_info_;
 };
 
 class MockFilterChainInfo : public FilterChainInfo {
@@ -342,8 +348,11 @@ public:
 
   // Network::FilterChainInfo
   MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
 
   std::string filter_chain_name_{"mock"};
+  envoy::config::core::v3::Metadata metadata_{};
 };
 
 class MockFilterChainManager : public FilterChainManager {
@@ -434,8 +443,8 @@ public:
   MOCK_METHOD(ConnectionSocket&, socket, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, continueFilterChain, (bool));
-  MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
-  MOCK_METHOD(void, setDynamicTypedMetadata, (const std::string&, const ProtobufWkt::Any& value));
+  MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const Protobuf::Struct&));
+  MOCK_METHOD(void, setDynamicTypedMetadata, (const std::string&, const Protobuf::Any& value));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(StreamInfo::FilterState&, filterState, (), ());
@@ -463,7 +472,9 @@ public:
   MockUdpPacketWriterFactory() = default;
 
   MOCK_METHOD(Network::UdpPacketWriterPtr, createUdpPacketWriter,
-              (Network::IoHandle&, Stats::Scope&), ());
+              (Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
+               absl::AnyInvocable<void() &&>),
+              ());
 };
 
 class MockUdpListenerConfig : public UdpListenerConfig {
@@ -586,6 +597,10 @@ public:
   MOCK_METHOD(const std::string&, addressAsString, (), (const));
   MOCK_METHOD(bool, isAnyAddress, (), (const));
   MOCK_METHOD(bool, isUnicastAddress, (), (const));
+  MOCK_METHOD(bool, isLinkLocalAddress, (), (const));
+  MOCK_METHOD(bool, isUniqueLocalAddress, (), (const));
+  MOCK_METHOD(bool, isSiteLocalAddress, (), (const));
+  MOCK_METHOD(bool, isTeredoAddress, (), (const));
   MOCK_METHOD(const Address::Ipv4*, ipv4, (), (const));
   MOCK_METHOD(const Address::Ipv6*, ipv6, (), (const));
   MOCK_METHOD(uint32_t, port, (), (const));

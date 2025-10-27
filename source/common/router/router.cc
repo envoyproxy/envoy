@@ -16,11 +16,10 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
-#include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
-#include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/grpc/common.h"
@@ -29,25 +28,21 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
-#include "source/common/network/application_protocol.h"
-#include "source/common/network/socket_option_factory.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/network/upstream_subject_alt_names.h"
 #include "source/common/orca/orca_load_metrics.h"
 #include "source/common/orca/orca_parser.h"
-#include "source/common/router/config_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
-#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Router {
 namespace {
-constexpr char NumInternalRedirectsFilterStateName[] = "num_internal_redirects";
+constexpr absl::string_view NumInternalRedirectsFilterStateName = "num_internal_redirects";
 
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
@@ -83,9 +78,8 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            const envoy::extensions::filters::http::router::v3::Router& config,
                            absl::Status& creation_status)
     : FilterConfig(
-          context.serverFactoryContext(), stat_prefix, context.serverFactoryContext().localInfo(),
-          context.scope(), context.serverFactoryContext().clusterManager(),
-          context.serverFactoryContext().runtime(),
+          context.serverFactoryContext(), stat_prefix, context.scope(),
+          context.serverFactoryContext().clusterManager(), context.serverFactoryContext().runtime(),
           context.serverFactoryContext().api().randomGenerator(), std::move(shadow_writer),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
           config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
@@ -216,8 +210,8 @@ TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
       timeout.global_timeout_ = route.timeout();
     }
   }
-  timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
-  timeout.per_try_idle_timeout_ = route.retryPolicy().perTryIdleTimeout();
+  timeout.per_try_timeout_ = route.retryPolicy()->perTryTimeout();
+  timeout.per_try_idle_timeout_ = route.retryPolicy()->perTryIdleTimeout();
 
   uint64_t header_timeout;
 
@@ -399,7 +393,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
         config_->empty_stat_name_,
         response_status_code,
         internal_request,
-        route_->virtualHost().statName(),
+        route_->virtualHost()->statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,
@@ -456,8 +450,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       modify_headers_from_upstream_lb_(headers);
     }
 
-    route_entry_->finalizeResponseHeaders(headers, callbacks_->streamInfo());
-
     if (attempt_count_ == 0 || !route_entry_->includeAttemptCountInResponse()) {
       return;
     }
@@ -493,11 +485,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     direct_response->rewritePathHeader(headers, !config_->suppress_envoy_headers_);
     callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
-        [this, direct_response,
-         &request_headers = headers](Http::ResponseHeaderMap& response_headers) -> void {
+        [this, direct_response](Http::ResponseHeaderMap& response_headers) -> void {
           std::string new_uri;
-          if (request_headers.Path()) {
-            new_uri = direct_response->newUri(request_headers);
+          ASSERT(downstream_headers_ != nullptr);
+          if (downstream_headers_->Path()) {
+            new_uri = direct_response->newUri(*downstream_headers_);
           }
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
@@ -506,7 +498,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           if (!new_uri.empty() && add_location) {
             response_headers.addReferenceKey(Http::Headers::get().Location, new_uri);
           }
-          direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
+          const Formatter::Context formatter_context(downstream_headers_, &response_headers, {}, {},
+                                                     {}, &callbacks_->activeSpan());
+          direct_response->finalizeResponseHeaders(response_headers, formatter_context,
+                                                   callbacks_->streamInfo());
         },
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
     return Http::FilterHeadersStatus::StopIteration;
@@ -514,10 +509,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
-  // If there's a route specific limit and it's smaller than general downstream
-  // limits, apply the new cap.
-  retry_shadow_buffer_limit_ =
-      std::min(retry_shadow_buffer_limit_, route_entry_->retryShadowBufferLimit());
+  // Store buffer limits from the route entry.
+  // The requestBodyBufferLimit() method handles both legacy per_request_buffer_limit_bytes
+  // and new request_body_buffer_limit configurations automatically.
+  request_body_buffer_limit_ = route_entry_->requestBodyBufferLimit();
   Upstream::ThreadLocalCluster* cluster =
       config_->cm_.getThreadLocalCluster(route_entry_->clusterName());
   if (!cluster) {
@@ -533,7 +528,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   cluster_ = cluster->info();
 
   // Set up stat prefixes, etc.
-  request_vcluster_ = route_->virtualHost().virtualCluster(headers);
+  request_vcluster_ = route_->virtualHost()->virtualCluster(headers);
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
@@ -591,12 +586,23 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // If large request buffering is enabled and its size is more than current buffer limit, update
+  // the buffer limit to a new larger value.
+  uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
+  if (effective_buffer_limit != std::numeric_limits<uint64_t>::max() &&
+      effective_buffer_limit > callbacks_->decoderBufferLimit()) {
+    ENVOY_STREAM_LOG(debug, "Setting new filter manager buffer limit: {}", *callbacks_,
+                     effective_buffer_limit);
+    callbacks_->setDecoderBufferLimit(effective_buffer_limit);
+  }
+
   // Increment the attempt count from 0 to 1 at the first upstream request.
   attempt_count_++;
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
   // Finalize the request headers before the host selection.
-  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
+  const Formatter::Context formatter_context(&headers, {}, {}, {}, {}, &callbacks_->activeSpan());
+  route_entry_->finalizeRequestHeaders(headers, formatter_context, callbacks_->streamInfo(),
                                        !config_->suppress_envoy_headers_);
 
   // Fetch a connection pool for the upstream cluster.
@@ -783,7 +789,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   ASSERT(headers.Scheme());
 
   retry_state_ = createRetryState(
-      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_context_,
+      *route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_context_,
       config_->factory_context_, callbacks_->dispatcher(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
@@ -804,7 +810,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   const bool can_send_early_data =
       route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
 
-  include_timeout_retry_header_in_request_ = route_->virtualHost().includeIsTimeoutRetryHeader();
+  include_timeout_retry_header_in_request_ = route_->virtualHost()->includeIsTimeoutRetryHeader();
 
   // Set initial HTTP/3 use based on the presence of HTTP/1.1 proxy config.
   // For retries etc, HTTP/3 usability may transition from true to false, but
@@ -816,47 +822,54 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
       allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
-  if (streaming_shadows_) {
-    // start the shadow streams.
-    for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
-      const auto& shadow_policy = shadow_policy_wrapper.get();
-      const absl::optional<absl::string_view> shadow_cluster_name =
-          getShadowCluster(shadow_policy, *downstream_headers_);
-      if (!shadow_cluster_name.has_value()) {
-        continue;
-      }
-      auto shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_);
-      const auto options =
-          Http::AsyncClient::RequestOptions()
-              .setTimeout(timeout_.global_timeout_)
-              .setParentSpan(callbacks_->activeSpan())
-              .setChildSpanName("mirror")
-              .setSampled(shadow_policy.traceSampled())
-              .setIsShadow(true)
-              .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
-              .setBufferAccount(callbacks_->account())
-              // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
-              // because a buffer limit of zero on async clients is interpreted as no buffer limit.
-              .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_)
-              .setDiscardResponseBody(true)
-              .setFilterConfig(config_)
-              .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
-      if (end_stream) {
-        // This is a header-only request, and can be dispatched immediately to the shadow
-        // without waiting.
-        Http::RequestMessagePtr request(new Http::RequestMessageImpl(
-            Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_)));
-        config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
-                                       options);
-      } else {
-        Http::AsyncClient::OngoingRequest* shadow_stream = config_->shadowWriter().streamingShadow(
-            std::string(shadow_cluster_name.value()), std::move(shadow_headers), options);
-        if (shadow_stream != nullptr) {
-          shadow_streams_.insert(shadow_stream);
-          shadow_stream->setDestructorCallback(
-              [this, shadow_stream]() { shadow_streams_.erase(shadow_stream); });
-          shadow_stream->setWatermarkCallbacks(watermark_callbacks_);
-        }
+  // Start the shadow streams.
+  for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
+    const auto& shadow_policy = shadow_policy_wrapper.get();
+    const absl::optional<absl::string_view> shadow_cluster_name =
+        getShadowCluster(shadow_policy, *downstream_headers_);
+    if (!shadow_cluster_name.has_value()) {
+      continue;
+    }
+    auto shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_);
+    applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
+    const auto options =
+        Http::AsyncClient::RequestOptions()
+            .setTimeout(timeout_.global_timeout_)
+            .setParentSpan(callbacks_->activeSpan())
+            .setChildSpanName("mirror")
+            .setSampled(shadow_policy.traceSampled())
+            .setIsShadow(true)
+            .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
+            .setBufferAccount(callbacks_->account())
+            // Calculate effective buffer limit for shadow streams using the same logic as main
+            // request. A buffer limit of 1 is set in the case that the effective limit == 0,
+            // because a buffer limit of zero on async clients is interpreted as no buffer limit.
+            .setBufferLimit([this]() -> uint32_t {
+              uint64_t effective_limit = calculateEffectiveBufferLimit();
+              // Convert to uint32_t for AsyncClient, clamping to max uint32_t if needed
+              uint32_t shadow_limit = static_cast<uint32_t>(std::min(
+                  effective_limit, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max())));
+              return shadow_limit == 0 ? 1 : shadow_limit;
+            }())
+            .setDiscardResponseBody(true)
+            .setFilterConfig(config_)
+            .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
+    if (end_stream) {
+      // This is a header-only request, and can be dispatched immediately to the shadow
+      // without waiting.
+      Http::RequestMessagePtr request(new Http::RequestMessageImpl(
+          Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_)));
+      applyShadowPolicyHeaders(shadow_policy, request->headers());
+      config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
+                                     options);
+    } else {
+      Http::AsyncClient::OngoingRequest* shadow_stream = config_->shadowWriter().streamingShadow(
+          std::string(shadow_cluster_name.value()), std::move(shadow_headers), options);
+      if (shadow_stream != nullptr) {
+        shadow_streams_.insert(shadow_stream);
+        shadow_stream->setDestructorCallback(
+            [this, shadow_stream]() { shadow_streams_.erase(shadow_stream); });
+        shadow_stream->setWatermarkCallbacks(watermark_callbacks_);
       }
     }
   }
@@ -923,40 +936,96 @@ void Filter::sendNoHealthyUpstreamResponse(absl::optional<std::string> optional_
                              absl::nullopt, details);
 }
 
+uint64_t Filter::calculateEffectiveBufferLimit() const {
+  // Use requestBodyBufferLimit() method which handles both legacy and new
+  // configurations. If no buffer limit is configured, fall back to connection limit.
+  uint64_t buffer_limit = request_body_buffer_limit_;
+
+  if (buffer_limit != std::numeric_limits<uint64_t>::max()) {
+    return buffer_limit;
+  }
+
+  // If no route-level buffer limit is set, use the connection buffer limit.
+  uint32_t current_connection_limit = callbacks_->decoderBufferLimit();
+  if (current_connection_limit != 0) {
+    return static_cast<uint64_t>(current_connection_limit);
+  }
+
+  // If no limits are set at all, return unlimited.
+  return std::numeric_limits<uint64_t>::max();
+}
+
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
   // try timeout timer is not started until onRequestComplete(). It could be zero
   // if the first request attempt has already failed and a retry is waiting for
-  // a backoff timer.
+  // a backoff timer..
   ASSERT(upstream_requests_.size() <= 1);
 
-  bool buffering = (retry_state_ && retry_state_->enabled()) ||
-                   (!active_shadow_policies_.empty() && !streaming_shadows_) ||
-                   (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
-  if (buffering &&
-      getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
+  bool retry_enabled = retry_state_ && retry_state_->enabled();
+  bool redirect_enabled = route_entry_ && route_entry_->internalRedirectPolicy().enabled();
+  bool buffering = retry_enabled || redirect_enabled;
+  uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
+
+  // Check if we would exceed buffer limits, regardless of current buffering state
+  // This ensures error details are set even if retry state was cleared due to upstream reset.
+  bool would_exceed_buffer =
+      (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
+
+  // Handle retry/shadow buffer overflow, excluding redirect-only scenarios.
+  // For redirect scenarios, buffer overflow should only affect redirect processing, not initial
+  // request.
+  bool had_retry_or_shadow = retry_enabled;
+  bool is_redirect_only = redirect_enabled && !retry_enabled;
+
+  if (would_exceed_buffer && had_retry_or_shadow && !is_redirect_only &&
+      !request_buffer_overflowed_) {
     ENVOY_LOG(debug,
-              "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
-              "up on the retry/shadow.",
-              getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
+              "The request payload has at least {} bytes data which exceeds buffer limit {}. "
+              "Giving up on buffering.",
+              getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit);
+
     cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
+    ENVOY_LOG(debug, "retry or shadow overflow: retry_state_ reset, buffering set to false");
     buffering = false;
     active_shadow_policies_.clear();
-    request_buffer_overflowed_ = true;
 
-    // If we had to abandon buffering and there's no request in progress, abort the request and
-    // clean up. This happens if the initial upstream request failed, and we are currently waiting
-    // for a backoff timer before starting the next upstream attempt.
+    // Only send local reply and cleanup if we're in a retry waiting state (no active upstream
+    // requests). If there are active upstream requests, let the normal upstream failure handling
+    // take precedence.
     if (upstream_requests_.empty()) {
+      request_buffer_overflowed_ = true;
+      ENVOY_LOG(debug,
+                "retry or shadow overflow: No upstream requests, resetting and calling cleanup()");
+      resetAll();
       cleanup();
+      callbacks_->streamInfo().setResponseCodeDetails(
+          StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
       callbacks_->sendLocalReply(
           Http::Code::InsufficientStorage, "exceeded request buffer limit while retrying upstream",
           modify_headers_, absl::nullopt,
           StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
       return Http::FilterDataStatus::StopIterationNoBuffer;
+    } else {
+      ENVOY_LOG(debug, "retry or shadow overflow: Upstream requests exist, deferring to normal "
+                       "upstream failure handling");
     }
+  }
+
+  // Handle redirect-only buffer overflow when retry/shadow is not active.
+  // For redirect scenarios, buffer overflow should only affect redirect processing, not initial
+  // request.
+  if (would_exceed_buffer && is_redirect_only && !request_buffer_overflowed_) {
+    ENVOY_LOG(debug,
+              "The request payload has at least {} bytes data which exceeds buffer limit {}. "
+              "Marking request as buffer overflowed to cancel internal redirects.",
+              getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit);
+
+    // Set the flag to cancel internal redirect processing, but allow the request to proceed
+    // normally.
+    request_buffer_overflowed_ = true;
   }
 
   for (auto* shadow_stream : shadow_streams_) {
@@ -1049,11 +1118,8 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   // it, it can latch the current buffer limit and does not need to update the
   // limit if another filter increases it.
   //
-  // The default is "do not limit". If there are configured (non-zero) buffer
-  // limits, apply them here.
-  if (callbacks_->decoderBufferLimit() != 0) {
-    retry_shadow_buffer_limit_ = callbacks_->decoderBufferLimit();
-  }
+  // Store the connection buffer limit for use in the new buffer limit logic.
+  connection_buffer_limit_ = callbacks_->decoderBufferLimit();
 
   watermark_callbacks_.setDecoderFilterCallbacks(callbacks_);
 }
@@ -1063,6 +1129,7 @@ void Filter::cleanup() {
   // list as appropriate.
   ASSERT(upstream_requests_.empty());
 
+  ENVOY_LOG(debug, "Executing cleanup(): resetting retry_state_ and disabling timers");
   retry_state_.reset();
   if (response_timeout_) {
     response_timeout_->disableTimer();
@@ -1086,38 +1153,33 @@ absl::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& p
   }
 }
 
-void Filter::maybeDoShadowing() {
-  for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
-    const auto& shadow_policy = shadow_policy_wrapper.get();
+void Filter::applyShadowPolicyHeaders(const ShadowPolicy& shadow_policy,
+                                      Http::RequestHeaderMap& headers) const {
+  const Envoy::Formatter::Context formatter_context{&headers};
+  shadow_policy.headerEvaluator().evaluateHeaders(headers, formatter_context,
+                                                  callbacks_->streamInfo());
 
-    const absl::optional<absl::string_view> shadow_cluster_name =
-        getShadowCluster(shadow_policy, *downstream_headers_);
+  if (!shadow_policy.hostRewriteLiteral().empty()) {
+    headers.setHost(shadow_policy.hostRewriteLiteral());
+  }
+}
 
-    // The cluster name got from headers is empty.
-    if (!shadow_cluster_name.has_value()) {
-      continue;
-    }
+void Filter::setupRouteTimeoutForWebsocketUpgrade() {
+  // Set up the route timeout early for websocket upgrades, since the upstream request
+  // will be paused waiting for the upgrade response and we need the timeout active.
+  if (!response_timeout_ && timeout_.global_timeout_.count() > 0) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
+    response_timeout_->enableTimer(timeout_.global_timeout_);
+  }
+}
 
-    Http::RequestMessagePtr request(new Http::RequestMessageImpl(
-        Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_)));
-    if (callbacks_->decodingBuffer()) {
-      request->body().add(*callbacks_->decodingBuffer());
-    }
-    if (shadow_trailers_) {
-      request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
-    }
-    const auto options =
-        Http::AsyncClient::RequestOptions()
-            .setTimeout(timeout_.global_timeout_)
-            .setParentSpan(callbacks_->activeSpan())
-            .setChildSpanName("mirror")
-            .setSampled(shadow_policy.traceSampled())
-            .setIsShadow(true)
-            .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
-            .setFilterConfig(config_)
-            .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
-    config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
-                                   options);
+void Filter::disableRouteTimeoutForWebsocketUpgrade() {
+  // Disable the route timeout after websocket upgrade completes successfully
+  // to prevent timeout from firing after the upgrade is done.
+  if (response_timeout_) {
+    response_timeout_->disableTimer();
+    response_timeout_.reset();
   }
 }
 
@@ -1132,11 +1194,7 @@ void Filter::onRequestComplete() {
   if (!upstream_requests_.empty()) {
     // Even if we got an immediate reset, we could still shadow, but that is a riskier change and
     // seems unnecessary right now.
-    if (!streaming_shadows_) {
-      maybeDoShadowing();
-    }
-
-    if (timeout_.global_timeout_.count() > 0) {
+    if (timeout_.global_timeout_.count() > 0 && !response_timeout_) {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);
     }
@@ -1367,6 +1425,14 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::CoreResponseFlag respo
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   callbacks_->streamInfo().setResponseFlag(response_flags);
+
+  // Check if buffer overflow occurred and override error details accordingly
+  if (request_buffer_overflowed_) {
+    code = Http::Code::InsufficientStorage;
+    body = "exceeded request buffer limit while retrying upstream";
+    details = StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit;
+  }
+
   // This will destroy any created retry timers.
   cleanup();
   // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
@@ -1626,20 +1692,43 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   // handle the case when an error grpc-status is sent as a trailer.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status;
   uint64_t grpc_to_http_status = 0;
+  uint64_t response_code_for_outlier_detection = response_code;
   if (grpc_request_) {
     grpc_status = Grpc::Common::getGrpcStatus(*headers);
     if (grpc_status.has_value()) {
       grpc_to_http_status = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
+      response_code_for_outlier_detection = grpc_to_http_status;
+    }
+  } else {
+    // Check cluster's http_protocol_options if different code should be reported to
+    // outlier detector.
+    absl::optional<bool> matched = cluster_->processHttpForOutlierDetection(*headers);
+    if (matched.has_value()) {
+      // Outlier detector distinguishes only two values:
+      // Anything >= 500 is error.
+      // Anything < 500 is success.
+      if (!matched.value()) {
+        // Matcher returned non-match.
+        // report success to outlier detector.
+        response_code_for_outlier_detection = 200;
+      } else {
+        // Matcher returned match (treat the response as error).
+        // If the original status code was error (>= 500), then report the
+        // original status code to the outlier detector.
+        if (response_code < 500) {
+          response_code_for_outlier_detection = 500;
+        }
+      }
     }
   }
 
-  maybeProcessOrcaLoadReport(*headers, upstream_request);
-
-  const uint64_t put_result_code = grpc_status.has_value() ? grpc_to_http_status : response_code;
   upstream_request.upstreamHost()->outlierDetector().putResult(
-      put_result_code >= 500 ? Upstream::Outlier::Result::ExtOriginRequestFailed
-                             : Upstream::Outlier::Result::ExtOriginRequestSuccess,
-      put_result_code);
+      response_code_for_outlier_detection >= 500
+          ? Upstream::Outlier::Result::ExtOriginRequestFailed
+          : Upstream::Outlier::Result::ExtOriginRequestSuccess,
+      response_code_for_outlier_detection);
+
+  maybeProcessOrcaLoadReport(*headers, upstream_request);
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstreamHost()->healthChecker().setUnhealthy(
@@ -1759,6 +1848,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
+  const Formatter::Context formatter_context(downstream_headers_, headers.get(), {}, {}, {},
+                                             &callbacks_->activeSpan());
+  route_entry_->finalizeResponseHeaders(*headers, formatter_context, callbacks_->streamInfo());
   modify_headers_(*headers);
 
   if (end_stream) {
@@ -1845,7 +1937,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
         response_time,
         upstream_request.upstreamCanary(),
         internal_request,
-        route_->virtualHost().statName(),
+        route_->virtualHost()->statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,
@@ -2060,7 +2152,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(
 }
 
 void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
-  for (const auto& options_predicate : route_entry_->retryPolicy().retryOptionsPredicates()) {
+  for (const auto& options_predicate : route_entry_->retryPolicy()->retryOptionsPredicates()) {
     const Upstream::RetryOptionsPredicate::UpdateOptionsParameters parameters{
         retriable_request.streamInfo(), upstreamSocketOptions()};
     auto ret = options_predicate->updateOptions(parameters);
@@ -2283,7 +2375,8 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   if (host_lb_policy_data.has_value()) {
     ENVOY_LOG(trace, "orca_load_report for {} report = {}", upstream_host->address()->asString(),
               (*orca_load_report).DebugString());
-    const absl::Status status = host_lb_policy_data->onOrcaLoadReport(*orca_load_report);
+    const absl::Status status =
+        host_lb_policy_data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
     if (!status.ok()) {
       ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
                        status.message());
@@ -2302,9 +2395,9 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& 
                              context, dispatcher, priority);
   if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
-    // only reason for doing retry, set the retry shadow buffer limit to 0 so that we don't retry or
+    // only reason for doing retry, set the buffer limit to 0 so that we don't retry or
     // buffer safe requests with body which is not common.
-    setRetryShadowBufferLimit(0);
+    setRequestBodyBufferLimit(0);
   }
   return retry_state;
 }

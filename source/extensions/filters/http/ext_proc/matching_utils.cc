@@ -25,12 +25,15 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
                            parse_status.status().ToString());
     }
 
-    Filters::Common::Expr::ExpressionPtr expression =
-        Extensions::Filters::Common::Expr::createExpression(builder_->builder(),
-                                                            parse_status.value().expr());
-
-    expressions.emplace(
-        matcher, ExpressionManager::CelExpression{parse_status.value(), std::move(expression)});
+    const auto& parsed_expr = parse_status.value();
+    const cel::expr::Expr& cel_expr = parsed_expr.expr();
+    auto compiled_expression =
+        Extensions::Filters::Common::Expr::CompiledExpression::Create(builder_, cel_expr);
+    if (!compiled_expression.ok()) {
+      throw EnvoyException(
+          absl::StrCat("failed to create an expression: ", compiled_expression.status().message()));
+    }
+    expressions.emplace(matcher, std::move(compiled_expression.value()));
   }
 #else
   ENVOY_LOG(warn, "CEL expression parsing is not available for use in this environment."
@@ -40,19 +43,19 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
   return expressions;
 }
 
-ProtobufWkt::Struct
+Protobuf::Struct
 ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& activation,
                                       const absl::flat_hash_map<std::string, CelExpression>& expr) {
 
-  ProtobufWkt::Struct proto;
+  Protobuf::Struct proto;
 
   if (expr.empty()) {
     return proto;
   }
 
   for (const auto& hash_entry : expr) {
-    ProtobufWkt::Arena arena;
-    const auto result = hash_entry.second.compiled_expr_->Evaluate(activation, &arena);
+    Protobuf::Arena arena;
+    const auto result = hash_entry.second.evaluate(activation, &arena);
     if (!result.ok()) {
       // TODO: Stats?
       continue;
@@ -82,7 +85,7 @@ ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& a
     // Handling all value types here would be graceful but is not currently
     // testable and drives down coverage %. This is not a _great_ reason to
     // not do it; will get feedback from reviewers.
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     switch (result.value().type()) {
     case google::api::expr::runtime::CelValue::Type::kBool:
       value.set_bool_value(result.value().BoolOrDie());

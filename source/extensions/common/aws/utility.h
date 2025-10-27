@@ -64,12 +64,12 @@ public:
   static std::string canonicalizeQueryString(absl::string_view query_string);
 
   /**
-   * URI encodes the given string based on AWS requirements.
-   * See step 3 in https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
-   * @param decoded the decoded string.
-   * @return the URI encoded string.
+   * URI encodes query component while preserving %2B semantics.
+   * %2B remains as literal +, raw + becomes %20 (space).
+   * @param original the original string (may contain percent-encoded sequences).
+   * @return the properly encoded string.
    */
-  static std::string encodeQueryComponent(absl::string_view decoded);
+  static std::string encodeQueryComponentPreservingPlus(absl::string_view original);
 
   /**
    * Get the semicolon-delimited string of canonical header names.
@@ -78,6 +78,17 @@ public:
    */
   static std::string
   joinCanonicalHeaderNames(const std::map<std::string, std::string>& canonical_headers);
+
+  /**
+   * Get the IAM Roles Anywhere Service endpoint for a given region:
+   * rolesanywhere.<region>.amazonaws.com See:
+   * https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication-sign-process.html#authentication-task1
+   * @param trust_anchor_arn The configured roles anywhere trust anchor arn for the region to be
+   * extracted from
+   * @return an sts endpoint url.
+   */
+
+  static std::string getRolesAnywhereEndpoint(const std::string& trust_anchor_arn);
 
   /**
    * Get the Security Token Service endpoint for a given region: sts.<region>.amazonaws.com
@@ -203,6 +214,14 @@ public:
    * @return boolean
    */
   static bool shouldNormalizeUriPath(const std::string service_name);
+
+private:
+  /**
+   * Helper method to encode a character based on reserved character rules.
+   * @param c the character to encode.
+   * @param result the string to append the encoded result to.
+   */
+  static void encodeCharacter(unsigned char c, std::string& result);
 };
 
 } // namespace Aws

@@ -91,7 +91,7 @@ public:
   void addHosts(std::vector<std::string> urls, bool primary = true) {
     HostVector& hosts = primary ? hosts_ : failover_hosts_;
     for (auto& url : urls) {
-      hosts.emplace_back(makeTestHost(cluster_.info_, url, simTime()));
+      hosts.emplace_back(makeTestHost(cluster_.info_, url));
     }
   }
 

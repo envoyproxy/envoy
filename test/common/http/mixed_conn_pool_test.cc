@@ -34,7 +34,7 @@ public:
                       HttpServerPropertiesCacheSharedPtr cache,
                       Server::OverloadManager& overload_manager)
       : HttpConnPoolImplMixed(dispatcher, random,
-                              Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
+                              Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                               Upstream::ResourcePriority::Default, nullptr, nullptr, state, origin,
                               cache, overload_manager) {}
 };
@@ -70,8 +70,9 @@ public:
 
   void testAlpnHandshake(absl::optional<Protocol> protocol);
   TestScopedRuntime scoped_runtime;
-  // The default capacity for HTTP/2 streams.
-  uint32_t expected_capacity_{536870912};
+  // The default capacity for HTTP/2 streams. This is determined by both the HTTP2 options
+  // (DEFAULT_MAX_CONCURRENT_STREAMS) and DEFAULT_MAX_STREAMS of connection pool.
+  uint32_t expected_capacity_{1024};
 };
 
 TEST_F(MixedConnPoolImplTest, AlpnTest) {

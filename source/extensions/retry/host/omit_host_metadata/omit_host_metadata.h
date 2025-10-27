@@ -29,7 +29,7 @@ public:
 
 private:
   const envoy::config::core::v3::Metadata metadata_match_criteria_;
-  std::vector<std::pair<std::string, ProtobufWkt::Value>> label_set_;
+  std::vector<std::pair<std::string, Protobuf::Value>> label_set_;
 };
 
 } // namespace Host

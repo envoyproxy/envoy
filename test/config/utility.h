@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -225,8 +226,6 @@ public:
   static std::string smallBufferFilter();
   // A string for a health check filter which can be used with prependFilter()
   static std::string defaultHealthCheckFilter();
-  // A string for a squash filter which can be used with prependFilter()
-  static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
   // A cluster that uses the startTls transport socket.
@@ -417,6 +416,14 @@ public:
   // Set limits on pending upstream outbound frames.
   void setUpstreamOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
 
+  // Set limits on HTTP/2 concurrent streams.
+  void setDownstreamHttp2MaxConcurrentStreams(uint32_t max_streams);
+  void setUpstreamHttp2MaxConcurrentStreams(uint32_t max_streams);
+
+  // Set limits on HTTP/2 window sizes.
+  void setDownstreamHttp2WindowSize(uint32_t stream_window, uint32_t connection_window);
+  void setUpstreamHttp2WindowSize(uint32_t stream_window, uint32_t connection_window);
+
   // Return the bootstrap configuration for hand-off to Envoy.
   const envoy::config::bootstrap::v3::Bootstrap& bootstrap() { return bootstrap_; }
 
@@ -439,7 +446,7 @@ public:
   void addRuntimeOverride(absl::string_view key, absl::string_view value);
 
   // Add typed_filter_metadata to the first listener.
-  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
+  void addListenerTypedMetadata(absl::string_view key, Protobuf::Any& packed_value);
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,

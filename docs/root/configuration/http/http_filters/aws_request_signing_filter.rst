@@ -7,10 +7,6 @@ AWS Request Signing
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning>`
 
-.. attention::
-
-  The AWS request signing filter is experimental and is currently under active development.
-
 The HTTP AWS request signing filter is used to access authenticated AWS services. It uses the
 existing AWS Credential Provider to get the secrets used for generating the required
 headers.
@@ -98,6 +94,24 @@ credentials provider. These settings include a ``watched_directory``, which conf
     :lineno-start: 46
     :linenos:
     :caption: :download:`aws-request-signing-filter-credential-provider-config.yaml <_include/aws-request-signing-filter-credential-provider-config.yaml>`
+
+An example of configuring this filter to use IAM Roles Anywhere to retrieve credentials:
+
+.. literalinclude:: _include/aws-request-signing-filter-iam-roles-anywhere.yaml
+    :language: yaml
+    :lines: 25-44
+    :lineno-start: 25
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-iam-roles-anywhere.yaml <_include/aws-request-signing-filter-iam-roles-anywhere.yaml>`
+
+An example of configuring this filter to use STS AssumeRole to retrieve credentials:
+
+.. literalinclude:: _include/aws-request-signing-filter-assumeroleprovider.yaml
+    :language: yaml
+    :lines: 45-60
+    :lineno-start: 45
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-assumeroleprovider.yaml <_include/aws-request-signing-filter-assumeroleprovider.yaml>`
 
 Configuration as an upstream HTTP filter
 ----------------------------------------

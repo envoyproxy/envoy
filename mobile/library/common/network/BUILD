@@ -5,6 +5,17 @@ licenses(["notice"])  # Apache 2
 envoy_mobile_package()
 
 envoy_cc_library(
+    name = "envoy_mobile_quic_network_observer_registry_factory_lib",
+    srcs = ["envoy_mobile_quic_network_observer_registry_factory.cc"],
+    hdrs = ["envoy_mobile_quic_network_observer_registry_factory.h"],
+    repository = "@envoy",
+    deps = [
+        ":network_types_lib",
+        "@envoy//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "connectivity_manager_lib",
     srcs = [
         "connectivity_manager.cc",
@@ -14,10 +25,13 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
+        ":envoy_mobile_quic_network_observer_registry_factory_lib",
         ":network_type_socket_option_lib",
+        ":network_types_lib",
         ":proxy_settings_lib",
         "//library/common:engine_types_lib",
         "//library/common/network:src_addr_socket_option_lib",
+        "//library/common/system:system_helper_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/network:socket_interface",
         "@envoy//envoy/singleton:manager_interface",
@@ -113,6 +127,14 @@ envoy_cc_library(
     deps = [
         "@envoy//source/common/network:utility_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "network_types_lib",
+    hdrs = [
+        "network_types.h",
+    ],
+    repository = "@envoy",
 )
 
 envoy_cc_library(

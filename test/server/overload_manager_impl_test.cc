@@ -231,11 +231,11 @@ protected:
                                                  options_, creation_status);
   }
 
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory2_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Duration> factory3_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::StringValue> factory4_;
-  FakeProactiveResourceMonitorFactory<Envoy::ProtobufWkt::BoolValue> factory5_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Struct> factory1_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Timestamp> factory2_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Duration> factory3_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::StringValue> factory4_;
+  FakeProactiveResourceMonitorFactory<Envoy::Protobuf::BoolValue> factory5_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory3_;
@@ -607,6 +607,35 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
             saturation_threshold: 1.0
   )YAML";
 
+constexpr char kReducedTimeoutsConfigWithFlush[] = R"YAML(
+  refresh_interval:
+    seconds: 1
+  resource_monitors:
+    - name: envoy.resource_monitors.fake_resource1
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  actions:
+    - name: envoy.overload_actions.reduce_timeouts
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+            min_timeout: 2s
+          - timer: HTTP_DOWNSTREAM_STREAM_IDLE
+            min_scale: { value: 10 } # percent
+          - timer: TRANSPORT_SOCKET_CONNECT
+            min_scale: { value: 40 } # percent
+          - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+            min_scale: { value: 20 } # percent
+          - timer: HTTP_DOWNSTREAM_STREAM_FLUSH
+            min_scale: { value: 30 } # percent
+      triggers:
+        - name: "envoy.resource_monitors.fake_resource1"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 1.0
+  )YAML";
+
 // These are the timer types according to the reduced timeouts config above.
 constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimums[]{
     {TimerType::HttpDownstreamIdleConnectionTimeout,
@@ -615,6 +644,16 @@ constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimu
     {TimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(UnitFloat(0.4))},
     {TimerType::HttpDownstreamMaxConnectionTimeout, Event::ScaledMinimum(UnitFloat(0.2))},
 };
+
+constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimumsWithFlush[]{
+    {TimerType::HttpDownstreamIdleConnectionTimeout,
+     Event::AbsoluteMinimum(std::chrono::seconds(2))},
+    {TimerType::HttpDownstreamIdleStreamTimeout, Event::ScaledMinimum(UnitFloat(0.1))},
+    {TimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(UnitFloat(0.4))},
+    {TimerType::HttpDownstreamMaxConnectionTimeout, Event::ScaledMinimum(UnitFloat(0.2))},
+    {TimerType::HttpDownstreamStreamFlush, Event::ScaledMinimum(UnitFloat(0.3))},
+};
+
 TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
   auto manager(createOverloadManager(kReducedTimeoutsConfig));
 
@@ -631,6 +670,25 @@ TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
 
   EXPECT_EQ(scaled_timer_manager.get(), mock_scaled_timer_manager);
   EXPECT_THAT(timer_minimums, Pointee(UnorderedElementsAreArray(kReducedTimeoutsMinimums)));
+}
+
+TEST_F(OverloadManagerImplTest, CreateScaledTimerManagerWithFlush) {
+  auto manager(createOverloadManager(kReducedTimeoutsConfigWithFlush));
+
+  auto* mock_scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+
+  Event::ScaledTimerTypeMapConstSharedPtr timer_minimums;
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(
+          DoAll(SaveArg<1>(&timer_minimums),
+                Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_scaled_timer_manager}))));
+
+  Event::MockDispatcher mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  EXPECT_EQ(scaled_timer_manager.get(), mock_scaled_timer_manager);
+  EXPECT_THAT(timer_minimums,
+              Pointee(UnorderedElementsAreArray(kReducedTimeoutsMinimumsWithFlush)));
 }
 
 TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {

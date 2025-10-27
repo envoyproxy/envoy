@@ -207,6 +207,16 @@ on_no_match:
         .WillByDefault(ReturnPointee(stream_info_.downstream_connection_info_provider_));
   }
 
+  void setLocalAddressWithNetworkNamespace(const std::string& network_namespace_path,
+                                           uint16_t port = 123) {
+    address_ = std::make_shared<Network::Address::Ipv4Instance>(
+        "127.0.0.1", port, nullptr, absl::make_optional(std::string(network_namespace_path)));
+
+    stream_info_.downstream_connection_info_provider_->setLocalAddress(address_);
+    ON_CALL(callbacks_.connection_.stream_info_, downstreamAddressProvider())
+        .WillByDefault(ReturnPointee(stream_info_.downstream_connection_info_provider_));
+  }
+
   void checkAccessLogMetadata(bool expected) {
     auto filter_meta = stream_info_.dynamicMetadata().filter_metadata().at(
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
@@ -218,18 +228,18 @@ on_no_match:
 
   void setMetadata() {
     ON_CALL(stream_info_, setDynamicMetadata(NetworkFilterNames::get().Rbac, _))
-        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(NetworkFilterNames::get().Rbac,
-                                                                  obj));
+              Protobuf::MapPair<std::string, Protobuf::Struct>(NetworkFilterNames::get().Rbac,
+                                                               obj));
         }));
 
     ON_CALL(stream_info_,
             setDynamicMetadata(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, _))
-        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+              Protobuf::MapPair<std::string, Protobuf::Struct>(
                   Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, obj));
         }));
   }
@@ -492,6 +502,106 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherDenied) {
       filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
   EXPECT_EQ("allowed",
             filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherNetworkNamespaceAllowed) {
+  envoy::extensions::filters::network::rbac::v3::RBAC config;
+  config.set_stat_prefix("tcp.");
+  config.set_shadow_rules_stat_prefix("shadow_rules_prefix_");
+
+  const std::string matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      single_predicate:
+        input:
+          name: envoy.matching.inputs.network_namespace
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.NetworkNamespaceInput
+        value_match:
+          exact: "/var/run/netns/ns1"
+    on_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow_ns
+          action: ALLOW
+on_no_match:
+  action:
+    name: action
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+      name: deny_all
+      action: DENY
+)EOF";
+
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(matcher_yaml, matcher);
+  *config.mutable_matcher() = matcher;
+
+  config_ = std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, *store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
+  initFilter();
+
+  setLocalAddressWithNetworkNamespace("/var/run/netns/ns1", 123);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherNetworkNamespaceDenied) {
+  envoy::extensions::filters::network::rbac::v3::RBAC config;
+  config.set_stat_prefix("tcp.");
+  config.set_shadow_rules_stat_prefix("shadow_rules_prefix_");
+
+  const std::string matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      single_predicate:
+        input:
+          name: envoy.matching.inputs.network_namespace
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.NetworkNamespaceInput
+        value_match:
+          exact: "/var/run/netns/ns1"
+    on_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow_ns
+          action: ALLOW
+on_no_match:
+  action:
+    name: action
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+      name: deny_all
+      action: DENY
+)EOF";
+
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(matcher_yaml, matcher);
+  *config.mutable_matcher() = matcher;
+
+  config_ = std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, *store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
+  initFilter();
+
+  setLocalAddressWithNetworkNamespace("/var/run/netns/other", 123);
+
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _)).Times(2);
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
 }
 
 // Log Tests

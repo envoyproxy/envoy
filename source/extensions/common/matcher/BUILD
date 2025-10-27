@@ -22,9 +22,9 @@ envoy_cc_library(
 )
 
 envoy_cc_extension(
-    name = "trie_matcher_lib",
-    srcs = ["trie_matcher.cc"],
-    hdrs = ["trie_matcher.h"],
+    name = "ip_range_matcher_lib",
+    srcs = ["ip_range_matcher.cc"],
+    hdrs = ["ip_range_matcher.h"],
     extra_visibility = [
         "//source/common/listener_manager:__subpackages__",
         "//test:__subpackages__",
@@ -37,6 +37,24 @@ envoy_cc_extension(
         "//source/common/matcher:matcher_lib",
         "//source/common/network:lc_trie_lib",
         "//source/common/network:utility_lib",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_extension(
+    name = "domain_matcher_lib",
+    srcs = ["domain_matcher.cc"],
+    hdrs = ["domain_matcher.h"],
+    extra_visibility = [
+        "//source/common/listener_manager:__subpackages__",
+        "//test:__subpackages__",
+    ],
+    deps = [
+        "//envoy/matcher:matcher_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:factory_context_interface",
+        "//source/common/matcher:matcher_lib",
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )

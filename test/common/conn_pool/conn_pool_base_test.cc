@@ -131,8 +131,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
-  Upstream::HostSharedPtr host_{
-      Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", dispatcher_.timeSource())};
+  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
   TestConnPoolImplBase pool_;
   AttachContext context_;
   std::vector<TestActiveClient*> clients_;
@@ -241,8 +240,7 @@ public:
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> descr_{
       new NiceMock<Upstream::MockHostDescription>()};
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostSharedPtr host_{
-      Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", dispatcher_->timeSource())};
+  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
   TestConnPoolImplBase pool_;
   AttachContext context_;
   std::vector<TestActiveClient*> clients_;

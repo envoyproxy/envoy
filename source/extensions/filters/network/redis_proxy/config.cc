@@ -6,6 +6,7 @@
 
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
+#include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
@@ -74,13 +75,38 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
+
+    // Create the AWS IAM authenticator if required
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator;
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config;
+    auto cluster_optref = server_context.clusterManager().clusters().getCluster(cluster);
+    if (cluster_optref.has_value()) {
+      // Does our cluster have an AwsIam element available? If so, create a new authenticator for
+      // this connection pool.
+      aws_iam_config = ProtocolOptionsConfigImpl::awsIamConfig(cluster_optref.value().get().info());
+      if (aws_iam_config.has_value()) {
+        if (!ProtocolOptionsConfigImpl::authUsername(cluster_optref.value().get().info(),
+                                                     context.serverFactoryContext().api())
+                 .empty()) {
+          aws_iam_authenticator = Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::
+              initAwsIamAuthenticator(server_context, aws_iam_config.value());
+        } else {
+          ENVOY_LOG_MISC(warn,
+                         "No auth_username found for cluster {}, AWS IAM Authentication will be "
+                         "disabled for this cluster",
+                         cluster);
+        }
+      }
+    }
+
     Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
         cluster, server_context.clusterManager(),
         Common::Redis::Client::ClientFactoryImpl::instance_, server_context.threadLocal(),
         proto_config.settings(), server_context.api(), std::move(stats_scope), redis_command_stats,
-        refresh_manager, filter_config->dns_cache_);
+        refresh_manager, filter_config->dns_cache_, aws_iam_config, aws_iam_authenticator);
     conn_pool_ptr->init();
     upstreams.emplace(cluster, conn_pool_ptr);
   }

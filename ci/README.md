@@ -69,27 +69,31 @@ to build an Envoy static binary and run tests.
 
 The build image defaults to `envoyproxy/envoy-build-ubuntu` on Linux and
 `envoyproxy/envoy-build-windows2019` on Windows, but you can choose build image by setting
-`IMAGE_NAME` in the environment.
+`ENVOY_BUILD_IMAGE` in the environment.
 
 In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the proxy servers before
 invoking the build.
 
 ```bash
-IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build-ubuntu:<tag> http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the default GOPROXY in China.
 
 ```bash
-IMAGE_NAME=envoyproxy/envoy-build-ubuntu go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build-ubuntu:<tag> go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
-To force the Envoy build image to be refreshed by Docker you can set `ENVOY_DOCKER_PULL=true`.
+## Resource Requirements and Troubleshooting
 
-```bash
-ENVOY_DOCKER_PULL=true ./ci/run_envoy_docker.sh <build_script_args>
-```
+Envoy requires a lot of resources (disk/memory/cpu) to build, especially the first time its built, as bazel does not yet have anything cached.
 
+**Memory Requirements:**
+- Envoy builds can be memory-intensive and require substantial RAM
+- If you have less than 2GB of RAM per CPU core, you may want to limit the number of parallel build jobs
+- To limit build parallelism, add or modify the jobs setting in your `user.bazelrc` file with a line that follows the format "build --jobs=X/2" where X is the number of GB of RAM that your system has e.g.: `"build --jobs=4"` for a system with 8GB of memory in the `user.bazlerc` file that you created
+
+This configuration helps prevent out-of-memory errors that can cause builds to crash.
 
 # Generating compile commands
 

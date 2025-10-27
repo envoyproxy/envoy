@@ -1,6 +1,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
 #include "source/extensions/common/wasm/ext/set_envoy_filter_state.pb.h"
+#include "source/extensions/common/wasm/ext/sign.pb.h"
 #include "source/extensions/common/wasm/ext/verify_signature.pb.h"
 #include "source/extensions/common/wasm/wasm.h"
 
@@ -13,12 +14,58 @@
 #include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 
-#include "source/common/common/logger.h"
+#include "absl/types/span.h"
 
 using proxy_wasm::RegisterForeignFunction;
 using proxy_wasm::WasmForeignFunction;
 
 namespace Envoy {
+
+namespace {
+// Helper function to import public key from either PEM or DER format
+Envoy::Common::Crypto::PKeyObjectPtr
+importPublicKey(Envoy::Common::Crypto::Utility& crypto_util,
+                const envoy::source::extensions::common::wasm::VerifySignatureArguments& args) {
+  bool has_pem = !args.public_key_pem().empty();
+  bool has_der = !args.public_key().empty();
+
+  if (has_pem && has_der) {
+    return nullptr; // Both PEM and DER keys provided
+  }
+
+  if (has_pem) {
+    return crypto_util.importPublicKeyPEM(args.public_key_pem());
+  } else if (has_der) {
+    auto key_str = args.public_key();
+    return crypto_util.importPublicKeyDER(
+        absl::MakeSpan(reinterpret_cast<const uint8_t*>(key_str.data()), key_str.size()));
+  } else {
+    return nullptr; // No key provided
+  }
+}
+
+// Helper function to import private key from either PEM or DER format
+Envoy::Common::Crypto::PKeyObjectPtr
+importPrivateKey(Envoy::Common::Crypto::Utility& crypto_util,
+                 const envoy::source::extensions::common::wasm::SignArguments& args) {
+  bool has_pem = !args.private_key_pem().empty();
+  bool has_der = !args.private_key().empty();
+
+  if (has_pem && has_der) {
+    return nullptr; // Both PEM and DER keys provided
+  }
+
+  if (has_pem) {
+    return crypto_util.importPrivateKeyPEM(args.private_key_pem());
+  } else if (has_der) {
+    auto key_str = args.private_key();
+    return crypto_util.importPrivateKeyDER(
+        absl::MakeSpan(reinterpret_cast<const uint8_t*>(key_str.data()), key_str.size()));
+  } else {
+    return nullptr; // No key provided
+  }
+}
+} // namespace
 namespace Extensions {
 namespace Common {
 namespace Wasm {
@@ -51,26 +98,70 @@ RegisterForeignFunction registerVerifySignatureForeignFunction(
       envoy::source::extensions::common::wasm::VerifySignatureArguments args;
       if (args.ParseFromArray(arguments.data(), arguments.size())) {
         const auto& hash = args.hash_function();
-        auto key_str = args.public_key();
         auto signature_str = args.signature();
         auto text_str = args.text();
 
-        std::vector<uint8_t> key(key_str.begin(), key_str.end());
-        std::vector<uint8_t> signature(signature_str.begin(), signature_str.end());
-        std::vector<uint8_t> text(text_str.begin(), text_str.end());
-
         auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-        Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKey(key);
+        auto crypto_ptr = importPublicKey(crypto_util, args);
+        if (!crypto_ptr) {
+          return WasmResult::BadArgument;
+        }
 
-        auto output = crypto_util.verifySignature(hash, *crypto_ptr, signature, text);
+        auto output = crypto_util.verifySignature(
+            hash, *crypto_ptr,
+            absl::MakeSpan(reinterpret_cast<const uint8_t*>(signature_str.data()),
+                           signature_str.size()),
+            absl::MakeSpan(reinterpret_cast<const uint8_t*>(text_str.data()), text_str.size()));
 
         envoy::source::extensions::common::wasm::VerifySignatureResult verification_result;
-        verification_result.set_result(output.result_);
-        verification_result.set_error(output.error_message_);
+        if (output.ok()) {
+          verification_result.set_result(true);
+          verification_result.set_error("");
+        } else {
+          verification_result.set_result(false);
+          verification_result.set_error(output.message());
+        }
 
         auto size = verification_result.ByteSizeLong();
         auto result = alloc_result(size);
         verification_result.SerializeToArray(result, static_cast<int>(size));
+        return WasmResult::Ok;
+      }
+      return WasmResult::BadArgument;
+    });
+
+RegisterForeignFunction registerSignForeignFunction(
+    "sign",
+    [](WasmBase&, std::string_view arguments,
+       const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
+      envoy::source::extensions::common::wasm::SignArguments args;
+      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+        const auto& hash = args.hash_function();
+        auto text_str = args.text();
+
+        auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+        auto crypto_ptr = importPrivateKey(crypto_util, args);
+        if (!crypto_ptr) {
+          return WasmResult::BadArgument;
+        }
+
+        auto output = crypto_util.sign(
+            hash, *crypto_ptr,
+            absl::MakeSpan(reinterpret_cast<const uint8_t*>(text_str.data()), text_str.size()));
+
+        envoy::source::extensions::common::wasm::SignResult signing_result;
+        if (output.ok()) {
+          signing_result.set_result(true);
+          signing_result.set_signature(output->data(), output->size());
+          signing_result.set_error("");
+        } else {
+          signing_result.set_result(false);
+          signing_result.set_error(output.status().message());
+        }
+
+        auto size = signing_result.ByteSizeLong();
+        auto result = alloc_result(size);
+        signing_result.SerializeToArray(result, static_cast<int>(size));
         return WasmResult::Ok;
       }
       return WasmResult::BadArgument;
@@ -138,14 +229,15 @@ RegisterForeignFunction registerClearRouteCacheForeignFunction(
 class ExpressionFactory : public Logger::Loggable<Logger::Id::wasm> {
 protected:
   struct ExpressionData {
-    google::api::expr::v1alpha1::ParsedExpr parsed_expr_;
+    cel::expr::ParsedExpr parsed_expr_;
     Filters::Common::Expr::ExpressionPtr compiled_expr_;
   };
 
   class ExpressionContext : public StorageObject {
   public:
     friend class ExpressionFactory;
-    ExpressionContext(Filters::Common::Expr::BuilderPtr builder) : builder_(std::move(builder)) {}
+    ExpressionContext(Filters::Common::Expr::BuilderConstPtr builder)
+        : builder_(std::move(builder)) {}
     uint32_t createToken() {
       uint32_t token = next_expr_token_++;
       for (;;) {
@@ -159,10 +251,10 @@ protected:
     bool hasExpression(uint32_t token) { return expr_.contains(token); }
     ExpressionData& getExpression(uint32_t token) { return expr_[token]; }
     void deleteExpression(uint32_t token) { expr_.erase(token); }
-    Filters::Common::Expr::Builder* builder() { return builder_.get(); }
+    const Filters::Common::Expr::Builder* builder() const { return builder_.get(); }
 
   private:
-    Filters::Common::Expr::BuilderPtr builder_{};
+    const Filters::Common::Expr::BuilderConstPtr builder_{};
     uint32_t next_expr_token_ = 0;
     absl::flat_hash_map<uint32_t, ExpressionData> expr_;
   };
@@ -203,9 +295,13 @@ public:
       auto token = expr_context.createToken();
       auto& handler = expr_context.getExpression(token);
 
-      handler.parsed_expr_ = parse_status.value();
+      const auto& parsed_expr = parse_status.value();
+      handler.parsed_expr_ = parsed_expr;
+
+      std::vector<absl::Status> warnings;
       auto cel_expression_status = expr_context.builder()->CreateExpression(
-          &handler.parsed_expr_.expr(), &handler.parsed_expr_.source_info());
+          &handler.parsed_expr_.expr(), &handler.parsed_expr_.source_info(), &warnings);
+
       if (!cel_expression_status.ok()) {
         ENVOY_LOG(info, "expr_create compile error: {}", cel_expression_status.status().message());
         expr_context.deleteExpression(token);
@@ -213,6 +309,7 @@ public:
       }
 
       handler.compiled_expr_ = std::move(cel_expression_status.value());
+
       auto result = reinterpret_cast<uint32_t*>(alloc_result(sizeof(uint32_t)));
       *result = token;
       return WasmResult::Ok;

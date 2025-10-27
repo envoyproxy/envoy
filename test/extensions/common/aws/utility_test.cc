@@ -323,6 +323,12 @@ TEST(UtilityTest, CanonicalizeQueryStringWithPlus) {
   EXPECT_EQ("a=1%202", canonical_query);
 }
 
+TEST(UtilityTest, CanonicalizeQueryStringWithPlusEncoded) {
+  const absl::string_view query = "a=1%2B2";
+  const auto canonical_query = Utility::canonicalizeQueryString(query);
+  EXPECT_EQ("a=1%2B2", canonical_query);
+}
+
 TEST(UtilityTest, CanonicalizeQueryStringWithTilde) {
   const absl::string_view query = "a=1%7E~2";
   const auto canonical_query = Utility::canonicalizeQueryString(query);
@@ -331,13 +337,13 @@ TEST(UtilityTest, CanonicalizeQueryStringWithTilde) {
 
 TEST(UtilityTest, EncodeQuerySegment) {
   const absl::string_view query = "^!@/-_~.";
-  const auto encoded_query = Utility::encodeQueryComponent(query);
+  const auto encoded_query = Utility::encodeQueryComponentPreservingPlus(query);
   EXPECT_EQ("%5E%21%40%2F-_~.", encoded_query);
 }
 
 TEST(UtilityTest, EncodeQuerySegmentReserved) {
   const absl::string_view query = "?=&";
-  const auto encoded_query = Utility::encodeQueryComponent(query);
+  const auto encoded_query = Utility::encodeQueryComponentPreservingPlus(query);
   EXPECT_EQ("%3F%3D%26", encoded_query);
 }
 
@@ -353,7 +359,7 @@ TEST(UtilityTest, CanonicalizationFuzzTest) {
         fuzz.push_back(k);
         Utility::uriEncodePath(fuzz);
         Utility::normalizePath(fuzz);
-        Utility::encodeQueryComponent(fuzz);
+        Utility::encodeQueryComponentPreservingPlus(fuzz);
         Utility::canonicalizeQueryString(fuzz);
         fuzz.pop_back();
       }
@@ -553,6 +559,29 @@ TEST(UtilityTest, CheckNormalization) {
   service = "lambda";
   should_normalize = Utility::shouldNormalizeUriPath(service);
   EXPECT_TRUE(should_normalize);
+}
+
+TEST(UtilityTest, RolesAnywhereEndpoint) {
+  std::string arn = "junkarn";
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("rolesanywhere-fips.us-east-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#else
+  EXPECT_EQ("rolesanywhere.us-east-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#endif
+  arn = "arn:aws:rolesanywhere:ap-southeast-2:012345678901:trust-anchor/"
+        "8d105284-f0a7-4939-a7e6-8df768ea535f";
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#else
+  EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+
+#endif
+  arn = "arn:aws:rolesanywhere:eu-west-1:randomjunk";
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("rolesanywhere.eu-west-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#else
+  EXPECT_EQ("rolesanywhere.eu-west-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#endif
 }
 
 } // namespace

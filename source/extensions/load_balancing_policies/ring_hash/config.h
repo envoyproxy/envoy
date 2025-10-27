@@ -12,7 +12,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace RingHash {
 
 using RingHashLbProto = envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash;
@@ -29,22 +29,26 @@ public:
                                               TimeSource& time_source) override;
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
-  loadConfig(Server::Configuration::ServerFactoryContext&,
+  loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override {
     ASSERT(dynamic_cast<const RingHashLbProto*>(&config) != nullptr);
-    const RingHashLbProto& typed_config = dynamic_cast<const RingHashLbProto&>(config);
-    return Upstream::LoadBalancerConfigPtr{new Upstream::TypedRingHashLbConfig(typed_config)};
+    const RingHashLbProto& typed_proto = dynamic_cast<const RingHashLbProto&>(config);
+    absl::Status creation_status = absl::OkStatus();
+    auto typed_config = std::make_unique<Upstream::TypedRingHashLbConfig>(
+        typed_proto, context.regexEngine(), creation_status);
+    RETURN_IF_NOT_OK_REF(creation_status);
+    return typed_config;
   }
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadLegacy(Server::Configuration::ServerFactoryContext&,
              const Upstream::ClusterProto& cluster) override {
-    return Upstream::LoadBalancerConfigPtr{new Upstream::TypedRingHashLbConfig(
-        cluster.common_lb_config(), cluster.ring_hash_lb_config())};
+    return std::make_unique<Upstream::TypedRingHashLbConfig>(cluster.common_lb_config(),
+                                                             cluster.ring_hash_lb_config());
   }
 };
 
 } // namespace RingHash
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

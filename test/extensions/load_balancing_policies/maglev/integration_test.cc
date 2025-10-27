@@ -14,7 +14,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Maglev {
 namespace {
 
@@ -83,6 +83,10 @@ public:
               name: envoy.load_balancing_policies.maglev
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.maglev.v3.Maglev
+                consistent_hashing_lb_config:
+                  hash_policy:
+                  - header:
+                      header_name: x-hash
           )EOF";
 
           TestUtility::loadFromYaml(policy_yaml, *policy);
@@ -141,6 +145,6 @@ TEST_P(MaglevIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
 
 } // namespace
 } // namespace Maglev
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

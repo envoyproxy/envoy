@@ -50,7 +50,7 @@ protected:
           callback_(std::move(callback)) {}
 
     void cancel(CancelReason) override {
-      ENVOY_LOG(debug, "cancelling query [{}]", dns_name_);
+      ENVOY_LOG(trace, "cancelling query [{}]", dns_name_);
       absl::MutexLock lock(&mutex_);
       cancelled_ = true;
     }

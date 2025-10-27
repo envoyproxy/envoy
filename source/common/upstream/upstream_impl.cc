@@ -56,6 +56,7 @@
 #include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/locality_pool.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -94,7 +95,7 @@ parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
 }
 
 absl::StatusOr<ProtocolOptionsConfigConstSharedPtr>
-createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
+createProtocolOptionsConfig(const std::string& name, const Protobuf::Any& typed_config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
@@ -360,6 +361,28 @@ createUpstreamLocalAddressSelector(
           !(cluster_name.has_value()) ? "Bootstrap"
                                       : fmt::format("Cluster {}", cluster_name.value())));
     }
+
+#if !defined(__linux__)
+    auto fail_status = absl::InvalidArgumentError(fmt::format(
+        "{}'s upstream binding config contains addresses with network namespace filepaths, but the "
+        "OS is not Linux. Network namespaces can only be used on Linux.",
+        !(cluster_name.has_value()) ? "Bootstrap"
+                                    : fmt::format("Cluster {}", cluster_name.value())));
+    if (bind_config->has_source_address() &&
+        !bind_config->source_address().network_namespace_filepath().empty()) {
+      return fail_status;
+    };
+    for (const auto& addr : bind_config->extra_source_addresses()) {
+      if (addr.has_address() && !addr.address().network_namespace_filepath().empty()) {
+        return fail_status;
+      }
+    }
+    for (const auto& addr : bind_config->additional_source_addresses()) {
+      if (!addr.network_namespace_filepath().empty()) {
+        return fail_status;
+      }
+    }
+#endif
   }
   UpstreamLocalAddressSelectorFactory* local_address_selector_factory;
   const envoy::config::core::v3::TypedExtensionConfig* const local_address_selector_config =
@@ -428,13 +451,14 @@ LoadMetricStats::StatMapPtr LoadMetricStatsImpl::latch() {
 absl::StatusOr<std::unique_ptr<HostDescriptionImpl>> HostDescriptionImpl::create(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
-    MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
+    MetadataConstSharedPtr locality_metadata,
+    std::shared_ptr<const envoy::config::core::v3::Locality> locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-    uint32_t priority, TimeSource& time_source, const AddressVector& address_list) {
+    uint32_t priority, const AddressVector& address_list) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<HostDescriptionImpl>(new HostDescriptionImpl(
       creation_status, cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
-      locality, health_check_config, priority, time_source, address_list));
+      locality, health_check_config, priority, address_list));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -442,12 +466,12 @@ absl::StatusOr<std::unique_ptr<HostDescriptionImpl>> HostDescriptionImpl::create
 HostDescriptionImpl::HostDescriptionImpl(
     absl::Status& creation_status, ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
-    MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
+    MetadataConstSharedPtr locality_metadata,
+    std::shared_ptr<const envoy::config::core::v3::Locality> locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-    uint32_t priority, TimeSource& time_source, const AddressVector& address_list)
+    uint32_t priority, const AddressVector& address_list)
     : HostDescriptionImplBase(cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
-                              locality, health_check_config, priority, time_source,
-                              creation_status),
+                              locality, health_check_config, priority, creation_status),
       address_(dest_address),
       address_list_or_null_(makeAddressListOrNull(dest_address, address_list)),
       health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)) {}
@@ -455,9 +479,10 @@ HostDescriptionImpl::HostDescriptionImpl(
 HostDescriptionImplBase::HostDescriptionImplBase(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
-    MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
+    MetadataConstSharedPtr locality_metadata,
+    std::shared_ptr<const envoy::config::core::v3::Locality> locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-    uint32_t priority, TimeSource& time_source, absl::Status& creation_status)
+    uint32_t priority, absl::Status& creation_status)
     : cluster_(cluster), hostname_(hostname),
       health_checks_hostname_(health_check_config.hostname()),
       canary_(Config::Metadata::metadataValue(endpoint_metadata.get(),
@@ -465,16 +490,18 @@ HostDescriptionImplBase::HostDescriptionImplBase(
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value()),
       endpoint_metadata_(endpoint_metadata), locality_metadata_(locality_metadata),
-      locality_(locality),
-      locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
+      locality_(std::move(locality)),
+      locality_zone_stat_name_(locality_->zone(), cluster->statsScope().symbolTable()),
       priority_(priority),
-      socket_factory_(resolveTransportSocketFactory(dest_address, endpoint_metadata_.get())),
-      creation_time_(time_source.monotonicTime()) {
+      socket_factory_(resolveTransportSocketFactory(dest_address, endpoint_metadata_.get())) {
   if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
     // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
     // for a pipe address is a misconfiguration.
     creation_status = absl::InvalidArgumentError(
         fmt::format("Invalid host configuration: non-zero port for non-IP address"));
+  } else if (dest_address && dest_address->networkNamespace().has_value()) {
+    creation_status = absl::InvalidArgumentError(
+        "Invalid host configuration: hosts cannot specify network namespaces with their address");
   }
 }
 
@@ -618,17 +645,13 @@ Host::CreateConnectionData HostImplBase::createConnection(
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
-    // TODO(adisuissa): convert from OptRef to reference once the runtime flag
-    // envoy.reloadable_features.use_config_in_happy_eyeballs is deprecated.
+    ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
     OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
-      ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
-      if (cluster.happyEyeballsConfig().has_value()) {
-        happy_eyeballs_config = cluster.happyEyeballsConfig();
-      } else {
-        happy_eyeballs_config = defaultHappyEyeballsConfig();
-      }
+    if (cluster.happyEyeballsConfig().has_value()) {
+      happy_eyeballs_config = cluster.happyEyeballsConfig();
+    } else {
+      happy_eyeballs_config = defaultHappyEyeballsConfig();
     }
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
         dispatcher, *address_list_or_null, source_address_selector, socket_factory,
@@ -658,15 +681,14 @@ absl::StatusOr<std::unique_ptr<HostImpl>> HostImpl::create(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr endpoint_metadata,
     MetadataConstSharedPtr locality_metadata, uint32_t initial_weight,
-    const envoy::config::core::v3::Locality& locality,
+    std::shared_ptr<const envoy::config::core::v3::Locality> locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-    TimeSource& time_source, const AddressVector& address_list) {
+    const AddressVector& address_list) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<HostImpl>(
-      new HostImpl(creation_status, cluster, hostname, address, endpoint_metadata,
-                   locality_metadata, initial_weight, locality, health_check_config, priority,
-                   health_status, time_source, address_list));
+  auto ret = std::unique_ptr<HostImpl>(new HostImpl(
+      creation_status, cluster, hostname, address, endpoint_metadata, locality_metadata,
+      initial_weight, locality, health_check_config, priority, health_status, address_list));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -711,7 +733,7 @@ std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
 void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
                               LocalityWeightsConstSharedPtr locality_weights,
                               const HostVector& hosts_added, const HostVector& hosts_removed,
-                              uint64_t seed, absl::optional<bool> weighted_priority_health,
+                              absl::optional<bool> weighted_priority_health,
                               absl::optional<uint32_t> overprovisioning_factor) {
   if (weighted_priority_health.has_value()) {
     weighted_priority_health_ = weighted_priority_health.value();
@@ -730,84 +752,7 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
   excluded_hosts_per_locality_ = std::move(update_hosts_params.excluded_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
 
-  // TODO(ggreenway): implement `weighted_priority_health` support in `rebuildLocalityScheduler`.
-  rebuildLocalityScheduler(healthy_locality_scheduler_, healthy_locality_entries_,
-                           *healthy_hosts_per_locality_, healthy_hosts_->get(), hosts_per_locality_,
-                           excluded_hosts_per_locality_, locality_weights_,
-                           overprovisioning_factor_, seed);
-  rebuildLocalityScheduler(degraded_locality_scheduler_, degraded_locality_entries_,
-                           *degraded_hosts_per_locality_, degraded_hosts_->get(),
-                           hosts_per_locality_, excluded_hosts_per_locality_, locality_weights_,
-                           overprovisioning_factor_, seed);
-
-  THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
-}
-
-void HostSetImpl::rebuildLocalityScheduler(
-    std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
-    std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
-    const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
-    HostsPerLocalityConstSharedPtr all_hosts_per_locality,
-    HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
-    LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor,
-    uint64_t seed) {
-  // Rebuild the locality scheduler by computing the effective weight of each
-  // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
-  // locality weights (i.e. using EDS) and there is at least one eligible host in this priority.
-  //
-  // We omit building a scheduler when there are zero eligible hosts in the priority as
-  // all the localities will have zero effective weight. At selection time, we'll either select
-  // from a different scheduler or there will be no available hosts in the priority. At that point
-  // we'll rely on other mechanisms such as panic mode to select a host, none of which rely on the
-  // scheduler.
-  //
-  // TODO(htuch): if the underlying locality index ->
-  // envoy::config::core::v3::Locality hasn't changed in hosts_/healthy_hosts_/degraded_hosts_, we
-  // could just update locality_weight_ without rebuilding. Similar to how host
-  // level WRR works, we would age out the existing entries via picks and lazily
-  // apply the new weights.
-  locality_scheduler = nullptr;
-  if (all_hosts_per_locality != nullptr && locality_weights != nullptr &&
-      !locality_weights->empty() && !eligible_hosts.empty()) {
-    locality_entries.clear();
-    for (uint32_t i = 0; i < all_hosts_per_locality->get().size(); ++i) {
-      const double effective_weight = effectiveLocalityWeight(
-          i, eligible_hosts_per_locality, *excluded_hosts_per_locality, *all_hosts_per_locality,
-          *locality_weights, overprovisioning_factor);
-      if (effective_weight > 0) {
-        locality_entries.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
-      }
-    }
-    // If not all effective weights were zero, create the scheduler.
-    if (!locality_entries.empty()) {
-      locality_scheduler = std::make_unique<EdfScheduler<LocalityEntry>>(
-          EdfScheduler<LocalityEntry>::createWithPicks(
-              locality_entries, [](const LocalityEntry& entry) { return entry.effective_weight_; },
-              seed));
-    }
-  }
-}
-
-absl::optional<uint32_t> HostSetImpl::chooseHealthyLocality() {
-  return chooseLocality(healthy_locality_scheduler_.get());
-}
-
-absl::optional<uint32_t> HostSetImpl::chooseDegradedLocality() {
-  return chooseLocality(degraded_locality_scheduler_.get());
-}
-
-absl::optional<uint32_t>
-HostSetImpl::chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler) {
-  if (locality_scheduler == nullptr) {
-    return {};
-  }
-  const std::shared_ptr<LocalityEntry> locality = locality_scheduler->pickAndAdd(
-      [](const LocalityEntry& locality) { return locality.effective_weight_; });
-  // We don't build a schedule if there are no weighted localities, so we should always succeed.
-  ASSERT(locality != nullptr);
-  // If we picked it before, its weight must have been positive.
-  ASSERT(locality->effective_weight_ > 0);
-  return locality->index_;
+  runUpdateCallbacks(hosts_added, hosts_removed);
 }
 
 PrioritySet::UpdateHostsParams
@@ -851,29 +796,6 @@ HostSetImpl::partitionHosts(HostVectorConstSharedPtr hosts,
                            std::move(std::get<2>(healthy_degraded_excluded_hosts_per_locality)));
 }
 
-double HostSetImpl::effectiveLocalityWeight(uint32_t index,
-                                            const HostsPerLocality& eligible_hosts_per_locality,
-                                            const HostsPerLocality& excluded_hosts_per_locality,
-                                            const HostsPerLocality& all_hosts_per_locality,
-                                            const LocalityWeights& locality_weights,
-                                            uint32_t overprovisioning_factor) {
-  const auto& locality_eligible_hosts = eligible_hosts_per_locality.get()[index];
-  const uint32_t excluded_count = excluded_hosts_per_locality.get().size() > index
-                                      ? excluded_hosts_per_locality.get()[index].size()
-                                      : 0;
-  const auto host_count = all_hosts_per_locality.get()[index].size() - excluded_count;
-  if (host_count == 0) {
-    return 0.0;
-  }
-  const double locality_availability_ratio = 1.0 * locality_eligible_hosts.size() / host_count;
-  const uint32_t weight = locality_weights[index];
-  // Availability ranges from 0-1.0, and is the ratio of eligible hosts to total hosts, modified
-  // by the overprovisioning factor.
-  const double effective_locality_availability_ratio =
-      std::min(1.0, (overprovisioning_factor / 100.0) * locality_availability_ratio);
-  return weight * effective_locality_availability_ratio;
-}
-
 const HostSet&
 PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
                                     absl::optional<bool> weighted_priority_health,
@@ -895,7 +817,7 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
 void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                                   LocalityWeightsConstSharedPtr locality_weights,
                                   const HostVector& hosts_added, const HostVector& hosts_removed,
-                                  uint64_t seed, absl::optional<bool> weighted_priority_health,
+                                  absl::optional<bool> weighted_priority_health,
                                   absl::optional<uint32_t> overprovisioning_factor,
                                   HostMapConstSharedPtr cross_priority_host_map) {
   // Update cross priority host map first. In this way, when the update callbacks of the priority
@@ -908,10 +830,10 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
   getOrCreateHostSet(priority, weighted_priority_health, overprovisioning_factor);
   static_cast<HostSetImpl*>(host_sets_[priority].get())
       ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
-                    hosts_removed, seed, weighted_priority_health, overprovisioning_factor);
+                    hosts_removed, weighted_priority_health, overprovisioning_factor);
 
   if (!batch_update_) {
-    THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
+    runUpdateCallbacks(hosts_added, hosts_removed);
   }
 }
 
@@ -925,13 +847,13 @@ void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
   HostVector net_hosts_added = filterHosts(scope.all_hosts_added_, scope.all_hosts_removed_);
   HostVector net_hosts_removed = filterHosts(scope.all_hosts_removed_, scope.all_hosts_added_);
 
-  THROW_IF_NOT_OK(runUpdateCallbacks(net_hosts_added, net_hosts_removed));
+  runUpdateCallbacks(net_hosts_added, net_hosts_removed);
 }
 
 void PrioritySetImpl::BatchUpdateScope::updateHosts(
     uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, uint64_t seed, absl::optional<bool> weighted_priority_health,
+    const HostVector& hosts_removed, absl::optional<bool> weighted_priority_health,
     absl::optional<uint32_t> overprovisioning_factor) {
   // We assume that each call updates a different priority.
   ASSERT(priorities_.find(priority) == priorities_.end());
@@ -946,13 +868,13 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
   }
 
   parent_.updateHosts(priority, std::move(update_hosts_params), locality_weights, hosts_added,
-                      hosts_removed, seed, weighted_priority_health, overprovisioning_factor);
+                      hosts_removed, weighted_priority_health, overprovisioning_factor);
 }
 
 void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                                       LocalityWeightsConstSharedPtr locality_weights,
                                       const HostVector& hosts_added,
-                                      const HostVector& hosts_removed, uint64_t seed,
+                                      const HostVector& hosts_removed,
                                       absl::optional<bool> weighted_priority_health,
                                       absl::optional<uint32_t> overprovisioning_factor,
                                       HostMapConstSharedPtr cross_priority_host_map) {
@@ -961,7 +883,7 @@ void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& upd
   updateCrossPriorityHostMap(priority, hosts_added, hosts_removed);
 
   PrioritySetImpl::updateHosts(priority, std::move(update_hosts_params), locality_weights,
-                               hosts_added, hosts_removed, seed, weighted_priority_health,
+                               hosts_added, hosts_removed, weighted_priority_health,
                                overprovisioning_factor);
 }
 
@@ -1573,6 +1495,27 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
                                                                : Http::Protocol::Http11};
 }
 
+absl::optional<bool>
+ClusterInfoImpl::processHttpForOutlierDetection(Http::ResponseHeaderMap& headers) const {
+  if (http_protocol_options_->outlier_detection_http_error_matcher_.empty()) {
+    return absl::nullopt;
+  }
+
+  Extensions::Common::Matcher::Matcher::MatchStatusVector statuses;
+
+  statuses.reserve(http_protocol_options_->outlier_detection_http_error_matcher_.size());
+  statuses = Extensions::Common::Matcher::Matcher::MatchStatusVector(
+      http_protocol_options_->outlier_detection_http_error_matcher_.size());
+  http_protocol_options_->outlier_detection_http_error_matcher_[0]->onNewStream(statuses);
+
+  // Run matchers.
+  http_protocol_options_->outlier_detection_http_error_matcher_[0]->onHttpResponseHeaders(headers,
+                                                                                          statuses);
+  return absl::optional<bool>(http_protocol_options_->outlier_detection_http_error_matcher_[0]
+                                  ->matchStatus(statuses)
+                                  .matches_);
+}
+
 absl::StatusOr<bool> validateTransportSocketSupportsQuic(
     const envoy::config::core::v3::TransportSocket& transport_socket) {
   // The transport socket is valid for QUIC if it is either a QUIC transport socket,
@@ -1597,10 +1540,13 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
       runtime_(cluster_context.serverFactoryContext().runtime()),
       wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       random_(cluster_context.serverFactoryContext().api().randomGenerator()),
-      time_source_(cluster_context.serverFactoryContext().timeSource()),
-      local_cluster_(cluster_context.clusterManager().localClusterName().value_or("") ==
-                     cluster.name()),
+      local_cluster_(
+          cluster_context.serverFactoryContext().clusterManager().localClusterName().value_or("") ==
+          cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
+          cluster_context.serverFactoryContext().singletonManager(),
+          cluster_context.serverFactoryContext().mainThreadDispatcher())),
+      const_locality_shared_pool_(LocalityPool::getConstLocalitySharedPool(
           cluster_context.serverFactoryContext().singletonManager(),
           cluster_context.serverFactoryContext().mainThreadDispatcher())) {
   auto& server_context = cluster_context.serverFactoryContext();
@@ -1622,10 +1568,11 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
   auto socket_matcher = std::move(*socket_matcher_or_error);
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = server_context.mainThreadDispatcher();
-  auto info_or_error = ClusterInfoImpl::create(
-      init_manager_, server_context, cluster, cluster_context.clusterManager().bindConfig(),
-      runtime_, std::move(socket_matcher), std::move(stats_scope), cluster_context.addedViaApi(),
-      *transport_factory_context_);
+  auto info_or_error =
+      ClusterInfoImpl::create(init_manager_, server_context, cluster,
+                              cluster_context.serverFactoryContext().clusterManager().bindConfig(),
+                              runtime_, std::move(socket_matcher), std::move(stats_scope),
+                              cluster_context.addedViaApi(), *transport_factory_context_);
   SET_AND_RETURN_IF_NOT_OK(info_or_error.status(), creation_status);
   info_ = std::shared_ptr<const ClusterInfoImpl>(
       (*info_or_error).release(), [&dispatcher](const ClusterInfoImpl* self) {
@@ -1690,7 +1637,6 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
         info_->endpointStats().membership_healthy_.set(healthy_hosts);
         info_->endpointStats().membership_degraded_.set(degraded_hosts);
         info_->endpointStats().membership_excluded_.set(excluded_hosts);
-        return absl::OkStatus();
       });
   // Drop overload configuration parsing.
   SET_AND_RETURN_IF_NOT_OK(parseDropOverloadConfig(cluster.load_assignment()), creation_status);
@@ -1920,9 +1866,9 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
     HostVectorConstSharedPtr hosts_copy = std::make_shared<HostVector>(host_set->hosts());
 
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
-    prioritySet().updateHosts(
-        priority, HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-        host_set->localityWeights(), {}, {}, random_.random(), absl::nullopt, absl::nullopt);
+    prioritySet().updateHosts(priority,
+                              HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
+                              host_set->localityWeights(), {}, {}, absl::nullopt, absl::nullopt);
   }
 }
 
@@ -1948,11 +1894,21 @@ ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& add
   return resolve_status;
 }
 
-absl::Status ClusterImplBase::validateEndpointsForZoneAwareRouting(
-    const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const {
-  if (local_cluster_ && endpoints.priority() > 0) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected non-zero priority for local cluster '{}'.", info()->name()));
+absl::Status ClusterImplBase::validateEndpoints(
+    absl::Span<const envoy::config::endpoint::v3::LocalityLbEndpoints* const> localities,
+    OptRef<const PriorityState> priorities) const {
+  for (const auto* endpoints : localities) {
+    if (local_cluster_ && endpoints->priority() > 0) {
+      return absl::InvalidArgumentError(
+          fmt::format("Unexpected non-zero priority for local cluster '{}'.", info()->name()));
+    }
+  }
+
+  if (priorities.has_value()) {
+    OptRef<const LoadBalancerConfig> lb_config = info_->loadBalancerConfig();
+    if (lb_config.has_value()) {
+      return lb_config->validateEndpoints(*priorities);
+    }
   }
   return absl::OkStatus();
 }
@@ -2158,10 +2114,8 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
                                            const LocalInfo::LocalInfo& local_info,
-                                           PrioritySet::HostUpdateCb* update_cb,
-                                           Random::RandomGenerator& random)
-    : parent_(cluster), local_info_node_(local_info.node()), update_cb_(update_cb),
-      random_(random) {}
+                                           PrioritySet::HostUpdateCb* update_cb)
+    : parent_(cluster), local_info_node_(local_info.node()), update_cb_(update_cb) {}
 
 void PriorityStateManager::initializePriorityFor(
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) {
@@ -2182,7 +2136,7 @@ void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
     const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source) {
+    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
   auto endpoint_metadata =
       lb_endpoint.has_metadata()
           ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
@@ -2192,11 +2146,12 @@ void PriorityStateManager::registerHostForPriority(
           ? parent_.constMetadataSharedPool()->getObject(locality_lb_endpoint.metadata())
           : nullptr;
   const auto host = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
-      HostImpl::create(parent_.info(), hostname, address, endpoint_metadata, locality_metadata,
-                       lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
-                       lb_endpoint.endpoint().health_check_config(),
-                       locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source,
-                       address_list),
+      HostImpl::create(
+          parent_.info(), hostname, address, endpoint_metadata, locality_metadata,
+          lb_endpoint.load_balancing_weight().value(),
+          parent_.constLocalitySharedPool()->getObject(locality_lb_endpoint.locality()),
+          lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
+          lb_endpoint.health_status(), address_list),
       std::unique_ptr<HostImpl>));
   registerHostForPriority(host, locality_lb_endpoint);
 }
@@ -2276,14 +2231,13 @@ void PriorityStateManager::updateClusterPrioritySet(
   if (update_cb_ != nullptr) {
     update_cb_->updateHosts(priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
                             std::move(locality_weights), hosts_added.value_or(*hosts),
-                            hosts_removed.value_or<HostVector>({}), random_.random(),
-                            weighted_priority_health, overprovisioning_factor);
+                            hosts_removed.value_or<HostVector>({}), weighted_priority_health,
+                            overprovisioning_factor);
   } else {
-    parent_.prioritySet().updateHosts(priority,
-                                      HostSetImpl::partitionHosts(hosts, per_locality_shared),
-                                      std::move(locality_weights), hosts_added.value_or(*hosts),
-                                      hosts_removed.value_or<HostVector>({}), random_.random(),
-                                      weighted_priority_health, overprovisioning_factor);
+    parent_.prioritySet().updateHosts(
+        priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
+        std::move(locality_weights), hosts_added.value_or(*hosts),
+        hosts_removed.value_or<HostVector>({}), weighted_priority_health, overprovisioning_factor);
   }
 }
 

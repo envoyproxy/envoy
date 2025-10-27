@@ -1,6 +1,7 @@
 use abi::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::any::Any;
+use std::vec;
 
 declare_init_functions!(
   init,
@@ -13,10 +14,10 @@ fn init() -> bool {
 }
 
 fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
-  _envoy_filter_config: &mut EC,
+  envoy_filter_config: &mut EC,
   name: &str,
   config: &[u8],
-) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
+) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "passthrough" => Some(Box::new(PassthroughHttpFilterConfig {})),
     "header_callbacks" => Some(Box::new(HeadersHttpFilterConfig {
@@ -32,6 +33,41 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
     })),
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
+    "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
+    "fake_external_cache" => Some(Box::new(FakeExternalCachingFilterConfig {})),
+    "stats_callbacks" => {
+      let config = String::from_utf8(config.to_owned()).unwrap();
+      let mut config_iter = config.split(',');
+      Some(Box::new(StatsCallbacksFilterConfig {
+        requests_total: envoy_filter_config
+          .define_counter("requests_total")
+          .unwrap(),
+        requests_pending: envoy_filter_config
+          .define_gauge("requests_pending")
+          .unwrap(),
+        requests_set_value: envoy_filter_config
+          .define_gauge("requests_set_value")
+          .unwrap(),
+        requests_header_values: envoy_filter_config
+          .define_histogram("requests_header_values")
+          .unwrap(),
+        entrypoint_total: envoy_filter_config
+          .define_counter_vec("entrypoint_total", &["entrypoint", "method"])
+          .unwrap(),
+        entrypoint_set_value: envoy_filter_config
+          .define_gauge_vec("entrypoint_set_value", &["entrypoint", "method"])
+          .unwrap(),
+        entrypoint_pending: envoy_filter_config
+          .define_gauge_vec("entrypoint_pending", &["entrypoint", "method"])
+          .unwrap(),
+        entrypoint_header_values: envoy_filter_config
+          .define_histogram_vec("entrypoint_header_values", &["entrypoint", "method"])
+          .unwrap(),
+        header_to_count: config_iter.next().unwrap().to_owned(),
+        header_to_set: config_iter.next().unwrap().to_owned(),
+      }))
+    },
+    "streaming_terminal_filter" => Some(Box::new(StreamingTerminalFilterConfig {})),
     _ => panic!("Unknown filter name: {}", name),
   }
 }
@@ -47,26 +83,44 @@ fn new_http_filter_per_route_config_fn(name: &str, config: &[u8]) -> Option<Box<
 
 struct PassthroughHttpFilterConfig {}
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for PassthroughHttpFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for PassthroughHttpFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    // Just to test that loggers can be accessible in a filter config callback.
+    envoy_log_trace!("new_http_filter called");
+    envoy_log_debug!("new_http_filter called");
+    envoy_log_info!("new_http_filter called");
+    envoy_log_warn!("new_http_filter called");
+    envoy_log_error!("new_http_filter called");
+    envoy_log_critical!("new_http_filter called");
     Box::new(PassthroughHttpFilter {})
   }
 }
 
 struct PassthroughHttpFilter {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PassthroughHttpFilter {}
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PassthroughHttpFilter {
+  fn on_request_headers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Just to test that loggers can be accessible in a filter callback.
+    envoy_log_trace!("on_request_headers called");
+    envoy_log_debug!("on_request_headers called");
+    envoy_log_info!("on_request_headers called");
+    envoy_log_warn!("on_request_headers called");
+    envoy_log_error!("on_request_headers called");
+    envoy_log_critical!("on_request_headers called");
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
 
 struct HeadersHttpFilterConfig {
   headers_to_add: String,
 }
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for HeadersHttpFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HeadersHttpFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     let headers_to_add: Vec<(String, String)> = self
       .headers_to_add
       .split(',')
@@ -180,10 +234,8 @@ struct PerRouteFilterConfig {
   value: String,
 }
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for PerRouteFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for PerRouteFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(PerRouteFilter {
       value: self.value.clone(),
       per_route_config: None,
@@ -240,10 +292,8 @@ struct BodyCallbacksFilterConfig {
   immediate_end_of_stream: bool,
 }
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for BodyCallbacksFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BodyCallbacksFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BodyCallbacksFilter {
       immediate_end_of_stream: self.immediate_end_of_stream,
       seen_request_body: false,
@@ -345,10 +395,8 @@ impl SendResponseHttpFilterConfig {
   }
 }
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for SendResponseHttpFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SendResponseHttpFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(self.f.clone())
   }
 }
@@ -416,10 +464,8 @@ struct HttpCalloutsFilterConfig {
   cluster_name: String,
 }
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for HttpCalloutsFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpCalloutsFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HttpCalloutsFilter {
       cluster_name: self.cluster_name.clone(),
     })
@@ -510,5 +556,436 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       vec![("some_header", b"some_value")],
       Some(b"local_response_body"),
     );
+  }
+}
+
+struct HttpFilterSchedulerConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpFilterSchedulerConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(HttpFilterScheduler {
+      event_ids: vec![],
+      thread_handles: vec![],
+    })
+  }
+}
+
+/// This spawns a thread for each request and response header callback and stops iteration at these
+/// event hooks.
+struct HttpFilterScheduler {
+  event_ids: Vec<u64>,
+  thread_handles: Vec<std::thread::JoinHandle<()>>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpFilterScheduler {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    let scheduler = envoy_filter.new_scheduler();
+    let thread = std::thread::spawn(move || {
+      scheduler.commit(0);
+      scheduler.commit(1);
+    });
+    self.thread_handles.push(thread);
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let scheduler = envoy_filter.new_scheduler();
+    let thread = std::thread::spawn(move || {
+      scheduler.commit(2);
+      scheduler.commit(3);
+    });
+    self.thread_handles.push(thread);
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
+  }
+
+  fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+    self.event_ids.push(event_id);
+    if event_id == 1 {
+      envoy_filter.continue_decoding()
+    } else if event_id == 3 {
+      envoy_filter.continue_encoding()
+    }
+  }
+}
+
+impl Drop for HttpFilterScheduler {
+  fn drop(&mut self) {
+    assert_eq!(self.event_ids, vec![0, 1, 2, 3]);
+    assert_eq!(self.thread_handles.len(), 2);
+    for thread in self.thread_handles.drain(..) {
+      thread.join().expect("Failed to join thread");
+    }
+  }
+}
+
+/// This implements a fake external caching filter that simulates an asynchronous cache lookup.
+struct FakeExternalCachingFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FakeExternalCachingFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(FakeExternalCachingFilter { rx: None })
+  }
+}
+
+struct FakeExternalCachingFilter {
+  rx: Option<std::sync::mpsc::Receiver<String>>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Get the cache key from the request header, which is owned by the Envoy filter.
+    let cache_key_header_value = envoy_filter.get_request_header_value("cacahe-key").unwrap();
+    // Construct the cache key String from the Envoy buffer so that it can be sent to the different
+    // thread.
+    let mut cache_key = String::new();
+    cache_key.push_str(std::str::from_utf8(cache_key_header_value.as_slice()).unwrap());
+    // We need to send the found cached response body back to the worker thread,
+    // so we use a channel to communicate between the filter and the worker thread safely.
+    //
+    // Alternatively, you can use Arc<Mutex<>> or similar constructs.
+    let (cx, rx) = std::sync::mpsc::channel();
+    self.rx = Some(rx);
+    // In real world scenarios, rather than spawning a thread per request,
+    // you would typically use a thread pool or an async runtime to handle
+    // the asynchronous I/O or computation.
+    let scheduler = envoy_filter.new_scheduler();
+    _ = std::thread::spawn(move || {
+      // Simulate some processing to check if the cache key exists.
+      let cache_hit = if cache_key == "existing" {
+        // Do some processing to get the cached response body in real world.
+        let cached_body = "cached_response_body".to_string();
+        // If the cache key exists, we send it back to the Envoy filter.
+        cx.send(cached_body).unwrap();
+        1
+      } else {
+        0
+      };
+      // We use the event_id pased to the commit method to indicate if the cache key was found.
+      scheduler.commit(cache_hit);
+    });
+    // Return StopIteration to indicate that we will continue the processing
+    // once the scheduled event is completed.
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
+  fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+    match event_id {
+      // Event from the on_request_headers when the cache key was not found.
+      0 => {
+        // Ensure that it is possible to set response headers on the generic scheduled event.
+        envoy_filter.set_request_header("on-scheduled", b"req");
+        envoy_filter.continue_decoding();
+      },
+      // Event from the on_scheduled when the cache key was found.
+      1 => {
+        let result = self.rx.take().unwrap().recv().unwrap();
+        envoy_filter.send_response(200, vec![("cached", b"yes")], Some(result.as_bytes()));
+      },
+      // Event from the on_response_headers.
+      2 => {
+        // Ensure that it is possible to set response headers on the generic scheduled event.
+        envoy_filter.set_response_header("on-scheduled", b"res");
+        envoy_filter.continue_encoding();
+      },
+      _ => unreachable!(),
+    }
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let scheduler = envoy_filter.new_scheduler();
+    _ = std::thread::spawn(move || {
+      scheduler.commit(2);
+    });
+
+    // Return StopIteration to indicate that we will continue the processing
+    // once the scheduled event is completed.
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
+  }
+}
+
+struct StatsCallbacksFilterConfig {
+  requests_total: EnvoyCounterId,
+  requests_pending: EnvoyGaugeId,
+  requests_header_values: EnvoyHistogramId,
+  requests_set_value: EnvoyGaugeId,
+  entrypoint_total: EnvoyCounterVecId,
+  entrypoint_pending: EnvoyGaugeVecId,
+  entrypoint_header_values: EnvoyHistogramVecId,
+  entrypoint_set_value: EnvoyGaugeVecId,
+  header_to_count: String,
+  header_to_set: String,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(StatsCallbacksFilter {
+      requests_total: self.requests_total,
+      requests_pending: self.requests_pending,
+      requests_header_values: self.requests_header_values,
+      requests_set_value: self.requests_set_value,
+      entrypoint_total: self.entrypoint_total,
+      entrypoint_pending: self.entrypoint_pending,
+      entrypoint_header_values: self.entrypoint_header_values,
+      entrypoint_set_value: self.entrypoint_set_value,
+      header_to_count: self.header_to_count.clone(),
+      header_to_set: self.header_to_set.clone(),
+      method: None,
+    })
+  }
+}
+
+struct StatsCallbacksFilter {
+  requests_total: EnvoyCounterId,
+  requests_pending: EnvoyGaugeId,
+  requests_set_value: EnvoyGaugeId,
+  requests_header_values: EnvoyHistogramId,
+
+  entrypoint_total: EnvoyCounterVecId,
+  entrypoint_pending: EnvoyGaugeVecId,
+  entrypoint_set_value: EnvoyGaugeVecId,
+  entrypoint_header_values: EnvoyHistogramVecId,
+  header_to_count: String,
+  header_to_set: String,
+  method: Option<String>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter
+      .increment_counter(self.requests_total, 1)
+      .unwrap();
+    envoy_filter
+      .increase_gauge(self.requests_pending, 1)
+      .unwrap();
+    let method = envoy_filter.get_request_header_value(":method").unwrap();
+    let method = std::str::from_utf8(method.as_slice()).unwrap();
+    envoy_filter
+      .increment_counter_vec(self.entrypoint_total, &["on_request_headers", method], 1)
+      .unwrap();
+    envoy_filter
+      .increase_gauge_vec(self.entrypoint_pending, &["on_request_headers", method], 1)
+      .unwrap();
+    self.method = Some(method.to_owned());
+
+    // Record histogram value to provided value in header
+    if let Some(header_val) = envoy_filter.get_request_header_value(self.header_to_count.as_str()) {
+      let header_val = std::str::from_utf8(header_val.as_slice())
+        .unwrap()
+        .parse()
+        .unwrap();
+      envoy_filter
+        .record_histogram_value(self.requests_header_values, header_val)
+        .unwrap();
+      envoy_filter
+        .record_histogram_value_vec(
+          self.entrypoint_header_values,
+          &["on_request_headers", method],
+          header_val,
+        )
+        .unwrap();
+    }
+
+    // Set gauges to provided value in header
+    if let Some(header_val) = envoy_filter.get_request_header_value(self.header_to_set.as_str()) {
+      let header_val = std::str::from_utf8(header_val.as_slice())
+        .unwrap()
+        .parse()
+        .unwrap();
+      envoy_filter
+        .set_gauge(self.requests_set_value, header_val)
+        .unwrap();
+      envoy_filter
+        .set_gauge_vec(
+          self.entrypoint_set_value,
+          &["on_request_headers", method],
+          header_val,
+        )
+        .unwrap();
+    }
+
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    envoy_filter
+      .increment_counter_vec(
+        self.entrypoint_total,
+        &["on_response_headers", self.method.as_ref().unwrap()],
+        1,
+      )
+      .unwrap();
+    envoy_filter
+      .decrease_gauge(self.requests_pending, 1)
+      .unwrap();
+    envoy_filter
+      .decrease_gauge_vec(
+        self.entrypoint_pending,
+        &["on_request_headers", self.method.as_ref().unwrap()],
+        1,
+      )
+      .unwrap();
+    envoy_filter
+      .increase_gauge_vec(
+        self.entrypoint_pending,
+        &["on_response_headers", self.method.as_ref().unwrap()],
+        1,
+      )
+      .unwrap();
+
+    // Record histogram value to provided value in header
+    if let Some(header_val) = envoy_filter.get_response_header_value(self.header_to_count.as_str())
+    {
+      let header_val = std::str::from_utf8(header_val.as_slice())
+        .unwrap()
+        .parse()
+        .unwrap();
+      envoy_filter
+        .record_histogram_value_vec(
+          self.entrypoint_header_values,
+          &["on_response_headers", self.method.as_ref().unwrap()],
+          header_val,
+        )
+        .unwrap();
+    }
+
+    // Set gauges to provided value in header
+    if let Some(header_val) = envoy_filter.get_response_header_value(self.header_to_set.as_str()) {
+      let header_val = std::str::from_utf8(header_val.as_slice())
+        .unwrap()
+        .parse()
+        .unwrap();
+      envoy_filter
+        .set_gauge_vec(
+          self.entrypoint_set_value,
+          &["on_response_headers", self.method.as_ref().unwrap()],
+          header_val,
+        )
+        .unwrap();
+    }
+
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+
+  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
+    envoy_filter
+      .decrease_gauge_vec(
+        self.entrypoint_pending,
+        &["on_response_headers", self.method.as_ref().unwrap()],
+        1,
+      )
+      .unwrap();
+  }
+}
+
+// Terminal filter that creates a response without an upstream.
+// This filter demonstrates a bidirectional stream with trailers - response processing
+// can happen in filter callbacks or scheduled events. We test scheduled events here
+// since it will be more common for terminal filters.
+//
+// Request flow:
+//   - Client sends headers
+//   - Filter returns headers and body
+//   - Client sends body
+//   - Filter returns body
+//   - Client closes request
+//   - Filter returns body and trailers
+struct StreamingTerminalFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StreamingTerminalFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(StreamingTerminalHttpFilter {
+      request_closed: false,
+    })
+  }
+}
+
+const EVENT_ID_START_RESPONSE: u64 = 1;
+const EVENT_ID_READ_REQUEST: u64 = 2;
+
+struct StreamingTerminalHttpFilter {
+  request_closed: bool,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter.new_scheduler().commit(EVENT_ID_START_RESPONSE);
+    return envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue;
+  }
+
+  fn on_request_body(
+    &mut self,
+    envoy_filter: &mut EHF,
+    end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
+    if end_of_stream {
+      self.request_closed = true;
+    }
+    envoy_filter.new_scheduler().commit(EVENT_ID_READ_REQUEST);
+    return envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer;
+  }
+
+  fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+    match event_id {
+      EVENT_ID_START_RESPONSE => {
+        envoy_filter.send_response_headers(
+          vec![
+            (":status", b"200"),
+            ("x-filter", b"terminal"),
+            ("trailers", b"x-status"),
+          ],
+          false,
+        );
+        envoy_filter.send_response_data(b"Who are you?", false);
+      },
+      EVENT_ID_READ_REQUEST => {
+        if !self.request_closed {
+          let mut body = Vec::new();
+          if let Some(buffers) = envoy_filter.get_request_body() {
+            for buffer in buffers {
+              body.extend_from_slice(buffer.as_slice());
+            }
+          }
+          envoy_filter.drain_request_body(body.len());
+          envoy_filter.send_response_data(
+            [b"Hi ", body.as_slice(), b". Anything else?"]
+              .concat()
+              .as_slice(),
+            false,
+          );
+        } else {
+          envoy_filter.send_response_data(b"Thanks!", false);
+          envoy_filter.send_response_trailers(vec![("x-status", b"finished")]);
+        }
+      },
+      _ => unreachable!(),
+    }
   }
 }

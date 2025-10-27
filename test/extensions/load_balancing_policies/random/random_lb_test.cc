@@ -32,8 +32,8 @@ TEST_P(RandomLoadBalancerTest, NoHosts) {
 
 TEST_P(RandomLoadBalancerTest, Normal) {
   init();
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                              makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -54,8 +54,8 @@ TEST_P(RandomLoadBalancerTest, FailClusterOnPanic) {
   init();
 
   hostSet().healthy_hosts_ = {};
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 }
@@ -68,7 +68,7 @@ TEST(TypedRandomLbConfigTest, TypedRandomLbConfigTest) {
   {
     envoy::config::cluster::v3::Cluster::CommonLbConfig common;
 
-    Extensions::LoadBalancingPolices::Random::TypedRandomLbConfig typed_config(common);
+    Extensions::LoadBalancingPolicies::Random::TypedRandomLbConfig typed_config(common);
 
     EXPECT_FALSE(typed_config.lb_config_.has_locality_lb_config());
   }
@@ -78,7 +78,7 @@ TEST(TypedRandomLbConfigTest, TypedRandomLbConfigTest) {
 
     common.mutable_locality_weighted_lb_config();
 
-    Extensions::LoadBalancingPolices::Random::TypedRandomLbConfig typed_config(common);
+    Extensions::LoadBalancingPolicies::Random::TypedRandomLbConfig typed_config(common);
 
     EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_TRUE(typed_config.lb_config_.locality_lb_config().has_locality_weighted_lb_config());
@@ -92,7 +92,7 @@ TEST(TypedRandomLbConfigTest, TypedRandomLbConfigTest) {
     common.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(23.0);
     common.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
 
-    Extensions::LoadBalancingPolices::Random::TypedRandomLbConfig typed_config(common);
+    Extensions::LoadBalancingPolicies::Random::TypedRandomLbConfig typed_config(common);
 
     EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_FALSE(typed_config.lb_config_.locality_lb_config().has_locality_weighted_lb_config());

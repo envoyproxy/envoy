@@ -69,7 +69,6 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:configuration_lib",
         "//test/common/upstream:utility_lib",
-        "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
@@ -269,8 +268,10 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/http/buffer:config",
+        "//source/server:cgroup_cpu_util_lib",
         "//source/server:options_lib",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
@@ -280,6 +281,33 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "cgroup_cpu_util_test",
+    srcs = ["cgroup_cpu_util_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/filesystem:filesystem_lib",
+        "//source/server:cgroup_cpu_util_lib",
+        "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "cgroup_cpu_simple_integration_test",
+    srcs = ["cgroup_cpu_simple_integration_test.cc"],
+    tags = [
+        # This test requires Docker with CPU limits (--cpus=2) to properly test 'cgroup' detection.
+        # Run locally with `ENVOY_DOCKER_CPUS=2 ./ci/run_envoy_docker.sh ./ci/do_ci.sh cpu-detection
+        "runtime-cpu",
+        "no-remote",
+    ],
+    deps = [
+        "//source/server:cgroup_cpu_util_lib",
     ],
 )
 
@@ -361,15 +389,17 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/common:notification_lib",
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
-        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/health_checkers/http:health_checker_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/tracers/zipkin:config",
         "//source/server:process_context_lib",
         "//source/server:server_lib",
@@ -378,6 +408,7 @@ envoy_cc_test(
         "//test/config:v2_link_hacks",
         "//test/integration:integration_lib",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/server:bootstrap_extension_factory_mocks",
         "//test/mocks/server:fatal_action_factory_mocks",
         "//test/mocks/server:hot_restart_mocks",

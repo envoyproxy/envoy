@@ -36,6 +36,9 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
       {TypeUtil::descriptorFullNameToTypeUrl(
           envoy::extensions::matching::common_inputs::network::v3::ServerNameInput::descriptor()
               ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(envoy::extensions::matching::common_inputs::network::
+                                                 v3::NetworkNamespaceInput::descriptor()
+                                                     ->full_name())},
       {TypeUtil::descriptorFullNameToTypeUrl(
           envoy::extensions::matching::common_inputs::ssl::v3::UriSanInput::descriptor()
               ->full_name())},
@@ -170,7 +173,7 @@ void RoleBasedAccessControlFilter::onEvent(Network::ConnectionEvent event) {
 
 void RoleBasedAccessControlFilter::setDynamicMetadata(const std::string& shadow_engine_result,
                                                       const std::string& shadow_policy_id) const {
-  ProtobufWkt::Struct metrics;
+  Protobuf::Struct metrics;
   auto& fields = *metrics.mutable_fields();
   if (!shadow_policy_id.empty()) {
     fields[config_->shadowEffectivePolicyIdField()].set_string_value(shadow_policy_id);

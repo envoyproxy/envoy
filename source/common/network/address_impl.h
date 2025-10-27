@@ -179,6 +179,22 @@ private:
              // inlined IN_MULTICAST() to avoid byte swapping
              !((ipv4_.address_.sin_addr.s_addr & htonl(0xf0000000)) == htonl(0xe0000000));
     }
+    bool isLinkLocalAddress() const override {
+      // Check if the address is in the link-local range: 169.254.0.0/16.
+      return (ipv4_.address_.sin_addr.s_addr & htonl(0xffff0000)) == htonl(0xa9fe0000);
+    }
+    bool isUniqueLocalAddress() const override {
+      // Unique Local Addresses (ULA) are not applicable to IPv4.
+      return false;
+    }
+    bool isSiteLocalAddress() const override {
+      // Site-Local Addresses are not applicable to IPv4.
+      return false;
+    }
+    bool isTeredoAddress() const override {
+      // Teredo addresses are not applicable to IPv4.
+      return false;
+    }
     const Ipv4* ipv4() const override { return &ipv4_; }
     const Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return ntohs(ipv4_.address_.sin_port); }
@@ -290,6 +306,29 @@ private:
     }
     bool isUnicastAddress() const override {
       return !isAnyAddress() && !IN6_IS_ADDR_MULTICAST(&ipv6_.address_.sin6_addr);
+    }
+    bool isLinkLocalAddress() const override {
+      // Check if the address is in the link-local range: fe80::/10 or in the v4 mapped link-local
+      // range: [::ffff:169.254.0.0].
+      return IN6_IS_ADDR_LINKLOCAL(&ipv6_.address_.sin6_addr) ||
+             (IN6_IS_ADDR_V4MAPPED(&ipv6_.address_.sin6_addr) &&
+              (ipv6_.address_.sin6_addr.s6_addr[12] == 0xa9 &&
+               ipv6_.address_.sin6_addr.s6_addr[13] == 0xfe));
+    }
+    bool isUniqueLocalAddress() const override {
+      // Unique Local Addresses (ULA) are in the range fc00::/7.
+      return (ipv6_.address_.sin6_addr.s6_addr[0] & 0xfe) == 0xfc;
+    }
+    bool isSiteLocalAddress() const override {
+      // Site-Local Addresses are in the range fec0::/10.
+      return IN6_IS_ADDR_SITELOCAL(&ipv6_.address_.sin6_addr);
+    }
+    bool isTeredoAddress() const override {
+      // Teredo addresses have the prefix 2001:0000::/32.
+      return ipv6_.address_.sin6_addr.s6_addr[0] == 0x20 &&
+             ipv6_.address_.sin6_addr.s6_addr[1] == 0x01 &&
+             ipv6_.address_.sin6_addr.s6_addr[2] == 0x00 &&
+             ipv6_.address_.sin6_addr.s6_addr[3] == 0x00;
     }
     const Ipv4* ipv4() const override { return nullptr; }
     const Ipv6* ipv6() const override { return &ipv6_; }

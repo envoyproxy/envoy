@@ -1,7 +1,12 @@
 #include "source/common/runtime/runtime_features.h"
 
+#include "envoy/http/codec_runtime_overrides.h"
+
+#include "source/common/singleton/const_singleton.h"
+
 #include "absl/flags/commandlineflag.h"
 #include "absl/flags/flag.h"
+#include "absl/flags/reflection.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
 
@@ -29,51 +34,32 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
-RUNTIME_GUARD(envoy_reloadable_features_allow_alt_svc_for_ips);
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
-RUNTIME_GUARD(envoy_reloadable_features_avoid_dfp_cluster_removal_on_cds_update);
+RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
-RUNTIME_GUARD(envoy_reloadable_features_dfp_fail_on_empty_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
-RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
-RUNTIME_GUARD(envoy_reloadable_features_enable_udp_proxy_outlier_detection);
-RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
-RUNTIME_GUARD(envoy_reloadable_features_filter_chain_aborted_can_not_continue);
-RUNTIME_GUARD(envoy_reloadable_features_gcp_authn_use_fixed_url);
-RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_num_retries);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
+RUNTIME_GUARD(envoy_reloadable_features_generic_proxy_codec_buffer_limit);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
-RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_allow_cr_or_lf_at_request_start);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_delay_reset);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_extension);
-// Ignore the automated "remove this flag" issue: we should keep this for 1 year.
-RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_propagate_reset_events);
 RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
-RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
-RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_cookie);
-RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_trailers);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
-RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_remove_jwt_from_query_params);
-RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_validate_uri);
-RUNTIME_GUARD(envoy_reloadable_features_jwt_fetcher_use_scheme_from_uri);
-RUNTIME_GUARD(envoy_reloadable_features_local_reply_traverses_filter_chain_after_1xx);
-RUNTIME_GUARD(envoy_reloadable_features_mmdb_files_reload_enabled);
+RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
-RUNTIME_GUARD(envoy_reloadable_features_normalize_rds_provider_config);
-RUNTIME_GUARD(envoy_reloadable_features_oauth2_use_refresh_token);
+RUNTIME_GUARD(envoy_reloadable_features_oauth2_cleanup_cookies);
+RUNTIME_GUARD(envoy_reloadable_features_oauth2_encrypt_tokens);
+RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
-RUNTIME_GUARD(envoy_reloadable_features_original_src_fix_port_exhaustion);
-RUNTIME_GUARD(envoy_reloadable_features_prefer_ipv6_dns_on_macos);
-RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
 RUNTIME_GUARD(envoy_reloadable_features_prefix_map_matcher_resume_after_subtree_miss);
-RUNTIME_GUARD(envoy_reloadable_features_proxy_104);
-RUNTIME_GUARD(envoy_reloadable_features_proxy_ssl_port);
-RUNTIME_GUARD(envoy_reloadable_features_proxy_status_mapping_more_core_response_flags);
+RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
+RUNTIME_GUARD(envoy_reloadable_features_quic_fix_defer_logging_miss_for_half_closed_stream);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
@@ -81,31 +67,28 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_signal_headers_only_to_http1_backen
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_for_read);
 RUNTIME_GUARD(envoy_reloadable_features_reject_empty_trusted_ca_file);
-RUNTIME_GUARD(envoy_reloadable_features_report_load_with_rq_issued);
-RUNTIME_GUARD(envoy_reloadable_features_report_stream_reset_error_code);
 RUNTIME_GUARD(envoy_reloadable_features_router_filter_resetall_on_local_reply);
-RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_trace_sampling);
+RUNTIME_GUARD(envoy_reloadable_features_safe_http2_options);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_ext_proc_on_local_reply);
-RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
-RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_retry_on_different_event_loop);
+RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_set_idle_timer_immediately_on_new_connection);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
+RUNTIME_GUARD(envoy_reloadable_features_trace_refresh_after_route_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
-RUNTIME_GUARD(envoy_reloadable_features_udp_socket_apply_aggregated_read_limit);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_match_on_asterisk);
-RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
-RUNTIME_GUARD(envoy_reloadable_features_use_filter_manager_state_for_downstream_end_stream);
-RUNTIME_GUARD(envoy_reloadable_features_use_typed_metadata_in_proxy_protocol_listener);
+RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
-RUNTIME_GUARD(envoy_reloadable_features_wait_for_first_byte_before_balsa_msg_done);
+RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_chain);
+RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
-RUNTIME_GUARD(envoy_reloadable_features_xds_prevent_resource_copy);
-RUNTIME_GUARD(envoy_restart_features_fix_dispatcher_approximate_now);
+
+RUNTIME_GUARD(envoy_restart_features_move_locality_schedulers_to_lb);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
 RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
+RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
@@ -130,8 +113,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
 // For more information about Universal Header Validation, please see
 // https://github.com/envoyproxy/envoy/issues/10646
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
-// TODO(pksohn): enable after canarying the feature internally without problems.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 // TODO(alyssar) evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_null_addresses);
 // TODO(alyssar) evaluate and either make this a config knob or remove.
@@ -148,12 +129,28 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_drain_pools_on_network_change);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
 // Adding runtime flag to use balsa_parser for http_inspector.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
+// TODO(danzh) re-enable it when the issue of preferring TCP over v6 rather than QUIC over v4 is
+// fixed.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
 // TODO(renjietang): Evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
+// TODO(abeyad): Evaluate and make this a config knob or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_srtt);
+// TODO(abeyad): Evaluate and make this a config knob or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_initial_rtt_estimate);
 // TODO(fredyw): Remove after done with debugging.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_log_ip_families_on_network_error);
+// TODO(abeyad): Flip to true after prod testing. Simple filtering applies to link-local addresses
+// only.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_mobile_ipv6_probe_simple_filtering);
+// TODO(abeyad): Flip to true after prod testing. Advanced filtering applies to all IP reserved
+// range addresses.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_mobile_ipv6_probe_advanced_filtering);
 // TODO(botengyao): flip to true after canarying the feature internally without problems.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_connection_close_through_filter_manager);
+// TODO(adisuissa): flip to true after all xDS types use the new subscription
+// method, and this is tested extensively.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_xdstp_based_config_singleton_subscriptions);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
@@ -167,6 +164,29 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_cl
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
+
+// Flag to remove legacy route formatter support in header parser
+// Flip to true after two release periods.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_route_formatter);
+
+// TODO(grnmeira):
+// Enables the new DNS implementation, a merged implementation of
+// strict and logical DNS clusters. This new implementation will
+// take over the split ones, and will be used as a base for the
+// implementation of on-demand DNS.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
+// Force a local reply from upstream envoy for reverse connections.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_conn_force_local_reply);
+// RELEASE_ASSERT when upstream stream detects UAF of downstream response decoder instance.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_abort_when_accessing_dead_decoder);
+// TODO(pradeepcrao): Create a config option to enable this instead after
+// testing.
+FALSE_RUNTIME_GUARD(envoy_restart_features_use_cached_grpc_client_for_xds);
+// Runtime guard to revert back to old non-RFC-compliant CONNECT behavior without Host header.
+// TODO(vinaykul): Drop this false-runtime-guard when deemed safe with RFC 9110 compliant CONNECT.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_11_proxy_connect_legacy_format);
+// TODO(tsaarni): Flip to true after prod testing or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
@@ -228,6 +248,13 @@ bool hasRuntimePrefix(absl::string_view feature) {
 
 bool isRuntimeFeature(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().getFlag(feature) != nullptr;
+}
+
+bool isLegacyRuntimeFeature(absl::string_view feature) {
+  return feature == Http::MaxRequestHeadersCountOverrideKey ||
+         feature == Http::MaxResponseHeadersCountOverrideKey ||
+         feature == Http::MaxRequestHeadersSizeOverrideKey ||
+         feature == Http::MaxResponseHeadersSizeOverrideKey;
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {

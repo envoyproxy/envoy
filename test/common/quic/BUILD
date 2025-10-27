@@ -152,6 +152,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
         "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
@@ -181,6 +182,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "@com_github_google_quiche//:quic_test_tools_config_peer_lib",
+        "@com_github_google_quiche//:quic_test_tools_stream_peer_lib",
         "@com_github_google_quiche//:quic_test_tools_server_session_base_peer",
         "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
     ]),
@@ -331,6 +333,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_utils_lib",
+        "//source/common/runtime:runtime_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@com_github_google_quiche//:quic_test_tools_test_utils_lib",

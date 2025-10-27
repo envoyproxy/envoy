@@ -3,17 +3,23 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
+#include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
+#include "envoy/type/v3/http_status.pb.h"
 
+#include "source/common/json/json_loader.h"
 #include "source/extensions/filters/http/ext_proc/config.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/ext_proc/ext_proc_integration_common.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.h"
@@ -30,6 +36,9 @@
 #include "ocpdiag/core/testing/status_matchers.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ExternalProcessing {
 
 using envoy::config::route::v3::Route;
 using envoy::config::route::v3::VirtualHost;
@@ -37,8 +46,8 @@ using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 using Envoy::Extensions::HttpFilters::ExternalProcessing::verifyMultipleHeaderValues;
+using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
-using Envoy::ProtobufWkt::Any;
 using envoy::service::ext_proc::v3::BodyResponse;
 using envoy::service::ext_proc::v3::CommonResponse;
 using envoy::service::ext_proc::v3::HeadersResponse;
@@ -51,882 +60,16 @@ using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::ProtocolConfiguration;
 using envoy::service::ext_proc::v3::TrailersResponse;
 using Extensions::HttpFilters::ExternalProcessing::DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS;
-using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
 using Extensions::HttpFilters::ExternalProcessing::OnProcessingResponseFactory;
-using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFactory;
 using Http::LowerCaseString;
 using test::integration::filters::LoggingTestFilterConfig;
+using testing::_;
+using testing::Not;
 
 using namespace std::chrono_literals;
-
-struct ConfigOptions {
-  bool valid_grpc_server = true;
-  bool add_logging_filter = false;
-  absl::optional<LoggingTestFilterConfig> logging_filter_config = absl::nullopt;
-  bool http1_codec = false;
-  bool add_metadata = false;
-  bool downstream_filter = true;
-  bool add_response_processor = false;
-};
-
-// A filter that sticks dynamic metadata info into headers for integration testing.
-class DynamicMetadataToHeadersFilter : public Http::PassThroughFilter {
-public:
-  constexpr static char name[] = "dynamic-metadata-to-headers-filter";
-
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
-    if (decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata_size() > 0) {
-      const auto& md = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
-      for (const auto& md_entry : md) {
-        std::string key_prefix = md_entry.first;
-        for (const auto& field : md_entry.second.fields()) {
-          headers.addCopy(Http::LowerCaseString(key_prefix), field.first);
-        }
-      }
-    }
-    return Http::FilterHeadersStatus::Continue;
-  }
-};
-
-// These tests exercise the ext_proc filter through Envoy's integration test
-// environment by configuring an instance of the Envoy server and driving it
-// through the mock network stack.
-class ExtProcIntegrationTest : public HttpIntegrationTest,
-                               public Grpc::GrpcClientIntegrationParamTest {
-protected:
-  ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
-
-  void createUpstreams() override {
-    HttpIntegrationTest::createUpstreams();
-
-    // Create separate "upstreams" for ExtProc gRPC servers
-    for (int i = 0; i < grpc_upstream_count_; ++i) {
-      grpc_upstreams_.push_back(&addFakeUpstream(Http::CodecType::HTTP2));
-    }
-  }
-
-  void TearDown() override {
-    if (processor_connection_) {
-      ASSERT_TRUE(processor_connection_->close());
-      ASSERT_TRUE(processor_connection_->waitForDisconnect());
-    }
-    cleanupUpstreamAndDownstream();
-  }
-
-  void initializeConfig(ConfigOptions config_option = {},
-                        const std::vector<std::pair<int, int>>& cluster_endpoints = {{0, 1},
-                                                                                     {1, 1}}) {
-    int total_cluster_endpoints = 0;
-    std::for_each(
-        cluster_endpoints.begin(), cluster_endpoints.end(),
-        [&total_cluster_endpoints](const auto& item) { total_cluster_endpoints += item.second; });
-    ASSERT_EQ(total_cluster_endpoints, grpc_upstream_count_);
-
-    config_helper_.addConfigModifier([this, cluster_endpoints, config_option](
-                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
-      ConfigHelper::setHttp2(
-          *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
-
-      // Clusters for ExtProc gRPC servers, starting by copying an existing
-      // cluster
-      for (const auto& [cluster_id, endpoint_count] : cluster_endpoints) {
-        auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
-        server_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-        std::string cluster_name = absl::StrCat("ext_proc_server_", cluster_id);
-        server_cluster->set_name(cluster_name);
-        server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
-        ASSERT_EQ(server_cluster->load_assignment().endpoints_size(), 1);
-        auto* endpoints = server_cluster->mutable_load_assignment()->mutable_endpoints(0);
-        ASSERT_EQ(endpoints->lb_endpoints_size(), 1);
-        for (int i = 1; i < endpoint_count; ++i) {
-          auto* new_lb_endpoint = endpoints->add_lb_endpoints();
-          new_lb_endpoint->MergeFrom(endpoints->lb_endpoints(0));
-        }
-      }
-
-      const std::string valid_grpc_cluster_name = "ext_proc_server_0";
-      if (config_option.valid_grpc_server) {
-        // Load configuration of the server from YAML and use a helper to add a grpc_service
-        // stanza pointing to the cluster that we just made
-        setGrpcService(*proto_config_.mutable_grpc_service(), valid_grpc_cluster_name,
-                       grpc_upstreams_[0]->localAddress());
-      } else {
-        // Set up the gRPC service with wrong cluster name and address.
-        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_wrong_server",
-                       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
-      }
-
-      std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
-      if (config_option.downstream_filter) {
-        // Construct a configuration proto for our filter and then re-write it
-        // to JSON so that we can add it to the overall config
-        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
-            ext_proc_filter;
-        ext_proc_filter.set_name(ext_proc_filter_name);
-        ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-        config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
-      }
-
-      // Add set_metadata filter to inject dynamic metadata used for testing
-      if (config_option.add_metadata) {
-        envoy::config::listener::v3::Filter set_metadata_filter;
-        std::string set_metadata_filter_name = "envoy.filters.http.set_metadata";
-        set_metadata_filter.set_name(set_metadata_filter_name);
-
-        envoy::extensions::filters::http::set_metadata::v3::Config set_metadata_config;
-        auto* untyped_md = set_metadata_config.add_metadata();
-        untyped_md->set_metadata_namespace("forwarding_ns_untyped");
-        untyped_md->set_allow_overwrite(true);
-        ProtobufWkt::Struct test_md_val;
-        (*test_md_val.mutable_fields())["foo"].set_string_value("value from set_metadata");
-        (*untyped_md->mutable_value()) = test_md_val;
-
-        auto* typed_md = set_metadata_config.add_metadata();
-        typed_md->set_metadata_namespace("forwarding_ns_typed");
-        typed_md->set_allow_overwrite(true);
-        envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_to_stuff;
-        typed_md_to_stuff.set_metadata_namespace("typed_value from set_metadata");
-        typed_md->mutable_typed_value()->PackFrom(typed_md_to_stuff);
-
-        set_metadata_filter.mutable_typed_config()->PackFrom(set_metadata_config);
-        config_helper_.prependFilter(
-            MessageUtil::getJsonStringFromMessageOrError(set_metadata_filter));
-
-        // Add filter that dumps streamInfo into headers so we can check our receiving
-        // namespaces
-        config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-        )EOF"));
-      }
-
-      // Add dynamic_metadata_to_headers filter to inject dynamic metadata used for testing
-      if (config_option.add_response_processor) {
-        simple_filter_config_ =
-            std::make_unique<SimpleFilterConfig<DynamicMetadataToHeadersFilter>>();
-        registration_ = std::make_unique<
-            Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>(
-            *simple_filter_config_);
-        config_helper_.prependFilter(fmt::format(R"EOF(
-         name: dynamic-metadata-to-headers-filter
-         typed_config:
-           "@type": type.googleapis.com/google.protobuf.Struct
-        )EOF"));
-      }
-
-      // Add logging test filter only in Envoy gRPC mode.
-      // gRPC side stream logging is only supported in Envoy gRPC mode at the moment.
-      if (clientType() == Grpc::ClientType::EnvoyGrpc && config_option.add_logging_filter &&
-          config_option.valid_grpc_server) {
-        LoggingTestFilterConfig logging_filter_config;
-        logging_filter_config.set_logging_id(ext_proc_filter_name);
-        logging_filter_config.set_upstream_cluster_name(valid_grpc_cluster_name);
-        // No need to check the bytes received for observability mode because it is a
-        // "send and go" mode.
-        logging_filter_config.set_check_received_bytes(!proto_config_.observability_mode());
-        logging_filter_config.set_http_rcd("via_upstream");
-        if (config_option.logging_filter_config) {
-          logging_filter_config.MergeFrom(*config_option.logging_filter_config);
-        }
-
-        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
-        logging_filter.set_name("logging-test-filter");
-        logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
-
-        config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
-      }
-
-      // Parameterize with defer processing to prevent bit rot as filter made
-      // assumptions of data flow, prior relying on eager processing.
-    });
-
-    if (config_option.add_response_processor) {
-      processing_response_factory_ = std::make_unique<TestOnProcessingResponseFactory>();
-      processing_response_factory_registration_ =
-          std::make_unique<Envoy::Registry::InjectFactory<OnProcessingResponseFactory>>(
-              *processing_response_factory_);
-      ProtobufWkt::Struct config;
-      proto_config_.mutable_on_processing_response()->set_name("test-on-processing-response");
-      proto_config_.mutable_on_processing_response()->mutable_typed_config()->PackFrom(config);
-    }
-
-    if (config_option.http1_codec) {
-      setUpstreamProtocol(Http::CodecType::HTTP1);
-      setDownstreamProtocol(Http::CodecType::HTTP1);
-    } else {
-      setUpstreamProtocol(Http::CodecType::HTTP2);
-      setDownstreamProtocol(Http::CodecType::HTTP2);
-    }
-  }
-
-  bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
-
-  void setPerRouteConfig(Route* route, const ExtProcPerRoute& cfg) {
-    Any cfg_any;
-    ASSERT_TRUE(cfg_any.PackFrom(cfg));
-    route->mutable_typed_per_filter_config()->insert(
-        MapPair<std::string, Any>("envoy.filters.http.ext_proc", cfg_any));
-  }
-
-  void setPerHostConfig(VirtualHost& vh, const ExtProcPerRoute& cfg) {
-    Any cfg_any;
-    ASSERT_TRUE(cfg_any.PackFrom(cfg));
-    vh.mutable_typed_per_filter_config()->insert(
-        MapPair<std::string, Any>("envoy.filters.http.ext_proc", cfg_any));
-  }
-
-  void protocolConfigEncoding(ProcessingRequest& request) {
-    protocol_config_encoded_ = false;
-    if (request.has_protocol_config()) {
-      protocol_config_encoded_ = true;
-      protocol_config_ = request.protocol_config();
-    }
-  }
-
-  IntegrationStreamDecoderPtr sendDownstreamRequest(
-      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
-    auto conn = makeClientConnection(lookupPort("http"));
-    codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestRequestHeaderMapImpl headers;
-    HttpTestUtility::addDefaultHeaders(headers);
-    if (modify_headers) {
-      (*modify_headers)(headers);
-    }
-    return codec_client_->makeHeaderOnlyRequest(headers);
-  }
-
-  IntegrationStreamDecoderPtr sendDownstreamRequestWithBody(
-      absl::string_view body,
-      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers,
-      bool add_content_length = false) {
-    auto conn = makeClientConnection(lookupPort("http"));
-    codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestRequestHeaderMapImpl headers;
-    HttpTestUtility::addDefaultHeaders(headers);
-    headers.setMethod("POST");
-    if (modify_headers) {
-      (*modify_headers)(headers);
-    }
-
-    if (add_content_length) {
-      headers.setContentLength(body.size());
-    }
-    return codec_client_->makeRequestWithBody(headers, std::string(body));
-  }
-
-  IntegrationStreamDecoderPtr sendDownstreamRequestWithBodyAndTrailer(absl::string_view body) {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    Http::TestRequestHeaderMapImpl headers;
-    HttpTestUtility::addDefaultHeaders(headers);
-
-    auto encoder_decoder = codec_client_->startRequest(headers);
-    request_encoder_ = &encoder_decoder.first;
-    auto response = std::move(encoder_decoder.second);
-    codec_client_->sendData(*request_encoder_, body, false);
-    Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
-    codec_client_->sendTrailers(*request_encoder_, request_trailers);
-
-    return response;
-  }
-
-  void verifyDownstreamResponse(IntegrationStreamDecoder& response, int status_code) {
-    ASSERT_TRUE(response.waitForEndStream());
-    EXPECT_TRUE(response.complete());
-    EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
-  }
-
-  void handleUpstreamRequest(bool add_content_length = false, int status_code = 200) {
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    Http::TestResponseHeaderMapImpl response_headers =
-        Http::TestResponseHeaderMapImpl{{":status", std::to_string(status_code)}};
-    uint64_t content_length = 100;
-    if (add_content_length) {
-      response_headers.setContentLength(content_length);
-    }
-    upstream_request_->encodeHeaders(response_headers, false);
-    upstream_request_->encodeData(content_length, true);
-  }
-
-  void verifyChunkedEncoding(const Http::RequestOrResponseHeaderMap& headers) {
-    EXPECT_EQ(headers.ContentLength(), nullptr);
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().TransferEncoding,
-                                       Http::Headers::get().TransferEncodingValues.Chunked));
-  }
-
-  void handleUpstreamRequestWithTrailer() {
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-    upstream_request_->encodeData(100, false);
-    upstream_request_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"x-test-trailers", "Yes"}});
-  }
-
-  void handleUpstreamRequestWithResponse(const Buffer::Instance& all_data, uint64_t chunk_size) {
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-
-    // Copy the data so that we don't modify it
-    Buffer::OwnedImpl total_response = all_data;
-    while (total_response.length() > 0) {
-      auto to_move = std::min(total_response.length(), chunk_size);
-      Buffer::OwnedImpl chunk;
-      chunk.move(total_response, to_move);
-      EXPECT_EQ(to_move, chunk.length());
-      upstream_request_->encodeData(chunk, false);
-    }
-    upstream_request_->encodeData(0, true);
-  }
-
-  void waitForFirstMessage(FakeUpstream& grpc_upstream, ProcessingRequest& request) {
-    ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
-    ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-  }
-
-  void processGenericMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const ProcessingRequest&, ProcessingResponse&)>> cb) {
-    ProcessingRequest request;
-    if (first_message) {
-      ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
-      ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    }
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    if (first_message) {
-      processor_stream_->startGrpcStream();
-    }
-    ProcessingResponse response;
-    const bool sendReply = !cb || (*cb)(request, response);
-    if (sendReply) {
-      processor_stream_->sendGrpcMessage(response);
-    }
-  }
-
-  void processRequestHeadersMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
-    ProcessingRequest request;
-    if (first_message) {
-      ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
-      ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    }
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    ASSERT_TRUE(request.has_request_headers());
-    protocolConfigEncoding(request);
-    if (first_message) {
-      processor_stream_->startGrpcStream();
-    }
-    ProcessingResponse response;
-    auto* headers = response.mutable_request_headers();
-    const bool sendReply = !cb || (*cb)(request.request_headers(), *headers);
-    if (sendReply) {
-      processor_stream_->sendGrpcMessage(response);
-    }
-  }
-
-  void processRequestTrailersMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb) {
-    ProcessingRequest request;
-    if (first_message) {
-      ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
-      ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    }
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    ASSERT_TRUE(request.has_request_trailers());
-    if (first_message) {
-      processor_stream_->startGrpcStream();
-    }
-    ProcessingResponse response;
-    auto* body = response.mutable_request_trailers();
-    const bool sendReply = !cb || (*cb)(request.request_trailers(), *body);
-    if (sendReply) {
-      processor_stream_->sendGrpcMessage(response);
-    }
-  }
-
-  void processResponseHeadersMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
-    ProcessingRequest request;
-    if (first_message) {
-      ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
-      ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    }
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    ASSERT_TRUE(request.has_response_headers());
-    protocolConfigEncoding(request);
-
-    if (first_message) {
-      processor_stream_->startGrpcStream();
-    }
-    ProcessingResponse response;
-    auto* headers = response.mutable_response_headers();
-    const bool sendReply = !cb || (*cb)(request.response_headers(), *headers);
-    if (sendReply) {
-      processor_stream_->sendGrpcMessage(response);
-    }
-  }
-
-  void
-  processRequestBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
-                            absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb,
-                            bool check_downstream_flow_control = false) {
-    ProcessingRequest request;
-    if (first_message) {
-      ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
-      ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    }
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    ASSERT_TRUE(request.has_request_body());
-    protocolConfigEncoding(request);
-
-    if (first_message) {
-      processor_stream_->startGrpcStream();
-    }
-
-    if (check_downstream_flow_control) {
-      // Check the flow control counter in downstream, which is triggered on the request
-      // path to ext_proc server (i.e., from side stream).
-      test_server_->waitForCounterGe(
-          "http.config_test.downstream_flow_control_paused_reading_total", 1);
-    }
-
-    // Send back the response from ext_proc server.
-    ProcessingResponse response;
-    auto* body = response.mutable_request_body();
-    const bool sendReply = !cb || (*cb)(request.request_body(), *body);
-    if (sendReply) {
-      processor_stream_->sendGrpcMessage(response);
-    }
-  }
-
-  void processResponseBodyMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
-    ProcessingRequest request;
-    if (first_message) {
-      ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
-      ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    }
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    ASSERT_TRUE(request.has_response_body());
-    protocolConfigEncoding(request);
-
-    if (first_message) {
-      processor_stream_->startGrpcStream();
-    }
-    ProcessingResponse response;
-    auto* body = response.mutable_response_body();
-    const bool sendReply = !cb || (*cb)(request.response_body(), *body);
-    if (sendReply) {
-      processor_stream_->sendGrpcMessage(response);
-    }
-  }
-
-  void processResponseTrailersMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb) {
-    ProcessingRequest request;
-    if (first_message) {
-      ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
-      ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    }
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    ASSERT_TRUE(request.has_response_trailers());
-    if (first_message) {
-      processor_stream_->startGrpcStream();
-    }
-    ProcessingResponse response;
-    auto* body = response.mutable_response_trailers();
-    const bool sendReply = !cb || (*cb)(request.response_trailers(), *body);
-    if (sendReply) {
-      processor_stream_->sendGrpcMessage(response);
-    }
-  }
-
-  void processAndRespondImmediately(FakeUpstream& grpc_upstream, bool first_message,
-                                    absl::optional<std::function<void(ImmediateResponse&)>> cb) {
-    ProcessingRequest request;
-    if (first_message) {
-      ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
-      ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    }
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    if (first_message) {
-      processor_stream_->startGrpcStream();
-    }
-    ProcessingResponse response;
-    auto* immediate = response.mutable_immediate_response();
-    if (cb) {
-      (*cb)(*immediate);
-    }
-    processor_stream_->sendGrpcMessage(response);
-  }
-
-  // ext_proc server sends back a response to tell Envoy to stop the
-  // original timer and start a new timer.
-  void serverSendNewTimeout(const uint64_t timeout_ms) {
-    ProcessingResponse response;
-    if (timeout_ms < 1000) {
-      response.mutable_override_message_timeout()->set_nanos(timeout_ms * 1000000);
-    } else {
-      response.mutable_override_message_timeout()->set_seconds(timeout_ms / 1000);
-    }
-    processor_stream_->sendGrpcMessage(response);
-  }
-
-  // The new timeout message is ignored by Envoy due to different reasons, like
-  // new_timeout setting is out-of-range, or max_message_timeout is not configured.
-  void newTimeoutWrongConfigTest(const uint64_t timeout_ms) {
-    // Set envoy filter timeout to be 200ms.
-    proto_config_.mutable_message_timeout()->set_nanos(200000000);
-    // Config max_message_timeout proto to enable the new timeout API.
-    if (max_message_timeout_ms_) {
-      if (max_message_timeout_ms_ < 1000) {
-        proto_config_.mutable_max_message_timeout()->set_nanos(max_message_timeout_ms_ * 1000000);
-      } else {
-        proto_config_.mutable_max_message_timeout()->set_seconds(max_message_timeout_ms_ / 1000);
-      }
-    }
-    initializeConfig();
-    HttpIntegrationTest::initialize();
-    auto response = sendDownstreamRequest(absl::nullopt);
-
-    processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                                 [&](const HttpHeaders&, HeadersResponse&) {
-                                   serverSendNewTimeout(timeout_ms);
-                                   // ext_proc server stays idle for 300ms before sending back the
-                                   // response.
-                                   timeSystem().advanceTimeWaitImpl(300ms);
-                                   return true;
-                                 });
-    // Verify the new timer is not started and the original timer timeouts,
-    // and downstream receives 504.
-    verifyDownstreamResponse(*response, 504);
-  }
-
-  void addMutationSetHeaders(const int count,
-                             envoy::service::ext_proc::v3::HeaderMutation& mutation) {
-    for (int i = 0; i < count; i++) {
-      auto* headers = mutation.add_set_headers();
-      auto str = absl::StrCat("x-test-header-internal-", std::to_string(i));
-      headers->mutable_append()->set_value(false);
-      headers->mutable_header()->set_key(str);
-      headers->mutable_header()->set_raw_value(str);
-    }
-  }
-
-  // Verify content-length header set by external processor is removed and chunked encoding is
-  // enabled.
-  void testWithHeaderMutation(ConfigOptions config_option) {
-    initializeConfig(config_option);
-    HttpIntegrationTest::initialize();
-
-    auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
-    processRequestHeadersMessage(
-        *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
-          auto* content_length =
-              headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
-          content_length->mutable_append()->set_value(false);
-          content_length->mutable_header()->set_key("content-length");
-          content_length->mutable_header()->set_raw_value("13");
-          return true;
-        });
-
-    processRequestBodyMessage(
-        *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
-          EXPECT_TRUE(body.end_of_stream());
-          auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-          body_mut->set_body("Hello, World!");
-          return true;
-        });
-    handleUpstreamRequest();
-    // Verify that the content length header is removed and chunked encoding is enabled by http1
-    // codec.
-    verifyChunkedEncoding(upstream_request_->headers());
-
-    EXPECT_EQ(upstream_request_->body().toString(), "Hello, World!");
-    verifyDownstreamResponse(*response, 200);
-  }
-
-  // Verify existing content-length header (i.e., no external processor mutation) is removed and
-  // chunked encoding is enabled.
-  void testWithoutHeaderMutation(ConfigOptions config_option) {
-    initializeConfig(config_option);
-    HttpIntegrationTest::initialize();
-
-    auto response =
-        sendDownstreamRequestWithBody("test!", absl::nullopt, /*add_content_length=*/true);
-    processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
-    processRequestBodyMessage(
-        *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
-          EXPECT_TRUE(body.end_of_stream());
-          auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-          body_mut->set_body("Hello, World!");
-          return true;
-        });
-
-    handleUpstreamRequest();
-    verifyChunkedEncoding(upstream_request_->headers());
-
-    EXPECT_EQ(upstream_request_->body().toString(), "Hello, World!");
-    verifyDownstreamResponse(*response, 200);
-  }
-
-  void addMutationRemoveHeaders(const int count,
-                                envoy::service::ext_proc::v3::HeaderMutation& mutation) {
-    for (int i = 0; i < count; i++) {
-      mutation.add_remove_headers(absl::StrCat("x-test-header-internal-", std::to_string(i)));
-    }
-  }
-
-  void testGetAndFailStream() {
-    HttpIntegrationTest::initialize();
-    auto response = sendDownstreamRequest(absl::nullopt);
-
-    ProcessingRequest request_headers_msg;
-    waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
-    // Fail the stream immediately
-    processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
-    verifyDownstreamResponse(*response, 500);
-  }
-
-  void testGetAndCloseStream() {
-    HttpIntegrationTest::initialize();
-    auto response = sendDownstreamRequest(absl::nullopt);
-
-    ProcessingRequest request_headers_msg;
-    waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
-    // Just close the stream without doing anything
-    processor_stream_->startGrpcStream();
-    processor_stream_->finishGrpcStream(Grpc::Status::Ok);
-
-    handleUpstreamRequest();
-    verifyDownstreamResponse(*response, 200);
-  }
-
-  void testSendDyanmicMetadata() {
-    ProtobufWkt::Struct test_md_struct;
-    (*test_md_struct.mutable_fields())["foo"].set_string_value("value from ext_proc");
-
-    ProtobufWkt::Value md_val;
-    *(md_val.mutable_struct_value()) = test_md_struct;
-
-    processGenericMessage(
-        *grpc_upstreams_[0], true,
-        [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
-          // Verify the processing request contains the untyped metadata we injected.
-          EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
-          const ProtobufWkt::Struct& fwd_metadata =
-              req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
-          EXPECT_EQ(1, fwd_metadata.fields_size());
-          EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
-          EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
-
-          // Verify the processing request contains the typed metadata we injected.
-          EXPECT_TRUE(
-              req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
-          const ProtobufWkt::Any& fwd_typed_metadata =
-              req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
-          EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
-                    fwd_typed_metadata.type_url());
-          envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_from_req;
-          fwd_typed_metadata.UnpackTo(&typed_md_from_req);
-          EXPECT_EQ("typed_value from set_metadata", typed_md_from_req.metadata_namespace());
-
-          // Spoof the response to contain receiving metadata.
-          HeadersResponse headers_resp;
-          (*resp.mutable_request_headers()) = headers_resp;
-          auto mut_md_fields = resp.mutable_dynamic_metadata()->mutable_fields();
-          (*mut_md_fields).emplace("receiving_ns_untyped", md_val);
-
-          return true;
-        });
-  }
-
-  void testSidestreamPushbackDownstream(uint32_t body_size, bool check_downstream_flow_control) {
-    config_helper_.setBufferLimits(1024, 1024);
-
-    proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
-    proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-    proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-    initializeConfig();
-    HttpIntegrationTest::initialize();
-
-    std::string body_str = std::string(body_size, 'a');
-    auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
-
-    bool end_stream = false;
-    int count = 0;
-    while (!end_stream) {
-      processRequestBodyMessage(
-          *grpc_upstreams_[0], count == 0 ? true : false,
-          [&end_stream](const HttpBody& body, BodyResponse&) {
-            end_stream = body.end_of_stream();
-            return true;
-          },
-          check_downstream_flow_control);
-      count++;
-    }
-    handleUpstreamRequest();
-
-    verifyDownstreamResponse(*response, 200);
-  }
-
-  IntegrationStreamDecoderPtr initAndSendDataDuplexStreamedMode(absl::string_view body_sent,
-                                                                bool end_of_stream,
-                                                                bool both_direction = false) {
-    config_helper_.setBufferLimits(1024, 1024);
-    auto* processing_mode = proto_config_.mutable_processing_mode();
-    processing_mode->set_request_header_mode(ProcessingMode::SEND);
-    processing_mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
-    processing_mode->set_request_trailer_mode(ProcessingMode::SEND);
-    if (!both_direction) {
-      processing_mode->set_response_header_mode(ProcessingMode::SKIP);
-    } else {
-      processing_mode->set_response_header_mode(ProcessingMode::SEND);
-      processing_mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
-      processing_mode->set_response_trailer_mode(ProcessingMode::SEND);
-    }
-
-    initializeConfig();
-    HttpIntegrationTest::initialize();
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    Http::TestRequestHeaderMapImpl default_headers;
-    HttpTestUtility::addDefaultHeaders(default_headers);
-
-    std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
-        codec_client_->startRequest(default_headers);
-    request_encoder_ = &encoder_decoder.first;
-    IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
-    codec_client_->sendData(*request_encoder_, body_sent, end_of_stream);
-    return response;
-  }
-
-  void serverReceiveHeaderDuplexStreamed(ProcessingRequest& header, bool first_message = true,
-                                         bool response = false) {
-    if (first_message) {
-      EXPECT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
-      EXPECT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    }
-    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header));
-    if (response) {
-      EXPECT_TRUE(header.has_response_headers());
-    } else {
-      EXPECT_TRUE(header.has_request_headers());
-    }
-  }
-
-  uint32_t serverReceiveBodyDuplexStreamed(absl::string_view body_sent, bool response = false,
-                                           bool compare_body = true) {
-    std::string body_received;
-    bool end_stream = false;
-    uint32_t total_req_body_msg = 0;
-    while (!end_stream) {
-      ProcessingRequest body_request;
-      EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
-      if (response) {
-        EXPECT_TRUE(body_request.has_response_body());
-        body_received = absl::StrCat(body_received, body_request.response_body().body());
-        end_stream = body_request.response_body().end_of_stream();
-      } else {
-        EXPECT_TRUE(body_request.has_request_body());
-        body_received = absl::StrCat(body_received, body_request.request_body().body());
-        end_stream = body_request.request_body().end_of_stream();
-      }
-      total_req_body_msg++;
-    }
-    EXPECT_TRUE(end_stream);
-    if (compare_body) {
-      EXPECT_EQ(body_received, body_sent);
-    }
-    return total_req_body_msg;
-  }
-
-  void serverSendHeaderRespDuplexStreamed(bool first_message = true, bool response = false) {
-    if (first_message) {
-      processor_stream_->startGrpcStream();
-    }
-    ProcessingResponse response_header;
-    HeadersResponse* header_resp;
-    if (response) {
-      header_resp = response_header.mutable_response_headers();
-    } else {
-      header_resp = response_header.mutable_request_headers();
-    }
-    auto* header_mutation = header_resp->mutable_response()->mutable_header_mutation();
-    auto* sh = header_mutation->add_set_headers();
-    auto* header = sh->mutable_header();
-    sh->mutable_append()->set_value(false);
-    header->set_key("x-new-header");
-    header->set_raw_value("new");
-    processor_stream_->sendGrpcMessage(response_header);
-  }
-
-  void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true,
-                                        bool response = false) {
-    for (uint32_t i = 0; i < total_resp_body_msg; i++) {
-      ProcessingResponse response_body;
-      BodyResponse* body_resp;
-      if (response) {
-        body_resp = response_body.mutable_response_body();
-      } else {
-        body_resp = response_body.mutable_request_body();
-      }
-
-      auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
-      auto* streamed_response = body_mut->mutable_streamed_response();
-      streamed_response->set_body("r");
-      if (end_of_stream) {
-        const bool end_of_stream = (i == total_resp_body_msg - 1) ? true : false;
-        streamed_response->set_end_of_stream(end_of_stream);
-      }
-      processor_stream_->sendGrpcMessage(response_body);
-    }
-  }
-
-  void serverSendTrailerRespDuplexStreamed() {
-    ProcessingResponse response_trailer;
-    auto* trailer_resp = response_trailer.mutable_request_trailers()->mutable_header_mutation();
-    auto* sh = trailer_resp->add_set_headers();
-    sh->mutable_append()->set_value(false);
-    auto* header = sh->mutable_header();
-    header->set_key("x-new-trailer");
-    header->set_raw_value("new");
-    processor_stream_->sendGrpcMessage(response_trailer);
-  }
-
-  std::unique_ptr<SimpleFilterConfig<DynamicMetadataToHeadersFilter>> simple_filter_config_;
-  std::unique_ptr<
-      Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>
-      registration_;
-  std::unique_ptr<TestOnProcessingResponseFactory> processing_response_factory_;
-  std::unique_ptr<Envoy::Registry::InjectFactory<OnProcessingResponseFactory>>
-      processing_response_factory_registration_;
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
-  bool protocol_config_encoded_ = false;
-  ProtocolConfiguration protocol_config_{};
-  uint32_t max_message_timeout_ms_{0};
-  std::vector<FakeUpstream*> grpc_upstreams_;
-  FakeHttpConnectionPtr processor_connection_;
-  FakeStreamPtr processor_stream_;
-  TestScopedRuntime scoped_runtime_;
-  // Number of grpc upstreams in the test.
-  int grpc_upstream_count_ = 2;
-};
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -940,6 +83,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
+  proto_config_.mutable_message_timeout()->set_seconds(1);
   // Turn on debug to troubleshoot possible flaky test.
   // TODO(cainelli): Remove this and the debug logs in the tracer test filter after a test failure
   // occurs.
@@ -1224,7 +368,7 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersResetOnServerMessage) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   EXPECT_EQ(upstream_request_->bodyLength(), 4);
 
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -1267,7 +411,7 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersGracefulClose) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   EXPECT_EQ(upstream_request_->bodyLength(), 4);
 
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -1316,7 +460,7 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersServerHalfClosesFirst) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   EXPECT_EQ(upstream_request_->bodyLength(), 4);
 
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -1389,8 +533,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader("x-remove-this", _)));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -1477,7 +621,7 @@ TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingSucceeded) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Host header is updated when `allow_all_routing` mutation rule is true.
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":authority", "new_host"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(":authority", "new_host"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -1582,12 +726,12 @@ TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Path header is updated.
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":path", "/mutated_path/bluh"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(":path", "/mutated_path/bluh"));
   // Routing headers are not updated by ext_proc when `allow_all_routing` mutation rule is false
   // (default value).
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":scheme", "http"));
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":authority", "host"));
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":method", "GET"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(":scheme", "http"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(":authority", "host"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(":method", "GET"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -1624,7 +768,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersWithLogging) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -1674,7 +818,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-bad-utf8"));
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader("x-bad-utf8", _)));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -1736,9 +880,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-bad-utf8"));
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader("x-bad-utf8", _)));
   EXPECT_THAT(upstream_request_->headers(),
-              SingleHeaderValueIs("x-new-utf8", "valid_prefix\303(valid_suffix"));
+              ContainsHeader("x-new-utf8", "valid_prefix\303(valid_suffix"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
 }
@@ -1961,7 +1105,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
       });
 
   verifyDownstreamResponse(*response, 201);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-response-processed", "1"));
   // Verify that the response processor added headers to dynamic metadata
   verifyMultipleHeaderValues(
       response->headers(),
@@ -1996,7 +1140,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseBadStatus) {
   // Invalid status code should be ignored, but the other header mutation
   // should still have been processed.
   verifyDownstreamResponse(*response, 200);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-response-processed", "1"));
 }
 
 // Test the filter using the default configuration by connecting to
@@ -2031,7 +1175,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseTwoStatuses) {
   // Invalid status code should be ignored, but the other header mutation
   // should still have been processed.
   verifyDownstreamResponse(*response, 201);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-response-processed", "1"));
 }
 
 // Test the filter using the default configuration by connecting to
@@ -2062,11 +1206,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersOnResponse) {
 
   verifyDownstreamResponse(*response, 200);
   ASSERT_TRUE(response->trailers());
-  EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-test-trailers", "Yes"));
-  EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-modified-trailers", "xxx"));
-  EXPECT_THAT(
-      response->headers(),
-      SingleHeaderValueIs("envoy-test-ext_proc-response_trailers_response", "x-modified-trailers"));
+  EXPECT_THAT(*(response->trailers()), ContainsHeader("x-test-trailers", "Yes"));
+  EXPECT_THAT(*(response->trailers()), ContainsHeader("x-modified-trailers", "xxx"));
+  EXPECT_THAT(response->headers(), ContainsHeader("envoy-test-ext_proc-response_trailers_response",
+                                                  "x-modified-trailers"));
 }
 
 // Test the filter using the default configuration by connecting to
@@ -2121,8 +1264,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetOnlyTrailersOnResponse) {
 
   verifyDownstreamResponse(*response, 200);
   ASSERT_TRUE(response->trailers());
-  EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-test-trailers", "Yes"));
-  EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-modified-trailers", "xxx"));
+  EXPECT_THAT(*(response->trailers()), ContainsHeader("x-test-trailers", "Yes"));
+  EXPECT_THAT(*(response->trailers()), ContainsHeader("x-modified-trailers", "xxx"));
 }
 
 // Test the filter with a response body callback enabled using an
@@ -2163,13 +1306,12 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
       });
 
   verifyDownstreamResponse(*response, 200);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-testing-response-header", "Yes"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-testing-response-header", "Yes"));
   // Verify that the content length header in the response is set by external processor,
   EXPECT_EQ(response->headers().getContentLengthValue(), "13");
   EXPECT_EQ("Hello, World!", response->body());
-  EXPECT_THAT(
-      response->headers(),
-      SingleHeaderValueIs("envoy-test-ext_proc-response_headers_response", "content-length"));
+  EXPECT_THAT(response->headers(),
+              ContainsHeader("envoy-test-ext_proc-response_headers_response", "content-length"));
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnResponse) {
@@ -2228,7 +1370,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponsePartialBuffered)
   verifyDownstreamResponse(*response, 200);
   // Verify that the content length header is removed in BUFFERED_PARTIAL BodySendMode.
   EXPECT_EQ(response->headers().ContentLength(), nullptr);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-testing-response-header", "Yes"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-testing-response-header", "Yes"));
 }
 
 // Test the filter with a response body callback enabled using an
@@ -2265,8 +1407,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersAndTrailersOnResponse) {
 
   verifyDownstreamResponse(*response, 200);
   ASSERT_TRUE(response->trailers());
-  EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-test-trailers", "Yes"));
-  EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-modified-trailers", "xxx"));
+  EXPECT_THAT(*(response->trailers()), ContainsHeader("x-test-trailers", "Yes"));
+  EXPECT_THAT(*(response->trailers()), ContainsHeader("x-modified-trailers", "xxx"));
 }
 
 // Test the filter using a configuration that sends response headers and trailers,
@@ -2328,7 +1470,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnBigResponse) {
       });
 
   verifyDownstreamResponse(*response, 200);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-testing-response-header", "Yes"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-testing-response-header", "Yes"));
 }
 
 // Test the filter with both body callbacks enabled and have the
@@ -2399,7 +1541,7 @@ TEST_P(ExtProcIntegrationTest, ProcessingModeResponseOnly) {
       });
 
   verifyDownstreamResponse(*response, 200);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-response-processed", "1"));
 }
 
 // Test the filter using the default configuration by connecting to
@@ -2430,9 +1572,95 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_TRUE(processor_stream_->waitForReset());
 
   verifyDownstreamResponse(*response, 401);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-failure-reason", "testing"));
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-failure-reason", "testing"));
+  EXPECT_THAT(response->headers(), ContainsHeader("content-type", "application/json"));
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+// Same as ExtProcIntegrationTest but with the helper function to configure ext_proc
+// as an upstream filter shared in this integration test file.
+class ExtProcIntegrationTestUpstream : public ExtProcIntegrationTest {
+public:
+  void initializeConfig() {
+    ConfigOptions config_option = {};
+    config_option.downstream_filter = false;
+    ExtProcIntegrationTest::initializeConfig(config_option);
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* static_resources = bootstrap.mutable_static_resources();
+      // Retrieve cluster_0.
+      auto* cluster = static_resources->mutable_clusters(0);
+      ConfigHelper::HttpProtocolOptions old_protocol_options;
+      if (cluster->typed_extension_protocol_options().contains(
+              "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+        old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+            (*cluster->mutable_typed_extension_protocol_options())
+                ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+      }
+      if (old_protocol_options.http_filters().empty()) {
+        auto* http_filter = old_protocol_options.add_http_filters();
+        http_filter->set_name("envoy.filters.http.upstream_codec");
+        http_filter->mutable_typed_config()->PackFrom(
+            envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::
+                default_instance());
+      }
+      auto* ext_proc_filter = old_protocol_options.add_http_filters();
+      ext_proc_filter->set_name("envoy.filters.http.ext_proc");
+      ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
+      for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
+        old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
+      }
+      (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(old_protocol_options);
+    });
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTestUpstream,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// This is almost the same as GetAndRespondImmediately but the filter is
+// configured as an upstream filter.
+TEST_P(ExtProcIntegrationTestUpstream, GetAndRespondImmediately_Upstream) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest([](Http::RequestHeaderMap& headers) {
+    // We want to ensure that the immediate response from an upstream ext_proc filter won't trigger
+    // a retry, which is a requirement of the upstream filter implementations.
+    //
+    // Setting this header normally triggers a retry on 5xx from the upstream servers.
+    // If the immediate response from an upstream ext_proc filter triggers a retry, the test will
+    // fail.
+    headers.addCopy(Http::LowerCaseString("x-envoy-retry-on"), "5xx");
+  });
+
+  bool called = false;
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [&called](ImmediateResponse& immediate) {
+    // Ensure that this lambda is called only once, meaning retry is not attempted.
+    EXPECT_FALSE(called);
+    called = true;
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
+    immediate.set_body("{\"reason\": \"Internal Server Error\"}");
+    immediate.set_details("Failed because of Internal Server Error");
+    auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_append()->set_value(false);
+    hdr1->mutable_header()->set_key("x-failure-reason");
+    hdr1->mutable_header()->set_raw_value("testing");
+    auto* hdr2 = immediate.mutable_headers()->add_set_headers();
+    hdr2->mutable_append()->set_value(false);
+    hdr2->mutable_header()->set_key("content-type");
+    hdr2->mutable_header()->set_raw_value("application/json");
+  });
+
+  // ext_proc will immediately close side stream in this case, which causes it to be reset,
+  // since side stream codec had not yet observed server trailers.
+  EXPECT_TRUE(processor_stream_->waitForReset());
+
+  verifyDownstreamResponse(*response, 500);
+  EXPECT_THAT(response->headers(), ContainsHeader("x-failure-reason", "testing"));
+  EXPECT_THAT(response->headers(), ContainsHeader("content-type", "application/json"));
+  EXPECT_EQ("{\"reason\": \"Internal Server Error\"}", response->body());
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulClose) {
@@ -2464,8 +1692,8 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulClose) {
   processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
   verifyDownstreamResponse(*response, 401);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-failure-reason", "testing"));
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-failure-reason", "testing"));
+  EXPECT_THAT(response->headers(), ContainsHeader("content-type", "application/json"));
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
   if (IsEnvoyGrpc()) {
     // There should be no resets
@@ -2501,8 +1729,8 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulCloseNoServerTrai
   // However server fails to send trailers
 
   verifyDownstreamResponse(*response, 401);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-failure-reason", "testing"));
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-failure-reason", "testing"));
+  EXPECT_THAT(response->headers(), ContainsHeader("content-type", "application/json"));
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 
   // Since the server did not send trailers, gRPC client will reset the stream after remote close
@@ -2532,8 +1760,8 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithLogging) {
   });
 
   verifyDownstreamResponse(*response, 401);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-failure-reason", "testing"));
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-failure-reason", "testing"));
+  EXPECT_THAT(response->headers(), ContainsHeader("content-type", "application/json"));
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
 
@@ -2600,9 +1828,9 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnStreamedRequestBody) {
   verifyDownstreamResponse(*response, 400);
   EXPECT_EQ("{\"reason\": \"Request too evil\"}", response->body());
   // The previously added request header is not sent to the client.
-  EXPECT_THAT(response->headers(), HasNoHeader("foo"));
+  EXPECT_THAT(response->headers(), Not(ContainsHeader("foo", _)));
   EXPECT_THAT(response->headers(),
-              SingleHeaderValueIs("envoy-test-ext_proc-request_headers_response", "foo"));
+              ContainsHeader("envoy-test-ext_proc-request_headers_response", "foo"));
 }
 
 // Test immediate_response behavior with STREAMED response body.
@@ -2634,7 +1862,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnStreamedResponseBody) {
   verifyDownstreamResponse(*response, 400);
   EXPECT_EQ("{\"reason\": \"Response too evil\"}", response->body());
   // The previously added response header is not sent to the client.
-  EXPECT_THAT(response->headers(), HasNoHeader("foo"));
+  EXPECT_THAT(response->headers(), Not(ContainsHeader("foo", _)));
 }
 
 // Test the filter with request body buffering enabled using
@@ -2796,7 +2024,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation)
   });
   verifyDownstreamResponse(*response, 401);
   // The added system header is not sent to the client.
-  EXPECT_THAT(response->headers(), HasNoHeader(":foo"));
+  EXPECT_THAT(response->headers(), Not(ContainsHeader(":foo", _)));
 }
 
 // Test the filter using an ext_proc server that responds to the request_header message
@@ -2816,7 +2044,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) 
     hdr->mutable_header()->set_raw_value("bar");
   });
   verifyDownstreamResponse(*response, 401);
-  EXPECT_THAT(response->headers(), HasNoHeader("x-envoy-foo"));
+  EXPECT_THAT(response->headers(), Not(ContainsHeader("x-envoy-foo", _)));
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
@@ -2839,8 +2067,8 @@ TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
   });
 
   verifyDownstreamResponse(*response, 401);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("host", "test"));
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-envoy-foo", "bar"));
+  EXPECT_THAT(response->headers(), ContainsHeader("host", "test"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-envoy-foo", "bar"));
 }
 
 // Test the filter with request body buffering enabled using
@@ -2916,8 +2144,8 @@ TEST_P(ExtProcIntegrationTest, ConvertGetToPost) {
 
   handleUpstreamRequest();
 
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":method", "POST"));
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("content-type", "text/plain"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(":method", "POST"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("content-type", "text/plain"));
   EXPECT_EQ(upstream_request_->bodyLength(), 14);
   EXPECT_EQ(upstream_request_->body().toString(), "Hello, Server!");
 
@@ -3557,7 +2785,7 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
         return true;
       });
   verifyDownstreamResponse(*response, 201);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-response-processed", "1"));
 }
 
 // Set up per-route configuration that extends original metadata.
@@ -3636,8 +2864,8 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader("x-remove-this", _)));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
 
@@ -4415,34 +3643,6 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadataObservabilityMode) {
-  proto_config_.set_observability_mode(true);
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-
-  auto* md_opts = proto_config_.mutable_metadata_options();
-  md_opts->mutable_forwarding_namespaces()->add_untyped("forwarding_ns_untyped");
-  md_opts->mutable_forwarding_namespaces()->add_typed("forwarding_ns_typed");
-  md_opts->mutable_receiving_namespaces()->add_untyped("receiving_ns_untyped");
-
-  ConfigOptions config_option = {};
-  config_option.add_metadata = true;
-  initializeConfig(config_option);
-  HttpIntegrationTest::initialize();
-
-  auto response = sendDownstreamRequest(absl::nullopt);
-
-  testSendDyanmicMetadata();
-
-  handleUpstreamRequest();
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  // No headers from dynamic metadata response as the response is ignored in observability mode.
-  EXPECT_THAT(response->headers(), HasNoHeader(Http::LowerCaseString("receiving_ns_untyped.foo")));
-  verifyDownstreamResponse(*response, 200);
-}
-
 #if defined(USE_CEL_PARSER)
 TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
@@ -4526,41 +3726,118 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
 
   verifyDownstreamResponse(*response, 200);
 }
+
+TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  envoy::extensions::http::ext_proc::processing_request_modifiers::mapped_attribute_builder::v3::
+      MappedAttributeBuilder builder;
+  auto* mapped_attributes = builder.mutable_mapped_request_attributes();
+  (*mapped_attributes)["remapped.method"] = "request.method";
+  auto* modifier_config = proto_config_.mutable_processing_request_modifier();
+  modifier_config->set_name("envoy.extensions.http.ext_proc.mapped_attribute_builder");
+  modifier_config->mutable_typed_config()->PackFrom(builder);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  const std::string body_str = "Hello";
+  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+
+  // Handle request headers message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Set as a header response
+        resp.mutable_request_headers();
+
+        EXPECT_TRUE(req.has_request_headers());
+        EXPECT_EQ(req.attributes().size(), 1);
+        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_EQ(proto_struct.fields().at("remapped.method").string_value(), "POST");
+        // Make sure we did not include anything else
+        EXPECT_EQ(proto_struct.fields().size(), 1);
+        return true;
+      });
+
+  // Handle body message, making sure we did not send request attributes again.
+  processGenericMessage(*grpc_upstreams_[0], false,
+                        [&body_str](const ProcessingRequest& req, ProcessingResponse& resp) {
+                          // Set as a body response
+                          resp.mutable_request_body();
+
+                          EXPECT_TRUE(req.has_request_body());
+                          EXPECT_EQ(req.request_body().body(), body_str);
+                          EXPECT_EQ(req.attributes().size(), 0);
+                          return true;
+                        });
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, MappedAttributeBuilderOverrides) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  // This will be ignored because of the matching attribute builder on the route.
+  proto_config_.mutable_request_attributes()->Add("request.path");
+
+  initializeConfig();
+  config_helper_.addConfigModifier([this](HttpConnectionManager& cm) {
+    // Set up "/foo" so that it has a mapped attribute builder
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_match()->set_path("/foo");
+    ExtProcPerRoute per_route;
+
+    envoy::extensions::http::ext_proc::processing_request_modifiers::mapped_attribute_builder::v3::
+        MappedAttributeBuilder builder;
+    auto* mapped_attributes = builder.mutable_mapped_request_attributes();
+    (*mapped_attributes)["remapped.method"] = "request.method";
+    auto* modifier_config = per_route.mutable_overrides()->mutable_processing_request_modifier();
+    modifier_config->set_name("envoy.extensions.http.ext_proc.mapped_attribute_builder");
+    modifier_config->mutable_typed_config()->PackFrom(builder);
+
+    setPerRouteConfig(route, per_route);
+  });
+  HttpIntegrationTest::initialize();
+  const std::string body_str = "Hello";
+  auto response = sendDownstreamRequestWithBody(
+      body_str, [](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
+
+  // Handle request headers message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Set as a header response
+        resp.mutable_request_headers();
+
+        EXPECT_TRUE(req.has_request_headers());
+        EXPECT_EQ(req.attributes().size(), 1);
+        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_EQ(proto_struct.fields().at("remapped.method").string_value(), "POST");
+        // Make sure we did not include anything else
+        EXPECT_EQ(proto_struct.fields().size(), 1);
+        return true;
+      });
+
+  // Handle body message, making sure we did not send request attributes again.
+  processGenericMessage(*grpc_upstreams_[0], false,
+                        [&body_str](const ProcessingRequest& req, ProcessingResponse& resp) {
+                          // Set as a body response
+                          resp.mutable_request_body();
+
+                          EXPECT_TRUE(req.has_request_body());
+                          EXPECT_EQ(req.request_body().body(), body_str);
+                          EXPECT_EQ(req.attributes().size(), 0);
+                          return true;
+                        });
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
 #endif
 
-TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
-  ConfigOptions config_option = {};
-  config_option.downstream_filter = false;
-
-  initializeConfig(config_option);
-  // Add ext_proc as upstream filter.
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    // Retrieve cluster_0.
-    auto* cluster = static_resources->mutable_clusters(0);
-    ConfigHelper::HttpProtocolOptions old_protocol_options;
-    if (cluster->typed_extension_protocol_options().contains(
-            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
-      old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
-          (*cluster->mutable_typed_extension_protocol_options())
-              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    }
-    if (old_protocol_options.http_filters().empty()) {
-      auto* upstream_codec = old_protocol_options.add_http_filters();
-      upstream_codec->set_name("envoy.filters.http.upstream_codec");
-      upstream_codec->mutable_typed_config()->PackFrom(
-          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
-    }
-    auto* ext_proc_filter = old_protocol_options.add_http_filters();
-    ext_proc_filter->set_name("envoy.filters.http.ext_proc");
-    ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
-    for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
-      old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
-    }
-    (*cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(old_protocol_options);
-  });
+TEST_P(ExtProcIntegrationTestUpstream, GetAndSetHeadersUpstream) {
+  initializeConfig();
   HttpIntegrationTest::initialize();
 
   auto response = sendDownstreamRequest(
@@ -4585,8 +3862,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader("x-remove-this", _)));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -4730,433 +4007,6 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
                 .getStringView(),
             "bluh");
   verifyDownstreamResponse(*response, 200);
-}
-
-TEST_P(ExtProcIntegrationTest, ObservabilityModeWithHeader) {
-  proto_config_.set_observability_mode(true);
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-
-  auto response = sendDownstreamRequest(absl::nullopt);
-  Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
-                                                          {":method", "GET"},
-                                                          {"host", "host"},
-                                                          {":path", "/"},
-                                                          {"x-forwarded-proto", "http"}};
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true,
-      [&expected_request_headers](const HttpHeaders& headers, HeadersResponse& headers_resp) {
-        // Verify the header request.
-        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
-        EXPECT_TRUE(headers.end_of_stream());
-
-        // Try to mutate the header.
-        auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
-        auto* add1 = response_mutation->add_set_headers();
-        add1->mutable_append()->set_value(false);
-        add1->mutable_header()->set_key("x-response-processed");
-        add1->mutable_header()->set_raw_value("1");
-        return true;
-      });
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  // Header mutation response has been ignored.
-  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-
-  Http::TestResponseHeaderMapImpl response_headers =
-      Http::TestResponseHeaderMapImpl{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, false);
-  upstream_request_->encodeData(100, true);
-
-  processResponseHeadersMessage(
-      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
-        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
-        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
-        return true;
-      });
-
-  verifyDownstreamResponse(*response, 200);
-
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
-}
-
-TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
-  proto_config_.set_observability_mode(true);
-
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
-
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  const std::string original_body_str = "Hello";
-  auto response = sendDownstreamRequestWithBody(original_body_str, absl::nullopt);
-
-  processRequestBodyMessage(*grpc_upstreams_[0], true,
-                            [&original_body_str](const HttpBody& body, BodyResponse& body_resp) {
-                              // Verify the received body message.
-                              EXPECT_EQ(body.body(), original_body_str);
-                              EXPECT_TRUE(body.end_of_stream());
-                              // Try to mutate the body.
-                              auto* body_mut =
-                                  body_resp.mutable_response()->mutable_body_mutation();
-                              body_mut->set_body("Hello, World!");
-                              return true;
-                            });
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  // Body mutation response has been ignored.
-  EXPECT_EQ(upstream_request_->body().toString(), original_body_str);
-
-  Http::TestResponseHeaderMapImpl response_headers =
-      Http::TestResponseHeaderMapImpl{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, false);
-  upstream_request_->encodeData(100, true);
-
-  processResponseBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
-    EXPECT_TRUE(body.end_of_stream());
-    return true;
-  });
-
-  verifyDownstreamResponse(*response, 200);
-
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
-}
-
-TEST_P(ExtProcIntegrationTest, ObservabilityModeWithWrongBodyMode) {
-  proto_config_.set_observability_mode(true);
-
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  const std::string original_body_str = "Hello";
-  auto response = sendDownstreamRequestWithBody(original_body_str, absl::nullopt);
-
-  handleUpstreamRequest();
-  verifyDownstreamResponse(*response, 200);
-
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
-}
-
-TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
-  proto_config_.set_observability_mode(true);
-
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-
-  handleUpstreamRequestWithTrailer();
-
-  processResponseTrailersMessage(
-      *grpc_upstreams_[0], true, [](const HttpTrailers& trailers, TrailersResponse& resp) {
-        // Verify the trailer
-        Http::TestResponseTrailerMapImpl expected_trailers{{"x-test-trailers", "Yes"}};
-        EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
-
-        // Try to mutate the trailer
-        auto* trailer_mut = resp.mutable_header_mutation();
-        auto* trailer_add = trailer_mut->add_set_headers();
-        trailer_add->mutable_append()->set_value(false);
-        trailer_add->mutable_header()->set_key("x-modified-trailers");
-        trailer_add->mutable_header()->set_raw_value("xxx");
-        return true;
-      });
-
-  verifyDownstreamResponse(*response, 200);
-  EXPECT_THAT(*(response->trailers()), HasNoHeader("x-modified-trailers"));
-
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
-}
-
-TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
-  proto_config_.set_observability_mode(true);
-  uint32_t deferred_close_timeout_ms = 1000;
-  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
-
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  const std::string body_str = "Hello";
-  auto response = sendDownstreamRequestWithBodyAndTrailer(body_str);
-
-  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
-  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
-  processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
-
-  handleUpstreamRequest();
-  verifyDownstreamResponse(*response, 200);
-
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms));
-}
-
-TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
-  proto_config_.set_observability_mode(true);
-  uint32_t deferred_close_timeout_ms = 1000;
-  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
-
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
-  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
-
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-
-  handleUpstreamRequestWithTrailer();
-
-  processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
-  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
-  processResponseTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
-
-  verifyDownstreamResponse(*response, 200);
-
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms));
-}
-
-TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequestAndTimeout) {
-  proto_config_.set_observability_mode(true);
-  uint32_t deferred_close_timeout_ms = 2000;
-  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
-
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequestWithBodyAndTrailer("Hello");
-
-  processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Advance 400 ms. Default timeout is 200ms
-                                 timeSystem().advanceTimeWaitImpl(400ms);
-                                 return false;
-                               });
-  processRequestBodyMessage(*grpc_upstreams_[0], false, [this](const HttpBody&, BodyResponse&) {
-    // Advance 400 ms. Default timeout is 200ms
-    timeSystem().advanceTimeWaitImpl(400ms);
-    return false;
-  });
-  processRequestTrailersMessage(*grpc_upstreams_[0], false,
-                                [this](const HttpTrailers&, TrailersResponse&) {
-                                  // Advance 400 ms. Default timeout is 200ms
-                                  timeSystem().advanceTimeWaitImpl(400ms);
-                                  return false;
-                                });
-
-  handleUpstreamRequest();
-  verifyDownstreamResponse(*response, 200);
-
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms - 1200));
-}
-
-TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
-  proto_config_.set_observability_mode(true);
-
-  ConfigOptions config_option = {};
-  config_option.add_logging_filter = true;
-  initializeConfig(config_option);
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(
-      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
-
-  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
-  handleUpstreamRequest();
-  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
-  verifyDownstreamResponse(*response, 200);
-}
-
-TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLoggingFailStream) {
-  proto_config_.set_observability_mode(true);
-
-  ConfigOptions config_option = {};
-  config_option.add_logging_filter = true;
-  initializeConfig(config_option);
-  testGetAndFailStream();
-}
-
-TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLoggingCloseStream) {
-  proto_config_.set_observability_mode(true);
-
-  ConfigOptions config_option = {};
-  config_option.add_logging_filter = true;
-  initializeConfig(config_option);
-  testGetAndCloseStream();
-}
-
-TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
-  proto_config_.set_observability_mode(true);
-
-  ConfigOptions config_option = {};
-  config_option.downstream_filter = false;
-
-  initializeConfig(config_option);
-  // Add ext_proc as upstream filter.
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    // Retrieve cluster_0.
-    auto* cluster = static_resources->mutable_clusters(0);
-    ConfigHelper::HttpProtocolOptions old_protocol_options;
-    if (cluster->typed_extension_protocol_options().contains(
-            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
-      old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
-          (*cluster->mutable_typed_extension_protocol_options())
-              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    }
-    if (old_protocol_options.http_filters().empty()) {
-      auto* http_filter = old_protocol_options.add_http_filters();
-      http_filter->set_name("envoy.filters.http.upstream_codec");
-      http_filter->mutable_typed_config()->PackFrom(
-          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
-    }
-    auto* ext_proc_filter = old_protocol_options.add_http_filters();
-    ext_proc_filter->set_name("envoy.filters.http.ext_proc");
-    ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
-    for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
-      old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
-    }
-    (*cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(old_protocol_options);
-  });
-  HttpIntegrationTest::initialize();
-
-  auto response = sendDownstreamRequest(
-      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
-
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
-        Http::TestRequestHeaderMapImpl expected_request_headers{
-            {":scheme", "http"}, {":method", "GET"},       {":authority", "host"},
-            {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
-        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
-        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
-        auto* mut1 = response_header_mutation->add_set_headers();
-        mut1->mutable_append()->set_value(false);
-        mut1->mutable_header()->set_key("x-new-header");
-        mut1->mutable_header()->set_raw_value("new");
-        response_header_mutation->add_remove_headers("x-remove-this");
-        return true;
-      });
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  upstream_request_->encodeData(100, true);
-
-  processResponseHeadersMessage(
-      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
-        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
-        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
-        return true;
-      });
-  verifyDownstreamResponse(*response, 200);
-}
-
-// Upstream filter chain is in alpha mode and it is not actively used in ext_proc at the moment.
-TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetHeadersUpstreamObservabilityModeWithLogging) {
-  proto_config_.set_observability_mode(true);
-
-  ConfigOptions config_option = {};
-  config_option.add_logging_filter = true;
-  config_option.downstream_filter = false;
-
-  initializeConfig(config_option);
-  // Add ext_proc as upstream filter.
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    // Retrieve cluster_0.
-    auto* cluster = static_resources->mutable_clusters(0);
-    ConfigHelper::HttpProtocolOptions old_protocol_options;
-    if (cluster->typed_extension_protocol_options().contains(
-            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
-      old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
-          (*cluster->mutable_typed_extension_protocol_options())
-              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    }
-    if (old_protocol_options.http_filters().empty()) {
-      auto* http_filter = old_protocol_options.add_http_filters();
-      http_filter->set_name("envoy.filters.http.upstream_codec");
-      http_filter->mutable_typed_config()->PackFrom(
-          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
-    }
-    auto* ext_proc_filter = old_protocol_options.add_http_filters();
-    ext_proc_filter->set_name("envoy.filters.http.ext_proc");
-    ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
-    for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
-      old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
-    }
-    (*cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(old_protocol_options);
-  });
-  HttpIntegrationTest::initialize();
-
-  auto response = sendDownstreamRequest(
-      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
-
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
-        Http::TestRequestHeaderMapImpl expected_request_headers{
-            {":scheme", "http"}, {":method", "GET"},       {":authority", "host"},
-            {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
-        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
-        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
-        auto* mut1 = response_header_mutation->add_set_headers();
-        mut1->mutable_append()->set_value(false);
-        mut1->mutable_header()->set_key("x-new-header");
-        mut1->mutable_header()->set_raw_value("new");
-        response_header_mutation->add_remove_headers("x-remove-this");
-        return true;
-      });
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  upstream_request_->encodeData(100, true);
-
-  processResponseHeadersMessage(
-      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
-        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
-        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
-        return true;
-      });
-  verifyDownstreamResponse(*response, 200);
-}
-
-TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
-  proto_config_.set_observability_mode(true);
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
-
-  ConfigOptions config_option = {};
-  config_option.valid_grpc_server = false;
-  initializeConfig(config_option);
-  HttpIntegrationTest::initialize();
-
-  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
-  handleUpstreamRequest();
-  EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
-                                                         std::chrono::milliseconds(25000)));
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {
@@ -5322,8 +4172,8 @@ TEST_P(ExtProcIntegrationTest, SendBodyBeforeHeaderRespStreamedBasicTest) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader("x-remove-this", _)));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
   EXPECT_EQ(upstream_request_->body().toString(), "replaced body");
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -5432,7 +4282,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespStreamedTes
   }
 
   handleUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
   EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
   verifyDownstreamResponse(*response, 200);
 }
@@ -5488,237 +4338,6 @@ TEST_P(ExtProcIntegrationTest, SendHeaderBodyNotSendTrailerTest) {
   processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
   handleUpstreamRequest(100);
   verifyDownstreamResponse(*response, 200);
-}
-
-TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespDuplexStreamed) {
-  const std::string body_sent(64 * 1024, 's');
-  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true);
-
-  // The ext_proc server receives the headers.
-  ProcessingRequest header_request;
-  serverReceiveHeaderDuplexStreamed(header_request);
-  // The ext_proc server receives the body.
-  uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent);
-
-  // The ext_proc server sends back the header response.
-  serverSendHeaderRespDuplexStreamed();
-  // The ext_proc server sends back the body response.
-  uint32_t total_resp_body_msg = 2 * total_req_body_msg;
-  const std::string body_upstream(total_resp_body_msg, 'r');
-  serverSendBodyRespDuplexStreamed(total_resp_body_msg);
-
-  handleUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
-  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
-  verifyDownstreamResponse(*response, 200);
-}
-
-// Buffer the whole message including header, body and trailer before sending response.
-TEST_P(ExtProcIntegrationTest,
-       ServerWaitForBodyAndTrailerBeforeSendsHeaderRespDuplexStreamedSmallBody) {
-  const std::string body_sent(128 * 1024, 's');
-  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, false);
-  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
-  codec_client_->sendTrailers(*request_encoder_, request_trailers);
-
-  // The ext_proc server receives the headers.
-  ProcessingRequest header_request;
-  serverReceiveHeaderDuplexStreamed(header_request);
-
-  std::string body_received;
-  bool end_stream = false;
-  uint32_t total_req_body_msg = 0;
-  while (!end_stream) {
-    ProcessingRequest request;
-    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    EXPECT_TRUE(request.has_request_body() || request.has_request_trailers());
-    if (!request.has_request_trailers()) {
-      // request_body is received
-      body_received = absl::StrCat(body_received, request.request_body().body());
-      total_req_body_msg++;
-    } else {
-      // request_trailer is received.
-      end_stream = true;
-    }
-  }
-  EXPECT_TRUE(end_stream);
-  EXPECT_EQ(body_received, body_sent);
-
-  // The ext_proc server sends back the header response.
-  serverSendHeaderRespDuplexStreamed();
-
-  // The ext_proc server sends back the body response.
-  uint32_t total_resp_body_msg = total_req_body_msg / 2;
-  const std::string body_upstream(total_resp_body_msg, 'r');
-  serverSendBodyRespDuplexStreamed(total_resp_body_msg, false);
-
-  // The ext_proc server sends back the trailer response.
-  serverSendTrailerRespDuplexStreamed();
-
-  handleUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
-  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
-  verifyDownstreamResponse(*response, 200);
-}
-
-// The body is large. The server sends some body responses after buffering some amount of data.
-// The server continuously does so until the entire body processing is done.
-TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyDuplexStreamed) {
-  const std::string body_sent(256 * 1024, 's');
-  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, false);
-  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
-  codec_client_->sendTrailers(*request_encoder_, request_trailers);
-
-  // The ext_proc server receives the headers.
-  ProcessingRequest header_request;
-  serverReceiveHeaderDuplexStreamed(header_request);
-  Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
-                                                          {":method", "GET"},
-                                                          {"host", "host"},
-                                                          {":path", "/"},
-                                                          {"x-forwarded-proto", "http"}};
-  EXPECT_THAT(header_request.request_headers().headers(),
-              HeaderProtosEqual(expected_request_headers));
-
-  std::string body_received;
-  bool end_stream = false;
-  uint32_t total_req_body_msg = 0;
-  bool header_resp_sent = false;
-  std::string body_upstream;
-
-  while (!end_stream) {
-    ProcessingRequest request;
-    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    EXPECT_TRUE(request.has_request_body() || request.has_request_trailers());
-    if (!request.has_request_trailers()) {
-      // Buffer the entire body.
-      body_received = absl::StrCat(body_received, request.request_body().body());
-      total_req_body_msg++;
-      // After receiving every 7 body chunks, the server sends back three body responses.
-      if (total_req_body_msg % 7 == 0) {
-        if (!header_resp_sent) {
-          // Before sending the 1st body response, sends a header response.
-          serverSendHeaderRespDuplexStreamed();
-          header_resp_sent = true;
-        }
-        ProcessingResponse response_body;
-        for (uint32_t i = 0; i < 3; i++) {
-          body_upstream += std::to_string(i);
-          auto* streamed_response = response_body.mutable_request_body()
-                                        ->mutable_response()
-                                        ->mutable_body_mutation()
-                                        ->mutable_streamed_response();
-          streamed_response->set_body(std::to_string(i));
-          processor_stream_->sendGrpcMessage(response_body);
-        }
-      }
-    } else {
-      // request_trailer is received.
-      end_stream = true;
-      Http::TestResponseTrailerMapImpl expected_trailers{{"x-trailer-foo", "yes"}};
-      EXPECT_THAT(request.request_trailers().trailers(), HeaderProtosEqual(expected_trailers));
-    }
-  }
-  EXPECT_TRUE(end_stream);
-  EXPECT_EQ(body_received, body_sent);
-
-  // Send one more body response at the end.
-  ProcessingResponse response_body;
-  auto* streamed_response = response_body.mutable_request_body()
-                                ->mutable_response()
-                                ->mutable_body_mutation()
-                                ->mutable_streamed_response();
-  streamed_response->set_body("END");
-  processor_stream_->sendGrpcMessage(response_body);
-  body_upstream += "END";
-
-  // The ext_proc server sends back the trailer response.
-  serverSendTrailerRespDuplexStreamed();
-
-  handleUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
-  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
-  verifyDownstreamResponse(*response, 200);
-}
-
-TEST_P(ExtProcIntegrationTest, DuplexStreamedInBothDirection) {
-  const std::string body_sent(8 * 1024, 's');
-  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true, true);
-
-  // The ext_proc server receives the headers/body.
-  ProcessingRequest header_request;
-  serverReceiveHeaderDuplexStreamed(header_request);
-  uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent);
-
-  // The ext_proc server sends back the response.
-  serverSendHeaderRespDuplexStreamed();
-  uint32_t total_resp_body_msg = 2 * total_req_body_msg;
-  const std::string body_upstream(total_resp_body_msg, 'r');
-  serverSendBodyRespDuplexStreamed(total_resp_body_msg);
-
-  handleUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
-  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
-
-  // The ext_proc server receives the responses from backend server.
-  ProcessingRequest header_response;
-  serverReceiveHeaderDuplexStreamed(header_response, false, true);
-  uint32_t total_rsp_body_msg = serverReceiveBodyDuplexStreamed("", true, false);
-
-  // The ext_proc server sends back the response.
-  serverSendHeaderRespDuplexStreamed(false, true);
-  serverSendBodyRespDuplexStreamed(total_rsp_body_msg * 3, true, true);
-
-  verifyDownstreamResponse(*response, 200);
-}
-
-// The ext_proc server sends out-of-order response causing Envoy to shutdown the external
-// processing.
-TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamed) {
-  const std::string body_sent(8 * 1024, 's');
-  // Enable FULL_DUPLEX_STREAMED body processing in both directions.
-  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true, true);
-
-  // The ext_proc server receives the request headers and body.
-  ProcessingRequest header_request;
-  serverReceiveHeaderDuplexStreamed(header_request);
-  uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent);
-
-  // The ext_proc server should send header response, but it sends back the body response,
-  // which is out-of-order. This cause Envoy to shut down the external processing, and
-  // send the buffered HTTP request headers to the upstream.
-  processor_stream_->startGrpcStream();
-  serverSendBodyRespDuplexStreamed(total_req_body_msg);
-
-  // The backend server processes the request and sends back a 400 response.
-  handleUpstreamRequest(false, 400);
-  // The body received by upstream server is expected to be empty.
-  EXPECT_EQ(upstream_request_->body().toString(), "");
-  // As the external processing is shut down, the response messages are not sent
-  // to the ext_proc server. Instead it is sent to the downstream directly.
-  verifyDownstreamResponse(*response, 400);
-}
-
-// The ext_proc server failed to send response in time trigger Envoy HCM stream_idle_timeout.
-TEST_P(ExtProcIntegrationTest, ServerWaitTooLongBeforeSendRespDuplexStreamed) {
-  // Set HCM stream_idle_timeout to be 10s. Note one can also set the
-  // RouteAction:idle_timeout under the route configuration to override it.
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { hcm.mutable_stream_idle_timeout()->set_seconds(10); });
-
-  const std::string body_sent(8 * 1024, 's');
-  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true);
-
-  // The ext_proc server receives the headers and body.
-  ProcessingRequest header_request;
-  serverReceiveHeaderDuplexStreamed(header_request);
-  serverReceiveBodyDuplexStreamed(body_sent);
-
-  // The ext_proc server waits for 12s before sending any response.
-  // HCM stream_idle_timeout is triggered, and local reply is sent to downstream.
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(12000));
-  verifyDownstreamResponse(*response, 504);
 }
 
 TEST_P(ExtProcIntegrationTest, ModeOverrideAllowed) {
@@ -5844,4 +4463,296 @@ TEST_P(ExtProcIntegrationTest, BufferedModeOverSizeRequestLocalReply) {
   verifyDownstreamResponse(*response, 413);
 }
 
+TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+
+  auto access_log_path = TestEnvironment::temporaryPath("ext_proc_filter_state_access.log");
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    // Test all three serialization modes.
+    (*json_format->mutable_fields())["ext_proc_plain"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:PLAIN)%");
+    (*json_format->mutable_fields())["ext_proc_typed"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:TYPED)%");
+
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["field_request_header_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_latency_us)%");
+    (*json_format->mutable_fields())["field_request_header_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_call_status)%");
+    (*json_format->mutable_fields())["field_request_body_calls"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_call_count)%");
+    (*json_format->mutable_fields())["field_request_body_total_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_total_latency_us)%");
+    (*json_format->mutable_fields())["field_request_body_max_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_max_latency_us)%");
+    (*json_format->mutable_fields())["field_request_body_last_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_last_call_status)%");
+    (*json_format->mutable_fields())["field_request_trailer_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_latency_us)%");
+    (*json_format->mutable_fields())["field_request_trailer_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_call_status)%");
+    (*json_format->mutable_fields())["field_response_header_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_latency_us)%");
+    (*json_format->mutable_fields())["field_response_header_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_call_status)%");
+    (*json_format->mutable_fields())["field_response_body_calls"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_call_count)%");
+    (*json_format->mutable_fields())["field_response_body_total_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_total_latency_us)%");
+    (*json_format->mutable_fields())["field_response_body_max_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_max_latency_us)%");
+    (*json_format->mutable_fields())["field_response_body_last_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_last_call_status)%");
+    (*json_format->mutable_fields())["field_response_trailer_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_latency_us)%");
+    (*json_format->mutable_fields())["field_response_trailer_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_call_status)%");
+    (*json_format->mutable_fields())["field_bytes_sent"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_sent)%");
+    (*json_format->mutable_fields())["field_bytes_received"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_received)%");
+
+    // Test non-existent field for coverage
+    (*json_format->mutable_fields())["field_non_existent"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:non_existent_field)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  // Send request with body and trailers to trigger all processing phases.
+  const std::string request_body = "Hello, World!";
+  auto response = sendDownstreamRequestWithBodyAndTrailer(request_body);
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  handleUpstreamRequestWithTrailer();
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  verifyDownstreamResponse(*response, 200);
+
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  ENVOY_LOG_MISC(info, "Comprehensive access log result: {}", log_result);
+
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+
+  // Verify PLAIN format contains all processing phases.
+  auto plain_value = json_log->getString("ext_proc_plain");
+  EXPECT_TRUE(plain_value.ok());
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("rh:[0-9]+:[0-9]+"));        // request header
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("rb:[0-9]+:[0-9]+:[0-9]+")); // request body
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("rt:[0-9]+:[0-9]+"));        // request trailer
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("sh:[0-9]+:[0-9]+"));        // response header
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("sb:[0-9]+:[0-9]+:[0-9]+")); // response body
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("st:[0-9]+:[0-9]+"));        // response trailer
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("bs:[0-9]+"));               // bytes sent
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("br:[0-9]+"));               // bytes received
+
+  // Verify TYPED format is valid JSON.
+  auto typed_obj = json_log->getObject("ext_proc_typed");
+  EXPECT_TRUE(typed_obj.ok());
+  auto typed_json_str = (*typed_obj)->asJsonString();
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_call_count\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_total_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_max_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_last_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_call_count\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_total_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_max_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_last_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"bytes_sent\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"bytes_received\""));
+
+  // Test individual field extraction.
+  auto validateField = [&](const std::string& field_name) {
+    auto field_value = json_log->getString(field_name);
+    EXPECT_TRUE(field_value.ok()) << "Field " << field_name << " should be accessible";
+    if (field_value.ok()) {
+      EXPECT_THAT(*field_value, testing::MatchesRegex("[0-9]+"))
+          << "Field " << field_name << " should be numeric, got: " << *field_value;
+    }
+  };
+
+  // Validate all individual fields can be extracted.
+  validateField("field_request_header_latency");
+  validateField("field_request_header_status");
+  validateField("field_request_body_calls");
+  validateField("field_request_body_total_latency");
+  validateField("field_request_body_max_latency");
+  validateField("field_request_body_last_status");
+  validateField("field_request_trailer_latency");
+  validateField("field_request_trailer_status");
+  validateField("field_response_header_latency");
+  validateField("field_response_header_status");
+  validateField("field_response_body_calls");
+  validateField("field_response_body_total_latency");
+  validateField("field_response_body_max_latency");
+  validateField("field_response_body_last_status");
+  validateField("field_response_trailer_latency");
+  validateField("field_response_trailer_status");
+  validateField("field_bytes_sent");
+  validateField("field_bytes_received");
+
+  // Test non-existent field handling (coverage for getField fallback).
+  // When a field doesn't exist, it's not included in the JSON output at all.
+  auto non_existent = json_log->getString("field_non_existent");
+  EXPECT_FALSE(non_existent.ok()); // Should fail to find the key
+  EXPECT_THAT(non_existent.status().message(),
+              testing::HasSubstr("key 'field_non_existent' missing"));
+
+  // Bytes are only populated for Envoy gRPC, not Google gRPC.
+  auto bytes_sent = json_log->getString("field_bytes_sent");
+  auto bytes_received = json_log->getString("field_bytes_received");
+  if (IsEnvoyGrpc()) {
+    EXPECT_THAT(*bytes_sent, testing::Not(testing::Eq("0")));
+    EXPECT_THAT(*bytes_received, testing::Not(testing::Eq("0")));
+  } else {
+    EXPECT_EQ(*bytes_sent, "0");
+    EXPECT_EQ(*bytes_received, "0");
+  }
+
+  // Verify all three serialization methods produce different output.
+  EXPECT_NE(*plain_value, typed_json_str);
+  EXPECT_NE(*plain_value, *bytes_sent);
+  EXPECT_NE(typed_json_str, *bytes_sent);
+
+  ENVOY_LOG_MISC(info, "All serialization formats validated successfully:");
+  ENVOY_LOG_MISC(info, "PLAIN: {}", *plain_value);
+  ENVOY_LOG_MISC(info, "TYPED: {}", typed_json_str);
+  ENVOY_LOG_MISC(info, "Sample FIELD: bytes_sent={}", *bytes_sent);
+}
+
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
+  auto access_log_path = TestEnvironment::temporaryPath("ext_proc_filter_state_access.log");
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    (*json_format->mutable_fields())["field_request_header_call_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_call_status)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  proto_config_.set_failure_mode_allow(true);
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Travel forward 400 ms
+                                 timeSystem().advanceTimeWaitImpl(400ms);
+                                 return false;
+                               });
+
+  // We should be able to continue from here since the error was ignored
+  handleUpstreamRequest();
+  // Since we are ignoring errors, the late response to the request headers
+  // message meant that subsequent messages are spurious and the response
+  // headers message was never sent.
+  // Despite the timeout the request should succeed.
+  verifyDownstreamResponse(*response, 200);
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_request_header_status = json_log->getString("field_request_header_call_status");
+  // Should be 4:DEADLINE_EXCEEDED instead of 10:ABORTED
+  EXPECT_EQ(*field_request_header_status, "4");
+}
+
+// Test when ext_proc filter is nested inside a composite filter, the access_log filter
+// uses the composite filter name to retrieve the ext_proc filter state values.
+TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
+  // Adding the composite/ext_proc filter configuration.
+  composite_test_ = true;
+  std::string tunnel_access_log_path_;
+  initializeConfig();
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* access_log = hcm.add_access_log();
+        access_log->set_name("envoy.access_loggers.file");
+        envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+        tunnel_access_log_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+        access_log_config.set_path(tunnel_access_log_path_);
+        // "composite" is the composite filter name.
+        access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+            "%FILTER_STATE(composite:TYPED)%\n");
+        access_log->mutable_typed_config()->PackFrom(access_log_config);
+      });
+  HttpIntegrationTest::initialize();
+  // Adding the match-header so the HTTP request hits the ext_proc filter path.
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("match-header"), "match"); });
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{
+            {":scheme", "http"}, {":method", "GET"},        {"host", "host"},
+            {":path", "/"},      {"match-header", "match"}, {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        response_header_mutation->add_remove_headers("match-header");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader("match-header", _)));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+
+  const std::string log_content = waitForAccessLog(tunnel_access_log_path_);
+  EXPECT_FALSE(log_content.empty());
+  EXPECT_THAT(log_content, testing::HasSubstr("request_header_call_status"));
+  EXPECT_THAT(log_content, testing::HasSubstr("request_header_latency_us"));
+  EXPECT_THAT(log_content, testing::HasSubstr("response_header_call_status"));
+  EXPECT_THAT(log_content, testing::HasSubstr("response_header_latency_us"));
+}
+
+} // namespace ExternalProcessing
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

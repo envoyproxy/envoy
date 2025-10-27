@@ -24,36 +24,6 @@ if [[ -z "$SSL_OUT" ]]; then
     exit
 fi
 
-validate_go() {
-    GO_VERSION=$(go version | awk '{print $3}')
-    if [[ "$GO_VERSION" != "$EXPECTED_GO_VERSION" ]]; then
-        echo "ERROR: Go version doesn't match." >&2
-        echo "  expected: $EXPECTED_GO_VERSION" >&2
-        echo "  found: $GO_VERSION" >&2
-        return 1
-    fi
-}
-
-validate_ninja() {
-    NINJA_VERSION=$(ninja --version)
-    if [[ "$NINJA_VERSION" != "$EXPECTED_NINJA_VERSION" ]]; then
-        echo "ERROR: Ninja version doesn't match." >&2
-        echo "  expected: $EXPECTED_NINJA_VERSION" >&2
-        echo "  found: $NINJA_VERSION" >&2
-        return 1
-    fi
-}
-
-validate_cmake() {
-    CMAKE_VERSION=$(cmake --version | head -n1)
-    if [[ "$CMAKE_VERSION" != "$EXPECTED_CMAKE_VERSION" ]]; then
-        echo "ERROR: CMake version doesn't match." >&2
-        echo "  expected: $EXPECTED_CMAKE_VERSION" >&2
-        echo "  found: $CMAKE_VERSION" >&2
-        return 1
-    fi
-}
-
 build_boringssl_fips() {
     cd "$BSSL_SRC" || exit 1
     export HOME="${BSSL_SRC}"
@@ -108,9 +78,6 @@ output_libs() {
     mv "${BSSL_SRC}/build/libssl.a" "$SSL_OUT"
 }
 
-validate_go
-validate_ninja
-validate_cmake
 build_boringssl_fips
 validate_fips
 output_libs

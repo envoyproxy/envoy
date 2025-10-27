@@ -31,7 +31,7 @@ namespace {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain&,
-                   FilterChainFactoryContextCreator&) const override {
+                   FilterChainFactoryContextCreator&, bool) const override {
     // A place holder to be found
     return std::make_shared<Network::MockFilterChain>();
   }

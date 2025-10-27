@@ -118,11 +118,16 @@ protected:
       void removeConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
         callbacks_.remove(&cb);
       }
+      const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
       void addBytesSentCallback(Network::Connection::BytesSentCb) override {
         IS_ENVOY_BUG("Unexpected function call");
       }
       void enableHalfClose(bool) override { IS_ENVOY_BUG("Unexpected function call"); }
       bool isHalfCloseEnabled() const override {
+        IS_ENVOY_BUG("Unexpected function call");
+        return false;
+      }
+      bool setSocketOption(Network::SocketOptionName, absl::Span<uint8_t>) override {
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }

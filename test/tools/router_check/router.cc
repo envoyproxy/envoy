@@ -7,6 +7,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
+#include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/common/enum_to_int.h"
@@ -176,17 +177,21 @@ void RouterCheckTool::assignRuntimeFraction(
 void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
                                       Envoy::StreamInfo::StreamInfoImpl stream_info) {
   if (!headers_finalized_ && tool_config.route_ != nullptr) {
+    const Formatter::Context formatter_context(tool_config.request_headers_.get(),
+                                               tool_config.response_headers_.get(), nullptr, {}, {},
+                                               nullptr);
+
     if (tool_config.route_->directResponseEntry() != nullptr) {
       tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.request_headers_,
                                                                    true);
       sendLocalReply(tool_config, *tool_config.route_->directResponseEntry());
       tool_config.route_->directResponseEntry()->finalizeResponseHeaders(
-          *tool_config.response_headers_, stream_info);
+          *tool_config.response_headers_, formatter_context, stream_info);
     } else if (tool_config.route_->routeEntry() != nullptr) {
-      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.request_headers_,
-                                                               stream_info, true);
+      tool_config.route_->routeEntry()->finalizeRequestHeaders(
+          *tool_config.request_headers_, formatter_context, stream_info, true);
       tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.response_headers_,
-                                                                stream_info);
+                                                                formatter_context, stream_info);
     }
   }
 
@@ -234,6 +239,47 @@ Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) 
   return Json::Factory::loadFromString(contents).value();
 }
 
+void RouterCheckTool::applyDynamicMetadata(
+    Envoy::StreamInfo::StreamInfoImpl& stream_info,
+    const Envoy::Protobuf::RepeatedPtrField<
+        envoy::extensions::filters::http::set_metadata::v3::Metadata>& dynamic_metadata) {
+  if (dynamic_metadata.empty()) {
+    return;
+  }
+
+  for (const auto& metadata : dynamic_metadata) {
+    if (metadata.has_value()) {
+      auto& mut_untyped_metadata = *stream_info.dynamicMetadata().mutable_filter_metadata();
+      const std::string& metadata_namespace = metadata.metadata_namespace();
+
+      if (!mut_untyped_metadata.contains(metadata_namespace)) {
+        // Insert the new entry.
+        mut_untyped_metadata[metadata_namespace] = metadata.value();
+      } else if (metadata.allow_overwrite()) {
+        // Get the existing metadata at this key for merging.
+        Protobuf::Struct& orig_fields = mut_untyped_metadata[metadata_namespace];
+        const auto& to_merge = metadata.value();
+
+        // Merge the new metadata into the existing metadata.
+        StructUtil::update(orig_fields, to_merge);
+      }
+      // If allow_overwrite is false and entry exists, we skip it
+    } else if (metadata.has_typed_value()) {
+      auto& mut_typed_metadata = *stream_info.dynamicMetadata().mutable_typed_filter_metadata();
+      const std::string& metadata_namespace = metadata.metadata_namespace();
+
+      if (!mut_typed_metadata.contains(metadata_namespace)) {
+        // Insert the new entry.
+        mut_typed_metadata[metadata_namespace] = metadata.typed_value();
+      } else if (metadata.allow_overwrite()) {
+        // Overwrite the existing typed metadata at this key.
+        mut_typed_metadata[metadata_namespace] = metadata.typed_value();
+      }
+      // If allow_overwrite is false and entry exists, we skip it
+    }
+  }
+}
+
 std::vector<envoy::RouterCheckToolSchema::ValidationItemResult>
 RouterCheckTool::compareEntries(const std::string& expected_routes) {
   envoy::RouterCheckToolSchema::Validation validation_config;
@@ -254,6 +300,10 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
         Envoy::Http::Protocol::Http11, factory_context_->mainThreadDispatcher().timeSource(),
         connection_info_provider, StreamInfo::FilterState::LifeSpan::FilterChain);
     ToolConfig tool_config = ToolConfig::create(check_config);
+
+    // Apply dynamic metadata to stream_info before routing
+    applyDynamicMetadata(stream_info, check_config.input().dynamic_metadata());
+
     tool_config.route_ =
         config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);
 
@@ -332,11 +382,12 @@ bool RouterCheckTool::compareVirtualCluster(
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
   const bool has_virtual_cluster =
       has_route_entry &&
-      tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_) != nullptr;
+      tool_config.route_->virtualHost()->virtualCluster(*tool_config.request_headers_) != nullptr;
   std::string actual = "";
   if (has_virtual_cluster) {
-    Stats::StatName stat_name =
-        tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_)->statName();
+    Stats::StatName stat_name = tool_config.route_->virtualHost()
+                                    ->virtualCluster(*tool_config.request_headers_)
+                                    ->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches =
@@ -362,7 +413,7 @@ bool RouterCheckTool::compareVirtualHost(
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
   std::string actual = "";
   if (has_route_entry) {
-    Stats::StatName stat_name = tool_config.route_->virtualHost().statName();
+    Stats::StatName stat_name = tool_config.route_->virtualHost()->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches =

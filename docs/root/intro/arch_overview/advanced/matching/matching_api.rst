@@ -49,6 +49,7 @@ These input functions are available for matching TCP connections and HTTP reques
 * :ref:`Direct source IP <extension_envoy.matching.inputs.direct_source_ip>`.
 * :ref:`Source type <extension_envoy.matching.inputs.source_type>`.
 * :ref:`Server name <extension_envoy.matching.inputs.server_name>`.
+* :ref:`Network namespace <extension_envoy.matching.inputs.network_namespace>`.
 * :ref:`Filter state <extension_envoy.matching.inputs.filter_state>`.
 
 These input functions are available for matching TCP connections:
@@ -80,9 +81,13 @@ Custom Matching Algorithms
 In addition to the built-in exact and prefix matchers, these custom matchers
 are available in some contexts:
 
-.. _extension_envoy.matching.custom_matchers.trie_matcher:
+.. _extension_envoy.matching.custom_matchers.ip_range_matcher:
 
-* :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
+* :ref:`IP range matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
+
+.. _extension_envoy.matching.custom_matchers.domain_matcher:
+
+* :ref:`Trie-based server name matcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` applies to network and HTTP inputs.
 
 * `Common Expression Language <https://github.com/google/cel-spec>`_ (CEL) based matching:
 

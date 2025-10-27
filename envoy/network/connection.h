@@ -343,10 +343,21 @@ public:
   virtual bool aboveHighWatermark() const PURE;
 
   /**
+   * @return const ConnectionSocketPtr& reference to the socket from current connection.
+   */
+  virtual const ConnectionSocketPtr& getSocket() const PURE;
+
+  /**
    * Get the socket options set on this connection.
    */
   virtual const ConnectionSocket::OptionsSharedPtr& socketOptions() const PURE;
 
+  /**
+   * Set a socket option on the underlying socket(s) of this connection.
+   * @param option The socket option to set.
+   * @return boolean telling if the socket option was set successfully.
+   */
+  virtual bool setSocketOption(Network::SocketOptionName name, absl::Span<uint8_t> value) PURE;
   /**
    * The StreamInfo object associated with this connection. This is typically
    * used for logging purposes. Individual filters may add specific information

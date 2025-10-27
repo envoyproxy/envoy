@@ -225,6 +225,30 @@ TEST(InitManagerImplTest, OneTargetReadyBeforeInitialization) {
   expectInitialized(m);
 }
 
+TEST(InitManagerImplTest, UpdateWatcherWhenInitializing) {
+  InSequence s;
+
+  ManagerImpl m("test");
+  expectUninitialized(m);
+
+  ExpectableTargetImpl t1("t1");
+  m.add(t1);
+
+  ExpectableWatcherImpl w1;
+  ExpectableWatcherImpl w2;
+
+  // first watcher should not be called
+  w1.expectReady().Times(0);
+
+  // initialization should complete immediately
+  t1.expectInitialize();
+  w2.expectReady();
+  m.initialize(w1);
+  m.updateWatcher(w2);
+  t1.ready();
+  expectInitialized(m);
+}
+
 } // namespace
 } // namespace Init
 } // namespace Envoy

@@ -447,6 +447,7 @@ var (
 	ErrValueNotFound   = errors.New("value not found")
 	// Failed to serialize the value when we fetch the value as string
 	ErrSerializationFailure = errors.New("serialization failure")
+	ErrInvalidIPAddress     = errors.New("invalid IP address")
 )
 
 // *************** errors end **************//

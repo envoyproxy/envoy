@@ -62,7 +62,7 @@ public:
 
       TestUtility::loadFromYaml(tracing_config_yaml, tracing_config);
 
-      tracing_config_ = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
+      tracing_config_ = std::make_unique<Tracing::ConnectionManagerTracingConfig>(
           envoy::config::core::v3::TrafficDirection::OUTBOUND, tracing_config);
     }
 
@@ -232,6 +232,12 @@ public:
 
 TEST_F(FilterTest, SimpleOnNewConnection) {
   initializeFilter();
+
+  EXPECT_CALL(*server_codec_, onConnected()).WillOnce(Invoke([this] {
+    ASSERT_NE(server_codec_callbacks_, nullptr);
+    ASSERT_EQ(&filter_callbacks_.connection_, server_codec_callbacks_->connection().ptr());
+  }));
+
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 }
 

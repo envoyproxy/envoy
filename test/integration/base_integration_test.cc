@@ -223,7 +223,7 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
     envoy::service::discovery::v3::DiscoveryResponse lds;
     lds.set_version_info("0");
     for (auto& listener : config_helper.bootstrap().static_resources().listeners()) {
-      ProtobufWkt::Any* resource = lds.add_resources();
+      Protobuf::Any* resource = lds.add_resources();
       resource->PackFrom(listener);
     }
 #ifdef ENVOY_ENABLE_YAML
@@ -377,12 +377,12 @@ bool BaseIntegrationTest::getSocketOption(const std::string& listener_name, int 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   test_server_->server().dispatcher().post([&]() {
     listeners = test_server_->server().listenerManager().listeners();
-    l.Lock();
+    l.lock();
     listeners_ready = true;
-    l.Unlock();
+    l.unlock();
   });
   l.LockWhen(absl::Condition(&listeners_ready));
-  l.Unlock();
+  l.unlock();
 
   for (auto& listener : listeners) {
     if (listener.get().name() == listener_name) {
@@ -404,12 +404,12 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   test_server->server().dispatcher().post([&listeners, &listeners_ready, &l, &test_server]() {
     listeners = test_server->server().listenerManager().listeners();
-    l.Lock();
+    l.lock();
     listeners_ready = true;
-    l.Unlock();
+    l.unlock();
   });
   l.LockWhen(absl::Condition(&listeners_ready));
-  l.Unlock();
+  l.unlock();
 
   auto listener_it = listeners.cbegin();
   auto port_it = port_names.cbegin();

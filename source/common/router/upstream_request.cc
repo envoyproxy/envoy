@@ -240,11 +240,11 @@ void UpstreamRequest::cleanUp() {
 }
 
 void UpstreamRequest::upstreamLog(AccessLog::AccessLogType access_log_type) {
-  const Formatter::HttpFormatterContext log_context{parent_.downstreamHeaders(),
-                                                    upstream_headers_.get(),
-                                                    upstream_trailers_.get(),
-                                                    {},
-                                                    access_log_type};
+  const Formatter::Context log_context{parent_.downstreamHeaders(),
+                                       upstream_headers_.get(),
+                                       upstream_trailers_.get(),
+                                       {},
+                                       access_log_type};
 
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
     upstream_log->log(log_context, stream_info_);
@@ -393,6 +393,16 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
     // method which is expecting 2xx response.
   } else if (Http::Utility::isWebSocketUpgradeRequest(*headers)) {
     paused_for_websocket_ = true;
+
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.websocket_enable_timeout_on_upgrade_response")) {
+      // For websocket upgrades, we need to set up timeouts immediately
+      // because the upstream request will be paused waiting for the upgrade response.
+      if (!per_try_timeout_) {
+        setupPerTryTimeout();
+      }
+      parent_.setupRouteTimeoutForWebsocketUpgrade();
+    }
   }
 
   // Kick off creation of the upstream connection immediately upon receiving headers.
@@ -646,7 +656,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
     upstream_info.setUpstreamProtocol(protocol.value());
   }
 
-  if (parent_.downstreamEndStream()) {
+  if (parent_.downstreamEndStream() && !per_try_timeout_) {
     setupPerTryTimeout();
   } else {
     create_per_try_timeout_on_request_complete_ = true;
@@ -797,12 +807,7 @@ void UpstreamRequestFilterManagerCallbacks::resetStream(
   // which should force reset the stream, and a codec driven reset, which should
   // tell the router the stream reset, and let the router make the decision to
   // send a local reply, or retry the stream.
-  bool is_codec_error;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")) {
-    is_codec_error = absl::StrContains(transport_failure_reason, "codec_error");
-  } else {
-    is_codec_error = transport_failure_reason == "codec_error";
-  }
+  bool is_codec_error = absl::StrContains(transport_failure_reason, "codec_error");
   if (reset_reason == Http::StreamResetReason::LocalReset && !is_codec_error) {
     upstream_request_.parent_.callbacks()->resetStream();
     return;
@@ -817,6 +822,28 @@ Upstream::ClusterInfoConstSharedPtr UpstreamRequestFilterManagerCallbacks::clust
 Http::Http1StreamEncoderOptionsOptRef
 UpstreamRequestFilterManagerCallbacks::http1StreamEncoderOptions() {
   return upstream_request_.parent_.callbacks()->http1StreamEncoderOptions();
+}
+
+void UpstreamRequestFilterManagerCallbacks::disableRouteTimeoutForWebsocketUpgrade() {
+  upstream_request_.parent_.disableRouteTimeoutForWebsocketUpgrade();
+}
+
+void UpstreamRequestFilterManagerCallbacks::disablePerTryTimeoutForWebsocketUpgrade() {
+  // Disable the per-try timeout and idle timeout timers once websocket upgrade succeeds.
+  // This mirrors the behavior for route timeout disabling in upgrades.
+  upstream_request_.disablePerTryTimeoutForWebsocketUpgrade();
+}
+
+void UpstreamRequest::disablePerTryTimeoutForWebsocketUpgrade() {
+  // Disable and clear per-try timers so they do not fire after websocket upgrade.
+  if (per_try_timeout_ != nullptr) {
+    per_try_timeout_->disableTimer();
+    per_try_timeout_.reset();
+  }
+  if (per_try_idle_timeout_ != nullptr) {
+    per_try_idle_timeout_->disableTimer();
+    per_try_idle_timeout_.reset();
+  }
 }
 
 } // namespace Router

@@ -1,5 +1,7 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 
+#include <chrono>
+
 #include "envoy/server/factory_context.h"
 
 namespace Envoy {
@@ -31,13 +33,26 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(); });
 };
 
+MetadataCredentialsProviderBase::~MetadataCredentialsProviderBase() {
+  if (metadata_fetcher_) {
+    metadata_fetcher_->cancel();
+  }
+}
+
 void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
   ENVOY_LOG(debug, "Received callback from aws cluster manager for cluster {}", cluster_name_);
   if (!cache_duration_timer_) {
-    cache_duration_timer_ = context_.mainThreadDispatcher().createTimer([this]() -> void {
-      stats_->credential_refreshes_performed_.inc();
-      refresh();
-    });
+    std::weak_ptr<MetadataCredentialsProviderStats> weak_stats = stats_;
+    std::weak_ptr<MetadataCredentialsProviderBase> weak_self = shared_from_this();
+    cache_duration_timer_ =
+        context_.mainThreadDispatcher().createTimer([weak_stats, weak_self]() -> void {
+          if (auto stats = weak_stats.lock()) {
+            stats->credential_refreshes_performed_.inc();
+          }
+          if (auto self = weak_self.lock()) {
+            self->refresh();
+          }
+        });
   }
   if (!cache_duration_timer_->enabled()) {
     cache_duration_timer_->enableTimer(std::chrono::milliseconds(1));
@@ -85,11 +100,25 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
       // If our returned token had an expiration time, use that to set the cache duration
       const auto now = context_.api().timeSource().systemTime();
       if (expiration_time_.has_value() && (expiration_time_.value() > now)) {
-        cache_duration_ =
-            std::chrono::duration_cast<std::chrono::seconds>(expiration_time_.value() - now);
+        auto time_until_expiration = expiration_time_.value() - now;
+        auto grace_period =
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(REFRESH_GRACE_PERIOD);
+
+        // Subtract grace period, but ensure we don't go negative
+        if (time_until_expiration > grace_period) {
+          cache_duration_ = std::chrono::duration_cast<std::chrono::seconds>(time_until_expiration -
+                                                                             grace_period);
+        } else {
+          ENVOY_LOG(warn,
+                    "Credential expiration time is within grace period {} seconds, refreshing now. "
+                    "Minimum expiration time should be 900 seconds (15 minutes).",
+                    REFRESH_GRACE_PERIOD.count());
+          cache_duration_ = std::chrono::seconds(1);
+        }
+
         ENVOY_LOG(debug,
                   "Metadata fetcher setting credential refresh to {}, based on "
-                  "credential expiration",
+                  "credential expiration with grace period",
                   std::chrono::seconds(cache_duration_.count()));
       } else {
         cache_duration_ = getCacheDuration();
@@ -97,7 +126,8 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
                   "Metadata fetcher setting credential refresh to {}, based on default expiration",
                   std::chrono::seconds(cache_duration_.count()));
       }
-      cache_duration_timer_->enableTimer(cache_duration_);
+      cache_duration_timer_->enableTimer(
+          std::chrono::duration_cast<std::chrono::milliseconds>(cache_duration_));
     }
   }
 }
@@ -116,21 +146,24 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
         /* Notify waiting signers on completion of credential setting above */
         [this]() {
           credentials_pending_.store(false);
-          std::list<CredentialSubscriberCallbacks*> subscribers_copy;
+          std::list<std::weak_ptr<CredentialSubscriberCallbacks>> subscribers_copy;
           {
             Thread::LockGuard guard(mu_);
             subscribers_copy = credentials_subscribers_;
           }
-          for (auto& cb : subscribers_copy) {
-            ENVOY_LOG(debug, "Notifying subscriber of credential update");
-            cb->onCredentialUpdate();
+          for (auto& weak_cb : subscribers_copy) {
+            if (auto cb = weak_cb.lock()) {
+              ENVOY_LOG(debug, "Notifying subscriber of credential update");
+              cb->onCredentialUpdate();
+            }
           }
         });
   }
 }
 
 CredentialSubscriberCallbacksHandlePtr
-MetadataCredentialsProviderBase::subscribeToCredentialUpdates(CredentialSubscriberCallbacks& cs) {
+MetadataCredentialsProviderBase::subscribeToCredentialUpdates(
+    CredentialSubscriberCallbacksSharedPtr cs) {
   Thread::LockGuard guard(mu_);
   return std::make_unique<CredentialSubscriberCallbacksHandle>(cs, credentials_subscribers_);
 }

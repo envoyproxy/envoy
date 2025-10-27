@@ -592,6 +592,47 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   EXPECT_EQ(expected_response_trailers, response_trailers);
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, NoTranscodingWithStreamedRequest) {
+  // It should not be an error to pass-through a non-transcoded request/response when
+  // the downstream sends more data after the upstream headers have been sent.
+  // This is a bit of an odd thing to test for specifically, but there was a bug here
+  // that caused debug builds to assert, so this is an anti-regression test.
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                                 {":method", "POST"},
+                                                 {":path", "/grpc.service/UnknownGrpcMethod"}};
+
+  Http::TestRequestHeaderMapImpl expected_request_headers{
+      {"content-type", "application/grpc"},
+      {":method", "POST"},
+      {":path", "/grpc.service/UnknownGrpcMethod"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(expected_request_headers, request_headers);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
+
+  // Not grpc response.
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/json"},
+                                                   {":status", "200"}};
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{{"content-type", "application/json"},
+                                                            {":status", "200"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ(expected_response_headers, response_headers);
+
+  // decodeData after pass-through encodeHeaders should not provoke an ASSERT.
+  Buffer::OwnedImpl request_data{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
+  EXPECT_EQ(2, request_data.length());
+
+  Buffer::OwnedImpl response_data{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_data, true));
+  EXPECT_EQ(2, response_data.length());
+}
+
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
@@ -1256,6 +1297,68 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
   }
 }
 
+class GrpcJsonTranscoderFilterTestWithLargerBuffer : public GrpcJsonTranscoderFilterTest {
+public:
+  GrpcJsonTranscoderFilterTestWithLargerBuffer()
+      : GrpcJsonTranscoderFilterTest(modifiedBookstoreProtoConfig()) {}
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
+  modifiedBookstoreProtoConfig() {
+    auto proto_config = bookstoreProtoConfig();
+    proto_config.mutable_max_request_body_size()->set_value(1024 * 1024 * 2);
+    return proto_config;
+  }
+};
+
+TEST_F(GrpcJsonTranscoderFilterTestWithLargerBuffer, TranscodingStreamPostWithLargeBufferHttpBody) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/streamBody?arg=hi"}, {"content-type", "text/plain"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/streamBody?arg=hi", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("POST", request_headers.get_("x-envoy-original-method"));
+  EXPECT_EQ("/bookstore.Bookstore/StreamBody", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  // For client_streaming, a large buffer should be packaged into multiple grpc frames.
+  // Test this with a buffer of 2MB plus 512 bytes.
+  std::string text(JsonTranscoderConfig::MaxStreamedPieceSize * 2 + 512, 'X');
+  Buffer::OwnedImpl buffer;
+  buffer.add(text);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, true));
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(buffer, frames);
+  ASSERT_EQ(frames.size(), 3);
+
+  // First frame should include non-streamed content, plus 1MB of streamed content.
+  bookstore::EchoBodyRequest expected_first_request;
+  expected_first_request.set_arg("hi");
+  expected_first_request.mutable_nested()->mutable_content()->set_content_type("text/plain");
+  expected_first_request.mutable_nested()->mutable_content()->set_data(
+      std::string(JsonTranscoderConfig::MaxStreamedPieceSize, 'X'));
+  bookstore::EchoBodyRequest request;
+  request.ParseFromString(frames[0].data_->toString());
+  EXPECT_THAT(request, ProtoEq(expected_first_request));
+
+  // Second frame should have only 1MB of streamed content.
+  bookstore::EchoBodyRequest expected_second_request;
+  expected_second_request.mutable_nested()->mutable_content()->set_data(
+      std::string(JsonTranscoderConfig::MaxStreamedPieceSize, 'X'));
+  request.ParseFromString(frames[1].data_->toString());
+  EXPECT_THAT(request, ProtoEq(expected_second_request));
+
+  // Third frame should have the remaining 512 bytes of streamed content.
+  bookstore::EchoBodyRequest expected_third_request;
+  expected_third_request.mutable_nested()->mutable_content()->set_data(std::string(512, 'X'));
+  request.ParseFromString(frames[2].data_->toString());
+  EXPECT_THAT(request, ProtoEq(expected_third_request));
+}
+
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamSSE) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config =
       bookstoreProtoConfig();
@@ -1292,11 +1395,35 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamSSE) {
   }
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamSSEUnary) {
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config =
+      bookstoreProtoConfig();
+  proto_config.mutable_print_options()->set_stream_newline_delimited(true);
+  proto_config.mutable_print_options()->set_stream_sse_style_delimited(true);
+
+  auto config = std::make_shared<JsonTranscoderConfig>(proto_config, *api_);
+  auto filter = JsonTranscoderFilter(config, stats_);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/shelves/1/books:unary"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(request_headers, false));
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                                   {":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter.encodeHeaders(response_headers, false));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+}
+
 // Streaming requests with HTTP bodies do not internally buffer any data.
 // The configured buffer limits will not apply.
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBodyNoBuffer) {
   EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
-      .Times(testing::AtLeast(3))
+      .Times(testing::AtLeast(1))
       .WillRepeatedly(Return(8));
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1490,7 +1617,7 @@ bookstore::EchoStructReqResp createDeepStruct(int level) {
   auto* field_map = msg.mutable_content()->mutable_fields();
   for (int i = 0; i < level; ++i) {
     (*field_map)["level"] = ValueUtil::numberValue(i);
-    Envoy::ProtobufWkt::Struct s;
+    Envoy::Protobuf::Struct s;
     (*field_map)["struct"] = ValueUtil::structValue(s);
     field_map = (*field_map)["struct"].mutable_struct_value()->mutable_fields();
   }

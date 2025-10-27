@@ -246,6 +246,14 @@ public:
   virtual bool pausedForWebsocketUpgrade() const PURE;
   virtual void setPausedForWebsocketUpgrade(bool value) PURE;
 
+  // Disable the route timeout after websocket upgrade completes successfully.
+  // This should only be used by the upstream codec filter.
+  virtual void disableRouteTimeoutForWebsocketUpgrade() PURE;
+
+  // Disable per-try timeouts after websocket upgrade completes successfully.
+  // This should only be used by the upstream codec filter.
+  virtual void disablePerTryTimeoutForWebsocketUpgrade() PURE;
+
   // Return the upstreamStreamOptions for this stream.
   virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
 
@@ -363,6 +371,19 @@ public:
    * the headers in a way that would affect routing.
    */
   virtual void clearRouteCache() PURE;
+
+  /**
+   * Refresh the target cluster but not the route cache. This is used when we want to change the
+   * target cluster after modifying the request attributes.
+   *
+   * NOTE: this is suggested to replace clearRouteCache() if you only want to determine the target
+   * cluster based on the latest request attributes that have been updated by the filters and do
+   * not want to configure multiple similar routes at the route table.
+   *
+   * NOTE: this depends on the route cluster specifier to support the refreshRouteCluster()
+   * method.
+   */
+  virtual void refreshRouteCluster() PURE;
 
   /**
    * Schedules a request for a RouteConfiguration update from the management server.
@@ -753,7 +774,7 @@ public:
    *
    * @param limit supplies the desired buffer limit.
    */
-  virtual void setDecoderBufferLimit(uint32_t limit) PURE;
+  virtual void setDecoderBufferLimit(uint64_t limit) PURE;
 
   /**
    * This routine returns the current buffer limit for decoder filters. Filters should abide by
@@ -762,7 +783,7 @@ public:
    *
    * @return the buffer limit the filter should apply.
    */
-  virtual uint32_t decoderBufferLimit() PURE;
+  virtual uint64_t decoderBufferLimit() PURE;
 
   /**
    * @return the account, if any, used by this stream.

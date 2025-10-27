@@ -13,6 +13,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
@@ -38,14 +39,18 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
     return absl::InvalidArgumentError(":-prefixed or host headers may not be modified");
   }
 
-  // UPSTREAM_METADATA and DYNAMIC_METADATA must be translated from JSON ["a", "b"] format to colon
-  // format (a:b)
-  std::string final_header_value = HeaderParser::translateMetadataFormat(header_value.value());
-  // Change PER_REQUEST_STATE to FILTER_STATE.
-  final_header_value = HeaderParser::translatePerRequestState(final_header_value);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_route_formatter")) {
+    // UPSTREAM_METADATA and DYNAMIC_METADATA must be translated from JSON ["a", "b"] format to
+    // colon format (a:b)
+    std::string final_header_value = HeaderParser::translateMetadataFormat(header_value.value());
+    // Change PER_REQUEST_STATE to FILTER_STATE.
+    final_header_value = HeaderParser::translatePerRequestState(final_header_value);
+    // Let the substitution formatter parse the final_header_value.
+    return Envoy::Formatter::FormatterImpl::create(final_header_value, true);
+  }
 
-  // Let the substitution formatter parse the final_header_value.
-  return Envoy::Formatter::FormatterImpl::create(final_header_value, true);
+  // Let the substitution formatter parse the header_value.
+  return Envoy::Formatter::FormatterImpl::create(header_value.value(), true);
 }
 
 } // namespace
@@ -136,14 +141,12 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& hea
   return header_parser;
 }
 
-void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const Formatter::HttpFormatterContext& context,
+void HeaderParser::evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                                    const StreamInfo::StreamInfo& stream_info) const {
   evaluateHeaders(headers, context, &stream_info);
 }
 
-void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const Formatter::HttpFormatterContext& context,
+void HeaderParser::evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                                    const StreamInfo::StreamInfo* stream_info) const {
   // Removing headers in the headers_to_remove_ list first makes
   // remove-before-add the default behavior as expected by users.
@@ -173,7 +176,7 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   for (const auto& [key, entry] : headers_to_add_) {
     absl::string_view value;
     if (stream_info != nullptr) {
-      value_buffer = entry->formatter_->formatWithContext(context, *stream_info);
+      value_buffer = entry->formatter_->format(context, *stream_info);
       value = value_buffer;
     } else {
       value = entry->original_value_;
@@ -218,7 +221,7 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
 
   for (const auto& [key, entry] : headers_to_add_) {
     if (do_formatting) {
-      const std::string value = entry->formatter_->formatWithContext({}, stream_info);
+      const std::string value = entry->formatter_->format({}, stream_info);
       if (!value.empty() || entry->add_if_empty_) {
         switch (entry->append_action_) {
         case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:

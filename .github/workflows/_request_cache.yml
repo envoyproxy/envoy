@@ -73,13 +73,11 @@ jobs:
         include:
         - name: Bazel (x64/cache)
           bazel-extra: >-
-            --config=remote-clang
             --config=remote-envoy-engflow
         - name: Bazel (arm64/cache)
           arch: arm64
           runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}
           bazel-extra: >-
-             --config=remote-arm64-clang
              --config=common-envoy-engflow
              --config=cache-envoy-engflow
           targets: >-

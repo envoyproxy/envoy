@@ -28,6 +28,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
+#include "source/common/common/notification.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
@@ -291,6 +292,12 @@ void InstanceBase::flushStatsInternal() {
   auto& stats_config = config_.statsConfig();
   InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, clusterManager(),
                                     timeSource());
+  if (const auto evict_on_flush = stats_config.evictOnFlush(); evict_on_flush > 0) {
+    stats_eviction_counter_ = (stats_eviction_counter_ + 1) % evict_on_flush;
+    if (stats_eviction_counter_ == 0) {
+      stats_store_.evictUnused();
+    }
+  }
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
@@ -752,6 +759,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
         [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
     envoy_bug_action_registration_ = Assert::addEnvoyBugFailureRecordAction(
         [this](const char*) { server_stats_->envoy_bug_failures_.inc(); });
+    envoy_notification_registration_ = Notification::addEnvoyNotificationRecordAction(
+        [this](absl::string_view) { server_stats_->envoy_notifications_.inc(); });
   }
 
   if (initial_config.admin().address()) {
@@ -794,9 +803,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
                                                           *local_info_, validation_context_, *this);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      serverFactoryContext(), stats_store_, thread_local_, http_context_,
+      serverFactoryContext(),
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
-      *ssl_context_manager_, quic_stat_names_, *this);
+      quic_stat_names_);
 
   // Now that the worker thread are initialized, notify the bootstrap extensions.
   for (auto&& bootstrap_extension : bootstrap_extensions_) {
@@ -874,13 +883,12 @@ void InstanceBase::onRuntimeReady() {
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        *config_.clusterManager(), thread_local_, server_contexts_, grpc_context_.statNames(),
-        bootstrap_.grpc_async_client_manager_config());
+        bootstrap_.grpc_async_client_manager_config(), server_contexts_, grpc_context_.statNames());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
       // HDS does not support xDS-Failover.
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0, false);
       THROW_IF_NOT_OK_REF(factory_or_error.status());
       hds_delegate_ = maybeCreateHdsDelegate(
           serverFactoryContext(), *stats_store_.rootScope(),
@@ -898,11 +906,13 @@ void InstanceBase::onRuntimeReady() {
 
   // TODO (nezdolik): Fully deprecate this runtime key in the next release.
   if (runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
-    ENVOY_LOG(warn,
-              "Usage of the deprecated runtime key {}, consider switching to "
-              "`envoy.resource_monitors.global_downstream_max_connections` instead."
-              "This runtime key will be removed in future.",
-              Runtime::Keys::GlobalMaxCxRuntimeKey);
+    if (!options_.skipDeprecatedLogs()) {
+      ENVOY_LOG(warn,
+                "Usage of the deprecated runtime key {}, consider switching to "
+                "`envoy.resource_monitors.global_downstream_max_connections` instead."
+                "This runtime key will be removed in future.",
+                Runtime::Keys::GlobalMaxCxRuntimeKey);
+    }
   }
 }
 
@@ -952,9 +962,10 @@ void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path
 }
 
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
-                     Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
-                     Init::Manager& init_manager, OverloadManager& overload_manager,
-                     OverloadManager& null_overload_manager, std::function<void()> post_init_cb)
+                     Config::XdsManager& xds_manager, Upstream::ClusterManager& cm,
+                     AccessLog::AccessLogManager& access_log_manager, Init::Manager& init_manager,
+                     OverloadManager& overload_manager, OverloadManager& null_overload_manager,
+                     std::function<void()> post_init_cb)
     : init_watcher_("RunHelper", [&instance, post_init_cb]() {
         if (!instance.isShutdown()) {
           post_init_cb();
@@ -1006,7 +1017,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // this can fire immediately if all clusters have already initialized. Also note that we need
   // to guard against shutdown at two different levels since SIGTERM can come in once the run loop
   // starts.
-  cm.setInitializedCb([&instance, &init_manager, &cm, this]() {
+  cm.setInitializedCb([&instance, &init_manager, &xds_manager, this]() {
     if (instance.isShutdown()) {
       return;
     }
@@ -1015,10 +1026,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
-    Config::ScopedResume maybe_resume_rds;
-    if (cm.adsMux()) {
-      maybe_resume_rds = cm.adsMux()->pause(type_url);
-    }
+    Config::ScopedResume resume_rds = xds_manager.pause(type_url);
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize(init_watcher_);
@@ -1033,8 +1041,8 @@ void InstanceBase::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
   const auto run_helper =
-      RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_, init_manager_,
-                overloadManager(), nullOverloadManager(), [this] {
+      RunHelper(*this, options_, *dispatcher_, xdsManager(), clusterManager(), access_log_manager_,
+                init_manager_, overloadManager(), nullOverloadManager(), [this] {
                   notifyCallbacksForStage(Stage::PostInit);
                   startWorkers();
                 });

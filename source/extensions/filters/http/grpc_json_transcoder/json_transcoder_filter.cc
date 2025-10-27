@@ -269,9 +269,9 @@ void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_
 
 Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor,
                                           const std::string& field_path_str,
-                                          std::vector<const ProtobufWkt::Field*>* field_path,
+                                          std::vector<const Protobuf::Field*>* field_path,
                                           bool* is_http_body) {
-  const ProtobufWkt::Type* message_type =
+  const Protobuf::Type* message_type =
       type_helper_->Info()->GetTypeByTypeUrl(Grpc::Common::typeUrl(descriptor->full_name()));
   if (message_type == nullptr) {
     return {StatusCode::kNotFound,
@@ -287,7 +287,7 @@ Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor
   if (field_path->empty()) {
     *is_http_body = descriptor->full_name() == google::api::HttpBody::descriptor()->full_name();
   } else {
-    const ProtobufWkt::Type* body_type =
+    const Protobuf::Type* body_type =
         type_helper_->Info()->GetTypeByTypeUrl(field_path->back()->type_url());
     *is_http_body = body_type != nullptr &&
                     body_type->name() == google::api::HttpBody::descriptor()->full_name();
@@ -594,12 +594,23 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   if (method_->request_type_is_http_body_) {
     stats_->transcoder_request_buffer_bytes_.add(data.length());
     request_data_.move(data);
-    if (decoderBufferLimitReached(request_data_.length())) {
+    if (!method_->descriptor_->client_streaming() &&
+        decoderBufferLimitReached(request_data_.length())) {
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
-    // TODO(euroelessar): Upper bound message size for streaming case.
-    if (end_stream || method_->descriptor_->client_streaming()) {
+    if (method_->descriptor_->client_streaming()) {
+      // To avoid sending a grpc frame larger than 4MB (which grpc will by default reject),
+      // split the input buffer into 1MB pieces until the buffer is smaller than 1MB.
+      Buffer::OwnedImpl remaining_request_data;
+      remaining_request_data.move(request_data_);
+      while (!first_request_sent_ || remaining_request_data.length() > 0) {
+        uint64_t piece_size = std::min<uint64_t>(remaining_request_data.length(),
+                                                 JsonTranscoderConfig::MaxStreamedPieceSize);
+        request_data_.move(remaining_request_data, piece_size);
+        maybeSendHttpBodyRequestMessage(&data);
+      }
+    } else if (end_stream) {
       maybeSendHttpBodyRequestMessage(&data);
     } else {
       // TODO(euroelessar): Avoid buffering if content length is already known.
@@ -667,6 +678,11 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
+  if (error_ || !transcoder_) {
+    ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (!Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
     ENVOY_STREAM_LOG(
         debug,
@@ -674,10 +690,6 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
         "without transcoding.",
         *encoder_callbacks_);
     error_ = true;
-  }
-
-  if (error_ || !transcoder_) {
-    ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -699,7 +711,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (per_route_config_->isStreamSSEStyleDelimited()) {
+  if (method_->descriptor_->server_streaming() && per_route_config_->isStreamSSEStyleDelimited()) {
     headers.setContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
   } else {
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
@@ -960,7 +972,7 @@ bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
         encoder_callbacks_->resetStream();
         return true;
       }
-      const auto& body = http_body.data();
+      const auto& body = MessageUtil::bytesToString(http_body.data());
 
       data.add(body);
 

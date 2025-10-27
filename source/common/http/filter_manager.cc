@@ -12,6 +12,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "matching/data_impl.h"
 
@@ -42,6 +43,16 @@ void recordLatestDataFilter(typename Filters::Iterator current_filter,
   // though filter M > N was the filter that inserted data into the buffer.
   if (current_filter != filters.begin() && latest_filter == std::prev(current_filter)->get()) {
     latest_filter = current_filter->get();
+  }
+}
+
+void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& stream_info,
+                     ResponseHeaderMap& headers) {
+  const Router::RouteConstSharedPtr& route = stream_info.route();
+  if (route != nullptr && route->routeEntry() != nullptr) {
+    const Formatter::Context formatter_context{
+        callbacks.requestHeaders().ptr(), &headers, {}, {}, {}, &callbacks.activeSpan()};
+    route->routeEntry()->finalizeResponseHeaders(headers, formatter_context, stream_info);
   }
 }
 
@@ -84,6 +95,12 @@ void ActiveStreamFilterBase::commonContinue() {
     }
   }
 
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
+  }
+
   // Make sure that we handle the zero byte data frame case. We make no effort to optimize this
   // case in terms of merging it into a header only request/response. This could be done in the
   // future.
@@ -92,7 +109,19 @@ void ActiveStreamFilterBase::commonContinue() {
     doHeaders(observedEndStream() && !bufferedData() && !hasTrailers());
   }
 
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
+  }
+
   doMetadata();
+
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
+  }
 
   // It is possible for trailers to be added during doData(). doData() itself handles continuation
   // of trailers for the non-continuation case. Thus, we must keep track of whether we had
@@ -101,6 +130,12 @@ void ActiveStreamFilterBase::commonContinue() {
   const bool had_trailers_before_data = hasTrailers();
   if (bufferedData()) {
     doData(observedEndStream() && !had_trailers_before_data);
+  }
+
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
   }
 
   if (had_trailers_before_data) {
@@ -349,10 +384,7 @@ bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
   // continue if a local reply has been sent or ActiveStreamDecoderFilter::recreateStream() is
   // called, etc.
-  return !parent_.state_.encoder_filter_chain_complete_ &&
-         (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.filter_chain_aborted_can_not_continue") ||
-          !parent_.stopEncoderFilterChain());
+  return !parent_.state_.encoder_filter_chain_complete_ && !parent_.stopEncoderFilterChain();
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
@@ -990,9 +1022,7 @@ void DownstreamFilterManager::sendLocalReply(
 
   if (!filter_manager_callbacks_.responseHeaders().has_value() &&
       (!filter_manager_callbacks_.informationalHeaders().has_value() ||
-       (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx") &&
-        !(state_.filter_call_state_ & FilterCallState::IsEncodingMask)))) {
+       !(state_.filter_call_state_ & FilterCallState::IsEncodingMask))) {
     // If the response has not started at all, or if the only response so far is an informational
     // 1xx that has already been fully processed, send the response through the filter chain.
 
@@ -1002,10 +1032,16 @@ void DownstreamFilterManager::sendLocalReply(
       // route refreshment in the response filter chain.
       cb->route(nullptr);
     }
-
-    // We only prepare a local reply to execute later if we're actively
-    // invoking filters to avoid re-entrant in filters.
-    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+    // We only prepare a local reply to execute later if we're actively invoking filters to avoid
+    // re-entrant in filters.
+    //
+    // For reverse connections (where upstream initiates the connection to downstream), we need to
+    // send local replies immediately rather than queuing them. This ensures proper handling of the
+    // reversed connection flow and prevents potential issues with connection state and filter chain
+    // processing.
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.reverse_conn_force_local_reply") &&
+        (state_.filter_call_state_ & FilterCallState::IsDecodingMask)) {
       prepareLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                       grpc_status, details);
     } else {
@@ -1051,9 +1087,7 @@ void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
   prepared_local_reply_ = Utility::prepareLocalReply(
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
-            }
+            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
             if (modify_headers) {
               modify_headers(headers);
             }
@@ -1102,9 +1136,7 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
-            }
+            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
             if (modify_headers) {
               modify_headers(headers);
             }
@@ -1135,9 +1167,7 @@ void DownstreamFilterManager::sendDirectLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
-            }
+            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
             if (modify_headers) {
               modify_headers(headers);
             }
@@ -1614,7 +1644,7 @@ void FilterManager::callLowWatermarkCallbacks() {
   }
 }
 
-void FilterManager::setBufferLimit(uint32_t new_limit) {
+void FilterManager::setBufferLimit(uint64_t new_limit) {
   ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", *this, new_limit);
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
@@ -1679,9 +1709,7 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory)
   OptRef<DownstreamStreamFilterCallbacks> downstream_callbacks =
       filter_manager_callbacks_.downstreamCallbacks();
 
-  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
-  // to set valid initial route only when the downstream callbacks is available.
-  FilterChainOptionsImpl options(downstream_callbacks.has_value() ? streamInfo().route() : nullptr);
+  FilterChainOptionsImpl options(streamInfo().route());
 
   UpgradeResult upgrade = UpgradeResult::UpgradeUnneeded;
 
@@ -1731,11 +1759,11 @@ void ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
   parent_.watermark_callbacks_.remove(&watermark_callbacks);
 }
 
-void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint32_t limit) {
+void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint64_t limit) {
   parent_.setBufferLimit(limit);
 }
 
-uint32_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
+uint64_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
 
 bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
   // Because the filter's and the HCM view of if the stream has a body and if

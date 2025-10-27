@@ -12,6 +12,7 @@ use mockall::*;
 #[path = "./lib_test.rs"]
 mod mod_test;
 
+use crate::abi::envoy_dynamic_module_type_metrics_result;
 use std::any::Any;
 use std::sync::OnceLock;
 
@@ -45,16 +46,13 @@ pub mod abi {
 ///   _envoy_filter_config: &mut EC,
 ///   _name: &str,
 ///   _config: &[u8],
-/// ) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
+/// ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
 ///   Some(Box::new(MyHttpFilterConfig {}))
 /// }
 ///
 /// struct MyHttpFilterConfig {}
 ///
-/// impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-///   for MyHttpFilterConfig
-/// {
-/// }
+/// impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MyHttpFilterConfig {}
 /// ```
 #[macro_export]
 macro_rules! declare_init_functions {
@@ -88,6 +86,107 @@ macro_rules! declare_init_functions {
   };
 }
 
+/// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_trace {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Trace, $($arg)*)
+    };
+}
+
+/// Log a debug message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_debug {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Debug, $($arg)*)
+    };
+}
+
+/// Log an info message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_info {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Info, $($arg)*)
+    };
+}
+
+/// Log a warning message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_warn {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Warn, $($arg)*)
+    };
+}
+
+/// Log an error message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_error {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Error, $($arg)*)
+    };
+}
+
+/// Log a critical message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_critical {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Critical, $($arg)*)
+    };
+}
+
+/// Internal logging macro that handles the actual call to the Envoy logging callback
+/// used by envoy_log_* macros.
+#[macro_export]
+macro_rules! envoy_log {
+  ($level:expr, $($arg:tt)*) => {
+    {
+      #[cfg(not(test))]
+      unsafe {
+        // Avoid allocating the message if the log level is not enabled.
+        if $crate::abi::envoy_dynamic_module_callback_log_enabled($level) {
+          let message = format!($($arg)*);
+          let message_bytes = message.as_bytes();
+          $crate::abi::envoy_dynamic_module_callback_log(
+            $level,
+            message_bytes.as_ptr() as *const ::std::os::raw::c_char,
+            message_bytes.len()
+          );
+        }
+      }
+      // In unit tests, just print to stderr since the Envoy symbols are not available.
+      #[cfg(test)]
+      {
+        let message = format!($($arg)*);
+        eprintln!("[{}] {}", stringify!($level), message);
+      }
+    }
+  };
+}
+
 /// The function signature for the program init function.
 ///
 /// This is called when the dynamic module is loaded, and it must return true on success, and false
@@ -109,7 +208,7 @@ pub type NewHttpFilterConfigFunction<EC, EHF> = fn(
   envoy_filter_config: &mut EC,
   name: &str,
   config: &[u8],
-) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>>;
+) -> Option<Box<dyn HttpFilterConfig<EHF>>>;
 
 /// The global init function for HTTP filter configurations. This is set via the
 /// `declare_init_functions` macro, and is not intended to be set directly.
@@ -138,10 +237,10 @@ pub static NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION: OnceLock<
 ///
 /// The object is created when the corresponding Envoy Http filter config is created, and it is
 /// dropped when the corresponding Envoy Http filter config is destroyed. Therefore, the
-/// imlementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
-pub trait HttpFilterConfig<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> {
+/// implementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
+pub trait HttpFilterConfig<EHF: EnvoyHttpFilter> {
   /// This is called when a HTTP filter chain is created for a new stream.
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     panic!("not implemented");
   }
 }
@@ -256,25 +355,219 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
     _response_body: Option<&[EnvoyBuffer]>,
   ) {
   }
+
+  /// This is called when the new event is scheduled via the [`EnvoyHttpFilterScheduler::commit`]
+  /// for this [`HttpFilter`].
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `event_id` is the ID of the event that was scheduled with
+  ///   [`EnvoyHttpFilterScheduler::commit`] to distinguish multiple scheduled events.
+  ///
+  /// See [`EnvoyHttpFilter::new_scheduler`] for more details on how to use this.
+  fn on_scheduled(&mut self, _envoy_filter: &mut EHF, _event_id: u64) {}
 }
 
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
 /// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
 pub trait EnvoyHttpFilterConfig {
-  // TODO: add methods like defining metrics, filter metadata, etc.
+  /// Define a new counter scoped to this filter config with the given name.
+  fn define_counter(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, envoy_dynamic_module_type_metrics_result>;
+
+  // Define a new counter vec scoped to this filter config with the given name.
+  fn define_counter_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new gauge scoped to this filter config with the given name.
+  fn define_gauge(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new gauge vec scoped to this filter config with the given name.
+  fn define_gauge_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new histogram scoped to this filter config with the given name.
+  fn define_histogram(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new histogram vec scoped to this filter config with the given name.
+  fn define_histogram_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result>;
 }
 
 pub struct EnvoyHttpFilterConfigImpl {
   raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
 }
 
-impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {}
+impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
+  fn define_counter(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, envoy_dynamic_module_type_metrics_result> {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_counter(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyCounterId(id))
+  }
+
+  fn define_counter_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result> {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyCounterVecId(id))
+  }
+
+  fn define_gauge(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, envoy_dynamic_module_type_metrics_result> {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_gauge(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyGaugeId(id))
+  }
+
+  fn define_gauge_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result> {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyGaugeVecId(id))
+  }
+
+  fn define_histogram(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result> {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_histogram(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyHistogramId(id))
+  }
+
+  fn define_histogram_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result> {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyHistogramVecId(id))
+  }
+}
+
+/// The identifier for an EnvoyCounter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyCounterId(usize);
+
+/// The identifier for an EnvoyCounterVec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyCounterVecId(usize);
+
+/// The identifier for an EnvoyGauge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyGaugeId(usize);
+
+/// The identifier for an EnvoyGaugeVec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyGaugeVecId(usize);
+
+/// The identifier for an EnvoyHistogram.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyHistogramId(usize);
+
+/// The identifier for an EnvoyHistogramVec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyHistogramVecId(usize);
 
 /// An opaque object that represents the underlying Envoy Http filter. This has one to one
 /// mapping with the Envoy Http filter object as well as [`HttpFilter`] object per HTTP stream.
 ///
 /// The Envoy filter object is inherently not thread-safe, and it is always recommended to
-/// access it from the same thread as the one that [`HttpFilter`] even hooks are called.
+/// access it from the same thread as the one that [`HttpFilter`] event hooks are called.
 #[automock]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyHttpFilter {
@@ -414,6 +707,20 @@ pub trait EnvoyHttpFilter {
     headers: Vec<(&'a str, &'a [u8])>,
     body: Option<&'a [u8]>,
   );
+
+  /// Send response headers to the downstream, optionally indicating end of stream.
+  /// Necessary pseudo headers such as :status should be present.
+  ///
+  /// The headers are passed as a list of key-value pairs.
+  fn send_response_headers<'a>(&mut self, headers: Vec<(&'a str, &'a [u8])>, end_stream: bool);
+
+  /// Send response body data to the downstream, optionally indicating end of stream.
+  fn send_response_data<'a>(&mut self, body: &'a [u8], end_stream: bool);
+
+  /// Send response trailers to the downstream. This implicitly ends the stream.
+  ///
+  /// The trailers are passed as a list of key-value pairs.
+  fn send_response_trailers<'a>(&mut self, trailers: Vec<(&'a str, &'a [u8])>);
 
   /// Get the number-typed metadata value with the given key.
   /// Use the `source` parameter to specify which metadata to use.
@@ -623,6 +930,129 @@ pub trait EnvoyHttpFilter {
   /// returns the most specific per-route configuration (i.e. the one most up along the config
   /// hierarchy) created by the filter.
   fn get_most_specific_route_config(&self) -> Option<std::sync::Arc<dyn Any>>;
+
+  /// This can be called to continue the decoding of the HTTP request when the processing is
+  /// stopped.
+  ///
+  /// For example, this can be used inside the [`HttpFilter::on_http_callout_done`] or
+  /// [`HttpFilter::on_scheduled`] methods to continue the decoding of the request body
+  /// after the callout or scheduled event is done.
+  fn continue_decoding(&mut self);
+
+  /// This is exactly the same as [`EnvoyHttpFilter::continue_decoding`], but it is
+  /// used to continue the encoding of the HTTP response.
+  fn continue_encoding(&mut self);
+
+  /// Create a new implementation of the [`EnvoyHttpFilterScheduler`] trait.
+  ///
+  /// ## Example Usage
+  ///
+  /// ```
+  /// use abi::*;
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  /// use std::thread;
+  ///
+  /// struct TestFilter;
+  /// impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for TestFilter {
+  ///   fn on_request_headers(
+  ///     &mut self,
+  ///     envoy_filter: &mut EHF,
+  ///     _end_of_stream: bool,
+  ///   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+  ///     let scheduler = envoy_filter.new_scheduler();
+  ///     let _ = std::thread::spawn(move || {
+  ///       // Do some work in a separate thread.
+  ///       // ...
+  ///       // Then schedule the event to continue processing.
+  ///       scheduler.commit(12345);
+  ///     });
+  ///     // Stops the iteration and schedules the event from the separate thread.
+  ///     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  ///   }
+  ///   fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+  ///     // The event_id should match the one we scheduled.
+  ///     assert_eq!(event_id, 12345);
+  ///     // Then we can continue processing the request.
+  ///     envoy_filter.continue_decoding();
+  ///   }
+  /// }
+  /// ```
+  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler>;
+
+  /// Increment the counter with the given id.
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment the counter vec with the given id.
+  fn increment_counter_vec<'a>(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge with the given id.
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge vec with the given id.
+  fn increase_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge with the given id.
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge vec with the given id.
+  fn decrease_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge with the given id.
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge vec with the given id.
+  fn set_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram with the given id.
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram vec with the given id.
+  fn record_histogram_value_vec<'a>(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -807,6 +1237,59 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn send_response_headers(&mut self, headers: Vec<(&str, &[u8])>, end_stream: bool) {
+    // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
+    // not because of any formal layout guarantees but because:
+    // 1) tuples _in practice_ are laid out packed and in order
+    // 2) &str and &[u8] are fat pointers (pointers to DSTs), whose layouts _in practice_ are a
+    //    pointer and length
+    // If these assumptions change, this will break. (Vec is guaranteed to point to a contiguous
+    // array, so it's safe to cast to a pointer)
+    let headers_ptr = headers.as_ptr() as *mut abi::envoy_dynamic_module_type_module_http_header;
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_send_response_headers(
+        self.raw_ptr,
+        headers_ptr,
+        headers.len(),
+        end_stream,
+      )
+    }
+  }
+
+  fn send_response_data(&mut self, body: &[u8], end_stream: bool) {
+    let body_ptr = body.as_ptr();
+    let body_length = body.len();
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_send_response_data(
+        self.raw_ptr,
+        body_ptr as *mut _,
+        body_length,
+        end_stream,
+      )
+    }
+  }
+
+  fn send_response_trailers(&mut self, trailers: Vec<(&str, &[u8])>) {
+    // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
+    // not because of any formal layout guarantees but because:
+    // 1) tuples _in practice_ are laid out packed and in order
+    // 2) &str and &[u8] are fat pointers (pointers to DSTs), whose layouts _in practice_ are a
+    //    pointer and length
+    // If these assumptions change, this will break. (Vec is guaranteed to point to a contiguous
+    // array, so it's safe to cast to a pointer)
+    let trailers_ptr = trailers.as_ptr() as *mut abi::envoy_dynamic_module_type_module_http_header;
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_send_response_trailers(
+        self.raw_ptr,
+        trailers_ptr,
+        trailers.len(),
+      )
+    }
+  }
+
   fn get_metadata_number(
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
@@ -979,7 +1462,6 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       )
     }
   }
-
   fn get_response_body(&mut self) -> Option<Vec<EnvoyMutBuffer>> {
     let mut size: usize = 0;
     let ok = unsafe {
@@ -1154,6 +1636,214 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       filter_config_ptr.as_ref().cloned()
     }
   }
+
+  fn continue_decoding(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_continue_decoding(self.raw_ptr);
+    }
+  }
+
+  fn continue_encoding(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_continue_encoding(self.raw_ptr);
+    }
+  }
+
+  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler> {
+    unsafe {
+      let scheduler_ptr =
+        abi::envoy_dynamic_module_callback_http_filter_scheduler_new(self.raw_ptr);
+      Box::new(EnvoyHttpFilterSchedulerImpl {
+        raw_ptr: scheduler_ptr,
+      })
+    }
+  }
+
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increment_counter(self.raw_ptr, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increment_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increment_counter_vec(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increase_gauge(self.raw_ptr, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_decrease_gauge(self.raw_ptr, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res =
+      unsafe { abi::envoy_dynamic_module_callback_http_filter_set_gauge(self.raw_ptr, id, value) };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_set_gauge_vec(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_record_histogram_value(self.raw_ptr, id, value)
+    })?;
+    Ok(())
+  }
+
+  fn record_histogram_value_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramVecId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
 }
 
 impl EnvoyHttpFilterImpl {
@@ -1287,6 +1977,53 @@ impl EnvoyHttpFilterImpl {
   }
 }
 
+/// This represents a thin thread-safe object that can be used to schedule a generic event to the
+/// Envoy HTTP filter on the work thread.
+///
+/// For example, this can be used to offload some blocking work from the HTTP filter processing
+/// thread to a module-managed thread, and then schedule an event to continue
+/// processing the request.
+///
+/// Since this is primarily designed to be used from a different thread than the one
+/// where the [`HttpFilter`] instance was created, it is marked as `Send` so that
+/// the [`Box<dyn EnvoyHttpFilterScheduler>`] can be sent across threads.
+#[automock]
+pub trait EnvoyHttpFilterScheduler: Send {
+  /// Commit the scheduled event to the worker thread where [`HttpFilter`] is running.
+  ///
+  /// It accepts an `event_id` which can be used to distinguish different events
+  /// scheduled by the same filter. The `event_id` can be any value.
+  ///
+  /// Once this is called, [`HttpFilter::on_scheduled`] will be called with
+  /// the same `event_id` on the worker thread where the filter is running IF
+  /// by the time the event is committed, the filter is still alive.
+  fn commit(&self, event_id: u64);
+}
+
+/// This implements the [`EnvoyHttpFilterScheduler`] trait with the given raw pointer to the Envoy
+/// HTTP filter scheduler object.
+struct EnvoyHttpFilterSchedulerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_http_filter_scheduler_module_ptr,
+}
+
+unsafe impl Send for EnvoyHttpFilterSchedulerImpl {}
+
+impl Drop for EnvoyHttpFilterSchedulerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_scheduler_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyHttpFilterScheduler for EnvoyHttpFilterSchedulerImpl {
+  fn commit(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_scheduler_commit(self.raw_ptr, event_id);
+    }
+  }
+}
+
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
@@ -1371,8 +2108,7 @@ fn envoy_dynamic_module_on_http_filter_config_new_impl(
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(config_ptr,
-    HttpFilterConfig<EnvoyHttpFilterConfigImpl,EnvoyHttpFilterImpl>);
+  drop_wrapped_c_void_ptr!(config_ptr, HttpFilterConfig<EnvoyHttpFilterImpl>);
 }
 
 #[no_mangle]
@@ -1431,22 +2167,21 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_new(
   filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
   filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
-  let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
+  let mut envoy_filter = EnvoyHttpFilterImpl {
     raw_ptr: filter_envoy_ptr,
   };
   let filter_config = {
-    let raw = filter_config_ptr
-      as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>;
+    let raw = filter_config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
     &mut **raw
   };
-  envoy_dynamic_module_on_http_filter_new_impl(&mut envoy_filter_config, filter_config)
+  envoy_dynamic_module_on_http_filter_new_impl(&mut envoy_filter, filter_config)
 }
 
 fn envoy_dynamic_module_on_http_filter_new_impl(
-  envoy_filter_config: &mut EnvoyHttpFilterConfigImpl,
-  filter_config: &mut dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
+  envoy_filter: &mut EnvoyHttpFilterImpl,
+  filter_config: &mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>,
 ) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
-  let filter = filter_config.new_http_filter(envoy_filter_config);
+  let filter = filter_config.new_http_filter(envoy_filter);
   wrap_into_c_void_ptr!(filter)
 }
 
@@ -1563,4 +2298,27 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
     headers,
     body,
   )
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_scheduled(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  event_id: u64,
+) {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
+  let filter = &mut **filter;
+  filter.on_scheduled(&mut EnvoyHttpFilterImpl::new(envoy_ptr), event_id);
+}
+
+impl From<envoy_dynamic_module_type_metrics_result>
+  for Result<(), envoy_dynamic_module_type_metrics_result>
+{
+  fn from(result: envoy_dynamic_module_type_metrics_result) -> Self {
+    if result == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(result)
+    }
+  }
 }

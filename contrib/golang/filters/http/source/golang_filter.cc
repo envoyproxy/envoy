@@ -168,8 +168,7 @@ void Filter::onDestroy() {
 }
 
 // access_log is executed before the log of the stream filter
-void Filter::log(const Formatter::HttpFormatterContext& log_context,
-                 const StreamInfo::StreamInfo&) {
+void Filter::log(const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
   uint64_t req_header_num = 0;
   uint64_t req_header_bytes = 0;
   uint64_t req_trailer_num = 0;
@@ -189,7 +188,7 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
   case Envoy::AccessLog::AccessLogType::DownstreamEnd:
     // log called by AccessLogDownstreamStart will happen before doHeaders
     if (initRequest()) {
-      request_headers_ = const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders());
+      request_headers_ = const_cast<Http::RequestHeaderMap*>(log_context.requestHeaders().ptr());
     }
 
     if (request_headers_ != nullptr) {
@@ -204,14 +203,14 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
       decoding_state_.trailers = request_trailers_;
     }
 
-    activation_response_headers_ = &log_context.responseHeaders();
+    activation_response_headers_ = log_context.responseHeaders().ptr();
     if (activation_response_headers_ != nullptr) {
       resp_header_num = activation_response_headers_->size();
       resp_header_bytes = activation_response_headers_->byteSize();
       encoding_state_.headers = const_cast<Http::ResponseHeaderMap*>(activation_response_headers_);
     }
 
-    activation_response_trailers_ = &log_context.responseTrailers();
+    activation_response_trailers_ = log_context.responseTrailers().ptr();
     if (activation_response_trailers_ != nullptr) {
       resp_trailer_num = activation_response_trailers_->size();
       resp_trailer_bytes = activation_response_trailers_->byteSize();
@@ -970,6 +969,55 @@ CAPIStatus Filter::removeTrailer(ProcessorState& state, absl::string_view key) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_view host,
+                                           bool strict) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  auto* s = dynamic_cast<DecodingProcessorState*>(&state);
+  if (s == nullptr) {
+    ENVOY_LOG(debug,
+              "golang filter invoking cgo api setUpstreamOverrideHost at invalid state: {}, "
+              "which must be DecodingProcessorState",
+              __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  if (!Http::Utility::parseAuthority(host).is_ip_address_) {
+    ENVOY_LOG(debug, "host is not a valid IP address");
+    return CAPIStatus::CAPIInvalidIPAddress;
+  }
+
+  if (state.isThreadSafe()) {
+    // it's safe to write header in the safe thread.
+    s->setUpstreamOverrideHost(std::make_pair(std::string(host), strict));
+  } else {
+    // should deep copy the string_view before post to dispatcher callback.
+    auto host_str = std::string(host);
+
+    auto weak_ptr = weak_from_this();
+    // dispatch a callback to write header in the envoy safe thread, to make the write operation
+    // safety. otherwise, there might be race between reading in the envoy worker thread and writing
+    // in the Go thread.
+    state.getDispatcher().post([this, s, weak_ptr, host_str] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        s->setUpstreamOverrideHost(std::make_pair(std::string(host_str), false));
+      } else {
+        ENVOY_LOG(debug, "golang filter has gone or destroyed in setUpstreamOverrideHost");
+      }
+    });
+  }
+
+  return CAPIStatus::CAPIOK;
+}
+
 CAPIStatus Filter::clearRouteCache(bool refresh) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -1176,8 +1224,8 @@ CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
 
 void Filter::setDynamicMetadataInternal(std::string filter_name, std::string key,
                                         const absl::string_view& buf) {
-  ProtobufWkt::Struct value;
-  ProtobufWkt::Value v;
+  Protobuf::Struct value;
+  Protobuf::Value v;
   v.ParseFromArray(buf.data(), buf.length());
 
   (*value.mutable_fields())[key] = v;

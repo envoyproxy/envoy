@@ -43,7 +43,11 @@ public:
   MOCK_METHOD(absl::Status, initializeSecondaryClusters,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(ClusterInfoMaps, clusters, (), (const));
-  MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (absl::string_view cluster_name), (const));
+  MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (const std::string& cluster_name), (const));
+  MOCK_METHOD(OptRef<const Cluster>, getActiveOrWarmingCluster, (const std::string& cluster_name),
+              (const));
+  MOCK_METHOD(bool, hasCluster, (const std::string& cluster_name), (const));
+  MOCK_METHOD(bool, hasActiveClusters, (), (const));
 
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
@@ -82,7 +86,9 @@ public:
   }
   MOCK_METHOD(void, drainConnections,
               (const std::string& cluster, DrainConnectionsHostPredicate predicate));
-  MOCK_METHOD(void, drainConnections, (DrainConnectionsHostPredicate predicate));
+  MOCK_METHOD(void, drainConnections,
+              (DrainConnectionsHostPredicate predicate,
+               ConnectionPool::DrainBehavior drain_behavior));
   MOCK_METHOD(absl::Status, checkActiveStaticCluster, (const std::string& cluster));
   MOCK_METHOD(absl::StatusOr<OdCdsApiHandlePtr>, allocateOdCdsApi,
               (OdCdsCreationFunction creation_function,

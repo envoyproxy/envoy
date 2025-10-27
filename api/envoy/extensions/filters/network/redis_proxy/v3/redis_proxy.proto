@@ -4,6 +4,7 @@ package envoy.extensions.filters.network.redis_proxy.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/extensions/common/aws/v3/credential_provider.proto";
 import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
 
 import "google/protobuf/duration.proto";
@@ -381,11 +382,42 @@ message RedisProtocolOptions {
 
   // Upstream server password as defined by the ``requirepass`` directive
   // `<https://redis.io/topics/config>`_ in the server's configuration file.
+  // If ``aws_iam`` is set, this field is ignored.
   config.core.v3.DataSource auth_password = 1 [(udpa.annotations.sensitive) = true];
 
   // Upstream server username as defined by the ``user`` directive
   // `<https://redis.io/topics/acl>`_ in the server's configuration file.
+  // If ``aws_iam``` is set, this field will be used as the authenticating user for redis IAM authentication.
+  // See ``Create a new IAM-enabled user`` under `Setup <https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth-iam.html#auth-iam-setup>`_ for more details.
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
+
+  // The cluster level configuration for AWS IAM authentication
+  AwsIam aws_iam = 3;
+}
+
+// [#next-free-field: 6]
+message AwsIam {
+  // An AwsCredentialProvider, allowing the use of a specific credential provider chain or specific provider settings
+  common.aws.v3.AwsCredentialProvider credential_provider = 1;
+
+  // The name of the cache, used when generating the authentication token.
+  string cache_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The optional service name to be used in AWS IAM authentication. If not provided, the service name will be set to ``elasticache``. For Amazon MemoryDB
+  // the service name should be set to ``memorydb``.
+  string service_name = 3;
+
+  // The optional AWS region that your cache is located in. If not provided, the region will be deduced using the region provider chain
+  // as described in :ref:`config_http_filters_aws_request_signing_region`.
+  string region = 4;
+
+  // Number of seconds before the IAM authentication token will expire. If not set, defaults to 60s (1 minute). Maximum of 900s (15 minutes)
+  // Expiration of the current authentication token will automatically trigger generation of a new token.
+  // As envoy will automatically continue to generate new tokens as required, there is no substantial benefit to using a long expiration value here.
+  google.protobuf.Duration expiration_time = 5 [(validate.rules).duration = {
+    lte {seconds: 900}
+    gte {}
+  }];
 }
 
 // RedisExternalAuthProvider specifies a gRPC service that can be used to authenticate Redis clients.

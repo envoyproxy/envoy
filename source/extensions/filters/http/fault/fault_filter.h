@@ -77,7 +77,7 @@ public:
     return response_rate_limit_percent_runtime_;
   }
   bool disableDownstreamClusterStats() const { return disable_downstream_cluster_stats_; }
-  const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+  const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
 
 private:
   class RuntimeKeyValues {
@@ -111,7 +111,7 @@ private:
   const std::string response_rate_limit_percent_runtime_;
   const bool disable_downstream_cluster_stats_;
 
-  const Envoy::ProtobufWkt::Struct filter_metadata_;
+  const Envoy::Protobuf::Struct filter_metadata_;
 };
 
 /**

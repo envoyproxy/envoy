@@ -90,6 +90,7 @@ namespace Redis {
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
+  ~RedisCluster();
   static absl::StatusOr<std::unique_ptr<RedisCluster>>
   create(const envoy::config::cluster::v3::Cluster& cluster,
          const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
@@ -114,7 +115,7 @@ public:
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
-  TimeSource& timeSource() const { return time_source_; }
+  /// TimeSource& timeSource() const { return time_source_; }
 
 protected:
   RedisCluster(const envoy::config::cluster::v3::Cluster& cluster,
@@ -152,13 +153,12 @@ private:
   public:
     static absl::StatusOr<std::unique_ptr<RedisHost>>
     create(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-           Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-           TimeSource& time_source);
+           Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary);
 
   protected:
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
               Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-              TimeSource& time_source, absl::Status& creation_status)
+              absl::Status& creation_status)
         : Upstream::HostImpl(
               creation_status, cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
@@ -166,10 +166,11 @@ private:
               std::make_shared<envoy::config::core::v3::Metadata>(
                   parent.localityLbEndpoint().metadata()),
               parent.lbEndpoint().load_balancing_weight().value(),
-              parent.localityLbEndpoint().locality(),
+              // TODO(adisuissa): Convert to use a shared pool of localities.
+              std::make_shared<const envoy::config::core::v3::Locality>(
+                  parent.localityLbEndpoint().locality()),
               parent.lbEndpoint().endpoint().health_check_config(),
-              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status(),
-              time_source),
+              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
           primary_(primary) {}
 
     bool isPrimary() const { return primary_; }
@@ -304,7 +305,10 @@ private:
   const std::string auth_password_;
   const std::string cluster_name_;
   const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
-  const Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
+  Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
+
+  // Flag to prevent callbacks during destruction
+  std::atomic<bool> is_destroying_{false};
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

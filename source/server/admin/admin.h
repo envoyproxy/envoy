@@ -152,6 +152,9 @@ public:
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
+  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+    return std::nullopt;
+  }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
   std::chrono::milliseconds requestHeadersTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
@@ -441,9 +444,16 @@ private:
 
     absl::string_view name() const override { return "admin"; }
 
+    bool addedViaApi() const override { return false; }
+
+    const Network::FilterChainInfoSharedPtr& filterChainInfo() const override {
+      return filter_chain_info_;
+    }
+
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;
     const Filter::NetworkFilterFactoriesList empty_network_filter_factory_;
+    const Network::FilterChainInfoSharedPtr filter_chain_info_;
   };
 
   Server::Instance& server_;

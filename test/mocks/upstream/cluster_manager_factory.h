@@ -41,12 +41,13 @@ public:
 
   MOCK_METHOD((absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>),
               clusterFromProto,
-              (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+              (const envoy::config::cluster::v3::Cluster& cluster,
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 
   MOCK_METHOD(absl::StatusOr<CdsApiPtr>, createCds,
               (const envoy::config::core::v3::ConfigSource& cds_config,
-               const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm));
+               const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
+               bool support_multi_ads_sources));
 };
 
 } // namespace Upstream

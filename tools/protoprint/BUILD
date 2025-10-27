@@ -3,15 +3,12 @@ load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("@rules_python//python:defs.bzl", "py_binary")
-load("//tools/base:envoy_python.bzl", "envoy_py_data", "envoy_pytool_binary")
+load("//tools/base:envoy_python.bzl", "envoy_py_data")
 load("//tools/protoprint:protoprint.bzl", "protoprint_rule")
-load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
 
-envoy_py_namespace()
-
-envoy_pytool_binary(
+py_binary(
     name = "protoprint",
     srcs = ["protoprint.py"],
     data = [

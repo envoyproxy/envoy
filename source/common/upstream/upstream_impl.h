@@ -58,8 +58,8 @@
 #include "source/common/orca/orca_load_metrics.h"
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/common/upstream/edf_scheduler.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/locality_pool.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
@@ -213,7 +213,7 @@ public:
   LoadMetricStats& loadMetricStats() const override { return load_metric_stats_; }
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
-  const envoy::config::core::v3::Locality& locality() const override { return locality_; }
+  const envoy::config::core::v3::Locality& locality() const override { return *locality_; }
   const MetadataConstSharedPtr localityMetadata() const override { return locality_metadata_; }
   Stats::StatName localityZoneStatName() const override {
     return locality_zone_stat_name_.statName();
@@ -249,9 +249,9 @@ protected:
       ClusterInfoConstSharedPtr cluster, const std::string& hostname,
       Network::Address::InstanceConstSharedPtr dest_address,
       MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-      const envoy::config::core::v3::Locality& locality,
+      std::shared_ptr<const envoy::config::core::v3::Locality> locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source, absl::Status& creation_status);
+      uint32_t priority, absl::Status& creation_status);
 
   /**
    * @return nullptr if address_list is empty, otherwise a shared_ptr copy of address_list.
@@ -268,7 +268,7 @@ private:
   mutable absl::Mutex metadata_mutex_;
   MetadataConstSharedPtr endpoint_metadata_ ABSL_GUARDED_BY(metadata_mutex_);
   const MetadataConstSharedPtr locality_metadata_;
-  const envoy::config::core::v3::Locality locality_;
+  const std::shared_ptr<const envoy::config::core::v3::Locality> locality_;
   Stats::StatNameDynamicStorage locality_zone_stat_name_;
   mutable HostStats stats_;
   mutable LoadMetricStatsImpl load_metric_stats_;
@@ -277,7 +277,6 @@ private:
   std::atomic<uint32_t> priority_;
   std::reference_wrapper<Network::UpstreamTransportSocketFactory>
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
-  const MonotonicTime creation_time_;
   absl::optional<MonotonicTime> last_hc_pass_time_;
   HostLbPolicyDataPtr lb_policy_data_;
 };
@@ -296,9 +295,9 @@ public:
   create(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
          Network::Address::InstanceConstSharedPtr dest_address,
          MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-         const envoy::config::core::v3::Locality& locality,
+         std::shared_ptr<const envoy::config::core::v3::Locality> locality,
          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-         uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
+         uint32_t priority, const AddressVector& address_list = {});
 
   // HostDescription
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
@@ -312,9 +311,9 @@ protected:
       absl::Status& creation_status, ClusterInfoConstSharedPtr cluster, const std::string& hostname,
       Network::Address::InstanceConstSharedPtr dest_address,
       MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-      const envoy::config::core::v3::Locality& locality,
+      std::shared_ptr<const envoy::config::core::v3::Locality> locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
+      uint32_t priority, const AddressVector& address_list = {});
 
 private:
   // No locks are required in this implementation: all address-related member
@@ -479,22 +478,23 @@ public:
   create(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
          Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr endpoint_metadata,
          MetadataConstSharedPtr locality_metadata, uint32_t initial_weight,
-         const envoy::config::core::v3::Locality& locality,
+         std::shared_ptr<const envoy::config::core::v3::Locality> locality,
          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
          uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-         TimeSource& time_source, const AddressVector& address_list = {});
+         const AddressVector& address_list = {});
 
 protected:
   HostImpl(absl::Status& creation_status, ClusterInfoConstSharedPtr cluster,
            const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
            MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-           uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
+           uint32_t initial_weight,
+           std::shared_ptr<const envoy::config::core::v3::Locality> locality,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-           TimeSource& time_source, const AddressVector& address_list = {})
+           const AddressVector& address_list = {})
       : HostImplBase(initial_weight, health_check_config, health_status),
         HostDescriptionImpl(creation_status, cluster, hostname, address, endpoint_metadata,
-                            locality_metadata, locality, health_check_config, priority, time_source,
+                            locality_metadata, locality, health_check_config, priority,
                             address_list) {}
 };
 
@@ -599,8 +599,6 @@ public:
     return excluded_hosts_per_locality_;
   }
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
-  absl::optional<uint32_t> chooseHealthyLocality() override;
-  absl::optional<uint32_t> chooseDegradedLocality() override;
   uint32_t priority() const override { return priority_; }
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
   bool weightedPriorityHealth() const override { return weighted_priority_health_; }
@@ -620,26 +618,16 @@ public:
 
   void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed, uint64_t seed,
+                   const HostVector& hosts_removed,
                    absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
 protected:
-  virtual absl::Status runUpdateCallbacks(const HostVector& hosts_added,
-                                          const HostVector& hosts_removed) {
-    return member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed);
+  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
+    member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed);
   }
 
 private:
-  // Weight for a locality taking into account health status using the provided eligible hosts per
-  // locality.
-  static double effectiveLocalityWeight(uint32_t index,
-                                        const HostsPerLocality& eligible_hosts_per_locality,
-                                        const HostsPerLocality& excluded_hosts_per_locality,
-                                        const HostsPerLocality& all_hosts_per_locality,
-                                        const LocalityWeights& locality_weights,
-                                        uint32_t overprovisioning_factor);
-
   const uint32_t priority_;
   uint32_t overprovisioning_factor_;
   bool weighted_priority_health_;
@@ -652,50 +640,10 @@ private:
   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_{HostsPerLocalityImpl::empty()};
   HostsPerLocalityConstSharedPtr excluded_hosts_per_locality_{HostsPerLocalityImpl::empty()};
   // TODO(mattklein123): Remove mutable.
-  mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
+  mutable Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
       member_update_cb_helper_;
-  // Locality weights (used to build WRR locality_scheduler_);
+  // Locality weights.
   LocalityWeightsConstSharedPtr locality_weights_;
-  // WRR locality scheduler state.
-  struct LocalityEntry {
-    LocalityEntry(uint32_t index, double effective_weight)
-        : index_(index), effective_weight_(effective_weight) {}
-    const uint32_t index_;
-    const double effective_weight_;
-  };
-
-  // Rebuilds the provided locality scheduler with locality entries based on the locality weights
-  // and eligible hosts.
-  //
-  // @param locality_scheduler the locality scheduler to rebuild. Will be set to nullptr if no
-  // localities are eligible.
-  // @param locality_entries the vector that holds locality entries. Will be reset and populated
-  // with entries corresponding to the new scheduler.
-  // @param eligible_hosts_per_locality eligible hosts for this scheduler grouped by locality.
-  // @param eligible_hosts all eligible hosts for this scheduler.
-  // @param all_hosts_per_locality all hosts for this HostSet grouped by locality.
-  // @param locality_weights the weighting of each locality.
-  // @param overprovisioning_factor the overprovisioning factor to use when computing the effective
-  // weight of a locality.
-  // @param seed a random number of initial picks to "invoke" on the locality scheduler. This
-  // allows to distribute the load between different localities across worker threads and a fleet
-  // of Envoys.
-  static void
-  rebuildLocalityScheduler(std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
-                           std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
-                           const HostsPerLocality& eligible_hosts_per_locality,
-                           const HostVector& eligible_hosts,
-                           HostsPerLocalityConstSharedPtr all_hosts_per_locality,
-                           HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
-                           LocalityWeightsConstSharedPtr locality_weights,
-                           uint32_t overprovisioning_factor, uint64_t seed);
-
-  static absl::optional<uint32_t> chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler);
-
-  std::vector<std::shared_ptr<LocalityEntry>> healthy_locality_entries_;
-  std::unique_ptr<EdfScheduler<LocalityEntry>> healthy_locality_scheduler_;
-  std::vector<std::shared_ptr<LocalityEntry>> degraded_locality_entries_;
-  std::unique_ptr<EdfScheduler<LocalityEntry>> degraded_locality_scheduler_;
 };
 
 using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
@@ -726,7 +674,7 @@ public:
 
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed, uint64_t seed,
+                   const HostVector& hosts_removed,
                    absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
@@ -746,13 +694,12 @@ protected:
                                          overprovisioning_factor);
   }
 
-  virtual absl::Status runUpdateCallbacks(const HostVector& hosts_added,
-                                          const HostVector& hosts_removed) {
-    return member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
+    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
   }
-  virtual absl::Status runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
-                                                   const HostVector& hosts_removed) {
-    return priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+  virtual void runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
+                                           const HostVector& hosts_removed) {
+    priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
   }
   // This vector will generally have at least one member, for priority level 0.
   // It will expand as host sets are added but currently does not shrink to
@@ -767,8 +714,9 @@ private:
   // because host_sets_ is directly returned so we avoid translation.
   std::vector<Common::CallbackHandlePtr> host_sets_priority_update_cbs_;
   // TODO(mattklein123): Remove mutable.
-  mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
-  mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
+  mutable Common::CallbackManager<void, const HostVector&, const HostVector&>
+      member_update_cb_helper_;
+  mutable Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
   bool batch_update_ : 1;
 
@@ -785,8 +733,7 @@ private:
 
     void updateHosts(uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
                      LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                     const HostVector& hosts_removed, uint64_t seed,
-                     absl::optional<bool> weighted_priority_health,
+                     const HostVector& hosts_removed, absl::optional<bool> weighted_priority_health,
                      absl::optional<uint32_t> overprovisioning_factor) override;
 
     absl::node_hash_set<HostSharedPtr> all_hosts_added_;
@@ -807,7 +754,7 @@ public:
   // PrioritySet
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed, uint64_t seed,
+                   const HostVector& hosts_removed,
                    absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
@@ -1022,13 +969,13 @@ public:
 
   // Http::FilterChainFactory
   bool createFilterChain(Http::FilterChainManager& manager,
-                         const Http::FilterChainOptions&) const override {
+                         const Http::FilterChainOptions& options) const override {
     if (http_filter_factories_.empty()) {
       return false;
     }
 
-    Http::FilterChainUtility::createFilterChainForFactories(
-        manager, Http::EmptyFilterChainOptions{}, http_filter_factories_);
+    Http::FilterChainUtility::createFilterChainForFactories(manager, options,
+                                                            http_filter_factories_);
     return true;
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
@@ -1041,6 +988,8 @@ public:
   Http::Http2::CodecStats& http2CodecStats() const override;
   Http::Http3::CodecStats& http3CodecStats() const override;
   Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
+
+  absl::optional<bool> processHttpForOutlierDetection(Http::ResponseHeaderMap&) const override;
 
   OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const override {
@@ -1226,6 +1175,10 @@ public:
     return const_metadata_shared_pool_;
   }
 
+  ConstLocalitySharedPoolSharedPtr constLocalitySharedPool() const {
+    return const_locality_shared_pool_;
+  }
+
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
   ClusterInfoConstSharedPtr info() const override { return info_; }
@@ -1286,11 +1239,11 @@ protected:
 
 protected:
   Random::RandomGenerator& random_;
-  TimeSource& time_source_;
   MainPrioritySetImpl priority_set_;
 
-  absl::Status validateEndpointsForZoneAwareRouting(
-      const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const;
+  absl::Status validateEndpoints(
+      absl::Span<const envoy::config::endpoint::v3::LocalityLbEndpoints* const> endpoints,
+      OptRef<const PriorityState> priorities) const;
 
 private:
   static const absl::string_view DoNotValidateAlpnRuntimeKey;
@@ -1304,6 +1257,7 @@ private:
   uint64_t pending_initialize_health_checks_{};
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
+  ConstLocalitySharedPoolSharedPtr const_locality_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
   UnitFloat drop_overload_{0};
   std::string drop_category_;
@@ -1320,7 +1274,7 @@ using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
 class PriorityStateManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
   PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info,
-                       PrioritySet::HostUpdateCb* update_cb, Random::RandomGenerator& random);
+                       PrioritySet::HostUpdateCb* update_cb);
 
   // Initializes the PriorityState vector based on the priority specified in locality_lb_endpoint.
   void initializePriorityFor(
@@ -1335,7 +1289,7 @@ public:
       const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
       const HostDescription::AddressVector& address_list,
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source);
+      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
 
   void registerHostForPriority(
       const HostSharedPtr& host,
@@ -1357,7 +1311,6 @@ private:
   PriorityState priority_state_;
   const envoy::config::core::v3::Node& local_info_node_;
   PrioritySet::HostUpdateCb* update_cb_;
-  Random::RandomGenerator& random_;
 };
 
 using PriorityStateManagerPtr = std::unique_ptr<PriorityStateManager>;

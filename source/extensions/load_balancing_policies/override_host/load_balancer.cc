@@ -33,7 +33,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace OverrideHost {
 
 using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
@@ -186,8 +186,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* cont
 absl::optional<absl::string_view>
 OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHostsFromMetadata(
     const ::envoy::config::core::v3::Metadata& metadata, const Config::MetadataKey& metadata_key) {
-  const ProtobufWkt::Value& metadata_value =
-      Config::Metadata::metadataValue(&metadata, metadata_key);
+  const Protobuf::Value& metadata_value = Config::Metadata::metadataValue(&metadata, metadata_key);
   // TODO(yanavlasov): make it distinguish between not-present and invalid metadata.
   if (metadata_value.has_string_value()) {
     return absl::string_view{metadata_value.string_value()};
@@ -292,6 +291,6 @@ OverrideHostLoadBalancer::LoadBalancerFactoryImpl::create(LoadBalancerParams par
 }
 
 } // namespace OverrideHost
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

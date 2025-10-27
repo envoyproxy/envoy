@@ -164,9 +164,20 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
         (protocol.has_value() && protocol.value() != Envoy::Http::Protocol::Http11)) {
       // handshake is finished and continue the data processing.
       filter_.callbacks_->upstreamCallbacks()->setPausedForWebsocketUpgrade(false);
+      // Disable the route timeout since the websocket upgrade completed successfully
+      filter_.callbacks_->upstreamCallbacks()->disableRouteTimeoutForWebsocketUpgrade();
+      // Disable per-try timeouts since the websocket upgrade completed successfully
+      filter_.callbacks_->upstreamCallbacks()->disablePerTryTimeoutForWebsocketUpgrade();
       filter_.callbacks_->continueDecoding();
+    } else if (Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain") &&
+               status >= 400) {
+      maybeEndDecode(end_stream);
+      filter_.callbacks_->encodeHeaders(std::move(headers), end_stream,
+                                        StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+      return;
     } else {
-      // Other status, e.g., 426 or 200, indicate a failed handshake, Envoy as a proxy will proxy
+      // Other status, e.g., 200, indicate a failed handshake, Envoy as a proxy will proxy
       // back the response header to downstream and then close the request, since WebSocket
       // just needs headers for handshake per RFC-6455. Note: HTTP/2 200 will be normalized to
       // 101 before this point in codec and this patch will skip this scenario from the above
@@ -233,14 +244,7 @@ void UpstreamCodecFilter::CodecBridge::onResetStream(Http::StreamResetReason rea
 
   std::string failure_reason(transport_failure_reason);
   if (reason == Http::StreamResetReason::LocalReset) {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.report_stream_reset_error_code")) {
-      ASSERT(transport_failure_reason.empty());
-      // Use this to communicate to the upstream request to not force-terminate.
-      failure_reason = "codec_error";
-    } else {
-      failure_reason = absl::StrCat(transport_failure_reason, "|codec_error");
-    }
+    failure_reason = absl::StrCat(transport_failure_reason, "|codec_error");
   }
   filter_.callbacks_->resetStream(reason, failure_reason);
 }

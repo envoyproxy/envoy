@@ -9,6 +9,7 @@
 #include "source/common/conn_pool/conn_pool_base.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
+#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/http/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -18,9 +19,15 @@ namespace Http {
 
 struct HttpAttachContext : public Envoy::ConnectionPool::AttachContext {
   HttpAttachContext(Http::ResponseDecoder* d, Http::ConnectionPool::Callbacks* c)
-      : decoder_(d), callbacks_(c) {}
+      : decoder_(d), callbacks_(c) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
+      decoder_handle_ = d->createResponseDecoderHandle();
+    }
+  }
+
   Http::ResponseDecoder* decoder_;
   Http::ConnectionPool::Callbacks* callbacks_;
+  ResponseDecoderHandlePtr decoder_handle_;
 };
 
 // An implementation of Envoy::ConnectionPool::PendingStream for HTTP/1.1 and HTTP/2
@@ -139,7 +146,15 @@ public:
   absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }
   void close() override { codec_client_->close(); }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
+  virtual Http::RequestEncoder&
+  newStreamEncoder(Http::ResponseDecoderHandlePtr response_decoder_handle) PURE;
   void onEvent(Network::ConnectionEvent event) override {
+    // Record request metrics only for successfully connected connections that handled requests
+    if ((event == Network::ConnectionEvent::LocalClose ||
+         event == Network::ConnectionEvent::RemoteClose) &&
+        hasHandshakeCompleted()) {
+      parent_.host()->cluster().trafficStats()->upstream_rq_per_cx_.recordValue(request_count_);
+    }
     parent_.onConnectionEvent(*this, codec_client_->connectionFailureReason(), event);
   }
   uint32_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
@@ -147,6 +162,8 @@ public:
   HttpConnPoolImplBase& parent() { return *static_cast<HttpConnPoolImplBase*>(&parent_); }
 
   Http::CodecClientPtr codec_client_;
+  // Request tracking for HTTP protocols
+  uint32_t request_count_{0};
 };
 
 /* An implementation of Envoy::ConnectionPool::ConnPoolImplBase for HTTP/1 and HTTP/2
@@ -213,6 +230,7 @@ public:
   // ConnPoolImpl::ActiveClient
   bool closingWithIncompleteStream() const override;
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
+  RequestEncoder& newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) override;
 
   // CodecClientCallbacks
   void onStreamDestroy() override;

@@ -225,7 +225,6 @@ UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
                 host_to_sessions_.erase(host_sessions_it);
               }
             }
-            return absl::OkStatus();
           })) {}
 
 UdpProxyFilter::ClusterInfo::~ClusterInfo() {
@@ -343,6 +342,7 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
 }
 
 void UdpProxyFilter::ActiveSession::onSessionComplete() {
+  ENVOY_BUG(!on_session_complete_called_, "onSessionComplete() called twice");
   ENVOY_LOG(debug, "deleting the session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_ != nullptr ? host_->address()->asStringView() : "unknown");
@@ -366,7 +366,7 @@ void UdpProxyFilter::ActiveSession::onSessionComplete() {
 
   if (!filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
-    const Formatter::HttpFormatterContext log_context{
+    const Formatter::Context log_context{
         nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpSessionEnd};
     for (const auto& access_log : filter_.config_->sessionAccessLogs()) {
       access_log->log(log_context, udp_session_info_);
@@ -385,7 +385,7 @@ UdpProxyFilter::ActiveSession::createDownstreamConnectionInfoProvider() {
 }
 
 void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   if (cluster_ != nullptr) {
     fields_map["cluster_name"] = ValueUtil::stringValue(cluster_->cluster_info_->name());
@@ -402,7 +402,7 @@ void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
 }
 
 void UdpProxyFilter::fillProxyStreamInfo() {
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   fields_map["bytes_sent"] =
       ValueUtil::numberValue(config_->stats().downstream_sess_tx_bytes_.value());
@@ -766,7 +766,7 @@ void UdpProxyFilter::ActiveSession::writeDownstream(Network::UdpRecvData& recv_d
 
 void UdpProxyFilter::ActiveSession::onAccessLogFlushInterval() {
   fillSessionStreamInfo();
-  const Formatter::HttpFormatterContext log_context{
+  const Formatter::Context log_context{
       nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpPeriodic};
   for (const auto& access_log : filter_.config_->sessionAccessLogs()) {
     access_log->log(log_context, udp_session_info_);
@@ -892,21 +892,23 @@ const std::string HttpUpstreamImpl::resolveTargetTunnelPath() {
   return absl::StrCat("/.well-known/masque/udp/", target_host, "/", target_port, "/");
 }
 
-HttpUpstreamImpl::~HttpUpstreamImpl() { resetEncoder(Network::ConnectionEvent::LocalClose); }
+HttpUpstreamImpl::~HttpUpstreamImpl() {
+  resetEncoder(Network::ConnectionEvent::LocalClose, /*by_local_close=*/true);
+}
 
-void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_downstream) {
+void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_local_close) {
   if (!request_encoder_) {
     return;
   }
 
   request_encoder_->getStream().removeCallbacks(*this);
-  if (by_downstream) {
+  if (by_local_close) {
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
 
   request_encoder_ = nullptr;
 
-  if (!by_downstream) {
+  if (!by_local_close) {
     // If we did not receive a valid CONNECT response yet we treat this as a pool
     // failure, otherwise we forward the event downstream.
     if (tunnel_creation_callbacks_.has_value()) {
@@ -1070,20 +1072,14 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
     udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
-      host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
-    }
+    host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     if (connecting_) {
       udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
     }
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
-      host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
-    }
+    host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   }
@@ -1105,14 +1101,11 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamReady(StreamInfo::StreamInf
   connecting_ = false;
   can_send_upstream_ = true;
   cluster_->cluster_stats_.sess_tunnel_success_.inc();
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
-    host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
-  }
+  host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
   if (filter_.config_->flushAccessLogOnTunnelConnected()) {
     fillSessionStreamInfo();
-    const Formatter::HttpFormatterContext log_context{
+    const Formatter::Context log_context{
         nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpTunnelUpstreamConnected};
     for (const auto& access_log : filter_.config_->sessionAccessLogs()) {
       access_log->log(log_context, udp_session_info_);

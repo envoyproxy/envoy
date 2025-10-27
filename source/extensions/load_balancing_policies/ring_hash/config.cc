@@ -4,7 +4,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace RingHash {
 
 Upstream::ThreadAwareLoadBalancerPtr
@@ -21,7 +21,7 @@ Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
       priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
       PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(cluster_info.lbConfig(),
                                                      healthy_panic_threshold, 100, 50),
-      typed_lb_config->lb_config_);
+      typed_lb_config->lb_config_, typed_lb_config->hash_policy_);
 }
 
 /**
@@ -30,6 +30,6 @@ Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
 REGISTER_FACTORY(Factory, Upstream::TypedLoadBalancerFactory);
 
 } // namespace RingHash
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

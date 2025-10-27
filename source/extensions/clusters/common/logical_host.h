@@ -22,8 +22,7 @@ public:
          const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
          const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
          const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
-         const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
-         TimeSource& time_source);
+         const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options);
 
   /**
    * Sets new addresses. This can be called dynamically during operation, and
@@ -60,7 +59,7 @@ protected:
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
       const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
-      TimeSource& time_source, absl::Status& creation_status);
+      absl::Status& creation_status);
 
 private:
   const Network::TransportSocketOptionsConstSharedPtr override_transport_socket_options_;

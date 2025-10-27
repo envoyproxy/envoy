@@ -90,10 +90,23 @@ absl::StatusOr<Network::DnsResolverSharedPtr> DnsCacheImpl::selectDnsResolver(
     Event::Dispatcher& main_thread_dispatcher,
     Server::Configuration::CommonFactoryContext& context) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  Network::DnsResolverFactory& dns_resolver_factory =
-      Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
-  return dns_resolver_factory.createDnsResolver(main_thread_dispatcher, context.api(),
-                                                typed_dns_resolver_config);
+  Network::DnsResolverFactory* dns_resolver_factory;
+
+  // If DnsCacheConfig doesn't have any DNS related configuration, and the
+  // default DNS resolver, i.e, the typed_dns_resolver_config in the bootstrap
+  // configuration, is not empty, then creates the default DNS resolver.
+  if (!config.has_typed_dns_resolver_config() && !config.has_dns_resolution_config() &&
+      context.api().bootstrap().has_typed_dns_resolver_config() &&
+      !(context.api().bootstrap().typed_dns_resolver_config().typed_config().type_url().empty())) {
+    typed_dns_resolver_config = context.api().bootstrap().typed_dns_resolver_config();
+    dns_resolver_factory =
+        &Network::createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  } else {
+    dns_resolver_factory =
+        &Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
+  }
+  return dns_resolver_factory->createDnsResolver(main_thread_dispatcher, context.api(),
+                                                 typed_dns_resolver_config);
 }
 
 DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
@@ -629,12 +642,16 @@ void DnsCacheImpl::ThreadLocalHostInfo::onHostMapUpdate(
     const HostMapUpdateInfoSharedPtr& resolved_host) {
   auto host_it = pending_resolutions_.find(resolved_host->host_);
   if (host_it != pending_resolutions_.end()) {
-    for (auto* resolution : host_it->second) {
+    // Calling the onLoadDnsCacheComplete may trigger more host resolutions adding more elements
+    // to the `pending_resolutions_` map, potentially invalidating the host_it iterator. So we
+    // copy the list of handles to a local variable before cleaning up the map.
+    std::list<LoadDnsCacheEntryHandleImpl*> completed_resolutions(std::move(host_it->second));
+    pending_resolutions_.erase(host_it);
+    for (auto* resolution : completed_resolutions) {
       auto& callbacks = resolution->callbacks_;
       resolution->cancel();
       callbacks.onLoadDnsCacheComplete(resolved_host->info_);
     }
-    pending_resolutions_.erase(host_it);
   }
 }
 

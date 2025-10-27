@@ -109,9 +109,11 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheForConflictingOptions) {
   initialize();
   HttpServerPropertiesCacheSharedPtr cache1 = manager_->getCache(options1_, dispatcher_);
   options2_.set_name(options1_.name());
-  EXPECT_ENVOY_BUG(manager_->getCache(options2_, dispatcher_),
-                   "options specified alternate protocols cache 'name1' with different settings "
-                   "first 'name: \"name1\"");
+  // Same as EXPECT_ENVOY_BUG
+  EXPECT_DEBUG_DEATH(
+      manager_->getCache(options2_, dispatcher_),
+      ::testing::ContainsRegex("(?s)options specified alternate protocols cache 'name1' with "
+                               "different settings first '.*name: \"name1\""));
 }
 
 } // namespace

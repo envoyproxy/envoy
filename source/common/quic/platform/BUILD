@@ -25,7 +25,7 @@ envoy_package()
 # to match a non-virtualized API required by the external Quiche implementation.
 #
 # See a detailed description of QUIC platform API dependency model at:
-# https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/README.md
+# https://quiche.googlesource.com/quiche/+/refs/heads/main/README.md
 
 # These implementations are tested through their APIs with tests mostly brought in from
 # QUICHE, thus new unit tests for them are deliberately omitted in Envoy tree. These

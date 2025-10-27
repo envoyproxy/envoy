@@ -12,6 +12,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
 #include "library/common/mobile_process_wide.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/proxy_api.h"
 #include "library/common/stats/utility.h"
 
@@ -26,6 +27,8 @@ MobileProcessWide& initOnceMobileProcessWide(const OptionsImplBase& options) {
 
 Network::Address::InstanceConstSharedPtr ipv6ProbeAddr() {
   // Use Google DNS IPv6 address for IPv6 probes.
+  // Same as Chromium:
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/dns/host_resolver_manager.cc;l=155;drc=7b232da0f22e8cdf555d43c52b6491baeb87f729.
   CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
                          new Network::Address::Ipv6Instance("2001:4860:4860::8888", 53));
 }
@@ -217,6 +220,26 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
               server_->serverFactoryContext(),
               server_->serverFactoryContext().messageValidationVisitor());
           connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
+          Network::DefaultNetworkChangeCallback cb =
+              [this](envoy_netconf_t current_configuration_key) {
+                dispatcher_->post([this, current_configuration_key]() {
+                  if (connectivity_manager_->getConfigurationKey() != current_configuration_key) {
+                    // The default network has changed to a different one.
+                    return;
+                  }
+                  ENVOY_LOG_MISC(
+                      trace,
+                      "Default network state has been changed. Current net configuration key {}",
+                      current_configuration_key);
+                  resetHttpPropertiesAndDrainHosts(probeAndGetLocalAddr(AF_INET6) != nullptr);
+                  if (!disable_dns_refresh_on_network_change_) {
+                    // This call will possibly drain all connections asynchronously.
+                    connectivity_manager_->doRefreshDns(current_configuration_key,
+                                                        /*drain_connections=*/true);
+                  }
+                });
+              };
+          connectivity_manager_->setDefaultNetworkChangeCallback(std::move(cb));
           if (Runtime::runtimeFeatureEnabled(
                   "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
             if (probeAndGetLocalAddr(AF_INET6) == nullptr) {
@@ -372,14 +395,40 @@ void InternalEngine::onDefaultNetworkChanged(int network) {
   });
 }
 
+void InternalEngine::onDefaultNetworkChangedAndroid(ConnectionType connection_type,
+                                                    int64_t net_id) {
+  connectivity_manager_->onDefaultNetworkChangedAndroid(connection_type, net_id);
+}
+
+void InternalEngine::onNetworkDisconnectAndroid(int64_t net_id) {
+  connectivity_manager_->onNetworkDisconnectAndroid(net_id);
+}
+
+void InternalEngine::onNetworkConnectAndroid(ConnectionType connection_type, int64_t net_id) {
+  connectivity_manager_->onNetworkConnectAndroid(connection_type, net_id);
+}
+
+void InternalEngine::purgeActiveNetworkListAndroid(const std::vector<int64_t>& active_network_ids) {
+  connectivity_manager_->purgeActiveNetworkListAndroid(active_network_ids);
+}
+
 void InternalEngine::onDefaultNetworkUnavailable() {
   ENVOY_LOG_MISC(trace, "Calling the default network unavailable callback");
   dispatcher_->post([&]() -> void { connectivity_manager_->dnsCache()->stop(); });
 }
 
 void InternalEngine::handleNetworkChange(const int network_type, const bool has_ipv6_connectivity) {
-  envoy_netconf_t configuration =
-      Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
+  envoy_netconf_t configuration = connectivity_manager_->setPreferredNetwork(network_type);
+
+  resetHttpPropertiesAndDrainHosts(has_ipv6_connectivity);
+  if (!disable_dns_refresh_on_network_change_) {
+    // Refresh DNS upon network changes.
+    // This call will possibly drain all connections asynchronously.
+    connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
+  }
+}
+
+void InternalEngine::resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
       Runtime::runtimeFeatureEnabled(
@@ -395,25 +444,28 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
   }
   Http::HttpServerPropertiesCacheManager& cache_manager =
       server_->httpServerPropertiesCacheManager();
-
-  Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
-      [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
-  cache_manager.forEachThreadLocalCache(clear_brokenness);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
-    Http::HttpServerPropertiesCacheManager& cache_manager =
-        server_->httpServerPropertiesCacheManager();
-
+    // Reset HTTP/3 status for all origins.
     Http::HttpServerPropertiesCacheManager::CacheFn reset_status =
         [](Http::HttpServerPropertiesCache& cache) { cache.resetStatus(); };
     cache_manager.forEachThreadLocalCache(reset_status);
+  } else {
+    // Reset HTTP/3 status only for origins marked as broken.
+    Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
+        [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
+    cache_manager.forEachThreadLocalCache(clear_brokenness);
   }
-  if (!disable_dns_refresh_on_network_change_) {
-    connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
-  } else if (Runtime::runtimeFeatureEnabled(
-                 "envoy.reloadable_features.drain_pools_on_network_change")) {
-    ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
-    connectivity_manager_->clusterManager().drainConnections(
-        [](const Upstream::Host&) { return true; });
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh") ||
+      disable_dns_refresh_on_network_change_) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.drain_pools_on_network_change")) {
+      // Since DNS refreshing is disabled, explicitly drain all non-migratable connections.
+      ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
+      getClusterManager().drainConnections(
+          [](const Upstream::Host&) { return true; },
+          Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections);
+    }
   }
 }
 
@@ -522,9 +574,6 @@ void InternalEngine::logInterfaces(absl::string_view event,
 
 Network::Address::InstanceConstSharedPtr InternalEngine::probeAndGetLocalAddr(int domain) {
   // This probing logic is borrowed from Chromium.
-  // -
-  // https://source.chromium.org/chromium/chromium/src/+/main:net/dns/host_resolver_manager.cc;l=154-157;drc=7b232da0f22e8cdf555d43c52b6491baeb87f729
-  // -
   // https://source.chromium.org/chromium/chromium/src/+/main:net/dns/host_resolver_manager.cc;l=1467-1488;drc=7b232da0f22e8cdf555d43c52b6491baeb87f729
   ENVOY_LOG(trace, "Checking for {} connectivity.", domain == AF_INET6 ? "IPv6" : "IPv4");
   const Api::SysCallSocketResult socket_result =
@@ -537,18 +586,47 @@ Network::Address::InstanceConstSharedPtr InternalEngine::probeAndGetLocalAddr(in
                                             /* socket_v6only= */ domain == AF_INET6, {domain});
   Api::SysCallIntResult connect_result =
       socket_handle.connect(domain == AF_INET6 ? ipv6ProbeAddr() : ipv4ProbeAddr());
-  if (connect_result.return_value_ == 0) {
-    auto address_or_error = socket_handle.localAddress();
-    if (!address_or_error.status().ok()) {
-      ENVOY_LOG(trace, "Local address error: {}", address_or_error.status().message());
+  if (connect_result.return_value_ != 0) {
+    ENVOY_LOG(trace, "No {} connectivity found with errno: {}.",
+              domain == AF_INET6 ? "IPv6" : "IPv4", connect_result.errno_);
+    return nullptr;
+  }
+
+  absl::StatusOr<Network::Address::InstanceConstSharedPtr> address = socket_handle.localAddress();
+  if (!address.status().ok()) {
+    ENVOY_LOG(trace, "Local address error: {}", address.status().message());
+    return nullptr;
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.mobile_ipv6_probe_simple_filtering")) {
+    if ((*address)->ip() == nullptr) {
+      ENVOY_LOG(trace, "Local address is not an IP address: {}.", (*address)->asString());
       return nullptr;
     }
-    ENVOY_LOG(trace, "Found {} connectivity.", domain == AF_INET6 ? "IPv6" : "IPv4");
-    return *address_or_error;
+    if ((*address)->ip()->isLinkLocalAddress()) {
+      ENVOY_LOG(trace, "Ignoring link-local address: {}.", (*address)->asString());
+      return nullptr;
+    }
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.mobile_ipv6_probe_advanced_filtering")) {
+      if ((*address)->ip()->isUniqueLocalAddress()) {
+        ENVOY_LOG(trace, "Ignoring unique-local address: {}.", (*address)->asString());
+        return nullptr;
+      }
+      if ((*address)->ip()->isSiteLocalAddress()) {
+        ENVOY_LOG(trace, "Ignoring site-local address: {}.", (*address)->asString());
+        return nullptr;
+      }
+      if ((*address)->ip()->isTeredoAddress()) {
+        ENVOY_LOG(trace, "Ignoring teredo address: {}.", (*address)->asString());
+        return nullptr;
+      }
+    }
   }
-  ENVOY_LOG(trace, "No {} connectivity found with errno: {}.", domain == AF_INET6 ? "IPv6" : "IPv4",
-            connect_result.errno_);
-  return nullptr;
+
+  ENVOY_LOG(trace, "Found {} connectivity.", domain == AF_INET6 ? "IPv6" : "IPv4");
+  return *address;
 }
 
 } // namespace Envoy

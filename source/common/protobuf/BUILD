@@ -1,5 +1,5 @@
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -64,6 +64,7 @@ envoy_cc_library(
         "//envoy/protobuf:message_validator_interface",
         "//source/common/common:statusor_lib",
         "//source/common/common:stl_helpers",
+        "@com_google_absl//absl/strings",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )

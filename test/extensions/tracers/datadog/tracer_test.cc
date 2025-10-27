@@ -74,7 +74,7 @@ TEST_F(DatadogTracerTest, Breathing) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
   config.report_traces = false;
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
                 thread_local_slot_allocator_, time_);
@@ -86,7 +86,7 @@ TEST_F(DatadogTracerTest, NoOpMode) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
   config.report_traces = false;
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
   datadog::tracing::TraceSamplerConfig::Rule invalid_rule;
   // The `sample_rate`, below, is invalid (should be between 0.0 and 1.0).
   // As a result, the constructor of `Tracer` will fail to initialize the
@@ -121,7 +121,7 @@ TEST_F(DatadogTracerTest, SpanProperties) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
   config.report_traces = false;
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
   // Configure the tracer to keep all spans. We then override that
   // configuration in the `Tracing::Decision`, below.
   config.trace_sampler.sample_rate = 1.0; // 100%
@@ -172,7 +172,7 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
   config.report_traces = false;
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
                 thread_local_slot_allocator_, time_);
@@ -206,6 +206,55 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
   EXPECT_EQ(5678, *dd_span.parent_id());
 }
 
+TEST_F(DatadogTracerTest, UseLocalDecisionTrue) {
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
+
+  // trace context in the Datadog style
+  Tracing::TestTraceContextImpl context{};
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name,
+                       {Tracing::Reason::NotTraceable, false});
+
+  // The `useLocalDecision` method is true because the span has no external trace sampling
+  // decision.
+  EXPECT_EQ(true, span->useLocalDecision());
+}
+
+TEST_F(DatadogTracerTest, UseLocalDecisionFalse) {
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
+
+  // trace context in the Datadog style
+  Tracing::TestTraceContextImpl context{
+      {"x-datadog-trace-id", "1234"},
+      {"x-datadog-parent-id", "5678"},
+      {"x-datadog-sampling-priority", "0"},
+  };
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name,
+                       {Tracing::Reason::NotTraceable, false});
+  // The `useLocalDecision` method is false because the span has an external trace sampling
+  // decision.
+  EXPECT_EQ(false, span->useLocalDecision());
+}
+
 TEST_F(DatadogTracerTest, ExtractionFailure) {
   // Verify that if there is invalid trace information in the `TraceContext`
   // supplied to `startSpan`, that the resulting span is nonetheless valid (it
@@ -213,7 +262,7 @@ TEST_F(DatadogTracerTest, ExtractionFailure) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
   config.report_traces = false;
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
                 thread_local_slot_allocator_, time_);
@@ -322,7 +371,7 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
     datadog::tracing::TracerConfig config;
     config.service = "envoy";
     config.report_traces = false;
-    config.report_telemetry = false;
+    config.telemetry.enabled = false;
     Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
                   thread_local_slot_allocator_, time_);
 

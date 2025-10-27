@@ -108,6 +108,8 @@ func capiStatusToErr(status C.CAPIStatus) error {
 		return api.ErrInternalFailure
 	case C.CAPISerializationFailure:
 		return api.ErrSerializationFailure
+	case C.CAPIInvalidIPAddress:
+		return api.ErrInvalidIPAddress
 	}
 
 	return errors.New("unknown status")
@@ -319,6 +321,17 @@ func (c *httpCApiImpl) HttpRemoveTrailer(s unsafe.Pointer, key string) {
 	state := (*processState)(s)
 	res := C.envoyGoFilterHttpRemoveTrailer(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)))
 	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpSetUpstreamOverrideHost(s unsafe.Pointer, host string, strict bool) error {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpSetUpstreamOverrideHost(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(host)), C.int(len(host)), C.bool(strict))
+	handleCApiStatus(res)
+	if res != C.CAPIOK {
+		return capiStatusToErr(res)
+	}
+
+	return nil
 }
 
 func (c *httpCApiImpl) ClearRouteCache(r unsafe.Pointer, refresh bool) {

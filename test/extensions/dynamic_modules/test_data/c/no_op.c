@@ -91,3 +91,7 @@ void envoy_dynamic_module_on_http_filter_http_callout_done(
     envoy_dynamic_module_type_http_callout_result result,
     envoy_dynamic_module_type_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_envoy_buffer* body_vector, size_t body_vector_size) {}
+
+void envoy_dynamic_module_on_http_filter_scheduled(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t event_id) {}

@@ -16,6 +16,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/hex.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/tls/utility.h"
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
 #include "absl/strings/ascii.h"
@@ -58,6 +59,8 @@ Config::Config(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja3_fingerprinting, false)),
       enable_ja4_fingerprinting_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja4_fingerprinting, false)),
+      close_connection_on_client_hello_parsing_errors_(
+          proto_config.close_connection_on_client_hello_parsing_errors()),
       max_client_hello_size_(max_client_hello_size),
       initial_read_buffer_size_(
           std::min(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, initial_read_buffer_size,
@@ -174,6 +177,71 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   return Network::FilterStatus::StopIteration;
 }
 
+void Filter::setDynamicMetadata(absl::string_view failure_reason) {
+  Protobuf::Struct metadata;
+  auto& fields = *metadata.mutable_fields();
+  fields[failureReasonKey()].set_string_value(failure_reason);
+  cb_->setDynamicMetadata(dynamicMetadataKey(), metadata);
+}
+
+ParseState Filter::getParserState(int handshake_status) {
+  switch (SSL_get_error(ssl_.get(), handshake_status)) {
+  case SSL_ERROR_WANT_READ:
+    if (read_ >= maxConfigReadBytes()) {
+      // We've hit the specified size limit. This is an unreasonably large ClientHello;
+      // indicate failure.
+      config_->stats().client_hello_too_large_.inc();
+      setDynamicMetadata(failureReasonClientHelloTooLarge());
+      return ParseState::Error;
+    }
+    if (read_ >= requested_read_bytes_) {
+      // Double requested bytes up to the maximum configured.
+      requested_read_bytes_ = std::min<uint32_t>(2 * read_, maxConfigReadBytes());
+    }
+    return ParseState::Continue;
+  case SSL_ERROR_SSL:
+    // There are 3 possibilities when get here:
+    // 1. A valid TLS Client Hello message was parsed (`clienthello_success_` is true)
+    // 2. A plain text message that generated a parsing error
+    // 3. A TLS Client Hello that generated a parsing error (i.e. invalid cipher list)
+    // It is not practical to distinguish between 2 and 3 based on error codes, so Envoy assumes
+    // this is either a plain text connection or invalid TLS connection based on config option.
+    // In the future it may be possible to add some error checking to make this detection more
+    // optimal.
+    if (clienthello_success_) {
+      config_->stats().tls_found_.inc();
+      if (alpn_found_) {
+        config_->stats().alpn_found_.inc();
+      } else {
+        config_->stats().alpn_not_found_.inc();
+      }
+      cb_->socket().setDetectedTransportProtocol("tls");
+    } else {
+      // Checking max message length should not be done here as it will close all plain text
+      // connections that happened to read more than maxConfigReadBytes() in one I/O operation. With
+      // the default limit of 16Kb it is fairly likely.
+      if (config_->closeConnectionOnTlsHelloParsingErrors()) {
+        // We've hit the specified size limit. This is an unreasonably large ClientHello;
+        // indicate failure.
+        if (read_ >= maxConfigReadBytes()) {
+          setDynamicMetadata(failureReasonClientHelloTooLarge());
+          config_->stats().client_hello_too_large_.inc();
+        }
+        return ParseState::Error;
+      }
+      config_->stats().tls_not_found_.inc();
+      setDynamicMetadata(failureReasonClientHelloNotDetected());
+      ENVOY_LOG(
+          debug, "tls inspector: parseClientHello failed: {}, {}: {}", ERR_peek_error(),
+          ERR_peek_last_error(),
+          Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"));
+    }
+    return ParseState::Done;
+  default:
+    return ParseState::Error;
+  }
+}
+
 ParseState Filter::parseClientHello(const void* data, size_t len,
                                     uint64_t bytes_already_processed) {
   // Ownership remains here though we pass a reference to it in `SSL_set0_rbio()`.
@@ -190,37 +258,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
 
   // This should never succeed because an error is always returned from the SNI callback.
   ASSERT(ret <= 0);
-  ParseState state = [this, ret]() {
-    switch (SSL_get_error(ssl_.get(), ret)) {
-    case SSL_ERROR_WANT_READ:
-      if (read_ == maxConfigReadBytes()) {
-        // We've hit the specified size limit. This is an unreasonably large ClientHello;
-        // indicate failure.
-        config_->stats().client_hello_too_large_.inc();
-        return ParseState::Error;
-      }
-      if (read_ == requested_read_bytes_) {
-        // Double requested bytes up to the maximum configured.
-        requested_read_bytes_ = std::min<uint32_t>(2 * requested_read_bytes_, maxConfigReadBytes());
-      }
-      return ParseState::Continue;
-    case SSL_ERROR_SSL:
-      if (clienthello_success_) {
-        config_->stats().tls_found_.inc();
-        if (alpn_found_) {
-          config_->stats().alpn_found_.inc();
-        } else {
-          config_->stats().alpn_not_found_.inc();
-        }
-        cb_->socket().setDetectedTransportProtocol("tls");
-      } else {
-        config_->stats().tls_not_found_.inc();
-      }
-      return ParseState::Done;
-    default:
-      return ParseState::Error;
-    }
-  }();
+  ParseState state = getParserState(ret);
 
   if (state != ParseState::Continue) {
     // Record bytes analyzed as we're done processing.
@@ -357,6 +395,22 @@ void Filter::createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
   std::string fingerprint = JA4Fingerprinter::create(ssl_client_hello);
   ENVOY_LOG(trace, "tls:createJA4Hash(), fingerprint: {}", fingerprint);
   cb_->socket().setJA4Hash(fingerprint);
+}
+
+const std::string& Filter::dynamicMetadataKey() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.listener.tls_inspector");
+}
+
+const std::string& Filter::failureReasonKey() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "failure_reason");
+}
+
+const std::string& Filter::failureReasonClientHelloTooLarge() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "ClientHelloTooLarge");
+}
+
+const std::string& Filter::failureReasonClientHelloNotDetected() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "ClientHelloNotDetected");
 }
 
 } // namespace TlsInspector

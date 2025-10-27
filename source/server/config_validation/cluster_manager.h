@@ -21,12 +21,9 @@ public:
   using ProdClusterManagerFactory::ProdClusterManagerFactory;
 
   explicit ValidationClusterManagerFactory(
-      Server::Configuration::ServerFactoryContext& server_context, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Http::Context& http_context,
-      LazyCreateDnsResolver dns_resolver_fn, Ssl::ContextManager& ssl_context_manager,
-      Quic::QuicStatNames& quic_stat_names, Server::Instance& server)
-      : ProdClusterManagerFactory(server_context, stats, tls, http_context, dns_resolver_fn,
-                                  ssl_context_manager, quic_stat_names, server) {}
+      Server::Configuration::ServerFactoryContext& server_context,
+      LazyCreateDnsResolver dns_resolver_fn, Quic::QuicStatNames& quic_stat_names)
+      : ProdClusterManagerFactory(server_context, dns_resolver_fn, quic_stat_names) {}
 
   absl::StatusOr<ClusterManagerPtr>
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
@@ -35,7 +32,7 @@ public:
   // unconditionally.
   absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                                       const xds::core::v3::ResourceLocator* cds_resources_locator,
-                                      ClusterManager& cm) override;
+                                      ClusterManager& cm, bool support_multi_ads_sources) override;
 };
 
 /**

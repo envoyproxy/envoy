@@ -16,8 +16,15 @@ namespace Aws {
 constexpr char AWS_ACCESS_KEY_ID[] = "AWS_ACCESS_KEY_ID";
 constexpr char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
 constexpr char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
+constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
+constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
+constexpr char TOKEN[] = "Token";
+constexpr char SESSION_TOKEN[] = "SessionToken";
+constexpr char EXPIRATION[] = "Expiration";
+constexpr char CREDENTIALS[] = "Credentials";
+constexpr char STS_SERVICE_NAME[] = "sts";
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
-constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
+constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{60};
 constexpr std::chrono::seconds MAX_CACHE_JITTER{30};
 
 /**
@@ -158,20 +165,28 @@ public:
   virtual void onCredentialUpdate() PURE;
 };
 
+using CredentialSubscriberCallbacksSharedPtr = std::shared_ptr<CredentialSubscriberCallbacks>;
+
 // Subscription model allowing CredentialsProviderChains to be notified of credential provider
 // updates. A credential provider chain will call credential_provider->subscribeToCredentialUpdates
 // to register itself for updates via onCredentialUpdate callback. When a credential provider has
 // successfully updated all threads with new credentials, via the setCredentialsToAllThreads method
 // it will notify all subscribers that credentials have been retrieved.
+//
+// Subscription is only relevant for metadata credentials providers, as these are the only
+// credential providers that implement async credential retrieval functionality.
+//
 // RAII is used, as credential providers may be instantiated as singletons, as such they may outlive
-// the credential provider chain. Subscription is only relevant for metadata credentials providers,
-// as these are the only credential providers that implement async credential retrieval
-// functionality.
-class CredentialSubscriberCallbacksHandle : public RaiiListElement<CredentialSubscriberCallbacks*> {
+// the credential provider chain.
+//
+// Uses weak_ptr to safely handle subscriber lifetime without dangling pointers.
+class CredentialSubscriberCallbacksHandle
+    : public RaiiListElement<std::weak_ptr<CredentialSubscriberCallbacks>> {
 public:
-  CredentialSubscriberCallbacksHandle(CredentialSubscriberCallbacks& cb,
-                                      std::list<CredentialSubscriberCallbacks*>& parent)
-      : RaiiListElement<CredentialSubscriberCallbacks*>(parent, &cb) {}
+  CredentialSubscriberCallbacksHandle(
+      CredentialSubscriberCallbacksSharedPtr cb,
+      std::list<std::weak_ptr<CredentialSubscriberCallbacks>>& parent)
+      : RaiiListElement<std::weak_ptr<CredentialSubscriberCallbacks>>(parent, cb) {}
 };
 
 using CredentialSubscriberCallbacksHandlePtr = std::unique_ptr<CredentialSubscriberCallbacksHandle>;
@@ -180,7 +195,8 @@ using CredentialSubscriberCallbacksHandlePtr = std::unique_ptr<CredentialSubscri
  * AWS credentials provider chain, able to fallback between multiple credential providers.
  */
 class CredentialsProviderChain : public CredentialSubscriberCallbacks,
-                                 public Logger::Loggable<Logger::Id::aws> {
+                                 public Logger::Loggable<Logger::Id::aws>,
+                                 public std::enable_shared_from_this<CredentialsProviderChain> {
 public:
   ~CredentialsProviderChain() override {
     for (auto& subscriber_handle : subscriber_handles_) {
@@ -191,12 +207,14 @@ public:
   }
 
   void add(const CredentialsProviderSharedPtr& credentials_provider) {
-    providers_.emplace_back(credentials_provider);
+    if (credentials_provider != nullptr) {
+      providers_.emplace_back(credentials_provider);
+    }
   }
 
   // Store a callback if credentials are pending from a credential provider, to be called when
   // credentials are available
-  bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
+  virtual bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
 
   // Loop through all credential providers in a chain and return credentials from the first one that
   // has credentials available

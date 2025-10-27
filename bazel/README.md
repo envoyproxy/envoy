@@ -98,7 +98,7 @@ for how to update or override dependencies.
     ```
 
     ### Linux
-    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html) for Clang 14.
+    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html) for Clang 18.
 
     Extract the tar.xz and run the following:
     ```console
@@ -364,8 +364,8 @@ for more details.
 
 ## Supported compiler versions
 
-We now require Clang >= 9 due to C++17 support and tcmalloc requirement. GCC >= 9 is also known to work.
-Currently the CI is running with Clang 14.
+We now require Clang >= 18 due to C++20 support (for Clang >= 14, your mileage may vary) and tcmalloc requirement. GCC >= 13 is also known to work for C++20.
+Currently the CI is running with Clang 18.
 
 ## Clang STL debug symbols
 
@@ -416,11 +416,12 @@ To observe more verbose test output:
 bazel test --test_output=streamed //test/common/http:async_client_impl_test
 ```
 
-It's also possible to pass into an Envoy test additional command-line args via `--test_arg`. For
+It's also possible to pass into an Envoy test additional command-line args via `--test_arg`. Note
+that `--test_arg="--"` should be added to pass Envoy command-line arguments. For
 example, for extremely verbose test debugging:
 
 ```
-bazel test --test_output=streamed //test/common/http:async_client_impl_test --test_arg="-l trace"
+bazel test --test_output=streamed //test/common/http:async_client_impl_test --test_arg="--" --test_arg="-l trace"
 ```
 
 By default, testing exercises both IPv4 and IPv6 address connections. In IPv4 or IPv6 only
@@ -662,7 +663,7 @@ logging at `-l trace`. For example, in tests:
 
 ```
 bazel test //test/integration:protocol_integration_test --test_output=streamed \
-  --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
+  --test_arg="--" --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
 ```
 
 Similarly, `QUICHE` verbose logs can be enabled by setting `ENVOY_QUICHE_VERBOSITY=n` in the
@@ -745,9 +746,9 @@ You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`
 Contrib extensions can be enabled and disabled similarly to above when building the contrib
 executable. For example:
 
-`bazel build //contrib/exe:envoy-static --//contrib/squash/filters/http/source:enabled=false`
+`bazel build //contrib/exe:envoy-static --//contrib/dynamo/filters/http/source:enabled=false`
 
-Will disable the squash extension when building the contrib executable.
+Will disable the dynamo extension when building the contrib executable.
 
 ## Customize extension build config
 
@@ -845,7 +846,7 @@ have seen some issues with seeing the artifacts tab. If you can't see it, log ou
 then log back in and it should start working.
 
 The latest coverage report for main is available
-[here](https://storage.googleapis.com/envoy-postsubmit/main/coverage/index.html). The latest fuzz coverage report for main is available [here](https://storage.googleapis.com/envoy-postsubmit/main/fuzz_coverage/index.html).
+[here](https://storage.googleapis.com/envoy-cncf-postsubmit/main/coverage/index.html). The latest fuzz coverage report for main is available [here](https://storage.googleapis.com/envoy-cncf-postsubmit/main/fuzz_coverage/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by

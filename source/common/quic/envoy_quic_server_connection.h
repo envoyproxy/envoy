@@ -67,10 +67,10 @@ public:
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   void continueFilterChain(bool /*success*/) override { IS_ENVOY_BUG("Should not be used."); }
   void useOriginalDst(bool /*use_original_dst*/) override { IS_ENVOY_BUG("Should not be used."); }
-  void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
+  void setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) override {
     stream_info_.setDynamicMetadata(name, value);
   }
-  void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) override {
+  void setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) override {
     stream_info_.setDynamicTypedMetadata(name, value);
   }
   envoy::config::core::v3::Metadata& dynamicMetadata() override {
@@ -132,12 +132,13 @@ private:
 
 class EnvoyQuicServerConnection : public quic::QuicConnection, public QuicNetworkConnection {
 public:
+  // Creates a new `EnvoyQuicServerConnection`. `writer` is owned by the caller and must
+  // outlive the connection.
   EnvoyQuicServerConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicSocketAddress initial_self_address,
                             quic::QuicSocketAddress initial_peer_address,
                             quic::QuicConnectionHelperInterface& helper,
                             quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
-                            bool owns_writer,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Network::ConnectionSocketPtr connection_socket,
                             quic::ConnectionIdGeneratorInterface& generator,

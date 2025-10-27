@@ -147,7 +147,7 @@ public:
 
 private:
   DynamicMetadataMapWrapper& parent_;
-  Protobuf::Map<std::string, ProtobufWkt::Struct>::const_iterator current_;
+  Protobuf::Map<std::string, Protobuf::Struct>::const_iterator current_;
 };
 
 /**
@@ -165,7 +165,7 @@ public:
 
 private:
   ConnectionDynamicMetadataMapWrapper& parent_;
-  Protobuf::Map<std::string, ProtobufWkt::Struct>::const_iterator current_;
+  Protobuf::Map<std::string, Protobuf::Struct>::const_iterator current_;
 };
 
 /**
@@ -261,6 +261,28 @@ private:
 };
 
 /**
+ * Lua wrapper for accessing filter state objects.
+ */
+class FilterStateWrapper : public Filters::Common::Lua::BaseLuaObject<FilterStateWrapper> {
+public:
+  FilterStateWrapper(StreamInfoWrapper& parent) : parent_(parent) {}
+  static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
+
+private:
+  /**
+   * Get a filter state object by name, with an optional field name.
+   * @param 1 (string): object name.
+   * @param 2 (string, optional): field name for objects that support field access.
+   * @return filter state value as string, or nil if not found.
+   */
+  DECLARE_LUA_FUNCTION(FilterStateWrapper, luaGet);
+
+  StreamInfo::StreamInfo& streamInfo();
+
+  StreamInfoWrapper& parent_;
+};
+
+/**
  * Lua wrapper for a stream info.
  */
 class StreamInfoWrapper : public Filters::Common::Lua::BaseLuaObject<StreamInfoWrapper> {
@@ -269,6 +291,8 @@ public:
   static ExportedFunctions exportedFunctions() {
     return {{"protocol", static_luaProtocol},
             {"dynamicMetadata", static_luaDynamicMetadata},
+            {"dynamicTypedMetadata", static_luaDynamicTypedMetadata},
+            {"filterState", static_luaFilterState},
             {"downstreamDirectLocalAddress", static_luaDownstreamDirectLocalAddress},
             {"downstreamLocalAddress", static_luaDownstreamLocalAddress},
             {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
@@ -276,7 +300,8 @@ public:
             {"downstreamSslConnection", static_luaDownstreamSslConnection},
             {"requestedServerName", static_luaRequestedServerName},
             {"routeName", static_luaRouteName},
-            {"virtualClusterName", static_luaVirtualClusterName}};
+            {"virtualClusterName", static_luaVirtualClusterName},
+            {"drainConnectionUponCompletion", static_luaDrainConnectionUponCompletion}};
   }
 
 private:
@@ -291,6 +316,18 @@ private:
    * @return DynamicMetadataMapWrapper representation of StreamInfo dynamic metadata.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicMetadata);
+
+  /**
+   * Get reference to stream info typed metadata object.
+   * @return typed metadata wrapped as a Lua table.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicTypedMetadata);
+
+  /**
+   * Get reference to stream info filter state objects.
+   * @return filter state objects wrapped as a Lua table with string keys and serialized values.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaFilterState);
 
   /**
    * Get reference to stream info downstreamSslConnection.
@@ -342,18 +379,29 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaVirtualClusterName);
 
+  /**
+   * Drains the connection upon completion of this stream.
+   * For HTTP/1.1 this will add "Connection: close" header.
+   * For HTTP/2 and HTTP/3 this will trigger sending a GOAWAY frame.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDrainConnectionUponCompletion);
+
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {
     dynamic_metadata_wrapper_.reset();
+    filter_state_wrapper_.reset();
     downstream_ssl_connection_.reset();
   }
 
   StreamInfo::StreamInfo& stream_info_;
   Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<FilterStateWrapper> filter_state_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::SslConnectionWrapper>
       downstream_ssl_connection_;
 
   friend class DynamicMetadataMapWrapper;
+  friend class FilterStateWrapper;
 };
 
 /**
@@ -413,6 +461,54 @@ private:
 class Timestamp {
 public:
   enum Resolution { Millisecond, Microsecond, Undefined };
+};
+
+class VirtualHostWrapper : public Filters::Common::Lua::BaseLuaObject<VirtualHostWrapper> {
+public:
+  VirtualHostWrapper(const StreamInfo::StreamInfo& stream_info,
+                     const absl::string_view filter_config_name)
+      : stream_info_{stream_info}, filter_config_name_{filter_config_name} {}
+
+  static ExportedFunctions exportedFunctions() { return {{"metadata", static_luaMetadata}}; }
+
+private:
+  /**
+   * @return a handle to the metadata.
+   */
+  DECLARE_LUA_FUNCTION(VirtualHostWrapper, luaMetadata);
+
+  const Protobuf::Struct& getMetadata() const;
+
+  // Filters::Common::Lua::BaseLuaObject
+  void onMarkDead() override { metadata_wrapper_.reset(); }
+
+  const StreamInfo::StreamInfo& stream_info_;
+  const absl::string_view filter_config_name_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+};
+
+class RouteWrapper : public Filters::Common::Lua::BaseLuaObject<RouteWrapper> {
+public:
+  RouteWrapper(const StreamInfo::StreamInfo& stream_info,
+               const absl::string_view filter_config_name)
+      : stream_info_{stream_info}, filter_config_name_{filter_config_name} {}
+
+  static ExportedFunctions exportedFunctions() { return {{"metadata", static_luaMetadata}}; }
+
+private:
+  /**
+   * @return a handle to the metadata.
+   */
+  DECLARE_LUA_FUNCTION(RouteWrapper, luaMetadata);
+
+  const Protobuf::Struct& getMetadata() const;
+
+  // Filters::Common::Lua::BaseLuaObject
+  void onMarkDead() override { metadata_wrapper_.reset(); }
+
+  const StreamInfo::StreamInfo& stream_info_;
+  const absl::string_view filter_config_name_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
 };
 
 } // namespace Lua

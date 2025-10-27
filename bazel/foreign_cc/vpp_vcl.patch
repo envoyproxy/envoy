@@ -1,8 +1,8 @@
-diff --git src/CMakeLists.txt src/CMakeLists.txt
-index 68d0a4f..9bf7ade 100644
---- src/CMakeLists.txt
-+++ src/CMakeLists.txt
-@@ -50,13 +50,8 @@ include(cmake/ccache.cmake)
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 71f0010bb..84440477a 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -35,13 +35,7 @@ include(cmake/ccache.cmake)
  ##############################################################################
  # VPP Version
  ##############################################################################
@@ -12,25 +12,26 @@ index 68d0a4f..9bf7ade 100644
 -  OUTPUT_VARIABLE VPP_VERSION
 -  OUTPUT_STRIP_TRAILING_WHITESPACE
 -)
- 
-+set(VPP_VERSION 24.03-dev)
+-
++set(VPP_VERSION 25.10-dev)
  if (VPP_PLATFORM)
    set(VPP_VERSION ${VPP_VERSION}-${VPP_PLATFORM_NAME})
  endif()
-@@ -277,8 +272,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
+@@ -263,8 +257,8 @@ if(VPP_HOST_TOOLS_ONLY)
+ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
    find_package(OpenSSL)
    set(SUBDIRS
-     vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl vpp-api
--    plugins tools/vppapigen tools/g2 tools/perftool cmake pkg
--    tools/appimage
-+    tools/vppapigen cmake pkg
+-    vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl vpp-api
+-    plugins crypto_engines tools/vppapigen tools/g2 tools/perftool cmake pkg
++    vppinfra svm vlib vnet vpp vcl
++    cmake pkg
+     tools/appimage
    )
  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-   set(SUBDIRS vppinfra)
-diff --git src/cmake/ccache.cmake src/cmake/ccache.cmake
-index a7b395b..d6a4c5b 100644
---- src/cmake/ccache.cmake
-+++ src/cmake/ccache.cmake
+diff --git a/src/cmake/ccache.cmake b/src/cmake/ccache.cmake
+index a7b395bc6..d6a4c5b30 100644
+--- a/src/cmake/ccache.cmake
++++ b/src/cmake/ccache.cmake
 @@ -14,7 +14,7 @@
  ##############################################################################
  # ccache
@@ -40,10 +41,10 @@ index a7b395b..d6a4c5b 100644
  if(VPP_USE_CCACHE)
    find_program(CCACHE_FOUND ccache)
    message(STATUS "Looking for ccache")
-diff --git src/cmake/library.cmake src/cmake/library.cmake
-index 45b3944..b1dcc56 100644
---- src/cmake/library.cmake
-+++ src/cmake/library.cmake
+diff --git a/src/cmake/library.cmake b/src/cmake/library.cmake
+index a06a795c6..eea0c73d3 100644
+--- a/src/cmake/library.cmake
++++ b/src/cmake/library.cmake
 @@ -24,7 +24,7 @@ macro(add_vpp_library lib)
    set_target_properties(${lo} PROPERTIES POSITION_INDEPENDENT_CODE ON)
    target_compile_options(${lo} PUBLIC ${VPP_DEFAULT_MARCH_FLAGS})
@@ -53,80 +54,79 @@ index 45b3944..b1dcc56 100644
    target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${lo}>)
  
    if(VPP_LIB_VERSION)
-diff --git src/tools/vppapigen/CMakeLists.txt src/tools/vppapigen/CMakeLists.txt
-index 04ebed5..bfabc3a 100644
---- src/tools/vppapigen/CMakeLists.txt
-+++ src/tools/vppapigen/CMakeLists.txt
-@@ -11,22 +11,6 @@
- # See the License for the specific language governing permissions and
- # limitations under the License.
+diff --git a/src/vcl/CMakeLists.txt b/src/vcl/CMakeLists.txt
+index 473e40346..95d298268 100644
+--- a/src/vcl/CMakeLists.txt
++++ b/src/vcl/CMakeLists.txt
+@@ -20,7 +20,7 @@ if(NOT VPP_BUILD_VCL)
+   return()
+ endif(NOT VPP_BUILD_VCL)
  
--find_package(
--  Python3
--  REQUIRED
--  COMPONENTS Interpreter
--)
--
--execute_process(
--  COMMAND ${Python3_EXECUTABLE} -c "import ply"
--  RESULT_VARIABLE _rv
--  OUTPUT_QUIET
--)
--
--if (NOT ${_rv} EQUAL 0)
--  message( FATAL_ERROR "The \"ply\" Python3 package is not installed.")
--endif()
--
- install(
-   FILES vppapigen.py
-   RENAME vppapigen
-diff --git src/tools/vppapigen/vppapigen.py src/tools/vppapigen/vppapigen.py
-index 2b0ce99..f28a173 100755
---- src/tools/vppapigen/vppapigen.py
-+++ src/tools/vppapigen/vppapigen.py
-@@ -7,6 +7,13 @@ import logging
- import binascii
- import os
- from subprocess import Popen, PIPE
-+
-+# Put ply on the path ...
-+plypath = os.path.join(
-+    os.environ["EXT_BUILD_ROOT"],
-+    os.path.dirname(os.environ["PLYPATHS"].split()[0]))
-+sys.path += [plypath]
-+
- import ply.lex as lex
- import ply.yacc as yacc
+-option(VPP_BUILD_VCL_BAPI "Build VCL BAPI" ON)
++option(VPP_BUILD_VCL_BAPI "Build VCL BAPI" OFF)
  
-diff --git src/vcl/CMakeLists.txt src/vcl/CMakeLists.txt
-index 610b422..c5e6f8c 100644
---- src/vcl/CMakeLists.txt
-+++ src/vcl/CMakeLists.txt
-@@ -35,6 +35,8 @@ if (LDP_HAS_GNU_SOURCE)
+ if (NOT VPP_BUILD_VCL_BAPI)
+   add_vpp_library(vppcom
+@@ -58,6 +58,8 @@ if (LDP_HAS_GNU_SOURCE)
    add_compile_definitions(HAVE_GNU_SOURCE)
  endif(LDP_HAS_GNU_SOURCE)
  
 +file(COPY vppcom.h DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 +
- add_vpp_library(vcl_ldpreload
-   SOURCES
-   ldp_socket_wrapper.c
-diff --git src/vppinfra/CMakeLists.txt src/vppinfra/CMakeLists.txt
-index f34ceed..51fd2be 100644
---- src/vppinfra/CMakeLists.txt
-+++ src/vppinfra/CMakeLists.txt
-@@ -233,13 +233,28 @@ option(VPP_USE_EXTERNAL_LIBEXECINFO "Use external libexecinfo (useful for non-gl
- if(VPP_USE_EXTERNAL_LIBEXECINFO)
-   set(EXECINFO_LIB execinfo)
+ if("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+   message("WARNING: vcl_ldpreload isn't supported on FreeBSD - disabled")
+ else()
+diff --git a/src/vppinfra/CMakeLists.txt b/src/vppinfra/CMakeLists.txt
+index 131f5a5b5..2397ef6c9 100644
+--- a/src/vppinfra/CMakeLists.txt
++++ b/src/vppinfra/CMakeLists.txt
+@@ -27,7 +27,7 @@ vpp_find_library(LIBUNWIND_LIB NAMES unwind libunwind)
+ if (LIBUNWIND_INCLUDE_DIR AND LIBUNWIND_LIB)
+   message(STATUS "libunwind found at ${LIBUNWIND_LIB}")
+   list(APPEND VPPINFRA_LIBS ${LIBUNWIND_LIB})
+-  add_definitions(-DHAVE_LIBUNWIND=1)
++  add_definitions(-DHAVE_LIBUNWIND=0)
+ else()
+   message(WARNING "libunwind not found - stack traces disabled")
+   add_definitions(-DHAVE_LIBUNWIND=0)
+@@ -58,10 +58,6 @@ install(
+ 
+ add_definitions(-fvisibility=hidden)
+ 
+-# Ensure symbols from cJSON are exported
+-set_source_files_properties( cJSON.c jsonformat.c PROPERTIES
+-  COMPILE_DEFINITIONS " CJSON_API_VISIBILITY " )
+-
+ ##############################################################################
+ # vppinfra sources
+ ##############################################################################
+@@ -80,7 +76,6 @@ set(VPPINFRA_SRCS
+   hash.c
+   heap.c
+   interrupt.c
+-  jsonformat.c
+   longjmp.S
+   macros.c
+   maplog.c
+@@ -169,7 +164,6 @@ set(VPPINFRA_HEADERS
+   hash.h
+   heap.h
+   interrupt.h
+-  jsonformat.h
+   lb_hash_hash.h
+   llist.h
+   lock.h
+@@ -253,13 +247,26 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+    )
  endif()
+ 
 -add_vpp_library(vppinfra
 -  SOURCES ${VPPINFRA_SRCS}
--  LINK_LIBRARIES m ${EXECINFO_LIB}
+-  LINK_LIBRARIES m ${VPPINFRA_LIBS}
 -  INSTALL_HEADERS ${VPPINFRA_HEADERS}
 -  COMPONENT libvppinfra
 -  LTO
 -)
-+
 +# GCC versions 11 and 12 at least have some kind of bug when
 +# LTO runs out of memory and breaking Envoy builds with gcc
 +# as a result. So we conditionally disable LTO on GCC builds
@@ -134,20 +134,19 @@ index f34ceed..51fd2be 100644
 +if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
 +  add_vpp_library(vppinfra
 +    SOURCES ${VPPINFRA_SRCS}
-+    LINK_LIBRARIES m ${EXECINFO_LIB}
++    LINK_LIBRARIES m ${VPPINFRA_LIBS}
 +    INSTALL_HEADERS ${VPPINFRA_HEADERS}
 +    COMPONENT libvppinfra
 +  )
 +else()
 +  add_vpp_library(vppinfra
 +    SOURCES ${VPPINFRA_SRCS}
-+    LINK_LIBRARIES m ${EXECINFO_LIB}
++    LINK_LIBRARIES m ${VPPINFRA_LIBS}
 +    INSTALL_HEADERS ${VPPINFRA_HEADERS}
 +    COMPONENT libvppinfra
 +    LTO
 +  )
 +endif()
-+
  
  ##############################################################################
  # vppinfra headers

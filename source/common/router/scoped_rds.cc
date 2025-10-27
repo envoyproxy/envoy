@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -93,11 +94,13 @@ makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
         MessageUtil::downcastAndValidate<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             *config_proto, factory_context.messageValidationContext().staticValidationVisitor());
     if (!scoped_route_config.route_configuration_name().empty()) {
-      throw EnvoyException("Fetching routes via RDS (route_configuration_name) is not supported "
-                           "with inline scoped routes.");
+      throwEnvoyExceptionOrPanic(
+          "Fetching routes via RDS (route_configuration_name) is not supported "
+          "with inline scoped routes.");
     }
     if (!scoped_route_config.has_route_configuration()) {
-      throw EnvoyException("You must specify a route_configuration with inline scoped routes.");
+      throwEnvoyExceptionOrPanic(
+          "You must specify a route_configuration with inline scoped routes.");
     }
     RouteConfigProviderPtr route_config_provider =
         config_provider_manager.routeConfigProviderManager().createStaticRouteConfigProvider(
@@ -288,7 +291,6 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
         scope_name_by_hash_.erase(scope_info_iter->second->scopeKey().hash());
       }
     }
-    rds.set_route_config_name(scoped_route_config.route_configuration_name());
     std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
     std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
     if (scoped_route_config.has_route_configuration()) {
@@ -394,8 +396,6 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
-  // NOTE: deletes are done before adds/updates.
-  absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr> to_be_removed_scopes;
   // Destruction of resume_rds will lift the floodgate for new RDS subscriptions.
   // Note in the case of partial acceptance, accepted RDS subscriptions should be started
   // despite of any error.
@@ -413,9 +413,7 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
   // In the case that localInitManager is uninitialized, RDS is already paused
   // either by Server init or LDS init.
-  if (factory_context_.clusterManager().adsMux()) {
-    resume_rds = factory_context_.clusterManager().adsMux()->pause(type_url);
-  }
+  resume_rds = factory_context_.xdsManager().pause(type_url);
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
     srds_init_mgr =

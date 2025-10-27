@@ -25,7 +25,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/tls/ssl_socket.h"
-#include "source/extensions/common/matcher/trie_matcher.h"
+#include "source/extensions/common/matcher/ip_range_matcher.h"
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
@@ -575,6 +575,33 @@ filter_chains:
   EXPECT_EQ(filter_chain->transportSocketConnectTimeout(), std::chrono::seconds(3));
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, FilterChainNameAndMetadata) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- name: foo
+  metadata:
+    filter_metadata:
+      envoy.test:
+        test_key: "test_value"
+  filters: []
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "foo");
+  const auto& filter_chain_info = filter_chain->filterChainInfo();
+  EXPECT_EQ(
+      Config::Metadata::metadataValue(&filter_chain_info->metadata(), "envoy.test", "test_key")
+          .string_value(),
+      "test_value");
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(*worker_, start(_, _));
   EXPECT_FALSE(manager_->isWorkerStarted());
@@ -856,6 +883,36 @@ filter_chains:
 
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("bar").value());
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
+}
+
+TEST_P(ListenerManagerImplTest, ListenerWithTargetNetworkNamespace) {
+  constexpr absl::string_view listener_yaml_tmpl = R"EOF(
+name: listener_with_ns
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+    network_namespace_filepath: "{}"
+filter_chains:
+- filters:
+  - name: envoy.filters.network.tcp_proxy
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+      stat_prefix: tcp
+      cluster: cluster_0
+)EOF";
+
+  const std::string namespace_path = "/var/run/netns/test_listener_ns";
+  envoy::config::listener::v3::Listener listener_config =
+      parseListenerFromV3Yaml(fmt::format(listener_yaml_tmpl, namespace_path));
+
+  auto status = manager_->addOrUpdateListener(listener_config, "", true);
+#if defined(__linux__)
+  // On Linux, adding the listener should succeed.
+  EXPECT_TRUE(status.ok());
+#else
+  EXPECT_FALSE(status.ok());
+#endif
 }
 
 TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
@@ -6661,6 +6718,59 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MptcpNotSupported) {
       "listener mptcp-udp: enable_mptcp is set but MPTCP is not supported by the operating system");
 }
 
+// Test that hasCompatibleAddress returns false if network namespace is different.
+TEST_P(ListenerManagerImplTest, HasCompatibleAddressWithNetNs) {
+  const std::string yaml_config1 = R"EOF(
+name: listener_0
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 10001
+    network_namespace_filepath: "/var/run/netns/ns1"
+filter_chains: {}
+)EOF";
+
+  const std::string yaml_config2 = R"EOF(
+name: listener_0
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 10001
+    network_namespace_filepath: "/var/run/netns/ns2"
+filter_chains: {}
+)EOF";
+
+  const std::string yaml_config3 = R"EOF(
+name: listener_0
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 10001
+    network_namespace_filepath: "/var/run/netns/ns1"
+filter_chains: {}
+)EOF";
+
+  envoy::config::listener::v3::Listener config1 =
+      TestUtility::parseYaml<envoy::config::listener::v3::Listener>(yaml_config1);
+  envoy::config::listener::v3::Listener config2 =
+      TestUtility::parseYaml<envoy::config::listener::v3::Listener>(yaml_config2);
+  envoy::config::listener::v3::Listener config3 =
+      TestUtility::parseYaml<envoy::config::listener::v3::Listener>(yaml_config3);
+
+  auto listener1 = ListenerImpl::create(config1, "", *manager_, config1.name(), false, false,
+                                        MessageUtil::hash(config1));
+  ASSERT_TRUE(listener1.ok());
+  auto listener2 = ListenerImpl::create(config2, "", *manager_, config2.name(), false, false,
+                                        MessageUtil::hash(config2));
+  ASSERT_TRUE(listener2.ok());
+  auto listener3 = ListenerImpl::create(config3, "", *manager_, config3.name(), false, false,
+                                        MessageUtil::hash(config3));
+  ASSERT_TRUE(listener3.ok());
+
+  EXPECT_FALSE(listener1.value()->hasCompatibleAddress(*(listener2.value())));
+  EXPECT_TRUE(listener1.value()->hasCompatibleAddress(*(listener3.value())));
+}
+
 // Set the resolver to the default IP resolver. The address resolver logic is unit tested in
 // resolver_impl_test.cc.
 TEST_P(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
@@ -8127,7 +8237,8 @@ address:
           .udpListenerConfig()
           ->packetWriterFactory()
           .createUdpPacketWriter(listen_socket->ioHandle(),
-                                 manager_->listeners()[0].get().listenerScope());
+                                 manager_->listeners()[0].get().listenerScope(),
+                                 server_.dispatcher_, []() {});
   EXPECT_FALSE(udp_packet_writer->isBatchMode());
 }
 
@@ -8240,6 +8351,228 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
   EXPECT_EQ(listener_impl->addSocketFactory(std::move(socket_factory)).message(),
             "No valid balance type for connection balance");
 #endif
+}
+
+// Test mock socket interface for custom address testing.
+class TestCustomSocketInterface : public Network::SocketInterfaceBase {
+public:
+  TestCustomSocketInterface() = default;
+
+  // Network::SocketInterface
+  Network::IoHandlePtr socket(Network::Socket::Type socket_type, Network::Address::Type addr_type,
+                              Network::Address::IpVersion version, bool socket_v6only,
+                              const Network::SocketCreationOptions& options) const override {
+    UNREFERENCED_PARAMETER(socket_v6only);
+    UNREFERENCED_PARAMETER(options);
+    // Create a regular socket for testing
+    if (socket_type == Network::Socket::Type::Stream && addr_type == Network::Address::Type::Ip) {
+      int domain = (version == Network::Address::IpVersion::v4) ? AF_INET : AF_INET6;
+      int sock_fd = ::socket(domain, SOCK_STREAM, 0);
+      if (sock_fd == -1) {
+        return nullptr;
+      }
+      was_called_ = true;
+      return std::make_unique<Network::IoSocketHandleImpl>(sock_fd);
+    }
+    return nullptr;
+  }
+
+  Network::IoHandlePtr socket(Network::Socket::Type socket_type,
+                              const Network::Address::InstanceConstSharedPtr addr,
+                              const Network::SocketCreationOptions& options) const override {
+    // Delegate to the other socket method
+    return socket(socket_type, addr->type(),
+                  addr->ip() ? addr->ip()->version() : Network::Address::IpVersion::v4, false,
+                  options);
+  }
+
+  bool ipFamilySupported(int domain) override { return domain == AF_INET || domain == AF_INET6; }
+
+  // Server::Configuration::BootstrapExtensionFactory
+  Server::BootstrapExtensionPtr
+  createBootstrapExtension(const Protobuf::Message& config,
+                           Server::Configuration::ServerFactoryContext& context) override {
+    UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(context);
+    return nullptr; // Not used in test
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return nullptr; // Not used in test
+  }
+
+  std::string name() const override { return "test.custom.socket.interface"; }
+
+  // Test helper
+  bool wasCalled() const { return was_called_; }
+  void resetCalled() { was_called_ = false; }
+
+private:
+  mutable bool was_called_{false};
+};
+
+// Test address that returns a custom socket interface
+class TestCustomAddress : public Network::Address::Instance {
+public:
+  TestCustomAddress(const Network::SocketInterface& custom_interface)
+      : address_string_("127.0.0.1:0"), logical_name_("custom://test-address"),
+        custom_interface_(custom_interface),
+        ipv4_instance_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0)) {}
+
+  // Network::Address::Instance
+  bool operator==(const Instance& rhs) const override { return address_string_ == rhs.asString(); }
+  Network::Address::Type type() const override { return Network::Address::Type::Ip; }
+  const std::string& asString() const override { return address_string_; }
+  absl::string_view asStringView() const override { return address_string_; }
+  const std::string& logicalName() const override { return logical_name_; }
+  const Network::Address::Ip* ip() const override { return ipv4_instance_->ip(); }
+  const Network::Address::Pipe* pipe() const override { return nullptr; }
+  const Network::Address::EnvoyInternalAddress* envoyInternalAddress() const override {
+    return nullptr;
+  }
+  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  const sockaddr* sockAddr() const override { return ipv4_instance_->sockAddr(); }
+  socklen_t sockAddrLen() const override { return ipv4_instance_->sockAddrLen(); }
+  absl::string_view addressType() const override { return "test_custom"; }
+
+  // Return the custom socket interface
+  const Network::SocketInterface& socketInterface() const override { return custom_interface_; }
+
+private:
+  std::string address_string_;
+  std::string logical_name_;
+  const Network::SocketInterface& custom_interface_;
+  Network::Address::InstanceConstSharedPtr ipv4_instance_;
+};
+
+// Test address that returns the default socket interface
+class TestDefaultAddress : public Network::Address::Instance {
+public:
+  TestDefaultAddress()
+      : address_string_("127.0.0.1:0"), logical_name_("default://test-address"),
+        ipv4_instance_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0)) {}
+
+  // Network::Address::Instance
+  bool operator==(const Instance& rhs) const override { return address_string_ == rhs.asString(); }
+  Network::Address::Type type() const override { return Network::Address::Type::Ip; }
+  const std::string& asString() const override { return address_string_; }
+  absl::string_view asStringView() const override { return address_string_; }
+  const std::string& logicalName() const override { return logical_name_; }
+  const Network::Address::Ip* ip() const override { return ipv4_instance_->ip(); }
+  const Network::Address::Pipe* pipe() const override { return nullptr; }
+  const Network::Address::EnvoyInternalAddress* envoyInternalAddress() const override {
+    return nullptr;
+  }
+  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  const sockaddr* sockAddr() const override { return ipv4_instance_->sockAddr(); }
+  socklen_t sockAddrLen() const override { return ipv4_instance_->sockAddrLen(); }
+  absl::string_view addressType() const override { return "test_default"; }
+
+  // Return the default socket interface
+  const Network::SocketInterface& socketInterface() const override {
+    return Network::SocketInterfaceSingleton::get();
+  }
+
+private:
+  std::string address_string_;
+  std::string logical_name_;
+  Network::Address::InstanceConstSharedPtr ipv4_instance_;
+};
+
+TEST_P(ListenerManagerImplTest, CustomSocketInterfaceIsUsedWhenAddressSpecifiesIt) {
+  auto custom_interface = std::make_unique<TestCustomSocketInterface>();
+  TestCustomSocketInterface* custom_interface_ptr = custom_interface.get();
+
+  auto custom_address = std::make_shared<TestCustomAddress>(*custom_interface);
+
+  // Create listener factory to test the implementation
+  ProdListenerComponentFactory real_listener_factory(server_);
+
+  Network::Socket::OptionsSharedPtr options = nullptr;
+  Network::SocketCreationOptions creation_options;
+
+  // Verify that the custom address returns the custom interface
+  EXPECT_NE(&custom_address->socketInterface(), &Network::SocketInterfaceSingleton::get());
+
+  // The listener factory should use the custom socket interface
+  auto socket_result = real_listener_factory.createListenSocket(
+      custom_address, Network::Socket::Type::Stream, options,
+      ListenerComponentFactory::BindType::NoBind, creation_options, 0 /* worker_index */);
+
+  // The socket creation should succeed
+  EXPECT_TRUE(socket_result.ok());
+  if (socket_result.ok()) {
+    auto socket = socket_result.value();
+    EXPECT_NE(socket, nullptr);
+    // Verify the socket was created with the expected address
+    EXPECT_EQ(socket->connectionInfoProvider().localAddress()->logicalName(),
+              custom_address->logicalName());
+  }
+
+  // Verify the custom interface was actually called
+  EXPECT_TRUE(custom_interface_ptr->wasCalled());
+}
+
+TEST_P(ListenerManagerImplTest, DefaultSocketInterfaceIsUsedWhenAddressUsesDefault) {
+  auto default_address = std::make_shared<TestDefaultAddress>();
+
+  // Create listener factory to test the implementation
+  ProdListenerComponentFactory real_listener_factory(server_);
+
+  Network::Socket::OptionsSharedPtr options = nullptr;
+  Network::SocketCreationOptions creation_options;
+
+  // Verify that the default address returns the default interface
+  EXPECT_EQ(&default_address->socketInterface(), &Network::SocketInterfaceSingleton::get());
+
+  // The listener factory should use the standard socket creation path
+  auto socket_result = real_listener_factory.createListenSocket(
+      default_address, Network::Socket::Type::Stream, options,
+      ListenerComponentFactory::BindType::NoBind, creation_options, 0 /* worker_index */);
+
+  // The socket creation should succeed
+  EXPECT_TRUE(socket_result.ok());
+  if (socket_result.ok()) {
+    auto socket = socket_result.value();
+    EXPECT_NE(socket, nullptr);
+    // Verify the socket was created with the expected address
+    EXPECT_EQ(socket->connectionInfoProvider().localAddress()->logicalName(),
+              default_address->logicalName());
+  }
+}
+
+TEST_P(ListenerManagerImplTest, CustomSocketInterfaceFailureIsHandledGracefully) {
+  // Create a failing custom socket interface
+  class FailingCustomSocketInterface : public TestCustomSocketInterface {
+  public:
+    Network::IoHandlePtr socket(Network::Socket::Type socket_type,
+                                const Network::Address::InstanceConstSharedPtr addr,
+                                const Network::SocketCreationOptions& options) const override {
+      UNREFERENCED_PARAMETER(socket_type);
+      UNREFERENCED_PARAMETER(addr);
+      UNREFERENCED_PARAMETER(options);
+      // Always return nullptr to simulate failure
+      return nullptr;
+    }
+  };
+
+  auto failing_interface = std::make_unique<FailingCustomSocketInterface>();
+  auto custom_address = std::make_shared<TestCustomAddress>(*failing_interface);
+
+  // Create listener factory to test the implementation
+  ProdListenerComponentFactory real_listener_factory(server_);
+
+  Network::Socket::OptionsSharedPtr options = nullptr;
+  Network::SocketCreationOptions creation_options;
+
+  // The listener factory should handle the failure gracefully
+  auto socket_result = real_listener_factory.createListenSocket(
+      custom_address, Network::Socket::Type::Stream, options,
+      ListenerComponentFactory::BindType::NoBind, creation_options, 0 /* worker_index */);
+
+  // The socket creation should fail with the expected error
+  EXPECT_FALSE(socket_result.ok());
+  EXPECT_EQ(socket_result.status().message(), "failed to create socket using custom interface");
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest, ::testing::Values(false));

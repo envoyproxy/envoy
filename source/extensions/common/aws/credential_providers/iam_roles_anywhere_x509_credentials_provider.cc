@@ -12,7 +12,8 @@ namespace Aws {
 
 using std::chrono::seconds;
 
-constexpr uint64_t X509_CERTIFICATE_MAX_BYTES{2048};
+constexpr uint64_t X509_CERTIFICATE_MAX_BYTES{10240};
+constexpr uint64_t X509_PRIVATE_KEY_MAX_BYTES{10240};
 constexpr uint64_t X509_CERTIFICATE_CHAIN_MAX_LENGTH{5};
 
 void CachedX509CredentialsProviderBase::refreshIfNeeded() {
@@ -35,7 +36,6 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
       certificate_chain_data_source_(certificate_chain_data_source) {};
 
 absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
-
   is_initialized_ = true;
 
   absl::Status status = absl::InvalidArgumentError("IAM Roles Anywhere will not be enabled");
@@ -69,7 +69,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
 
   auto pkey_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
       private_key_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
-      context_.api(), false, 2048);
+      context_.api(), false, X509_PRIVATE_KEY_MAX_BYTES);
   if (pkey_provider_or_error_.ok()) {
     private_key_data_source_provider_ = std::move(pkey_provider_or_error_.value());
   } else {
@@ -87,6 +87,11 @@ bool IAMRolesAnywhereX509CredentialsProvider::needsRefresh() {
   const auto expired = (now - last_updated_ > REFRESH_INTERVAL);
 
   if (expiration_time_.has_value()) {
+    // If already expired, definitely need refresh
+    if (expiration_time_.value() <= now) {
+      return true;
+    }
+    // Otherwise check if within grace period
     return expired || (expiration_time_.value() - now < REFRESH_GRACE_PERIOD);
   } else {
     return expired;
@@ -109,7 +114,6 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
 
   // We should not be able to get here with an empty certificate or one larger than the max size
   // defined in the header. This is a sanity check.
-
   if (!pem_size || pem_size > X509_CERTIFICATE_MAX_BYTES) {
     return absl::InvalidArgumentError("Invalid certificate size");
   }
@@ -128,14 +132,10 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
   }
 
   X509_ALGOR* alg;
+  // X509_PUBKEY_get0_param will in fact always return 1
   int param_status =
       X509_PUBKEY_get0_param(nullptr, nullptr, nullptr, &alg, X509_get_X509_PUBKEY(cert.get()));
-  if (param_status != 1) {
-    error_code = ERR_peek_last_error();
-    ERR_error_string(error_code, error_data);
-    return absl::InvalidArgumentError(
-        fmt::format("Invalid certificate - X509_PUBKEY_get0_param failed: {}", error_data));
-  }
+  ASSERT(param_status == 1);
 
   int nid = OBJ_obj2nid(alg->algorithm);
 
@@ -150,10 +150,8 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
     return absl::InvalidArgumentError("Invalid certificate public key signature algorithm");
   }
 
+  // Serial number is mandatory and no error code is returned from this function
   ser = X509_get_serialNumber(cert.get());
-  if (ser == nullptr) {
-    return absl::InvalidArgumentError("Certificate serial number could not be extracted");
-  }
 
   bnser = ASN1_INTEGER_to_BN(ser, nullptr);
   // Asserts here as we cannot stub OpenSSL
@@ -230,16 +228,9 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(absl::string_v
     ERR_clear_error();
 
     int der_length = i2d_X509(cert.get(), &cert_in_der);
-    if (!(der_length > 0 && cert_in_der != nullptr)) {
 
-      error_code = ERR_peek_last_error();
-      ERR_error_string(error_code, error_data);
-
-      return absl::InvalidArgumentError(
-          is_chain ? fmt::format("Certificate chain PEM #{} could not be converted to DER: {}",
-                                 cert_count, error_data)
-                   : fmt::format("Certificate could not be converted to DER: {}", error_data));
-    }
+    ASSERT(der_length > 0);
+    ASSERT(cert_in_der != nullptr);
 
     output.append(Base64::encode(reinterpret_cast<const char*>(cert_in_der), der_length));
     output.append(",");

@@ -50,7 +50,7 @@ Factory::routeConfigProviderFromProto(const ProxyConfig& config,
 }
 
 std::vector<NamedFilterFactoryCb>
-Factory::filtersFactoryFromProto(const ProtobufWkt::RepeatedPtrField<TypedExtensionConfig>& filters,
+Factory::filtersFactoryFromProto(const Protobuf::RepeatedPtrField<TypedExtensionConfig>& filters,
                                  const TypedExtensionConfig& codec_config,
                                  const std::string stats_prefix,
                                  Envoy::Server::Configuration::FactoryContext& context) {
@@ -118,7 +118,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
     if (proto_config.tracing().has_provider()) {
       tracer = tracer_manager->getOrCreateTracer(&proto_config.tracing().provider());
     }
-    tracing_config = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
+    tracing_config = std::make_unique<Tracing::ConnectionManagerTracingConfig>(
         context.listenerInfo().direction(), proto_config.tracing());
   }
 

@@ -30,6 +30,10 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:
     name: foo
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
 )EOF";
     config_helper_.prependFilter(filter);
 
@@ -42,6 +46,10 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
   dns_cache_config:
     name: foo
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
 )EOF";
       TestUtility::loadFromYaml(cluster_type_config, *cluster->mutable_cluster_type());
       cluster->clear_load_assignment();
@@ -121,12 +129,16 @@ typed_config:
   }
 
   void stripConnectUpgradeAndRespond(bool include_content_length = false) {
-    // Strip the CONNECT upgrade.
+    // Strip the CONNECT upgrade - expect RFC 9110 compliant request with Host header.
     std::string prefix_data;
     const std::string hostname(default_request_headers_.getHostValue());
     const std::string port = Http::HeaderUtility::hostHasPort(hostname) ? "" : ":443";
     ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", prefix_data));
-    EXPECT_EQ(absl::StrCat("CONNECT ", hostname, port, " HTTP/1.1\r\n\r\n"), prefix_data);
+
+    // Verify the CONNECT request format is RFC 9110 compliant with Host header.
+    std::string expected_connect = absl::StrCat("CONNECT ", hostname, port, " HTTP/1.1\r\n",
+                                                "Host: ", hostname, port, "\r\n\r\n");
+    EXPECT_EQ(expected_connect, prefix_data);
 
     absl::string_view content_length = include_content_length ? "Content-Length: 0\r\n" : "";
     // Ship the CONNECT response.
@@ -214,6 +226,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, CleartextRequestResponse) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("bar")).empty());
 }
+
 // Test sending 2 requests to one proxy
 TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSignleEndpoint) {
   initialize();
@@ -527,6 +540,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddressLegacy) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
+// Test sending a request to host with port.
 TEST_P(Http11ConnectHttpIntegrationTest, HostWithPort) {
   initialize();
 

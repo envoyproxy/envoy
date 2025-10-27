@@ -46,6 +46,13 @@ class EnvoyQuicNetworkObserverRegistry;
 
 } // namespace Quic
 
+namespace Config {
+// TODO(adisuissa): This forward declaration is needed because OD-CDS code is
+// part of the Envoy::Upstream namespace but should be eventually moved to the
+// Envoy::Config namespace (next to the XdsManager).
+class XdsManager;
+} // namespace Config
+
 namespace Upstream {
 
 /**
@@ -340,7 +347,35 @@ public:
    *
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
-  virtual OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const PURE;
+  virtual OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const PURE;
+
+  /**
+   * Receives a cluster name and returns an active or warming cluster (if found).
+   * @param cluster_name the name of the cluster.
+   * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual OptRef<const Cluster>
+  getActiveOrWarmingCluster(const std::string& cluster_name) const PURE;
+
+  /**
+   * Returns true iff the given cluster name is known in the cluster-manager
+   * (either as active or as warming).
+   * @param cluster_name the name of the cluster.
+   * @return bool true if the cluster name is known, and false otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual bool hasCluster(const std::string& cluster_name) const PURE;
+
+  /**
+   * Returns true iff there's an active cluster in the cluster-manager.
+   * @return bool true if there is an active cluster, and false otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual bool hasActiveClusters() const PURE;
 
   using ClusterSet = absl::flat_hash_set<std::string>;
 
@@ -478,7 +513,8 @@ public:
    * @param predicate supplies the optional drain connections host predicate. If not supplied, all
    *                  hosts are drained.
    */
-  virtual void drainConnections(DrainConnectionsHostPredicate predicate) PURE;
+  virtual void drainConnections(DrainConnectionsHostPredicate predicate,
+                                ConnectionPool::DrainBehavior drain_behavior) PURE;
 
   /**
    * Check if the cluster is active and statically configured, and if not, return an error
@@ -494,12 +530,15 @@ public:
    * @param validation_visitor
    * @return OdCdsApiHandlePtr the ODCDS handle.
    */
-
+  // TODO(adisuissa): once the xDS-TP config-sources are fully supported, the
+  // `odcds_config` parameter should become optional, and the comment above
+  // should be updated.
   using OdCdsCreationFunction = std::function<absl::StatusOr<std::shared_ptr<OdCdsApi>>(
       const envoy::config::core::v3::ConfigSource& odcds_config,
-      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
-      MissingClusterNotifier& notifier, Stats::Scope& scope,
-      ProtobufMessage::ValidationVisitor& validation_visitor)>;
+      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
+      Config::XdsManager& xds_manager, ClusterManager& cm, MissingClusterNotifier& notifier,
+      Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+      Server::Configuration::ServerFactoryContext& server_factory_context)>;
 
   virtual absl::StatusOr<OdCdsApiHandlePtr>
   allocateOdCdsApi(OdCdsCreationFunction creation_function,
@@ -604,7 +643,7 @@ public:
    * Allocate a cluster from configuration proto.
    */
   virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
-  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) PURE;
 
   /**
@@ -612,7 +651,8 @@ public:
    */
   virtual absl::StatusOr<CdsApiPtr>
   createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-            const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm) PURE;
+            const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
+            bool support_multi_ads_sources) PURE;
 };
 
 /**

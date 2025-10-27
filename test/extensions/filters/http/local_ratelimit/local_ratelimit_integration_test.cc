@@ -54,10 +54,10 @@ protected:
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
 
-      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                               {route_config_name}, true));
       sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-          Config::TypeUrl::get().RouteConfiguration,
+          Config::TestTypeUrl::get().RouteConfiguration,
           {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
               initial_route_config)},
           "1");
@@ -86,10 +86,10 @@ protected:
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
 
-      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "",
                                               {"local_cluster"}, true));
       sendSotwDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          Config::TypeUrl::get().ClusterLoadAssignment,
+          Config::TestTypeUrl::get().ClusterLoadAssignment,
           {TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(
               initial_local_cluster_endpoints)},
           "1");
@@ -171,17 +171,16 @@ protected:
     EXPECT_EQ(expected_body_size, response->body().size());
     EXPECT_THAT(
         response->headers(),
-        Http::HeaderValueOf(
+        ContainsHeader(
             Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
             expected_limit));
+    EXPECT_THAT(response->headers(),
+                ContainsHeader(Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get()
+                                   .XRateLimitRemaining,
+                               expected_remaining));
     EXPECT_THAT(
         response->headers(),
-        Http::HeaderValueOf(Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get()
-                                .XRateLimitRemaining,
-                            expected_remaining));
-    EXPECT_THAT(
-        response->headers(),
-        Http::HeaderValueOf(
+        ContainsHeader(
             Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
             expected_reset));
   }
@@ -633,7 +632,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, BasicTestPerRouteAndRds) {
 
   // Update route config by RDS when request is sending. Test whether RDS can work normally.
   sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
+      Config::TestTypeUrl::get().RouteConfiguration,
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(update_route_config_)},
       "2");
   test_server_->waitForCounterGe("http.config_test.rds.basic_routes.update_success", 2);
@@ -683,7 +682,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, TestLocalClusterRateLimit) {
   EXPECT_EQ(1.0, share_provider->getTokensShareFactor());
 
   sendSotwDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment,
+      Config::TestTypeUrl::get().ClusterLoadAssignment,
       {TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           update_local_cluster_endpoints_)},
       "2");

@@ -17,6 +17,7 @@ namespace Upstream {
 using ClientSideWeightedRoundRobinLbProto = envoy::extensions::load_balancing_policies::
     client_side_weighted_round_robin::v3::ClientSideWeightedRoundRobin;
 using OrcaLoadReportProto = xds::data::orca::v3::OrcaLoadReport;
+using CommonLbConfig = envoy::config::cluster::v3::Cluster::CommonLbConfig;
 
 /**
  * Load balancer config used to wrap the config proto.
@@ -61,7 +62,8 @@ public:
         : report_handler_(std::move(handler)), weight_(weight), non_empty_since_(non_empty_since),
           last_update_time_(last_update_time) {}
 
-    absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report) override;
+    absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
+                                  const StreamInfo::StreamInfo& stream_info) override;
 
     // Update the weight and timestamps for first and last update time.
     void updateWeightNow(uint32_t weight, const MonotonicTime& now) {
@@ -138,7 +140,7 @@ public:
   // Thread local shim to store callbacks for weight updates of worker local lb.
   class ThreadLocalShim : public Envoy::ThreadLocal::ThreadLocalObject {
   public:
-    Common::CallbackManager<uint32_t> apply_weights_cb_helper_;
+    Common::CallbackManager<void> apply_weights_cb_helper_;
   };
 
   // This class is used to handle the load balancing on the worker thread.
@@ -171,7 +173,10 @@ public:
 
     bool recreateOnHostChange() const override { return false; }
 
-    void applyWeightsToAllWorkers(uint32_t priority);
+    Upstream::LoadBalancerPtr createWithCommonLbConfig(const CommonLbConfig& common_lb_config,
+                                                       Upstream::LoadBalancerParams params);
+
+    void applyWeightsToAllWorkers();
 
     std::unique_ptr<Envoy::ThreadLocal::TypedSlot<ThreadLocalShim>> tls_;
 

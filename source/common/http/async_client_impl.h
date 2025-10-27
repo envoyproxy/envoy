@@ -84,7 +84,6 @@ private:
   const Router::FilterConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
-  Runtime::Loader& runtime_;
   const LocalReply::LocalReplyPtr local_reply_;
 
   friend class AsyncStreamImpl;
@@ -231,10 +230,10 @@ private:
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void sendGoAwayAndClose() override {}
 
-  void setDecoderBufferLimit(uint32_t) override {
+  void setDecoderBufferLimit(uint64_t) override {
     IS_ENVOY_BUG("decoder buffer limits should not be overridden on async streams.");
   }
-  uint32_t decoderBufferLimit() override { return buffer_limit_.value_or(0); }
+  uint64_t decoderBufferLimit() override { return buffer_limit_.value_or(0); }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
@@ -253,7 +252,7 @@ private:
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
   absl::optional<Upstream::LoadBalancerContext::OverrideHost>
   upstreamOverrideHost() const override {
-    return absl::nullopt;
+    return upstream_override_host_;
   }
   bool shouldLoadShed() const override { return false; }
   absl::string_view filterConfigName() const override { return ""; }
@@ -279,14 +278,14 @@ private:
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
   const LocalReply::LocalReply& local_reply_;
-  const std::unique_ptr<const Router::RetryPolicy> retry_policy_;
+  Router::RouteConstSharedPtr parent_route_;
   std::shared_ptr<NullRouteImpl> route_;
   uint32_t high_watermark_calls_{};
   bool local_closed_{};
   bool remote_closed_{};
   Buffer::InstancePtr buffered_body_;
   Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
-  absl::optional<uint32_t> buffer_limit_{absl::nullopt};
+  absl::optional<uint64_t> buffer_limit_{absl::nullopt};
   RequestHeaderMap* request_headers_{};
   RequestTrailerMap* request_trailers_{};
   bool encoded_response_headers_{};
@@ -295,6 +294,9 @@ private:
   bool send_xff_{true};
   bool send_internal_{true};
   bool router_destroyed_{false};
+
+  // Upstream override host for bypassing load balancer selection
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
 
   friend class AsyncClientImpl;
   friend class AsyncClientImplUnitTest;

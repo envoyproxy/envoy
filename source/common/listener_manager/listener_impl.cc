@@ -877,7 +877,7 @@ void ListenerImpl::buildOriginalDstListenerFilter(
             "envoy.filters.listener.original_dst");
 
     Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(), nullptr, *listener_factory_context_);
+        Envoy::Protobuf::Empty(), nullptr, *listener_factory_context_);
     auto* cfg_provider_manager = parent_.factory_->getTcpListenerConfigProviderManager();
     auto filter_config_provider = cfg_provider_manager->createStaticFilterConfigProvider(
         callback, "envoy.filters.listener.original_dst");
@@ -974,7 +974,7 @@ bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterMana
   return false;
 }
 
-void ListenerImpl::dumpListenerConfig(ProtobufWkt::Any& dump) const {
+void ListenerImpl::dumpListenerConfig(Protobuf::Any& dump) const {
   dump.PackFrom(config_maybe_partial_filter_chains_);
 }
 
@@ -1072,14 +1072,10 @@ ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::List
 
 void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
                                    std::function<void(Network::DrainableFilterChain&)> callback) {
-  for (const auto& message_and_filter_chain : filter_chain_manager_->filterChainsByMessage()) {
-    if (another_listener.filter_chain_manager_->filterChainsByMessage().find(
-            message_and_filter_chain.first) ==
-        another_listener.filter_chain_manager_->filterChainsByMessage().end()) {
-      // The filter chain exists in `this` listener but not in the listener passed in.
-      callback(*message_and_filter_chain.second);
-    }
+  for (const auto& draining_filter_chain : filter_chain_manager_->drainingFilterChains()) {
+    callback(*draining_filter_chain);
   }
+
   // Filter chain manager maintains an optional default filter chain besides the filter chains
   // indexed by message.
   if (auto eq = MessageUtil();
@@ -1139,7 +1135,7 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
     return false;
   }
 
-  // Second, check if the listener has the same addresses.
+  // Second, check if the listener has the same addresses (including network namespaces if Linux).
   // The listener support listening on the zero port address for test. Multiple zero
   // port addresses are also supported. For comparing two listeners with multiple
   // zero port addresses, only need to ensure there are the same number of zero

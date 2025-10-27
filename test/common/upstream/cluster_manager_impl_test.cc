@@ -74,7 +74,7 @@ public:
     return std::make_unique<AlpnSocketFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 };
 
@@ -183,8 +183,9 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   }
   )EOF";
 
-  EXPECT_CALL(log_manager_, createAccessLog(Filesystem::FilePathAndType{
-                                Filesystem::DestinationType::File, "foo"}));
+  EXPECT_CALL(
+      factory_.server_context_.access_log_manager_,
+      createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"}));
   create(parseBootstrapFromV3Json(json));
 }
 
@@ -193,7 +194,7 @@ TEST_F(ClusterManagerImplTest, AdsCluster) {
   // can be set on.
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
-  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
 
   const std::string yaml = R"EOF(
   dynamic_resources:
@@ -229,7 +230,7 @@ TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
   // can be set on.
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
-  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
 
   const std::string yaml = R"EOF(
   dynamic_resources:
@@ -634,7 +635,7 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNoLb) {
           ReturnRef(Config::Utility::getAndCheckFactoryByName<Upstream::TypedLoadBalancerFactory>(
               "envoy.load_balancing_policies.cluster_provided")));
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Json(json)), EnvoyException,
                             "cluster manager: cluster provided LB specified but cluster "
@@ -648,7 +649,7 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNotConfigured) {
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "cluster_0";
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, new MockThreadAwareLoadBalancer())));
   EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Json(json)), EnvoyException,
                             "cluster manager: cluster provided LB not specified but cluster "
@@ -1519,6 +1520,77 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   factory_.tls_.shutdownThread();
 }
 
+TEST_F(ClusterManagerImplTest, GetActiveOrWarmingCluster) {
+  // Start with a static cluster.
+  const std::string bootstrap_yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: static_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: static_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(bootstrap_yaml));
+
+  // Static cluster should be active.
+  EXPECT_NE(absl::nullopt, cluster_manager_->getActiveCluster("static_cluster"));
+  EXPECT_NE(absl::nullopt, cluster_manager_->getActiveOrWarmingCluster("static_cluster"));
+  EXPECT_EQ(absl::nullopt, cluster_manager_->getActiveOrWarmingCluster("non_existent_cluster"));
+
+  // Now, add a dynamic cluster. It will start in warming state.
+  const std::string warming_cluster_yaml = R"EOF(
+    name: warming_cluster
+    connect_timeout: 0.250s
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: static_cluster
+  )EOF";
+  auto warming_cluster_config = parseClusterFromV3Yaml(warming_cluster_yaml);
+
+  // Mock the cluster creation for the warming cluster.
+  std::shared_ptr<MockClusterMockPrioritySet> warming_cluster =
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  warming_cluster->info_->name_ = "warming_cluster";
+  std::function<void()> cluster_init_callback;
+  EXPECT_CALL(*warming_cluster, initialize(_)).WillOnce(SaveArg<0>(&cluster_init_callback));
+  EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(warming_cluster_config), _, true))
+      .WillOnce(Return(std::make_pair(warming_cluster, nullptr)));
+
+  // Add the cluster.
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(warming_cluster_config, "version1"));
+
+  // The cluster should be in warming, not active.
+  EXPECT_EQ(absl::nullopt, cluster_manager_->getActiveCluster("warming_cluster"));
+  OptRef<const Cluster> cluster = cluster_manager_->getActiveOrWarmingCluster("warming_cluster");
+  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_EQ("warming_cluster", cluster->info()->name());
+
+  // Finish initialization. This should move it to active.
+  cluster_init_callback();
+
+  // Now the cluster should be active.
+  cluster = cluster_manager_->getActiveCluster("warming_cluster");
+  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_EQ("warming_cluster", cluster->info()->name());
+  cluster = cluster_manager_->getActiveOrWarmingCluster("warming_cluster");
+  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_EQ("warming_cluster", cluster->info()->name());
+}
+
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
   createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
@@ -1773,7 +1845,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom per-filter empty config proto
     // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<Envoy::Protobuf::Struct>();
   }
   std::string name() const override { return "envoy.test.filter"; }
 };
@@ -1821,8 +1893,8 @@ class ClusterManagerInitHelperTest : public testing::Test {
 public:
   MOCK_METHOD(void, onClusterInit, (ClusterManagerCluster & cluster));
 
-  NiceMock<MockClusterManager> cm_;
-  ClusterManagerInitHelper init_helper_{cm_, [this](ClusterManagerCluster& cluster) {
+  NiceMock<Config::MockXdsManager> xds_manager_;
+  ClusterManagerInitHelper init_helper_{xds_manager_, [this](ClusterManagerCluster& cluster) {
                                           onClusterInit(cluster);
                                           return absl::OkStatus();
                                         }};

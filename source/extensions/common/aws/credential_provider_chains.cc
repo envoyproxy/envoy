@@ -4,9 +4,16 @@
 
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
+#include "source/extensions/common/aws/credential_providers/assume_role_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
+#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
+
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,6 +27,7 @@ CommonCredentialsProviderChain::customCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config) {
   if (credential_provider_config.custom_credential_provider_chain() &&
+      !credential_provider_config.has_assume_role_credential_provider() &&
       !credential_provider_config.has_container_credential_provider() &&
       !credential_provider_config.has_credentials_file_provider() &&
       !credential_provider_config.has_environment_credential_provider() &&
@@ -31,12 +39,27 @@ CommonCredentialsProviderChain::customCredentialsProviderChain(
         "Custom credential provider chain must have at least one credential provider");
   }
 
-  return std::make_shared<CommonCredentialsProviderChain>(context, region,
-                                                          credential_provider_config);
+  auto chain =
+      std::make_shared<CommonCredentialsProviderChain>(context, region, credential_provider_config);
+  chain->setupSubscriptions();
+  return chain;
 }
 CredentialsProviderChainSharedPtr CommonCredentialsProviderChain::defaultCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region) {
-  return std::make_shared<CommonCredentialsProviderChain>(context, region, absl::nullopt);
+  auto chain = std::make_shared<CommonCredentialsProviderChain>(context, region, absl::nullopt);
+  chain->setupSubscriptions();
+  return chain;
+}
+
+void CommonCredentialsProviderChain::setupSubscriptions() {
+  for (auto& provider : providers_) {
+    // Set up subscription for each provider that supports it
+    auto metadata_provider = std::dynamic_pointer_cast<MetadataCredentialsProviderBase>(provider);
+    if (metadata_provider) {
+      storeSubscription(metadata_provider->subscribeToCredentialUpdates(
+          std::static_pointer_cast<CredentialSubscriberCallbacks>(shared_from_this())));
+    }
+  }
 }
 
 CommonCredentialsProviderChain::CommonCredentialsProviderChain(
@@ -107,6 +130,31 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
     ENVOY_LOG(debug, "Using credentials file credentials provider");
     add(factories.createCredentialsFileCredentialsProvider(
         context, chain_to_create.credentials_file_provider()));
+  }
+
+  if (chain_to_create.has_assume_role_credential_provider()) {
+    auto assume_role_config = chain_to_create.assume_role_credential_provider();
+
+    const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
+    const auto cluster_name = stsClusterName(region);
+
+    // Default session name if not provided.
+    if (assume_role_config.role_session_name().empty()) {
+      assume_role_config.set_role_session_name(sessionName(context.api()));
+    }
+
+    ENVOY_LOG(debug,
+              "Using assumerole credentials provider with STS endpoint: {} and session name: {}",
+              sts_endpoint, assume_role_config.role_session_name());
+    add(factories.createAssumeRoleCredentialsProvider(context, aws_cluster_manager_, region,
+                                                      assume_role_config));
+  }
+
+  if (chain_to_create.has_iam_roles_anywhere_credential_provider()) {
+    ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
+    add(factories.createIAMRolesAnywhereCredentialsProvider(
+        context, aws_cluster_manager_, region,
+        chain_to_create.iam_roles_anywhere_credential_provider()));
   }
 
   if (chain_to_create.has_assume_role_with_web_identity_provider()) {
@@ -184,6 +232,65 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
   }
 }
 
+CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view region,
+    const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& assume_role_config) {
+
+  const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+  const auto initialization_timer = std::chrono::seconds(2);
+
+  auto cluster_name = stsClusterName(region);
+  auto uri = Utility::getSTSEndpoint(region) + ":443";
+
+  auto status = aws_cluster_manager->addManagedCluster(
+      cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
+
+  CredentialsProviderChainSharedPtr credentials_provider_chain;
+
+  if (assume_role_config.has_credential_provider()) {
+    // If a custom chain has been configured in the assume role provider, ensure we do not allow the
+    // user to specify another assume role provider.
+
+    envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config;
+    credential_provider_config.CopyFrom(assume_role_config.credential_provider());
+
+    if (credential_provider_config.has_assume_role_credential_provider()) {
+      ENVOY_LOG(warn, "Multiple assume_role_credential_provider configurations are not supported. "
+                      "Ignoring second assume_role_credential_provider.");
+    }
+
+    credential_provider_config.clear_assume_role_credential_provider();
+    credentials_provider_chain =
+        std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
+            context, region, credential_provider_config);
+  } else {
+    credentials_provider_chain =
+        std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context, region,
+                                                                                  absl::nullopt);
+  }
+
+  // Create our own signer specifically for signing AssumeRole API call
+  auto signer = std::make_unique<SigV4SignerImpl>(
+      STS_SERVICE_NAME, region, credentials_provider_chain, context,
+      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+
+  auto credential_provider = std::make_shared<AssumeRoleCredentialsProvider>(
+      context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
+      initialization_timer, std::move(signer), assume_role_config);
+
+  auto handleOr = aws_cluster_manager->addManagedClusterUpdateCallbacks(
+      cluster_name,
+      *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
+
+  if (handleOr.ok()) {
+    credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+  }
+
+  // Note: Subscription will be set up after construction
+  return credential_provider;
+};
+
 SINGLETON_MANAGER_REGISTRATION(container_credentials_provider);
 SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
 
@@ -215,8 +322,7 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createContainerCred
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
-
+  // Note: Subscription will be set up after construction
   return credential_provider;
 }
 
@@ -249,8 +355,7 @@ CommonCredentialsProviderChain::createInstanceProfileCredentialsProvider(
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
-
+  // Note: Subscription will be set up after construction
   return credential_provider;
 }
 
@@ -281,8 +386,63 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createWebIdentityCr
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
+  // Note: Subscription will be set up after construction
+  return credential_provider;
+};
 
+CredentialsProviderSharedPtr
+CommonCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view region,
+    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+        iam_roles_anywhere_config) const {
+
+  const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+  const auto initialization_timer = std::chrono::seconds(2);
+
+  const auto cluster_host =
+      Utility::getRolesAnywhereEndpoint(iam_roles_anywhere_config.trust_anchor_arn());
+  const auto uri = cluster_host + ":443";
+
+  const auto cluster_name = absl::StrReplaceAll(cluster_host, {{".", "_"}});
+
+  auto status = aws_cluster_manager->addManagedCluster(
+      cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
+  if (!status.ok()) {
+    ENVOY_LOG(error, "Failed to initialize AWS Cluster Manager cluster for IAM Roles Anywhere, "
+                     "disabling this credential provider");
+    return nullptr;
+  }
+
+  auto roles_anywhere_certificate_provider =
+      std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
+          context, iam_roles_anywhere_config.certificate(), iam_roles_anywhere_config.private_key(),
+          iam_roles_anywhere_config.has_certificate_chain()
+              ? makeOptRef(iam_roles_anywhere_config.certificate_chain())
+              : absl::nullopt);
+  status = roles_anywhere_certificate_provider->initialize();
+  if (!status.ok()) {
+    ENVOY_LOG(error, "Failed to initialize IAM Roles Anywhere X509 Credentials Provider, disabling "
+                     "this credential provider");
+    return nullptr;
+  }
+
+  // Create our own x509 signer just for IAM Roles Anywhere
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view(region),
+          roles_anywhere_certificate_provider, context.mainThreadDispatcher().timeSource());
+
+  auto credential_provider = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
+      context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
+      initialization_timer, std::move(roles_anywhere_signer), iam_roles_anywhere_config);
+  auto handleOr = aws_cluster_manager->addManagedClusterUpdateCallbacks(
+      cluster_name,
+      *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
+  if (handleOr.ok()) {
+
+    credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+  }
   return credential_provider;
 };
 

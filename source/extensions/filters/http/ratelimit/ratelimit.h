@@ -37,6 +37,8 @@ enum class FilterRequestType { Internal, External, Both };
  */
 enum class VhRateLimitOptions { Override, Include, Ignore };
 
+using RateLimitConfig = Extensions::Filters::Common::RateLimit::RateLimitConfig;
+
 /**
  * Global configuration for the HTTP rate limit filter.
  */
@@ -44,7 +46,8 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ratelimit::v3::RateLimit& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Http::Context& http_context, absl::Status& creation_status)
+               Runtime::Loader& runtime, Server::Configuration::ServerFactoryContext& context,
+               absl::Status& creation_status)
       : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),
         request_type_(config.request_type().empty() ? stringToType("both")
                                                     : stringToType(config.request_type())),
@@ -58,7 +61,8 @@ public:
             config.rate_limited_as_resource_exhausted()
                 ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
                 : absl::nullopt),
-        http_context_(http_context), stat_names_(scope.symbolTable(), config.stat_prefix()),
+        http_context_(context.httpContext()),
+        stat_names_(scope.symbolTable(), config.stat_prefix()),
         rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
         status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())),
         filter_enabled_(
@@ -70,11 +74,18 @@ public:
             config.has_filter_enforced()
                 ? absl::optional<Envoy::Runtime::FractionalPercent>(
                       Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
-                : absl::nullopt) {
+                : absl::nullopt),
+        failure_mode_deny_percent_(config.has_failure_mode_deny_percent()
+                                       ? absl::optional<Envoy::Runtime::FractionalPercent>(
+                                             Envoy::Runtime::FractionalPercent(
+                                                 config.failure_mode_deny_percent(), runtime_))
+                                       : absl::nullopt) {
     absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
         Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
     SET_AND_RETURN_IF_NOT_OK(response_headers_parser_or_.status(), creation_status);
     response_headers_parser_ = std::move(response_headers_parser_or_.value());
+    rate_limit_config_ = std::make_unique<Filters::Common::RateLimit::RateLimitConfig>(
+        config.rate_limits(), context, creation_status);
   }
 
   const std::string& domain() const { return domain_; }
@@ -83,7 +94,12 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Scope& scope() { return scope_; }
   FilterRequestType requestType() const { return request_type_; }
-  bool failureModeAllow() const { return !failure_mode_deny_; }
+  bool failureModeAllow() const {
+    if (failure_mode_deny_percent_.has_value()) {
+      return !failure_mode_deny_percent_->enabled();
+    }
+    return !failure_mode_deny_;
+  }
   bool enableXRateLimitHeaders() const { return enable_x_ratelimit_headers_; }
   bool enableXEnvoyRateLimitedHeader() const { return !disable_x_envoy_ratelimited_header_; }
   const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
@@ -96,6 +112,18 @@ public:
   Http::Code statusOnError() const { return status_on_error_; }
   bool enabled() const;
   bool enforced() const;
+  bool hasRateLimitConfigs() const {
+    ASSERT(rate_limit_config_ != nullptr);
+    return !rate_limit_config_->empty();
+  }
+  void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const StreamInfo::StreamInfo& info,
+                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
+                           bool on_stream_done) const {
+    ASSERT(rate_limit_config_ != nullptr);
+    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors,
+                                            on_stream_done);
+  }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -142,6 +170,8 @@ private:
   const Http::Code status_on_error_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
+  const absl::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
+  std::unique_ptr<RateLimitConfig> rate_limit_config_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -184,7 +214,7 @@ private:
   const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
       vh_rate_limits_;
   const std::string domain_;
-  std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
+  std::unique_ptr<RateLimitConfig> rate_limit_config_;
 };
 
 using FilterConfigPerRouteSharedPtr = std::shared_ptr<FilterConfigPerRoute>;
@@ -262,7 +292,8 @@ private:
  */
 class OnStreamDoneCallBack : public Filters::Common::RateLimit::RequestCallbacks {
 public:
-  OnStreamDoneCallBack(Filters::Common::RateLimit::ClientPtr client) : client_(std::move(client)) {}
+  OnStreamDoneCallBack(std::shared_ptr<Filters::Common::RateLimit::Client> client)
+      : client_(std::move(client)) {}
   ~OnStreamDoneCallBack() override = default;
 
   // RateLimit::RequestCallbacks
@@ -274,7 +305,7 @@ public:
   Filters::Common::RateLimit::Client& client() { return *client_; }
 
 private:
-  Filters::Common::RateLimit::ClientPtr client_;
+  std::shared_ptr<Filters::Common::RateLimit::Client> client_;
 };
 
 } // namespace RateLimitFilter

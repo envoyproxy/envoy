@@ -9,7 +9,7 @@ namespace ExtProc {
 
 ExternalProcessorClientPtr createExternalProcessorClient(Grpc::AsyncClientManager& client_manager,
                                                          Stats::Scope& scope) {
-  static constexpr char kExternalMethod[] =
+  static constexpr absl::string_view kExternalMethod =
       "envoy.service.network_ext_proc.v3.NetworkExternalProcessor.Process";
   return std::make_unique<
       CommonExtProc::ProcessorClientImpl<ProcessingRequest, ProcessingResponse>>(
