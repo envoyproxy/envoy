@@ -827,7 +827,10 @@ def _com_github_grpc_grpc():
     external_http_archive(
         "build_bazel_rules_apple",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:rules_apple.patch"],
+        patches = [
+            "@envoy//bazel:rules_apple.patch",
+            "@envoy//bazel:rules_apple_py.patch",
+        ],
     )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
