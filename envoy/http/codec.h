@@ -586,11 +586,6 @@ public:
    */
   virtual void goAway() PURE;
 
-  /**
-   * Indicate graceful "go away" to the remote. For HTTP/2, this implements RFC-compliant
-   * graceful shutdown. For other protocols, this falls back to regular goAway().
-   */
-  virtual void goAwayGraceful() { goAway(); }
 
   /**
    * @return the protocol backing the connection. This can change if for example an HTTP/1.1

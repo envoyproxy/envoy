@@ -663,13 +663,6 @@ message Http2ProtocolOptions {
   // Configure the maximum amount of metadata than can be handled per stream. Defaults to 1 MB.
   google.protobuf.UInt64Value max_metadata_size = 17;
 
-  // Timeout for graceful HTTP/2 GOAWAY shutdown sequence.
-  // When graceful shutdown is enabled, Envoy will send an initial GOAWAY frame with
-  // last_stream_id set to 2^31-1, wait for this timeout period, then send a final
-  // GOAWAY frame with the actual highest received stream ID. This allows in-flight
-  // requests to complete gracefully. If set to 0, graceful shutdown is disabled
-  // and the standard immediate GOAWAY behavior is used. Defaults to 1000ms (1 second).
-  google.protobuf.Duration graceful_goaway_timeout = 18;
 }
 
 // [#not-implemented-hide:]

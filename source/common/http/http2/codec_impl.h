@@ -159,7 +159,6 @@ public:
   // NOTE: the `dispatch` method is also overridden in the ServerConnectionImpl class
   Http::Status dispatch(Buffer::Instance& data) override;
   void goAway() override;
-  void goAwayGraceful() override;
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
   Status protocolErrorForTest(); // Used in tests to simulate errors.
@@ -800,16 +799,13 @@ private:
   std::map<int32_t, StreamImpl*> pending_deferred_reset_streams_;
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
-  bool graceful_goaway_in_progress_ : 1;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
   MonotonicTime last_received_data_time_{};
   Event::TimerPtr keepalive_send_timer_;
   Event::TimerPtr keepalive_timeout_timer_;
-  Event::TimerPtr graceful_goaway_timer_;
   std::chrono::milliseconds keepalive_interval_;
   std::chrono::milliseconds keepalive_timeout_;
-  std::chrono::milliseconds graceful_goaway_timeout_;
   uint32_t keepalive_interval_jitter_percent_;
 };
 

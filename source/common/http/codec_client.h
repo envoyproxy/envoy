@@ -89,11 +89,6 @@ public:
    */
   void goAway() { codec_->goAway(); }
 
-  /**
-   * Send a graceful codec level go away indication to the peer.
-   * For HTTP/2, this implements RFC-compliant graceful shutdown.
-   */
-  void goAwayGraceful() { codec_->goAwayGraceful(); }
 
   /**
    * @return the underlying connection ID.

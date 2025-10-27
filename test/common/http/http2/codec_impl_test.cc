@@ -187,9 +187,9 @@ public:
                             Http2Impl http2_implementation)
       : client_settings_(client_settings), server_settings_(server_settings),
         http2_implementation_(http2_implementation) {
-    // Allow graceful GOAWAY timer creation (default 1000ms timeout creates timer)
-    EXPECT_CALL(client_connection_.dispatcher_, createTimer_(_)).Times(testing::AtMost(1));
-    EXPECT_CALL(server_connection_.dispatcher_, createTimer_(_)).Times(testing::AtMost(1));
+    // Make sure we explicitly test for stream flush timer creation.
+    EXPECT_CALL(client_connection_.dispatcher_, createTimer_(_)).Times(0);
+    EXPECT_CALL(server_connection_.dispatcher_, createTimer_(_)).Times(0);
   }
   virtual ~Http2CodecImplTestFixture() {
     client_connection_.dispatcher_.clearDeferredDeleteList();
@@ -653,175 +653,6 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
   response_encoder_->encodeHeaders(response_headers, true);
   driveToCompletion();
-}
-
-TEST_P(Http2CodecImplTest, GracefulGoAwayBasicFunctionality) {
-  // Configure graceful GOAWAY timeout of 100ms
-  server_http2_options_.mutable_graceful_goaway_timeout()->set_seconds(0);
-  server_http2_options_.mutable_graceful_goaway_timeout()->set_nanos(100 * 1000 * 1000); // 100ms
-
-  auto graceful_goaway_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
-  EXPECT_CALL(*graceful_goaway_timer, enableTimer(std::chrono::milliseconds(100), _));
-
-  initialize();
-
-  // Test basic functionality - just verify the method exists and stats work
-  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
-  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
-
-  // Allow GOAWAY callbacks to be called (these happen automatically when frames are processed)
-  EXPECT_CALL(client_callbacks_, onGoAway(_)).Times(AtLeast(1));
-
-  server_->goAwayGraceful();
-  driveToCompletion();
-
-  // Verify graceful GOAWAY was sent (stats should increment)
-  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
-  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
-
-  // Trigger timeout and final GOAWAY
-  graceful_goaway_timer->invokeCallback();
-  driveToCompletion();
-
-  // Verify final GOAWAY was sent
-  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
-  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
-}
-
-TEST_P(Http2CodecImplTest, GracefulGoAwayFallbackWhenTimeoutZero) {
-  // Configure graceful GOAWAY timeout of 0 (disabled)
-  server_http2_options_.mutable_graceful_goaway_timeout()->set_seconds(0);
-  server_http2_options_.mutable_graceful_goaway_timeout()->set_nanos(0);
-  initialize();
-
-  // Should fallback to immediate GOAWAY
-  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
-  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
-
-  EXPECT_CALL(client_callbacks_, onGoAway(_)).Times(AtLeast(1));
-  server_->goAwayGraceful();
-  driveToCompletion();
-
-  // Verify immediate GOAWAY was sent (no graceful GOAWAY)
-  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
-  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
-}
-
-TEST_P(Http2CodecImplTest, GracefulGoAwayAlreadyInProgress) {
-  // Configure graceful GOAWAY timeout of 100ms
-  server_http2_options_.mutable_graceful_goaway_timeout()->set_seconds(0);
-  server_http2_options_.mutable_graceful_goaway_timeout()->set_nanos(100 * 1000 * 1000); // 100ms
-
-  auto graceful_goaway_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
-  EXPECT_CALL(*graceful_goaway_timer, enableTimer(std::chrono::milliseconds(100), _));
-
-  initialize();
-
-  // First graceful GOAWAY call
-  EXPECT_CALL(client_callbacks_, onGoAway(_)).Times(AtLeast(1));
-  server_->goAwayGraceful();
-  driveToCompletion();
-
-  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
-  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
-
-  // Second graceful GOAWAY call should fallback to immediate GOAWAY
-  server_->goAwayGraceful();
-  driveToCompletion();
-
-  // Should have sent immediate GOAWAY
-  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
-  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
-}
-
-TEST_P(Http2CodecImplTest, GracefulGoAwayCausesOutboundFlood) {
-  // Configure graceful GOAWAY timeout of 100ms
-  server_http2_options_.mutable_graceful_goaway_timeout()->set_seconds(0);
-  server_http2_options_.mutable_graceful_goaway_timeout()->set_nanos(100 * 1000 * 1000); // 100ms
-
-  initialize();
-
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
-  driveToCompletion();
-
-  int frame_count = 0;
-  Buffer::OwnedImpl buffer;
-  ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
-        ++frame_count;
-        buffer.move(frame);
-      }));
-
-  auto* violation_callback =
-      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
-
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  response_encoder_->encodeHeaders(response_headers, false);
-  // Account for the single HEADERS frame above
-  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
-    Buffer::OwnedImpl data("0");
-    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
-  }
-  EXPECT_NO_THROW(driveToCompletion());
-
-  EXPECT_FALSE(violation_callback->enabled_);
-
-  // Test graceful goaway with outbound flood - should trigger error path
-  server_->goAwayGraceful();
-  driveToCompletion();
-
-  EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
-  violation_callback->invokeCallback();
-
-  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
-  EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
-  // Verify graceful GOAWAY stat was incremented before the error
-  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
-}
-
-TEST_P(Http2CodecImplTest, GracefulGoAwayRuntimeGuardDisabled) {
-  // Configure graceful GOAWAY timeout of 100ms
-  server_http2_options_.mutable_graceful_goaway_timeout()->set_seconds(0);
-  server_http2_options_.mutable_graceful_goaway_timeout()->set_nanos(100 * 1000 * 1000); // 100ms
-
-  // Disable the runtime feature
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_graceful_goaway", "false"}});
-
-  initialize();
-
-  // Should fallback to immediate GOAWAY when runtime feature is disabled
-  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
-  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
-
-  EXPECT_CALL(client_callbacks_, onGoAway(_)).Times(AtLeast(1));
-  server_->goAwayGraceful();
-  driveToCompletion();
-
-  // Verify immediate GOAWAY was sent (no graceful GOAWAY due to runtime guard)
-  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
-  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
-}
-
-TEST_P(Http2CodecImplTest, ShutdownNoticeDoesNotIncrementGracefulCounter) {
-  initialize();
-
-  // Test that shutdownNotice does NOT increment the graceful GOAWAY counter
-  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
-  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
-
-  // shutdownNotice should send initial graceful GOAWAY via adapter
-  EXPECT_CALL(client_callbacks_, onGoAway(_));
-  server_->shutdownNotice();
-  driveToCompletion();
-
-  // Verify: graceful GOAWAY counter should NOT increment (shutdownNotice uses adapter
-  // implementation)
-  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
 }
 
 TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
@@ -1641,7 +1472,7 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
           "max_headers_kb_: 60, max_headers_count_: 100, "
           "per_stream_buffer_limit_: 16777216, allow_metadata_: 0, "
           "stream_error_on_invalid_http_messaging_: 0, is_outbound_flood_monitored_control_frame_: "
-          "0, dispatching_: 0, raised_goaway_: 0, graceful_goaway_in_progress_: 0, "
+          "0, dispatching_: 0, raised_goaway_: 0, "
           "pending_deferred_reset_streams_.size(): 0\n"
           "  &protocol_constraints_: \n"
           "    ProtocolConstraints"));
@@ -4531,7 +4362,7 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway
   }
   driveToCompletion();
 
-  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
 }
 
 TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointSendGoAwayAndClose) {
@@ -4551,7 +4382,7 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointSendGoAwayAndClose) {
 
   driveToCompletion();
 
-  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
 }
 
 TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointsAreOnlyConsultedOncePerDispatch) {

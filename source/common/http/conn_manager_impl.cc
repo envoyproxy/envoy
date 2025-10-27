@@ -787,17 +787,22 @@ void ConnectionManagerImpl::sendGoAwayAndClose() {
     return;
   }
 
-  // Try graceful GOAWAY for HTTP/2 connections, fallback to regular GOAWAY
-  auto* http2_conn = dynamic_cast<Http2::ConnectionImpl*>(codec_.get());
-  if (http2_conn != nullptr) {
-    http2_conn->goAwayGraceful();
+  // For HTTP/2 connections, use graceful drain sequence for RFC-compliant shutdown
+  if (codec_->protocol() >= Protocol::Http2) {
+    if (drain_state_ == DrainState::NotDraining) {
+      startDrainSequence();
+    }
+    // For HTTP/2, consider the "go away" process started once draining begins.
+    // The actual GOAWAY frame will be sent in onDrainTimeout(), but we want to
+    // prevent multiple calls to sendGoAwayAndClose() from starting multiple drain sequences.
+    go_away_sent_ = true;
   } else {
+    // For HTTP/1.x connections, use immediate GOAWAY and close
     codec_->goAway();
+    go_away_sent_ = true;
+    doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
+                      "forced_goaway");
   }
-
-  go_away_sent_ = true;
-  doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
-                    "forced_goaway");
 }
 
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,
