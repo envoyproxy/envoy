@@ -334,7 +334,7 @@ private:
   std::string node_id_;
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;
   absl::optional<Protobuf::Struct> node_metadata_ = absl::nullopt;
-  bool enable_stats_collection_ = false;
+  bool enable_stats_collection_ = true;
 #ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif // ENVOY_MOBILE_XDS
