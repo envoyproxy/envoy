@@ -48,9 +48,6 @@ on:
           -e CXX
           -e BAZEL_BUILD_OPTION_LIST
           -e MOBILE_DOCS_CHECKOUT_DIR
-      diskspace-hack:
-        type: boolean
-        default: false
       downloads:
         type: string
         default:

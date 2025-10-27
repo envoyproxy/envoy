@@ -321,16 +321,17 @@ case $CI_TARGET in
             echo "ENVOY_CACHE_ROOT not set" >&2
             exit 1
         fi
-        BAZEL_BUILD_OPTIONS=()
         setup_clang_toolchain
         echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
         bazel --output_user_root="${ENVOY_CACHE_ROOT}" \
               --output_base="${ENVOY_CACHE_ROOT}/base" \
+              --nowrite_command_log \
               aquery "deps(${ENVOY_CACHE_TARGETS})" \
               --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
-              "${BAZEL_BUILD_OPTIONS[@]}" \
               "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" \
               > /dev/null
+          TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
+          echo "Generated cache: ${TOTAL_SIZE}"
         ;;
 
     format-api|check_and_fix_proto_format)

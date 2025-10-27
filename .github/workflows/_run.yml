@@ -36,7 +36,7 @@ on:
             target: GITHUB_WORKSPACE
             chown: "runner:runner"
           - src: /mnt/runner
-            target: RUNNER_TEMP/bazel_root
+            target: RUNNER_TEMP/container/bazel_root
             chown: "runner:runner"
       cache-build-image:
         type: string
@@ -64,7 +64,8 @@ on:
         default: false
       diskspace-hack-paths:
         type: string
-        default:
+        default: |
+          /opt/hostedtoolcache
       docker-cpus:
         type: number
         default: 0
@@ -115,22 +116,6 @@ on:
           - run: |
               # Pre build report
               df -h > "${TMP_REPORT}/df-pre"
-              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" ]]; then
-                  exit 0
-              fi
-              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" -maxdepth 1 -type d \
-                  | rev \
-                  | cut -d/ -f1 \
-                  | rev \
-                  > "${TMP_REPORT}/shas-pre"
-              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" ]]; then
-                  exit 0
-              fi
-              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" -maxdepth 1 -type d \
-                  | rev \
-                  | cut -d/ -f1 \
-                  | rev \
-                  >> "${TMP_REPORT}/shas-pre"
             shell: bash
       report-post:
         type: string
@@ -139,22 +124,6 @@ on:
               # Post build report
               df -h > "${TMP_REPORT}/df-post"
               (du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G" || :) > "${TMP_REPORT}/du-post"
-              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" ]]; then
-                  exit 0
-              fi
-              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" -maxdepth 1 -type d \
-                  | rev \
-                  | cut -d/ -f1 \
-                  | rev \
-                  > "${TMP_REPORT}/shas-post"
-              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" ]]; then
-                  exit 0
-              fi
-              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" -maxdepth 1 -type d \
-                  | rev \
-                  | cut -d/ -f1 \
-                  | rev \
-                  >> "${TMP_REPORT}/shas-post"
             shell: bash
       request:
         type: string
@@ -232,7 +201,7 @@ jobs:
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.28
       id: started
       name: Create timestamp
       with:
@@ -240,7 +209,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.28
       name: Context
       id: context
       with:
@@ -260,12 +229,14 @@ jobs:
              "job-started": ${{ steps.started.outputs.value }}}
           | . * {$config, $check}
 
+    - run: |
+        mkdir ${{ runner.temp }}/container
     - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.28
       if: inputs.bind-mount
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.26
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.28
       if: inputs.diskspace-hack || github.event.repository.private
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
@@ -281,13 +252,13 @@ jobs:
       if: ${{ inputs.docker-ipv6 }}
 
     # Caches
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.28
       name: Setup GCP (cache)
       if: ${{ inputs.gcs-cache-bucket }}
       with:
         key: ${{ secrets.gcs-cache-key }}
         force-install: ${{ contains(fromJSON('["envoy-arm64-medium", "github-arm64-2c-8gb"]'), inputs.runs-on) }}
-    - uses: envoyproxy/toolshed/gh-actions/cache/restore@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/cache/restore@actions-v0.3.28
       if: ${{ inputs.gcs-cache-bucket }}
       name: >-
         Restore Bazel cache
@@ -295,7 +266,7 @@ jobs:
       with:
         gcs-bucket: ${{ inputs.gcs-cache-bucket }}
         key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch || 'x64' }}
-        path: ${{ runner.temp }}/bazel_root
+        path: ${{ runner.temp }}/container/bazel_root
 
     # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
     - if: ${{ inputs.cache-build-image }}
@@ -307,12 +278,12 @@ jobs:
         key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
     - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.26
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.28
       with:
         image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.28
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -323,7 +294,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.28
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -340,7 +311,7 @@ jobs:
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.28
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -349,12 +320,12 @@ jobs:
         ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
 
     - name: Import GPG key
-      uses: envoyproxy/toolshed/gh-actions/gpg/import@actions-v0.3.26
+      uses: envoyproxy/toolshed/gh-actions/gpg/import@actions-v0.3.28
       if: ${{ inputs.import-gpg }}
       with:
         key: ${{ secrets.gpg-key }}
         passphrase: ${{ secrets.gpg-key-password }}
-        passphrase-path: "${{ runner.temp }}/gpg-passphrase"
+        passphrase-path: "${{ runner.temp }}/container/gpg-passphrase"
         configured-passphrase-path: /build/gpg-passphrase
 
     - run: |
@@ -362,7 +333,7 @@ jobs:
       name: Configure PR Bazel settings
       if: >-
         ${{ fromJSON(inputs.request).request.pr != '' }}
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.28
       name: Setup GCP (artefacts/rbe)
       id: gcp
       with:
@@ -380,7 +351,9 @@ jobs:
       if: ${{ vars.ENVOY_CI_BAZELRC }}
       name: Configure repo Bazel settings
 
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.26
+    # NOTE: This is where untrusted code can be run!!!
+    #  It MUST be the last step in the workflow
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.28
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
         args: ${{ inputs.args != '--' && inputs.args || inputs.target }}
@@ -416,7 +389,7 @@ jobs:
         GITHUB_TOKEN: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
         DOCKERHUB_USERNAME: ${{ inputs.dockerhub-username }}
         DOCKERHUB_PASSWORD: ${{ secrets.dockerhub-password }}
-        ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
+        ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}/container
         ENVOY_RBE: ${{ inputs.rbe == true && 1 || '' }}
         RBE_KEY: ${{ secrets.rbe-key }}
         BAZEL_BUILD_EXTRA_OPTIONS: >-

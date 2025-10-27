@@ -27,8 +27,8 @@ public:
    * @param stream_info supplies the stream info.
    * @return std::string string containing the complete formatted substitution line.
    */
-  virtual std::string formatWithContext(const Context& context,
-                                        const StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual std::string format(const Context& context,
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using FormatterPtr = std::unique_ptr<Formatter>;
@@ -48,8 +48,8 @@ public:
    * @return absl::optional<std::string> optional string containing a single value extracted from
    *         the given context and stream info.
    */
-  virtual absl::optional<std::string>
-  formatWithContext(const Context& context, const StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual absl::optional<std::string> format(const Context& context,
+                                             const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * Format the value with the given context and stream info.
@@ -58,9 +58,8 @@ public:
    * @return Protobuf::Value containing a single value extracted from the given
    *         context and stream info.
    */
-  virtual Protobuf::Value
-  formatValueWithContext(const Context& context,
-                         const StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual Protobuf::Value formatValue(const Context& context,
+                                      const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;

@@ -1,15 +1,13 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
-load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_jinja_env", "envoy_py_data", "envoy_pytool_binary", "envoy_pytool_library")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_jinja_env", "envoy_py_data")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
-load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
 
-envoy_py_namespace()
-
-envoy_pytool_binary(
+py_binary(
     name = "generate_empty",
     srcs = ["generate_empty.py"],
     visibility = ["//visibility:public"],
@@ -42,7 +40,7 @@ envoy_py_data(
     src = "//docs:protodoc_manifest.yaml",
 )
 
-envoy_pytool_binary(
+py_binary(
     name = "manifest_to_json",
     srcs = ["manifest_to_json.py"],
     args = ["$(location @envoy_api//:v3_proto_set)"],
@@ -113,7 +111,7 @@ envoy_py_data(
     src = ":data_srcs",
 )
 
-envoy_pytool_binary(
+py_binary(
     name = "protodoc",
     srcs = ["protodoc.py"],
     visibility = ["//visibility:public"],
@@ -137,7 +135,7 @@ protodoc_rule(
     ],
 )
 
-envoy_pytool_library(
+py_library(
     name = "rst_filters",
     srcs = ["rst_filters.py"],
 )

@@ -1460,7 +1460,7 @@ void Context::initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& call
   network_write_filter_callbacks_ = &callbacks;
 }
 
-void Context::log(const Formatter::HttpFormatterContext& log_context,
+void Context::log(const Formatter::Context& log_context,
                   const StreamInfo::StreamInfo& stream_info) {
   // `log` may be called multiple times due to mid-request logging -- we only want to run on the
   // last call.
