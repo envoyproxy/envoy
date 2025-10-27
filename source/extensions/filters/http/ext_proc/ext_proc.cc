@@ -347,6 +347,7 @@ void ExtProcLoggingInfo::recordGrpcCall(std::chrono::microseconds latency,
   }
 }
 
+// Need to consider the case where it is partial
 void ExtProcLoggingInfo::updateProcessingEffect(ProcessorState::CallbackState callback_state,
                                         envoy::config::core::v3::TrafficDirection traffic_direction,
                                         ProcessingEffect::Effect processing_effect){
@@ -369,6 +370,7 @@ void ExtProcLoggingInfo::updateProcessingEffect(ProcessorState::CallbackState ca
   if (grpcCalls(traffic_direction).body_stats_ != nullptr){
     grpcCalls(traffic_direction).body_stats_->processing_effect_ = processing_effect;
   }
+  return;
 }
 
 ExtProcLoggingInfo::GrpcCalls&

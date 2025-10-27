@@ -159,19 +159,17 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
   const auto& common_response = response.response();
 
   // Process header mutation if present
-  ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None;
+  ProcessingEffect::Effect header_processing_effect = ProcessingEffect::Effect::None;
   if (common_response.has_header_mutation()) {
-    const auto mut_status = processHeaderMutation(common_response, processing_effect);
+    const auto mut_status = processHeaderMutation(common_response, header_processing_effect);
     if (!mut_status.ok()) {
       filter_.onProcessHeadersResponse(response, mut_status, trafficDirection());
       return mut_status;
     }
   }
-  if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
-  }
 
   clearRouteCache(common_response);
-  onFinishProcessorCall(Grpc::Status::Ok, processing_effect,
+  onFinishProcessorCall(Grpc::Status::Ok, header_processing_effect,
                         getCallbackStateAfterHeaderResp(common_response));
 
   if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
@@ -193,14 +191,19 @@ absl::Status ProcessorState::handleHeaderContinueAndReplace(const HeadersRespons
     // the original one.
     headers_->removeContentLength();
     body_replaced_ = true;
+    ProcessingEffect::Effect body_processing_effect = ProcessingEffect::Effect::None;
     if (bufferedData() == nullptr) {
       Buffer::OwnedImpl new_body;
-      MutationUtils::applyBodyMutations(common_response.body_mutation(), new_body);
+      body_processing_effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), new_body);
       addBufferedData(new_body);
     } else {
-      modifyBufferedData([&common_response](Buffer::Instance& buf) {
-        MutationUtils::applyBodyMutations(common_response.body_mutation(), buf);
+      modifyBufferedData([&common_response, &body_processing_effect](Buffer::Instance& buf) {
+        body_processing_effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), buf);
       });
+    }
+    ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
+    if (logging_info != nullptr) {
+      logging_info->updateProcessingEffect(CallbackState::BufferedBodyCallback, traffic_direction_, body_processing_effect);
     }
   }
 
@@ -365,7 +368,7 @@ bool ProcessorState::isValidBodyCallbackState() const {
 
 absl::StatusOr<bool>
 ProcessorState::handleBufferedBodyCallback(const CommonResponse& common_response) {
-  ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None;
+  ProcessingEffect::Effect body_processing_effect = ProcessingEffect::Effect::None;
   // Handle header mutations if present
   if (common_response.has_header_mutation()) {
     const absl::Status mutation_status = processHeaderMutationIfAvailable(common_response);
@@ -380,11 +383,11 @@ ProcessorState::handleBufferedBodyCallback(const CommonResponse& common_response
     if (!validation_status.ok()) {
       return validation_status;
     }
-    applyBufferedBodyMutation(common_response, processing_effect);
+    applyBufferedBodyMutation(common_response, body_processing_effect);
   }
 
   clearWatermark();
-  onFinishProcessorCall(Grpc::Status::Ok, processing_effect);
+  onFinishProcessorCall(Grpc::Status::Ok, body_processing_effect);
   return true;
 }
 
@@ -459,7 +462,15 @@ absl::Status
 ProcessorState::processHeaderMutationIfAvailable(const CommonResponse& common_response) {
   ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None;
   if (headers_ != nullptr) {
-    return processHeaderMutation(common_response, processing_effect);
+   // TODO - consider making a helper function for updating processing effect in this file.
+    absl::Status mut_status = processHeaderMutation(common_response, processing_effect);
+    if (mut_status == absl::OkStatus()){
+      ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
+      if (logging_info != nullptr) {
+        logging_info->updateProcessingEffect(CallbackState::HeadersCallback, traffic_direction_, processing_effect);
+      }
+    }
+    return mut_status;
   }
   ENVOY_STREAM_LOG(debug, "Response had header mutations but headers aren't available",
                    *filter_callbacks_);
