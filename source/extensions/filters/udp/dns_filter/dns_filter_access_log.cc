@@ -27,13 +27,13 @@ public:
 
   // FormatterProvider
   absl::optional<std::string>
-  formatWithContext(const Formatter::Context& context,
-                    const StreamInfo::StreamInfo& stream_info) const override {
+  format(const Formatter::Context& context,
+         const StreamInfo::StreamInfo& stream_info) const override {
     return field_extractor_(context, stream_info);
   }
 
-  Protobuf::Value formatValueWithContext(const Formatter::Context& context,
-                                         const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const Formatter::Context& context,
+                              const StreamInfo::StreamInfo& stream_info) const override {
     const auto str = field_extractor_(context, stream_info);
     return str.has_value() ? ValueUtil::stringValue(str.value()) : ValueUtil::nullValue();
   }
