@@ -26,9 +26,8 @@ public:
       : field_extractor_(std::move(field_extractor)) {}
 
   // FormatterProvider
-  absl::optional<std::string>
-  format(const Formatter::Context& context,
-         const StreamInfo::StreamInfo& stream_info) const override {
+  absl::optional<std::string> format(const Formatter::Context& context,
+                                     const StreamInfo::StreamInfo& stream_info) const override {
     return field_extractor_(context, stream_info);
   }
 
