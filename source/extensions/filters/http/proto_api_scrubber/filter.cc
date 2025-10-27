@@ -57,12 +57,11 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
   request_msg_converter_ = std::make_unique<MessageConverter>(
       std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
 
-  // TODO: Can this be created in decodeData() itself?
   request_scrubber_ = std::make_unique<ProtoScrubber>(
       /*RequestType*/
       nullptr,
       /*TypeFinder*/ [](const std::string&) { return nullptr; },
-      /*FieldCheckerList*/ std::vector<const FieldCheckerInterface*>{new FieldChecker(nullptr)},
+      /*FieldCheckerList*/ std::vector<const FieldCheckerInterface*>{},
       ScrubberContext::kRequestScrubbing,
       /*field_check_only*/ false);
 
