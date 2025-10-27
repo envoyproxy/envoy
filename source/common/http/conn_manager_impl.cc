@@ -780,7 +780,7 @@ void ConnectionManagerImpl::onDrainTimeout() {
   checkForDeferredClose(false);
 }
 
-void ConnectionManagerImpl::sendGoAwayAndClose() {
+void ConnectionManagerImpl::sendGoAwayAndClose(bool immediate_close) {
   ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggerred from filters.",
                  read_callbacks_->connection());
   if (go_away_sent_) {
@@ -788,7 +788,8 @@ void ConnectionManagerImpl::sendGoAwayAndClose() {
   }
 
   // For HTTP/2 connections, use graceful drain sequence for RFC-compliant shutdown
-  if (codec_->protocol() >= Protocol::Http2) {
+  // unless immediate_close is requested
+  if (codec_->protocol() >= Protocol::Http2 && !immediate_close) {
     if (drain_state_ == DrainState::NotDraining) {
       startDrainSequence();
     }
@@ -797,7 +798,7 @@ void ConnectionManagerImpl::sendGoAwayAndClose() {
     // prevent multiple calls to sendGoAwayAndClose() from starting multiple drain sequences.
     go_away_sent_ = true;
   } else {
-    // For HTTP/1.x connections, use immediate GOAWAY and close
+    // For HTTP/1.x connections or immediate close requested, use immediate GOAWAY and close
     codec_->goAway();
     go_away_sent_ = true;
     doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,

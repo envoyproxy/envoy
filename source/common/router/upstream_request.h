@@ -344,7 +344,7 @@ public:
   void disarmRequestTimeout() override {}
   void resetIdleTimer() override {}
   void onLocalReply(Http::Code) override {}
-  void sendGoAwayAndClose() override {}
+  void sendGoAwayAndClose(bool immediate_close = false) override {}
   // Upgrade filter chains not supported.
   const Router::RouteEntry::UpgradeMap* upgradeMap() override { return nullptr; }
 
