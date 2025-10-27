@@ -604,7 +604,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
       // split the input buffer into 1MB pieces until the buffer is smaller than 1MB.
       Buffer::OwnedImpl remaining_request_data;
       remaining_request_data.move(request_data_);
-      while (remaining_request_data.length() > 0) {
+      while (!first_request_sent_ || remaining_request_data.length() > 0) {
         uint64_t piece_size = std::min<uint64_t>(remaining_request_data.length(),
                                                  JsonTranscoderConfig::MaxStreamedPieceSize);
         request_data_.move(remaining_request_data, piece_size);
@@ -711,7 +711,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (per_route_config_->isStreamSSEStyleDelimited()) {
+  if (method_->descriptor_->server_streaming() && per_route_config_->isStreamSSEStyleDelimited()) {
     headers.setContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
   } else {
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);

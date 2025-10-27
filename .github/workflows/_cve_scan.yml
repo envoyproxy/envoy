@@ -28,7 +28,7 @@ jobs:
       id: vars
       run: |
         echo "cve-data-path=${{ inputs.cve-data-path }}" > $GITHUB_OUTPUT
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.25
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.28
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cve-key }}
@@ -42,4 +42,4 @@ jobs:
           "${{ steps.vars.outputs.cve-data-path }}"
     - name: Run CVE dependency scanner
       run: |
-        bazel test --config=ci //tools/dependency:cve_test
+        bazel test --config=ci --config=cves //tools/dependency:cve_test

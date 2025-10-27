@@ -6,14 +6,11 @@ load(
     "xcode_schemes",
     "xcodeproj",
 )
-load("@envoy//tools/python:namespace.bzl", "envoy_py_namespace")
 load("@rules_android//android:rules.bzl", "aar_import")
 load("@rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2
-
-envoy_py_namespace()
 
 exports_files(["VERSION"])
 

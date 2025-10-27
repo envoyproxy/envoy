@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3;
 
+import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -42,7 +44,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // See the :ref:`load balancing architecture
 // overview<arch_overview_load_balancing_types>` for more information.
 //
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ClientSideWeightedRoundRobin {
   // Whether to enable out-of-band utilization reporting collection from
   // the endpoints. By default, per-request utilization reporting is used.
@@ -82,4 +84,9 @@ message ClientSideWeightedRoundRobin {
   // For map fields in the ORCA proto, the string will be of the form ``<map_field_name>.<map_key>``. For example, the string ``named_metrics.foo`` will mean to look for the key ``foo`` in the ORCA :ref:`named_metrics <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.named_metrics>` field.
   // If none of the specified metrics are present in the load report, then :ref:`cpu_utilization <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.cpu_utilization>` is used instead.
   repeated string metric_names_for_computing_utilization = 7;
+
+  // Configuration for slow start mode.
+  // If this configuration is not set, slow start will not be not enabled.
+  // [#not-implemented-hide:]
+  common.v3.SlowStartConfig slow_start_config = 8;
 }

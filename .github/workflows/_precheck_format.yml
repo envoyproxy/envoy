@@ -55,7 +55,7 @@ jobs:
         include:
         - target: format
           upload-name: fix_format.diff
-          upload-path: /home/runner/work/_temp/fix_format.diff
+          upload-path: /home/runner/work/_temp/container/fix_format.diff
         - target: format-api
           upload-name: fix_proto_format.diff
-          upload-path: /home/runner/work/_temp/fix_proto_format.diff
+          upload-path: /home/runner/work/_temp/container/fix_proto_format.diff

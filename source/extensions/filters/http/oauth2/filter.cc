@@ -469,7 +469,7 @@ FilterConfig::FilterConfig(
            proto_config.cookie_configs().has_code_verifier_cookie_config())
               ? CookieSettings(proto_config.cookie_configs().code_verifier_cookie_config())
               : CookieSettings()) {
-  if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
+  if (!context.clusterManager().hasCluster(oauth_token_endpoint_.cluster())) {
     // This is not necessarily a configuration error — sometimes cluster is sent later than the
     // listener in the xDS stream.
     ENVOY_LOG(warn, "OAuth2 filter: unknown cluster '{}' in config. ",
@@ -706,8 +706,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   auth_code_ = result.auth_code_;
   Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
-  const auto redirect_uri =
-      formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
+  const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
 
   std::string encrypted_code_verifier =
       Http::Utility::parseCookieValue(headers, config_->cookieNames().code_verifier_);
@@ -897,8 +896,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 
   Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
-  const auto redirect_uri =
-      formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
+  const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
   const std::string escaped_redirect_uri = Http::Utility::PercentEncoding::urlEncode(redirect_uri);
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
 

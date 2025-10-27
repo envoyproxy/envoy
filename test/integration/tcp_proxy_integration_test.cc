@@ -1025,8 +1025,7 @@ TEST_P(TcpProxyIntegrationTest, TestCloseOnHealthFailure) {
 
 TEST_P(TcpProxyIntegrationTest, RecordsUpstreamConnectionTimeLatency) {
   FakeAccessLogFactory factory;
-  factory.setLogCallback([](const Formatter::HttpFormatterContext&,
-                            const StreamInfo::StreamInfo& stream_info) {
+  factory.setLogCallback([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
     EXPECT_TRUE(
         stream_info.upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency().has_value());
   });

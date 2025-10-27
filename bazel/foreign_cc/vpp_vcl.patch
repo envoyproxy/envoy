@@ -1,5 +1,5 @@
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 71f0010bb..377fe1a56 100644
+index 71f0010bb..84440477a 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
 @@ -35,13 +35,7 @@ include(cmake/ccache.cmake)
@@ -13,15 +13,18 @@ index 71f0010bb..377fe1a56 100644
 -  OUTPUT_STRIP_TRAILING_WHITESPACE
 -)
 -
-+set(VPP_VERSION 25.06-dev)
++set(VPP_VERSION 25.10-dev)
  if (VPP_PLATFORM)
    set(VPP_VERSION ${VPP_VERSION}-${VPP_PLATFORM_NAME})
  endif()
-@@ -264,7 +258,6 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
+@@ -263,8 +257,8 @@ if(VPP_HOST_TOOLS_ONLY)
+ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
    find_package(OpenSSL)
    set(SUBDIRS
-     vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl vpp-api
+-    vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl vpp-api
 -    plugins crypto_engines tools/vppapigen tools/g2 tools/perftool cmake pkg
++    vppinfra svm vlib vnet vpp vcl
++    cmake pkg
      tools/appimage
    )
  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
@@ -51,56 +54,20 @@ index a06a795c6..eea0c73d3 100644
    target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${lo}>)
  
    if(VPP_LIB_VERSION)
-diff --git a/src/tools/vppapigen/CMakeLists.txt b/src/tools/vppapigen/CMakeLists.txt
-index 97a6d35f9..55b662a8d 100644
---- a/src/tools/vppapigen/CMakeLists.txt
-+++ b/src/tools/vppapigen/CMakeLists.txt
-@@ -11,22 +11,6 @@
- # See the License for the specific language governing permissions and
- # limitations under the License.
- 
--find_package(
--  Python3
--  REQUIRED
--  COMPONENTS Interpreter
--)
--
--execute_process(
--  COMMAND ${Python3_EXECUTABLE} -c "import ply"
--  RESULT_VARIABLE _rv
--  OUTPUT_QUIET
--)
--
--if (NOT ${_rv} EQUAL 0)
--  message( FATAL_ERROR "The \"ply\" Python3 package is not installed.")
--endif()
--
- install(
-   FILES vppapigen.py
-   RENAME vppapigen
-diff --git a/src/tools/vppapigen/vppapigen.py b/src/tools/vppapigen/vppapigen.py
-index 0bed578eb..ed5b2ce75 100755
---- a/src/tools/vppapigen/vppapigen.py
-+++ b/src/tools/vppapigen/vppapigen.py
-@@ -7,6 +7,13 @@ import logging
- import binascii
- import os
- from subprocess import Popen, PIPE
-+
-+# Put ply on the path ...
-+plypath = os.path.join(
-+    os.environ["EXT_BUILD_ROOT"],
-+    os.path.dirname(os.path.dirname(os.environ["PLYPATHS"].split()[0])))
-+sys.path += [plypath]
-+
- import ply.lex as lex
- import ply.yacc as yacc
- from io import TextIOWrapper
 diff --git a/src/vcl/CMakeLists.txt b/src/vcl/CMakeLists.txt
-index 2787ce678..8cbe2b4fc 100644
+index 473e40346..95d298268 100644
 --- a/src/vcl/CMakeLists.txt
 +++ b/src/vcl/CMakeLists.txt
-@@ -41,6 +41,8 @@ if (LDP_HAS_GNU_SOURCE)
+@@ -20,7 +20,7 @@ if(NOT VPP_BUILD_VCL)
+   return()
+ endif(NOT VPP_BUILD_VCL)
+ 
+-option(VPP_BUILD_VCL_BAPI "Build VCL BAPI" ON)
++option(VPP_BUILD_VCL_BAPI "Build VCL BAPI" OFF)
+ 
+ if (NOT VPP_BUILD_VCL_BAPI)
+   add_vpp_library(vppcom
+@@ -58,6 +58,8 @@ if (LDP_HAS_GNU_SOURCE)
    add_compile_definitions(HAVE_GNU_SOURCE)
  endif(LDP_HAS_GNU_SOURCE)
  
@@ -110,7 +77,7 @@ index 2787ce678..8cbe2b4fc 100644
    message("WARNING: vcl_ldpreload isn't supported on FreeBSD - disabled")
  else()
 diff --git a/src/vppinfra/CMakeLists.txt b/src/vppinfra/CMakeLists.txt
-index 131f5a5b5..06fe42179 100644
+index 131f5a5b5..2397ef6c9 100644
 --- a/src/vppinfra/CMakeLists.txt
 +++ b/src/vppinfra/CMakeLists.txt
 @@ -27,7 +27,7 @@ vpp_find_library(LIBUNWIND_LIB NAMES unwind libunwind)
@@ -122,7 +89,34 @@ index 131f5a5b5..06fe42179 100644
  else()
    message(WARNING "libunwind not found - stack traces disabled")
    add_definitions(-DHAVE_LIBUNWIND=0)
-@@ -253,13 +253,26 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+@@ -58,10 +58,6 @@ install(
+ 
+ add_definitions(-fvisibility=hidden)
+ 
+-# Ensure symbols from cJSON are exported
+-set_source_files_properties( cJSON.c jsonformat.c PROPERTIES
+-  COMPILE_DEFINITIONS " CJSON_API_VISIBILITY " )
+-
+ ##############################################################################
+ # vppinfra sources
+ ##############################################################################
+@@ -80,7 +76,6 @@ set(VPPINFRA_SRCS
+   hash.c
+   heap.c
+   interrupt.c
+-  jsonformat.c
+   longjmp.S
+   macros.c
+   maplog.c
+@@ -169,7 +164,6 @@ set(VPPINFRA_HEADERS
+   hash.h
+   heap.h
+   interrupt.h
+-  jsonformat.h
+   lb_hash_hash.h
+   llist.h
+   lock.h
+@@ -253,13 +247,26 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
     )
  endif()
  
