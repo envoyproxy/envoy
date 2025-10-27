@@ -99,20 +99,15 @@ envoy_cert_validation_result verify_cert(const std::vector<std::string>& certs,
   CFErrorRef error = NULL;
   bool verified = SecTrustEvaluateWithError(trust, &error);
 
+  CFRelease(trust);
   CFRelease(cert_array);
   CFRelease(trust_policies);
-  CFRelease(trust);
-
-  envoy_cert_validation_result result;
-  if (!verified) {
-    result =
-        make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN, "validation couldn't be conducted.");
-  } else {
-    result = make_result(ENVOY_SUCCESS, 0, "");
-  }
-
   if (error) {
     CFRelease(error);
   }
-  return result;
+
+  if (!verified) {
+    return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN, "cert verification error.");
+  }
+  return make_result(ENVOY_SUCCESS, 0, "");
 }
