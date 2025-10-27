@@ -22,7 +22,6 @@ open class EngineBuilder: NSObject {
   private var quicHints: [String: Int] = [:]
   private var quicCanonicalSuffixes: [String] = []
   private var enableInterfaceBinding: Bool = false
-  private var enableStatsCollection: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
   private var upstreamTlsSni: String?
@@ -225,17 +224,6 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enableInterfaceBinding(_ enableInterfaceBinding: Bool) -> Self {
     self.enableInterfaceBinding = enableInterfaceBinding
-    return self
-  }
-
-  /// Specify whether Envoy internal stats should be collected.
-  ///
-  /// - parameter enableStatsCollection: whether to enable stats collection.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableStatsCollection(_ enableStatsCollection: Bool) -> Self {
-    self.enableStatsCollection = enableStatsCollection
     return self
   }
 
@@ -572,7 +560,6 @@ open class EngineBuilder: NSObject {
       enableGzipDecompression: self.enableGzipDecompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
-      enableStatsCollection: self.enableStatsCollection,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
       enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,

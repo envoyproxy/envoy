@@ -29,7 +29,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enableGzipDecompression;
 @property (nonatomic, assign) BOOL enableBrotliDecompression;
 @property (nonatomic, assign) BOOL enableInterfaceBinding;
-@property (nonatomic, assign) BOOL enableStatsCollection;
 @property (nonatomic, assign) BOOL enableDrainPostDnsRefresh;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
 @property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
@@ -68,7 +67,6 @@ NS_ASSUME_NONNULL_BEGIN
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
-                            enableStatsCollection:(BOOL)enableStatsCollection
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation

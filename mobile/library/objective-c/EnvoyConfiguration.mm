@@ -83,7 +83,6 @@
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
-                            enableStatsCollection:(BOOL)enableStatsCollection
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
@@ -130,7 +129,6 @@
   self.enableGzipDecompression = enableGzipDecompression;
   self.enableBrotliDecompression = enableBrotliDecompression;
   self.enableInterfaceBinding = enableInterfaceBinding;
-  self.enableStatsCollection = enableStatsCollection;
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
   self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
@@ -202,7 +200,6 @@
   builder.addDnsRefreshSeconds(self.dnsRefreshSeconds);
   builder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh);
   builder.enableInterfaceBinding(self.enableInterfaceBinding);
-  builder.enableStatsCollection(self.enableStatsCollection);
   builder.enforceTrustChainVerification(self.enforceTrustChainVerification);
   builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       self.h2ConnectionKeepaliveIdleIntervalMilliseconds);
