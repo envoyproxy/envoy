@@ -21,6 +21,7 @@ final class EngineApiTest: XCTestCase {
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)
+      .enableStatsCollection(true)
       .setLogger { _, msg in
         print(msg, terminator: "")
       }
