@@ -1254,7 +1254,6 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredInLocalReplyEncoderFilter
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
-
 // Send client headers, a GoAway and then a body and ensure the full request and
 // response are received.
 TEST_P(MultiplexedIntegrationTest, GoAway) {

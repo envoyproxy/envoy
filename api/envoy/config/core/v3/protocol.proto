@@ -473,7 +473,7 @@ message KeepaliveSettings {
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
-// [#next-free-field: 19]
+// [#next-free-field: 18]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -662,7 +662,6 @@ message Http2ProtocolOptions {
 
   // Configure the maximum amount of metadata than can be handled per stream. Defaults to 1 MB.
   google.protobuf.UInt64Value max_metadata_size = 17;
-
 }
 
 // [#not-implemented-hide:]

@@ -943,7 +943,6 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
                     StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
 }
 
-
 bool ConnectionImpl::slowContainsStreamId(int32_t stream_id) const {
   for (const auto& stream : active_streams_) {
     if (stream->stream_id_ == stream_id) {
@@ -1046,7 +1045,6 @@ void ConnectionImpl::goAway() {
     return;
   }
 }
-
 
 void ConnectionImpl::shutdownNotice() {
   adapter_->SubmitShutdownNotice();

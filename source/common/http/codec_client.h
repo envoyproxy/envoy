@@ -89,7 +89,6 @@ public:
    */
   void goAway() { codec_->goAway(); }
 
-
   /**
    * @return the underlying connection ID.
    */

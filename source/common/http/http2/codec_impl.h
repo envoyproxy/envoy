@@ -786,7 +786,6 @@ private:
                             uint32_t padding_length);
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
-  void onGracefulGoAwayTimeout();
   bool slowContainsStreamId(int32_t stream_id) const;
   virtual StreamResetReason getMessagingErrorResetReason() const PURE;
 

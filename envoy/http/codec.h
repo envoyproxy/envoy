@@ -586,7 +586,6 @@ public:
    */
   virtual void goAway() PURE;
 
-
   /**
    * @return the protocol backing the connection. This can change if for example an HTTP/1.1
    *         connection gets an HTTP/1.0 request on it.
