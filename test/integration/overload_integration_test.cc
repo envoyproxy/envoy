@@ -1135,7 +1135,6 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
     return;
   }
   autonomous_upstream_ = true;
-
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
       name: "envoy.load_shed_points.http2_server_go_away_on_dispatch"
