@@ -1,6 +1,7 @@
 x-envoy-build-base: &envoy-build-base
   image: >-
     ${ENVOY_BUILD_IMAGE:-docker.io/envoyproxy/envoy-build-ubuntu:f4a881a1205e8e6db1a57162faf3df7aed88eae8@sha256:b10346fe2eee41733dbab0e02322c47a538bf3938d093a5daebad9699860b814}
+  cpus: ${ENVOY_DOCKER_CPUS:-0}
   user: root:root
   working_dir: ${ENVOY_DOCKER_SOURCE_DIR:-/source}
   stdin_open: true
