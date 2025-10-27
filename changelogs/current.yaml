@@ -72,6 +72,10 @@ bug_fixes:
     Fixed per-route configuration for composite filter to support matching on response headers and trailers.
     Previously, per-route matchers would silently fail when attempting to match on ``HttpResponseHeaderMatchInput``
     or ``HttpResponseTrailerMatchInput``, causing the delegated filter to be skipped without error.
+- area: dns
+  change: |
+    Fixed c-ares DNS resolver to reinitialize when queries timeout. Previously,
+    timeout errors could leave the resolver unable to perform new lookups.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

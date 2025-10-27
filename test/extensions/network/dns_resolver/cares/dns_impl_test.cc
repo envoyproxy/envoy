@@ -1965,7 +1965,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplZeroTimeoutTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Validate that timeouts result in an empty callback.
+// Validate that timeouts result in an empty callback and trigger channel reinitialization.
 TEST_P(DnsImplZeroTimeoutTest, Timeout) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
 
@@ -1973,8 +1973,9 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // After `ARES_ETIMEOUT`, the channel should reinitialize.
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
-             0 /*get_addr_failure*/, 3 /*timeouts*/, 0 /*reinitializations*/);
+             0 /*get_addr_failure*/, 3 /*timeouts*/, 1 /*reinitializations*/);
 }
 
 // Validate that c-ares query cache is disabled by default.

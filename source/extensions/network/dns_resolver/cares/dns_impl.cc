@@ -252,7 +252,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     // If c-ares returns ARES_ECONNREFUSED and there is no fallback we assume that the channel_ is
     // broken and hence we reinitialize it here.
     if (status == ARES_ECONNREFUSED || status == ARES_EREFUSED || status == ARES_ESERVFAIL ||
-        status == ARES_ENOTIMP) {
+        status == ARES_ENOTIMP || status == ARES_ETIMEOUT) {
       parent_.reinitializeChannel();
     }
   }
