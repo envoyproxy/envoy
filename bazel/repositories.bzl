@@ -920,7 +920,6 @@ def _com_github_luajit_luajit():
         build_file_content = BUILD_ALL_CONTENT,
         patches = ["@envoy//bazel/foreign_cc:luajit.patch"],
         patch_args = ["-p1"],
-        patch_cmds = ["chmod u+x build.py"],
     )
 
 def _com_github_google_tcmalloc():
