@@ -29,26 +29,26 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%REQ(header-key)%"
-        new-body-key: "%RQ_BODY(body-key)%"
+        new-body-key: "%REQUEST_BODY(body-key)%"
     action: REPLACE
 response_transformation:
   headers_mutations:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
+        value: "%RESPONSE_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%RESP(header-key)%"
-        new-body-key: "%RS_BODY(body-key)%"
+        new-body-key: "%RESPONSE_BODY(body-key)%"
     action: MERGE
 clear_route_cache: true
   )EOF";
@@ -78,13 +78,13 @@ response_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
+        value: "%RESPONSE_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%RESP(header-key)%"
-        new-body-key: "%RS_BODY(body-key)%"
+        new-body-key: "%RESPONSE_BODY(body-key)%"
     action: MERGE
 clear_route_cache: true
 clear_cluster_cache: true

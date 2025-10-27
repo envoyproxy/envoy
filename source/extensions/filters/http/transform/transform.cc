@@ -62,10 +62,10 @@ public:
   Formatter::FormatterProviderPtr parse(absl::string_view command, absl::string_view command_arg,
                                         absl::optional<size_t>) const override {
 
-    if (command == "RQ_BODY") {
+    if (command == "REQUEST_BODY") {
       return std::make_unique<BodyFormatterProvider>(command_arg, true);
     }
-    if (command == "RS_BODY") {
+    if (command == "RESPONSE_BODY") {
       return std::make_unique<BodyFormatterProvider>(command_arg, false);
     }
     return nullptr;

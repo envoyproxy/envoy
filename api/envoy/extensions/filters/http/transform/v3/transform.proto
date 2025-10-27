@@ -5,8 +5,6 @@ package envoy.extensions.filters.http.transform.v3;
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/substitution_format_string.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -56,9 +54,9 @@ message Transformation {
   // And except the commonly used format specifiers, there are some additional format specifiers
   // provided by the transform filter:
   //
-  // * ``%RQ_BODY(KEY*)%``: the request body. And ``Key`` KEY is an optional
+  // * ``%REQUEST_BODY(KEY*)%``: the request body. And ``Key`` KEY is an optional
   //   lookup key in the namespace with the option of specifying nested keys separated by ':'.
-  // * ``%RS_BODY(KEY*)%``: the response body. And ``Key`` KEY is an optional
+  // * ``%RESPONSE_BODY(KEY*)%``: the response body. And ``Key`` KEY is an optional
   //   lookup key in the namespace with the option of specifying nested keys separated by ':'.
   repeated config.common.mutation_rules.v3.HeaderMutation headers_mutations = 1;
 
@@ -76,7 +74,7 @@ message BodyTransformation {
   }
 
   // Body transformation configuration. If not set, no body transformation will be performed.
-  // NOTE the ``RQ_BODY`` and ``RS_BODY`` format specifiers can also be used here.
+  // NOTE the ``REQUEST_BODY`` and ``RESPONSE_BODY`` format specifiers can also be used here.
   config.core.v3.SubstitutionFormatString body_format = 3
       [(validate.rules).message = {required: true}];
 

@@ -54,7 +54,7 @@ headers and body transformations.
 And except the commonly used format specifiers, there are some additional format specifiers
 provided by the transform filter:
 
-* ``%RQ_BODY(KEY*)%``: the request body. And ``Key`` KEY is an optional
+* ``%REQUEST_BODY(KEY*)%``: the request body. And ``Key`` KEY is an optional
   lookup key in the namespace with the option of specifying nested keys separated by ':'.
-* ``%RS_BODY(KEY*)%``: the response body. And ``Key`` KEY is an optional
+* ``%RESPONSE_BODY(KEY*)%``: the response body. And ``Key`` KEY is an optional
   lookup key in the namespace with the option of specifying nested keys separated by ':'.

@@ -159,13 +159,13 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%REQ(header-key)%"
-        new-body-key: "%RQ_BODY(body-key)%"
+        new-body-key: "%REQUEST_BODY(body-key)%"
     action: MERGE
 )EOF";
 
@@ -190,13 +190,13 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%REQ(header-key)%"
-        new-body-key: "%RQ_BODY(body-key)%"
+        new-body-key: "%REQUEST_BODY(body-key)%"
     action: MERGE
 )EOF";
 
@@ -214,13 +214,13 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%REQ(header-key)%"
-        new-body-key: "%RQ_BODY(body-key)%"
+        new-body-key: "%REQUEST_BODY(body-key)%"
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -262,13 +262,13 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%REQ(header-key)%"
-        new-body-key: "%RQ_BODY(body-key)%"
+        new-body-key: "%REQUEST_BODY(body-key)%"
     action: MERGE
 clear_route_cache: true
 )EOF";
@@ -318,13 +318,13 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%REQ(header-key)%"
-        new-body-key: "%RQ_BODY(body-key)%"
+        new-body-key: "%REQUEST_BODY(body-key)%"
     action: MERGE
 clear_cluster_cache: true
 )EOF";
@@ -374,13 +374,13 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%REQ(header-key)%"
-        new-body-key: "%RQ_BODY(body-key)%"
+        new-body-key: "%REQUEST_BODY(body-key)%"
     action: REPLACE
 )EOF";
 
@@ -427,13 +427,13 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%REQ(header-key)%"
-        new-body-key: "%RQ_BODY(body-key)%"
+        new-body-key: "%REQUEST_BODY(body-key)%"
     action: MERGE
 )EOF";
 
@@ -482,13 +482,13 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%REQ(header-key)%"
-        new-body-key: "%RQ_BODY(body-key)%"
+        new-body-key: "%REQUEST_BODY(body-key)%"
     action: MERGE
 )EOF";
 
@@ -499,7 +499,7 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body-by-route"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
 )EOF";
 
   initializeFilter(yaml_config, route_yaml_config);
@@ -536,7 +536,7 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -567,7 +567,7 @@ request_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RQ_BODY(body-key)%"
+        value: "%REQUEST_BODY(body-key)%"
   body_transformation:
     body_format:
       text_format_source:
@@ -604,13 +604,13 @@ response_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
+        value: "%RESPONSE_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%RESP(header-key)%"
-        new-body-key: "%RS_BODY(body-key)%"
+        new-body-key: "%RESPONSE_BODY(body-key)%"
     action: MERGE
 )EOF";
 
@@ -635,13 +635,13 @@ response_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
+        value: "%RESPONSE_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%RESP(header-key)%"
-        new-body-key: "%RS_BODY(body-key)%"
+        new-body-key: "%RESPONSE_BODY(body-key)%"
     action: MERGE
 )EOF";
 
@@ -659,13 +659,13 @@ response_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
+        value: "%RESPONSE_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%RESP(header-key)%"
-        new-body-key: "%RS_BODY(body-key)%"
+        new-body-key: "%RESPONSE_BODY(body-key)%"
     action: MERGE
 )EOF";
 
@@ -704,13 +704,13 @@ response_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
+        value: "%RESPONSE_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%RESP(header-key)%"
-        new-body-key: "%RS_BODY(body-key)%"
+        new-body-key: "%RESPONSE_BODY(body-key)%"
     action: MERGE
 )EOF";
 
@@ -760,13 +760,13 @@ response_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
+        value: "%RESPONSE_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%RESP(header-key)%"
-        new-body-key: "%RS_BODY(body-key)%"
+        new-body-key: "%RESPONSE_BODY(body-key)%"
     action: REPLACE
 )EOF";
 
@@ -812,13 +812,13 @@ response_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
+        value: "%RESPONSE_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%RESP(header-key)%"
-        new-body-key: "%RS_BODY(body-key)%"
+        new-body-key: "%RESPONSE_BODY(body-key)%"
     action: MERGE
 )EOF";
 
@@ -867,7 +867,7 @@ response_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
+        value: "%RESPONSE_BODY(body-key)%"
 )EOF";
 
   initializeFilter(yaml_config, "");
@@ -901,7 +901,7 @@ response_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
+        value: "%RESPONSE_BODY(body-key)%"
   body_transformation:
     body_format:
       text_format_source:
@@ -938,13 +938,13 @@ response_transformation:
   - append:
       header:
         key: "x-new-header-from-body"
-        value: "%RS_BODY(body-key)%"
+        value: "%RESPONSE_BODY(body-key)%"
   body_transformation:
     body_format:
       json_format:
         raw-key: "raw-value"
         header-key: "%RESP(header-key)%"
-        new-body-key: "%RS_BODY(body-key)%"
+        new-body-key: "%RESPONSE_BODY(body-key)%"
     action: MERGE
 )EOF";
 

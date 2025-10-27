@@ -52,7 +52,7 @@ typed_config:
     - append:
         header:
           key: "model-header"
-          value: "%RQ_BODY(model)%"
+          value: "%REQUEST_BODY(model)%"
         append_action: OVERWRITE_IF_EXISTS_OR_ADD
     body_transformation:
       body_format:
@@ -64,12 +64,12 @@ typed_config:
     - append:
         header:
           key: "prompt-tokens"
-          value: "%RS_BODY(usage:prompt_tokens)%"
+          value: "%RESPONSE_BODY(usage:prompt_tokens)%"
         append_action: OVERWRITE_IF_EXISTS_OR_ADD
     - append:
         header:
           key: "completion-tokens"
-          value: "%RS_BODY(usage:completion_tokens)%"
+          value: "%RESPONSE_BODY(usage:completion_tokens)%"
         append_action: OVERWRITE_IF_EXISTS_OR_ADD
 )EOF";
 
@@ -85,7 +85,7 @@ request_transformation:
   - append:
       header:
         key: "model-header"
-        value: "%RQ_BODY(model)%"
+        value: "%REQUEST_BODY(model)%"
       append_action: OVERWRITE_IF_EXISTS_OR_ADD
 )EOF";
 
