@@ -220,6 +220,7 @@ configure_make(
         "LIBS": "-l:libstdc++.a",
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
         "ARFLAGS": "r",
+        "PYTHON": "$$EXT_BUILD_ROOT/$(PYTHON3)",
     } | select({
         "//bazel/foreign_cc:parallel_builds_enabled": {
             "MAKEFLAGS": "-j ARFLAGS=r",
@@ -249,6 +250,7 @@ configure_make(
         "libicudata.a",
     ],
     tags = ["skip_on_windows"],
+    toolchains = ["@rules_python//python:current_py_toolchain"],
     alwayslink = True,
 )
 
