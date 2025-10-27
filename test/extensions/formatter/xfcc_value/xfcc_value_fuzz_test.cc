@@ -23,7 +23,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   request_headers.setForwardedClientCert(sv);
   StreamInfo::MockStreamInfo stream_info;
 
-  formatter->formatValueWithContext({&request_headers}, stream_info);
+  formatter->formatValue({&request_headers}, stream_info);
 }
 
 } // namespace

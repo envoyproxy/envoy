@@ -42,7 +42,7 @@ public:
    * @param stream_info the stream info.
    */
   virtual void mutateQueryParameter(Http::Utility::QueryParamsMulti& params,
-                                    const Formatter::HttpFormatterContext& context,
+                                    const Formatter::Context& context,
                                     const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 using QueryParameterMutationPtr = std::unique_ptr<QueryParameterMutation>;
@@ -52,8 +52,7 @@ public:
   QueryParameterMutationRemove(absl::string_view key) : key_(key) {}
 
   // QueryParameterMutation
-  void mutateQueryParameter(Http::Utility::QueryParamsMulti& params,
-                            const Formatter::HttpFormatterContext&,
+  void mutateQueryParameter(Http::Utility::QueryParamsMulti& params, const Formatter::Context&,
                             const StreamInfo::StreamInfo&) const override {
     params.remove(key_);
   }
@@ -70,7 +69,7 @@ public:
 
   // QueryParameterMutation
   void mutateQueryParameter(Http::Utility::QueryParamsMulti& params,
-                            const Formatter::HttpFormatterContext& context,
+                            const Formatter::Context& context,
                             const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
@@ -86,17 +85,13 @@ public:
   Mutations(const MutationsProto& config, Server::Configuration::ServerFactoryContext& context,
             absl::Status& creation_status);
 
-  void mutateRequestHeaders(Http::RequestHeaderMap& headers,
-                            const Formatter::HttpFormatterContext& context,
+  void mutateRequestHeaders(Http::RequestHeaderMap& headers, const Formatter::Context& context,
                             const StreamInfo::StreamInfo& stream_info) const;
-  void mutateResponseHeaders(Http::ResponseHeaderMap& headers,
-                             const Formatter::HttpFormatterContext& context,
+  void mutateResponseHeaders(Http::ResponseHeaderMap& headers, const Formatter::Context& context,
                              const StreamInfo::StreamInfo& stream_info) const;
-  void mutateResponseTrailers(Http::ResponseTrailerMap& trailers,
-                              const Formatter::HttpFormatterContext& context,
+  void mutateResponseTrailers(Http::ResponseTrailerMap& trailers, const Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info) const;
-  void mutateRequestTrailers(Http::RequestTrailerMap& trailers,
-                             const Formatter::HttpFormatterContext& context,
+  void mutateRequestTrailers(Http::RequestTrailerMap& trailers, const Formatter::Context& context,
                              const StreamInfo::StreamInfo& stream_info) const;
 
 private:

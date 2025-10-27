@@ -1,0 +1,191 @@
+diff --git a/BUILD b/BUILD
+index 2a69b280..0d7f1687 100644
+--- a/BUILD
++++ b/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ exports_files(["LICENSE"])
+diff --git a/apple/testing/default_runner/BUILD b/apple/testing/default_runner/BUILD
+index 0bedc521..a3f7b08d 100644
+--- a/apple/testing/default_runner/BUILD
++++ b/apple/testing/default_runner/BUILD
+@@ -23,6 +23,7 @@ load(
+     "//apple/testing/default_runner:watchos_test_runner.bzl",
+     "watchos_test_runner",
+ )
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+ 
+ licenses(["notice"])
+ 
+diff --git a/tools/alticonstool/BUILD b/tools/alticonstool/BUILD
+index 7922cc75..e4d32ec9 100644
+--- a/tools/alticonstool/BUILD
++++ b/tools/alticonstool/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_binary(
+diff --git a/tools/bitcode_strip/BUILD b/tools/bitcode_strip/BUILD
+index 53cf078e..9307f4ed 100644
+--- a/tools/bitcode_strip/BUILD
++++ b/tools/bitcode_strip/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_library(
+diff --git a/tools/bundletool/BUILD b/tools/bundletool/BUILD
+index 37674a6d..7537c56b 100644
+--- a/tools/bundletool/BUILD
++++ b/tools/bundletool/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_binary(
+diff --git a/tools/clangrttool/BUILD b/tools/clangrttool/BUILD
+index d9da4073..973cf8f9 100644
+--- a/tools/clangrttool/BUILD
++++ b/tools/clangrttool/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_binary(
+diff --git a/tools/codesigningtool/BUILD b/tools/codesigningtool/BUILD
+index a8ffb8d0..ea3b0e14 100644
+--- a/tools/codesigningtool/BUILD
++++ b/tools/codesigningtool/BUILD
+@@ -1,4 +1,5 @@
+ load("@build_bazel_apple_support//rules:toolchain_substitution.bzl", "toolchain_substitution")
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+ 
+ licenses(["notice"])
+ 
+diff --git a/tools/dossier_codesigningtool/BUILD b/tools/dossier_codesigningtool/BUILD
+index 37cdab19..b19cb18a 100644
+--- a/tools/dossier_codesigningtool/BUILD
++++ b/tools/dossier_codesigningtool/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_binary(
+diff --git a/tools/imported_dynamic_framework_processor/BUILD b/tools/imported_dynamic_framework_processor/BUILD
+index 339f14a3..4de74089 100644
+--- a/tools/imported_dynamic_framework_processor/BUILD
++++ b/tools/imported_dynamic_framework_processor/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_binary(
+diff --git a/tools/local_provisioning_profile_finder/BUILD b/tools/local_provisioning_profile_finder/BUILD
+index 2d1aab45..e631c585 100644
+--- a/tools/local_provisioning_profile_finder/BUILD
++++ b/tools/local_provisioning_profile_finder/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ py_binary(
+     name = "local_provisioning_profile_finder",
+     srcs = ["local_provisioning_profile_finder.py"],
+diff --git a/tools/plisttool/BUILD b/tools/plisttool/BUILD
+index 2102ad9b..6c7c47f4 100644
+--- a/tools/plisttool/BUILD
++++ b/tools/plisttool/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_binary(
+diff --git a/tools/provisioning_profile_tool/BUILD b/tools/provisioning_profile_tool/BUILD
+index a36c5123..d022ae28 100644
+--- a/tools/provisioning_profile_tool/BUILD
++++ b/tools/provisioning_profile_tool/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_binary(
+diff --git a/tools/swift_stdlib_tool/BUILD b/tools/swift_stdlib_tool/BUILD
+index 024c6828..fcd0cc78 100644
+--- a/tools/swift_stdlib_tool/BUILD
++++ b/tools/swift_stdlib_tool/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_binary(
+diff --git a/tools/versiontool/BUILD b/tools/versiontool/BUILD
+index ba04a6e9..a31f7c65 100644
+--- a/tools/versiontool/BUILD
++++ b/tools/versiontool/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_binary(
+diff --git a/tools/wrapper_common/BUILD b/tools/wrapper_common/BUILD
+index 435e55d4..6e7c149c 100644
+--- a/tools/wrapper_common/BUILD
++++ b/tools/wrapper_common/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_library(
+diff --git a/tools/xcarchivetool/BUILD b/tools/xcarchivetool/BUILD
+index e7cfd3fa..4390c9a9 100644
+--- a/tools/xcarchivetool/BUILD
++++ b/tools/xcarchivetool/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ py_binary(
+     name = "make_xcarchive",
+     srcs = ["make_xcarchive.py"],
+diff --git a/tools/xcframework_processor_tool/BUILD b/tools/xcframework_processor_tool/BUILD
+index 0aabfe52..12992f09 100644
+--- a/tools/xcframework_processor_tool/BUILD
++++ b/tools/xcframework_processor_tool/BUILD
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ licenses(["notice"])
+ 
+ py_binary(
+diff --git a/tools/xctoolrunner/BUILD b/tools/xctoolrunner/BUILD
+index 6831fff3..d80260f7 100644
+--- a/tools/xctoolrunner/BUILD
++++ b/tools/xctoolrunner/BUILD
+@@ -1,3 +1,4 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+ load("//tools:binary_env.bzl", "binary_env")
+ 
+ licenses(["notice"])
+diff --git a/tools/xctrunnertool/BUILD.bazel b/tools/xctrunnertool/BUILD.bazel
+index b385cba3..aabc15c0 100644
+--- a/tools/xctrunnertool/BUILD.bazel
++++ b/tools/xctrunnertool/BUILD.bazel
+@@ -1,3 +1,5 @@
++load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
++
+ py_library(
+     name = "lib",
+     srcs = glob(["lib/*.py"]),

@@ -1206,7 +1206,7 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                                                                {":method", "GET"},
                                                                {"x-forwarded-proto", "http"}};
 
-        Formatter::HttpFormatterContext formatter_context;
+        Formatter::Context formatter_context;
 
         // Coverage for finalizeRequestHeaders
         NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -2484,8 +2484,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
       }));
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::HttpFormatterContext&,
-                           const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
@@ -2550,11 +2549,10 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
   }));
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
-            auto dynamic_meta = stream_info.dynamicMetadata().filter_metadata().at("metadata_key");
-            EXPECT_EQ("value", dynamic_meta.fields().at("field").string_value());
-          }));
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        auto dynamic_meta = stream_info.dynamicMetadata().filter_metadata().at("metadata_key");
+        EXPECT_EQ("value", dynamic_meta.fields().at("field").string_value());
+      }));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -2594,14 +2592,13 @@ TEST_F(HttpConnectionManagerImplTest, TestRemoteDownstreamDisconnectAccessLog) {
       }));
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
-            EXPECT_FALSE(stream_info.responseCode());
-            EXPECT_TRUE(stream_info.hasAnyResponseFlag());
-            EXPECT_TRUE(stream_info.hasResponseFlag(
-                StreamInfo::CoreResponseFlag::DownstreamConnectionTermination));
-            EXPECT_EQ("downstream_remote_disconnect", stream_info.responseCodeDetails().value());
-          }));
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_FALSE(stream_info.responseCode());
+        EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+        EXPECT_TRUE(stream_info.hasResponseFlag(
+            StreamInfo::CoreResponseFlag::DownstreamConnectionTermination));
+        EXPECT_EQ("downstream_remote_disconnect", stream_info.responseCodeDetails().value());
+      }));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -2638,11 +2635,10 @@ TEST_F(HttpConnectionManagerImplTest, TestLocalDownstreamDisconnectAccessLog) {
       }));
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
-            EXPECT_EQ("downstream_local_disconnect(reason_for_local_close)",
-                      stream_info.responseCodeDetails().value());
-          }));
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ("downstream_local_disconnect(reason_for_local_close)",
+                  stream_info.responseCodeDetails().value());
+      }));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -2680,15 +2676,14 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
       }));
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
-            EXPECT_TRUE(stream_info.responseCode());
-            EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
-            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
-            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-            EXPECT_NE(nullptr, stream_info.route());
-          }));
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_TRUE(stream_info.responseCode());
+        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.route());
+      }));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -2733,18 +2728,18 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
       }));
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke([this](const Formatter::HttpFormatterContext&,
-                              const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_TRUE(stream_info.responseCode());
-        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
-        EXPECT_EQ("missing_host_header", stream_info.responseCodeDetails().value());
-        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        // Even the request is invalid, will still try to find a route before response filter chain
-        // path.
-        EXPECT_EQ(route_config_provider_.route_config_->route_, stream_info.route());
-      }));
+      .WillOnce(
+          Invoke([this](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_TRUE(stream_info.responseCode());
+            EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
+            EXPECT_EQ("missing_host_header", stream_info.responseCodeDetails().value());
+            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
+            // Even the request is invalid, will still try to find a route before response filter
+            // chain path.
+            EXPECT_EQ(route_config_provider_.route_config_->route_, stream_info.route());
+          }));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -2781,25 +2776,25 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
   flush_access_log_on_new_request_ = true;
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        // First call to log() is made when a new HTTP request has been received
-        // On the first call it is expected that there is no response code.
-        EXPECT_EQ(AccessLog::AccessLogType::DownstreamStart, log_context.accessLogType());
-        EXPECT_FALSE(stream_info.responseCode());
-      }))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        // Second call to log() is made when filter is destroyed, so it is expected
-        // that the response code is available and matches the response headers.
-        EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
-        EXPECT_TRUE(stream_info.responseCode());
-        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.route());
-      }));
+      .WillOnce(Invoke(
+          [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            // First call to log() is made when a new HTTP request has been received
+            // On the first call it is expected that there is no response code.
+            EXPECT_EQ(AccessLog::AccessLogType::DownstreamStart, log_context.accessLogType());
+            EXPECT_FALSE(stream_info.responseCode());
+          }))
+      .WillOnce(Invoke(
+          [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            // Second call to log() is made when filter is destroyed, so it is expected
+            // that the response code is available and matches the response headers.
+            EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
+            EXPECT_TRUE(stream_info.responseCode());
+            EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
+            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
+            EXPECT_NE(nullptr, stream_info.route());
+          }));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -2843,25 +2838,25 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnTunnelEstablished) {
   flush_log_on_tunnel_successfully_established_ = true;
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        // First call to log() is made when a new HTTP tunnel has been established.
-        EXPECT_EQ(log_context.accessLogType(),
-                  AccessLog::AccessLogType::DownstreamTunnelSuccessfullyEstablished);
-        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-      }))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        // Second call to log() is made when the request is completed, so it is expected
-        // that the response code is available and matches the response headers.
-        EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
-        EXPECT_TRUE(stream_info.responseCode());
-        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.route());
-      }));
+      .WillOnce(Invoke(
+          [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            // First call to log() is made when a new HTTP tunnel has been established.
+            EXPECT_EQ(log_context.accessLogType(),
+                      AccessLog::AccessLogType::DownstreamTunnelSuccessfullyEstablished);
+            EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
+          }))
+      .WillOnce(Invoke(
+          [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            // Second call to log() is made when the request is completed, so it is expected
+            // that the response code is available and matches the response headers.
+            EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
+            EXPECT_TRUE(stream_info.responseCode());
+            EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
+            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
+            EXPECT_NE(nullptr, stream_info.route());
+          }));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -2926,22 +2921,22 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   conn_manager_->onData(fake_input, false);
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::HttpFormatterContext& log_context,
-                           const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_EQ(AccessLog::AccessLogType::DownstreamPeriodic, log_context.accessLogType());
-        EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
-        EXPECT_EQ(stream_info.requestComplete(), absl::nullopt);
-        EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
-                    testing::IsNull());
-      }))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_EQ(AccessLog::AccessLogType::DownstreamPeriodic, log_context.accessLogType());
-        EXPECT_EQ(stream_info.getDownstreamBytesMeter()
-                      ->bytesAtLastDownstreamPeriodicLog()
-                      ->wire_bytes_received,
-                  4);
-      }));
+      .WillOnce(Invoke(
+          [&](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(AccessLog::AccessLogType::DownstreamPeriodic, log_context.accessLogType());
+            EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
+            EXPECT_EQ(stream_info.requestComplete(), absl::nullopt);
+            EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
+                        testing::IsNull());
+          }))
+      .WillOnce(Invoke(
+          [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(AccessLog::AccessLogType::DownstreamPeriodic, log_context.accessLogType());
+            EXPECT_EQ(stream_info.getDownstreamBytesMeter()
+                          ->bytesAtLastDownstreamPeriodicLog()
+                          ->wire_bytes_received,
+                      4);
+          }));
   // Pretend like some 30s has passed, and the log should be written.
   EXPECT_CALL(*periodic_log_timer, enableTimer(*access_log_flush_interval_, _)).Times(2);
   periodic_log_timer->invokeCallback();
@@ -2949,18 +2944,18 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   response_encoder_.stream_.bytes_meter_->addWireBytesReceived(12);
   periodic_log_timer->invokeCallback();
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::HttpFormatterContext& log_context,
-                           const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
-        EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
-        EXPECT_THAT(stream_info.responseCodeDetails(),
-                    testing::Optional(testing::StrEq("details")));
-        EXPECT_THAT(stream_info.responseCode(), testing::Optional(200));
-        EXPECT_EQ(stream_info.getDownstreamBytesMeter()
-                      ->bytesAtLastDownstreamPeriodicLog()
-                      ->wire_bytes_received,
-                  4 + 12);
-      }));
+      .WillOnce(Invoke(
+          [&](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
+            EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
+            EXPECT_THAT(stream_info.responseCodeDetails(),
+                        testing::Optional(testing::StrEq("details")));
+            EXPECT_THAT(stream_info.responseCode(), testing::Optional(200));
+            EXPECT_EQ(stream_info.getDownstreamBytesMeter()
+                          ->bytesAtLastDownstreamPeriodicLog()
+                          ->wire_bytes_received,
+                      4 + 12);
+          }));
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(*periodic_log_timer, disableTimer);
@@ -2984,16 +2979,15 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
       }));
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
-            EXPECT_TRUE(stream_info.responseCode());
-            EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
-            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
-            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-            EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().sslConnection());
-            EXPECT_NE(nullptr, stream_info.route());
-          }));
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_TRUE(stream_info.responseCode());
+        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().sslConnection());
+        EXPECT_NE(nullptr, stream_info.route());
+      }));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -3227,8 +3221,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext&,
-                          const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_TRUE(stream_info.hasAnyResponseFlag());
         EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout));
@@ -4766,20 +4759,20 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterAccessLogBeforeConfigAccessLog) 
     InSequence s; // Create an InSequence object to enforce order
 
     EXPECT_CALL(*log_handler_, log(_, _))
-        .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                            const StreamInfo::StreamInfo& stream_info) {
-          EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
-          EXPECT_FALSE(stream_info.hasAnyResponseFlag());
-        }));
+        .WillOnce(Invoke(
+            [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+              EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
+              EXPECT_FALSE(stream_info.hasAnyResponseFlag());
+            }));
 
     EXPECT_CALL(*handler, log(_, _))
-        .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                            const StreamInfo::StreamInfo& stream_info) {
-          // First call to log() is made when a new HTTP request has been received
-          // On the first call it is expected that there is no response code.
-          EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
-          EXPECT_TRUE(stream_info.responseCode());
-        }));
+        .WillOnce(Invoke(
+            [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+              // First call to log() is made when a new HTTP request has been received
+              // On the first call it is expected that there is no response code.
+              EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
+              EXPECT_TRUE(stream_info.responseCode());
+            }));
   }
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
