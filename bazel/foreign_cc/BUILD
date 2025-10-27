@@ -130,7 +130,7 @@ cc_library(
 
 configure_make(
     name = "luajit",
-    configure_command = "build.py",
+    configure_command = "luajit_build.sh",
     env = select({
         # This shouldn't be needed! See
         # https://github.com/envoyproxy/envoy/issues/6084
