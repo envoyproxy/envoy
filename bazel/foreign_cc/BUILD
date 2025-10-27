@@ -276,6 +276,10 @@ envoy_cmake(
         "SXG_WITH_CERT_CHAIN": "off",
         "RUN_TEST": "off",
         "CMAKE_INSTALL_LIBDIR": "lib",
+        "OPENSSL_ROOT_DIR": "$$EXT_BUILD_DEPS",
+        "OPENSSL_INCLUDE_DIR": "$$EXT_BUILD_DEPS/include",
+        "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto_internal.a",
+        "OPENSSL_SSL_LIBRARY": "$$EXT_BUILD_DEPS/lib/libssl_internal.a",
     },
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {
