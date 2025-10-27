@@ -2,6 +2,18 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: server
+  change: |
+    Added container-aware CPU detection on Linux that respects cgroup CPU limits in addition to hardware thread count
+    and CPU affinity. This change only affects behavior when the ``--concurrency`` flag is not explicitly set.
+    Envoy now uses the minimum of hardware threads, CPU affinity, and cgroup CPU limits
+    to determine the number of worker threads by default. This provides better resource utilization in
+    containerized environments (Docker, Kubernetes) where CPU limits are set via cgroups. The new behavior
+    is enabled by default and can be disabled by setting the ``ENVOY_CGROUP_CPU_DETECTION`` environment
+    variable to ``false``. When disabled, Envoy will fall back to the previous behavior of using only
+    hardware thread count and CPU affinity for worker thread calculation. Uses conservative rounding (floor)
+    to account for non-worker threads and prevent container throttling. This can cause potential total connections
+    number drop.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -21,6 +33,10 @@ minor_behavior_changes:
     <envoy_v3_api_msg_service.ext_proc.v3.HeaderMutation>` fails. Removing
     request-specific details allows grouping by similar failure types. Detailed
     messages remain available in debug logs.
+- area: ext_authz
+  change: |
+    Check the response header count is < the configured limits before applying mutations and don't
+    add new headers if not.
 - area: mobile
   change: |
     Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
@@ -46,6 +62,11 @@ bug_fixes:
   change: |
     Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
     or responses trigger flow control.
+- area: http
+  change: |
+    Fixed ``shouldDrainConnectionUponCompletion()`` to properly send ``GOAWAY`` frames for HTTP/2 and HTTP/3
+    instead of aggressively closing connections. This prevents response body transmission interruption and
+    ``ERR_DRAINING`` errors on the client side. HTTP/1.1 behavior remains unchanged.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -69,6 +90,14 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: udp_sink
+  change: |
+    Enhance UDP sink to handle the tapped message which the size is bigger than 64K.
+- area: otlp_stat_sink
+  change: |
+    Supported dropping stats
+    :ref:`DropAction
+    <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during custom metric conversion.
 - area: http
   change: |
     Added ``vhost_header`` to the RouteConfiguration, allowing use of a different header for vhost matching.
@@ -105,5 +134,10 @@ new_features:
 - area: admin
   change: |
     Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.
+- area: quic
+  change: |
+    Add a new quic configuration field, 'max_sessions_per_event_loop', to QuicProtocolOptions in Envoy listener.
+    This allows tuning the maximum number of new QUIC sessions created within a single event loop.
+    The default value is 16, preserving the previous hardcoded limit.
 
 deprecated:

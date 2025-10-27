@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.peak_ewma.v3alpha;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.peak_ewma.v3alpha";
+option java_outer_classname = "PeakEwmaProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/http/peak_ewma/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Peak EWMA HTTP Filter]
+// Configuration for the Peak EWMA HTTP filter.
+// This filter measures request RTT and provides timing data to the Peak EWMA load balancer.
+
+// [#extension: envoy.filters.http.peak_ewma]
+message PeakEwmaConfig {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+}

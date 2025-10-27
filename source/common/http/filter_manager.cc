@@ -50,7 +50,7 @@ void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& 
                      ResponseHeaderMap& headers) {
   const Router::RouteConstSharedPtr& route = stream_info.route();
   if (route != nullptr && route->routeEntry() != nullptr) {
-    const Formatter::HttpFormatterContext formatter_context{
+    const Formatter::Context formatter_context{
         callbacks.requestHeaders().ptr(), &headers, {}, {}, {}, &callbacks.activeSpan()};
     route->routeEntry()->finalizeResponseHeaders(headers, formatter_context, stream_info);
   }

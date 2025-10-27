@@ -47,7 +47,7 @@ TEST_P(ListenerTypedMetadataIntegrationTest, Hello) {
 
 class MockAccessLog : public AccessLog::Instance {
 public:
-  MOCK_METHOD(void, log, (const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&));
+  MOCK_METHOD(void, log, (const Formatter::Context&, const StreamInfo::StreamInfo&));
 };
 
 class TestAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
@@ -59,7 +59,7 @@ public:
     auto out = std::make_shared<NiceMock<MockAccessLog>>();
     EXPECT_CALL(*out, log(_, _))
         .WillRepeatedly(testing::Invoke(
-            [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& info) -> void {
+            [](const Formatter::Context&, const StreamInfo::StreamInfo& info) -> void {
               // Check that expected listener metadata is present
               auto listener_info = info.downstreamAddressProvider().listenerInfo();
               ASSERT_TRUE(listener_info.has_value());
