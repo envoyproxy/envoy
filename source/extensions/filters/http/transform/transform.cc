@@ -21,9 +21,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Transform {
 
-absl::optional<std::string>
-BodyFormatterProvider::formatWithContext(const Formatter::Context& context,
-                                         const StreamInfo::StreamInfo&) const {
+absl::optional<std::string> BodyFormatterProvider::format(const Formatter::Context& context,
+                                                          const StreamInfo::StreamInfo&) const {
   const auto extension = context.typedExtension<BodyContextExtension>();
   if (!extension.has_value()) {
     return absl::nullopt;
@@ -42,8 +41,8 @@ BodyFormatterProvider::formatWithContext(const Formatter::Context& context,
   return str;
 }
 
-Protobuf::Value BodyFormatterProvider::formatValueWithContext(const Formatter::Context& context,
-                                                              const StreamInfo::StreamInfo&) const {
+Protobuf::Value BodyFormatterProvider::formatValue(const Formatter::Context& context,
+                                                   const StreamInfo::StreamInfo&) const {
   const auto extension = context.typedExtension<BodyContextExtension>();
   if (!extension.has_value()) {
     return Protobuf::Value::default_instance();
@@ -265,8 +264,7 @@ TransformFilter::TransformResult TransformFilter::handleCompleteBody(
   // Transform the body if configured and validate the result is valid JSON if patch
   // mode is enabled.
   if (transformation.bodyFormatter().has_value()) {
-    new_buffer = transformation.bodyFormatter()->formatWithContext(
-        context, decoder_callbacks_->streamInfo());
+    new_buffer = transformation.bodyFormatter()->format(context, decoder_callbacks_->streamInfo());
     if (transformation.mergeFormatString()) {
       if (auto s = MessageUtil::loadFromJsonNoThrow(new_buffer, new_struct); !s.ok()) {
         ENVOY_LOG(error, "Failed to parse transformed body as JSON: {}", s.message());

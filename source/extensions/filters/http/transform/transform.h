@@ -58,10 +58,10 @@ public:
       : path_(absl::StrSplit(path, ':')), request_body_(request_body) {}
 
   // FormatterProvider
-  absl::optional<std::string> formatWithContext(const Formatter::Context& context,
-                                                const StreamInfo::StreamInfo&) const override;
-  Protobuf::Value formatValueWithContext(const Formatter::Context& context,
-                                         const StreamInfo::StreamInfo&) const override;
+  absl::optional<std::string> format(const Formatter::Context& context,
+                                     const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const Formatter::Context& context,
+                              const StreamInfo::StreamInfo&) const override;
 
 private:
   const std::vector<std::string> path_;

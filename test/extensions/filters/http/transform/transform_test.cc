@@ -26,9 +26,9 @@ TEST(BodyFormatterProviderTest, BodyFormatterProviderTest) {
   {
     // No BodyContextExtension present.
     Formatter::Context context;
-    const auto value = request_provider.formatWithContext(context, stream_info);
+    const auto value = request_provider.format(context, stream_info);
     EXPECT_FALSE(value.has_value());
-    const auto proto_value = request_provider.formatValueWithContext(context, stream_info);
+    const auto proto_value = request_provider.formatValue(context, stream_info);
     EXPECT_EQ(proto_value.kind_case(), Protobuf::Value::KIND_NOT_SET);
   }
 
@@ -38,9 +38,9 @@ TEST(BodyFormatterProviderTest, BodyFormatterProviderTest) {
     BodyContextExtension extension;
     context.setExtension(extension);
 
-    const auto value = request_provider.formatWithContext(context, stream_info);
+    const auto value = request_provider.format(context, stream_info);
     EXPECT_FALSE(value.has_value());
-    const auto proto_value = request_provider.formatValueWithContext(context, stream_info);
+    const auto proto_value = request_provider.formatValue(context, stream_info);
     EXPECT_EQ(proto_value.kind_case(), Protobuf::Value::KIND_NOT_SET);
   }
 
@@ -54,10 +54,10 @@ TEST(BodyFormatterProviderTest, BodyFormatterProviderTest) {
         .set_string_value("response-body-value");
     context.setExtension(extension);
 
-    const auto value = response_provider.formatWithContext(context, stream_info);
+    const auto value = response_provider.format(context, stream_info);
     ASSERT_TRUE(value.has_value());
     EXPECT_EQ(value.value(), "response-body-value");
-    const auto proto_value = response_provider.formatValueWithContext(context, stream_info);
+    const auto proto_value = response_provider.formatValue(context, stream_info);
     EXPECT_EQ(proto_value.kind_case(), Protobuf::Value::kStringValue);
     EXPECT_EQ(proto_value.string_value(), "response-body-value");
   }
@@ -72,10 +72,10 @@ TEST(BodyFormatterProviderTest, BodyFormatterProviderTest) {
         .set_number_value(1);
     context.setExtension(extension);
 
-    const auto value = request_provider.formatWithContext(context, stream_info);
+    const auto value = request_provider.format(context, stream_info);
     ASSERT_TRUE(value.has_value());
     EXPECT_EQ(value.value(), "1");
-    const auto proto_value = request_provider.formatValueWithContext(context, stream_info);
+    const auto proto_value = request_provider.formatValue(context, stream_info);
     EXPECT_EQ(proto_value.kind_case(), Protobuf::Value::kNumberValue);
     EXPECT_EQ(proto_value.number_value(), 1);
   }
@@ -90,10 +90,10 @@ TEST(BodyFormatterProviderTest, BodyFormatterProviderTest) {
         .set_bool_value(true);
     context.setExtension(extension);
 
-    const auto value = response_provider.formatWithContext(context, stream_info);
+    const auto value = response_provider.format(context, stream_info);
     ASSERT_TRUE(value.has_value());
     EXPECT_EQ(value.value(), "true");
-    const auto proto_value = response_provider.formatValueWithContext(context, stream_info);
+    const auto proto_value = response_provider.formatValue(context, stream_info);
     EXPECT_EQ(proto_value.kind_case(), Protobuf::Value::kBoolValue);
     EXPECT_EQ(proto_value.bool_value(), true);
   }
