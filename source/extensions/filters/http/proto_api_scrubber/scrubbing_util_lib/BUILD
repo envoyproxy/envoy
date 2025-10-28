@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "scrubbing_util",
+    name = "scrubbing_util_lib",
     srcs = [
         "field_checker.cc",
     ],
