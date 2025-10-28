@@ -68,14 +68,6 @@ genrule(
     stamp = 1,
 )
 
-cc_library(
-    name = "static_stdlib",
-    linkopts = select({
-        "//bazel:linux": ["-static-libgcc"],
-        "//conditions:default": [],
-    }),
-)
-
 config_setting(
     name = "windows_opt_build",
     values = {

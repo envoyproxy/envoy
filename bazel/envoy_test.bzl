@@ -13,7 +13,6 @@ load(
     "envoy_linkstatic",
     "envoy_select_exported_symbols",
     "envoy_select_force_libcpp",
-    "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
 load(":envoy_library.bzl", "tcmalloc_external_deps")
@@ -104,7 +103,7 @@ def envoy_cc_fuzz_test(
     envoy_cc_test_library(
         name = test_lib_name,
         exec_properties = exec_properties,
-        deps = deps + envoy_stdlib_deps() + [
+        deps = deps + [
             repository + "//test/fuzz:fuzz_runner_lib",
             repository + "//test/test_common:test_version_linkstamp",
         ],
@@ -187,7 +186,7 @@ def envoy_cc_test(
         linkopts = _envoy_test_linkopts() + linkopts,
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
-        deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//test:main",
             repository + "//test/test_common:test_version_linkstamp",
             "@com_google_googletest//:gtest",

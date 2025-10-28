@@ -7,7 +7,6 @@ load(
     "envoy_exported_symbols_input",
     "envoy_external_dep_path",
     "envoy_select_exported_symbols",
-    "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
 
@@ -41,7 +40,7 @@ def envoy_cc_binary(
         linkopts = linkopts + _envoy_stamped_linkopts()
         deps = deps + _envoy_stamped_deps()
     linkopts += envoy_dbg_linkopts()
-    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + envoy_stdlib_deps()
+    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps]
     native.cc_binary(
         name = name,
         srcs = srcs,

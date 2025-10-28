@@ -161,11 +161,6 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
         "//conditions:default": default or [],
     })
 
-def envoy_stdlib_deps():
-    return select({
-        "//conditions:default": ["@envoy//bazel:static_stdlib"],
-    })
-
 def envoy_dbg_linkopts():
     return select({
         # TODO: Remove once we have https://github.com/bazelbuild/bazel/pull/15635
