@@ -218,6 +218,8 @@ public:
   EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
   // Sets the node.metadata field in the Bootstrap configuration.
   EngineBuilder& setNodeMetadata(Protobuf::Struct node_metadata);
+  // Sets whether to collect Envoy's internal stats (counters & guages). Off by default.
+  EngineBuilder& enableStatsCollection(bool stats_collection_on);
 
 #ifdef ENVOY_MOBILE_XDS
   // Sets the xDS configuration for the Envoy Mobile engine.
@@ -332,6 +334,7 @@ private:
   std::string node_id_;
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;
   absl::optional<Protobuf::Struct> node_metadata_ = absl::nullopt;
+  bool enable_stats_collection_ = true;
 #ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif // ENVOY_MOBILE_XDS

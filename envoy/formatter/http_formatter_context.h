@@ -163,7 +163,5 @@ private:
   AccessLogType log_type_{AccessLogType::NotSet};
 };
 
-using HttpFormatterContext = Context;
-
 } // namespace Formatter
 } // namespace Envoy

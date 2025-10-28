@@ -32,6 +32,7 @@ envoy_cmake(
         "CMAKE_INSTALL_LIBDIR": "lib",
         "FAT_RUNTIME": "on",
         "RAGEL": "$$EXT_BUILD_DEPS/ragel/bin/ragel",
+        "PYTHON_EXECUTABLE": "$(PYTHON3)",
     },
     default_cache_entries = {},
     exec_properties = select({
@@ -48,6 +49,7 @@ envoy_cmake(
     out_static_libs = ["libhs.a"],
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    toolchains = ["@rules_python//python:current_py_toolchain"],
     deps = [
         "//bazel/foreign_cc:ragel",
     ],

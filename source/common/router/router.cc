@@ -498,8 +498,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           if (!new_uri.empty() && add_location) {
             response_headers.addReferenceKey(Http::Headers::get().Location, new_uri);
           }
-          const Formatter::HttpFormatterContext formatter_context(
-              downstream_headers_, &response_headers, {}, {}, {}, &callbacks_->activeSpan());
+          const Formatter::Context formatter_context(downstream_headers_, &response_headers, {}, {},
+                                                     {}, &callbacks_->activeSpan());
           direct_response->finalizeResponseHeaders(response_headers, formatter_context,
                                                    callbacks_->streamInfo());
         },
@@ -601,8 +601,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
   // Finalize the request headers before the host selection.
-  const Formatter::HttpFormatterContext formatter_context(&headers, {}, {}, {}, {},
-                                                          &callbacks_->activeSpan());
+  const Formatter::Context formatter_context(&headers, {}, {}, {}, {}, &callbacks_->activeSpan());
   route_entry_->finalizeRequestHeaders(headers, formatter_context, callbacks_->streamInfo(),
                                        !config_->suppress_envoy_headers_);
 
@@ -1156,7 +1155,7 @@ absl::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& p
 
 void Filter::applyShadowPolicyHeaders(const ShadowPolicy& shadow_policy,
                                       Http::RequestHeaderMap& headers) const {
-  const Envoy::Formatter::HttpFormatterContext formatter_context{&headers};
+  const Envoy::Formatter::Context formatter_context{&headers};
   shadow_policy.headerEvaluator().evaluateHeaders(headers, formatter_context,
                                                   callbacks_->streamInfo());
 
@@ -1849,8 +1848,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
-  const Formatter::HttpFormatterContext formatter_context(downstream_headers_, headers.get(), {},
-                                                          {}, {}, &callbacks_->activeSpan());
+  const Formatter::Context formatter_context(downstream_headers_, headers.get(), {}, {}, {},
+                                             &callbacks_->activeSpan());
   route_entry_->finalizeResponseHeaders(*headers, formatter_context, callbacks_->streamInfo());
   modify_headers_(*headers);
 
