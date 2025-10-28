@@ -3,9 +3,11 @@
 #include "envoy/common/exception.h"
 #include "envoy/singleton/manager.h"
 
+#include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "extensions/regex_functions.h"
+#include "extensions/strings.h"
 
 #include "cel/expr/syntax.pb.h"
 #include "eval/public/builtin_func_registrar.h"
@@ -101,25 +103,35 @@ ActivationPtr createActivation(const LocalInfo::LocalInfo* local_info,
                                             response_trailers);
 }
 
-BuilderInstanceSharedPtr createBuilder(Protobuf::Arena* arena) {
+BuilderConstPtr createBuilder(OptRef<const envoy::config::core::v3::CelExpressionConfig> config,
+                              Protobuf::Arena* arena) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   google::api::expr::runtime::InterpreterOptions options;
 
-  // Security-oriented defaults
+  // Security-oriented defaults.
   options.enable_comprehension = false;
   options.enable_regex = true;
   options.regex_max_program_size = 100;
   options.enable_qualified_identifier_rewrites = true;
-  options.enable_string_conversion = false;
-  options.enable_string_concat = false;
+
+  // Resolve options from configuration or fall back to security-oriented defaults.
+  bool enable_string_functions = false;
+  if (config.has_value()) {
+    options.enable_string_conversion = config->enable_string_conversion();
+    options.enable_string_concat = config->enable_string_concat();
+    enable_string_functions = config->enable_string_functions();
+  } else {
+    options.enable_string_conversion = false;
+    options.enable_string_concat = false;
+  }
   options.enable_list_concat = false;
 
-  // Performance-oriented defaults
+  // Performance-oriented defaults.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_cel_regex_precompilation")) {
     options.enable_regex_precompilation = true;
   }
 
-  // Enable constant folding (performance optimization)
+  // Enable constant folding with arena if provided for RBAC backward compatibility optimization.
   if (arena != nullptr) {
     options.constant_folding = true;
     options.constant_arena = arena;
@@ -138,14 +150,61 @@ BuilderInstanceSharedPtr createBuilder(Protobuf::Arena* arena) {
     throw CelException(absl::StrCat("failed to register extension regex functions: ",
                                     ext_register_status.message()));
   }
-  return std::make_shared<BuilderInstance>(std::move(builder));
+  // Register string extension functions only if enabled in configuration.
+  if (enable_string_functions) {
+    auto string_register_status =
+        cel::extensions::RegisterStringsFunctions(builder->GetRegistry(), options);
+    if (!string_register_status.ok()) {
+      throw CelException(absl::StrCat("failed to register extension string functions: ",
+                                      string_register_status.message()));
+    }
+  }
+  return builder;
 }
 
-SINGLETON_MANAGER_REGISTRATION(expression_builder);
+BuilderInstanceSharedConstPtr BuilderCache::getOrCreateBuilder(
+    OptRef<const envoy::config::core::v3::CelExpressionConfig> config) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
 
-BuilderInstanceSharedConstPtr getBuilder(Server::Configuration::CommonFactoryContext& context) {
-  return context.singletonManager().getTyped<BuilderInstance>(
-      SINGLETON_MANAGER_REGISTERED_NAME(expression_builder), [] { return createBuilder(nullptr); });
+  ConfigHash hash = 0;
+  if (config.has_value()) {
+    // Use MessageUtil::hash for proto hashing.
+    hash = MessageUtil::hash(config.ref());
+  }
+
+  auto it = builders_.find(hash);
+  if (it != builders_.end()) {
+    auto locked_builder = it->second.lock();
+    if (locked_builder) {
+      return locked_builder;
+    }
+  }
+
+  // Create new builder with the configuration.
+  auto builder = createBuilder(config);
+  auto instance = std::make_shared<BuilderInstance>(std::move(builder), shared_from_this());
+  // Store as weak_ptr to allow release after xDS unload.
+  builders_[hash] = instance;
+  return instance;
+}
+
+SINGLETON_MANAGER_REGISTRATION(builder_cache);
+
+BuilderInstanceSharedConstPtr
+getBuilder(Server::Configuration::CommonFactoryContext& context,
+           OptRef<const envoy::config::core::v3::CelExpressionConfig> config) {
+  auto cache = context.singletonManager().getTyped<BuilderCache>(
+      SINGLETON_MANAGER_REGISTERED_NAME(builder_cache),
+      [] { return std::make_shared<BuilderCache>(); });
+  return cache->getOrCreateBuilder(config);
+}
+
+absl::StatusOr<CompiledExpression>
+CompiledExpression::Create(Server::Configuration::CommonFactoryContext& context,
+                           const cel::expr::Expr& expr,
+                           OptRef<const envoy::config::core::v3::CelExpressionConfig> config) {
+  auto builder = getBuilder(context, config);
+  return Create(builder, expr);
 }
 
 absl::StatusOr<CompiledExpression>
@@ -165,13 +224,13 @@ CompiledExpression::Create(const BuilderInstanceSharedConstPtr& builder,
 absl::StatusOr<CompiledExpression>
 CompiledExpression::Create(const BuilderInstanceSharedConstPtr& builder,
                            const xds::type::v3::CelExpression& xds_expr) {
-  // First try to get expression from the new CEL canonical format
+  // First try to get expression from the new CEL canonical format.
   if (xds_expr.has_cel_expr_checked()) {
     return Create(builder, xds_expr.cel_expr_checked().expr());
   } else if (xds_expr.has_cel_expr_parsed()) {
     return Create(builder, xds_expr.cel_expr_parsed().expr());
   }
-  // Fallback to handling legacy formats for backward compatibility
+  // Fallback to handling legacy formats for backward compatibility.
   switch (xds_expr.expr_specifier_case()) {
   case xds::type::v3::CelExpression::ExprSpecifierCase::kParsedExpr:
     return Create(builder, xds_expr.parsed_expr().expr());
