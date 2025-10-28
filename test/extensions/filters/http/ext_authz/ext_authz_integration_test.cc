@@ -2105,7 +2105,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAddExceedsLimit) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
       });
 
-  initializeConfig({.enforce_response_header_limits=true});
+  initializeConfig({.enforce_response_header_limits = true});
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
 
@@ -2149,7 +2149,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToSetExceedsLimit) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
       });
 
-  initializeConfig({.enforce_response_header_limits=true});
+  initializeConfig({.enforce_response_header_limits = true});
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
 
@@ -2200,7 +2200,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAppendIfAbsentExceedsLimit) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
       });
 
-  initializeConfig({.enforce_response_header_limits=true});
+  initializeConfig({.enforce_response_header_limits = true});
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
 
