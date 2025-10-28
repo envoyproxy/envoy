@@ -127,6 +127,7 @@ public:
 
   EngineBuilder& setLogLevel(Logger::Logger::Levels log_level);
   EngineBuilder& setLogger(std::unique_ptr<EnvoyLogger> logger);
+  EngineBuilder& enableLogger(bool logger_on);
   EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
   EngineBuilder& setOnEngineRunning(absl::AnyInvocable<void()> closure);
   EngineBuilder& setOnEngineExit(absl::AnyInvocable<void()> closure);
@@ -260,6 +261,7 @@ private:
 
   Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;
   std::unique_ptr<EnvoyLogger> logger_{nullptr};
+  bool enable_logger_{true};
   std::unique_ptr<EngineCallbacks> callbacks_;
   std::unique_ptr<EnvoyEventTracker> event_tracker_{nullptr};
 
