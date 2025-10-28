@@ -178,8 +178,7 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
 
   filter_->decodeHeaders(headers, false);
 
-  std::string json =
-      R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
   Buffer::OwnedImpl decoding_buffer;
 
