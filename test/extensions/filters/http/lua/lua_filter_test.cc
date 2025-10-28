@@ -3931,6 +3931,62 @@ TEST_F(LuaHttpFilterTest, GetStreamInfoTypedMetadataUnpackFailure) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
+// Test drainConnectionUponCompletion on request path.
+TEST_F(LuaHttpFilterTest, DrainConnectionUponCompletionRequest) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:streamInfo():drainConnectionUponCompletion()
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Event::SimulatedTimeSystem test_time;
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_FALSE(stream_info.shouldDrainConnectionUponCompletion());
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_TRUE(stream_info.shouldDrainConnectionUponCompletion());
+}
+
+// Test drainConnectionUponCompletion on response path.
+TEST_F(LuaHttpFilterTest, DrainConnectionUponCompletionResponse) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      -- Check for Connection: close header from upstream.
+      local connection_header = response_handle:headers():get("connection")
+      if connection_header == "close" then
+        response_handle:streamInfo():drainConnectionUponCompletion()
+        response_handle:logTrace("drain_set_to_true")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Event::SimulatedTimeSystem test_time;
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+  // Verify initially false.
+  EXPECT_FALSE(stream_info.shouldDrainConnectionUponCompletion());
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"connection", "close"}};
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
+  EXPECT_LOG_CONTAINS("trace", "drain_set_to_true",
+                      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                filter_->encodeHeaders(response_headers, true)));
+
+  // Verify it was set to true.
+  EXPECT_TRUE(stream_info.shouldDrainConnectionUponCompletion());
+}
+
 // Test that handle:virtualHost():metadata() works when both virtual host and route match.
 // This verifies that when a virtual host is matched and a route is found for the request,
 // the virtualHost() function returns a valid object and metadata can be accessed

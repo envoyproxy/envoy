@@ -50,14 +50,14 @@ TEST(DelegatingRouteEntry, DelegatingRouteEntryTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   StreamInfo::MockStreamInfo stream_info;
-  const Formatter::HttpFormatterContext formatter_context(&request_headers, &response_headers);
+  const Formatter::Context formatter_context(&request_headers, &response_headers);
 
   TEST_METHOD(finalizeResponseHeaders, response_headers, formatter_context, stream_info);
   TEST_METHOD(responseHeaderTransforms, stream_info);
   TEST_METHOD(clusterName);
   TEST_METHOD(clusterNotFoundResponseCode);
   TEST_METHOD(corsPolicy);
-  TEST_METHOD(currentUrlPathAfterRewrite, request_headers);
+  TEST_METHOD(currentUrlPathAfterRewrite, request_headers, formatter_context, stream_info);
   TEST_METHOD(finalizeRequestHeaders, request_headers, formatter_context, stream_info, true);
   TEST_METHOD(requestHeaderTransforms, stream_info);
   TEST_METHOD(hashPolicy);

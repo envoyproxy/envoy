@@ -1023,6 +1023,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/integration/filters:local_reply_during_decoding_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -2932,8 +2933,8 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "ads_lrs_grpc_client_cache_test",
-    srcs = ["ads_lrs_grpc_client_cache_test.cc"],
+    name = "ads_lrs_grpc_client_cache_integration_test",
+    srcs = ["ads_lrs_grpc_client_cache_integration_test.cc"],
     deps = [
         ":http_integration_lib",
         "//test/test_common:test_runtime_lib",

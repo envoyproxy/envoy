@@ -61,7 +61,7 @@ jobs:
       timeout-minutes: 120
       trusted: ${{ inputs.trusted }}
       upload-name: release.${{ inputs.arch }}
-      upload-path: envoy/${{ inputs.arch }}/bin/
+      upload-path: container/envoy/${{ inputs.arch }}/bin/
 
   docker:
     permissions:
@@ -79,7 +79,7 @@ jobs:
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
       downloads: |
-        release.${{ inputs.arch }}: envoy/${{ inputs.arch }}/bin/
+        release.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/bin/
       request: ${{ inputs.request }}
       source: |
         export NO_BUILD_SETUP=1
@@ -92,7 +92,7 @@ jobs:
         # export DOCKER_FORCE_OCI_OUTPUT=true
       trusted: ${{ inputs.trusted }}
       upload-name: oci.${{ inputs.arch }}
-      upload-path: envoy/${{ inputs.arch }}/build_images
+      upload-path: container/envoy/${{ inputs.arch }}/build_images
       runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
 
   distribution:
@@ -112,7 +112,7 @@ jobs:
       bazel-extra: >-
         --config=remote-cache-envoy-engflow
       downloads: |
-        release.${{ inputs.arch }}: release/${{ inputs.arch }}/bin/
+        release.${{ inputs.arch }}: container/release/${{ inputs.arch }}/bin/
       target: distribution
       target-suffix: ${{ inputs.arch }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
@@ -125,4 +125,4 @@ jobs:
       runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
       trusted: ${{ inputs.trusted }}
       upload-name: packages.${{ inputs.arch }}
-      upload-path: envoy/${{ inputs.arch }}
+      upload-path: container/envoy/${{ inputs.arch }}

@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: QUIC listener config]
 
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
@@ -99,4 +99,10 @@ message QuicProtocolOptions {
   // QUIC layer by replying with an empty version negotiation packet to the
   // client.
   bool reject_new_connections = 13;
+
+  // Maximum number of QUIC sessions to create per event loop.
+  // If not specified, the default value is 16.
+  // This is an equivalent of the TCP listener option
+  // max_connections_to_accept_per_socket_event.
+  google.protobuf.UInt32Value max_sessions_per_event_loop = 14 [(validate.rules).uint32 = {gt: 0}];
 }

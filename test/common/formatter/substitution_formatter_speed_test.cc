@@ -71,7 +71,7 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
 
   size_t output_bytes = 0;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += formatter->formatWithContext({}, *stream_info).length();
+    output_bytes += formatter->format({}, *stream_info).length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -104,7 +104,7 @@ static void BM_AccessLogFormatterTextMockJson(benchmark::State& state) {
 
   size_t output_bytes = 0;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += formatter->formatWithContext({}, *stream_info).length();
+    output_bytes += formatter->format({}, *stream_info).length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -119,7 +119,7 @@ static void BM_JsonAccessLogFormatter(benchmark::State& state) {
 
   size_t output_bytes = 0;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += json_formatter->formatWithContext({}, *stream_info).length();
+    output_bytes += json_formatter->format({}, *stream_info).length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }

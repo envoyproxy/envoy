@@ -372,7 +372,7 @@ void UdpProxyFilter::ActiveSession::onSessionComplete() {
 
   if (!filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
-    const Formatter::HttpFormatterContext log_context{
+    const Formatter::Context log_context{
         nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpSessionEnd};
     for (const auto& access_log : filter_.config_->sessionAccessLogs()) {
       access_log->log(log_context, udp_session_info_);
@@ -772,7 +772,7 @@ void UdpProxyFilter::ActiveSession::writeDownstream(Network::UdpRecvData& recv_d
 
 void UdpProxyFilter::ActiveSession::onAccessLogFlushInterval() {
   fillSessionStreamInfo();
-  const Formatter::HttpFormatterContext log_context{
+  const Formatter::Context log_context{
       nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpPeriodic};
   for (const auto& access_log : filter_.config_->sessionAccessLogs()) {
     access_log->log(log_context, udp_session_info_);
@@ -1111,7 +1111,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamReady(StreamInfo::StreamInf
 
   if (filter_.config_->flushAccessLogOnTunnelConnected()) {
     fillSessionStreamInfo();
-    const Formatter::HttpFormatterContext log_context{
+    const Formatter::Context log_context{
         nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpTunnelUpstreamConnected};
     for (const auto& access_log : filter_.config_->sessionAccessLogs()) {
       access_log->log(log_context, udp_session_info_);

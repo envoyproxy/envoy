@@ -5856,20 +5856,11 @@ TEST_P(DownstreamProtocolIntegrationTest, EmptyCookieHeader) {
 
   const bool has_empty_cookie =
       !upstream_request_->headers().get(Http::LowerCaseString("cookie")).empty();
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_remove_empty_cookie")) {
-    if (downstreamProtocol() == Http::CodecType::HTTP1 &&
-        upstreamProtocol() == Http::CodecType::HTTP1) {
-      EXPECT_TRUE(has_empty_cookie);
-    } else {
-      EXPECT_FALSE(has_empty_cookie);
-    }
+  if (downstreamProtocol() == Http::CodecType::HTTP1 &&
+      upstreamProtocol() == Http::CodecType::HTTP1) {
+    EXPECT_TRUE(has_empty_cookie);
   } else {
-    if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-        upstreamProtocol() == Http::CodecType::HTTP2) {
-      EXPECT_FALSE(has_empty_cookie);
-    } else {
-      EXPECT_TRUE(has_empty_cookie);
-    }
+    EXPECT_FALSE(has_empty_cookie);
   }
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
