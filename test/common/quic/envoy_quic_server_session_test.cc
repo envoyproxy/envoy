@@ -292,7 +292,7 @@ protected:
   Http::ServerConnectionPtr http_connection_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
-  NickMock<Server::MockOverloadManager> overload_manager_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 };
 
 TEST_F(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
