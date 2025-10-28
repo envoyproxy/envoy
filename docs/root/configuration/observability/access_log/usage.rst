@@ -456,6 +456,7 @@ The following command operators are supported:
     * ``US_TX_BEG``: The time point of the upstream request sending begin.
     * ``US_TX_END``: The time point of the upstream request sending end.
     * ``US_RX_BEG``: The time point of the upstream response receiving begin.
+    * ``US_RX_BODY_BEG``: The time point of the upstream response body receiving begin.
     * ``US_RX_END``: The time point of the upstream response receiving end.
     * ``DS_TX_BEG``: The time point of the downstream response sending begin.
     * ``DS_TX_END``: The time point of the downstream response sending end.
@@ -500,20 +501,6 @@ The following command operators are supported:
   HTTP
     Total duration in milliseconds of the request from the start time to the first byte read from the
     upstream host.
-
-  TCP/UDP
-    Not implemented ("-").
-
-  Renders a numeric value in typed JSON logs.
-
-%RESPONSE_FIRST_UPSTREAM_DATA_DURATION%
-  HTTP
-    Total duration in milliseconds of the request from the start time to the first DATA frame byte
-    received from the upstream host. For HTTP/2 and HTTP/3, this is distinct from RESPONSE_DURATION
-    because the upstream may send HEADERS frames before DATA frames. This metric is particularly useful
-    for measuring time-to-first-token (TTFT) in streaming scenarios such as gRPC streaming or
-    Server-Sent Events, where the initial headers are sent immediately but the first chunk of actual
-    response data may arrive later after processing.
 
   TCP/UDP
     Not implemented ("-").

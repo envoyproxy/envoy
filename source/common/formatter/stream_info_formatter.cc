@@ -363,6 +363,14 @@ const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointG
            }
            return {};
          }},
+        {FirstUpstreamRxBodyReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().first_upstream_rx_body_byte_received_;
+           }
+           return {};
+         }},
         {LastUpstreamRxByteReceived,
          [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
            const auto upstream_info = stream_info.upstreamInfo();
@@ -839,15 +847,6 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   [](const StreamInfo::StreamInfo& stream_info) {
                     StreamInfo::TimingUtility timing(stream_info);
                     return timing.firstUpstreamRxByteReceived();
-                  });
-            }}},
-          {"RESPONSE_FIRST_UPSTREAM_DATA_DURATION",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoDurationFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    StreamInfo::TimingUtility timing(stream_info);
-                    return timing.firstUpstreamDataRxByteReceived();
                   });
             }}},
           {"RESPONSE_TX_DURATION",

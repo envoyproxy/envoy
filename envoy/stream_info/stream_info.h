@@ -330,14 +330,11 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the first DATA frame byte is received from upstream.
-   * For HTTP/2 and HTTP/3, this captures when the first DATA frame arrives,
-   * which may be after headers. This is useful for measuring time-to-first-token
-   * in streaming scenarios like gRPC or Server-Sent Events.
+   * Sets the time when the first byte of the response body is received from upstream.
    */
-  void onFirstUpstreamDataRxByteReceived(TimeSource& time_source) {
-    ASSERT(!first_upstream_data_rx_byte_received_);
-    first_upstream_data_rx_byte_received_ = time_source.monotonicTime();
+  void onFirstUpstreamRxBodyByteReceived(TimeSource& time_source) {
+    ASSERT(!first_upstream_rx_body_byte_received_);
+    first_upstream_rx_body_byte_received_ = time_source.monotonicTime();
   }
 
   void onUpstreamConnectStart(TimeSource& time_source) {
@@ -366,7 +363,7 @@ struct UpstreamTiming {
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
-  absl::optional<MonotonicTime> first_upstream_data_rx_byte_received_;
+  absl::optional<MonotonicTime> first_upstream_rx_body_byte_received_;
 
   absl::optional<MonotonicTime> upstream_connect_start_;
   absl::optional<MonotonicTime> upstream_connect_complete_;
