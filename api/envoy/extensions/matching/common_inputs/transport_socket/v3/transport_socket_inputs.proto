@@ -99,4 +99,3 @@ message TransportSocketNameAction {
   // This name must reference a named transport socket in the cluster's transport_socket_matches.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 }
-
