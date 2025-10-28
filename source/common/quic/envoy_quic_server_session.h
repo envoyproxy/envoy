@@ -156,7 +156,7 @@ private:
   QuicConnectionStats& connection_stats_;
   quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
   std::unique_ptr<quic::QuicConnectionDebugVisitor> debug_visitor_;
-  // Loadshed points for GoAway
+  // Load shed points for H3 GoAway
   Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
   Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
   bool h3_go_away_sent_ = false;
