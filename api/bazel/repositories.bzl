@@ -37,8 +37,6 @@ def api_dependencies(bzlmod = False):
     )
     external_http_archive(
         name = "com_envoyproxy_protoc_gen_validate",
-        patch_args = ["-p1"],
-        patches = ["@envoy_api//bazel:pgv.patch"],
     )
     external_http_archive(
         name = "com_google_googleapis",
