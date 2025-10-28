@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_enable_http3",
@@ -450,9 +451,53 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_extension(
+    name = "transport_socket_input_lib_envoy_extension",
+    srcs = ["transport_socket_input.cc"],
+    hdrs = ["transport_socket_input.h"],
+    deps = [
+        "//envoy/matcher:matcher_interface",
+        "//envoy/network:address_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/config:metadata_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/json:json_utility_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/transport_socket/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/metadata/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_library(
     name = "transport_socket_match_lib",
     srcs = ["transport_socket_match_impl.cc"],
+    hdrs = ["transport_socket_match_impl.h"],
+    deps = [
+        ":transport_socket_input_lib",
+        ":upstream_includes",
+        "//envoy/matcher:matcher_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/matcher:field_matcher_lib",
+        "//source/common/matcher:matcher_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_extension(
+    name = "transport_socket_match_lib_envoy_extension",
+    srcs = ["transport_socket_match_impl.cc"],
+    hdrs = ["transport_socket_match_impl.h"],
     deps = [
         ":transport_socket_input_lib",
         ":upstream_includes",
