@@ -287,16 +287,28 @@ void OpenTelemetryGrpcMetricsExporterImpl::onFailure(Grpc::Status::GrpcStatus re
 }
 
 template <class StatType>
-OptRef<const SinkConfig::ConversionAction>
+OtlpMetricsFlusherImpl::MetricConfig
 OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
   Stats::StatMatchingDataImpl<StatType> data(stat);
   const ::Envoy::Matcher::MatchResult result =
       Envoy::Matcher::evaluateMatch<Stats::StatMatchingData>(*config_->matcher(), data);
   ASSERT(result.isComplete());
-  if (!result.isMatch()) {
-    return {};
+  if (result.isMatch()) {
+    if (dynamic_cast<const DropAction*>(result.action().get())) {
+      return {true, {}};
+    }
+
+    if (const auto* match_action = dynamic_cast<const ConversionAction*>(result.action().get())) {
+      return {false, *match_action->config()};
+    }
+
+    ENVOY_LOG(error, "Unknown action type for custom metric conversion: {}",
+              result.action()->typeUrl());
   }
-  return {*result.action()->getTyped<OnMatchAction>().config()};
+
+  // By default, this stat will be converted to the metric without any
+  // customization.
+  return {false, {}};
 }
 
 template <class StatType>
@@ -343,15 +355,23 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   for (const auto& gauge : snapshot.gauges()) {
     if (predicate_(gauge)) {
       auto metric_config = getMetricConfig(gauge.get());
-      const std::string metric_name = getMetricName(gauge.get(), metric_config);
-      auto attributes = getCombinedAttributes(gauge.get(), metric_config);
+      if (metric_config.drop_stat) {
+        continue;
+      }
+
+      const std::string metric_name = getMetricName(gauge.get(), metric_config.conversion_action);
+      auto attributes = getCombinedAttributes(gauge.get(), metric_config.conversion_action);
       aggregator.addGauge(metric_name, gauge.get().value(), attributes);
     };
   }
   for (const auto& gauge : snapshot.hostGauges()) {
     auto metric_config = getMetricConfig(gauge);
-    const std::string metric_name = getMetricName(gauge, metric_config);
-    auto attributes = getCombinedAttributes(gauge, metric_config);
+    if (metric_config.drop_stat) {
+      continue;
+    }
+
+    const std::string metric_name = getMetricName(gauge, metric_config.conversion_action);
+    auto attributes = getCombinedAttributes(gauge, metric_config.conversion_action);
     aggregator.addGauge(metric_name, gauge.value(), attributes);
   }
 
@@ -363,16 +383,26 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   for (const auto& counter : snapshot.counters()) {
     if (predicate_(counter.counter_)) {
       auto metric_config = getMetricConfig(counter.counter_.get());
-      const std::string metric_name = getMetricName(counter.counter_.get(), metric_config);
-      auto attributes = getCombinedAttributes(counter.counter_.get(), metric_config);
+      if (metric_config.drop_stat) {
+        continue;
+      }
+
+      const std::string metric_name =
+          getMetricName(counter.counter_.get(), metric_config.conversion_action);
+      auto attributes =
+          getCombinedAttributes(counter.counter_.get(), metric_config.conversion_action);
       aggregator.addCounter(metric_name, counter.counter_.get().value(), counter.delta_,
                             counter_temporality, attributes);
     }
   }
   for (const auto& counter : snapshot.hostCounters()) {
     auto metric_config = getMetricConfig(counter);
-    const std::string metric_name = getMetricName(counter, metric_config);
-    auto attributes = getCombinedAttributes(counter, metric_config);
+    if (metric_config.drop_stat) {
+      continue;
+    }
+
+    const std::string metric_name = getMetricName(counter, metric_config.conversion_action);
+    auto attributes = getCombinedAttributes(counter, metric_config.conversion_action);
     aggregator.addCounter(metric_name, counter.value(), counter.delta(), counter_temporality,
                           attributes);
   }
@@ -385,8 +415,13 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   for (const auto& histogram : snapshot.histograms()) {
     if (predicate_(histogram)) {
       auto metric_config = getMetricConfig(histogram.get());
-      const std::string metric_name = getMetricName(histogram.get(), metric_config);
-      auto attributes = getCombinedAttributes(histogram.get(), metric_config);
+      if (metric_config.drop_stat) {
+        continue;
+      }
+
+      const std::string metric_name =
+          getMetricName(histogram.get(), metric_config.conversion_action);
+      auto attributes = getCombinedAttributes(histogram.get(), metric_config.conversion_action);
       const Stats::HistogramStatistics& histogram_stats =
           config_->reportHistogramsAsDeltas() ? histogram.get().intervalStatistics()
                                               : histogram.get().cumulativeStatistics();

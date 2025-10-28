@@ -48,6 +48,7 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: CI ${{ matrix.name || matrix.target }}
     with:
+      bind-mount: false
       command:
       container-command:
       docker-ipv6: false

@@ -370,7 +370,7 @@ Config::SharedConfig::evaluateDynamicTLVs(const StreamInfo::StreamInfo& stream_i
 
   // Evaluate dynamic TLV formatters.
   for (const auto& tlv_formatter : dynamic_tlv_formatters_) {
-    const std::string formatted_value = tlv_formatter.formatter->formatWithContext({}, stream_info);
+    const std::string formatted_value = tlv_formatter.formatter->format({}, stream_info);
 
     // Convert formatted string to bytes and add to result.
     result.push_back({tlv_formatter.type,
@@ -616,18 +616,6 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
     cluster->trafficStats()->upstream_cx_overflow_.inc();
     onInitFailure(UpstreamFailureReason::ResourceLimitExceeded);
     return Network::FilterStatus::StopIteration;
-  }
-
-  if (!config_->backoffStrategy() &&
-      !Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop")) {
-    const uint32_t max_connect_attempts = config_->maxConnectAttempts();
-    if (connect_attempts_ >= max_connect_attempts) {
-      getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
-      cluster->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
-      onInitFailure(UpstreamFailureReason::ConnectFailed);
-      return Network::FilterStatus::StopIteration;
-    }
   }
 
   auto& downstream_connection = read_callbacks_->connection();
@@ -880,10 +868,18 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     }
     request_id_extension_ = extension_or_error.value();
   }
+
+  // Populate optional request ID customization fields if provided.
+  if (!config_message.tunneling_config().request_id_header().empty()) {
+    request_id_header_ = config_message.tunneling_config().request_id_header();
+  }
+  if (!config_message.tunneling_config().request_id_metadata_key().empty()) {
+    request_id_metadata_key_ = config_message.tunneling_config().request_id_metadata_key();
+  }
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
-  return hostname_fmt_->formatWithContext({}, stream_info);
+  return hostname_fmt_->format({}, stream_info);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseHeaders(
@@ -1085,13 +1081,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         }
       }
       if (!downstream_closed_) {
-        if (!config_->backoffStrategy() &&
-            !Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop")) {
-          onRetryTimer();
-          return;
-        }
-
+        // Always defer retry to a different event loop iteration via the retry timer.
         if (connect_attempts_ >= config_->maxConnectAttempts()) {
           onConnectMaxAttempts();
           return;
@@ -1197,7 +1187,7 @@ void Filter::onAccessLogFlushInterval() {
 }
 
 void Filter::flushAccessLog(AccessLog::AccessLogType access_log_type) {
-  const Formatter::HttpFormatterContext log_context{nullptr, nullptr, nullptr, {}, access_log_type};
+  const Formatter::Context log_context{nullptr, nullptr, nullptr, {}, access_log_type};
 
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(log_context, getStreamInfo());

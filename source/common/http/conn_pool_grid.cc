@@ -330,12 +330,11 @@ ConnectivityGrid::ConnectivityGrid(
   // HTTP/3.
   ASSERT(connectivity_options.protocols_.size() == 3);
   ASSERT(alternate_protocols);
-  std::chrono::milliseconds rtt =
-      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(
-          origin_, Runtime::runtimeFeatureEnabled(
-                       "envoy.reloadable_features.use_canonical_suffix_for_srtt")));
+  std::chrono::microseconds rtt = alternate_protocols_->getSrtt(
+      origin_,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_canonical_suffix_for_srtt"));
   if (rtt.count() != 0) {
-    next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 2);
+    next_attempt_duration_ = std::chrono::duration_cast<std::chrono::milliseconds>(rtt * 1.5);
   }
 }
 

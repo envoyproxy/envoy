@@ -247,20 +247,19 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
             std::make_unique<DecodedResourceImpl>(resource_decoder, resource));
       }
       END_TRY
-      catch (const EnvoyException& e) {
-        xds_resources_delegate_->onResourceLoadFailed(source_id, resource.name(), e);
-      }
+      CATCH(const EnvoyException& e,
+            { xds_resources_delegate_->onResourceLoadFailed(source_id, resource.name(), e); });
     }
 
     processDiscoveryResources(decoded_resources, api_state, type_url, version_info,
                               /*call_delegate=*/false);
   }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     // TODO(abeyad): do something else here?
     ENVOY_LOG_MISC(warn, "Failed to load config from delegate for {}: {}", source_id.toKey(),
                    e.what());
-  }
+  });
 }
 
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
@@ -412,7 +411,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       // TODO(snowp): Check the underlying type when the resource is a Resource.
       if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
           type_url != resource.type_url()) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
                         resource.type_url(), type_url, message->DebugString()));
       }
@@ -435,7 +434,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     }
   }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     for (auto watch : api_state.watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
@@ -448,7 +447,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     if (xds_config_tracker_.has_value()) {
       xds_config_tracker_->onConfigRejected(*message, error_detail->message());
     }
-  }
+  });
   api_state.previously_fetched_data_ = true;
   api_state.request_.set_response_nonce(message->nonce());
   ASSERT(api_state.paused());
