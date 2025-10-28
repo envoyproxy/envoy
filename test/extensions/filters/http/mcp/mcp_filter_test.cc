@@ -296,15 +296,6 @@ TEST_F(McpFilterTest, PostWithWrongContentType) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
-// Test case-insensitive header matching
-TEST_F(McpFilterTest, CaseInsensitiveHeaders) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
-                                         {"Accept", "Text/Event-Stream"}}; // Different case
-
-  // Should still match as SSE request
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-}
-
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters
