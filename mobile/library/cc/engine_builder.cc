@@ -27,6 +27,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
+#include "absl/debugging/leak_check.h"
 #include "fmt/core.h"
 #include "library/common/internal_engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
@@ -57,6 +58,11 @@ EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
 
 EngineBuilder& EngineBuilder::setLogger(std::unique_ptr<EnvoyLogger> logger) {
   logger_ = std::move(logger);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableLogger(bool logger_on) {
+  enable_logger_ = logger_on;
   return *this;
 }
 
@@ -1019,9 +1025,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  InternalEngine* envoy_engine =
-      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-                         network_thread_priority_, disable_dns_refresh_on_network_change_);
+  InternalEngine* envoy_engine = absl::IgnoreLeak(new InternalEngine(
+      std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+      network_thread_priority_, disable_dns_refresh_on_network_change_, enable_logger_));
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
