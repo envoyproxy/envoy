@@ -21,7 +21,7 @@ message Mcp {
     // Default mode - pass through all traffic (MCP and non-MCP)
     // MCP JSON_RPC is parsed to metadata
     PASS_THROUGH = 0;
-    
+
     // Reject requests that are not MCP valid
     // Valid MCP requests include:
     // - POST requests with JSON-RPC 2.0 messages

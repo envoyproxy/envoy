@@ -96,6 +96,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       is_mcp_request_ = false;
     } else {
       // Need to buffer the body to check for JSON-RPC 2.0
+      is_mcp_request_ = true;
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
@@ -112,7 +113,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
 }
 
 Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  if (!is_json_post_request_) {
+  if (!is_json_post_request_ || !is_mcp_request_) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -128,6 +129,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     // Always reject for no-valid JSON requests
     if (!status.ok()) {
       is_mcp_request_ = false;
+      ENVOY_LOG(debug, "failed to parse the JSON");
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::BadRequest,
                                          "Request body is not a valid JSON.", nullptr,
                                          absl::nullopt, "");
@@ -138,7 +140,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     if (metadata_->fields().contains("jsonrpc") &&
         metadata_->fields().at("jsonrpc").string_value() == McpConstants::JsonRpcVersion) {
       is_mcp_request_ = true;
-      // TODO(botengyao) Add more detailed MCP validataion
+      // TODO(botengyao) Add more detailed MCP check.
       finalizeDynamicMetadata();
       ENVOY_LOG(debug, "valid MCP JSON-RPC 2.0 request detected");
       return Http::FilterDataStatus::Continue;

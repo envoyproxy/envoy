@@ -115,7 +115,7 @@ TEST_P(McpFilterIntegrationTest, MissingJsonRpcFieldPass) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Test no-MCP traffic is passed through without both accpet headers
+// Test no-MCP traffic is passed through without both accept headers
 TEST_P(McpFilterIntegrationTest, NoAcceptHeaderPassThrough) {
   initializeFilter();
 
@@ -158,7 +158,7 @@ TEST_P(McpFilterIntegrationTest, WrongContentTypePostRequestIgnored) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Test no-MCP traffic is passed through without both accpet headers
+// Test no-MCP traffic is passed through without both accept headers
 TEST_P(McpFilterIntegrationTest, NoAcceptHeaderReject) {
   initializeFilter(R"EOF(
     name: envoy.filters.http.mcp
