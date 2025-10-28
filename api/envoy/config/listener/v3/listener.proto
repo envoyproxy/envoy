@@ -54,7 +54,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -360,6 +360,15 @@ message Listener {
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
   // emitted by this listener.
   repeated accesslog.v3.AccessLog access_log = 22;
+
+  message AccessLogOptions {
+    // If set to true, the access log is flushed when a TCP connection starts, after the
+    // transport socket successfully connected.
+    bool flush_access_log_on_connected = 2;
+  }
+
+  // Additional access log options for the listener.
+  AccessLogOptions access_log_options = 37;
 
   // The maximum length a tcp listener's pending connections queue can grow to. If no value is
   // provided net.core.somaxconn will be used on Linux and 128 otherwise.

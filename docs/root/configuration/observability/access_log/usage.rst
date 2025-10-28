@@ -8,8 +8,9 @@ Configuration
 
 Access logs are configured as part of the :ref:`HTTP connection manager config
 <config_http_conn_man>`, :ref:`TCP Proxy <config_network_filters_tcp_proxy>`,
-:ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>` or
-:ref:`Thrift Proxy <config_network_filters_thrift_proxy>`.
+:ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`,
+:ref:`Thrift Proxy <config_network_filters_thrift_proxy>` or
+:ref:`listener <envoy_v3_api_field_config.listener.v3.Listener.access_log>`
 
 * :ref:`v3 API reference <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
 
