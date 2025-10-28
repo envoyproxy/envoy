@@ -105,6 +105,13 @@ new_features:
   change: |
     Added support for not-equal operator for access log filter rules, in
     :ref:`ComparisonFilter <envoy_v3_api_msg_config.accesslog.v3.ComparisonFilter>`.
+- area: formatter
+  change: |
+    Added support for the following new access log formatters:
+    - ``%REQUEST_HEADER(X?Y):Z%`` as full name version of ``%REQ(X?Y):Z%``
+    - ``%RESPONSE_HEADER(X?Y):Z%`` as full name version of ``%RESP(X?Y):Z%``
+    - ``%RESPONSE_TRAILER(X?Y):Z%`` as full name version of ``%TRAILER(X?Y):Z%``
+    This mainly to provide a more consistent naming scheme for users to understand and use.
 - area: lua
   change: |
     Added ``drainConnectionUponCompletion()`` to the Lua filter stream info API. This allows Lua scripts

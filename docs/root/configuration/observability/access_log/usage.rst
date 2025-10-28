@@ -44,10 +44,10 @@ If custom format string is not specified, Envoy uses the following default forma
 
 .. code-block:: none
 
-  [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
+  [%START_TIME%] "%REQUEST_HEADER(:METHOD)% %REQUEST_HEADER(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
   %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
-  %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%"
-  "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
+  %RESPONSE_HEADER(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQUEST_HEADER(X-FORWARDED-FOR)%" "%REQUEST_HEADER(USER-AGENT)%"
+  "%REQUEST_HEADER(X-REQUEST-ID)%" "%REQUEST_HEADER(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
 
 Example of the default Envoy access log format:
 
@@ -75,7 +75,7 @@ For example, with the following format provided in the configuration as ``json_f
       "json_format": {
           "protocol": "%PROTOCOL%",
           "duration": "%DURATION%",
-          "my_custom_header": "%REQ(MY_CUSTOM_HEADER)%"
+          "my_custom_header": "%REQUEST_HEADER(MY_CUSTOM_HEADER)%"
       }
     }
   }
@@ -835,8 +835,8 @@ UDP
   An identifier for the stream (HTTP request, long-live HTTP2 stream, TCP connection, etc.). It can be used to
   cross-reference TCP access logs across multiple log sinks, or to cross-reference timer-based reports for the same connection.
   Different with %CONNECTION_ID%, the identifier should be unique across multiple instances or between restarts.
-  And it's value should be same with %REQ(X-REQUEST-ID)% for HTTP request.
-  This should be used to replace %CONNECTION_ID% and %REQ(X-REQUEST-ID)% in most cases.
+  And it's value should be same with %REQUEST_HEADER(X-REQUEST-ID)% for HTTP request.
+  This should be used to replace %CONNECTION_ID% and %REQUEST_HEADER(X-REQUEST-ID)% in most cases.
 
 %GRPC_STATUS(X)%
   `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>`_ formatted according to the optional parameter ``X``, which can be ``CAMEL_STRING``, ``SNAKE_STRING`` and ``NUMBER``.
@@ -848,7 +848,7 @@ UDP
 
 .. _config_access_log_format_req:
 
-%REQ(X?Y):Z%
+%REQUEST_HEADER(X?Y):Z%/%REQ(X?Y):Z%
   HTTP
     An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
     optional parameter denoting string truncation up to Z characters long. The value is taken from
@@ -858,16 +858,16 @@ UDP
   TCP/UDP
     Not implemented ("-").
 
-%RESP(X?Y):Z%
+%RESPONSE_HEADER(X?Y):Z%/%RESP(X?Y):Z%
   HTTP
-    Same as **%REQ(X?Y):Z%** but taken from HTTP response headers.
+    Same as **%REQUEST_HEADER(X?Y):Z%** but taken from HTTP response headers.
 
   TCP/UDP
     Not implemented ("-").
 
-%TRAILER(X?Y):Z%
+%RESPONSE_TRAILER(X?Y):Z%/%TRAILER(X?Y):Z%
   HTTP
-    Same as **%REQ(X?Y):Z%** but taken from HTTP response trailers.
+    Same as **%REQUEST_HEADER(X?Y):Z%** but taken from HTTP response trailers.
 
   TCP/UDP
     Not implemented ("-").
