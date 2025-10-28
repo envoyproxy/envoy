@@ -8,12 +8,9 @@
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_utility.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/stream_message.h"
-#include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util/field_checker.h"
 
 #include "absl/log/check.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
-#include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
-#include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,8 +22,6 @@ using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::MessageConverter;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::StreamMessage;
 using ::Envoy::Grpc::Status;
 using ::Envoy::Grpc::Utility;
-using proto_processing_lib::proto_scrubber::FieldCheckerInterface;
-using proto_processing_lib::proto_scrubber::ScrubberContext;
 
 const char kRcDetailFilterProtoApiScrubber[] = "proto_api_scrubber";
 const char kRcDetailErrorRequestBufferConversion[] = "REQUEST_BUFFER_CONVERSION_FAIL";
@@ -56,14 +51,6 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
 
   request_msg_converter_ = std::make_unique<MessageConverter>(
       std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
-
-  request_scrubber_ = std::make_unique<ProtoScrubber>(
-      /*RequestType*/
-      nullptr,
-      /*TypeFinder*/ [](const std::string&) { return nullptr; },
-      /*FieldCheckerList*/ std::vector<const FieldCheckerInterface*>{},
-      ScrubberContext::kRequestScrubbing,
-      /*field_check_only*/ false);
 
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
@@ -113,11 +100,6 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
 
       // Skip the empty message
       continue;
-    }
-
-    absl::Status scrubbing_status = request_scrubber_->Scrub(stream_message->message());
-    if (!scrubbing_status.ok()) {
-      return Envoy::Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
     auto buf_convert_status =
