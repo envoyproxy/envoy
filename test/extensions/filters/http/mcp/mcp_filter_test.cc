@@ -136,8 +136,8 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
 
   filter_->decodeHeaders(headers, false);
 
-  std::string non_jsonrpc = R"({"method": "test"})"; // Missing jsonrpc field
-  Buffer::OwnedImpl buffer(non_jsonrpc);
+  std::string body = R"({"method": "test"})";
+  Buffer::OwnedImpl buffer(body);
   Buffer::OwnedImpl decoding_buffer;
 
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
