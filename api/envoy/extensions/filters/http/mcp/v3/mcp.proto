@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.mcp.v3;
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp.v3";
 option java_outer_classname = "McpProto";
@@ -15,10 +16,25 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.mcp]
 
 message Mcp {
-  // TODO: Add configuration fields
+  // Traffic handling mode.
+  enum TrafficMode {
+    // Default mode - pass through all traffic (MCP and non-MCP)
+    // MCP JSON_RPC is parsed to metadata
+    PASS_THROUGH = 0;
+    
+    // Reject requests that are not MCP valid
+    // Valid MCP requests include:
+    // - POST requests with JSON-RPC 2.0 messages
+    // - GET requests for SSE streams (with Accept: text/event-stream)
+    REJECT_NO_MCP = 1;
+  }
+
+  // Configures how the filter handles non-MCP traffic
+  TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
 }
 
 // McpOverride for MCP filter
 message McpOverride {
-  // TODO: Add configuration fields
+  // Optional per-route traffic mode override
+  Mcp.TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
 }
