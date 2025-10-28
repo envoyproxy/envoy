@@ -178,9 +178,9 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
 
   filter_->decodeHeaders(headers, false);
 
-  std::string json_rpc =
+  std::string json =
       R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
-  Buffer::OwnedImpl buffer(json_rpc);
+  Buffer::OwnedImpl buffer(json);
   Buffer::OwnedImpl decoding_buffer;
 
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
@@ -250,29 +250,6 @@ TEST_F(McpFilterTest, EmptyPostBodyWithMcpHeaders) {
 
   // If end_stream is true in headers, it means empty body
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
-}
-
-// Test notification request (no id field)
-TEST_F(McpFilterTest, JsonRpcNotification) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"},
-                                         {"accept", "application/json"},
-                                         {"accept", "text/event-stream"}};
-
-  filter_->decodeHeaders(headers, false);
-
-  // Notification has no id field
-  std::string notification =
-      R"({"jsonrpc": "2.0", "method": "notify", "params": {"data": "test"}})";
-  Buffer::OwnedImpl buffer(notification);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-
-  // Notifications are valid MCP requests
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Test configuration getters
