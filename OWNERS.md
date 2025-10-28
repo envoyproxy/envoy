@@ -78,7 +78,7 @@ without further review.
   * Golang
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
   * Wasm, JWT, gRPC-JSON transcoder
-* JuniorHsu ([juniorhsu](https://github.com/juniorhsu)) (CuveeHsu@gmail.com)
+* Kuo-Chung Hsu ([juniorhsu](https://github.com/juniorhsu)) (CuveeHsu@gmail.com)
   * Thrift
 
 # Envoy security team
