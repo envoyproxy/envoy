@@ -126,11 +126,11 @@ envoy_cc_library(
         "custom_tag_impl.h",
     ],
     deps = [
-        "//source/common/formatter:substitution_formatter_lib",
         ":trace_context_lib",
         "//envoy/router:router_interface",
         "//envoy/tracing:custom_tag_interface",
         "//source/common/config:metadata_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
     ],
 )

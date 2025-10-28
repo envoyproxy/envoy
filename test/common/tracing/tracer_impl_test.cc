@@ -104,6 +104,7 @@ protected:
   };
 
   void expectSetCustomTags(const std::vector<CustomTagCase>& cases) {
+    custom_tags.clear(); // Reset before each call to clear previous expectations.
     for (const CustomTagCase& cas : cases) {
       envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
@@ -206,7 +207,7 @@ TEST_F(FinalizerImplTest, TestAll) {
         {"{ tag: cc-1-a, environment: { name: E_CC, default_value: _c } }", true, "c"},
         {"{ tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }", true, "c2"},
         {"{ tag: cc-3, environment: { name: E_CC_NOT_FOUND} }", false, ""},
-        {"{ tag: dd, value: %REQ(x-bb)% }", true, "b"},
+        {"{ tag: dd, value: '%REQ(x-bb)%' }", true, "b"},
     });
 
     TracerUtility::finalizeSpan(span, stream_info, config, true);

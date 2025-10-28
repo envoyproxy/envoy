@@ -2,8 +2,9 @@
 
 #include "envoy/router/router.h"
 
-#include "absl/types/optional.h"
 #include "source/common/formatter/substitution_formatter.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Tracing {

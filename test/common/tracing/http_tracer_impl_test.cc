@@ -492,9 +492,9 @@ metadata:
   kind: { host: {} }
   metadata_key: { key: m.host, path: [ { key: not-found } ] })EOF",
        false, ""},
-      {"{ tag: ee-1, value: %REQ(x-bb)% }", true, "b"},
-      {"{ tag: ee-2, value: %REQ(x-bb-not-found)%_ee }", true, "_ee"},
-      {"{ tag: ee-3, value: %REQ(x-bb-not-found)% }", false, ""},
+      {"{ tag: ee-1, value: '%REQ(x-bb)%' }", true, "b"},
+      {"{ tag: ee-2, value: '%REQ(x-bb-not-found)%_ee' }", true, "_ee"},
+      {"{ tag: ee-3, value: '%REQ(x-bb-not-found)%' }", false, ""},
   });
 
   ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers_));

@@ -1,11 +1,11 @@
 #pragma once
 
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/tracing/custom_tag.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
 #include "source/common/config/metadata.h"
 #include "source/common/tracing/trace_context_impl.h"
-#include "envoy/formatter/substitution_formatter.h"
 
 namespace Envoy {
 namespace Tracing {
