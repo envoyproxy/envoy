@@ -53,6 +53,22 @@ TEST(BodyBytesToString, All) {
 
   {
     envoy::data::tap::v3::TraceWrapper trace;
+    // Two read events
+    auto* event_r1 = trace.mutable_socket_streamed_trace_segment()->mutable_events()->add_events();
+    event_r1->mutable_read()->mutable_data()->set_as_bytes("hello");
+    auto* event_r2 = trace.mutable_socket_streamed_trace_segment()->mutable_events()->add_events();
+    event_r2->mutable_read()->mutable_data()->set_as_bytes("world");
+    Utility::bodyBytesToString(trace, envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
+
+    const auto& socket_trace_events = trace.socket_streamed_trace_segment().events().events();
+    const auto& event_h = socket_trace_events.Get(0);
+    EXPECT_EQ("hello", event_h.read().data().as_string());
+    const auto& event_w = socket_trace_events.Get(1);
+    EXPECT_EQ("world", event_w.read().data().as_string());
+  }
+
+  {
+    envoy::data::tap::v3::TraceWrapper trace;
     trace.mutable_socket_streamed_trace_segment()
         ->mutable_event()
         ->mutable_write()
@@ -60,6 +76,22 @@ TEST(BodyBytesToString, All) {
         ->set_as_bytes("hello");
     Utility::bodyBytesToString(trace, envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
     EXPECT_EQ("hello", trace.socket_streamed_trace_segment().event().write().data().as_string());
+  }
+
+  {
+    envoy::data::tap::v3::TraceWrapper trace;
+    // Two write events
+    auto* event_w1 = trace.mutable_socket_streamed_trace_segment()->mutable_events()->add_events();
+    event_w1->mutable_write()->mutable_data()->set_as_bytes("hello");
+    auto* event_w2 = trace.mutable_socket_streamed_trace_segment()->mutable_events()->add_events();
+    event_w2->mutable_write()->mutable_data()->set_as_bytes("world");
+    Utility::bodyBytesToString(trace, envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
+
+    const auto& socket_trace_events = trace.socket_streamed_trace_segment().events().events();
+    const auto& event_h = socket_trace_events.Get(0);
+    EXPECT_EQ("hello", event_h.write().data().as_string());
+    const auto& event_w = socket_trace_events.Get(1);
+    EXPECT_EQ("world", event_w.write().data().as_string());
   }
 }
 

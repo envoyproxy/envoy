@@ -53,6 +53,9 @@ bug_fixes:
   change: |
     Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
     larger payload (greater than the body buffer limit).
+- area: tap
+  change: |
+    Add the missing conversion support to ensure tapped message are correctly handled for multi-event submissions.
 - area: bootstrap
   change: |
     Fixed an issue where the custom
