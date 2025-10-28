@@ -167,11 +167,12 @@ ProtobufTypes::MessagePtr LocalityMetadataInputFactory::createEmptyConfigProto()
 
 // Register factories for transport socket matching inputs.
 // The endpoint_metadata and locality_metadata inputs are unique to transport socket matching.
-// The network attribute inputs (destination_ip, source_ip, etc.) use the SAME NAMES as the
-// generic network inputs, but are registered in the DataInputFactory<TransportSocketMatchingData>
-// registry. The type-safe factory lookup ensures the correct implementation is selected based on
-// the matching context. These implementations handle nullable pointers specific to transport
-// socket matching.
+// The network attribute inputs (destination_ip, source_ip, etc.) are also registered here
+// as separate implementations for the TransportSocketMatchingData type, even though factories
+// with the same names exist for Network::Matching::MatchingData. The factory registry is
+// type-safe and maintains separate registries for each matching data type, so there's no conflict.
+// These implementations handle the nullable pointers and context-specific data access patterns
+// required for transport socket matching.
 REGISTER_FACTORY(EndpointMetadataInputFactory,
                  Matcher::DataInputFactory<TransportSocketMatchingData>);
 REGISTER_FACTORY(LocalityMetadataInputFactory,

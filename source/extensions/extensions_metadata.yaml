@@ -1662,6 +1662,7 @@ envoy.matching.inputs.cel_data_input:
 envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.http.input
+  - envoy.matching.inputs
   - envoy.matching.network.input
   security_posture: unknown
   status: stable
@@ -1670,6 +1671,7 @@ envoy.matching.inputs.destination_ip:
 envoy.matching.inputs.destination_port:
   categories:
   - envoy.matching.http.input
+  - envoy.matching.inputs
   - envoy.matching.network.input
   security_posture: unknown
   status: stable
@@ -1678,6 +1680,7 @@ envoy.matching.inputs.destination_port:
 envoy.matching.inputs.source_ip:
   categories:
   - envoy.matching.http.input
+  - envoy.matching.inputs
   - envoy.matching.network.input
   security_posture: unknown
   status: stable
@@ -1686,6 +1689,7 @@ envoy.matching.inputs.source_ip:
 envoy.matching.inputs.source_port:
   categories:
   - envoy.matching.http.input
+  - envoy.matching.inputs
   - envoy.matching.network.input
   security_posture: unknown
   status: stable
@@ -1710,6 +1714,7 @@ envoy.matching.inputs.source_type:
 envoy.matching.inputs.server_name:
   categories:
   - envoy.matching.http.input
+  - envoy.matching.inputs
   - envoy.matching.network.input
   security_posture: unknown
   status: stable
@@ -1738,6 +1743,7 @@ envoy.matching.inputs.locality_metadata:
   - envoy.extensions.matching.common_inputs.transport_socket.v3.LocalityMetadataInput
 envoy.matching.inputs.application_protocol:
   categories:
+  - envoy.matching.inputs
   - envoy.matching.network.input
   security_posture: unknown
   status: stable

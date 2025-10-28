@@ -168,7 +168,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput>();
   }
 
-  std::string category() const override { return "envoy.matching.network.input"; }
+  std::string category() const override { return "envoy.matching.inputs"; }
 };
 
 /**
@@ -206,7 +206,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::SourceIPInput>();
   }
 
-  std::string category() const override { return "envoy.matching.network.input"; }
+  std::string category() const override { return "envoy.matching.inputs"; }
 };
 
 /**
@@ -244,7 +244,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::DestinationPortInput>();
   }
 
-  std::string category() const override { return "envoy.matching.network.input"; }
+  std::string category() const override { return "envoy.matching.inputs"; }
 };
 
 /**
@@ -282,7 +282,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::SourcePortInput>();
   }
 
-  std::string category() const override { return "envoy.matching.network.input"; }
+  std::string category() const override { return "envoy.matching.inputs"; }
 };
 
 /**
@@ -327,7 +327,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::ServerNameInput>();
   }
 
-  std::string category() const override { return "envoy.matching.network.input"; }
+  std::string category() const override { return "envoy.matching.inputs"; }
 };
 
 /**
@@ -363,7 +363,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::ApplicationProtocolInput>();
   }
 
-  std::string category() const override { return "envoy.matching.network.input"; }
+  std::string category() const override { return "envoy.matching.inputs"; }
 };
 
 } // namespace Upstream
