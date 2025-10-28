@@ -114,7 +114,7 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
   }
 }
 
-absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_response, ProcessingEffect::Effect processing_effect) {
+absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_response, ProcessingEffect::Effect& processing_effect) {
   ENVOY_STREAM_LOG(debug, "Applying header mutations", *filter_callbacks_);
   const auto mut_status = MutationUtils::applyHeaderMutations(
       common_response.header_mutation(), *headers_,
@@ -167,6 +167,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       return mut_status;
     }
   }
+  std::cout << "Returned processing effect " << static_cast<int>(header_processing_effect);
 
   clearRouteCache(common_response);
   onFinishProcessorCall(Grpc::Status::Ok, header_processing_effect,
@@ -495,7 +496,7 @@ absl::Status ProcessorState::validateContentLength(const CommonResponse& common_
   return absl::OkStatus();
 }
 
-void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_response, ProcessingEffect::Effect effect) {
+void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_response, ProcessingEffect::Effect& effect) {
   ENVOY_STREAM_LOG(debug, "Applying body response to buffered data. State = {}", *filter_callbacks_,
                    static_cast<int>(callback_state_));
   modifyBufferedData([&common_response, &effect](Buffer::Instance& data) {

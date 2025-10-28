@@ -298,7 +298,7 @@ std::string processingEffectToString(ProcessingEffect::Effect processing_effect)
   case ProcessingEffect::Effect::InvalidMutationRejected:
     return "invalid_mutation_rejected";
   case ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded:
-    return "mutation_rejected_size_limited_exceeded";
+    return "mutation_rejected_size_limit_exceeded";
   default:
     return "unknown";
   }
@@ -310,6 +310,7 @@ void ExtProcLoggingInfo::recordGrpcCall(std::chrono::microseconds latency,
                                         envoy::config::core::v3::TrafficDirection traffic_direction,
                                         ProcessingEffect::Effect processing_effect) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
+  std::cout << "recording processing effect " << processingEffectToString(processing_effect) << "\n";
 
   // Record the gRPC call stats for the header.
   if (callback_state == ProcessorState::CallbackState::HeadersCallback) {

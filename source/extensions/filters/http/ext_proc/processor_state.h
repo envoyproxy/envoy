@@ -297,7 +297,7 @@ private:
       const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
-  processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response, ProcessingEffect::Effect processing_effect);
+  processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response, ProcessingEffect::Effect& processing_effect);
   void clearStreamingChunk() { chunk_queue_.clear(); }
   CallbackState getCallbackStateAfterHeaderResp(
       const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
@@ -413,7 +413,7 @@ private:
    * @param common_response The common response containing body mutations to apply
    */
   void
-  applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response, ProcessingEffect::Effect effect);
+  applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response, ProcessingEffect::Effect& effect);
 
   /**
    * Finalizes body response processing by handling trailers and continuation.
