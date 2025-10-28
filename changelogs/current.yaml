@@ -131,6 +131,9 @@ bug_fixes:
 - area: udp_proxy
   change: |
     Fixed a crash in the UDP proxy that occurred during ``ENVOY_SIGTERM`` when active tunneling sessions were present.
+- area: udp_proxy
+  change: |
+    Fixed a few areas where the addresses might be moved from the data packet being processed.
 - area: geoip
   change: |
     Fixed a bug in the MaxMind provider where the ``found_entry`` field in the lookup result was not checked before
