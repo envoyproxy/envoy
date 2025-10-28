@@ -1538,14 +1538,14 @@ TEST_P(TcpProxyTest, IntermediateLogEntry) {
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
   filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(10);
   EXPECT_CALL(*mock_access_logger_, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpPeriodic);
+      .WillOnce(Invoke(
+          [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpPeriodic);
 
-        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10);
-        EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
-                    testing::IsNull());
-      }));
+            EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10);
+            EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
+                        testing::IsNull());
+          }));
   flush_timer->invokeCallback();
 
   // No valid duration until the connection is closed.
@@ -1553,24 +1553,23 @@ TEST_P(TcpProxyTest, IntermediateLogEntry) {
 
   filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(9);
   EXPECT_CALL(*mock_access_logger_, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpPeriodic);
+      .WillOnce(Invoke(
+          [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpPeriodic);
 
-        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 19);
-        EXPECT_EQ(stream_info.getDownstreamBytesMeter()
-                      ->bytesAtLastDownstreamPeriodicLog()
-                      ->wire_bytes_received,
-                  10);
-      }));
+            EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 19);
+            EXPECT_EQ(stream_info.getDownstreamBytesMeter()
+                          ->bytesAtLastDownstreamPeriodicLog()
+                          ->wire_bytes_received,
+                      10);
+          }));
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
   flush_timer->invokeCallback();
 
   EXPECT_CALL(*mock_access_logger_, log(_, _))
-      .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext& log_context, const StreamInfo::StreamInfo&) {
-            EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpConnectionEnd);
-          }));
+      .WillOnce(Invoke([](const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpConnectionEnd);
+      }));
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();

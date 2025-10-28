@@ -348,6 +348,11 @@ EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool val
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enableStatsCollection(bool stats_collection_on) {
+  enable_stats_collection_ = stats_collection_on;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
   node_id_ = std::move(node_id);
   return *this;
@@ -919,24 +924,29 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Set up stats.
-  auto* list = bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
-  list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
-  list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
-  list->add_patterns()->set_prefix("cluster.base.upstream_cx_");
-  list->add_patterns()->set_prefix("cluster.stats.upstream_cx_");
-  list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
-  list->add_patterns()->set_exact("cluster.base.upstream_http3_broken");
-  list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
-  list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
-  list->add_patterns()->set_prefix("http.hcm.decompressor.");
-  list->add_patterns()->set_prefix("pulse.");
-  list->add_patterns()->set_prefix("runtime.load_success");
-  list->add_patterns()->set_prefix("dns_cache");
-  list->add_patterns()->mutable_safe_regex()->set_regex(
-      "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
-      "total)");
-  list->add_patterns()->set_contains("quic_connection_close_error_code");
-  list->add_patterns()->set_contains("quic_reset_stream_error_code");
+  if (enable_stats_collection_) {
+    auto* list =
+        bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
+    list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
+    list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
+    list->add_patterns()->set_prefix("cluster.base.upstream_cx_");
+    list->add_patterns()->set_prefix("cluster.stats.upstream_cx_");
+    list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
+    list->add_patterns()->set_exact("cluster.base.upstream_http3_broken");
+    list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
+    list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
+    list->add_patterns()->set_prefix("http.hcm.decompressor.");
+    list->add_patterns()->set_prefix("pulse.");
+    list->add_patterns()->set_prefix("runtime.load_success");
+    list->add_patterns()->set_prefix("dns_cache");
+    list->add_patterns()->mutable_safe_regex()->set_regex(
+        "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
+        "total)");
+    list->add_patterns()->set_contains("quic_connection_close_error_code");
+    list->add_patterns()->set_contains("quic_reset_stream_error_code");
+  } else {
+    bootstrap->mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
+  }
   bootstrap->mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
 
   // Set up watchdog
