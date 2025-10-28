@@ -33,16 +33,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // [#extension: envoy.matching.inputs.endpoint_metadata]
 message EndpointMetadataInput {
-  // The filter name to retrieve the Struct from the endpoint metadata.
-  // If not specified or empty, defaults to ``envoy.transport_socket_match``.
-  string filter = 1;
-
-  // The path to retrieve the Value from the Struct.
-  // If empty, the entire filter metadata struct is used for matching.
-  // Each path segment specifies a key to traverse in nested metadata structures.
-  repeated PathSegment path = 2;
-
   // Specifies the segment in a path to retrieve value from Metadata.
+  // Note: Currently it's not supported to retrieve a value from a list in Metadata. This means that
+  // if the segment key refers to a list, it has to be the last segment in a path.
   message PathSegment {
     oneof segment {
       option (validate.required) = true;
@@ -51,6 +44,12 @@ message EndpointMetadataInput {
       string key = 1 [(validate.rules).string = {min_len: 1}];
     }
   }
+
+  // The filter name to retrieve the Struct from the endpoint metadata.
+  string filter = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The path to retrieve the Value from the Struct.
+  repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
 // Specifies that matching should be performed by the locality metadata.
@@ -73,16 +72,9 @@ message EndpointMetadataInput {
 //
 // [#extension: envoy.matching.inputs.locality_metadata]
 message LocalityMetadataInput {
-  // The filter name to retrieve the Struct from the locality metadata.
-  // If not specified or empty, defaults to ``envoy.transport_socket_match``.
-  string filter = 1;
-
-  // The path to retrieve the Value from the Struct.
-  // If empty, the entire filter metadata struct is used for matching.
-  // Each path segment specifies a key to traverse in nested metadata structures.
-  repeated PathSegment path = 2;
-
   // Specifies the segment in a path to retrieve value from Metadata.
+  // Note: Currently it's not supported to retrieve a value from a list in Metadata. This means that
+  // if the segment key refers to a list, it has to be the last segment in a path.
   message PathSegment {
     oneof segment {
       option (validate.required) = true;
@@ -91,6 +83,12 @@ message LocalityMetadataInput {
       string key = 1 [(validate.rules).string = {min_len: 1}];
     }
   }
+
+  // The filter name to retrieve the Struct from the locality metadata.
+  string filter = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The path to retrieve the Value from the Struct.
+  repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
 // Configuration for the transport socket name action.
@@ -101,3 +99,4 @@ message TransportSocketNameAction {
   // This name must reference a named transport socket in the cluster's transport_socket_matches.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 }
+

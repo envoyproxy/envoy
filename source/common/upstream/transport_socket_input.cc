@@ -2,10 +2,10 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
+#include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
+#include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.validate.h"
 #include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.h"
 #include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.validate.h"
-#include "envoy/type/metadata/v3/metadata.pb.h"
-#include "envoy/type/metadata/v3/metadata.pb.validate.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/config/metadata.h"
@@ -101,19 +101,16 @@ Matcher::DataInputFactoryCb<TransportSocketMatchingData>
 EndpointMetadataInputFactory::createDataInputFactoryCb(
     const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
   UNREFERENCED_PARAMETER(validation_visitor);
-  using ProtoEndpointMetadataInput =
-      envoy::extensions::matching::common_inputs::transport_socket::v3::EndpointMetadataInput;
-  const auto& endpoint_metadata_input_proto =
-      dynamic_cast<const ProtoEndpointMetadataInput&>(config);
+  const auto& metadata_input_proto =
+      dynamic_cast<const envoy::extensions::matching::common_inputs::transport_socket::v3::
+                       EndpointMetadataInput&>(config);
 
-  // Extract filter and path from the endpoint metadata input.
-  std::string filter = endpoint_metadata_input_proto.filter().empty()
-                           ? std::string("envoy.transport_socket_match")
-                           : std::string(endpoint_metadata_input_proto.filter());
+  // Extract filter and path from the metadata input.
+  std::string filter = metadata_input_proto.filter();
   std::vector<std::string> path;
-  if (endpoint_metadata_input_proto.path_size() > 0) {
-    path.reserve(endpoint_metadata_input_proto.path_size());
-    for (const auto& segment : endpoint_metadata_input_proto.path()) {
+  if (metadata_input_proto.path_size() > 0) {
+    path.reserve(metadata_input_proto.path_size());
+    for (const auto& segment : metadata_input_proto.path()) {
       // Only key segments are supported per proto.
       if (segment.has_key()) {
         path.push_back(segment.key());
@@ -135,19 +132,16 @@ Matcher::DataInputFactoryCb<TransportSocketMatchingData>
 LocalityMetadataInputFactory::createDataInputFactoryCb(
     const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
   UNREFERENCED_PARAMETER(validation_visitor);
-  using ProtoLocalityMetadataInput =
-      envoy::extensions::matching::common_inputs::transport_socket::v3::LocalityMetadataInput;
-  const auto& locality_metadata_input_proto =
-      dynamic_cast<const ProtoLocalityMetadataInput&>(config);
+  const auto& metadata_input_proto =
+      dynamic_cast<const envoy::extensions::matching::common_inputs::transport_socket::v3::
+                       LocalityMetadataInput&>(config);
 
-  // Extract filter and path from the locality metadata input.
-  std::string filter = locality_metadata_input_proto.filter().empty()
-                           ? std::string("envoy.transport_socket_match")
-                           : std::string(locality_metadata_input_proto.filter());
+  // Extract filter and path from the metadata input.
+  std::string filter = metadata_input_proto.filter();
   std::vector<std::string> path;
-  if (locality_metadata_input_proto.path_size() > 0) {
-    path.reserve(locality_metadata_input_proto.path_size());
-    for (const auto& segment : locality_metadata_input_proto.path()) {
+  if (metadata_input_proto.path_size() > 0) {
+    path.reserve(metadata_input_proto.path_size());
+    for (const auto& segment : metadata_input_proto.path()) {
       // Only key segments are supported per proto.
       if (segment.has_key()) {
         path.push_back(segment.key());

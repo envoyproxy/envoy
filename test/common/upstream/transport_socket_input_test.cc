@@ -1,6 +1,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.h"
 #include "envoy/matcher/matcher.h"
-#include "envoy/type/metadata/v3/metadata.pb.h"
 
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -203,32 +203,6 @@ TEST_F(TransportSocketInputTest, LocalityMetadataInputFactory_WithPath) {
   EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
   ASSERT_TRUE(absl::holds_alternative<std::string>(result.data_));
   EXPECT_EQ(absl::get<std::string>(result.data_), "us-west1-a");
-}
-
-TEST_F(TransportSocketInputTest,
-       LocalityMetadataInputFactory_EmptyFilterDefaultsToTransportSocketMatch) {
-  LocalityMetadataInputFactory factory;
-  // Empty filter should default to "envoy.transport_socket_match".
-  envoy::extensions::matching::common_inputs::transport_socket::v3::LocalityMetadataInput config;
-  // Intentionally leave filter empty.
-  auto* seg = config.add_path();
-  seg->set_key("region");
-
-  auto& visitor = ProtobufMessage::getNullValidationVisitor();
-  auto cb = factory.createDataInputFactoryCb(config, visitor);
-  auto input = cb();
-
-  // Populate metadata at default filter with the specified path.
-  envoy::config::core::v3::Metadata locality_md;
-  auto& val =
-      Config::Metadata::mutableMetadataValue(locality_md, "envoy.transport_socket_match", "region");
-  val.set_string_value("us-east");
-
-  TransportSocketMatchingData data_with_md(nullptr, &locality_md);
-  auto result = input->get(data_with_md);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(result.data_));
-  EXPECT_EQ(absl::get<std::string>(result.data_), "us-east");
 }
 
 TEST_F(TransportSocketInputTest, MetadataValue_FloatConversion) {
