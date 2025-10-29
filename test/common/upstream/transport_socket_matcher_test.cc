@@ -31,6 +31,9 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
+using Extensions::Matching::CommonInputs::TransportSocket::TransportSocketNameAction;
+using Extensions::Matching::CommonInputs::TransportSocket::TransportSocketNameActionFactory;
+
 class FakeTransportSocketFactory : public Network::UpstreamTransportSocketFactory {
 public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));

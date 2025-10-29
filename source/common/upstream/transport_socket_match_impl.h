@@ -22,7 +22,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/upstream/transport_socket_input.h"
+#include "source/extensions/matching/common_inputs/transport_socket/config.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
@@ -135,43 +135,9 @@ private:
   std::unique_ptr<Matcher::MatchTree<TransportSocketMatchingData>> matcher_;
 };
 
-/**
- * Action that carries a transport socket name.
- */
-class TransportSocketNameAction : public Matcher::Action {
-public:
-  explicit TransportSocketNameAction(const std::string& name) : name_(name) {}
-  const std::string& name() const { return name_; }
-  absl::string_view typeUrl() const override {
-    return "type.googleapis.com/"
-           "envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction";
-  }
-
-private:
-  const std::string name_;
-};
-
-/**
- * ActionFactory that creates TransportSocketNameAction from a StringValue.
- */
-class TransportSocketNameActionFactory
-    : public Matcher::ActionFactory<TransportSocketActionFactoryContext>,
-      public Logger::Loggable<Logger::Id::upstream> {
-public:
-  std::string name() const override { return "envoy.matching.action.transport_socket.name"; }
-  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
-                                             TransportSocketActionFactoryContext&,
-                                             ProtobufMessage::ValidationVisitor&) override {
-    const auto& typed_config =
-        dynamic_cast<const envoy::extensions::matching::common_inputs::transport_socket::v3::
-                         TransportSocketNameAction&>(config);
-    return std::make_shared<TransportSocketNameAction>(typed_config.name());
-  }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::matching::common_inputs::transport_socket::v3::
-                                TransportSocketNameAction>();
-  }
-};
+// Import action classes from the extension.
+using TransportSocketNameAction =
+    Extensions::Matching::CommonInputs::TransportSocket::TransportSocketNameAction;
 
 } // namespace Upstream
 } // namespace Envoy

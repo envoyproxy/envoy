@@ -1,4 +1,4 @@
-#include "source/common/upstream/transport_socket_input.h"
+#include "source/extensions/matching/common_inputs/transport_socket/config.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
@@ -6,6 +6,7 @@
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.validate.h"
 #include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.h"
 #include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.validate.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/config/metadata.h"
@@ -14,7 +15,10 @@
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
-namespace Upstream {
+namespace Extensions {
+namespace Matching {
+namespace CommonInputs {
+namespace TransportSocket {
 
 namespace {
 
@@ -119,7 +123,7 @@ EndpointMetadataInputFactory::createDataInputFactoryCb(
   }
 
   return [filter = std::move(filter), path = std::move(path)]() {
-    return std::make_unique<Upstream::EndpointMetadataInput>(filter, path);
+    return std::make_unique<EndpointMetadataInput>(filter, path);
   };
 }
 
@@ -150,13 +154,105 @@ LocalityMetadataInputFactory::createDataInputFactoryCb(
   }
 
   return [filter = std::move(filter), path = std::move(path)]() {
-    return std::make_unique<Upstream::LocalityMetadataInput>(filter, path);
+    return std::make_unique<LocalityMetadataInput>(filter, path);
   };
 }
 
 ProtobufTypes::MessagePtr LocalityMetadataInputFactory::createEmptyConfigProto() {
   return std::make_unique<
       envoy::extensions::matching::common_inputs::transport_socket::v3::LocalityMetadataInput>();
+}
+
+Matcher::DataInputGetResult DestinationIPInput::get(const TransportSocketMatchingData& data) const {
+  if (data.local_address_ == nullptr) {
+    return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+  }
+  const auto& address = *data.local_address_;
+  if (address.type() != Network::Address::Type::Ip) {
+    return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+  }
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+          address.ip()->addressAsString()};
+}
+
+Matcher::DataInputGetResult SourceIPInput::get(const TransportSocketMatchingData& data) const {
+  if (data.remote_address_ == nullptr) {
+    return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+  }
+  const auto& address = *data.remote_address_;
+  if (address.type() != Network::Address::Type::Ip) {
+    return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+  }
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+          address.ip()->addressAsString()};
+}
+
+Matcher::DataInputGetResult
+DestinationPortInput::get(const TransportSocketMatchingData& data) const {
+  if (data.local_address_ == nullptr) {
+    return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+  }
+  const auto& address = *data.local_address_;
+  if (address.type() != Network::Address::Type::Ip) {
+    return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+  }
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+          absl::StrCat(address.ip()->port())};
+}
+
+Matcher::DataInputGetResult SourcePortInput::get(const TransportSocketMatchingData& data) const {
+  if (data.remote_address_ == nullptr) {
+    return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+  }
+  const auto& address = *data.remote_address_;
+  if (address.type() != Network::Address::Type::Ip) {
+    return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+  }
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+          absl::StrCat(address.ip()->port())};
+}
+
+Matcher::DataInputGetResult ServerNameInput::get(const TransportSocketMatchingData& data) const {
+  // First try the explicit server name if provided.
+  if (!data.server_name_.empty()) {
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::string(data.server_name_)};
+  }
+
+  // Fall back to connection info provider if available.
+  if (data.connection_info_) {
+    const auto server_name = data.connection_info_->requestedServerName();
+    if (!server_name.empty()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              std::string(server_name)};
+    }
+  }
+
+  return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+}
+
+Matcher::DataInputGetResult
+ApplicationProtocolInput::get(const TransportSocketMatchingData& data) const {
+  if (data.application_protocols_ != nullptr && !data.application_protocols_->empty()) {
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            absl::StrJoin(*data.application_protocols_, ",")};
+  }
+  return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+}
+
+Matcher::ActionConstSharedPtr
+TransportSocketNameActionFactory::createAction(const Protobuf::Message& config,
+                                               Server::Configuration::ServerFactoryContext&,
+                                               ProtobufMessage::ValidationVisitor&) {
+  const auto& typed_config =
+      dynamic_cast<const envoy::extensions::matching::common_inputs::transport_socket::v3::
+                       TransportSocketNameAction&>(config);
+  return std::make_shared<TransportSocketNameAction>(typed_config.name());
+}
+
+ProtobufTypes::MessagePtr TransportSocketNameActionFactory::createEmptyConfigProto() {
+  return std::make_unique<envoy::extensions::matching::common_inputs::transport_socket::v3::
+                              TransportSocketNameAction>();
 }
 
 // Register factories for transport socket matching inputs.
@@ -179,6 +275,11 @@ REGISTER_FACTORY(SourcePortInputFactory, Matcher::DataInputFactory<TransportSock
 REGISTER_FACTORY(ServerNameInputFactory, Matcher::DataInputFactory<TransportSocketMatchingData>);
 REGISTER_FACTORY(ApplicationProtocolInputFactory,
                  Matcher::DataInputFactory<TransportSocketMatchingData>);
+REGISTER_FACTORY(TransportSocketNameActionFactory,
+                 Matcher::ActionFactory<Server::Configuration::ServerFactoryContext>);
 
-} // namespace Upstream
+} // namespace TransportSocket
+} // namespace CommonInputs
+} // namespace Matching
+} // namespace Extensions
 } // namespace Envoy

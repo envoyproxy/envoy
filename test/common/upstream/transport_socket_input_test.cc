@@ -5,7 +5,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/filter_state_impl.h"
-#include "source/common/upstream/transport_socket_input.h"
+#include "source/extensions/matching/common_inputs/transport_socket/config.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -24,6 +24,23 @@ namespace Upstream {
 namespace {
 
 using Envoy::Matcher::DataInputGetResult;
+
+using Extensions::Matching::CommonInputs::TransportSocket::ApplicationProtocolInput;
+using Extensions::Matching::CommonInputs::TransportSocket::ApplicationProtocolInputFactory;
+using Extensions::Matching::CommonInputs::TransportSocket::DestinationIPInput;
+using Extensions::Matching::CommonInputs::TransportSocket::DestinationIPInputFactory;
+using Extensions::Matching::CommonInputs::TransportSocket::DestinationPortInput;
+using Extensions::Matching::CommonInputs::TransportSocket::DestinationPortInputFactory;
+using Extensions::Matching::CommonInputs::TransportSocket::EndpointMetadataInput;
+using Extensions::Matching::CommonInputs::TransportSocket::EndpointMetadataInputFactory;
+using Extensions::Matching::CommonInputs::TransportSocket::LocalityMetadataInput;
+using Extensions::Matching::CommonInputs::TransportSocket::LocalityMetadataInputFactory;
+using Extensions::Matching::CommonInputs::TransportSocket::ServerNameInput;
+using Extensions::Matching::CommonInputs::TransportSocket::ServerNameInputFactory;
+using Extensions::Matching::CommonInputs::TransportSocket::SourceIPInput;
+using Extensions::Matching::CommonInputs::TransportSocket::SourceIPInputFactory;
+using Extensions::Matching::CommonInputs::TransportSocket::SourcePortInput;
+using Extensions::Matching::CommonInputs::TransportSocket::SourcePortInputFactory;
 
 class TransportSocketInputTest : public testing::Test {};
 

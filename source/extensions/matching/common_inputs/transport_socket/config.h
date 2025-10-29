@@ -2,21 +2,23 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
+#include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.h"
+#include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.validate.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
-#include "envoy/server/factory_context.h"
+#include "envoy/registry/registry.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/config/metadata.h"
-#include "source/common/config/well_known_names.h"
-#include "source/common/network/utility.h"
-#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
-namespace Upstream {
+namespace Extensions {
+namespace Matching {
+namespace CommonInputs {
+namespace TransportSocket {
 
 /**
  * Data structure holding context for transport socket matching.
@@ -50,7 +52,7 @@ struct TransportSocketMatchingData {
 };
 
 /**
- * Base class for transport socket data input factories.
+ * Base class for transport socket data input implementations.
  */
 class TransportSocketInputBase : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
@@ -130,7 +132,7 @@ public:
 };
 
 // Transport socket specific network inputs.
-// These are separate from the standard network inputs because they operate on
+// These are separate implementations from the standard network inputs because they operate on
 // TransportSocketMatchingData instead of Network::Matching::MatchingData.
 
 /**
@@ -138,17 +140,7 @@ public:
  */
 class DestinationIPInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
-  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override {
-    if (data.local_address_ == nullptr) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-    }
-    const auto& address = *data.local_address_;
-    if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-    }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address.ip()->addressAsString()};
-  }
+  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override;
 };
 
 /**
@@ -176,17 +168,7 @@ public:
  */
 class SourceIPInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
-  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override {
-    if (data.remote_address_ == nullptr) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-    }
-    const auto& address = *data.remote_address_;
-    if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-    }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address.ip()->addressAsString()};
-  }
+  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override;
 };
 
 /**
@@ -214,17 +196,7 @@ public:
  */
 class DestinationPortInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
-  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override {
-    if (data.local_address_ == nullptr) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-    }
-    const auto& address = *data.local_address_;
-    if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-    }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat(address.ip()->port())};
-  }
+  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override;
 };
 
 /**
@@ -252,17 +224,7 @@ public:
  */
 class SourcePortInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
-  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override {
-    if (data.remote_address_ == nullptr) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-    }
-    const auto& address = *data.remote_address_;
-    if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-    }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat(address.ip()->port())};
-  }
+  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override;
 };
 
 /**
@@ -290,24 +252,7 @@ public:
  */
 class ServerNameInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
-  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override {
-    // First try the explicit server name if provided.
-    if (!data.server_name_.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              std::string(data.server_name_)};
-    }
-
-    // Fall back to connection info provider if available.
-    if (data.connection_info_) {
-      const auto server_name = data.connection_info_->requestedServerName();
-      if (!server_name.empty()) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-                std::string(server_name)};
-      }
-    }
-
-    return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-  }
+  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override;
 };
 
 /**
@@ -332,17 +277,10 @@ public:
 
 /**
  * Data input for application protocols (ALPN).
- * This is transport-socket-specific since it reads from the TransportSocketMatchingData.
  */
 class ApplicationProtocolInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
-  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override {
-    if (data.application_protocols_ != nullptr && !data.application_protocols_->empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              absl::StrJoin(*data.application_protocols_, ",")};
-    }
-    return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-  }
+  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override;
 };
 
 /**
@@ -366,5 +304,44 @@ public:
   std::string category() const override { return "envoy.matching.inputs"; }
 };
 
+/**
+ * Action that carries a transport socket name.
+ */
+class TransportSocketNameAction : public Matcher::Action {
+public:
+  explicit TransportSocketNameAction(const std::string& name) : name_(name) {}
+  const std::string& name() const { return name_; }
+  absl::string_view typeUrl() const override {
+    return "type.googleapis.com/"
+           "envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction";
+  }
+
+private:
+  const std::string name_;
+};
+
+/**
+ * ActionFactory that creates TransportSocketNameAction.
+ */
+class TransportSocketNameActionFactory
+    : public Matcher::ActionFactory<Server::Configuration::ServerFactoryContext> {
+public:
+  std::string name() const override { return "envoy.matching.action.transport_socket.name"; }
+  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
+                                             Server::Configuration::ServerFactoryContext&,
+                                             ProtobufMessage::ValidationVisitor&) override;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+};
+
+} // namespace TransportSocket
+} // namespace CommonInputs
+} // namespace Matching
+} // namespace Extensions
+
+// Export TransportSocketMatchingData to the Upstream namespace for backward compatibility.
+namespace Upstream {
+using TransportSocketMatchingData =
+    Extensions::Matching::CommonInputs::TransportSocket::TransportSocketMatchingData;
 } // namespace Upstream
+
 } // namespace Envoy

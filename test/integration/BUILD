@@ -846,9 +846,9 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/matcher:matcher_lib",
-        "//source/common/upstream:transport_socket_input_lib",
         "//source/common/upstream:transport_socket_match_lib",
         "//source/extensions/load_balancing_policies/subset:config",
+        "//source/extensions/matching/common_inputs/transport_socket:config_lib",
         "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",

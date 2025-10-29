@@ -229,9 +229,5 @@ void TransportSocketMatcherImpl::setupTransportSocketMatcher(
   creation_status = absl::OkStatus();
 }
 
-// Register action factory.
-REGISTER_FACTORY(TransportSocketNameActionFactory,
-                 Matcher::ActionFactory<TransportSocketActionFactoryContext>);
-
 } // namespace Upstream
 } // namespace Envoy

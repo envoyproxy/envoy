@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_enable_http3",
@@ -430,39 +429,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "transport_socket_input_lib",
-    srcs = ["transport_socket_input.cc"],
-    hdrs = ["transport_socket_input.h"],
-    deps = [
-        "//envoy/matcher:matcher_interface",
-        "//envoy/network:address_interface",
-        "//envoy/server:factory_context_interface",
-        "//source/common/config:metadata_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/json:json_utility_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
-        "//source/common/stream_info:filter_state_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/matching/common_inputs/transport_socket/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_extension(
-    name = "transport_socket_input_lib_envoy_extension",
-    deps = [
-        ":transport_socket_input_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "transport_socket_match_lib",
     srcs = ["transport_socket_match_impl.cc"],
     hdrs = ["transport_socket_match_impl.h"],
     deps = [
-        ":transport_socket_input_lib",
         ":upstream_includes",
         "//envoy/matcher:matcher_interface",
         "//envoy/server:factory_context_interface",
@@ -472,6 +442,7 @@ envoy_cc_library(
         "//source/common/matcher:matcher_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/matching/common_inputs/transport_socket:config_lib",
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -479,17 +450,9 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_extension(
-    name = "transport_socket_match_lib_envoy_extension",
-    deps = [
-        ":transport_socket_match_lib",
-    ],
-)
-
 envoy_cc_library(
     name = "upstream_includes",
     hdrs = [
-        "transport_socket_input.h",
         "transport_socket_match_impl.h",
         "upstream_impl.h",
     ],
@@ -531,6 +494,7 @@ envoy_cc_library(
         "//source/common/stats:deferred_creation",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/matching/common_inputs/transport_socket:config_lib",
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
@@ -538,7 +502,6 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/matching/common_inputs/transport_socket/v3:pkg_cc_proto",
     ],
 )

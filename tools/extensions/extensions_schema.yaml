@@ -27,9 +27,6 @@ builtin:
 - envoy.matching.inputs.uri_san
 - envoy.matching.inputs.dns_san
 - envoy.matching.inputs.subject
-- envoy.matching.inputs.endpoint_metadata
-- envoy.matching.inputs.locality_metadata
-- envoy.matching.action.transport_socket.name
 - envoy.regex_engines.google_re2
 - envoy.filters.http.upstream_codec
 - envoy.upstream.local_address_selector.default_local_address_selector
