@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP header and body transformations.
 // [#extension: envoy.filters.http.transform]
 
-// Configuration for the transform filter. The request and response transformations are
+// Configuration for the transform filter. The filter may buffer the request/response until the entire body is received, and then mutate the headers and body according to the contents of the request/response. The request and response transformations are
 // independent and could be configured separately.
 // Only JSON body transformation is supported for now.
 message TransformConfig {
