@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP header and body transformations.
 // [#extension: envoy.filters.http.transform]
 
-// Configuration for the transform filter. The request and response transformations are
+// Configuration for the transform filter. The filter may buffer the request/response until the entire body is received, and then mutate the headers and body according to the contents of the request/response. The request and response transformations are
 // independent and could be configured separately.
 // Only JSON body transformation is supported for now.
 message TransformConfig {
@@ -51,8 +51,7 @@ message TransformConfig {
 message Transformation {
   // The header mutations to perform.
   // The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
-  // And except the commonly used format specifiers, there are some additional format specifiers
-  // provided by the transform filter:
+  // In addition to the commonly used format specifiers, this filter introduces additional format specifiers:
   //
   // * ``%REQUEST_BODY(KEY*)%``: the request body. And ``Key`` KEY is an optional
   //   lookup key in the namespace with the option of specifying nested keys separated by ':'.
@@ -78,7 +77,7 @@ message BodyTransformation {
   // The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
   // And except the commonly used format specifiers, the additional format specifiers
   // ``%REQUEST_BODY(KEY*)%`` and ``%RESPONSE_BODY(KEY*)%`` could also be used here.
-  config.core.v3.SubstitutionFormatString body_format = 3
+  config.core.v3.SubstitutionFormatString body_format = 1
       [(validate.rules).message = {required: true}];
 
   // The action to perform for new body content and original body content.
@@ -86,5 +85,5 @@ message BodyTransformation {
   // will be merged into the original body content.
   //
   // Default is ``MERGE``.
-  TransformAction action = 4;
+  TransformAction action = 2;
 }
