@@ -73,11 +73,18 @@ message BodyTransformation {
     REPLACE = 1;
   }
 
-  // Body transformation configuration. If not set, no body transformation will be performed.
-  // NOTE the ``REQUEST_BODY`` and ``RESPONSE_BODY`` format specifiers can also be used here.
+  // Body transformation configuration. The substitution format string is used as the template
+  // to generate the transformed new body content.
+  // The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
+  // And except the commonly used format specifiers, the additional format specifiers
+  // ``%REQUEST_BODY(KEY*)%`` and ``%RESPONSE_BODY(KEY*)%`` could also be used here.
   config.core.v3.SubstitutionFormatString body_format = 3
       [(validate.rules).message = {required: true}];
 
-  // The action to perform for body transformation. Default is ``MERGE``.
+  // The action to perform for new body content and original body content.
+  // For example, if ``MERGE`` is used, then the new body content generated from the ``body_format``
+  // will be merged into the original body content.
+  //
+  // Default is ``MERGE``.
   TransformAction action = 4;
 }
