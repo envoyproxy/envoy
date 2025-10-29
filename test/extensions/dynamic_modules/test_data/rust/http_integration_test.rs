@@ -906,11 +906,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
 // can happen in filter callbacks or scheduled events. We test scheduled events here
 // since it will be more common for terminal filters.
 //
+// The terminal filter test configures the connection buffer to 1024 bytes. We test
+// watermark events by writing 8 1024 byte chunks, once immediately and the remaining
+// in response to low watermark events.
+//
 // Request flow:
 //   - Client sends headers
 //   - Filter returns headers and body
 //   - Client sends body
-//   - Filter returns body
+//   - Filter returns large body chunks triggering watermark events
 //   - Client closes request
 //   - Filter returns body and trailers
 struct StreamingTerminalFilterConfig {}
@@ -919,6 +923,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StreamingTerminalFilterConf
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(StreamingTerminalHttpFilter {
       request_closed: false,
+      above_watermark_count: 0,
+      below_watermark_count: 0,
+      large_response_bytes_sent: 0,
     })
   }
 }
@@ -928,6 +935,9 @@ const EVENT_ID_READ_REQUEST: u64 = 2;
 
 struct StreamingTerminalHttpFilter {
   request_closed: bool,
+  above_watermark_count: usize,
+  below_watermark_count: usize,
+  large_response_bytes_sent: usize,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
@@ -974,18 +984,47 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
             }
           }
           envoy_filter.drain_request_body(body.len());
-          envoy_filter.send_response_data(
-            [b"Hi ", body.as_slice(), b". Anything else?"]
-              .concat()
-              .as_slice(),
-            false,
-          );
+          self.send_large_response_chunk(envoy_filter);
         } else {
           envoy_filter.send_response_data(b"Thanks!", false);
-          envoy_filter.send_response_trailers(vec![("x-status", b"finished")]);
+          envoy_filter.send_response_trailers(vec![
+            ("x-status", b"finished"),
+            (
+              "x-above-watermark-count",
+              self.above_watermark_count.to_string().as_bytes(),
+            ),
+            (
+              "x-below-watermark-count",
+              self.below_watermark_count.to_string().as_bytes(),
+            ),
+          ]);
         }
       },
       _ => unreachable!(),
     }
+  }
+
+  fn on_downstream_above_write_buffer_high_watermark(&mut self, _envoy_filter: &mut EHF) {
+    self.above_watermark_count += 1;
+  }
+
+  fn on_downstream_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut EHF) {
+    self.below_watermark_count += 1;
+    if self.above_watermark_count == self.below_watermark_count {
+      // Watermark levels are balanced, we can send more data.
+      self.send_large_response_chunk(_envoy_filter);
+    }
+  }
+}
+
+impl StreamingTerminalHttpFilter {
+  fn send_large_response_chunk<EHF: EnvoyHttpFilter>(&mut self, envoy_filter: &mut EHF) {
+    if self.large_response_bytes_sent >= 8 * 1024 {
+      return;
+    }
+    let chunk_size = 1024;
+    let chunk = vec![b'a'; chunk_size];
+    envoy_filter.send_response_data(&chunk, false);
+    self.large_response_bytes_sent += chunk_size;
   }
 }
