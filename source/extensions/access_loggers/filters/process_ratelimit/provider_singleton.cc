@@ -23,6 +23,27 @@ createRateLimiterImpl(const envoy::type::v3::TokenBucket& token_bucket,
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>());
 }
 
+void RateLimiterProviderSingleton::RateLimiterWrapper::setLimiter(
+    LocalRateLimiterSharedPtr limiter) {
+  ENVOY_BUG(init_target_ != nullptr,
+            "init_target_ should not be null if the limiter is set from callback");
+  limiter_slot_.runOnAllThreads(
+      [limiter, cancelled = cancelled_](OptRef<ThreadLocalLimiter> thread_local_limiter) {
+        if (cancelled->load()) {
+          return;
+        }
+
+        thread_local_limiter->limiter = limiter;
+      },
+      [init_target = init_target_.get(), cancelled = cancelled_]() {
+        if (cancelled->load()) {
+          return;
+        }
+
+        init_target->ready();
+      });
+}
+
 RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton::getRateLimiter(
     Server::Configuration::ServerFactoryContext& factory_context, absl::string_view key,
     const envoy::config::core::v3::ConfigSource& config_source, intptr_t setter_key,

@@ -70,8 +70,8 @@ public:
                        TokenBucketSubscriptionSharedPtr subscription,
                        std::shared_ptr<LocalRateLimiterImpl> limiter,
                        std::unique_ptr<Init::TargetImpl> init_target)
-        : provider_(provider), subscription_(subscription), limiter_slot_(tls),
-          init_target_(std::move(init_target)) {
+        : cancelled_(std::make_shared<std::atomic<bool>>(false)), provider_(provider),
+          subscription_(subscription), limiter_slot_(tls), init_target_(std::move(init_target)) {
       limiter_slot_.set([l = limiter](Envoy::Event::Dispatcher&) {
         return std::make_shared<ThreadLocalLimiter>(l);
       });
@@ -79,18 +79,16 @@ public:
 
     LocalRateLimiterSharedPtr getLimiter() const { return limiter_slot_.get()->limiter; }
 
-    void setLimiter(LocalRateLimiterSharedPtr limiter) {
-      ENVOY_BUG(init_target_ != nullptr, "init_target_ should not be null");
-      limiter_slot_.runOnAllThreads(
-          [limiter](OptRef<ThreadLocalLimiter> thread_local_limiter) {
-            thread_local_limiter->limiter = limiter;
-          },
-          [init_target = init_target_.get()]() { init_target->ready(); });
-    }
+    void setLimiter(LocalRateLimiterSharedPtr limiter);
+
+    ~RateLimiterWrapper() { cancelled_->store(true); }
 
     TokenBucketSubscriptionSharedPtr getSubscription() const { return subscription_; }
 
   private:
+    // The bool to denote if the object is deleted so we need to cancel the async setter and the
+    // callback.
+    std::shared_ptr<std::atomic<bool>> cancelled_;
     // The `provider_` holds the ownership of this singleton by shared
     // pointer, as the rate limiter map singleton isn't pinned and is
     // shared among all the access log rate limit filters.
