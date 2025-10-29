@@ -16,7 +16,9 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
     const envoy::extensions::access_loggers::filters::process_ratelimit::v3::ProcessRateLimitFilter&
         config)
     : setter_key_(reinterpret_cast<intptr_t>(this)),
-      cancel_cb_(std::make_shared<std::atomic<bool>>(false)), context_(context) {
+      cancel_cb_(std::make_shared<std::atomic<bool>>(false)), context_(context),
+      stats_({ALL_PROCESS_RATELIMIT_FILTER_STATS(
+          POOL_COUNTER_PREFIX(context.scope(), "access_log.process_ratelimit."))}) {
   auto setter =
       [this, cancel_cb = cancel_cb_](
           Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter)
@@ -57,7 +59,13 @@ bool ProcessRateLimitFilter::evaluate(const Formatter::Context&,
             "rate_limiter_.limiter_ should be already set in init callback.");
   Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter =
       rate_limiter_->getLimiter();
-  return limiter->requestAllowed({}).allowed;
+  auto result = limiter->requestAllowed({});
+  if (!result.allowed) {
+    stats_.denied_.inc();
+  } else {
+    stats_.allowed_.inc();
+  }
+  return result.allowed;
 }
 
 } // namespace ProcessRateLimit

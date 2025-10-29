@@ -12,6 +12,16 @@ namespace AccessLoggers {
 namespace Filters {
 namespace ProcessRateLimit {
 
+#define ALL_PROCESS_RATELIMIT_FILTER_STATS(COUNTER)                                                \
+  COUNTER(allowed)                                                                                 \
+  COUNTER(denied)
+
+/**
+ * Struct definition for all process ratelimit filter stats. @see stats_macros.h
+ */
+struct ProcessRateLimitFilterStats {
+  ALL_PROCESS_RATELIMIT_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
 class ProcessRateLimitFilter : public AccessLog::Filter {
 public:
   ProcessRateLimitFilter(Server::Configuration::ServerFactoryContext& context,
@@ -27,6 +37,7 @@ private:
   const intptr_t setter_key_;
   std::shared_ptr<std::atomic<bool>> cancel_cb_;
   Server::Configuration::ServerFactoryContext& context_;
+  ProcessRateLimitFilterStats stats_;
   mutable Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
       RateLimiterWrapperPtr rate_limiter_;
 };

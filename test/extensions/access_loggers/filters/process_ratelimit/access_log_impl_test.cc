@@ -59,6 +59,7 @@ public:
     ON_CALL(context_.server_factory_context_, accessLogManager())
         .WillByDefault(ReturnRef(log_manager_));
     ON_CALL(log_manager_, createAccessLog(_)).WillByDefault(Return(file_));
+    ON_CALL(context_.server_factory_context_, scope()).WillByDefault(ReturnRef(context_.scope()));
     ON_CALL(*file_, write(_)).WillByDefault(SaveArg<0>(&output_));
     stream_info_.addBytesReceived(1);
     stream_info_.addBytesSent(2);
@@ -204,10 +205,16 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, HappyPath) {
 
   // First log is written, second is rate limited.
   expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
+  EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.allowed").value(), 1);
+
+  EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 1);
 
   time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
   // Third log is written, fourth is rate limited.
   expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
+  EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.allowed").value(), 2);
+
+  EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 2);
 }
 
 TEST_F(AccessLogImplTestWithRateLimitFilter, InitedWithDeltaUpdate) {
@@ -231,11 +238,9 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitTogether) {
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
   ASSERT_EQ(callbackss_.size(), 1);
 
-  EXPECT_CALL(init_watcher_, ready());
   const auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
       {{"token_bucket_name", token_bucket_resource_}});
   EXPECT_TRUE(callbackss_["token_bucket_name"]->onConfigUpdate(decoded_resources.refvec_, "").ok());

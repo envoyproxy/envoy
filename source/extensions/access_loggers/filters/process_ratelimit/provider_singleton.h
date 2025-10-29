@@ -68,8 +68,10 @@ public:
   public:
     RateLimiterWrapper(ThreadLocal::Instance& tls, RateLimiterProviderSingletonSharedPtr provider,
                        TokenBucketSubscriptionSharedPtr subscription,
-                       std::shared_ptr<LocalRateLimiterImpl> limiter)
-        : provider_(provider), subscription_(subscription), limiter_slot_(tls) {
+                       std::shared_ptr<LocalRateLimiterImpl> limiter,
+                       std::unique_ptr<Init::TargetImpl> init_target)
+        : provider_(provider), subscription_(subscription), limiter_slot_(tls),
+          init_target_(std::move(init_target)) {
       limiter_slot_.set([l = limiter](Envoy::Event::Dispatcher&) {
         return std::make_shared<ThreadLocalLimiter>(l);
       });
@@ -78,9 +80,12 @@ public:
     LocalRateLimiterSharedPtr getLimiter() const { return limiter_slot_.get()->limiter; }
 
     void setLimiter(LocalRateLimiterSharedPtr limiter) {
-      limiter_slot_.runOnAllThreads([limiter](OptRef<ThreadLocalLimiter> thread_local_limiter) {
-        thread_local_limiter->limiter = limiter;
-      });
+      ENVOY_BUG(init_target_ != nullptr, "init_target_ should not be null");
+      limiter_slot_.runOnAllThreads(
+          [limiter](OptRef<ThreadLocalLimiter> thread_local_limiter) {
+            thread_local_limiter->limiter = limiter;
+          },
+          [init_target = init_target_.get()]() { init_target->ready(); });
     }
 
     TokenBucketSubscriptionSharedPtr getSubscription() const { return subscription_; }
@@ -104,6 +109,10 @@ public:
     // concurrently when listeners are active and there are new TokenBucket
     // resources coming.
     Envoy::ThreadLocal::TypedSlot<ThreadLocalLimiter> limiter_slot_;
+
+    // The `init_target_` is used to wait for the rate limiter to be set. It
+    // makes sure the access logger won't log until the rate limiter is ready.
+    std::unique_ptr<Init::TargetImpl> init_target_;
   };
   using RateLimiterWrapperPtr = std::unique_ptr<RateLimiterWrapper>;
 
@@ -132,12 +141,6 @@ public:
 
     std::shared_ptr<LocalRateLimiterImpl> getLimiter();
 
-    Init::TargetImpl* getInitTarget() { return init_target_ ? init_target_.get() : nullptr; }
-
-    void setInitTarget(std::unique_ptr<Init::TargetImpl> target) {
-      init_target_ = std::move(target);
-    }
-
     // Config::SubscriptionCallbacks
     absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                 const std::string&) override;
@@ -153,7 +156,6 @@ public:
     void handleRemovedResource(absl::string_view resource_name);
 
     RateLimiterProviderSingleton& parent_;
-    std::unique_ptr<Init::TargetImpl> init_target_;
     std::string resource_name_;
     Config::SubscriptionPtr subscription_;
     absl::flat_hash_map<intptr_t, SetRateLimiterCb> setters_;
