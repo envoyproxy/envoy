@@ -103,6 +103,11 @@ new_features:
     Added support for dropping stats via
     :ref:`DropAction <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during
     custom metric conversion.
+- area: lrs
+  change: |
+    Added :ref:`load_stats_over_ads_config_connection <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.load_stats_over_ads_config_connection>`
+    that makes the load reporting server use the primary server connection specified by the
+    :ref:`ads_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DynamicResources.ads_config>`.
 - area: http
   change: |
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to

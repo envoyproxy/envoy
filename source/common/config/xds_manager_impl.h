@@ -35,6 +35,7 @@ public:
   void shutdown() override { ads_mux_.reset(); }
   absl::Status
   setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source) override;
+  void setAdsClientChangeCallback(AdsClientChangeCallback cb) override;
 
   Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
   SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
@@ -96,6 +97,9 @@ private:
   // exist, or doesn't match. This will only be populated if default_config_source
   // is defined in the bootstrap.
   std::unique_ptr<AuthorityData> default_authority_;
+
+  // An optional callback that will be invoked when the ADS is replaced.
+  AdsClientChangeCallback ads_client_change_callback_;
 };
 
 } // namespace Config

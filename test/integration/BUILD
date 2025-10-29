@@ -1670,6 +1670,7 @@ envoy_cc_test(
     srcs = ["load_stats_integration_test.cc"],
     rbe_pool = "4core",
     deps = [
+        ":ads_integration_lib",
         ":http_integration_lib",
         "//test/config:utility_lib",
         "//test/test_common:network_utility_lib",

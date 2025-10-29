@@ -9,6 +9,7 @@
 #include "source/common/common/base64.h"
 
 #include "test/config/utility.h"
+#include "test/integration/ads_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
@@ -954,5 +955,395 @@ TEST_P(LoadStatsIntegrationTest, EndpointLevelStatsReportingSuccessAndFailure) {
   cleanupLoadStatsConnection();
 }
 
+// Test class to test the behavior of LRS over ADS config source.
+class LrsOverAdsIntegrationTest : public AdsIntegrationTest {
+public:
+  LrsOverAdsIntegrationTest() {
+    create_xds_upstream_ = true;
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    // By default test a case of LRS over ADS. If the test wants to disable
+    // that, it should set this flag to 'false' prior to invoking 'initialize()'.
+    lrs_over_ads_ = true;
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([lrs_over_ads = lrs_over_ads_](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      bootstrap.mutable_cluster_manager()->set_load_stats_over_ads_config_connection(lrs_over_ads);
+    });
+    AdsIntegrationTest::initialize();
+  }
+
+  ABSL_MUST_USE_RESULT AssertionResult waitForLoadStatsRequest(
+      const std::vector<envoy::config::endpoint::v3::UpstreamLocalityStats>&
+          expected_locality_stats) {
+    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+    Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats;
+    if (!expected_locality_stats.empty()) {
+      auto* cluster_stats = expected_cluster_stats.Add();
+      cluster_stats->set_cluster_name("cluster1");
+      std::copy(
+          expected_locality_stats.begin(), expected_locality_stats.end(),
+          Protobuf::RepeatedPtrFieldBackInserter(cluster_stats->mutable_upstream_locality_stats()));
+    }
+
+    envoy::service::load_stats::v3::LoadStatsRequest loadstats_request;
+    // Because multiple load stats may be sent while load in being sent (on slow machines), loop and
+    // merge until all the expected load has been reported.
+    do {
+      envoy::service::load_stats::v3::LoadStatsRequest local_loadstats_request;
+      AssertionResult result =
+          lrs_stream_->waitForGrpcMessage(*dispatcher_, local_loadstats_request);
+      RELEASE_ASSERT(result, result.message());
+      // Check that "envoy.lrs.supports_send_all_clusters" client feature is set.
+      if (local_loadstats_request.has_node()) {
+        EXPECT_THAT(local_loadstats_request.node().client_features(),
+                    ::testing::ElementsAre("envoy.lrs.supports_send_all_clusters"));
+      }
+      // Sanity check and clear the measured load report interval.
+      for (auto& cluster_stats : *local_loadstats_request.mutable_cluster_stats()) {
+        const uint32_t actual_load_report_interval_ms =
+            Protobuf::util::TimeUtil::DurationToMilliseconds(cluster_stats.load_report_interval());
+        // Turns out libevent timers aren't that accurate; without this adjustment we see things
+        // like "expected 500, actual 497". Tweak as needed if races are observed.
+        EXPECT_GE(actual_load_report_interval_ms, load_report_interval_ms_ - 100);
+        // Allow for some skew in test environment.
+        EXPECT_LT(actual_load_report_interval_ms, load_report_interval_ms_ + 1000);
+        cluster_stats.mutable_load_report_interval()->Clear();
+      }
+
+      EXPECT_EQ("POST", lrs_stream_->headers().getMethodValue());
+      EXPECT_EQ(LrsPath, lrs_stream_->headers().getPathValue());
+      EXPECT_EQ("application/grpc", lrs_stream_->headers().getContentTypeValue());
+      if (!bound.withinBound()) {
+        return TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
+                                                        loadstats_request.cluster_stats(), true);
+      }
+    } while (!TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
+                                                       loadstats_request.cluster_stats(), true));
+    return testing::AssertionSuccess();
+  }
+
+  void sendRequestLoadStatsResponse(const std::vector<std::string>& clusters,
+                                    bool send_all_clusters = false,
+                                    bool report_endpoint_granularity = false) {
+    envoy::service::load_stats::v3::LoadStatsResponse loadstats_response;
+    loadstats_response.mutable_load_reporting_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(load_report_interval_ms_));
+    for (const auto& cluster : clusters) {
+      loadstats_response.add_clusters(cluster);
+    }
+    if (send_all_clusters) {
+      loadstats_response.set_send_all_clusters(true);
+    }
+    loadstats_response.set_report_endpoint_granularity(report_endpoint_granularity);
+    lrs_stream_->sendGrpcMessage(loadstats_response);
+    // Wait until the request has been received by Envoy.
+    test_server_->waitForCounterGe("load_reporter.requests", ++load_requests_);
+  }
+
+  void reconnectAdsAndLrsStreamsAndVerify(FakeUpstream* fake_upstream) {
+    FakeHttpConnectionPtr new_xds_connection;
+    // Wait for Envoy to reconnect.
+    EXPECT_TRUE(fake_upstream->waitForHttpConnection(*dispatcher_, new_xds_connection));
+    // After reconnection, Envoy will establish new streams for both ADS and LRS.
+    // The order in which streams are established is not guaranteed. We wait for
+    // two streams to be established, then check that we receive one LRS request
+    // and one ADS request.
+    FakeStreamPtr stream1, stream2;
+    EXPECT_TRUE(new_xds_connection->waitForNewStream(*dispatcher_, stream1));
+    EXPECT_TRUE(new_xds_connection->waitForNewStream(*dispatcher_, stream2));
+    EXPECT_NE(nullptr, stream1);
+    EXPECT_NE(nullptr, stream2);
+
+    stream1->startGrpcStream();
+    stream2->startGrpcStream();
+
+    // After reconnection, Envoy will send a request on each stream.
+    // Verify their types by checking the path.
+    ASSERT_TRUE(stream1->waitForHeadersComplete());
+    ASSERT_TRUE(stream2->waitForHeadersComplete());
+    absl::string_view stream1_path = stream1->headers().getPathValue();
+    absl::string_view stream2_path = stream2->headers().getPathValue();
+    bool stream1_is_lrs = (stream1_path == LrsPath);
+    bool stream2_is_lrs = (stream2_path == LrsPath);
+    bool stream1_is_ads = (stream1_path == SotwAdsPath) || (stream1_path == DeltaAdsPath);
+    bool stream2_is_ads = (stream2_path == SotwAdsPath) || (stream2_path == DeltaAdsPath);
+
+    EXPECT_TRUE((stream1_is_lrs && stream2_is_ads) || (stream1_is_ads && stream2_is_lrs));
+
+    // Cleanup.
+    AssertionResult result = new_xds_connection->close();
+    RELEASE_ASSERT(result, result.message());
+    result = new_xds_connection->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+  }
+
+  bool lrs_over_ads_;
+  FakeStreamPtr lrs_stream_;
+  uint32_t load_requests_;
+  static constexpr uint32_t load_report_interval_ms_ = 500;
+  // After reconnection, Envoy will send a request on each stream.
+  // Verify their types by checking the path.
+  // The path for ADS is
+  // /envoy.service.discovery.v3.AggregatedDiscoveryService/StreamAggregatedResources or
+  // /envoy.service.discovery.v3.AggregatedDiscoveryService/DeltaAggregatedResources. The path for
+  // LRS is /envoy.service.load_stats.v3.LoadReportingService/StreamLoadStats
+  static constexpr absl::string_view SotwAdsPath =
+      "/envoy.service.discovery.v3.AggregatedDiscoveryService/StreamAggregatedResources";
+  static constexpr absl::string_view DeltaAdsPath =
+      "/envoy.service.discovery.v3.AggregatedDiscoveryService/DeltaAggregatedResources";
+  static constexpr absl::string_view LrsPath =
+      "/envoy.service.load_stats.v3.LoadReportingService/StreamLoadStats";
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, LrsOverAdsIntegrationTest, ADS_INTEGRATION_PARAMS);
+
+// Note: When using GoogleGrpc, the LRS request may arrive to the server before the
+// first CDS request. To avoid the race-condition in the test (not knowing in
+// advance which message will be assigned to the xds_stream_ and the
+// lrs_stream_), the tests that use GoogleGrpc and depend on the order of
+// messages will be skipped.
+
+// Testing that the connection is shared between ADS and LRS.
+TEST_P(LrsOverAdsIntegrationTest, SharedAdsLrsConnection) {
+  // Avoid testing with GoogleGrpc, to avoid a test race.
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
+  initialize();
+
+  // Handle the CDS request-response.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster,
+      {ConfigHelper::buildStaticCluster("cluster1", 8000, "127.0.0.1")},
+      {ConfigHelper::buildStaticCluster("cluster1", 8000, "127.0.0.1")}, {}, "1");
+
+  // Handle the LDS request-response.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}, false));
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TestTypeUrl::get().Listener, {buildListener("listener1", "route_config1")},
+      {buildListener("listener1", "route_config1")}, {}, "1");
+
+  // CDS Ack.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}));
+  // RDS request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                      {"route_config1"}, {"route_config1"}, {}));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TestTypeUrl::get().RouteConfiguration,
+      {buildRouteConfig("route_config1", "cluster1")},
+      {buildRouteConfig("route_config1", "cluster1")}, {}, "1");
+
+  // LDS and RDS Acks.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
+                                      {"route_config1"}, {}, {}));
+
+  // The LRS/ADS connection was established in AdsIntegrationTest::initialize() above,
+  // now need to receive a stream for LRS over the same connection.
+  EXPECT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, lrs_stream_));
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  lrs_stream_->startGrpcStream();
+
+  // Send an LRS response.
+  sendRequestLoadStatsResponse({"cluster1"});
+
+  // Receive an empty load-report status.
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
+  // On slow machines, more than one load stats response may be pushed while we are simulating load.
+  EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+}
+
+// Testing that the connection is shared between ADS and LRS in the GoogleGrpc case.
+TEST_P(LrsOverAdsIntegrationTest, SharedAdsLrsConnectionGoogleGrpc) {
+  // This test is specific for GoogleGrpc.
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::EnvoyGrpc);
+  initialize();
+
+  // There is a race between the ADS and LRS streams that reach the connection,
+  // so this test just validates that 2 streams are made on the same connection.
+  // TODO(adisuissa): create a better testing framework to test the contents of
+  // the streams.
+  // One of the streams was already created in the `initialize()` step, wait for
+  // the other stream.
+  FakeStreamPtr stream;
+  EXPECT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, stream));
+  ASSERT_TRUE(stream->waitForHeadersComplete());
+  stream->startGrpcStream();
+
+  // Verify their types by checking the path.
+  absl::string_view stream_path = stream->headers().getPathValue();
+  bool stream_is_lrs = (stream_path == LrsPath);
+  bool stream_is_ads = (stream_path == SotwAdsPath) || (stream_path == DeltaAdsPath);
+
+  EXPECT_TRUE(stream_is_lrs || stream_is_ads);
+  cleanUpXdsConnection();
+}
+
+// Test that if the ADS/LRS connection is severed, both streams are re-established.
+TEST_P(LrsOverAdsIntegrationTest, AdsLrsConnectionReconnects) {
+  // Avoid testing with GoogleGrpc, to avoid a test race.
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
+  initialize();
+
+  // Handle the CDS request-response.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster,
+      {ConfigHelper::buildStaticCluster("cluster1", 8000, "127.0.0.1")},
+      {ConfigHelper::buildStaticCluster("cluster1", 8000, "127.0.0.1")}, {}, "1");
+
+  // Handle the LDS request-response.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}, false));
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TestTypeUrl::get().Listener, {buildListener("listener1", "route_config1")},
+      {buildListener("listener1", "route_config1")}, {}, "1");
+
+  // CDS Ack.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}));
+  // RDS request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                      {"route_config1"}, {"route_config1"}, {}));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TestTypeUrl::get().RouteConfiguration,
+      {buildRouteConfig("route_config1", "cluster1")},
+      {buildRouteConfig("route_config1", "cluster1")}, {}, "1");
+
+  // LDS and RDS Acks.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
+                                      {"route_config1"}, {}, {}));
+
+  // The LRS/ADS connection was established in AdsIntegrationTest::initialize() above,
+  // now need to receive a stream for LRS over the same connection.
+  EXPECT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, lrs_stream_));
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  lrs_stream_->startGrpcStream();
+
+  // Send an LRS response.
+  sendRequestLoadStatsResponse({"cluster1"});
+
+  // Receive an empty load-report status.
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
+  // On slow machines, more than one load stats response may be pushed while we are simulating load.
+  EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+
+  // Kill the connection.
+  AssertionResult result = xds_connection_->close();
+  RELEASE_ASSERT(result, result.message());
+  result = xds_connection_->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+
+  reconnectAdsAndLrsStreamsAndVerify(xds_upstream_);
+}
+
+// Test that if the ADS config is replaced, both streams are re-established on the new connection.
+// This is similar to the ReplaceAdsConfig test in ads_integration_test.cc.
+TEST_P(LrsOverAdsIntegrationTest, ReplaceAdsConfigRecreatesStreams) {
+  // Avoid testing with GoogleGrpc, to avoid a test race.
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
+  initialize();
+
+  // Initial ADS and LRS setup.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {}, "1");
+  EXPECT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, lrs_stream_));
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  lrs_stream_->startGrpcStream();
+
+  // Create a new ApiConfigSource pointing to the dummy_cluster upstream
+  // (dummy_cluster will be the new xDS server).
+  envoy::config::core::v3::ApiConfigSource new_ads_config;
+  new_ads_config.set_api_type((sotwOrDelta() == Grpc::SotwOrDelta::Sotw) ||
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
+                                  ? envoy::config::core::v3::ApiConfigSource::GRPC
+                                  : envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  new_ads_config.set_set_node_on_first_message_only(true);
+  auto* grpc_service = new_ads_config.add_grpc_services();
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    auto* google_grpc = grpc_service->mutable_google_grpc();
+    auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
+    ssl_creds->mutable_root_certs()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+  }
+  setGrpcService(*grpc_service, "dummy_cluster", fake_upstreams_[0]->localAddress());
+
+  // Replace the ADS config. This must be done on the main thread.
+  test_server_->server().dispatcher().post([this, &new_ads_config]() {
+    auto status = test_server_->server().xdsManager().setAdsConfigSource(new_ads_config);
+    EXPECT_TRUE(status.ok());
+  });
+
+  // Verify the old streams are closed.
+  EXPECT_TRUE(xds_stream_->waitForReset());
+  EXPECT_TRUE(lrs_stream_->waitForReset());
+  xds_stream_.reset();
+  lrs_stream_.reset();
+
+  // fake_upstreams_[0] is the dummy_cluster upstream.
+  reconnectAdsAndLrsStreamsAndVerify(fake_upstreams_[0].get());
+}
+
+// Test that if the ADS config is replaced and uses GoogleGrpc, both streams are
+// re-established on the new connection.
+TEST_P(LrsOverAdsIntegrationTest, ReplaceAdsConfigRecreatesStreamsGoogleGrpc) {
+  // This test is specific for GoogleGrpc.
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::EnvoyGrpc);
+  initialize();
+
+  // There is a race between the ADS and LRS streams that reach the connection,
+  // so this test just validates that 2 streams are made on the same connection.
+  // TODO(adisuissa): create a better testing framework to test the contents of
+  // the streams.
+  // One of the streams was already created in the `initialize()` step, wait for
+  // the other stream.
+  FakeStreamPtr stream;
+  EXPECT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, stream));
+
+  // Verify their types by checking the path.
+  ASSERT_TRUE(stream->waitForHeadersComplete());
+  stream->startGrpcStream();
+
+  absl::string_view stream_path = stream->headers().getPathValue();
+  bool stream_is_lrs = (stream_path == LrsPath);
+  bool stream_is_ads = (stream_path == SotwAdsPath) || (stream_path == DeltaAdsPath);
+
+  EXPECT_TRUE(stream_is_lrs || stream_is_ads);
+
+  // Both LRS and ADS streams are connected, replace the ADS, and ensure that
+  // LRS is also replaced.
+  // Create a new ApiConfigSource pointing to the dummy_cluster upstream
+  // (dummy_cluster will be the new xDS server).
+  envoy::config::core::v3::ApiConfigSource new_ads_config;
+  new_ads_config.set_api_type((sotwOrDelta() == Grpc::SotwOrDelta::Sotw) ||
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
+                                  ? envoy::config::core::v3::ApiConfigSource::GRPC
+                                  : envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  new_ads_config.set_set_node_on_first_message_only(true);
+  auto* grpc_service = new_ads_config.add_grpc_services();
+  // dummy_cluster has no TLS certificate, so avoiding adding it to the gRPC service.
+  setGrpcService(*grpc_service, "dummy_cluster", fake_upstreams_[0]->localAddress());
+
+  // Replace the ADS config. This must be done on the main thread.
+  test_server_->server().dispatcher().post([this, &new_ads_config]() {
+    auto status = test_server_->server().xdsManager().setAdsConfigSource(new_ads_config);
+    EXPECT_TRUE(status.ok());
+  });
+
+  // Verify the old streams are closed.
+  EXPECT_TRUE(xds_stream_->waitForReset());
+  EXPECT_TRUE(stream->waitForReset());
+  xds_stream_.reset();
+  stream.reset();
+
+  // fake_upstreams_[0] is the dummy_cluster upstream.
+  reconnectAdsAndLrsStreamsAndVerify(fake_upstreams_[0].get());
+  cleanUpXdsConnection();
+}
 } // namespace
 } // namespace Envoy

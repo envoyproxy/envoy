@@ -29,6 +29,7 @@ public:
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(absl::Status, setAdsConfigSource,
               (const envoy::config::core::v3::ApiConfigSource& config_source));
+  MOCK_METHOD(void, setAdsClientChangeCallback, (AdsClientChangeCallback cb));
   MOCK_METHOD(absl::Status, initializeAdsConnections,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(GrpcMuxSharedPtr, adsMux, ());

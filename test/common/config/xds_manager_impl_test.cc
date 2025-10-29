@@ -2505,6 +2505,175 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, PauseResume) {
   }
 }
 
+// Validates that shared clients are created when load_stats_over_ads_config_connection is true,
+// even when use_cached_grpc_client_for_xds is false.
+TEST_P(XdsManagerImplTest, AdsInitializationUsesSharedClientWithLoadStatsOverAds) {
+  if (GetParam()) {
+    // This test's condition is only meaningful when use_cached_grpc_client_for_xds is false.
+    // When true, it will always use shared clients.
+    return;
+  }
+  testing::InSequence s;
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+
+  initialize(R"EOF(
+  dynamic_resources:
+    ads_config:
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  cluster_manager:
+    load_stats_over_ads_config_connection: true
+  )EOF");
+
+  // Expect shared client creation because load_stats_over_ads_config_connection is true.
+  EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+      .WillOnce(Return(ByMove(std::make_shared<Grpc::MockAsyncClient>())));
+  EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _)).Times(0);
+
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+}
+
+// Validates that unique clients are created when load_stats_over_ads_config_connection is false
+// and use_cached_grpc_client_for_xds is also false.
+TEST_P(XdsManagerImplTest, AdsInitializationUsesUniqueClientWithoutLoadStatsOverAds) {
+  if (GetParam()) {
+    // This test is only relevant when use_cached_grpc_client_for_xds is false.
+    return;
+  }
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+
+  initialize(R"EOF(
+  dynamic_resources:
+    ads_config:
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+
+  // Expect unique client creation because load_stats_over_ads_config_connection is false
+  // and use_cached_grpc_client_for_xds is false.
+  EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _)).Times(0);
+  auto mock_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  auto* raw_mock_factory = mock_factory.get();
+  auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+  EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillOnce(
+          Return(ByMove(absl::StatusOr<Grpc::AsyncClientFactoryPtr>(std::move(mock_factory)))));
+  EXPECT_CALL(*raw_mock_factory, createUncachedRawAsyncClient())
+      .WillOnce(Return(ByMove(absl::StatusOr<Grpc::RawAsyncClientPtr>(std::move(mock_client)))));
+
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+}
+
+// Validates that the AdsClientChangeCallback is invoked on successful ADS config replacement.
+TEST_P(XdsManagerImplTest, AdsReplacementCallback) {
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+  // Replace the created GrpcMux mock.
+  std::shared_ptr<NiceMock<MockGrpcMux>> ads_mux_shared(std::make_shared<NiceMock<MockGrpcMux>>());
+  NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared.get());
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _)).WillOnce(Return(ads_mux_shared));
+
+  // Start with a static cluster, and set it to be the ADS cluster.
+  initialize(R"EOF(
+  dynamic_resources:
+    ads_config:
+      api_type: GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster1
+  static_resources:
+    clusters:
+    - name: ads_cluster1
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    - name: ads_cluster2
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster2
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+  )EOF");
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+
+  bool callback_invoked = false;
+  Grpc::RawAsyncClientSharedPtr captured_client;
+  xds_manager_impl_.setAdsClientChangeCallback(
+      [&callback_invoked, &captured_client](Grpc::RawAsyncClientSharedPtr client) {
+        callback_invoked = true;
+        captured_client = client;
+      });
+
+  // Replace the ADS config to be the second ADS cluster.
+  envoy::config::core::v3::ApiConfigSource new_ads_config;
+  TestUtility::loadFromYaml(R"EOF(
+      api_type: GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster2
+  )EOF",
+                            new_ads_config);
+
+  EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config)))
+      .WillOnce(Return(absl::OkStatus()));
+  const auto res = xds_manager_impl_.setAdsConfigSource(new_ads_config);
+  EXPECT_TRUE(res.ok());
+  EXPECT_TRUE(callback_invoked);
+  EXPECT_NE(captured_client, nullptr);
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy
