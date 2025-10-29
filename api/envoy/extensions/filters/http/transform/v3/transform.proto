@@ -51,8 +51,7 @@ message TransformConfig {
 message Transformation {
   // The header mutations to perform.
   // The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
-  // And except the commonly used format specifiers, there are some additional format specifiers
-  // provided by the transform filter:
+  // In addition to the commonly used format specifiers, this filter introduces additional format specifiers:
   //
   // * ``%REQUEST_BODY(KEY*)%``: the request body. And ``Key`` KEY is an optional
   //   lookup key in the namespace with the option of specifying nested keys separated by ':'.
