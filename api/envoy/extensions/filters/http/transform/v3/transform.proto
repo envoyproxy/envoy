@@ -74,7 +74,7 @@ message BodyTransformation {
 
   // Body transformation configuration. If not set, no body transformation will be performed.
   // NOTE the ``REQUEST_BODY`` and ``RESPONSE_BODY`` format specifiers can also be used here.
-  config.core.v3.SubstitutionFormatString body_format = 3
+  config.core.v3.SubstitutionFormatString body_format = 1
       [(validate.rules).message = {required: true}];
 
   // The action to perform for body transformation. Default is ``MERGE``.
