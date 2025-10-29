@@ -16,7 +16,7 @@ CredentialsFileCredentialsProvider::CredentialsFileCredentialsProvider(
     : context_(context), profile_("") {
 
   if (credential_file_config.has_credentials_data_source()) {
-    auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+    auto provider_or_error_ = Config::DataSource::createStringDataSourceProvider(
         credential_file_config.credentials_data_source(), context.mainThreadDispatcher(),
         context.threadLocal(), context.api(), false, 4096);
     if (provider_or_error_.ok()) {

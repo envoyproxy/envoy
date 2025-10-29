@@ -517,7 +517,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                                      : RetryPolicyImpl::DefaultRetryPolicy;
 
   if (route.has_direct_response() && route.direct_response().has_body()) {
-    auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider::create(
+    auto provider_or_error = Envoy::Config::DataSource::createStringDataSourceProvider(
         route.direct_response().body(), factory_context.mainThreadDispatcher(),
         factory_context.threadLocal(), factory_context.api(), true,
         vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());

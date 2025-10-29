@@ -40,7 +40,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
 
   absl::Status status = absl::InvalidArgumentError("IAM Roles Anywhere will not be enabled");
 
-  auto provider_or_error = Config::DataSource::DataSourceProvider::create(
+  auto provider_or_error = Config::DataSource::createStringDataSourceProvider(
       certificate_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
       context_.api(), false, X509_CERTIFICATE_MAX_BYTES);
   if (provider_or_error.ok()) {
@@ -53,7 +53,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
   }
 
   if (certificate_chain_data_source_.has_value()) {
-    auto chain_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+    auto chain_provider_or_error_ = Config::DataSource::createStringDataSourceProvider(
         certificate_chain_data_source_.value(), context_.mainThreadDispatcher(),
         context_.threadLocal(), context_.api(), false, X509_CERTIFICATE_MAX_BYTES * 5);
     if (chain_provider_or_error_.ok()) {
@@ -67,7 +67,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
     certificate_chain_data_source_provider_ = absl::nullopt;
   }
 
-  auto pkey_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+  auto pkey_provider_or_error_ = Config::DataSource::createStringDataSourceProvider(
       private_key_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
       context_.api(), false, X509_PRIVATE_KEY_MAX_BYTES);
   if (pkey_provider_or_error_.ok()) {

@@ -87,86 +87,19 @@ absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& s
              : absl::nullopt;
 }
 
-DynamicData::DynamicData(Event::Dispatcher& main_dispatcher,
-                         ThreadLocal::TypedSlotPtr<ThreadLocalData> slot,
-                         Filesystem::WatcherPtr watcher)
-    : dispatcher_(main_dispatcher), slot_(std::move(slot)), watcher_(std::move(watcher)) {}
+// Helper function for creating string-based DataSourceProvider with backward compatibility.
+absl::StatusOr<DataSourceProviderPtr>
+createStringDataSourceProvider(const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
+                               ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty,
+                               uint64_t max_size) {
+  // Identity transformation that wraps string in unique_ptr.
+  auto identity_transform =
+      [](const std::string& data) -> absl::StatusOr<std::unique_ptr<const std::string>> {
+    return std::make_unique<const std::string>(data);
+  };
 
-DynamicData::~DynamicData() {
-  if (!dispatcher_.isThreadSafe()) {
-    dispatcher_.post([to_delete = std::move(slot_)] {});
-  }
-}
-
-const std::string& DynamicData::data() const {
-  const auto thread_local_data = slot_->get();
-  return thread_local_data.has_value() ? *thread_local_data->data_ : EMPTY_STRING;
-}
-
-const std::string& DataSourceProvider::data() const {
-  if (absl::holds_alternative<std::string>(data_)) {
-    return absl::get<std::string>(data_);
-  }
-  return absl::get<DynamicData>(data_).data();
-}
-
-absl::StatusOr<DataSourceProviderPtr> DataSourceProvider::create(const ProtoDataSource& source,
-                                                                 Event::Dispatcher& main_dispatcher,
-                                                                 ThreadLocal::SlotAllocator& tls,
-                                                                 Api::Api& api, bool allow_empty,
-                                                                 uint64_t max_size) {
-  auto initial_data_or_error = read(source, allow_empty, api, max_size);
-  RETURN_IF_NOT_OK_REF(initial_data_or_error.status());
-
-  // read() only validates the size of the file and does not check the size of inline data.
-  // We check the size of inline data here.
-  // TODO(wbpcode): consider moving this check to read() to avoid duplicate checks.
-  if (max_size > 0 && initial_data_or_error.value().length() > max_size) {
-    return absl::InvalidArgumentError(fmt::format("response body size is {} bytes; maximum is {}",
-                                                  initial_data_or_error.value().length(),
-                                                  max_size));
-  }
-
-  if (!source.has_watched_directory() ||
-      source.specifier_case() != envoy::config::core::v3::DataSource::kFilename) {
-    return std::unique_ptr<DataSourceProvider>(
-        new DataSourceProvider(std::move(initial_data_or_error).value()));
-  }
-
-  auto slot = ThreadLocal::TypedSlot<DynamicData::ThreadLocalData>::makeUnique(tls);
-  slot->set([initial_data = std::make_shared<std::string>(
-                 std::move(initial_data_or_error.value()))](Event::Dispatcher&) {
-    return std::make_shared<DynamicData::ThreadLocalData>(initial_data);
-  });
-
-  const auto& filename = source.filename();
-  auto watcher = main_dispatcher.createFilesystemWatcher();
-  // DynamicData will ensure that the watcher is destroyed before the slot is destroyed.
-  // TODO(wbpcode): use Config::WatchedDirectory instead of directly creating a watcher
-  // if the Config::WatchedDirectory is exception-free in the future.
-  auto watcher_status = watcher->addWatch(
-      absl::StrCat(source.watched_directory().path(), "/"), Filesystem::Watcher::Events::MovedTo,
-      [slot_ptr = slot.get(), &api, filename, allow_empty, max_size](uint32_t) -> absl::Status {
-        auto new_data_or_error = readFile(filename, api, allow_empty, max_size);
-        if (!new_data_or_error.ok()) {
-          // Log an error but don't fail the watch to avoid throwing EnvoyException at runtime.
-          ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), error,
-                              "Failed to read file: {}", new_data_or_error.status().message());
-          return absl::OkStatus();
-        }
-        slot_ptr->runOnAllThreads(
-            [new_data = std::make_shared<std::string>(std::move(new_data_or_error.value()))](
-                OptRef<DynamicData::ThreadLocalData> obj) {
-              if (obj.has_value()) {
-                obj->data_ = new_data;
-              }
-            });
-        return absl::OkStatus();
-      });
-  RETURN_IF_NOT_OK(watcher_status);
-
-  return std::unique_ptr<DataSourceProvider>(
-      new DataSourceProvider(DynamicData(main_dispatcher, std::move(slot), std::move(watcher))));
+  return DataSourceProvider<std::string>::create(source, main_dispatcher, tls, api, allow_empty,
+                                                 max_size, identity_transform);
 }
 
 } // namespace DataSource

@@ -23,7 +23,7 @@ WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
       role_arn_(web_identity_config.role_arn()),
       role_session_name_(web_identity_config.role_session_name()) {
 
-  auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+  auto provider_or_error_ = Config::DataSource::createStringDataSourceProvider(
       web_identity_config.web_identity_token_data_source(), context.mainThreadDispatcher(),
       context.threadLocal(), context.api(), false, 4096);
   if (provider_or_error_.ok()) {

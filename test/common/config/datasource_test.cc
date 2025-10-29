@@ -222,7 +222,7 @@ TEST(DataSourceProviderTest, NonFileDataSourceTest) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
+      DataSource::createStringDataSourceProvider(config, *dispatcher, tls, *api, false, 0);
   EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 }
 
@@ -263,7 +263,7 @@ TEST(DataSourceProviderTest, FileDataSourceButNoWatch) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
+      DataSource::createStringDataSourceProvider(config, *dispatcher, tls, *api, false, 0);
   EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
@@ -323,7 +323,7 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatch) {
 
   // Create a provider with watch.
   auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
+      DataSource::createStringDataSourceProvider(config, *dispatcher, tls, *api, false, 0);
   EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
@@ -384,7 +384,7 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
   // Create a provider with watch. The max size is set to 15, so the updated content will be
   // ignored.
   auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 15);
+      DataSource::createStringDataSourceProvider(config, *dispatcher, tls, *api, false, 15);
   EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
@@ -401,6 +401,240 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+}
+
+// Custom data type for testing transformation callbacks.
+struct ParsedData {
+  int value;
+  std::string name;
+};
+
+TEST(DataSourceProviderTemplatedTest, NonFileDataSourceWithTransformation) {
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml = fmt::format(R"EOF(
+    inline_string: "42:test_name"
+    watched_directory:
+      path: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kInlineString,
+            config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  // Transformation that parses "value:name" format.
+  auto transform_fn =
+      [](const std::string& data) -> absl::StatusOr<std::unique_ptr<const ParsedData>> {
+    auto pos = data.find(':');
+    if (pos == std::string::npos) {
+      return absl::InvalidArgumentError("Invalid format, expected 'value:name'");
+    }
+    auto parsed = std::make_unique<ParsedData>();
+    parsed->value = std::stoi(data.substr(0, pos));
+    parsed->name = data.substr(pos + 1);
+    return parsed;
+  };
+
+  auto provider_or_error = DataSource::DataSourceProvider<ParsedData>::create(
+      config, *dispatcher, tls, *api, false, 0, transform_fn);
+  EXPECT_TRUE(provider_or_error.ok());
+  const auto& parsed_data = provider_or_error.value()->data();
+  EXPECT_EQ(parsed_data.value, 42);
+  EXPECT_EQ(parsed_data.name, "test_name");
+}
+
+TEST(DataSourceProviderTemplatedTest, TransformationFailureOnInitialLoad) {
+  envoy::config::core::v3::DataSource config;
+  const std::string yaml = R"EOF(
+    inline_string: "invalid_format"
+  )EOF";
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  // Transformation that expects "value:name" format.
+  auto transform_fn =
+      [](const std::string& data) -> absl::StatusOr<std::unique_ptr<const ParsedData>> {
+    auto pos = data.find(':');
+    if (pos == std::string::npos) {
+      return absl::InvalidArgumentError("Invalid format, expected 'value:name'");
+    }
+    auto parsed = std::make_unique<ParsedData>();
+    parsed->value = std::stoi(data.substr(0, pos));
+    parsed->name = data.substr(pos + 1);
+    return parsed;
+  };
+
+  auto provider_or_error = DataSource::DataSourceProvider<ParsedData>::create(
+      config, *dispatcher, tls, *api, false, 0, transform_fn);
+  EXPECT_FALSE(provider_or_error.ok());
+  EXPECT_THAT(provider_or_error.status().message(), testing::HasSubstr("Invalid format"));
+}
+
+TEST(DataSourceProviderTemplatedTest, FileDataSourceWithTransformationAndReload) {
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_new_link").c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+    watched_directory:
+      path: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test/transform_link"),
+                                       TestEnvironment::temporaryPath("envoy_test"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/transform_target"));
+    file << "10:original";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/transform_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/transform_link"));
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/transform_new_target"));
+    file << "99:updated";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/transform_new_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/transform_new_link"));
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  // Transformation that parses "value:name" format.
+  auto transform_fn =
+      [](const std::string& data) -> absl::StatusOr<std::unique_ptr<const ParsedData>> {
+    auto pos = data.find(':');
+    if (pos == std::string::npos) {
+      return absl::InvalidArgumentError("Invalid format, expected 'value:name'");
+    }
+    auto parsed = std::make_unique<ParsedData>();
+    parsed->value = std::stoi(data.substr(0, pos));
+    parsed->name = data.substr(pos + 1);
+    return parsed;
+  };
+
+  // Create a provider with watch.
+  auto provider_or_error = DataSource::DataSourceProvider<ParsedData>::create(
+      config, *dispatcher, tls, *api, false, 0, transform_fn);
+  EXPECT_TRUE(provider_or_error.ok());
+  const auto& initial_data = provider_or_error.value()->data();
+  EXPECT_EQ(initial_data.value, 10);
+  EXPECT_EQ(initial_data.name, "original");
+
+  // Update the symlink to point to the new file.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/transform_new_link"),
+                              TestEnvironment::temporaryPath("envoy_test/transform_link"));
+  // Handle the events if any.
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // The provider should return the updated transformed content.
+  const auto& updated_data = provider_or_error.value()->data();
+  EXPECT_EQ(updated_data.value, 99);
+  EXPECT_EQ(updated_data.name, "updated");
+
+  // Remove the file.
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_new_link").c_str());
+}
+
+TEST(DataSourceProviderTemplatedTest, TransformationFailureOnReloadKeepsOldData) {
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_fail_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_fail_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_fail_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_fail_new_link").c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml =
+      fmt::format(R"EOF(
+    filename: "{}"
+    watched_directory:
+      path: "{}"
+  )EOF",
+                  TestEnvironment::temporaryPath("envoy_test/transform_fail_link"),
+                  TestEnvironment::temporaryPath("envoy_test"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/transform_fail_target"));
+    file << "10:original";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/transform_fail_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/transform_fail_link"));
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/transform_fail_new_target"));
+    file << "invalid_format"; // This will fail transformation.
+    file.close();
+  }
+  TestEnvironment::createSymlink(
+      TestEnvironment::temporaryPath("envoy_test/transform_fail_new_target"),
+      TestEnvironment::temporaryPath("envoy_test/transform_fail_new_link"));
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  // Transformation that parses "value:name" format.
+  auto transform_fn =
+      [](const std::string& data) -> absl::StatusOr<std::unique_ptr<const ParsedData>> {
+    auto pos = data.find(':');
+    if (pos == std::string::npos) {
+      return absl::InvalidArgumentError("Invalid format, expected 'value:name'");
+    }
+    auto parsed = std::make_unique<ParsedData>();
+    parsed->value = std::stoi(data.substr(0, pos));
+    parsed->name = data.substr(pos + 1);
+    return parsed;
+  };
+
+  // Create a provider with watch.
+  auto provider_or_error = DataSource::DataSourceProvider<ParsedData>::create(
+      config, *dispatcher, tls, *api, false, 0, transform_fn);
+  EXPECT_TRUE(provider_or_error.ok());
+  const auto& initial_data = provider_or_error.value()->data();
+  EXPECT_EQ(initial_data.value, 10);
+  EXPECT_EQ(initial_data.name, "original");
+
+  // Update the symlink to point to the new file with invalid content.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/transform_fail_new_link"),
+                              TestEnvironment::temporaryPath("envoy_test/transform_fail_link"));
+  // Handle the events if any.
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // The provider should still return the old data because transformation failed.
+  const auto& data_after_failed_reload = provider_or_error.value()->data();
+  EXPECT_EQ(data_after_failed_reload.value, 10);
+  EXPECT_EQ(data_after_failed_reload.name, "original");
+
+  // Remove the file.
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_fail_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_fail_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_fail_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/transform_fail_new_link").c_str());
 }
 
 } // namespace
