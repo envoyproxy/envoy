@@ -77,11 +77,11 @@ These input functions are available for transport socket matching in clusters:
 
 .. _extension_envoy.matching.inputs.endpoint_metadata:
 
-* :ref:`Endpoint metadata <envoy_v3_api_msg_extensions.matching.common_inputs.transport_socket.v3.EndpointMetadataInput>`.
+* Endpoint metadata - extracts metadata from the selected endpoint for transport socket selection.
 
 .. _extension_envoy.matching.inputs.locality_metadata:
 
-* :ref:`Locality metadata <envoy_v3_api_msg_extensions.matching.common_inputs.transport_socket.v3.LocalityMetadataInput>`.
+* Locality metadata - extracts metadata from the endpoint's locality for transport socket selection.
 
 Additionally, the following network input functions can be used in transport socket matching context:
 
@@ -156,8 +156,7 @@ These actions are available for use with matchers:
 
 .. _extension_envoy.matching.action.transport_socket.name:
 
-* :ref:`Transport socket name action <envoy_v3_api_msg_extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction>` selects a named transport socket
-  from the cluster's transport_socket_matches configuration.
+* Transport socket name action - selects a named transport socket from the cluster's transport_socket_matches configuration based on matching criteria.
 
 Filter Integration
 ##################
