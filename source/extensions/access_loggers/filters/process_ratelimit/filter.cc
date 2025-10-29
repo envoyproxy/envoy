@@ -23,14 +23,11 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
       [this, cancel_cb = cancel_cb_](
           Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter)
       -> void {
-    if (cancel_cb->load()) {
-      return;
+    if (!cancel_cb->load()) {
+      ENVOY_BUG(limiter != nullptr, "limiter shouldn't be null if the `limiter` is set from "
+                                    "callback.");
+      rate_limiter_->setLimiter(limiter);
     }
-
-    ENVOY_BUG(limiter != nullptr, "limiter shouldn't be null if the `limiter` is set from "
-                                  "callback.");
-
-    rate_limiter_->setLimiter(limiter);
   };
 
   if (!config.has_dynamic_config()) {

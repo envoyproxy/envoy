@@ -29,18 +29,14 @@ void RateLimiterProviderSingleton::RateLimiterWrapper::setLimiter(
             "init_target_ should not be null if the limiter is set from callback");
   limiter_slot_.runOnAllThreads(
       [limiter, cancelled = cancelled_](OptRef<ThreadLocalLimiter> thread_local_limiter) {
-        if (cancelled->load()) {
-          return;
+        if (!cancelled->load()) {
+          thread_local_limiter->limiter = limiter;
         }
-
-        thread_local_limiter->limiter = limiter;
       },
       [init_target = init_target_.get(), cancelled = cancelled_]() {
-        if (cancelled->load()) {
-          return;
+        if (!cancelled->load()) {
+          init_target->ready();
         }
-
-        init_target->ready();
       });
 }
 
