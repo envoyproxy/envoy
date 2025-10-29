@@ -1993,6 +1993,15 @@ ConnectionImpl::Http2Options::Http2Options(
   // 512 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb
   // in both headers and trailers
   nghttp2_option_set_max_continuations(options_, 512);
+
+#ifdef ENVOY_ENABLE_UHV
+  // nghttp2 v1.67+ promotes stream errors to connection errors for invalid HTTP messaging.
+  // When UHV is enabled, Envoy performs comprehensive HTTP validation, so disable nghttp2's HTTP
+  // messaging validation to prevent it from promoting errors to connection level. This allows
+  // Envoy to maintain full control over validation and error handling semantics via the
+  // stream_error_on_invalid_http_messaging_ flag.
+  nghttp2_option_set_no_http_messaging(options_, 1);
+#endif
 #endif
 }
 
@@ -2021,6 +2030,15 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
   // 1024 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb
   // in both headers and trailers
   nghttp2_option_set_max_continuations(options_, 1024);
+
+#ifdef ENVOY_ENABLE_UHV
+  // nghttp2 v1.67+ promotes stream errors to connection errors for invalid HTTP messaging.
+  // When UHV (Universal Header Validator) is enabled, Envoy performs comprehensive HTTP validation,
+  // so disable nghttp2's HTTP messaging validation to prevent it from promoting errors to
+  // connection level. This allows Envoy to maintain full control over validation and error handling
+  // semantics via the stream_error_on_invalid_http_messaging_ flag.
+  nghttp2_option_set_no_http_messaging(options_, 1);
+#endif
 #endif
 }
 
