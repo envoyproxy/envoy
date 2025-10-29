@@ -13,7 +13,7 @@ using AccessLogType = envoy::data::accesslog::v3::AccessLogType;
 /**
  * HTTP specific substitution formatter context for HTTP access logs or formatters.
  */
-class HttpFormatterContext {
+class Context {
 public:
   /**
    * Interface for a context extension which can be used to provide non-HTTP specific data to
@@ -36,12 +36,11 @@ public:
    * @param log_type supplies the access log type.
    * @param active_span supplies the active span.
    */
-  HttpFormatterContext(const Http::RequestHeaderMap* request_headers = nullptr,
-                       const Http::ResponseHeaderMap* response_headers = nullptr,
-                       const Http::ResponseTrailerMap* response_trailers = nullptr,
-                       absl::string_view local_reply_body = {},
-                       AccessLogType log_type = AccessLogType::NotSet,
-                       const Tracing::Span* active_span = nullptr)
+  Context(const Http::RequestHeaderMap* request_headers = nullptr,
+          const Http::ResponseHeaderMap* response_headers = nullptr,
+          const Http::ResponseTrailerMap* response_trailers = nullptr,
+          absl::string_view local_reply_body = {}, AccessLogType log_type = AccessLogType::NotSet,
+          const Tracing::Span* active_span = nullptr)
       : local_reply_body_(local_reply_body), request_headers_(makeOptRefFromPtr(request_headers)),
         response_headers_(makeOptRefFromPtr(response_headers)),
         response_trailers_(makeOptRefFromPtr(response_trailers)),
@@ -51,7 +50,7 @@ public:
    * Set or overwrite the request headers.
    * @param request_headers supplies the request headers.
    */
-  HttpFormatterContext& setRequestHeaders(const Http::RequestHeaderMap& request_headers) {
+  Context& setRequestHeaders(const Http::RequestHeaderMap& request_headers) {
     request_headers_ = request_headers;
     return *this;
   }
@@ -60,7 +59,7 @@ public:
    * Set or overwrite the response headers.
    * @param response_headers supplies the response headers.
    */
-  HttpFormatterContext& setResponseHeaders(const Http::ResponseHeaderMap& response_headers) {
+  Context& setResponseHeaders(const Http::ResponseHeaderMap& response_headers) {
     response_headers_ = response_headers;
     return *this;
   }
@@ -69,7 +68,7 @@ public:
    * Set or overwrite the response trailers.
    * @param response_trailers supplies the response trailers.
    */
-  HttpFormatterContext& setResponseTrailers(const Http::ResponseTrailerMap& response_trailers) {
+  Context& setResponseTrailers(const Http::ResponseTrailerMap& response_trailers) {
     response_trailers_ = response_trailers;
     return *this;
   }
@@ -78,7 +77,7 @@ public:
    * Set or overwrite the local reply body.
    * @param local_reply_body supplies the local reply body.
    */
-  HttpFormatterContext& setLocalReplyBody(absl::string_view local_reply_body) {
+  Context& setLocalReplyBody(absl::string_view local_reply_body) {
     local_reply_body_ = local_reply_body;
     return *this;
   }
@@ -87,7 +86,7 @@ public:
    * Set or overwrite the access log type.
    * @param log_type supplies the access log type.
    */
-  HttpFormatterContext& setAccessLogType(AccessLogType log_type) {
+  Context& setAccessLogType(AccessLogType log_type) {
     log_type_ = log_type;
     return *this;
   }
@@ -122,7 +121,7 @@ public:
    * Set or overwrite the active span.
    * @param active_span supplies the active span.
    */
-  HttpFormatterContext& setActiveSpan(const Tracing::Span& active_span) {
+  Context& setActiveSpan(const Tracing::Span& active_span) {
     active_span_ = makeOptRefFromPtr(&active_span);
     return *this;
   }
@@ -136,7 +135,7 @@ public:
    * Set the context extension.
    * @param extension supplies the context extension.
    */
-  HttpFormatterContext& setExtension(const Extension& extension) {
+  Context& setExtension(const Extension& extension) {
     extension_ = extension;
     return *this;
   }
@@ -163,8 +162,6 @@ private:
   OptRef<const Tracing::Span> active_span_;
   AccessLogType log_type_{AccessLogType::NotSet};
 };
-
-using Context = HttpFormatterContext;
 
 } // namespace Formatter
 } // namespace Envoy

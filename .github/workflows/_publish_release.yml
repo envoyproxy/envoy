@@ -58,11 +58,14 @@ jobs:
         --//distribution:x64-release=//distribution:custom/x64/bin/release.tar.zst
         --//distribution:arm64-release=//distribution:custom/arm64/bin/release.tar.zst
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       downloads: |
-        packages.arm64: envoy/arm64/
-        packages.x64: envoy/x64/
-        release.arm64: envoy/arm64/bin/
-        release.x64: envoy/x64/bin/
+        packages.arm64: container/envoy/arm64/
+        packages.x64: container/envoy/x64/
+        release.arm64: container/envoy/arm64/bin/
+        release.x64: container/envoy/x64/bin/
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       import-gpg: true
       request: ${{ inputs.request }}
@@ -70,11 +73,11 @@ jobs:
         export NO_BUILD_SETUP=1
       trusted: ${{ inputs.trusted }}
       upload-name: release.signed
-      upload-path: envoy/release.signed.tar.zst
+      upload-path: container/envoy/release.signed.tar.zst
       steps-pre: |
         - run: |
             mkdir distribution/custom
-            cp -a %{{ runner.temp }}/envoy/x64 %{{ runner.temp }}/envoy/arm64 distribution/custom
+            cp -a %{{ runner.temp }}/container/envoy/x64 %{{ runner.temp }}/container/envoy/arm64 distribution/custom
           shell: bash
 
   container:
@@ -114,7 +117,7 @@ jobs:
       rbe: false
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       downloads: |
-        release.signed: release.signed
+        release.signed: container/release.signed
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       source: ${{ matrix.source }}
       request: ${{ inputs.request }}
@@ -144,12 +147,12 @@ jobs:
     needs:
     - release
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.28
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.28
       with:
         ref: main
         repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}

@@ -58,10 +58,10 @@ Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_val
   return values;
 }
 
-void Config::updateFilterState(const Formatter::HttpFormatterContext& context,
+void Config::updateFilterState(const Formatter::Context& context,
                                StreamInfo::StreamInfo& info) const {
   for (const auto& value : values_) {
-    const std::string bytes_value = value.value_->formatWithContext(context, info);
+    const std::string bytes_value = value.value_->format(context, info);
     if (bytes_value.empty() && value.skip_if_empty_) {
       ENVOY_LOG(debug, "Skip empty value for an object '{}'", value.key_);
       continue;

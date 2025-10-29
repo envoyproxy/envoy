@@ -706,8 +706,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   auth_code_ = result.auth_code_;
   Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
-  const auto redirect_uri =
-      formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
+  const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
 
   std::string encrypted_code_verifier =
       Http::Utility::parseCookieValue(headers, config_->cookieNames().code_verifier_);
@@ -897,8 +896,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 
   Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
-  const auto redirect_uri =
-      formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
+  const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
   const std::string escaped_redirect_uri = Http::Utility::PercentEncoding::urlEncode(redirect_uri);
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
 

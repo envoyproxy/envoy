@@ -13,12 +13,11 @@ namespace Formatter {
 class TestFormatter : public FormatterProvider {
 public:
   // FormatterProvider
-  absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
-                    const StreamInfo::StreamInfo& stream_info) const override;
+  absl::optional<std::string> format(const Context& context,
+                                     const StreamInfo::StreamInfo& stream_info) const override;
 
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
-                                         const StreamInfo::StreamInfo& stream_info) const override;
+  Protobuf::Value formatValue(const Context& context,
+                              const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class TestCommandParser : public CommandParser {
@@ -40,12 +39,11 @@ public:
 class AdditionalFormatter : public FormatterProvider {
 public:
   // FormatterProvider
-  absl::optional<std::string>
-  formatWithContext(const HttpFormatterContext& context,
-                    const StreamInfo::StreamInfo& stream_info) const override;
+  absl::optional<std::string> format(const Context& context,
+                                     const StreamInfo::StreamInfo& stream_info) const override;
 
-  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
-                                         const StreamInfo::StreamInfo& stream_info) const override;
+  Protobuf::Value formatValue(const Context& context,
+                              const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class AdditionalCommandParser : public CommandParser {
