@@ -1140,7 +1140,7 @@ TEST_P(MultiplexedIntegrationTest, BadFrame) {
   }
 }
 
-// Test GoAway from L7 decoder filters with StopIteration.
+// Test graceful GoAway from L7 decoder filters with StopIteration.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilter) {
   config_helper_.addFilter("name: send-goaway-during-decode-filter");
   initialize();
@@ -1169,19 +1169,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilterContinue) {
                                      {"continue-filter-chain", "true"},
                                      {"skip-goaway", "false"}});
 
-  if (downstream_protocol_ >= Http::CodecType::HTTP2) {
-    // For HTTP/2+: graceful drain behavior - stream should NOT reset immediately
-    ASSERT_FALSE(response->waitForReset(std::chrono::milliseconds(100)));
-    // Connection should close gracefully after drain timeout
-    ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(1000)));
-  } else {
-    // For HTTP/1.x: immediate behavior is preserved
-    ASSERT_TRUE(response->waitForReset());
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-  }
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
-// Test GoAway from L7 encoder filters with StopIteration.
+// Test graceful GoAway from L7 encoder filters with StopIteration.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterStopIteration) {
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::RequestEncoder* encoder;
@@ -1209,11 +1201,12 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterStopIterat
                                       {"send-encoder-goaway", "true"},
                                       {"continue-encoder-filter-chain", "false"}},
       true);
+
   ASSERT_TRUE(response->waitForReset());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
-// Test GoAway from L7 encoder filters with Continue.
+// Test graceful GoAway from L7 encoder filters with Continue.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) {
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::RequestEncoder* encoder;
@@ -1241,11 +1234,12 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) 
                                       {"send-encoder-goaway", "true"},
                                       {"continue-encoder-filter-chain", "true"}},
       true);
+
   ASSERT_TRUE(response->waitForReset());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
-// Test graceful GoAway during SendLocalReply from L7 encoder filters.
+// Test immediate GoAway during SendLocalReply from L7 encoder filters.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredInLocalReplyEncoderFilter) {
   config_helper_.addFilter("name: send-goaway-during-decode-filter");
   initialize();
@@ -1259,20 +1253,10 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredInLocalReplyEncoderFilter
       {"send-local-reply", "true"},
   });
 
-  if (downstream_protocol_ >= Http::CodecType::HTTP2) {
-    // For HTTP/2+: graceful drain behavior - local reply should be sent successfully
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_EQ("410", response->headers().Status()->value().getStringView());
-    // Stream should NOT reset immediately with graceful drain
-    ASSERT_FALSE(response->waitForReset(std::chrono::milliseconds(100)));
-    // Connection should close gracefully after drain timeout
-    ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(1000)));
-  } else {
-    // For HTTP/1.x: immediate behavior is preserved
-    ASSERT_TRUE(response->waitForReset());
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-  }
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
+
 
 // Send client headers, a GoAway and then a body and ensure the full request and
 // response are received.

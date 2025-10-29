@@ -4362,13 +4362,10 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway
   EXPECT_CALL(server_->server_go_away_on_dispatch, shouldShedLoad()).WillOnce(Return(true));
   EXPECT_CALL(client_callbacks_, onGoAway(_));
 
-  if (http2_implementation_ == Http2Impl::Oghttp2) {
-    EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-    EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
-  } else {
-    // nghttp2 does not raise the headers to the decoder.
-    EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
-  }
+  // With graceful shutdown notice (shutdownNotice), both implementations
+  // allow current streams to continue processing, so headers are decoded.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
 
   EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());

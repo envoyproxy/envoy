@@ -1051,7 +1051,7 @@ void ConnectionImpl::goAway() {
 
 void ConnectionImpl::shutdownNotice() {
   adapter_->SubmitShutdownNotice();
-
+  stats_.goaway_sent_.inc();
   if (sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
@@ -2306,7 +2306,9 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   }
   if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
       should_send_go_away_on_dispatch_->shouldShedLoad()) {
-    ConnectionImpl::goAway();
+    // Use graceful shutdown notice (GOAWAY with last_stream_id=2^31-1)
+    // to implement RFC 9113 graceful shutdown and avoid collateral damage
+    ConnectionImpl::shutdownNotice();
     sent_go_away_on_dispatch_ = true;
   }
   return ConnectionImpl::dispatch(data);

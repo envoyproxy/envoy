@@ -30,7 +30,9 @@ public:
       go_away_skiped_ = true;
       return Http::FilterHeadersStatus::Continue;
     }
-    decoder_callbacks_->sendGoAwayAndClose();
+
+    // Use immediate close for filter-triggered error conditions
+    decoder_callbacks_->sendGoAwayAndClose(true);
     result = request_headers.get(Http::LowerCaseString("continue-filter-chain"));
     if (!result.empty() && result[0]->value() == "true") {
       return Http::FilterHeadersStatus::Continue;
@@ -51,7 +53,7 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
     if (auto status = Http::Utility::getResponseStatus(headers);
         status == enumToInt(Http::Code::Gone)) {
-      decoder_callbacks_->sendGoAwayAndClose();
+      decoder_callbacks_->sendGoAwayAndClose(true);
       return Http::FilterHeadersStatus::Continue;
     }
 
@@ -59,7 +61,7 @@ public:
     if (result.empty()) {
       return Http::FilterHeadersStatus::Continue;
     }
-    decoder_callbacks_->sendGoAwayAndClose();
+    decoder_callbacks_->sendGoAwayAndClose(true);
     result = headers.get(Http::LowerCaseString("continue-encoder-filter-chain"));
     if (!result.empty() && result[0]->value() == "true") {
       return Http::FilterHeadersStatus::Continue;
