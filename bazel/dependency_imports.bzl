@@ -1,4 +1,4 @@
-load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
+load("@bazel_lib//lib:repositories.bzl", "bazel_lib_register_toolchains")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
@@ -23,6 +23,7 @@ load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
+load("@rules_shell//shell:repositories.bzl", "rules_shell_dependencies", "rules_shell_toolchains")
 
 # go version for rules_go
 GO_VERSION = "1.24.6"
@@ -41,6 +42,8 @@ def envoy_dependency_imports(
         buf_version = BUF_VERSION):
     compatibility_proxy_repo()
     rules_foreign_cc_dependencies()
+    rules_shell_dependencies()
+    rules_shell_toolchains()
     go_rules_dependencies()
     go_register_toolchains(go_version)
     if go_version != "host":
@@ -79,8 +82,7 @@ def envoy_dependency_imports(
         oss_fuzz = True,
         honggfuzz = False,
     )
-    register_jq_toolchains(version = jq_version)
-    register_yq_toolchains(version = yq_version)
+    bazel_lib_register_toolchains()
     parser_deps()
 
     rules_buf_toolchains(
