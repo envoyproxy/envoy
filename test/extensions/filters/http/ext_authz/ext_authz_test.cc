@@ -2109,7 +2109,8 @@ class RequestHeaderLimitTest : public HttpFilterTest {
 public:
   RequestHeaderLimitTest() = default;
 
-  void runTest(Http::RequestHeaderMap& request_headers, Filters::Common::ExtAuthz::Response response) {
+  void runTest(Http::RequestHeaderMap& request_headers,
+               Filters::Common::ExtAuthz::Response response) {
     InSequence s;
 
     initialize(R"EOF(
@@ -2121,10 +2122,10 @@ public:
     prepareCheck();
 
     EXPECT_CALL(*client_, check(_, _, _, _))
-        .WillOnce(
-            Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                       const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                       const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+        .WillOnce(Invoke(
+            [&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter_->decodeHeaders(request_headers, false));

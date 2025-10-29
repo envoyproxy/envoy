@@ -69,7 +69,7 @@ const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& defaultChe
 
 bool headersWithinLimits(Http::HeaderMap& headers) {
   return headers.size() <= headers.maxHeadersCount() &&
-      headers.byteSize() <= headers.maxHeadersKb() * 1024;
+         headers.byteSize() <= headers.maxHeadersKb() * 1024;
 }
 
 } // namespace
@@ -691,11 +691,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
         request_headers_->setCopy(Http::LowerCaseString(key), value);
-    if (!headersWithinLimits(*request_headers_)) {
-      stats_.request_header_limits_reached_.inc();
-      rejectResponse();
-      return;
-    }
+        if (!headersWithinLimits(*request_headers_)) {
+          stats_.request_header_limits_reached_.inc();
+          rejectResponse();
+          return;
+        }
         break;
       case CheckResult::IGNORE:
         ENVOY_STREAM_LOG(trace, "Ignoring invalid header to set '{}':'{}'.", *decoder_callbacks_,
@@ -715,11 +715,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
         request_headers_->addCopy(Http::LowerCaseString(key), value);
-    if (!headersWithinLimits(*request_headers_)) {
-      stats_.request_header_limits_reached_.inc();
-      rejectResponse();
-      return;
-    }
+        if (!headersWithinLimits(*request_headers_)) {
+          stats_.request_header_limits_reached_.inc();
+          rejectResponse();
+          return;
+        }
         break;
       case CheckResult::IGNORE:
         ENVOY_STREAM_LOG(trace, "Ignoring invalid header to add '{}':'{}'.", *decoder_callbacks_,
@@ -799,11 +799,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
         request_headers_->remove(lowercase_key);
-    if (!headersWithinLimits(*request_headers_)) {
-      stats_.request_header_limits_reached_.inc();
-      rejectResponse();
-      return;
-    }
+        if (!headersWithinLimits(*request_headers_)) {
+          stats_.request_header_limits_reached_.inc();
+          rejectResponse();
+          return;
+        }
         break;
       case CheckResult::IGNORE:
         ENVOY_STREAM_LOG(trace, "Ignoring disallowed header removal '{}'.", *decoder_callbacks_,
