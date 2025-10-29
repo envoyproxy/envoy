@@ -151,8 +151,8 @@ public:
                             CallbackState callback_state);
   void
   onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
-                        ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None,
                         CallbackState next_state = CallbackState::Idle);
+  void logMutation(CallbackState callback_state, ProcessingEffect::Effect processing_effect);
   void stopMessageTimer();
   bool restartMessageTimer(const uint32_t message_timeout_ms);
 
@@ -393,7 +393,7 @@ private:
    *         or an error status on failure
    */
   absl::Status processHeaderMutationIfAvailable(
-      const envoy::service::ext_proc::v3::CommonResponse& common_response);
+      const envoy::service::ext_proc::v3::CommonResponse& common_response, ProcessingEffect::Effect& effect);
 
   /**
    * Validates content length against body mutation size. Content-length header is only

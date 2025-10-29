@@ -71,7 +71,6 @@ public:
         : latency_(latency), call_status_(call_status), processing_effect_(processing_effect) {}
     const std::chrono::microseconds latency_;
     const Grpc::Status::GrpcStatus call_status_;
-    ProcessingEffect::Effect processing_effect_;
   };
 
   // gRPC call stats for body.
@@ -89,7 +88,6 @@ public:
     std::chrono::microseconds total_latency_;
     std::chrono::microseconds max_latency_;
     std::chrono::microseconds min_latency_;
-    ProcessingEffect::Effect processing_effect_;
   };
 
   struct GrpcCallStats {
@@ -98,15 +96,20 @@ public:
     std::unique_ptr<GrpcCallBody> body_stats_;
   };
 
+  struct ProcessingEffects{
+    ProcessingEffect::Effect header_effect_;
+    ProcessingEffect::Effect body_effect_;
+    ProcessingEffect::Effect trailer_effect_;
+
+  }
+
   using GrpcCalls = struct GrpcCallStats;
 
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
-                      envoy::config::core::v3::TrafficDirection traffic_direction,
-                      ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None);
-  void updateProcessingEffect(ProcessorState::CallbackState callback_state,
-                                        envoy::config::core::v3::TrafficDirection traffic_direction,
-                                        ProcessingEffect::Effect processing_effect);
+                      envoy::config::core::v3::TrafficDirection traffic_direction);
+  void recordProcessingEffect(ProcessorState::CallbackState callback_state,
+                                        envoy::config::core::v3::TrafficDirection traffic_direction, ProcessingEffect::Effect processing_effect);
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
@@ -131,6 +134,7 @@ public:
   uint64_t bytesReceived() const { return bytes_received_; }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
+  const ProcessingEffects& processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
@@ -147,6 +151,8 @@ private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
+  ProcessingEffects encoding_processor_effects_ {};
+  ProcessingEffects decoding_processor_effects_{};
   const Envoy::Protobuf::Struct filter_metadata_;
   // The following stats are populated for ext_proc filters using Envoy gRPC only.
   // The bytes sent and received are for the entire stream.
