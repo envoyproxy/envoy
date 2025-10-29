@@ -1081,7 +1081,7 @@ public:
 
   bool lrs_over_ads_;
   FakeStreamPtr lrs_stream_;
-  uint32_t load_requests_;
+  uint32_t load_requests_{0};
   static constexpr uint32_t load_report_interval_ms_ = 500;
   // After reconnection, Envoy will send a request on each stream.
   // Verify their types by checking the path.
@@ -1338,12 +1338,9 @@ TEST_P(LrsOverAdsIntegrationTest, ReplaceAdsConfigRecreatesStreamsGoogleGrpc) {
   // Verify the old streams are closed.
   EXPECT_TRUE(xds_stream_->waitForReset());
   EXPECT_TRUE(stream->waitForReset());
-  xds_stream_.reset();
-  stream.reset();
 
   // fake_upstreams_[0] is the dummy_cluster upstream.
   reconnectAdsAndLrsStreamsAndVerify(fake_upstreams_[0].get());
-  cleanUpXdsConnection();
 }
 } // namespace
 } // namespace Envoy
