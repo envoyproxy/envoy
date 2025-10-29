@@ -12,8 +12,8 @@ behavior_changes:
     is enabled by default and can be disabled by setting the ``ENVOY_CGROUP_CPU_DETECTION`` environment
     variable to ``false``. When disabled, Envoy will fall back to the previous behavior of using only
     hardware thread count and CPU affinity for worker thread calculation. Uses conservative rounding (floor)
-    to account for non-worker threads and prevent container throttling. This can cause potential total connections
-    number drop.
+    to account for non-worker threads and prevent container throttling, which may reduce the total number of
+    connections.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -35,7 +35,7 @@ minor_behavior_changes:
     messages remain available in debug logs.
 - area: ext_authz
   change: |
-    Check the response header count is < the configured limits before applying mutations and don't
+    Check that the response header count is less than the configured limits before applying mutations, and do not
     add new headers if not.
 - area: mobile
   change: |
@@ -46,27 +46,32 @@ bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: http2
   change: |
-    Fixed a bug where Envoy will leak memory if the HTTP2 stream is reset before the request headers are
-    sent. For example, if one upstream http filter send a local reply after the connection is established but
-    before the request headers are sent, the memory allocated for the stream will not be released.
+    Fixed a bug where Envoy would leak memory if an HTTP/2 stream was reset before request headers were
+    sent. For example, if an upstream HTTP filter sent a local reply after the connection was established but
+    before request headers were sent, the memory allocated for the stream was not released.
 - area: lua
   change: |
-    Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
-    larger payload (greater than the body buffer limit).
+    Fixed a bug where Lua filters could cause Envoy to crash when setting the response body to a payload larger
+    than the body buffer limit.
 - area: bootstrap
   change: |
     Fixed an issue where the custom
     :ref:`header_prefix <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.header_prefix>`
-    will result in crash at startup.
+    would result in a crash at startup.
 - area: connection pool
   change: |
-    Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
+    Fixed a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
     or responses trigger flow control.
 - area: http
   change: |
     Fixed ``shouldDrainConnectionUponCompletion()`` to properly send ``GOAWAY`` frames for HTTP/2 and HTTP/3
     instead of aggressively closing connections. This prevents response body transmission interruption and
     ``ERR_DRAINING`` errors on the client side. HTTP/1.1 behavior remains unchanged.
+- area: composite
+  change: |
+    Fixed per-route configuration for composite filter to support matching on response headers and trailers.
+    Previously, per-route matchers would silently fail when attempting to match on ``HttpResponseHeaderMatchInput``
+    or ``HttpResponseTrailerMatchInput``, causing the delegated filter to be skipped without error.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -97,32 +102,37 @@ new_features:
     This also make it possible to refresh routes based on the attributes in the request body.
 - area: udp_sink
   change: |
-    Enhance UDP sink to handle the tapped message which the size is bigger than 64K.
+    Enhanced the UDP sink to support tapped messages larger than 64 KB.
 - area: otlp_stat_sink
   change: |
-    Supported dropping stats
-    :ref:`DropAction
-    <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during custom metric conversion.
+    Added support for dropping stats via
+    :ref:`DropAction <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during
+    custom metric conversion.
 - area: http
   change: |
-    Added ``vhost_header`` to the RouteConfiguration, allowing use of a different header for vhost matching.
+    Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to
+    :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`, allowing use of a different
+    header for vhost matching.
 - area: logging
   change: |
-    Added support for not-equal operator for access log filter rules, in
+    Added support for the not-equal operator in access log filter rules, in
     :ref:`ComparisonFilter <envoy_v3_api_msg_config.accesslog.v3.ComparisonFilter>`.
 - area: cel
   change: |
     Added per-expression configuration options for CEL evaluator to control string conversion, concatenation,
     and string extension functions. CEL expressions in RBAC policies and access logger filters
-    can now enable string functions such as ``replace()`` and ``split()`` through the new ``cel_config`` field
-    in their respective configurations.
+    can now enable string functions such as ``replace()`` and ``split()`` through the new
+    :ref:`cel_config <envoy_v3_api_field_config.rbac.v3.Policy.cel_config>` and
+    :ref:`cel_config <envoy_v3_api_field_extensions.access_loggers.filters.cel.v3.ExpressionFilter.cel_config>` fields
+    in their respective configurations. See :ref:`CelExpressionConfig <envoy_v3_api_msg_config.core.v3.CelExpressionConfig>`
+    for details.
 - area: formatter
   change: |
     Added support for the following new access log formatters:
     - ``%REQUEST_HEADER(X?Y):Z%`` as full name version of ``%REQ(X?Y):Z%``
     - ``%RESPONSE_HEADER(X?Y):Z%`` as full name version of ``%RESP(X?Y):Z%``
     - ``%RESPONSE_TRAILER(X?Y):Z%`` as full name version of ``%TRAILER(X?Y):Z%``
-    This mainly to provide a more consistent naming scheme for users to understand and use.
+    This provides a more consistent naming scheme for users to understand and use.
 - area: lua
   change: |
     Added ``drainConnectionUponCompletion()`` to the Lua filter stream info API. This allows Lua scripts
@@ -134,7 +144,7 @@ new_features:
     See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
 - area: redis
   change: |
-    Added cluster-scope command support with flexible response handling framework.
+    Added cluster-scoped command support with a flexible response handling framework.
 - area: overload management
   change: |
     The fixed heap resource monitor can now calculate memory pressure as currently allocated memory divided by maximum heap size,
@@ -147,8 +157,8 @@ new_features:
     Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.
 - area: quic
   change: |
-    Add a new quic configuration field, 'max_sessions_per_event_loop', to QuicProtocolOptions in Envoy listener.
-    This allows tuning the maximum number of new QUIC sessions created within a single event loop.
-    The default value is 16, preserving the previous hardcoded limit.
+    Added QUIC protocol option :ref:`max_sessions_per_event_loop
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.max_sessions_per_event_loop>` to limit the maximum
+    number of new QUIC sessions created per event loop. The default is 16, preserving the previous hardcoded limit.
 
 deprecated:
