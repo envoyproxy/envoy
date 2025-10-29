@@ -74,6 +74,11 @@ bug_fixes:
     Fixed ``shouldDrainConnectionUponCompletion()`` to properly send ``GOAWAY`` frames for HTTP/2 and HTTP/3
     instead of aggressively closing connections. This prevents response body transmission interruption and
     ``ERR_DRAINING`` errors on the client side. HTTP/1.1 behavior remains unchanged.
+- area: composite
+  change: |
+    Fixed per-route configuration for composite filter to support matching on response headers and trailers.
+    Previously, per-route matchers would silently fail when attempting to match on ``HttpResponseHeaderMatchInput``
+    or ``HttpResponseTrailerMatchInput``, causing the delegated filter to be skipped without error.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -152,6 +157,9 @@ new_features:
 - area: admin
   change: |
     Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.
+- area: dns_filter
+  change: |
+    Added :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.access_log>` for DNS filter.
 - area: quic
   change: |
     Added QUIC protocol option :ref:`max_sessions_per_event_loop
