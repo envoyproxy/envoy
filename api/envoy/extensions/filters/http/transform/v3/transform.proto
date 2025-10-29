@@ -78,5 +78,5 @@ message BodyTransformation {
       [(validate.rules).message = {required: true}];
 
   // The action to perform for body transformation. Default is ``MERGE``.
-  TransformAction action = 4;
+  TransformAction action = 2;
 }
