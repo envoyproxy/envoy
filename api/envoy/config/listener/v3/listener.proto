@@ -130,6 +130,12 @@ message Listener {
     core.v3.ConfigSource config_source = 2;
   }
 
+  message AccessLogOptions {
+    // If set to true, the access log is flushed when a TCP connection starts, after the
+    // transport socket successfully connected.
+    bool flush_access_log_on_connected = 1;
+  }
+
   reserved 14, 23;
 
   // The unique name by which this listener is known. If no name is provided,
@@ -360,12 +366,6 @@ message Listener {
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
   // emitted by this listener.
   repeated accesslog.v3.AccessLog access_log = 22;
-
-  message AccessLogOptions {
-    // If set to true, the access log is flushed when a TCP connection starts, after the
-    // transport socket successfully connected.
-    bool flush_access_log_on_connected = 2;
-  }
 
   // Additional access log options for the listener.
   AccessLogOptions access_log_options = 37;
