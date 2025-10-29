@@ -2299,15 +2299,13 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
   if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
       should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
-    ConnectionImpl::goAway();
+    ConnectionImpl::shutdownNotice();
     sent_go_away_on_dispatch_ = true;
     return envoyOverloadError(
         "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
   }
   if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
       should_send_go_away_on_dispatch_->shouldShedLoad()) {
-    // Use graceful shutdown notice (GOAWAY with last_stream_id=2^31-1)
-    // to implement RFC 9113 graceful shutdown and avoid collateral damage
     ConnectionImpl::shutdownNotice();
     sent_go_away_on_dispatch_ = true;
   }
