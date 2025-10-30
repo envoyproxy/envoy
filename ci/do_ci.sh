@@ -321,16 +321,17 @@ case $CI_TARGET in
             echo "ENVOY_CACHE_ROOT not set" >&2
             exit 1
         fi
-        BAZEL_BUILD_OPTIONS=()
         setup_clang_toolchain
         echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
         bazel --output_user_root="${ENVOY_CACHE_ROOT}" \
               --output_base="${ENVOY_CACHE_ROOT}/base" \
+              --nowrite_command_log \
               aquery "deps(${ENVOY_CACHE_TARGETS})" \
               --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
-              "${BAZEL_BUILD_OPTIONS[@]}" \
               "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" \
               > /dev/null
+          TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
+          echo "Generated cache: ${TOTAL_SIZE}"
         ;;
 
     format-api|check_and_fix_proto_format)
@@ -388,7 +389,7 @@ case $CI_TARGET in
             --define wasm=wamr \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips \
+            --test_tag_filters=-nofips,-runtime-cpu \
             --build_tests_only
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
@@ -398,7 +399,7 @@ case $CI_TARGET in
             --define admin_functionality=disabled \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips \
+            --test_tag_filters=-nofips,-runtime-cpu \
             --build_tests_only
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
@@ -439,6 +440,20 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
             "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
+        ;;
+
+    cpu-detection)
+        # this can be removed once the expectation is that the integration test
+        # is present
+        if [[ ! -f "test/server/cgroup_cpu_simple_integration_test.cc" ]]; then
+            echo "CPU detection skipped, no integration test available"
+            exit 0
+        fi
+        setup_clang_toolchain
+        bazel test \
+              --test_tag_filters=runtime-cpu \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              //test/server:cgroup_cpu_simple_integration_test
         ;;
 
     debug)

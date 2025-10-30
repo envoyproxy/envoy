@@ -1,17 +1,15 @@
+load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
-load("@rules_python//python:defs.bzl", "py_binary")
-load("//tools/base:envoy_python.bzl", "envoy_py_data", "envoy_pytool_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("//tools/base:envoy_python.bzl", "envoy_py_data")
 load("//tools/protoprint:protoprint.bzl", "protoprint_rule")
-load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
 
-envoy_py_namespace()
-
-envoy_pytool_binary(
+py_binary(
     name = "protoprint",
     srcs = ["protoprint.py"],
     data = [
@@ -21,10 +19,9 @@ envoy_pytool_binary(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":utils",
         ":validate_py_pb2",
         "//tools/api_versioning:utils",
-        "//tools/protoxform:options",
-        "//tools/protoxform:utils",
         "@envoy_repo",
         requirement("packaging"),
         "//tools/type_whisperer",
@@ -34,6 +31,15 @@ envoy_pytool_binary(
         "@com_google_googleapis//google/api:annotations_py_proto",
         "@com_google_protobuf//:protobuf_python",
         "@envoy_api//envoy/annotations:pkg_py_proto",
+    ],
+)
+
+py_library(
+    name = "utils",
+    srcs = ["utils.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":validate_py_pb2",
     ],
 )
 
@@ -71,7 +77,7 @@ pkg_tar(
 
 protoprint_rule(
     name = "test_protoprinted_srcs",
-    deps = ["//tools/protoxform:test_protoxform"],
+    deps = ["//tools/testdata/protoxform/envoy/v2:fix_protos"],
 )
 
 pkg_files(
@@ -92,9 +98,26 @@ pkg_tar(
     extension = "tar.gz",
 )
 
+genquery(
+    name = "test_proto_targets_txt.json",
+    expression = "labels(srcs, labels(deps, //tools/testdata/protoxform:fix_protos))",
+    scope = ["//tools/testdata/protoxform:fix_protos"],
+)
+
+jq(
+    name = "test_proto_targets",
+    srcs = [":test_proto_targets_txt.json"],
+    out = "test_proto_targets.json",
+    args = ["-sR"],
+    filter = """
+    split("\n") |  map(select(length>0))
+    """,
+    visibility = ["//visibility:public"],
+)
+
 envoy_py_data(
     name = "test_data",
-    src = "//tools/protoxform:test_proto_targets",
+    src = ":test_proto_targets",
 )
 
 py_binary(

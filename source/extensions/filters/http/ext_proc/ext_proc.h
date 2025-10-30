@@ -52,7 +52,6 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_ignored)                                                               \
   COUNTER(clear_route_cache_disabled)                                                              \
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
-  COUNTER(send_immediate_resp_upstream_ignored)                                                    \
   COUNTER(http_not_ok_resp_received)
 
 struct ExtProcFilterStats {

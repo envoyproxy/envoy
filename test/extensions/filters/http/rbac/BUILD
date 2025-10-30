@@ -86,6 +86,26 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "string_functions_integration_test",
+    size = "large",
+    srcs = ["string_functions_integration_test.cc"],
+    extension_names = [
+        "envoy.filters.http.rbac",
+        "envoy.bootstrap.cel",
+    ],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/bootstrap/cel:config",
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/http/rbac:config",
+        "//test/integration:http_protocol_integration_lib",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_extension_cc_mock(
     name = "route_config_mocks",
     hdrs = ["mocks.h"],

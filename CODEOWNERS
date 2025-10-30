@@ -103,8 +103,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # previous hosts
 /*/extensions/retry/host/previous_hosts @nezdolik @mattklein123
 # HTTP caching extension
-/*/extensions/filters/http/cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
-/*/extensions/http/cache/simple_http_cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
+/*/extensions/filters/http/cache @toddmgreer @penguingao @mpwarres @capoferro @UNOWNED
+/*/extensions/http/cache/simple_http_cache @toddmgreer @penguingao @mpwarres @capoferro @UNOWNED
 /*/extensions/filters/http/cache_v2 @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
 /*/extensions/http/cache_v2/simple_http_cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
 # AWS common signing components
@@ -255,7 +255,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # File system based extensions
 /*/extensions/common/async_files @mattklein123 @ravenblackx
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
-/*/extensions/http/cache/file_system_http_cache @ggreenway @ravenblackx
+/*/extensions/http/cache/file_system_http_cache @ggreenway @UNOWNED
 /*/extensions/http/cache_v2/file_system_http_cache @ggreenway @ravenblackx
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
@@ -357,6 +357,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
 /*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
 /*/extensions/load_balancing_policies/override_host @yanavlasov @tonya11en
+/*/extensions/load_balancing_policies/wrr_locality @wbpcode @adisuissa @efimki
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
 # Network matching extensions
@@ -441,3 +442,5 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/qat/ @giantcroc @soulxu
 /contrib/generic_proxy/ @wbpcode @UNOWNED
 /contrib/tap_sinks/ @coolg92003 @yiyibaoguo
+/contrib/peak_ewma/filters/http/ @rroblak @UNOWNED
+/contrib/peak_ewma/load_balancing_policies/ @rroblak @UNOWNED

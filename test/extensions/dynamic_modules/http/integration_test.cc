@@ -606,25 +606,109 @@ TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
   }
 }
 
-TEST_P(DynamicModulesIntegrationTest, InjectBody) {
-  initializeFilter("inject_body");
+std::string terminal_filter_config;
+
+class DynamicModulesTerminalIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModulesTerminalIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), terminal_filter_config) {};
+
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    terminal_filter_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
+    filter_chains:
+      filters:
+        name: envoy.filters.network.http_connection_manager
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          http_filters:
+          - name: http_integration_test
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+              dynamic_module_config:
+                name: http_integration_test
+              filter_name: streaming_terminal_filter
+              terminal_filter: true
+          route_config:
+            virtual_hosts:
+            - domains:
+              - '*'
+              name: local_proxy_route
+          stat_prefix: ingress_http
+    per_connection_buffer_limit_bytes: 1024
+      )EOF");
+  }
+
+  void SetUp() override { HttpIntegrationTest::initialize(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesTerminalIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DynamicModulesTerminalIntegrationTest, StreamingTerminalFilter) {
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
-  auto response =
-      codec_client_->makeRequestWithBody(default_request_headers_, "ignored_request_body");
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData("ignored_response_body", true);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
 
-  ASSERT_TRUE(response->waitForEndStream());
-
-  // Verify the injected request was received upstream, as expected.
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ("injected_request_body", upstream_request_->body().toString());
-  // Verify the injected response was received downstream, as expected.
-  EXPECT_TRUE(response->complete());
+  response->waitForHeaders();
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  EXPECT_EQ("injected_response_body", response->body());
+  EXPECT_EQ("terminal",
+            response->headers().get(Http::LowerCaseString("x-filter"))[0]->value().getStringView());
+
+  response->waitForBodyData(12);
+  EXPECT_EQ("Who are you?", response->body());
+  response->clearBody();
+
+  auto large_response_chunk = std::string(1024, 'a');
+  codec_client_->sendData(request_encoder, "Envoy", false);
+  // Have the client read only a chunk at a time to ensure watermarks are
+  // triggered.
+  for (int i = 0; i < 8; i++) {
+    response->waitForBodyData(1024 * (i + 1));
+  }
+  auto large_response = std::string("");
+  for (int i = 0; i < 8; i++) {
+    large_response += large_response_chunk;
+  }
+  EXPECT_EQ(large_response, response->body());
+  response->clearBody();
+
+  codec_client_->sendData(request_encoder, "Nope", true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("Thanks!", response->body());
+  EXPECT_EQ("finished", response->trailers()
+                            .get()
+                            ->get(Http::LowerCaseString("x-status"))[0]
+                            ->value()
+                            .getStringView());
+  unsigned int above_watermark_count;
+  unsigned int below_watermark_count;
+  EXPECT_TRUE(absl::SimpleAtoi(response->trailers()
+                                   .get()
+                                   ->get(Http::LowerCaseString("x-above-watermark-count"))[0]
+                                   ->value()
+                                   .getStringView(),
+                               &above_watermark_count));
+  EXPECT_TRUE(absl::SimpleAtoi(response->trailers()
+                                   .get()
+                                   ->get(Http::LowerCaseString("x-below-watermark-count"))[0]
+                                   ->value()
+                                   .getStringView(),
+                               &below_watermark_count));
+  // The filter goes over the watermark count on large response body chunk. With 8 writes, we
+  // expect the counts to generally be 8. However, the response flow is executed to completion
+  // as soon as the 8th chunk is received by the client. In practice, it is extremely likely
+  // for the filter to get 8 above watermark callbacks, and highly likely to get the 8 corresponding
+  // below watermark callbacks, but it is conceivable timing issues can cause either to be one
+  // lower. Checking 7 or 8 should be a good test while also having no chance of flakiness.
+  EXPECT_GE(above_watermark_count, 7);
+  EXPECT_LE(above_watermark_count, 8);
+  EXPECT_GE(below_watermark_count, 7);
+  EXPECT_EQ(below_watermark_count, 8);
 }
 
 } // namespace Envoy

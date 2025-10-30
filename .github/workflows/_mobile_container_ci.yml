@@ -13,6 +13,9 @@ on:
     inputs:
       args:
         type: string
+      bind-mount:
+        type: boolean
+        default: true
       catch-errors:
         type: boolean
         default: false
@@ -45,9 +48,6 @@ on:
           -e CXX
           -e BAZEL_BUILD_OPTION_LIST
           -e MOBILE_DOCS_CHECKOUT_DIR
-      diskspace-hack:
-        type: boolean
-        default: false
       downloads:
         type: string
         default:
@@ -133,6 +133,7 @@ jobs:
     with:
       args: ${{ inputs.args }}
       rbe: ${{ inputs.rbe }}
+      bind-mount: ${{ inputs.bind-mount }}
       # This always just caches the main build image, the mobile one is layered on top
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       catch-errors: ${{ inputs.catch-errors }}

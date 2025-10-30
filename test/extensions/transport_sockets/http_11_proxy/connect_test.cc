@@ -39,12 +39,18 @@ class Http11ConnectTest : public testing::TestWithParam<Network::Address::IpVers
 public:
   Http11ConnectTest() = default;
 
+  static inline const std::string TestHostname = "test.example.com";
+  static inline const std::string ConnectRequestWithHostname = absl::StrCat(
+      "CONNECT ", TestHostname, ":443 HTTP/1.1\r\nHost: ", TestHostname, ":443\r\n\r\n");
+
   void initialize(bool no_proxy_protocol = false, absl::optional<uint32_t> target_port = {}) {
     initializeInternal(no_proxy_protocol, false, target_port);
   }
 
   // Initialize the test with the proxy address provided via endpoint metadata.
-  void initializeWithMetadataProxyAddr() { initializeInternal(false, true, {}); }
+  void initializeWithMetadataProxyAddr(bool with_hostname = false) {
+    initializeInternal(false, true, {}, with_hostname);
+  }
 
   void setAddress() {
     std::string address_string =
@@ -83,13 +89,14 @@ public:
   NiceMock<Network::MockIoHandle> io_handle_;
   std::unique_ptr<UpstreamHttp11ConnectSocket> connect_socket_;
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks_;
-  Buffer::OwnedImpl connect_data_{"CONNECT www.foo.com:443 HTTP/1.1\r\n\r\n"};
+  Buffer::OwnedImpl connect_data_{
+      "CONNECT www.foo.com:443 HTTP/1.1\r\nHost: www.foo.com:443\r\n\r\n"};
   Ssl::ConnectionInfoConstSharedPtr ssl_{
       std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>()};
 
 private:
   void initializeInternal(bool no_proxy_protocol, bool use_metadata_proxy_addr,
-                          absl::optional<uint32_t> target_port) {
+                          absl::optional<uint32_t> target_port, bool with_hostname = false) {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
     Network::Address::InstanceConstSharedPtr address =
@@ -102,11 +109,6 @@ private:
 
     if (!no_proxy_protocol) {
       if (use_metadata_proxy_addr) {
-        // In the case of endpoint metadata configuring the proxy address, we expect the hostname
-        // used to be that of the host.
-        connect_data_ = Buffer::OwnedImpl{
-            fmt::format("CONNECT {} HTTP/1.1\r\n\r\n", host->address()->asStringView())};
-
         auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
         const std::string metadata_key =
             Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR;
@@ -117,6 +119,29 @@ private:
         anypb.PackFrom(addr_proto);
         metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, anypb));
         EXPECT_CALL(*host, metadata()).Times(AnyNumber()).WillRepeatedly(Return(metadata));
+
+        if (with_hostname) {
+          static const std::string hostname = "test.example.com";
+          EXPECT_CALL(*host, hostname()).Times(AnyNumber()).WillRepeatedly(ReturnRef(hostname));
+
+          // Create real address with port 443.
+          auto real_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 443);
+          EXPECT_CALL(*host, address()).Times(AnyNumber()).WillRepeatedly(Return(real_address));
+
+          connect_data_ = Buffer::OwnedImpl(ConnectRequestWithHostname);
+        } else {
+          // Set empty hostname.
+          static const std::string empty_hostname;
+          EXPECT_CALL(*host, hostname())
+              .Times(AnyNumber())
+              .WillRepeatedly(ReturnRef(empty_hostname));
+
+          // Set up the connect_data buffer to use host address view with Host header (RFC 9110).
+          EXPECT_CALL(*host, address()).Times(AnyNumber()).WillRepeatedly(Return(address));
+          connect_data_ =
+              Buffer::OwnedImpl{fmt::format("CONNECT {} HTTP/1.1\r\nHost: {}\r\n\r\n",
+                                            address->asStringView(), address->asStringView())};
+        }
       } else {
         info = std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>(
             proxy_info_hostname, address);
@@ -148,6 +173,7 @@ TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnceTransportSocketOpts) {
   injectHeaderOnceTest();
 }
 
+// Test with host header including port.
 TEST_P(Http11ConnectTest, HostWithPort) {
   initialize(false, 443);
   injectHeaderOnceTest();
@@ -156,6 +182,12 @@ TEST_P(Http11ConnectTest, HostWithPort) {
 // Test injects CONNECT only once. Configured via endpoint metadata.
 TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnceEndpointMetadata) {
   initializeWithMetadataProxyAddr();
+  injectHeaderOnceTest();
+}
+
+// Test injects CONNECT with host header using hostname when available.
+TEST_P(Http11ConnectTest, InjectsHeaderWithHostnameFromMetadata) {
+  initializeWithMetadataProxyAddr(true);
   injectHeaderOnceTest();
 }
 
@@ -221,7 +253,7 @@ TEST_P(Http11ConnectTest, NoInjectTlsAbsent) {
   connect_socket_->doRead(buffer);
 }
 
-// Test returns KeepOpen action when write error is EAGAIN
+// Test returns KeepOpen action when write error is EAGAIN.
 TEST_P(Http11ConnectTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
   initialize();
 
@@ -246,7 +278,7 @@ TEST_P(Http11ConnectTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
   EXPECT_EQ(Network::PostIoAction::KeepOpen, rc.action_);
 }
 
-// Test returns Close action when write error is not EAGAIN
+// Test returns Close action when write error is not EAGAIN.
 TEST_P(Http11ConnectTest, ReturnsCloseWhenWriteErrorIsNotAgain) {
   initialize();
 
@@ -318,7 +350,7 @@ TEST_P(Http11ConnectTest, PeekFail) {
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
 }
 
-// Test read fail after successful peek
+// Test read fail after successful peek.
 TEST_P(Http11ConnectTest, ReadFail) {
   initialize();
 
@@ -417,7 +449,7 @@ public:
   std::unique_ptr<UpstreamHttp11ConnectSocketFactory> factory_;
 };
 
-// Test createTransportSocket returns nullptr if inner call returns nullptr
+// Test createTransportSocket returns nullptr if inner call returns nullptr.
 TEST_F(SocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
   initialize();
   EXPECT_CALL(*inner_factory_, createTransportSocket(_, _)).WillOnce(testing::ReturnNull());
@@ -558,6 +590,131 @@ TEST(ParseTest, ContentLengthZeroHttp11) {
   EXPECT_THAT(parser.parser().contentLength(), Optional(0));
   EXPECT_FALSE(parser.parser().isChunked());
   EXPECT_FALSE(parser.parser().hasTransferEncoding());
+}
+
+// Test the formatConnectRequest() utility method with various inputs.
+TEST(FormatConnectRequestTest, FormatConnectRequestWithVariousInputs) {
+  // Test with hostname without port.
+  EXPECT_EQ("CONNECT example.com HTTP/1.1\r\nHost: example.com\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("example.com"));
+
+  // Test with hostname with port.
+  EXPECT_EQ("CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("example.com:443"));
+
+  // Test with IPv4 address without port.
+  EXPECT_EQ("CONNECT 192.168.1.1 HTTP/1.1\r\nHost: 192.168.1.1\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("192.168.1.1"));
+
+  // Test with IPv4 address with port.
+  EXPECT_EQ("CONNECT 192.168.1.1:8080 HTTP/1.1\r\nHost: 192.168.1.1:8080\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("192.168.1.1:8080"));
+
+  // Test with IPv6 address without port.
+  EXPECT_EQ("CONNECT [2001:db8::1] HTTP/1.1\r\nHost: [2001:db8::1]\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("[2001:db8::1]"));
+
+  // Test with IPv6 address with port.
+  EXPECT_EQ("CONNECT [2001:db8::1]:443 HTTP/1.1\r\nHost: [2001:db8::1]:443\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("[2001:db8::1]:443"));
+}
+
+// Test runtime guard for legacy behavior with transport socket options.
+TEST_P(Http11ConnectTest, RuntimeGuardLegacyBehaviorTransportSocketOpts) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_11_proxy_connect_legacy_format", "true"}});
+
+  initialize();
+
+  Buffer::OwnedImpl msg("initial data");
+  Buffer::OwnedImpl expected_legacy_data{"CONNECT www.foo.com:443 HTTP/1.1\r\n\r\n"};
+
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_legacy_data.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoError::none());
+      }));
+
+  Network::IoResult rc1 = connect_socket_->doWrite(msg, false);
+  EXPECT_EQ(expected_legacy_data.length(), rc1.bytes_processed_);
+
+  EXPECT_CALL(*inner_socket_, onConnected());
+  connect_socket_->onConnected();
+
+  // Simulate successful CONNECT response to complete the handshake.
+  std::string connect_response("HTTP/1.1 200 OK\r\n\r\n");
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
+      .WillOnce(Invoke([&connect_response](void* buffer, size_t, int) {
+        memcpy(buffer, connect_response.data(), connect_response.length());
+        return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
+      }));
+  EXPECT_CALL(io_handle_, read(_, Optional(connect_response.length())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+        buffer.add(connect_response);
+        return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
+      }));
+  EXPECT_CALL(*inner_socket_, doRead(_))
+      .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 0, false}));
+  Buffer::OwnedImpl read_buffer("");
+  connect_socket_->doRead(read_buffer);
+
+  // Verify that writes are no longer buffered after CONNECT handshake completes.
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false))
+      .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false}));
+  Network::IoResult rc2 = connect_socket_->doWrite(msg, false);
+  EXPECT_EQ(msg.length(), rc2.bytes_processed_);
+}
+
+// Test runtime guard for legacy behavior with metadata proxy address.
+TEST_P(Http11ConnectTest, RuntimeGuardLegacyBehaviorEndpointMetadata) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_11_proxy_connect_legacy_format", "true"}});
+
+  initializeWithMetadataProxyAddr();
+
+  Buffer::OwnedImpl msg("initial data");
+  const std::string expected_connect_string = absl::StrCat(
+      "CONNECT ", Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234 HTTP/1.1\r\n\r\n");
+  Buffer::OwnedImpl expected_legacy_data{expected_connect_string};
+
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_legacy_data.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoError::none());
+      }));
+
+  Network::IoResult rc1 = connect_socket_->doWrite(msg, false);
+  EXPECT_EQ(expected_legacy_data.length(), rc1.bytes_processed_);
+
+  EXPECT_CALL(*inner_socket_, onConnected());
+  connect_socket_->onConnected();
+
+  // Simulate successful CONNECT response to complete the handshake.
+  std::string connect_response("HTTP/1.1 200 OK\r\n\r\n");
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
+      .WillOnce(Invoke([&connect_response](void* buffer, size_t, int) {
+        memcpy(buffer, connect_response.data(), connect_response.length());
+        return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
+      }));
+  EXPECT_CALL(io_handle_, read(_, Optional(connect_response.length())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+        buffer.add(connect_response);
+        return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
+      }));
+  EXPECT_CALL(*inner_socket_, doRead(_))
+      .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 0, false}));
+  Buffer::OwnedImpl read_buffer("");
+  connect_socket_->doRead(read_buffer);
+
+  // Verify that writes are no longer buffered after CONNECT handshake completes.
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false))
+      .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false}));
+  Network::IoResult rc2 = connect_socket_->doWrite(msg, false);
+  EXPECT_EQ(msg.length(), rc2.bytes_processed_);
 }
 
 } // namespace
