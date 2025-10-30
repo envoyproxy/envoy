@@ -32,9 +32,14 @@ message Config {
     TagFormatString format_string = 2;
   }
 
+  message Tag {
+    string name = 1;
+    TagValue value = 2;
+  }
+
   message Stat {
     string name = 1 [(validate.rules).string = {min_len: 1}];
-    map<string, TagValue> tags = 2;
+    repeated Tag tags = 2;
     google.protobuf.UInt32Value max_cardinality = 3;
 
     // How would this be implemented? @kyessenov you've done some work in this area, right?
