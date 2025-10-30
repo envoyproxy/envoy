@@ -55,11 +55,11 @@ There are two ways to configure delayed upstream connection establishment:
 Explicit configuration
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The preferred method is to use the :ref:`upstream_connect_mode
-<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`
+The preferred method is to use the :ref:`upstream_connect_trigger
+<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_trigger>`
 configuration field. This provides explicit control over when the upstream connection is established.
 
-The following trigger modes are supported:
+The following modes are supported:
 
 * ``IMMEDIATE`` (Default): Establish the upstream connection immediately when the downstream connection is accepted.
   This provides the lowest latency and is the default behavior for backward compatibility.
@@ -90,12 +90,11 @@ Example configuration:
     "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
     stat_prefix: tcp
     cluster: upstream_cluster
-    upstream_connect_mode:
-      trigger: ON_DOWNSTREAM_DATA
+    upstream_connect_trigger:
+      mode: ON_DOWNSTREAM_DATA
       max_wait_time: 5s
       downstream_data_config:
         max_buffered_bytes: 8192
-        forward_buffered_data: true
 
 .. attention::
 
@@ -121,7 +120,7 @@ established. This is to protect the early buffer from overflowing.
 
 .. note::
 
-  When using the explicit configuration method (``upstream_connect_mode``), the filter state approach
+  When using the explicit configuration method (``upstream_connect_trigger``), the filter state approach
   is ignored. The two methods are mutually exclusive, with the explicit configuration taking precedence.
 
 .. _config_network_filters_tcp_proxy_tunneling_over_http:

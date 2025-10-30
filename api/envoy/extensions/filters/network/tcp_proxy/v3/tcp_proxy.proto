@@ -312,19 +312,21 @@ message TcpProxy {
   repeated config.core.v3.TlvEntry proxy_protocol_tlvs = 19;
 
   // Configuration for controlling when to establish the upstream connection.
+  // This replaces the previous filter state based approach using the
+  // ``envoy.tcp_proxy.receive_before_connect`` key.
   //
-  // When not specified, the filter uses the default ``IMMEDIATE`` mode for backward compatibility.
+  // When not specified, the filter uses the default ``IMMEDIATE`` trigger for backward compatibility.
   //
   // .. attention::
-  //   Server-first protocols (e.g., SMTP, MySQL, POP3) require ``IMMEDIATE`` mode. Data-triggered
+  //   Server-first protocols (e.g., SMTP, MySQL, POP3) require ``IMMEDIATE`` trigger. Data-triggered
   //   modes will cause connection timeouts as the client waits for the server greeting.
-  UpstreamConnectMode upstream_connect_mode = 21;
+  UpstreamConnectTrigger upstream_connect_trigger = 21;
 }
 
-// Configuration for controlling when the TCP proxy establishes the upstream connection.
-message UpstreamConnectMode {
-  // Specifies when to trigger the upstream connection establishment.
-  enum ConnectionTrigger {
+// Configuration for triggering upstream connection establishment.
+message UpstreamConnectTrigger {
+  // Specifies the mode for upstream connection establishment.
+  enum UpstreamConnectMode {
     // Establish the upstream connection immediately when the downstream connection is accepted.
     // This is the default behavior and provides the lowest latency.
     IMMEDIATE = 0;
@@ -354,53 +356,47 @@ message UpstreamConnectMode {
     //   connections, it behaves the same as ``IMMEDIATE``.
     ON_DOWNSTREAM_TLS_HANDSHAKE = 2;
 
-    // Wait for both initial data and TLS handshake completion (whichever occurs last) before
+    // Wait for both initial data and TLS handshake completion before
     // establishing the upstream connection. This provides maximum information about the
     // downstream connection before connecting upstream.
     //
     // .. note::
-    //   Use this mode when you need both the initial data and complete TLS information
-    //   for making routing decisions. For non-TLS connections, this mode behaves the same
-    //   as ``ON_DOWNSTREAM_DATA``.
+    //   This mode is primarily useful for TLS 1.3 0-RTT (early data) scenarios where
+    //   the client may send encrypted application data before the TLS handshake completes.
+    //   For non-TLS connections, this mode behaves the same as ``ON_DOWNSTREAM_DATA``.
     //
     // .. warning::
     //   Like ``ON_DOWNSTREAM_DATA``, this mode is not suitable for server-first protocols.
     ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE = 3;
   }
 
-  // Configuration for the ``ON_DOWNSTREAM_DATA`` trigger mode.
+  // Configuration for the ``ON_DOWNSTREAM_DATA`` mode.
   message DownstreamDataConfig {
     // Maximum bytes to buffer from the downstream connection before forcing the
     // upstream connection establishment. This prevents excessive memory usage
     // when the downstream sends large amounts of data.
     // If not specified, defaults to 64KB.
     google.protobuf.UInt32Value max_buffered_bytes = 1 [(validate.rules).uint32 = {lte: 1048576}];
-
-    // Whether to forward the buffered downstream data to the upstream connection
-    // after it is established. In most cases, this should be ``true`` to ensure
-    // data is not lost. Set to ``false`` only if the data is used solely for
-    // routing decisions and should not be sent upstream.
-    // Defaults to ``true``.
-    google.protobuf.BoolValue forward_buffered_data = 2;
   }
 
-  // When to trigger the upstream connection establishment.
-  ConnectionTrigger trigger = 1 [(validate.rules).enum = {defined_only: true}];
+  // The mode for upstream connection establishment.
+  UpstreamConnectMode mode = 1 [(validate.rules).enum = {defined_only: true}];
 
-  // Maximum time to wait for the trigger condition before forcing the upstream connection.
-  // This prevents indefinite waiting if the trigger condition is never met.
-  // If not specified, the filter uses a default timeout of 30 seconds.
+  // Optional maximum time to wait for the trigger condition before forcing the upstream connection.
+  // If not specified, the filter waits indefinitely for the trigger condition to be met,
+  // strictly respecting the configured mode.
   //
-  // .. note::
-  //   Setting this to ``0s`` disables the timeout, but this is not recommended as it
-  //   may lead to connection hangs.
+  // .. attention::
+  //   Use this field as a safety mechanism to prevent connection hangs due to misconfiguration
+  //   (e.g., using ``ON_DOWNSTREAM_DATA`` with a server-first protocol). For correctly configured
+  //   triggers, leaving this unset allows the filter to wait as long as needed for the condition.
   google.protobuf.Duration max_wait_time = 2 [(validate.rules).duration = {
     lte {seconds: 300}
     gte {}
   }];
 
-  // Configuration specific to the ``ON_DOWNSTREAM_DATA`` trigger.
-  // This field is only used when ``trigger`` is set to ``ON_DOWNSTREAM_DATA`` or
+  // Configuration specific to the ``ON_DOWNSTREAM_DATA`` mode.
+  // This field is only used when ``mode`` is set to ``ON_DOWNSTREAM_DATA`` or
   // ``ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE``.
   DownstreamDataConfig downstream_data_config = 3;
 }

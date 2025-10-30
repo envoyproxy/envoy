@@ -1969,9 +1969,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeOnDownstreamData) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_DATA);
     mode->mutable_max_wait_time()->set_seconds(10);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
@@ -2006,51 +2006,6 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeOnDownstreamData) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
-// Test ON_DOWNSTREAM_DATA mode with forward_buffered_data=false.
-TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeNoForwardBufferedData) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* filter = filter_chain->mutable_filters(0);
-
-    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
-
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_DATA);
-    mode->mutable_downstream_data_config()->mutable_forward_buffered_data()->set_value(false);
-
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
-  });
-
-  initialize();
-
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-
-  // Send data to trigger connection.
-  ASSERT_TRUE(tcp_client->write("discarded", false));
-
-  // Upstream connection should be established.
-  FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-
-  // The buffered data should NOT be forwarded - wait a bit to confirm no data arrives.
-  std::string temp_data;
-  ASSERT_FALSE(
-      fake_upstream_connection->waitForData(1, &temp_data, std::chrono::milliseconds(500)));
-
-  // New data should be forwarded normally.
-  ASSERT_TRUE(tcp_client->write("hello", false));
-  std::string received_data;
-  ASSERT_TRUE(fake_upstream_connection->waitForData(5, &received_data));
-  EXPECT_EQ("hello", received_data);
-
-  ASSERT_TRUE(fake_upstream_connection->close());
-  tcp_client->waitForHalfClose();
-  tcp_client->close();
-}
-
 // Test timeout forcing connection when no data is received.
 TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTimeoutForces) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -2061,9 +2016,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTimeoutForces) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_DATA);
     mode->mutable_max_wait_time()->set_seconds(0);
     mode->mutable_max_wait_time()->set_nanos(500000000); // 500ms
 
@@ -2100,9 +2055,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeEarlyDataWithHalfClose) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_DATA);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2143,9 +2098,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeMultipleConcurrent) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_DATA);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2202,9 +2157,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeOnDownstreamDataAndTls) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
     mode->mutable_max_wait_time()->set_seconds(1); // Short timeout for test.
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
@@ -2239,9 +2194,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeDownstreamCloseBeforeUpstream
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_DATA);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2269,9 +2224,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeNonTls) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_TLS_HANDSHAKE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_TLS_HANDSHAKE);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2311,9 +2266,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeWithUpstreamTls) 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_TLS_HANDSHAKE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_TLS_HANDSHAKE);
     mode->mutable_max_wait_time()->set_seconds(5);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
@@ -2350,14 +2305,13 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeDataAndTlsSimple) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
     mode->mutable_max_wait_time()->set_seconds(5);
 
     auto* data_config = mode->mutable_downstream_data_config();
     data_config->mutable_max_buffered_bytes()->set_value(65536);
-    data_config->mutable_forward_buffered_data()->set_value(true);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2397,9 +2351,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeTimeout) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_DATA);
     mode->mutable_max_wait_time()->set_seconds(1); // Short timeout for test.
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
@@ -2434,14 +2388,13 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeConnectionCloseDuringWait) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_DATA);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_DATA);
     mode->mutable_max_wait_time()->set_seconds(5);
 
     auto* data_config = mode->mutable_downstream_data_config();
     data_config->mutable_max_buffered_bytes()->set_value(65536);
-    data_config->mutable_forward_buffered_data()->set_value(true);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2474,9 +2427,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeDataAndTlsNonTls) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::
-                          ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
+                       ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2510,9 +2463,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeImmediate) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
     filter->typed_config().UnpackTo(&tcp_proxy);
 
-    auto* mode = tcp_proxy.mutable_upstream_connect_mode();
-    mode->set_trigger(
-        envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode::IMMEDIATE);
+    auto* mode = tcp_proxy.mutable_upstream_connect_trigger();
+    mode->set_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::IMMEDIATE);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
