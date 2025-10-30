@@ -194,7 +194,7 @@ function bazel_envoy_api_build() {
         --//tools/api_proto_plugin:extra_args=api_version:3.7 \
         //tools/protoprint:protoprint_test
     echo "Validating API structure..."
-    "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/api:validate_structure "${PWD}/api/envoy"
     echo "Testing API..."
     bazel_with_collection \
         test "${BAZEL_BUILD_OPTIONS[@]}" \
