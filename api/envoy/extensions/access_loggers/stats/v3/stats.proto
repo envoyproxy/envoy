@@ -2,9 +2,12 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.stats.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -18,8 +21,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Stats logger]
 // [#extension: envoy.access_loggers.stats]
 
+// [#next-free-field: 6]
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;
+
+  enum TimeUnit {
+    Milliseconds = 0;
+    Microseconds = 1;
+    Nanoseconds = 2;
+  }
 
   message TagFormatString {
     string format_string = 1;
@@ -31,56 +41,57 @@ message Config {
   message TagValue {
     // onoeof these
     string fixed_string = 1;
+
     TagFormatString format_string = 2;
   }
 
   message Tag {
     string name = 1;
+
     TagValue value = 2;
   }
 
   message Stat {
     string name = 1 [(validate.rules).string = {min_len: 1}];
+
     repeated Tag tags = 2;
+
     google.protobuf.UInt32Value max_cardinality = 3;
-  }
-
-
-  enum TimeUnit {
-    Milliseconds = 0;
-    Microseconds = 1;
-    Nanoseconds = 2;
   }
 
   message Histogram {
     Stat stat = 1;
+
     TimeUnit unit = 2;
-    string value = 3; // format string; must evaluate to a number
+
+    string value = 3;
+    // format string; must evaluate to a number
   }
 
   // Increase the counter by the amount of `value`.
   message Counter {
     Stat stat = 1;
 
-    // oneof
-    string value_format_string = 2; // format string; must evaluate to a numeric value
-    google.protobuf.UInt32Value value_fixed = 3;
-  }
+    oneof value {
+      // Must evaluate to a numeric value
+      string value_format_string = 2;
 
-  // Increment the counter with described tags each time the tags match.
-  // This only makes sense if at least one of the tags is TagFormatString
-  message Event { // I don't love this name. Any better ideas?
-    Stat stat = 1;
+      // For the computed set of tags, increment the counter by this fixed amount.
+      uint32 value_fixed = 3;
+    }
   }
 
   string stat_prefix = 1;
-  google.protobuf.UInt32Value max_stats = 2; // Overall maximum number of stats from all types.
+
+  google.protobuf.UInt32Value max_stats = 2;
+  // Overall maximum number of stats from all types.
+
   repeated Histogram histograms = 3;
+
   repeated Counter counters = 4;
-  repeated Event events = 5;
 
   // Specifies a collection of Formatter plugins that can be called from the access log configuration.
   // See the formatters extensions documentation for details.
   // [#extension-category: envoy.formatter]
-  repeated TypedExtensionConfig formatters = 6;
+  repeated config.core.v3.TypedExtensionConfig formatters = 5;
 }
