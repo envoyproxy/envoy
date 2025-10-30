@@ -1,23 +1,26 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.timing_stats.v3;
+package envoy.extensions.access_loggers.stats.v3;
 
 import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.timing_stats.v3";
-option java_outer_classname = "TimingStatsProto";
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.stats.v3";
+option java_outer_classname = "StatsProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/timing_stats/v3;timing_statsv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/stats/v3;statsv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Timing_stats]
-// [#extension: envoy.filters.http.timing_stats]
+// [#protodoc-title: Stats logger]
+// [#extension: envoy.access_loggers.stats]
 
 message Config {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+
   message TagFormatString {
     string format_string = 1;
 
