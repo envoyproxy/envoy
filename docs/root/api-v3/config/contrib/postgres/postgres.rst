@@ -4,4 +4,4 @@ Postgres Filters
 .. toctree::
   :maxdepth: 2
 
-  Postgres Inspector <../../../../configuration/listeners/listener_filters/postgres_inspector_filter>
+  ../../../extensions/filters/listener/postgres_inspector/v3alpha/postgres_inspector.proto
