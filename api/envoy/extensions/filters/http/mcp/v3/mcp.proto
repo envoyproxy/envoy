@@ -18,10 +18,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This filter will inspect and get attributes from MCP traffic.
 // We are iterating it to add more supports.
 message Mcp {
-  // Traffic handling mode.
+  // Traffic handling mode for no MCP traffic.
   enum TrafficMode {
-    // Proxies the HTTP request and response without filtering.
-    // Also stores the JSON_RPC contents in the request/response body in the metadata.
+    // Proxies the HTTP request and response without MCP spec check.
     // This is the default mode.
     PASS_THROUGH = 0;
 
@@ -29,11 +28,10 @@ message Mcp {
     // Valid MCP requests are:
     // - POST requests with JSON-RPC 2.0 messages
     // - GET requests for SSE streams (with Accept: text/event-stream)
-    // Valid MCP JSON_RPC will be parsed and stored to metadata.
     REJECT_NO_MCP = 1;
   }
 
-  // Configures how the filter handles non-MCP traffic
+  // Configures how the filter handles non-MCP traffic.
   TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
 }
 
