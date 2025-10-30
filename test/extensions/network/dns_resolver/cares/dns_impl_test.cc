@@ -733,6 +733,9 @@ public:
       cares.mutable_edns0_max_payload_size()->set_value(getEdns0MaxPayloadSize());
     }
 
+    // Enable `reinit_channel_on_timeout` if requested by the test case.
+    cares.set_reinit_channel_on_timeout(reinitOnTimeout());
+
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
     // setup the typed config
@@ -741,6 +744,8 @@ public:
 
     return typed_dns_resolver_config;
   }
+  // Whether to enable `reinit_channel_on_timeout` in the resolver config for this test.
+  virtual bool reinitOnTimeout() const { return false; }
 
   void SetUp() override {
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
@@ -1958,6 +1963,7 @@ TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterAllV6) {
 class DnsImplZeroTimeoutTest : public DnsImplTest {
 protected:
   bool queryTimeout() const override { return true; }
+  bool reinitOnTimeout() const override { return true; }
 };
 
 // Parameterize the DNS test server socket address.
