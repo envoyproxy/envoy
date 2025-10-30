@@ -151,8 +151,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           // If rq_active is non-zero, we should send the locality stats even if
           // rq_issued is zero(no requests have been issued in this poll
           // window), some load balancer may need rq_active for load balancing.
-          should_send_locality_stats =
-              should_send_locality_stats || (rq_active != 0);
+          should_send_locality_stats = should_send_locality_stats || (rq_active != 0);
         }
 
         if (should_send_locality_stats) {

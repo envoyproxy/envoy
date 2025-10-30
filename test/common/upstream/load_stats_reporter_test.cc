@@ -543,18 +543,15 @@ TEST_F(LoadStatsReporterTest, RemoteStreamGracefulClose) {
   EXPECT_EQ(load_stats_reporter_->getStats().retries_.value(), 1);
 }
 
-
 // Validate that when
 // "envoy.reloadable_features.report_load_when_rq_active_is_non_zero" is set and
 // rq_active is non-zero, a load report is sent even if rq_issued is 0.
 TEST_F(LoadStatsReporterTest, ReportLoadWhenRqActiveIsNonZero) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.report_load_when_rq_active_is_non_zero",
-        "true"}});
+      {{"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "true"}});
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-      .WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
   time_system_.setMonotonicTime(std::chrono::microseconds(100));
@@ -585,8 +582,7 @@ TEST_F(LoadStatsReporterTest, ReportLoadWhenRqActiveIsNonZero) {
     expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
 
-    auto* expected_locality_stats =
-        expected_cluster_stats.add_upstream_locality_stats();
+    auto* expected_locality_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality_stats->mutable_locality()->MergeFrom(locality);
     expected_locality_stats->set_priority(0);
     expected_locality_stats->set_total_successful_requests(0);
@@ -594,13 +590,12 @@ TEST_F(LoadStatsReporterTest, ReportLoadWhenRqActiveIsNonZero) {
     expected_locality_stats->set_total_issued_requests(0);
     expected_locality_stats->set_total_requests_in_progress(5);
 
-    std::vector<envoy::config::endpoint::v3::ClusterStats>
-        expected_cluster_stats_vector = {expected_cluster_stats};
+    std::vector<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats_vector = {
+        expected_cluster_stats};
 
     expectSendMessage(expected_cluster_stats_vector);
   }
-  EXPECT_CALL(*response_timer_,
-              enableTimer(std::chrono::milliseconds(42000), _));
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();
 }
 
