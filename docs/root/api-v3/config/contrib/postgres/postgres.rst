@@ -1,8 +1,7 @@
-Postgres Filter API
-===================
+Postgres Filters
+================
 
 .. toctree::
-  :glob:
   :maxdepth: 2
 
-  ../../../extensions/filters/listener/postgres_inspector/v3alpha/*
+  Postgres Inspector <../../../../configuration/listeners/listener_filters/postgres_inspector_filter>
