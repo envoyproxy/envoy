@@ -58,7 +58,10 @@ message Config {
   // Increase the counter by the amount of `value`.
   message Counter {
     Stat stat = 1;
-    string value = 2; // format string; must evaluate to a numeric value
+
+    // oneof
+    string value_format_string = 2; // format string; must evaluate to a numeric value
+    google.protobuf.UInt32Value value_fixed = 3;
   }
 
   // Increment the counter with described tags each time the tags match.
