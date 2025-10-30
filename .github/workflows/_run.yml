@@ -229,10 +229,26 @@ jobs:
              "job-started": ${{ steps.started.outputs.value }}}
           | . * {$config, $check}
 
+    - id: remount
+      name: Remount /mnt
+      run: |
+        # Discover what device is mounted at /mnt (if any)
+        device=$(findmnt -n -o SOURCE /mnt 2>/dev/null || true)
+        if [[ -z "$device" ]]; then
+            echo "⚠️  No device mounted at /mnt, using main disk"
+            exit 0
+        fi
+        echo "Found spare disk: $device mounted at /mnt"
+        sudo umount /mnt
+        sudo mkfs.ext4 -F -L spare "$device"
+        sudo mount "$device" /mnt
+        echo "✓ Fresh /mnt ready: $(df -h /mnt | tail -1)"
+        echo "mount=/mnt" >> $GITHUB_ENV
+
     - run: |
         mkdir ${{ runner.temp }}/container
     - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.28
-      if: inputs.bind-mount
+      if: inputs.bind-mount && steps.findout.outputs.mount
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
