@@ -240,6 +240,9 @@ jobs:
       if: inputs.diskspace-hack || github.event.repository.private
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
+    - run: |
+        mount
+        df -h
 
     - run: |
         sudo mkdir -p /etc/docker
