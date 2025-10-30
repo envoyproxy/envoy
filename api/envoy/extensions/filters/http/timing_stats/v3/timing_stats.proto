@@ -2,6 +2,11 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.timing_stats.v3;
 
+import "envoy/type/matcher/v3/string.proto";
+
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.timing_stats.v3";
@@ -14,10 +19,29 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.timing_stats]
 
 message Config {
-  enum TimePoint {
-    FirstDownstreamRxByteReceived = 0;
-    // TODO: add the rest
+  message TagFormatString {
+    string format_string = 1;
+
+    // Valid values for this tag. If empty, any value is allowed. Must match at least 1 matcher.
+    repeated type.matcher.v3.StringMatcher allowed_values = 2;
   }
+
+  message TagValue {
+    // onoeof these
+    string fixed_string = 1;
+    TagFormatString format_string = 2;
+  }
+
+  message Stat {
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+    map<string, TagValue> tags = 2;
+    google.protobuf.UInt32Value max_cardinality = 3;
+
+    // How would this be implemented? @kyessenov you've done some work in this area, right?
+    // Or should the expiration be at the filter config level, not the individual stat?
+    google.protobuf.Duration expiration = 4;
+  }
+
 
   enum TimeUnit {
     Milliseconds = 0;
@@ -25,13 +49,27 @@ message Config {
     Nanoseconds = 2;
   }
 
-  message Duration {
-    string stat_name = 1 [(validate.rules).string = {min_len: 1}];
-    TimePoint begin = 2 [(validate.rules).enum = {defined_only: true}];
-    TimePoint end = 3 [(validate.rules).enum = {defined_only: true}];
-    TimeUnit units = 4 [(validate.rules).enum = {defined_only: true}];
+  message Histogram {
+    Stat stat = 1;
+    TimeUnit unit = 2;
+    string value = 3; // format string; must evaluate to a number
   }
 
-  repeated Duration durations = 1;
-  string stat_prefix = 2;
+  // Increase the counter by the amount of `value`.
+  message Counter {
+    Stat stat = 1;
+    string value = 2; // format string; must evaluate to a numeric value
+  }
+
+  // Increment the counter with described tags each time the tags match.
+  // This only makes sense if at least one of the tags is TagFormatString
+  message Event { // I don't love this name. Any better ideas?
+    Stat stat = 1;
+  }
+
+  string stat_prefix = 1;
+  google.protobuf.UInt32Value max_stats = 2; // Overall maximum number of stats from all types.
+  repeated Histogram histograms = 3;
+  repeated Counter counters = 4;
+  repeated Event events = 5;
 }
