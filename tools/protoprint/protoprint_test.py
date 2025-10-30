@@ -35,22 +35,21 @@ def path_and_filename(label):
     return '/'.join(splitted_label[:len(splitted_label) - 1])[1:], splitted_label[-1]
 
 
-def golden_proto_file(tmp, path, filename, version):
+def golden_proto_file(tmp, path, filename):
     """Retrieve golden proto file path. In general, those are placed in tools/testdata/protoxform.
 
     Args:
         path: target proto path
         filename: target proto filename
-        version: api version to specify target golden proto filename
 
     Returns:
         actual golden proto absolute path
     """
 
-    return tmp.joinpath("golden").joinpath(f"{filename}.{version}.gold").absolute()
+    return tmp.joinpath("golden").joinpath(f"{filename}.gold").absolute()
 
 
-def result_proto_file(tmp, path, filename, version):
+def result_proto_file(tmp, path, filename):
     """Retrieve result proto file path. In general, those are placed in bazel artifacts.
 
     Args:
@@ -64,7 +63,6 @@ def result_proto_file(tmp, path, filename, version):
         actual result proto absolute path
     """
 
-    target_filename = f"{filename}.{version}.proto"
     pkg_dir = tmp.joinpath("formatted")
     return pkg_dir.joinpath("fix_protos").joinpath(path).joinpath(f"{filename}.proto").absolute()
 
@@ -82,7 +80,7 @@ def diff(result_file, golden_file):
     return run_command(f"diff -u {result_file} {golden_file}")
 
 
-def run(tmp, target, version):
+def run(tmp, target):
     """Run main execution for protoxform test
 
     Args:
@@ -90,7 +88,6 @@ def run(tmp, target, version):
         cmd: fix or freeze?
         path: target proto path
         filename: target proto filename
-        version: api version to specify target result proto filename
 
     Returns:
         result message extracted from diff command
@@ -98,8 +95,8 @@ def run(tmp, target, version):
     message = ""
 
     path, filename = path_and_filename(target)
-    golden_path = golden_proto_file(tmp, path, filename, version)
-    test_path = result_proto_file(tmp, path, filename, version)
+    golden_path = golden_proto_file(tmp, path, filename)
+    test_path = result_proto_file(tmp, path, filename)
 
     if os.stat(golden_path).st_size == 0 and not os.path.exists(test_path):
         return message
@@ -133,7 +130,7 @@ def main():
         messages = ""
         logging.basicConfig(format='%(message)s')
         for target in test_data:
-            messages += run(tmp, target, 'active_or_frozen')
+            messages += run(tmp, target)
 
         if len(messages) == 0:
             logging.warning("PASS")
