@@ -365,7 +365,7 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
-void updateProcessingEffect(ProcessingEffect::Effect& current_effect, ProcessingEffect::Effect new_effect) {
+void updateProcessingEffect(ProcessingEffect::Effect& current_effect, ProcessingEffect::Effect& new_effect) {
     if (new_effect == ProcessingEffect::Effect::None) {
         // Do nothing. Default value is None and we want to log the most recent effect that is not none.
         return;
@@ -389,28 +389,36 @@ void updateProcessingEffect(ProcessingEffect::Effect& current_effect, Processing
             }
             break;
     }
+    std::cout << "value of current_effect" << static_cast<int>(current_effect) << "\n";
 }
 
 void ExtProcLoggingInfo::recordProcessingEffect(ProcessorState::CallbackState callback_state,
                                         envoy::config::core::v3::TrafficDirection traffic_direction, ProcessingEffect::Effect processing_effect){
    ASSERT(callback_state != ProcessorState::CallbackState::Idle);
-   auto processor_effects = processingEffects(traffic_direction);
+   // TODO MAKE THIS A REFERENCE
+   // auto processor_effects = processingEffects(traffic_direction);
    switch (callback_state){
       case ProcessorState::CallbackState::HeadersCallback:
-        updateProcessingEffect(processor_effects.header_effect_, processing_effect);
+        std::cout << "Curent effect " << static_cast<int>(processingEffects(traffic_direction).header_effect_) << " new effect " << static_cast<int>(processing_effect) << "\n";
+        updateProcessingEffect(processingEffects(traffic_direction).header_effect_, processing_effect);
+        std::cout << "Value of header effect" << static_cast<int>(processingEffects(traffic_direction).header_effect_) << "\n";
         break;
       case ProcessorState::CallbackState::TrailersCallback:
-        updateProcessingEffect(processor_effects.trailer_effect_, processing_effect);
+        std::cout << "Curent effect " << static_cast<int>(processingEffects(traffic_direction).trailer_effect_) << " new effect " << static_cast<int>(processing_effect) << "\n";
+        updateProcessingEffect(processingEffects(traffic_direction).trailer_effect_, processing_effect);
+        std::cout << "Value of trailer effect" << static_cast<int>(processingEffects(traffic_direction).trailer_effect_) << "\n";
         break;
       default:
         // Fall through for body callbacks
-        updateProcessingEffect(processor_effects.body_effect_, processing_effect);
+        std::cout << "Curent effect " << static_cast<int>(processingEffects(traffic_direction).body_effect_) << " new effect " << static_cast<int>(processing_effect) << "\n";
+        updateProcessingEffect(processingEffects(traffic_direction).body_effect_, processing_effect);
+        std::cout << "Value of body effect" << static_cast<int>(processingEffects(traffic_direction).body_effect_) << "\n";
         break;
    }
 }
 
-const ExtProcLoggingInfo::ProcessingEffects&
-ExtProcLoggingInfo::processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) const {
+ExtProcLoggingInfo::ProcessingEffects&
+ExtProcLoggingInfo::processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) {
   ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
   return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
              ? decoding_processor_effects_
@@ -533,6 +541,8 @@ absl::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
 
 StreamInfo::FilterState::Object::FieldType
 ExtProcLoggingInfo::getField(absl::string_view field_name) const {
+  std::cout << "encoding_processor_effects_.header_effect_ " << static_cast<int>(encoding_processor_effects_.header_effect_) << "\n";
+  std::cout << "decoding_processor_effects_.body_effect_ " << static_cast<int>(decoding_processor_effects_.body_effect_) << "\n";
   if (field_name == RequestHeaderLatencyUsField && decoding_processor_grpc_calls_.header_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.header_stats_->latency_.count());
   }

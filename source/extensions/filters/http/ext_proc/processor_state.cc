@@ -69,6 +69,7 @@ void ProcessorState::stopMessageTimer() {
 void ProcessorState::logMutation(CallbackState callback_state, ProcessingEffect::Effect processing_effect){
   ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
     if (logging_info != nullptr) {
+      std::cout << "logging effect " << static_cast<int>(processing_effect) <<"\n";
       logging_info->recordProcessingEffect(callback_state, trafficDirection(), processing_effect);
     }
 }
