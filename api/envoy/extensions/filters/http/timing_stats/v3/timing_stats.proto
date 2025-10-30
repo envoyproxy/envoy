@@ -5,7 +5,6 @@ package envoy.extensions.filters.http.timing_stats.v3;
 import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/wrappers.proto";
-import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -41,10 +40,6 @@ message Config {
     string name = 1 [(validate.rules).string = {min_len: 1}];
     repeated Tag tags = 2;
     google.protobuf.UInt32Value max_cardinality = 3;
-
-    // How would this be implemented? @kyessenov you've done some work in this area, right?
-    // Or should the expiration be at the filter config level, not the individual stat?
-    google.protobuf.Duration expiration = 4;
   }
 
 
