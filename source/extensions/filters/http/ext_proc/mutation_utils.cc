@@ -141,7 +141,6 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                                                  bool remove_content_length) {
   // Check whether the remove_headers or set_headers size exceed the HTTP connection manager limit.
   // Reject the mutation and return error status if either one does.
-  std::cout << "Applying Header Mutations\n";
   const auto result = responseHeaderSizeCheck(headers, mutation, rejected_mutations);
   if (!result.ok()) {
     effect = ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded;
@@ -157,7 +156,6 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                          "remove_headers contain invalid character, may not be removed.");
       rejected_mutations.inc();
       effect = ProcessingEffect::Effect::InvalidMutationRejected;
-      std::cout << "mutation invalid\n";
       return absl::InvalidArgumentError(kInvalidCharacterInRemoveMsg);
     }
     const LowerCaseString remove_header(hdr);
@@ -169,21 +167,18 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       int removals = headers.remove(remove_header);
       if (removals > 0){
         effect = ProcessingEffect::Effect::MutationApplied;
-        std::cout << "mutation applied\n";
       }
       }
       break;
     case CheckResult::IGNORE:
       ENVOY_LOG(debug, "Header {} may not be removed per rules", remove_header);
       rejected_mutations.inc();
-      std::cout << "mutation ignored\n";
       break;
     case CheckResult::FAIL:
       ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
                          "Header {} may not be removed. Returning error", remove_header);
       rejected_mutations.inc();
       effect = ProcessingEffect::Effect::MutationFailed;
-      std::cout << "mutation failed\n";
       return absl::InvalidArgumentError(kRemoveFailedMsg);
     }
   }
@@ -236,19 +231,16 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
         headers.setCopy(header_name, header_value);
       }
       effect = ProcessingEffect::Effect::MutationApplied;
-      std::cout << "mutation applied\n";
       break;
     case CheckResult::IGNORE:
       ENVOY_LOG(debug, "Header {} may not be modified per rules", header_name);
       rejected_mutations.inc();
-      std::cout << "mutation ignored\n";
       break;
     case CheckResult::FAIL:
       ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
                          "Header {} may not be modified. Returning error", header_name);
       rejected_mutations.inc();
       effect = ProcessingEffect::Effect::MutationFailed;
-      std::cout << "mutation failed\n";
       return absl::InvalidArgumentError(kSetFailedMsg);
     }
   }
@@ -257,32 +249,26 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
   auto status = headerMutationResultCheck(headers, rejected_mutations);
   if (!status.ok()){
     effect = ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded;
-    std::cout << "mutation size too big\n";
   }
-  std::cout << "value of effect before return " << static_cast<int>(effect) << "\n";
   return status;
 }
 
 ProcessingEffect::Effect MutationUtils::applyBodyMutations(const BodyMutation& mutation, Buffer::Instance& buffer) {
-  std::cout << "applying body mutations\n";
   switch (mutation.mutation_case()) {
   case BodyMutation::MutationCase::kClearBody:
     if (mutation.clear_body()) {
       ENVOY_LOG(trace, "Clearing HTTP body");
       buffer.drain(buffer.length());
     }
-    std::cout << "mutation applied\n";
     return ProcessingEffect::Effect::MutationApplied;
   case BodyMutation::MutationCase::kBody:
     ENVOY_LOG(trace, "Replacing body of {} bytes with new body of {} bytes", buffer.length(),
               mutation.body().size());
     buffer.drain(buffer.length());
     buffer.add(mutation.body());
-    std::cout << "mutation applied\n";
     return ProcessingEffect::Effect::MutationApplied;
   default:
     // Nothing to do on default
-    std::cout << "mutation nothing, skipped\n";
     break;
   }
   return ProcessingEffect::Effect::None;

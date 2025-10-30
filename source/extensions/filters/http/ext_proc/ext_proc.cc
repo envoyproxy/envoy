@@ -288,25 +288,6 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
 }
 
-std::string processingEffectToString(ProcessingEffect::Effect processing_effect) {
-  switch (processing_effect) {
-  case ProcessingEffect::Effect::None:
-    return "none";
-  case ProcessingEffect::Effect::MutationApplied:
-    return "mutation_applied";
-  case ProcessingEffect::Effect::MutationFailed:
-    return "mutation_failed";
-  case ProcessingEffect::Effect::InvalidMutationRejected:
-    return "invalid_mutation_rejected";
-  case ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded:
-    return "mutation_rejected_size_limit_exceeded";
-  case ProcessingEffect::Effect::PartialMutationsApplied:
-    return "partial_mutations_applied";
-  default:
-    return "unknown";
-  }
-}
-
 void ExtProcLoggingInfo::recordGrpcCall(std::chrono::microseconds latency,
                                         Grpc::Status::GrpcStatus call_status,
                                         ProcessorState::CallbackState callback_state,
@@ -365,54 +346,44 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
-void updateProcessingEffect(ProcessingEffect::Effect& current_effect, ProcessingEffect::Effect& new_effect) {
+ProcessingEffect::Effect updateProcessingEffect(ProcessingEffect::Effect current_effect, ProcessingEffect::Effect new_effect) {
     if (new_effect == ProcessingEffect::Effect::None) {
         // Do nothing. Default value is None and we want to log the most recent effect that is not none.
-        return;
+        return current_effect;
     }
     switch(current_effect){
         case ProcessingEffect::Effect::None:
-            current_effect = new_effect;
-            break;
+            return new_effect;
         case ProcessingEffect::Effect::PartialMutationsApplied:
             // Do not update as partial mutation and rejection is already set.
-            break;
+            return current_effect;
         case ProcessingEffect::Effect::MutationApplied:
             if (new_effect != ProcessingEffect::Effect::MutationApplied){
-                current_effect = ProcessingEffect::Effect::PartialMutationsApplied;
+                return ProcessingEffect::Effect::PartialMutationsApplied;
             }
-            break;
+            return current_effect;
         default:
             // Fall through for all failures.
             if (new_effect == ProcessingEffect::Effect::MutationApplied){
-                current_effect = ProcessingEffect::Effect::PartialMutationsApplied;
+                return ProcessingEffect::Effect::PartialMutationsApplied;
             }
-            break;
+            return current_effect;
     }
-    std::cout << "value of current_effect" << static_cast<int>(current_effect) << "\n";
 }
 
 void ExtProcLoggingInfo::recordProcessingEffect(ProcessorState::CallbackState callback_state,
                                         envoy::config::core::v3::TrafficDirection traffic_direction, ProcessingEffect::Effect processing_effect){
    ASSERT(callback_state != ProcessorState::CallbackState::Idle);
-   // TODO MAKE THIS A REFERENCE
-   // auto processor_effects = processingEffects(traffic_direction);
    switch (callback_state){
       case ProcessorState::CallbackState::HeadersCallback:
-        std::cout << "Curent effect " << static_cast<int>(processingEffects(traffic_direction).header_effect_) << " new effect " << static_cast<int>(processing_effect) << "\n";
-        updateProcessingEffect(processingEffects(traffic_direction).header_effect_, processing_effect);
-        std::cout << "Value of header effect" << static_cast<int>(processingEffects(traffic_direction).header_effect_) << "\n";
+        processingEffects(traffic_direction).header_effect_ = updateProcessingEffect(processingEffects(traffic_direction).header_effect_, processing_effect);
         break;
       case ProcessorState::CallbackState::TrailersCallback:
-        std::cout << "Curent effect " << static_cast<int>(processingEffects(traffic_direction).trailer_effect_) << " new effect " << static_cast<int>(processing_effect) << "\n";
-        updateProcessingEffect(processingEffects(traffic_direction).trailer_effect_, processing_effect);
-        std::cout << "Value of trailer effect" << static_cast<int>(processingEffects(traffic_direction).trailer_effect_) << "\n";
+        processingEffects(traffic_direction).trailer_effect_ = updateProcessingEffect(processingEffects(traffic_direction).trailer_effect_, processing_effect);
         break;
       default:
         // Fall through for body callbacks
-        std::cout << "Curent effect " << static_cast<int>(processingEffects(traffic_direction).body_effect_) << " new effect " << static_cast<int>(processing_effect) << "\n";
-        updateProcessingEffect(processingEffects(traffic_direction).body_effect_, processing_effect);
-        std::cout << "Value of body effect" << static_cast<int>(processingEffects(traffic_direction).body_effect_) << "\n";
+        processingEffects(traffic_direction).body_effect_ = updateProcessingEffect(processingEffects(traffic_direction).body_effect_, processing_effect);
         break;
    }
 }
@@ -541,8 +512,6 @@ absl::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
 
 StreamInfo::FilterState::Object::FieldType
 ExtProcLoggingInfo::getField(absl::string_view field_name) const {
-  std::cout << "encoding_processor_effects_.header_effect_ " << static_cast<int>(encoding_processor_effects_.header_effect_) << "\n";
-  std::cout << "decoding_processor_effects_.body_effect_ " << static_cast<int>(decoding_processor_effects_.body_effect_) << "\n";
   if (field_name == RequestHeaderLatencyUsField && decoding_processor_grpc_calls_.header_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.header_stats_->latency_.count());
   }
