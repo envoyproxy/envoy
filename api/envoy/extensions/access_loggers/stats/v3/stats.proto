@@ -25,12 +25,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;
 
-  enum TimeUnit {
-    Milliseconds = 0;
-    Microseconds = 1;
-    Nanoseconds = 2;
-  }
-
   message TagFormatString {
     string format_string = 1;
 
@@ -60,12 +54,27 @@ message Config {
   }
 
   message Histogram {
+    enum Unit {
+      Unspecified = 0;
+
+      Bytes = 1;
+
+      Microseconds = 2;
+
+      Milliseconds = 3;
+
+      Nanoseconds = 4;
+
+      // Values are scaled to range 0-1.0, indicating 0%-100%.
+      Percent = 5;
+    }
+
     Stat stat = 1;
 
-    TimeUnit unit = 2;
+    Unit unit = 2;
 
+    // format string; must evaluate to a positive number
     string value = 3;
-    // format string; must evaluate to a number
   }
 
   // Increase the counter by the amount of `value`.
@@ -83,8 +92,8 @@ message Config {
 
   string stat_prefix = 1;
 
-  google.protobuf.UInt32Value max_stats = 2;
   // Overall maximum number of stats from all types.
+  google.protobuf.UInt32Value max_stats = 2;
 
   repeated Histogram histograms = 3;
 
