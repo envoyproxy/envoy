@@ -18,14 +18,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Mcp {
   // Traffic handling mode.
   enum TrafficMode {
-    // Default mode - pass through all traffic (MCP and non-MCP)
-    // MCP JSON_RPC is parsed to metadata
+    // Proxies the HTTP request and response without filtering.
+    // Also stores the JSON_RPC contents in the request/response body in the metadata.
+    // This is the default mode.
     PASS_THROUGH = 0;
 
-    // Reject requests that are not MCP valid
-    // Valid MCP requests include:
+    // Reject requests that are not following MCP spec.
+    // Valid MCP requests are:
     // - POST requests with JSON-RPC 2.0 messages
     // - GET requests for SSE streams (with Accept: text/event-stream)
+    // Valid MCP JSON_RPC will be parsed and stored to metadata.
     REJECT_NO_MCP = 1;
   }
 
