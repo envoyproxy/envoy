@@ -365,6 +365,18 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   ///
   /// See [`EnvoyHttpFilter::new_scheduler`] for more details on how to use this.
   fn on_scheduled(&mut self, _envoy_filter: &mut EHF, _event_id: u64) {}
+
+  /// This is called when the downstream buffer size goes above the high watermark for a
+  /// terminal filter.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  fn on_downstream_above_write_buffer_high_watermark(&mut self, _envoy_filter: &mut EHF) {}
+
+  /// This is called when the downstream buffer size goes below the low watermark for a
+  /// terminal filter.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  fn on_downstream_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut EHF) {}
 }
 
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
@@ -2309,6 +2321,26 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_scheduled(
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
   filter.on_scheduled(&mut EnvoyHttpFilterImpl::new(envoy_ptr), event_id);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
+  let filter = &mut **filter;
+  filter.on_downstream_above_write_buffer_high_watermark(&mut EnvoyHttpFilterImpl::new(envoy_ptr));
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
+  let filter = &mut **filter;
+  filter.on_downstream_below_write_buffer_low_watermark(&mut EnvoyHttpFilterImpl::new(envoy_ptr));
 }
 
 impl From<envoy_dynamic_module_type_metrics_result>

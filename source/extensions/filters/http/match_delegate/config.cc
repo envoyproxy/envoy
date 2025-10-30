@@ -363,6 +363,10 @@ FilterConfigPerRoute::createFilterMatchTree(
   requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
       envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance().GetTypeName()));
   requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
+      envoy::type::matcher::v3::HttpResponseHeaderMatchInput::default_instance().GetTypeName()));
+  requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
+      envoy::type::matcher::v3::HttpResponseTrailerMatchInput::default_instance().GetTypeName()));
+  requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
       xds::type::matcher::v3::HttpAttributesCelMatchInput::default_instance().GetTypeName()));
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,

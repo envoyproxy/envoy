@@ -36,7 +36,7 @@ on:
             target: GITHUB_WORKSPACE
             chown: "runner:runner"
           - src: /mnt/runner
-            target: RUNNER_TEMP/bazel_root
+            target: RUNNER_TEMP/container/bazel_root
             chown: "runner:runner"
       cache-build-image:
         type: string
@@ -64,7 +64,8 @@ on:
         default: false
       diskspace-hack-paths:
         type: string
-        default:
+        default: |
+          /opt/hostedtoolcache
       docker-cpus:
         type: number
         default: 0
@@ -115,22 +116,6 @@ on:
           - run: |
               # Pre build report
               df -h > "${TMP_REPORT}/df-pre"
-              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" ]]; then
-                  exit 0
-              fi
-              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" -maxdepth 1 -type d \
-                  | rev \
-                  | cut -d/ -f1 \
-                  | rev \
-                  > "${TMP_REPORT}/shas-pre"
-              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" ]]; then
-                  exit 0
-              fi
-              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" -maxdepth 1 -type d \
-                  | rev \
-                  | cut -d/ -f1 \
-                  | rev \
-                  >> "${TMP_REPORT}/shas-pre"
             shell: bash
       report-post:
         type: string
@@ -139,22 +124,6 @@ on:
               # Post build report
               df -h > "${TMP_REPORT}/df-post"
               (du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G" || :) > "${TMP_REPORT}/du-post"
-              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" ]]; then
-                  exit 0
-              fi
-              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" -maxdepth 1 -type d \
-                  | rev \
-                  | cut -d/ -f1 \
-                  | rev \
-                  > "${TMP_REPORT}/shas-post"
-              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" ]]; then
-                  exit 0
-              fi
-              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" -maxdepth 1 -type d \
-                  | rev \
-                  | cut -d/ -f1 \
-                  | rev \
-                  >> "${TMP_REPORT}/shas-post"
             shell: bash
       request:
         type: string
@@ -260,6 +229,8 @@ jobs:
              "job-started": ${{ steps.started.outputs.value }}}
           | . * {$config, $check}
 
+    - run: |
+        mkdir ${{ runner.temp }}/container
     - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.28
       if: inputs.bind-mount
       with:
@@ -269,6 +240,9 @@ jobs:
       if: inputs.diskspace-hack || github.event.repository.private
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
+    - run: |
+        mount
+        df -h
 
     - run: |
         sudo mkdir -p /etc/docker
@@ -295,7 +269,7 @@ jobs:
       with:
         gcs-bucket: ${{ inputs.gcs-cache-bucket }}
         key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch || 'x64' }}
-        path: ${{ runner.temp }}/bazel_root
+        path: ${{ runner.temp }}/container/bazel_root
 
     # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
     - if: ${{ inputs.cache-build-image }}
@@ -354,7 +328,7 @@ jobs:
       with:
         key: ${{ secrets.gpg-key }}
         passphrase: ${{ secrets.gpg-key-password }}
-        passphrase-path: "${{ runner.temp }}/gpg-passphrase"
+        passphrase-path: "${{ runner.temp }}/container/gpg-passphrase"
         configured-passphrase-path: /build/gpg-passphrase
 
     - run: |
@@ -380,6 +354,8 @@ jobs:
       if: ${{ vars.ENVOY_CI_BAZELRC }}
       name: Configure repo Bazel settings
 
+    # NOTE: This is where untrusted code can be run!!!
+    #  It MUST be the last step in the workflow
     - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.28
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
@@ -416,7 +392,7 @@ jobs:
         GITHUB_TOKEN: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
         DOCKERHUB_USERNAME: ${{ inputs.dockerhub-username }}
         DOCKERHUB_PASSWORD: ${{ secrets.dockerhub-password }}
-        ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
+        ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}/container
         ENVOY_RBE: ${{ inputs.rbe == true && 1 || '' }}
         RBE_KEY: ${{ secrets.rbe-key }}
         BAZEL_BUILD_EXTRA_OPTIONS: >-
