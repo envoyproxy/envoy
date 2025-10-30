@@ -68,10 +68,12 @@ function bazel_with_collection() {
     then
         pushd bazel-testlogs
         failed_logs=$(grep "  /build.*test.log" "${BAZEL_OUTPUT}" | sed -e 's/  \/build.*\/testlogs\/\(.*\)/\1/')
-        while read -r f; do
-        cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
-        done <<< "$failed_logs"
-        popd
+        if [[ -n "${failed_logs}" ]]; then
+            while read -r f; do
+                cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
+            done <<< "$failed_logs"
+            popd
+        fi
     fi
     exit "${BAZEL_STATUS}"
   fi
