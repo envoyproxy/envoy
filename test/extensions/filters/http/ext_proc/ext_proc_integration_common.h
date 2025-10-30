@@ -42,12 +42,19 @@ using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFacto
 using test::integration::filters::LoggingTestFilterConfig;
 
 struct ConfigOptions {
+  enum class FilterSetup {
+    kNone,
+    kDownstream,
+    kCompositeMatchOnRequestHeaders,
+    kCompositeMatchOnResponseHeaders,
+  };
+
+  FilterSetup filter_setup = FilterSetup::kDownstream;
   bool valid_grpc_server = true;
   bool add_logging_filter = false;
   absl::optional<LoggingTestFilterConfig> logging_filter_config = absl::nullopt;
   bool http1_codec = false;
   bool add_metadata = false;
-  bool downstream_filter = true;
   bool add_response_processor = false;
 };
 
@@ -80,17 +87,27 @@ public:
 class ExtProcIntegrationTest : public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 protected:
-  ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
+ enum class FilterSetup {
+   kDirect,
+   kCompositeMatchOnRequestHeaders,
+   kCompositeMatchOnResponseHeaders,
+ };
 
-  void createUpstreams() override;
+ ExtProcIntegrationTest()
+     : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
-  void TearDown() override;
+ void createUpstreams() override;
 
-  void initializeConfig(ConfigOptions config_option = {},
-                        const std::vector<std::pair<int, int>>& cluster_endpoints = {{0, 1},
-                                                                                     {1, 1}});
+ void TearDown() override;
 
-  bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
+ void initializeConfig(
+     ConfigOptions config_option = {},
+     const std::vector<std::pair<int, int>>& cluster_endpoints = {{0, 1},
+                                                                  {1, 1}});
+
+ bool IsEnvoyGrpc() {
+   return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc;
+ }
 
   void setPerRouteConfig(Route* route, const ExtProcPerRoute& cfg);
   void setPerHostConfig(VirtualHost& vh, const ExtProcPerRoute& cfg);
@@ -177,7 +194,8 @@ protected:
   void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true,
                                         bool response = false, absl::string_view body_sent = "");
   void serverSendTrailerRespDuplexStreamed();
-  void prependExprocCompositeFilter();
+  void prependExtProcCompositeFilterMatchOnRequestHeaders();
+  void prependExtProcCompositeFilterMatchOnResponseHeaders();
 
   std::unique_ptr<SimpleFilterConfig<DynamicMetadataToHeadersFilter>> simple_filter_config_;
   std::unique_ptr<
@@ -196,7 +214,6 @@ protected:
   TestScopedRuntime scoped_runtime_;
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
-  bool composite_test_ = false;
 };
 
 } // namespace ExternalProcessing
