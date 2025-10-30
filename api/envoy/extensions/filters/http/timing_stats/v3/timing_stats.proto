@@ -75,4 +75,9 @@ message Config {
   repeated Histogram histograms = 3;
   repeated Counter counters = 4;
   repeated Event events = 5;
+
+  // Specifies a collection of Formatter plugins that can be called from the access log configuration.
+  // See the formatters extensions documentation for details.
+  // [#extension-category: envoy.formatter]
+  repeated TypedExtensionConfig formatters = 6;
 }
