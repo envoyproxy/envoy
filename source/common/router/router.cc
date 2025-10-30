@@ -682,7 +682,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // well as handling unsupported asynchronous host selection by treating it
     // as host selection failure and calling sendNoHealthyUpstreamResponse.
     continueDecodeHeaders(cluster, headers, end_stream, std::move(host_selection_response.host),
-                          std::string(host_selection_response.details));
+                          host_selection_response.details);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -723,7 +723,7 @@ void Filter::onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::stri
 bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
                                    Http::RequestHeaderMap& headers, bool end_stream,
                                    Upstream::HostConstSharedPtr&& selected_host,
-                                   absl::optional<std::string> host_selection_details) {
+                                   absl::string_view host_selection_details) {
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_end_ms", callbacks_->dispatcher().timeSource().monotonicTime());
 
@@ -926,12 +926,12 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalClu
                                         callbacks_->streamInfo().protocol(), this, *message);
 }
 
-void Filter::sendNoHealthyUpstreamResponse(absl::optional<std::string> optional_details) {
+void Filter::sendNoHealthyUpstreamResponse(absl::string_view optional_details) {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, false);
-  absl::string_view details = (optional_details.has_value() && !optional_details->empty())
-                                  ? absl::string_view(*optional_details)
-                                  : StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream;
+  absl::string_view details = optional_details.empty()
+                                  ? StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream
+                                  : optional_details;
   callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", modify_headers_,
                              absl::nullopt, details);
 }
@@ -2218,7 +2218,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
                              TimeoutRetry is_timeout_retry, Upstream::HostConstSharedPtr&& host,
                              Upstream::ThreadLocalCluster& cluster,
-                             absl::optional<std::string> host_selection_details) {
+                             absl::string_view host_selection_details) {
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_end_ms", callbacks_->dispatcher().timeSource().monotonicTime());
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(cluster, host);
