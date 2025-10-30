@@ -118,6 +118,11 @@ new_features:
     - ``%RESPONSE_HEADER(X?Y):Z%`` as full name version of ``%RESP(X?Y):Z%``
     - ``%RESPONSE_TRAILER(X?Y):Z%`` as full name version of ``%TRAILER(X?Y):Z%``
     This mainly to provide a more consistent naming scheme for users to understand and use.
+- area: tracing
+  change: |
+    Added new :ref:`value <envoy_v3_api_field_type.tracing.v3.CustomTag.value>` field and
+    the :ref:`substitution format specifier <config_access_log_format>` could be used to
+    extract values from various parts of the request/response for custom tags.
 - area: lua
   change: |
     Added ``drainConnectionUponCompletion()`` to the Lua filter stream info API. This allows Lua scripts
