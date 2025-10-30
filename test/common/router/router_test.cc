@@ -72,9 +72,7 @@ class TestAccessLog : public AccessLog::Instance {
 public:
   explicit TestAccessLog(std::function<void(const StreamInfo::StreamInfo&)> func) : func_(func) {}
 
-  void log(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& info) override {
-    func_(info);
-  }
+  void log(const Formatter::Context&, const StreamInfo::StreamInfo& info) override { func_(info); }
 
 private:
   std::function<void(const StreamInfo::StreamInfo&)> func_;
@@ -479,8 +477,7 @@ TEST_F(RouterTest, Http1Upstream) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _, true))
-      .WillOnce(Invoke([this](Http::RequestHeaderMap& headers,
-                              const Formatter::HttpFormatterContext& context,
+      .WillOnce(Invoke([this](Http::RequestHeaderMap& headers, const Formatter::Context& context,
                               const StreamInfo::StreamInfo&, bool) {
         EXPECT_EQ(context.requestHeaders().ptr(), &headers);
         EXPECT_EQ(context.activeSpan().ptr(), &span_);

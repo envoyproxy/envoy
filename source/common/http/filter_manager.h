@@ -712,7 +712,7 @@ public:
   // FilterChainManager
   void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
-  void log(const Formatter::HttpFormatterContext log_context) {
+  void log(const Formatter::Context log_context) {
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(log_context, streamInfo());
     }

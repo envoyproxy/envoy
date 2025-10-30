@@ -370,7 +370,7 @@ Config::SharedConfig::evaluateDynamicTLVs(const StreamInfo::StreamInfo& stream_i
 
   // Evaluate dynamic TLV formatters.
   for (const auto& tlv_formatter : dynamic_tlv_formatters_) {
-    const std::string formatted_value = tlv_formatter.formatter->formatWithContext({}, stream_info);
+    const std::string formatted_value = tlv_formatter.formatter->format({}, stream_info);
 
     // Convert formatted string to bytes and add to result.
     result.push_back({tlv_formatter.type,
@@ -879,7 +879,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
-  return hostname_fmt_->formatWithContext({}, stream_info);
+  return hostname_fmt_->format({}, stream_info);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseHeaders(
@@ -1187,7 +1187,7 @@ void Filter::onAccessLogFlushInterval() {
 }
 
 void Filter::flushAccessLog(AccessLog::AccessLogType access_log_type) {
-  const Formatter::HttpFormatterContext log_context{nullptr, nullptr, nullptr, {}, access_log_type};
+  const Formatter::Context log_context{nullptr, nullptr, nullptr, {}, access_log_type};
 
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(log_context, getStreamInfo());

@@ -86,6 +86,37 @@ Rate limit filter :ref:`configuration <envoy_v3_api_msg_extensions.filters.http.
 at the virtual host or route levels using the :ref:`RateLimitQuotaOverride <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride>`
 configuration. The more specific configuration fully overrides less specific configuration.
 
+gRPC Status Configuration
+-------------------------
+
+The rate limit quota filter supports customizing the response when requests exceed quota limits through the
+:ref:`deny_response_settings <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.deny_response_settings>`
+configuration.
+
+For HTTP requests, you can configure the HTTP status code via ``http_status`` (defaults to 429).
+
+For gRPC requests, you can optionally set ``grpc_status`` to specify the exact gRPC status code and message.
+If not set, Envoy will derive the gRPC status from the HTTP status code.
+
+**Example: Using default behavior (gRPC status derived from HTTP status)**
+
+.. code-block:: yaml
+
+  deny_response_settings:
+    http_status:
+      code: 429
+
+**Example: Using explicit gRPC status**
+
+.. code-block:: yaml
+
+  deny_response_settings:
+    http_status:
+      code: 429
+    grpc_status:
+      code: 8  # RESOURCE_EXHAUSTED
+      message: "Quota exhausted"
+
 Matcher extensions
 ------------------
 
