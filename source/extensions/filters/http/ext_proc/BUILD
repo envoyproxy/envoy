@@ -80,7 +80,7 @@ envoy_cc_library(
     srcs = ["mutation_utils.cc"],
     hdrs = ["mutation_utils.h"],
     deps = [
-        ":processing_effect",
+        ":processing_effect_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stats:stats_interface",
@@ -144,7 +144,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "processing_effect",
+    name = "processing_effect_lib",
     hdrs = ["processing_effect.h"],
     tags = ["skip_on_windows"],
 )
