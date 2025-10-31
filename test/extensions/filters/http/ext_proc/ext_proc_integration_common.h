@@ -190,8 +190,7 @@ protected:
   void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true,
                                         bool response = false, absl::string_view body_sent = "");
   void serverSendTrailerRespDuplexStreamed();
-  void prependExtProcCompositeFilterMatchOnRequestHeaders();
-  void prependExtProcCompositeFilterMatchOnResponseHeaders();
+  void prependExtProcCompositeFilter(const Protobuf::Message& match_input);
 
   std::unique_ptr<SimpleFilterConfig<DynamicMetadataToHeadersFilter>> simple_filter_config_;
   std::unique_ptr<
