@@ -149,8 +149,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
                                            "report_load_when_rq_active_is_non_zero")) {
           // If rq_active is non-zero, we should send the locality stats even if
-          // rq_issued is zero(no requests have been issued in this poll
-          // window), some load balancer may need rq_active for load balancing.
+          // rq_issued is zero (no new requests have been issued in this poll
+          // window). This is needed to report long-lived connections/requests (e.g., when web-sockets are used).
           should_send_locality_stats = should_send_locality_stats || (rq_active != 0);
         }
 

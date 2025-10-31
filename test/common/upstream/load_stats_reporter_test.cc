@@ -543,10 +543,9 @@ TEST_F(LoadStatsReporterTest, RemoteStreamGracefulClose) {
   EXPECT_EQ(load_stats_reporter_->getStats().retries_.value(), 1);
 }
 
-// Validate that when
-// "envoy.reloadable_features.report_load_when_rq_active_is_non_zero" is set and
-// rq_active is non-zero, a load report is sent even if rq_issued is 0.
+// Validate that when rq_active is non-zero, a load report is sent even if rq_issued is 0.
 TEST_F(LoadStatsReporterTest, ReportLoadWhenRqActiveIsNonZero) {
+  // Keep this test when deprecating the runtime flag.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "true"}});
