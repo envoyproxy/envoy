@@ -198,6 +198,7 @@ envoy_cc_library(
         ":envoy_quic_connection_helper_lib",
         ":envoy_quic_proof_verifier_lib",
         ":envoy_quic_utils_lib",
+        ":quic_client_packet_writer_factory_impl_lib",
         "//envoy/http:codec_interface",
         "//envoy/http:persistent_quic_info_interface",
         "//envoy/registry",
@@ -392,6 +393,18 @@ envoy_cc_library(
         "@com_github_google_quiche//:quic_core_connection_lib",
         "@com_github_google_quiche//:quic_core_packet_writer_lib",
         "@com_github_google_quiche//:quic_core_packets_lib",
+    ]),
+)
+
+envoy_cc_library(
+    name = "quic_client_packet_writer_factory_impl_lib",
+    srcs = envoy_select_enable_http3(["quic_client_packet_writer_factory_impl.cc"]),
+    hdrs = envoy_select_enable_http3(["quic_client_packet_writer_factory_impl.h"]),
+    deps = envoy_select_enable_http3([
+        ":envoy_quic_packet_writer_lib",
+        ":envoy_quic_utils_lib",
+        ":envoy_quic_client_connection_lib",
+        "//source/common/network:udp_packet_writer_handler_lib",
     ]),
 )
 

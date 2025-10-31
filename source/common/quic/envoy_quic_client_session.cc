@@ -80,6 +80,25 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     Stats::Scope& scope,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     OptRef<Network::UpstreamTransportSocketFactory> transport_socket_factory)
+    : EnvoyQuicClientSession(
+          config, supported_versions, std::move(connection), nullptr, nullptr,
+          quic::QuicConnectionMigrationConfig{.allow_server_preferred_address = false}, server_id,
+          crypto_config, dispatcher, send_buffer_limit, crypto_stream_factory, quic_stat_names,
+          rtt_cache, scope, transport_socket_options, transport_socket_factory) {}
+
+EnvoyQuicClientSession::EnvoyQuicClientSession(
+    const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
+    std::unique_ptr<EnvoyQuicClientConnection> connection,
+    quic::QuicForceBlockablePacketWriter* absl_nullable writer,
+    EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* absl_nullable migration_helper,
+    const quic::QuicConnectionMigrationConfig& migration_config,
+    const quic::QuicServerId& server_id,
+    std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, Event::Dispatcher& dispatcher,
+    uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
+    QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
+    Stats::Scope& scope,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+    OptRef<Network::UpstreamTransportSocketFactory> transport_socket_factory)
     : QuicFilterManagerConnectionImpl(
           *connection, connection->connection_id(), dispatcher, send_buffer_limit,
           std::make_shared<QuicSslConnectionInfo>(*this),
@@ -88,12 +107,16 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
               connection->connectionSocket()->connectionInfoProviderSharedPtr(),
               StreamInfo::FilterState::LifeSpan::Connection),
           quic_stat_names, scope),
-      quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
-                                  crypto_config.get()),
+      quic::QuicSpdyClientSession(config, supported_versions, connection.release(),
+                                  /*visitor=*/nullptr, writer, migration_helper, migration_config,
+                                  server_id, crypto_config.get()),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
       rtt_cache_(rtt_cache), transport_socket_options_(transport_socket_options),
       transport_socket_factory_(makeOptRefFromPtr(
-          dynamic_cast<QuicTransportSocketFactoryBase*>(transport_socket_factory.ptr()))) {
+          dynamic_cast<QuicTransportSocketFactoryBase*>(transport_socket_factory.ptr()))),
+      session_handles_migration_(migration_helper != nullptr) {
+  ENVOY_BUG(migration_helper == nullptr || writer != nullptr,
+            "writer must be set if migration helper is set");
   streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   if (transport_socket_options_ != nullptr &&
       !transport_socket_options_->applicationProtocolListOverride().empty()) {
@@ -301,6 +324,10 @@ void EnvoyQuicClientSession::OnNewEncryptionKeyAvailable(
 }
 void EnvoyQuicClientSession::OnServerPreferredAddressAvailable(
     const quic::QuicSocketAddress& server_preferred_address) {
+  if (session_handles_migration_) {
+    quic::QuicSpdyClientSession::OnServerPreferredAddressAvailable(server_preferred_address);
+    return;
+  }
   static_cast<EnvoyQuicClientConnection*>(connection())
       ->probeAndMigrateToServerPreferredAddress(server_preferred_address);
 }
@@ -316,6 +343,15 @@ void EnvoyQuicClientSession::registerNetworkObserver(EnvoyQuicNetworkObserverReg
   }
   registry.registerObserver(*network_connectivity_observer_);
   registry_ = makeOptRef(registry);
+}
+
+void EnvoyQuicClientSession::StartDraining() {
+  quic::QuicSpdyClientSession::StartDraining();
+  // Treat draining as receiving a GOAWAY.
+  if (http_connection_callbacks_ != nullptr) {
+    // HTTP/3 GOAWAY doesn't have an error code field.
+    http_connection_callbacks_->onGoAway(Http::GoAwayErrorCode::NoError);
+  }
 }
 
 } // namespace Quic

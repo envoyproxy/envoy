@@ -204,12 +204,15 @@ public:
                              std::unique_ptr<EnvoyQuicClientConnection> connection,
                              Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                              EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
-      : EnvoyQuicClientSession(config, supported_versions, std::move(connection),
-                               quic::QuicServerId("example.com", 443),
-                               std::make_shared<quic::QuicCryptoClientConfig>(
-                                   quic::test::crypto_test_utils::ProofVerifierForTesting()),
-                               dispatcher, send_buffer_limit, crypto_stream_factory,
-                               quic_stat_names_, {}, *stats_store_.rootScope(), nullptr, {}) {}
+      : EnvoyQuicClientSession(
+            config, supported_versions, std::move(connection),
+            /*writer=*/nullptr, /*migration_helper=*/nullptr,
+            quic::QuicConnectionMigrationConfig{.allow_server_preferred_address = false},
+            quic::QuicServerId("example.com", 443),
+            std::make_shared<quic::QuicCryptoClientConfig>(
+                quic::test::crypto_test_utils::ProofVerifierForTesting()),
+            dispatcher, send_buffer_limit, crypto_stream_factory, quic_stat_names_, {},
+            *stats_store_.rootScope(), nullptr, {}) {}
 
   void Initialize() override {
     EnvoyQuicClientSession::Initialize();
