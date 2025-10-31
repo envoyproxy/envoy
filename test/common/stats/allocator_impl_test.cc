@@ -69,20 +69,19 @@ TEST_F(AllocatorImplTest, CountersWithUpDown) {
   CounterSharedPtr c1 = alloc_.makeCounter(counter_name, StatName(), {});
   EXPECT_EQ(1, c1->use_count());
   EXPECT_FALSE(c1->used());
-  c1->inc();
+
+  c1->dec();
   EXPECT_TRUE(c1->used());
+  EXPECT_EQ(-1, c1->value());
+  c1->dec();
+  EXPECT_EQ(-2, c1->value());
   c1->inc();
-  EXPECT_EQ(2, c1->value());
-  c1->dec();
+  EXPECT_EQ(-1, c1->value());
+
+  c1->sub(100);
+  EXPECT_EQ(-101, c1->value());
+  c1->add(102);
   EXPECT_EQ(1, c1->value());
-  c1->dec();
-  EXPECT_EQ(0, c1->value());
-  c1->add(10);
-  EXPECT_EQ(10, c1->value());
-  c1->sub(3);
-  EXPECT_EQ(7, c1->value());
-  c1->sub(4);
-  EXPECT_EQ(3, c1->value());
 }
 
 TEST_F(AllocatorImplTest, GaugesWithSameName) {

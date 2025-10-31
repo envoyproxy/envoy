@@ -169,7 +169,7 @@ public:
   int64_t value() const override { return value_; }
 
 private:
-  std::atomic<uint64_t> value_{0};
+  std::atomic<int64_t> value_{0};
   std::atomic<int64_t> pending_delta_{0};
 };
 
