@@ -14,6 +14,11 @@ behavior_changes:
     hardware thread count and CPU affinity for worker thread calculation. Uses conservative rounding (floor)
     to account for non-worker threads and prevent container throttling, which may reduce the total number of
     connections.
+- area: dynamic modules
+  change: |
+    The dynamic module ABI has been updated to support streaming body manipulation. This change also
+    fixed potential incorrect behavior when access or modify the request or response body. See
+    https://github.com/envoyproxy/envoy/issues/40918 for more details.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
