@@ -153,9 +153,6 @@ new_features:
 - area: admin
   change: |
     Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.
-- area: http2
-  change: |
-    Fixed sending HTTP/2 graceful GOAWAY during stream shutdown.
 - area: dns_filter
   change: |
     Added :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.access_log>` for DNS filter.
