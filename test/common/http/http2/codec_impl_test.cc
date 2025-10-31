@@ -252,7 +252,6 @@ public:
     driveToCompletion();
 
     EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .Times(AnyNumber())
         .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
@@ -1008,14 +1007,6 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   }
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
   driveToCompletion();
-}
-
-TEST_P(Http2CodecImplTest, ResetBeforeHeadersSent) {
-  initialize();
-
-  EXPECT_EQ(1, TestUtility::findGauge(client_stats_store_, "http2.streams_active")->value());
-  request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
-  EXPECT_EQ(0, TestUtility::findGauge(client_stats_store_, "http2.streams_active")->value());
 }
 
 TEST_P(Http2CodecImplTest, InvalidHeadersFrameMissing) {
@@ -4362,10 +4353,13 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway
   EXPECT_CALL(server_->server_go_away_on_dispatch, shouldShedLoad()).WillOnce(Return(true));
   EXPECT_CALL(client_callbacks_, onGoAway(_));
 
-  // With graceful shutdown notice (shutdownNotice), both implementations
-  // allow current streams to continue processing, so headers are decoded.
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+    EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  } else {
+    // nghttp2 does not raise the headers to the decoder.
+    EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  }
   driveToCompletion();
 
   EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());

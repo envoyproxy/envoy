@@ -408,8 +408,10 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
     ENVOY_CONN_LOG(debug, "invoking onStreamClose for stream: {} via processBufferedData",
                    parent_.connection_, stream_id_);
     // We only buffer the onStreamClose if we had no errors.
-    Status status = parent_.onStreamClose(this, 0);
-    ASSERT(status.ok());
+    if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
+      ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
+                     status.message()); // LCOV_EXCL_LINE
+    }
   }
 }
 
@@ -808,11 +810,6 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
   if (stream_id_ == -1) {
     // Handle the case where client streams are reset before headers are created.
-    // For example, if we send local reply after the stream is created but before
-    // headers are sent, we will end up here.
-    ENVOY_CONN_LOG(trace, "Stream {} reset before headers sent.", parent_.connection_, stream_id_);
-    Status status = parent_.onStreamClose(this, 0);
-    ASSERT(status.ok());
     return;
   }
   if (codec_callbacks_) {
@@ -1051,6 +1048,7 @@ void ConnectionImpl::goAway() {
 
 void ConnectionImpl::shutdownNotice() {
   adapter_->SubmitShutdownNotice();
+
   if (sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
@@ -1885,7 +1883,6 @@ void ConnectionImpl::Http2Visitor::OnRstStream(Http2StreamId stream_id, Http2Err
 bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id,
                                                  Http2ErrorCode error_code) {
   Status status = connection_->onStreamClose(stream_id, static_cast<uint32_t>(error_code));
-  ASSERT(status.ok());
   if (stream_close_listener_) {
     ENVOY_CONN_LOG(trace, "Http2Visitor invoking stream close listener for stream {}",
                    connection_->connection_, stream_id);
