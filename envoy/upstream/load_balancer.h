@@ -62,7 +62,7 @@ struct HostSelectionResponse {
   HostSelectionResponse(HostConstSharedPtr host, std::string details)
       : host(host), details(details) {}
   HostConstSharedPtr host;
-  // Optional details if host selection fails.
+  // Optional details if host selection fails (empty string implies no details).
   std::string details;
   std::unique_ptr<AsyncHostSelectionHandle> cancelable;
 };
