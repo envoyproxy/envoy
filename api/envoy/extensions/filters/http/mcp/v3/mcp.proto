@@ -16,7 +16,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.mcp]
 
 // This filter will inspect and get attributes from MCP traffic.
-// We are iterating it to add more supports.
 message Mcp {
   // Traffic handling mode for no MCP traffic.
   enum TrafficMode {
