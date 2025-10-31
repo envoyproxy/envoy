@@ -3726,7 +3726,6 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   verifyDownstreamResponse(*response, 200);
 }
 
-
 TEST_P(ExtProcIntegrationTest, RequestAttributesInResponseOnlyProcessing) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
@@ -3735,10 +3734,9 @@ TEST_P(ExtProcIntegrationTest, RequestAttributesInResponseOnlyProcessing) {
   proto_config_.mutable_response_attributes()->Add("request.scheme");
   proto_config_.mutable_response_attributes()->Add("request.size");
 
-  initializeConfig(ConfigOptions{
-      // Causes filter to only be invoked in response path
-      .filter_setup =
-          ConfigOptions::FilterSetup::kCompositeMatchOnResponseHeaders});
+  initializeConfig(
+      ConfigOptions{// Causes filter to only be invoked in response path
+                    .filter_setup = ConfigOptions::FilterSetup::kCompositeMatchOnResponseHeaders});
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
@@ -3749,15 +3747,13 @@ TEST_P(ExtProcIntegrationTest, RequestAttributesInResponseOnlyProcessing) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                      {"match-header", "match"}},
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"match-header", "match"}},
       /*end_stream=*/false);
   upstream_request_->encodeData("body", /*end_stream=*/true);
 
   // Handle response headers message.
   processGenericMessage(
-      *grpc_upstreams_[0], true,
-      [](const ProcessingRequest& req, ProcessingResponse& resp) {
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
         // Add something to the response so the message isn't seen as spurious
         envoy::service::ext_proc::v3::HeadersResponse headers_resp;
         *(resp.mutable_response_headers()) = headers_resp;
@@ -4745,10 +4741,9 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
 // uses the composite filter name to retrieve the ext_proc filter state values.
 TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
   std::string tunnel_access_log_path_;
-  initializeConfig(ConfigOptions{
-      // Use composite/ext_proc filter configuration.
-      .filter_setup =
-          ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders});
+  initializeConfig(
+      ConfigOptions{// Use composite/ext_proc filter configuration.
+                    .filter_setup = ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders});
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {

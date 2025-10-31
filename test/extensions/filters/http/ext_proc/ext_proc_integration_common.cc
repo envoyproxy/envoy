@@ -88,24 +88,22 @@ void ExtProcIntegrationTest::initializeConfig(
 
     std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
     switch (config_option.filter_setup) {
-      case ConfigOptions::FilterSetup::kNone:
-        break;
-      case ConfigOptions::FilterSetup::kDownstream: {
-        // Construct a configuration proto for our filter and then re-write it
-        // to JSON so that we can add it to the overall config
-        envoy::extensions::filters::network::http_connection_manager::v3::
-            HttpFilter ext_proc_filter;
-        ext_proc_filter.set_name(ext_proc_filter_name);
-        ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-        config_helper_.prependFilter(
-            MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
-      } break;
-      case ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders:
-        prependExtProcCompositeFilterMatchOnRequestHeaders();
-        break;
-      case ConfigOptions::FilterSetup::kCompositeMatchOnResponseHeaders:
-        prependExtProcCompositeFilterMatchOnResponseHeaders();
-        break;
+    case ConfigOptions::FilterSetup::kNone:
+      break;
+    case ConfigOptions::FilterSetup::kDownstream: {
+      // Construct a configuration proto for our filter and then re-write it
+      // to JSON so that we can add it to the overall config
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
+      ext_proc_filter.set_name(ext_proc_filter_name);
+      ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
+    } break;
+    case ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders:
+      prependExtProcCompositeFilterMatchOnRequestHeaders();
+      break;
+    case ConfigOptions::FilterSetup::kCompositeMatchOnResponseHeaders:
+      prependExtProcCompositeFilterMatchOnResponseHeaders();
+      break;
     }
 
     // Add set_metadata filter to inject dynamic metadata used for testing
@@ -850,80 +848,66 @@ void ExtProcIntegrationTest::serverSendTrailerRespDuplexStreamed() {
   processor_stream_->sendGrpcMessage(response_trailer);
 }
 
-void ExtProcIntegrationTest::
-    prependExtProcCompositeFilterMatchOnRequestHeaders() {
-  envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
-      composite_filter;
+void ExtProcIntegrationTest::prependExtProcCompositeFilterMatchOnRequestHeaders() {
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter composite_filter;
   composite_filter.set_name("composite");
 
-  envoy::extensions::common::matching::v3::ExtensionWithMatcher
-      extension_with_matcher;
+  envoy::extensions::common::matching::v3::ExtensionWithMatcher extension_with_matcher;
   auto* extension_config = extension_with_matcher.mutable_extension_config();
   extension_config->set_name("composite");
   envoy::extensions::filters::http::composite::v3::Composite composite_config;
   extension_config->mutable_typed_config()->PackFrom(composite_config);
 
-  auto* matcher_tree =
-      extension_with_matcher.mutable_xds_matcher()->mutable_matcher_tree();
+  auto* matcher_tree = extension_with_matcher.mutable_xds_matcher()->mutable_matcher_tree();
   auto* input = matcher_tree->mutable_input();
   input->set_name("request-headers");
   envoy::type::matcher::v3::HttpRequestHeaderMatchInput header_match_input;
   header_match_input.set_header_name("match-header");
   input->mutable_typed_config()->PackFrom(header_match_input);
 
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction
-      execute_filter_action;
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction execute_filter_action;
   auto* typed_config = execute_filter_action.mutable_typed_config();
   typed_config->set_name("envoy.filters.http.ext_proc");
   typed_config->mutable_typed_config()->PackFrom(proto_config_);
 
-  auto& on_match =
-      (*matcher_tree->mutable_exact_match_map()->mutable_map())["match"];
+  auto& on_match = (*matcher_tree->mutable_exact_match_map()->mutable_map())["match"];
   on_match.mutable_action()->set_name("composite-action");
-  on_match.mutable_action()->mutable_typed_config()->PackFrom(
-      execute_filter_action);
+  on_match.mutable_action()->mutable_typed_config()->PackFrom(execute_filter_action);
 
   composite_filter.mutable_typed_config()->PackFrom(extension_with_matcher);
-  config_helper_.prependFilter(
-      MessageUtil::getJsonStringFromMessageOrError(composite_filter), true);
+  config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(composite_filter),
+                               true);
 }
 
-void ExtProcIntegrationTest::
-    prependExtProcCompositeFilterMatchOnResponseHeaders() {
-  envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
-      composite_filter;
+void ExtProcIntegrationTest::prependExtProcCompositeFilterMatchOnResponseHeaders() {
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter composite_filter;
   composite_filter.set_name("composite");
 
-  envoy::extensions::common::matching::v3::ExtensionWithMatcher
-      extension_with_matcher;
+  envoy::extensions::common::matching::v3::ExtensionWithMatcher extension_with_matcher;
   auto* extension_config = extension_with_matcher.mutable_extension_config();
   extension_config->set_name("composite");
   envoy::extensions::filters::http::composite::v3::Composite composite_config;
   extension_config->mutable_typed_config()->PackFrom(composite_config);
 
-  auto* matcher_tree =
-      extension_with_matcher.mutable_xds_matcher()->mutable_matcher_tree();
+  auto* matcher_tree = extension_with_matcher.mutable_xds_matcher()->mutable_matcher_tree();
   auto* input = matcher_tree->mutable_input();
   input->set_name("response-headers");
   envoy::type::matcher::v3::HttpResponseHeaderMatchInput header_match_input;
   header_match_input.set_header_name("match-header");
   input->mutable_typed_config()->PackFrom(header_match_input);
 
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction
-      execute_filter_action;
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction execute_filter_action;
   auto* typed_config = execute_filter_action.mutable_typed_config();
   typed_config->set_name("envoy.filters.http.ext_proc");
   typed_config->mutable_typed_config()->PackFrom(proto_config_);
 
-  auto& on_match =
-      (*matcher_tree->mutable_exact_match_map()->mutable_map())["match"];
+  auto& on_match = (*matcher_tree->mutable_exact_match_map()->mutable_map())["match"];
   on_match.mutable_action()->set_name("composite-action");
-  on_match.mutable_action()->mutable_typed_config()->PackFrom(
-      execute_filter_action);
+  on_match.mutable_action()->mutable_typed_config()->PackFrom(execute_filter_action);
 
   composite_filter.mutable_typed_config()->PackFrom(extension_with_matcher);
-  config_helper_.prependFilter(
-      MessageUtil::getJsonStringFromMessageOrError(composite_filter), true);
+  config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(composite_filter),
+                               true);
 }
 
 } // namespace ExternalProcessing

@@ -87,27 +87,23 @@ public:
 class ExtProcIntegrationTest : public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 protected:
- enum class FilterSetup {
-   kDirect,
-   kCompositeMatchOnRequestHeaders,
-   kCompositeMatchOnResponseHeaders,
- };
+  enum class FilterSetup {
+    kDirect,
+    kCompositeMatchOnRequestHeaders,
+    kCompositeMatchOnResponseHeaders,
+  };
 
- ExtProcIntegrationTest()
-     : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
+  ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
- void createUpstreams() override;
+  void createUpstreams() override;
 
- void TearDown() override;
+  void TearDown() override;
 
- void initializeConfig(
-     ConfigOptions config_option = {},
-     const std::vector<std::pair<int, int>>& cluster_endpoints = {{0, 1},
-                                                                  {1, 1}});
+  void initializeConfig(ConfigOptions config_option = {},
+                        const std::vector<std::pair<int, int>>& cluster_endpoints = {{0, 1},
+                                                                                     {1, 1}});
 
- bool IsEnvoyGrpc() {
-   return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc;
- }
+  bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
   void setPerRouteConfig(Route* route, const ExtProcPerRoute& cfg);
   void setPerHostConfig(VirtualHost& vh, const ExtProcPerRoute& cfg);

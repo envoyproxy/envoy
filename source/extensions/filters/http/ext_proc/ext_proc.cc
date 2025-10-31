@@ -1439,8 +1439,7 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
   }
 
   auto activation_ptr = Filters::Common::Expr::createActivation(
-      &config_->expressionManager().localInfo(),
-      state.callbacks()->streamInfo(),
+      &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
       state.callbacks()->streamInfo().getRequestHeaders(),
       dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
       dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
