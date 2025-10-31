@@ -2,7 +2,6 @@
 
 #include "envoy/http/header_map.h"
 
-#include "processing_effect.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"

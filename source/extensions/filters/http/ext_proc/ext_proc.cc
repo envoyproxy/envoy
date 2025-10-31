@@ -1,5 +1,4 @@
 #include "ext_proc.h"
-#include "processor_state.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include <functional>
