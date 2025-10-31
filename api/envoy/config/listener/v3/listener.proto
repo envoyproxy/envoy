@@ -131,9 +131,8 @@ message Listener {
   }
 
   message AccessLogOptions {
-    // If set to true, the access log is flushed when a TCP connection starts, after the
-    // transport socket successfully connected.
-    bool flush_access_log_on_connected = 1;
+    // If set to true, the access log is flushed when a TCP connection starts.
+    bool flush_on_start = 1;
   }
 
   reserved 14, 23;
@@ -363,9 +362,11 @@ message Listener {
   //   is warned similar to macOS. It is left enabled for UDP with undefined behavior currently.
   google.protobuf.BoolValue enable_reuse_port = 29;
 
-  // Configuration for :ref:`access logs <arch_overview_access_logs>` emitted by this listener. By default, the log is
-  // flushed at the end of the TCP connections. See :ref:`access_log_options
-  // <envoy_v3_api_field_config.listener.v3.Listener.access_log_options>` for configuring when the log is flushed.
+  // Configuration for :ref:`access logs <arch_overview_access_logs>` emitted by this listener. By
+  // default, the log is flushed at the end of the TCP connections, or when the TCP connection is
+  // not established. See :ref:`access_log_options
+  // <envoy_v3_api_field_config.listener.v3.Listener.access_log_options>` for additional
+  // configuration.
   repeated accesslog.v3.AccessLog access_log = 22;
 
   // Additional access log options for the listener.

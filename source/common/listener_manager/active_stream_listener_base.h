@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
@@ -30,7 +31,8 @@ class ActiveStreamListenerBase : public ActiveListenerImplBase,
 public:
   ActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
                            Network::ListenerPtr&& listener, Network::ListenerConfig& config);
-  static void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info);
+  static void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info,
+                       AccessLog::AccessLogType access_log_type);
 
   Event::Dispatcher& dispatcher() { return dispatcher_; }
 
@@ -102,7 +104,8 @@ public:
       if (!active_socket->connected()) {
         // If active_socket is about to be destructed, emit logs if a connection is not created.
         if (active_socket->streamInfo() != nullptr) {
-          emitLogs(*config_, *active_socket->streamInfo());
+          emitLogs(*config_, *active_socket->streamInfo(), AccessLog::AccessLogType::NotConnected);
+          ;
         } else {
           // If the active_socket is not connected, this socket is not promoted to active
           // connection. Thus the stream_info_ is owned by this active socket.

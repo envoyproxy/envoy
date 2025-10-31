@@ -966,6 +966,7 @@ private:
     const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
       return empty_access_logs_;
     }
+    bool flushAccessLogsOnStart() const override { return false; }
     const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
       return listener_info_;
     }

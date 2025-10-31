@@ -17,10 +17,15 @@ ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& p
       listener_(std::move(listener)), dispatcher_(dispatcher) {}
 
 void ActiveStreamListenerBase::emitLogs(Network::ListenerConfig& config,
-                                        StreamInfo::StreamInfo& stream_info) {
-  stream_info.onRequestComplete();
+                                        StreamInfo::StreamInfo& stream_info,
+                                        AccessLog::AccessLogType access_log_type) {
+  if (access_log_type == AccessLog::AccessLogType::NotConnected ||
+      access_log_type == AccessLog::AccessLogType::TcpConnectionEnd) {
+    stream_info.onRequestComplete();
+  }
+  const Formatter::Context log_context{nullptr, nullptr, nullptr, {}, access_log_type};
   for (const auto& access_log : config.accessLogs()) {
-    access_log->log({}, stream_info);
+    access_log->log(log_context, stream_info);
   }
 }
 
@@ -35,7 +40,7 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
     stats_.no_filter_chain_match_.inc();
     stream_info->setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
     stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
-    emitLogs(*config_, *stream_info);
+    emitLogs(*config_, *stream_info, AccessLog::AccessLogType::NotConnected);
     socket->close();
     return;
   }
@@ -93,10 +98,15 @@ ActiveTcpConnection::ActiveTcpConnection(ActiveConnections& active_connections,
   // been incremented at this point either via the connection balancer or in the socket accept
   // path if there is no configured balancer.
   listener.parent_.incNumConnections();
+  if (listener.config_->flushAccessLogsOnStart()) {
+    ActiveStreamListenerBase::emitLogs(*listener.config_, *stream_info_,
+                                       AccessLog::AccessLogType::TcpConnectionStart);
+  }
 }
 
 ActiveTcpConnection::~ActiveTcpConnection() {
-  ActiveStreamListenerBase::emitLogs(*active_connections_.listener_.config_, *stream_info_);
+  ActiveStreamListenerBase::emitLogs(*active_connections_.listener_.config_, *stream_info_,
+                                     AccessLog::AccessLogType::TcpConnectionEnd);
   auto& listener = active_connections_.listener_;
   listener.stats_.downstream_cx_active_.dec();
   listener.stats_.downstream_cx_destroy_.inc();

@@ -463,7 +463,8 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, UsageOfInjectDataMethodsShouldBe
 }
 
 TEST_P(InjectDataWithEchoFilterIntegrationTest, FilterChainMismatch) {
-  useListenerAccessLog("%FILTER_CHAIN_NAME% %RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  useListenerAccessLog(
+      "%ACCESS_LOG_TYPE% %FILTER_CHAIN_NAME% %RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_static_resources()
         ->mutable_listeners(0)
@@ -477,7 +478,8 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, FilterChainMismatch) {
   ASSERT_TRUE(tcp_client->write("hello", false, false));
 
   std::string access_log =
-      absl::StrCat("- ", // No filter chain is selected, print dash instead.
+      absl::StrCat("NotConnected ", // No TCP connection started.
+                   "- ",            // No filter chain is selected, print dash instead.
                    "NR ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr(access_log));
   tcp_client->waitForDisconnect();

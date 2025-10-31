@@ -278,6 +278,11 @@ public:
   virtual const AccessLog::InstanceSharedPtrVector& accessLogs() const PURE;
 
   /**
+   * @return bool whether the access logs are flushed when the TCP connection starts.
+   */
+  virtual bool flushAccessLogsOnStart() const PURE;
+
+  /**
    * @return pending connection backlog for TCP listeners.
    */
   virtual uint32_t tcpBacklogSize() const PURE;

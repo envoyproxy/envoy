@@ -36,6 +36,7 @@ enum AccessLogType {
   NotSet = 0;
   TcpUpstreamConnected = 1;
   TcpPeriodic = 2;
+  TcpConnectionStart = 14;
   TcpConnectionEnd = 3;
   DownstreamStart = 4;
   DownstreamPeriodic = 5;
@@ -47,6 +48,7 @@ enum AccessLogType {
   UdpTunnelUpstreamConnected = 11;
   UdpPeriodic = 12;
   UdpSessionEnd = 13;
+  NotConnected = 15;
 }
 
 message TCPAccessLogEntry {

@@ -320,6 +320,7 @@ public:
   }
   ResourceLimit& openConnections() override { return *open_connections_; }
   const AccessLog::InstanceSharedPtrVector& accessLogs() const override { return access_logs_; }
+  bool flushAccessLogsOnStart() const override { return flush_logs_on_start_; }
   uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
   uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
     return max_connections_to_accept_per_socket_event_;
@@ -484,6 +485,7 @@ private:
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;
   const bool reuse_port_;
+  const bool flush_logs_on_start_;
 
   // Per-listener connection limits are only specified via runtime.
   //

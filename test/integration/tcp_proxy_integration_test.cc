@@ -381,9 +381,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
   std::string access_log_path = TestEnvironment::temporaryPath(
       fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
                   TestUtility::uniqueFilename()));
-  useListenerAccessLog();
+  useListenerAccessLog("%ACCESS_LOG_TYPE% ");
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_access_log_options()->set_flush_on_start(true);
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
@@ -458,6 +459,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
                                        "UPSTREAM_WIRE_BYTES_RECEIVED=5"
                                        "\r?.*",
                                        ip_port_regex, ip_regex)));
+
+  auto listener_log_result = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(listener_log_result, MatchesRegex(fmt::format("TcpConnectionStart TcpConnectionEnd "
+                                                            "\r?.*")));
 }
 
 // Verifies that access log value for `UPSTREAM_TRANSPORT_FAILURE_REASON` matches the failure
