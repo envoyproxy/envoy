@@ -99,14 +99,12 @@ void ExtProcIntegrationTest::initializeConfig(
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
     } break;
     case ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders: {
-      envoy::type::matcher::v3::HttpRequestHeaderMatchInput
-        request_match_input;
+      envoy::type::matcher::v3::HttpRequestHeaderMatchInput request_match_input;
       request_match_input.set_header_name("match-header");
       prependExtProcCompositeFilter(request_match_input);
     } break;
     case ConfigOptions::FilterSetup::kCompositeMatchOnResponseHeaders: {
-      envoy::type::matcher::v3::HttpResponseHeaderMatchInput
-        response_match_input;
+      envoy::type::matcher::v3::HttpResponseHeaderMatchInput response_match_input;
       response_match_input.set_header_name("match-header");
       prependExtProcCompositeFilter(response_match_input);
     } break;
