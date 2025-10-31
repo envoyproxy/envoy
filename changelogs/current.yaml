@@ -49,6 +49,12 @@ bug_fixes:
     Fixed a bug where Envoy would leak memory if an HTTP/2 stream was reset before request headers were
     sent. For example, if an upstream HTTP filter sent a local reply after the connection was established but
     before request headers were sent, the memory allocated for the stream was not released.
+- area: http2
+  change: |
+    Optimized HTTP/2 header processing by avoiding memory allocations and string copies for well-known header names.
+    For common HTTP/2 headers (such as ``:method``, ``:path``, ``:status``, ``content-type``, ``user-agent``, etc.),
+    Envoy now references static strings instead of copying header names. This reduces memory allocations and improves
+    performance for typical HTTP/2 traffic.
 - area: lua
   change: |
     Fixed a bug where Lua filters could cause Envoy to crash when setting the response body to a payload larger
@@ -72,6 +78,10 @@ bug_fixes:
     Fixed per-route configuration for composite filter to support matching on response headers and trailers.
     Previously, per-route matchers would silently fail when attempting to match on ``HttpResponseHeaderMatchInput``
     or ``HttpResponseTrailerMatchInput``, causing the delegated filter to be skipped without error.
+- area: dns
+  change: |
+    c-ares resolver: add optional ``reinit_channel_on_timeout`` to reinitialize
+    the resolver after DNS timeouts.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

@@ -61,7 +61,7 @@ DnsResolverImpl::DnsResolverImpl(
               ? std::chrono::milliseconds(Protobuf::util::TimeUtil::DurationToMilliseconds(
                     config.max_udp_channel_duration()))
               : std::chrono::milliseconds::zero()),
-      resolvers_csv_(resolvers_csv),
+      reinit_channel_on_timeout_(config.reinit_channel_on_timeout()), resolvers_csv_(resolvers_csv),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
   AresOptions options = defaultAresOptions();
@@ -252,7 +252,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     // If c-ares returns ARES_ECONNREFUSED and there is no fallback we assume that the channel_ is
     // broken and hence we reinitialize it here.
     if (status == ARES_ECONNREFUSED || status == ARES_EREFUSED || status == ARES_ESERVFAIL ||
-        status == ARES_ENOTIMP) {
+        status == ARES_ENOTIMP || (status == ARES_ETIMEOUT && parent_.reinit_channel_on_timeout_)) {
       parent_.reinitializeChannel();
     }
   }
