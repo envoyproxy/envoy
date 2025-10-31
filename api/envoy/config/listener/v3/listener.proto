@@ -363,8 +363,9 @@ message Listener {
   //   is warned similar to macOS. It is left enabled for UDP with undefined behavior currently.
   google.protobuf.BoolValue enable_reuse_port = 29;
 
-  // Configuration for :ref:`access logs <arch_overview_access_logs>`
-  // emitted by this listener.
+  // Configuration for :ref:`access logs <arch_overview_access_logs>` emitted by this listener. By default, the log is
+  // flushed at the end of the TCP connections. See :ref:`access_log_options
+  // <envoy_v3_api_field_config.listener.v3.Listener.access_log_options>` for configuring when the log is flushed.
   repeated accesslog.v3.AccessLog access_log = 22;
 
   // Additional access log options for the listener.
