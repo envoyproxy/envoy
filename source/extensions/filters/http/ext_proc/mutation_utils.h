@@ -34,11 +34,13 @@ public:
   applyHeaderMutations(const envoy::service::ext_proc::v3::HeaderMutation& mutation,
                        Http::HeaderMap& headers, bool replacing_message,
                        const Filters::Common::MutationRules::Checker& rule_checker,
-                       Stats::Counter& rejected_mutations, ProcessingEffect::Effect& effect, bool remove_content_length = false);
+                       Stats::Counter& rejected_mutations, ProcessingEffect::Effect& effect,
+                       bool remove_content_length = false);
 
   // Modify a buffer based on a set of mutations from a protobuf
-  static ProcessingEffect::Effect applyBodyMutations(const envoy::service::ext_proc::v3::BodyMutation& mutation,
-                                 Buffer::Instance& buffer);
+  static ProcessingEffect::Effect
+  applyBodyMutations(const envoy::service::ext_proc::v3::BodyMutation& mutation,
+                     Buffer::Instance& buffer);
 
   // Determine if a particular HTTP status code is valid.
   static bool isValidHttpStatus(int code);

@@ -149,9 +149,8 @@ public:
 
   void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                             CallbackState callback_state);
-  void
-  onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
-                        CallbackState next_state = CallbackState::Idle);
+  void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
+                             CallbackState next_state = CallbackState::Idle);
   void logMutation(CallbackState callback_state, ProcessingEffect::Effect processing_effect);
   void stopMessageTimer();
   bool restartMessageTimer(const uint32_t message_timeout_ms);
@@ -297,7 +296,8 @@ private:
       const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
-  processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response, ProcessingEffect::Effect& processing_effect);
+  processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response,
+                        ProcessingEffect::Effect& processing_effect);
   void clearStreamingChunk() { chunk_queue_.clear(); }
   CallbackState getCallbackStateAfterHeaderResp(
       const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
@@ -393,7 +393,8 @@ private:
    *         or an error status on failure
    */
   absl::Status processHeaderMutationIfAvailable(
-      const envoy::service::ext_proc::v3::CommonResponse& common_response, ProcessingEffect::Effect& effect);
+      const envoy::service::ext_proc::v3::CommonResponse& common_response,
+      ProcessingEffect::Effect& effect);
 
   /**
    * Validates content length against body mutation size. Content-length header is only
@@ -413,7 +414,8 @@ private:
    * @param common_response The common response containing body mutations to apply
    */
   void
-  applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response, ProcessingEffect::Effect& effect);
+  applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response,
+                            ProcessingEffect::Effect& effect);
 
   /**
    * Finalizes body response processing by handling trailers and continuation.

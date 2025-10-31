@@ -288,17 +288,16 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
 }
 
-void ExtProcLoggingInfo::recordGrpcCall(std::chrono::microseconds latency,
-                                        Grpc::Status::GrpcStatus call_status,
-                                        ProcessorState::CallbackState callback_state,
-                                        envoy::config::core::v3::TrafficDirection traffic_direction) {
+void ExtProcLoggingInfo::recordGrpcCall(
+    std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
+    ProcessorState::CallbackState callback_state,
+    envoy::config::core::v3::TrafficDirection traffic_direction) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
 
   // Record the gRPC call stats for the header.
   if (callback_state == ProcessorState::CallbackState::HeadersCallback) {
     if (grpcCalls(traffic_direction).header_stats_ == nullptr) {
-      grpcCalls(traffic_direction).header_stats_ =
-          std::make_unique<GrpcCall>(latency, call_status);
+      grpcCalls(traffic_direction).header_stats_ = std::make_unique<GrpcCall>(latency, call_status);
     }
     return;
   }
@@ -314,8 +313,8 @@ void ExtProcLoggingInfo::recordGrpcCall(std::chrono::microseconds latency,
 
   // Record the gRPC call stats for the bodies.
   if (grpcCalls(traffic_direction).body_stats_ == nullptr) {
-    grpcCalls(traffic_direction).body_stats_ = std::make_unique<GrpcCallBody>(
-        1, call_status, latency, latency, latency);
+    grpcCalls(traffic_direction).body_stats_ =
+        std::make_unique<GrpcCallBody>(1, call_status, latency, latency, latency);
   } else {
     auto& body_stats = grpcCalls(traffic_direction).body_stats_;
     body_stats->call_count_++;
@@ -346,46 +345,62 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
-ProcessingEffect::Effect updateProcessingEffect(ProcessingEffect::Effect current_effect, ProcessingEffect::Effect new_effect) {
-    if (new_effect == ProcessingEffect::Effect::None) {
-        // Do nothing. Default value is None and we want to log the most recent effect that is not none.
-        return current_effect;
+// Handles the potential cases on when to update the effect field.
+// This is needed for body_send_mode = Buffered.
+ProcessingEffect::Effect updateProcessingEffect(ProcessingEffect::Effect current_effect,
+                                                ProcessingEffect::Effect new_effect) {
+  if (new_effect == ProcessingEffect::Effect::None) {
+    // Do nothing. Default value is None and we want to log the most recent effect that is not none.
+    return current_effect;
+  }
+  switch (current_effect) {
+  case ProcessingEffect::Effect::None:
+    return new_effect;
+  case ProcessingEffect::Effect::PartialMutationsApplied:
+    // Do not update as partial mutation and rejection is already set.
+    return current_effect;
+  case ProcessingEffect::Effect::MutationApplied:
+    if (new_effect != ProcessingEffect::Effect::MutationApplied) {
+      return ProcessingEffect::Effect::PartialMutationsApplied;
     }
-    switch(current_effect){
-        case ProcessingEffect::Effect::None:
-            return new_effect;
-        case ProcessingEffect::Effect::PartialMutationsApplied:
-            // Do not update as partial mutation and rejection is already set.
-            return current_effect;
-        case ProcessingEffect::Effect::MutationApplied:
-            if (new_effect != ProcessingEffect::Effect::MutationApplied){
-                return ProcessingEffect::Effect::PartialMutationsApplied;
-            }
-            return current_effect;
-        default:
-            // Fall through for all failures.
-            if (new_effect == ProcessingEffect::Effect::MutationApplied){
-                return ProcessingEffect::Effect::PartialMutationsApplied;
-            }
-            return current_effect;
+    return current_effect;
+  default:
+    // Fall through for all failures.
+    if (new_effect == ProcessingEffect::Effect::MutationApplied) {
+      return ProcessingEffect::Effect::PartialMutationsApplied;
     }
+    return current_effect;
+  }
 }
 
-void ExtProcLoggingInfo::recordProcessingEffect(ProcessorState::CallbackState callback_state,
-                                        envoy::config::core::v3::TrafficDirection traffic_direction, ProcessingEffect::Effect processing_effect){
-   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
-   switch (callback_state){
-      case ProcessorState::CallbackState::HeadersCallback:
-        processingEffects(traffic_direction).header_effect_ = updateProcessingEffect(processingEffects(traffic_direction).header_effect_, processing_effect);
-        break;
-      case ProcessorState::CallbackState::TrailersCallback:
-        processingEffects(traffic_direction).trailer_effect_ = updateProcessingEffect(processingEffects(traffic_direction).trailer_effect_, processing_effect);
-        break;
-      default:
-        // Fall through for body callbacks
-        processingEffects(traffic_direction).body_effect_ = updateProcessingEffect(processingEffects(traffic_direction).body_effect_, processing_effect);
-        break;
-   }
+void ExtProcLoggingInfo::recordProcessingEffect(
+    ProcessorState::CallbackState callback_state,
+    envoy::config::core::v3::TrafficDirection traffic_direction,
+    ProcessingEffect::Effect processing_effect) {
+  ASSERT(callback_state != ProcessorState::CallbackState::Idle);
+  switch (callback_state) {
+  case ProcessorState::CallbackState::HeadersCallback:
+    processingEffects(traffic_direction).header_effect_ = updateProcessingEffect(
+        processingEffects(traffic_direction).header_effect_, processing_effect);
+    break;
+  case ProcessorState::CallbackState::TrailersCallback:
+    processingEffects(traffic_direction).trailer_effect_ = updateProcessingEffect(
+        processingEffects(traffic_direction).trailer_effect_, processing_effect);
+    break;
+  default:
+    // Fall through for body callbacks
+    processingEffects(traffic_direction).body_effect_ = updateProcessingEffect(
+        processingEffects(traffic_direction).body_effect_, processing_effect);
+    break;
+  }
+}
+
+const ExtProcLoggingInfo::ProcessingEffects& ExtProcLoggingInfo::processingEffects(
+    envoy::config::core::v3::TrafficDirection traffic_direction) const {
+  ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+  return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
+             ? decoding_processor_effects_
+             : encoding_processor_effects_;
 }
 
 ExtProcLoggingInfo::ProcessingEffects&
@@ -473,9 +488,9 @@ absl::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
   parts.reserve(8);
 
   if (decoding_processor_grpc_calls_.header_stats_) {
-    parts.push_back(absl::StrCat(
-        "rh:", decoding_processor_grpc_calls_.header_stats_->latency_.count(), ":",
-        static_cast<int>(decoding_processor_grpc_calls_.header_stats_->call_status_)));
+    parts.push_back(
+        absl::StrCat("rh:", decoding_processor_grpc_calls_.header_stats_->latency_.count(), ":",
+                     static_cast<int>(decoding_processor_grpc_calls_.header_stats_->call_status_)));
   }
   if (decoding_processor_grpc_calls_.body_stats_) {
     parts.push_back(absl::StrCat(
@@ -489,9 +504,9 @@ absl::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
         static_cast<int>(decoding_processor_grpc_calls_.trailer_stats_->call_status_)));
   }
   if (encoding_processor_grpc_calls_.header_stats_) {
-    parts.push_back(absl::StrCat(
-        "sh:", encoding_processor_grpc_calls_.header_stats_->latency_.count(), ":",
-        static_cast<int>(encoding_processor_grpc_calls_.header_stats_->call_status_)));
+    parts.push_back(
+        absl::StrCat("sh:", encoding_processor_grpc_calls_.header_stats_->latency_.count(), ":",
+                     static_cast<int>(encoding_processor_grpc_calls_.header_stats_->call_status_)));
   }
   if (encoding_processor_grpc_calls_.body_stats_) {
     parts.push_back(absl::StrCat(

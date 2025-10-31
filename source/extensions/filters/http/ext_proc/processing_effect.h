@@ -19,11 +19,18 @@ public:
     // This is the dafualt value for body requests/responses using
     // FULL_DUPLEX_STREAMED processing mode.
     MutationApplied,
-    // The processor response sent a mutation that was attempted to modify the body or headers but
-    // was not applied due to failure or ignored.
+    // The processor response sent a mutation that was attempted to modify the headers or trailers
+    // but was not applied due to invalid name or value.
     InvalidMutationRejected,
+    // The processor response sent a mutation that was attempted to modify the headers or trailers
+    // but was not applied due to size limit exceeded.
     MutationRejectedSizeLimitExceeded,
+    // The processor response sent a mutation that was attempted to modify the headers or trailers
+    // but was not applied due to failure.
     MutationFailed,
+    // Some mutations were applied while other mutations were rejected.
+    // This can arise when multiple GRPC messages attempt to mutate the same part of the HTTP
+    // request/repsonse.
     PartialMutationsApplied,
   };
 };

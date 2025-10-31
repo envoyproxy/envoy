@@ -137,7 +137,8 @@ absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& hea
 absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                                                  Http::HeaderMap& headers, bool replacing_message,
                                                  const Checker& checker,
-                                                 Counter& rejected_mutations, ProcessingEffect::Effect& effect,
+                                                 Counter& rejected_mutations,
+                                                 ProcessingEffect::Effect& effect,
                                                  bool remove_content_length) {
   // Check whether the remove_headers or set_headers size exceed the HTTP connection manager limit.
   // Reject the mutation and return error status if either one does.
@@ -160,16 +161,14 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     }
     const LowerCaseString remove_header(hdr);
     switch (checker.check(CheckOperation::REMOVE, remove_header, "")) {
-    case CheckResult::OK:
-      {
+    case CheckResult::OK: {
       ENVOY_LOG(trace, "Removing header {}", remove_header);
       // int removals;
       int removals = headers.remove(remove_header);
-      if (removals > 0){
+      if (removals > 0) {
         effect = ProcessingEffect::Effect::MutationApplied;
       }
-      }
-      break;
+    } break;
     case CheckResult::IGNORE:
       ENVOY_LOG(debug, "Header {} may not be removed per rules", remove_header);
       rejected_mutations.inc();
@@ -247,13 +246,14 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
 
   // After header mutation, check the ending headers are not exceeding the HCM limit.
   auto status = headerMutationResultCheck(headers, rejected_mutations);
-  if (!status.ok()){
+  if (!status.ok()) {
     effect = ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded;
   }
   return status;
 }
 
-ProcessingEffect::Effect MutationUtils::applyBodyMutations(const BodyMutation& mutation, Buffer::Instance& buffer) {
+ProcessingEffect::Effect MutationUtils::applyBodyMutations(const BodyMutation& mutation,
+                                                           Buffer::Instance& buffer) {
   switch (mutation.mutation_case()) {
   case BodyMutation::MutationCase::kClearBody:
     if (mutation.clear_body()) {

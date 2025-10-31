@@ -78,7 +78,7 @@ public:
                  const std::chrono::microseconds max_latency,
                  const std::chrono::microseconds min_latency)
         : call_count_(call_count), last_call_status_(call_status), total_latency_(total_latency),
-          max_latency_(max_latency), min_latency_(min_latency){}
+          max_latency_(max_latency), min_latency_(min_latency) {}
     uint32_t call_count_;
     Grpc::Status::GrpcStatus last_call_status_;
     std::chrono::microseconds total_latency_;
@@ -92,7 +92,7 @@ public:
     std::unique_ptr<GrpcCallBody> body_stats_;
   };
 
-  struct ProcessingEffects{
+  struct ProcessingEffects {
     ProcessingEffect::Effect header_effect_;
     ProcessingEffect::Effect body_effect_;
     ProcessingEffect::Effect trailer_effect_;
@@ -104,7 +104,8 @@ public:
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
   void recordProcessingEffect(ProcessorState::CallbackState callback_state,
-                                        envoy::config::core::v3::TrafficDirection traffic_direction, ProcessingEffect::Effect processing_effect);
+                              envoy::config::core::v3::TrafficDirection traffic_direction,
+                              ProcessingEffect::Effect processing_effect);
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
@@ -130,6 +131,8 @@ public:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
+  const ProcessingEffects&
+  processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
 
@@ -146,7 +149,7 @@ private:
   ProcessingEffects& processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction);
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
-  ProcessingEffects encoding_processor_effects_ {};
+  ProcessingEffects encoding_processor_effects_{};
   ProcessingEffects decoding_processor_effects_{};
   const Envoy::Protobuf::Struct filter_metadata_;
   // The following stats are populated for ext_proc filters using Envoy gRPC only.
@@ -546,8 +549,7 @@ private:
   void closeStream();
   void halfCloseAndWaitForRemoteClose();
 
-  void onFinishProcessorCalls(
-      Grpc::Status::GrpcStatus call_status);
+  void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
   void clearAsyncState(Grpc::Status::GrpcStatus call_status = Grpc::Status::Aborted);
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 
