@@ -989,7 +989,7 @@ pub trait EnvoyHttpFilter {
   ///   }
   /// }
   /// ```
-  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler>;
+  fn new_scheduler(&self) -> impl EnvoyHttpFilterScheduler + 'static;
 
   /// Increment the counter with the given id.
   fn increment_counter(
@@ -1661,13 +1661,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler> {
+  fn new_scheduler(&self) -> impl EnvoyHttpFilterScheduler + 'static {
     unsafe {
       let scheduler_ptr =
         abi::envoy_dynamic_module_callback_http_filter_scheduler_new(self.raw_ptr);
-      Box::new(EnvoyHttpFilterSchedulerImpl {
+      EnvoyHttpFilterSchedulerImpl {
         raw_ptr: scheduler_ptr,
-      })
+      }
     }
   }
 
@@ -2036,6 +2036,14 @@ impl EnvoyHttpFilterScheduler for EnvoyHttpFilterSchedulerImpl {
     unsafe {
       abi::envoy_dynamic_module_callback_http_filter_scheduler_commit(self.raw_ptr, event_id);
     }
+  }
+}
+
+// Box<dyn EnvoyHttpFilterScheduler> is returned by mockall, so we need to implement
+// EnvoyHttpFilterScheduler for it as well.
+impl EnvoyHttpFilterScheduler for Box<dyn EnvoyHttpFilterScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
   }
 }
 
