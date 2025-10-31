@@ -60,7 +60,7 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
 
 * The HTTP connection manager :ref:`drain_timeout
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`
-  is the time that Envoy will wait between sending an initial HTTP/2 "shutdown notification" (GOAWAY frame
+  is the time that Envoy will wait between sending an initial HTTP/2 "shutdown notification" (``GOAWAY`` frame
   with max stream ID) and a final GOAWAY frame. This grace period allows in-flight requests to be assigned
   stream IDs and prevents a race with the final GOAWAY frame. During this grace period, Envoy will continue
   to accept new streams. After the grace period elapses, a final GOAWAY frame is sent and Envoy will start
