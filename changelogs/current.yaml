@@ -82,6 +82,11 @@ bug_fixes:
   change: |
     c-ares resolver: add optional ``reinit_channel_on_timeout`` to reinitialize
     the resolver after DNS timeouts.
+- area: admin
+  change: |
+    Fixed admin ``/listeners`` endpoint to include network namespace filepath in socket addresses.
+    Previously, listeners in non-default network namespaces would return addresses without the namespace
+    information.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

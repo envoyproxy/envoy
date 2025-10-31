@@ -558,6 +558,15 @@ TEST(NetworkUtility, ParseProtobufAddress) {
   }
   {
     envoy::config::core::v3::Address proto_address;
+    proto_address.mutable_socket_address()->set_address("::1");
+    proto_address.mutable_socket_address()->set_port_value(1234);
+    proto_address.mutable_socket_address()->set_network_namespace_filepath("/proc/test-ns/ns/net");
+    EXPECT_EQ("[::1]:1234", Utility::protobufAddressToAddressNoThrow(proto_address)->asString());
+    EXPECT_EQ("/proc/test-ns/ns/net",
+              Utility::protobufAddressToAddressNoThrow(proto_address)->networkNamespace().value());
+  }
+  {
+    envoy::config::core::v3::Address proto_address;
     proto_address.mutable_pipe()->set_path("/tmp/unix-socket");
     EXPECT_EQ("/tmp/unix-socket",
               Utility::protobufAddressToAddressNoThrow(proto_address)->asString());
@@ -602,6 +611,15 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
     EXPECT_TRUE(proto_address.has_envoy_internal_address());
     EXPECT_EQ("internal_address", proto_address.envoy_internal_address().server_listener_name());
     EXPECT_EQ("endpoint_id", proto_address.envoy_internal_address().endpoint_id());
+  }
+  {
+    envoy::config::core::v3::Address proto_address;
+    Address::Ipv6Instance address("::1", 1234, nullptr, true, "/proc/1234/ns/net");
+    Utility::addressToProtobufAddress(address, proto_address);
+    EXPECT_TRUE(proto_address.has_socket_address());
+    EXPECT_EQ("::1", proto_address.socket_address().address());
+    EXPECT_EQ(1234, proto_address.socket_address().port_value());
+    EXPECT_EQ("/proc/1234/ns/net", proto_address.socket_address().network_namespace_filepath());
   }
 }
 
