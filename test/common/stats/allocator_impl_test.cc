@@ -72,7 +72,6 @@ TEST_F(AllocatorImplTest, CountersWithUpDown) {
 
   c1->dec();
   EXPECT_TRUE(c1->used());
-  LOG(INFO) << "c1->value(): " << c1->value();
   EXPECT_EQ(-1, c1->value());
   c1->dec();
   EXPECT_EQ(-2, c1->value());
