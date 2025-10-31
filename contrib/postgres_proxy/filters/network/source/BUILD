@@ -32,6 +32,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         "//contrib/common/sqlutils/source:sqlutils_lib",
+        "//contrib/postgres/protocol:postgres_protocol_lib",
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",

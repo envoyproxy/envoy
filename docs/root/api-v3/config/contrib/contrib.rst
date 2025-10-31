@@ -13,6 +13,7 @@ Contrib extensions
   hyperscan/matcher
   hyperscan/regex_engine
   dlb/dlb
+  postgres/postgres
   qat/qat
   http_tcp_bridge/http_tcp_bridge
   tap_sinks/tap_sinks

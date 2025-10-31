@@ -63,6 +63,11 @@ envoy.filters.network.postgres_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
+envoy.filters.listener.postgres_inspector:
+  categories:
+  - envoy.filters.listener
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
 envoy.filters.network.sip_proxy:
   categories:
   - envoy.filters.network

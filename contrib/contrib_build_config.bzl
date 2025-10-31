@@ -30,6 +30,12 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
 
     #
+    # Listener filters
+    #
+
+    "envoy.filters.listener.postgres_inspector":                "//contrib/postgres_inspector/filters/listener/source:config",
+
+    #
     # Sip proxy
     #
 
