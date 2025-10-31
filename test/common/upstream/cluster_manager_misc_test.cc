@@ -993,6 +993,163 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
   expectSetsockoptSoKeepalive(7, 4, 1);
 }
 
+// Tests for cluster-level `TCP_NOTSENT_LOWAT` configuration.
+class TcpNotsentLowatTest : public ClusterManagerImplTest {
+public:
+  void initialize(const std::string& yaml) { create(parseBootstrapFromV3Yaml(yaml)); }
+
+  void TearDown() override { factory_.tls_.shutdownThread(); }
+
+  void expectSetsSockoptTcpNotsentLowat(uint32_t lowat_bytes) {
+    if (!ENVOY_SOCKET_TCP_NOTSENT_LOWAT.hasValue()) {
+      EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+          .WillOnce(
+              Invoke([this](Network::Address::InstanceConstSharedPtr,
+                            Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                            const Network::ConnectionSocket::OptionsSharedPtr& options)
+                         -> Network::ClientConnection* {
+                EXPECT_NE(nullptr, options.get());
+                NiceMock<Network::MockConnectionSocket> socket;
+                EXPECT_FALSE((Network::Socket::applyOptions(
+                    options, socket, envoy::config::core::v3::SocketOption::STATE_BOUND)));
+                return connection_;
+              }));
+      cluster_manager_->getThreadLocalCluster("TcpNotsentLowatCluster")->tcpConn(nullptr);
+      return;
+    }
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+        .WillOnce(Invoke([this, lowat_bytes](
+                             Network::Address::InstanceConstSharedPtr,
+                             Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                             const Network::ConnectionSocket::OptionsSharedPtr& options)
+                             -> Network::ClientConnection* {
+          EXPECT_NE(nullptr, options.get());
+          NiceMock<Network::MockConnectionSocket> socket;
+          EXPECT_CALL(socket,
+                      setSocketOption(ENVOY_SOCKET_TCP_NOTSENT_LOWAT.level(),
+                                      ENVOY_SOCKET_TCP_NOTSENT_LOWAT.option(), _, sizeof(uint32_t)))
+              .WillOnce(Invoke(
+                  [lowat_bytes](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+                    EXPECT_EQ(lowat_bytes, *static_cast<const uint32_t*>(optval));
+                    return {0, 0};
+                  }));
+          EXPECT_TRUE((Network::Socket::applyOptions(
+              options, socket, envoy::config::core::v3::SocketOption::STATE_BOUND)));
+          return connection_;
+        }));
+    auto conn_data =
+        cluster_manager_->getThreadLocalCluster("TcpNotsentLowatCluster")->tcpConn(nullptr);
+    EXPECT_EQ(connection_, conn_data.connection_.get());
+  }
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+};
+
+TEST_F(TcpNotsentLowatTest, TcpNotsentLowatUnset) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: TcpNotsentLowatCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: TcpNotsentLowatCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+  )EOF";
+  initialize(yaml);
+  // Without `tcp_notsent_lowat` set, the option should not be applied.
+  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillOnce(Invoke(
+          [this](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+                 Network::TransportSocketPtr&,
+                 const Network::ConnectionSocket::OptionsSharedPtr&) -> Network::ClientConnection* {
+            // Options may have `SO_NOSIGPIPE` but not `TCP_NOTSENT_LOWAT`.
+            return connection_;
+          }));
+  cluster_manager_->getThreadLocalCluster("TcpNotsentLowatCluster")->tcpConn(nullptr);
+}
+
+TEST_F(TcpNotsentLowatTest, TcpNotsentLowatCluster) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: TcpNotsentLowatCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: TcpNotsentLowatCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_connection_options:
+        tcp_notsent_lowat: 16384
+  )EOF";
+  initialize(yaml);
+  expectSetsSockoptTcpNotsentLowat(16384);
+}
+
+TEST_F(TcpNotsentLowatTest, TcpNotsentLowatClusterWithDifferentValue) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: TcpNotsentLowatCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: TcpNotsentLowatCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_connection_options:
+        tcp_notsent_lowat: 4096
+  )EOF";
+  initialize(yaml);
+  expectSetsSockoptTcpNotsentLowat(4096);
+}
+
+TEST_F(TcpNotsentLowatTest, TcpNotsentLowatClusterZeroValue) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: TcpNotsentLowatCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: TcpNotsentLowatCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_connection_options:
+        tcp_notsent_lowat: 0
+  )EOF";
+  initialize(yaml);
+  expectSetsSockoptTcpNotsentLowat(0);
+}
+
 class PreconnectTest : public ClusterManagerImplTest {
 public:
   void initialize(float ratio) {

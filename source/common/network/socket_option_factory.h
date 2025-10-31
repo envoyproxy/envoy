@@ -45,6 +45,13 @@ public:
    */
   static std::unique_ptr<Socket::Options>
   buildDoNotFragmentOptions(bool supports_v4_mapped_v6_addresses);
+  /**
+   * Builds `TCP_NOTSENT_LOWAT` socket option for controlling kernel send buffer watermark.
+   * This is critical for HTTP/2 stream prioritization as it prevents the kernel from buffering
+   * excessive amounts of data, allowing Envoy to quickly adjust stream priorities.
+   * @param lowat_bytes the number of unsent bytes threshold. Recommended: 16384 for HTTP/2.
+   */
+  static std::unique_ptr<Socket::Options> buildTcpNotsentLowatOptions(uint32_t lowat_bytes);
 };
 } // namespace Network
 } // namespace Envoy
