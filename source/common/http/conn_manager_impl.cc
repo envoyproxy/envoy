@@ -801,6 +801,7 @@ void ConnectionManagerImpl::sendGoAwayAndClose(bool graceful) {
     go_away_sent_ = true;
   } else {
     // Immediate close - send GOAWAY and close immediately
+    codec_->shutdownNotice();
     codec_->goAway();
     go_away_sent_ = true;
     doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
