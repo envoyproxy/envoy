@@ -87,12 +87,6 @@ public:
 class ExtProcIntegrationTest : public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 protected:
-  enum class FilterSetup {
-    kDirect,
-    kCompositeMatchOnRequestHeaders,
-    kCompositeMatchOnResponseHeaders,
-  };
-
   ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
   void createUpstreams() override;
