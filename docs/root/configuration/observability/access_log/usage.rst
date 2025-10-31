@@ -456,6 +456,7 @@ The following command operators are supported:
     * ``US_TX_BEG``: The time point of the upstream request sending begin.
     * ``US_TX_END``: The time point of the upstream request sending end.
     * ``US_RX_BEG``: The time point of the upstream response receiving begin.
+    * ``US_RX_BODY_BEG``: The time point of the upstream response body receiving begin.
     * ``US_RX_END``: The time point of the upstream response receiving end.
     * ``DS_TX_BEG``: The time point of the downstream response sending begin.
     * ``DS_TX_END``: The time point of the downstream response sending end.

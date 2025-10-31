@@ -363,6 +363,14 @@ const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointG
            }
            return {};
          }},
+        {FirstUpstreamRxBodyReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().first_upstream_rx_body_byte_received_;
+           }
+           return {};
+         }},
         {LastUpstreamRxByteReceived,
          [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
            const auto upstream_info = stream_info.upstreamInfo();

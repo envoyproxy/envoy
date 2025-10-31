@@ -203,6 +203,13 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
 
 // This is response data arriving from the codec. Send it through the filter manager.
 void UpstreamCodecFilter::CodecBridge::decodeData(Buffer::Instance& data, bool end_stream) {
+  // Record the time when the first byte of response body is received.
+  if (!first_body_rx_recorded_) {
+    first_body_rx_recorded_ = true;
+    filter_.upstreamTiming().onFirstUpstreamRxBodyByteReceived(
+        filter_.callbacks_->dispatcher().timeSource());
+  }
+
   maybeEndDecode(end_stream);
   filter_.callbacks_->encodeData(data, end_stream);
 }
