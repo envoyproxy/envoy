@@ -151,7 +151,7 @@ public:
 
   // Stats::Counter
   void add(uint64_t amount) override {
-    // Note that a reader may see a new value but an old pending_increment_ or
+    // Note that a reader may see a new value but an old pending_delta_ or
     // used(). From a system perspective this should be eventually consistent.
     value_ += amount;
     pending_delta_ += amount;

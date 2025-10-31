@@ -72,16 +72,19 @@ TEST_F(AllocatorImplTest, CountersWithUpDown) {
 
   c1->dec();
   EXPECT_TRUE(c1->used());
+  LOG(INFO) << "c1->value(): " << c1->value();
   EXPECT_EQ(-1, c1->value());
   c1->dec();
   EXPECT_EQ(-2, c1->value());
   c1->inc();
   EXPECT_EQ(-1, c1->value());
+  EXPECT_EQ(-1, c1->latch());
+  EXPECT_EQ(0, c1->latch());
 
   c1->sub(100);
   EXPECT_EQ(-101, c1->value());
-  c1->add(102);
-  EXPECT_EQ(1, c1->value());
+  EXPECT_EQ(-100, c1->latch());
+  EXPECT_EQ(0, c1->latch());
 }
 
 TEST_F(AllocatorImplTest, GaugesWithSameName) {
