@@ -124,6 +124,119 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
                             "Multiple health checks not supported");
 }
 
+TEST_F(ClusterManagerImplTest, LrsOverAdsConfigAndLoadStatsConfigAreMutuallyExclusive) {
+  const std::string yaml = R"EOF(
+  cluster_manager:
+    load_stats_config:
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: lrs_cluster
+    load_stats_over_ads_config_connection: true
+  dynamic_resources:
+    ads_config:
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: lrs_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: lrs_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                            "Cannot configure both 'load_stats_config' and "
+                            "'load_stats_over_xds_config_connection' in the bootstrap");
+}
+
+TEST_F(ClusterManagerImplTest, LrsOverAdsRequiresAdsConfig) {
+  const std::string yaml = R"EOF(
+  cluster_manager:
+    load_stats_over_ads_config_connection: true
+  static_resources:
+    clusters:
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                            "Cannot configure 'load_stats_over_xds_config_connection' without "
+                            "configuring 'ads_config' in the bootstrap");
+}
+
+TEST_F(ClusterManagerImplTest, LrsOverAdsWithInvalidGrpcService) {
+  const std::string yaml = R"EOF(
+  cluster_manager:
+    load_stats_over_ads_config_connection: true
+  dynamic_resources:
+    ads_config:
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: unknown_cluster
+  static_resources:
+    clusters:
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+  )EOF";
+
+  // Replace the adsMux to have mocked GrpcMux object that later expectations
+  // can be set on.
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
+      std::make_shared<NiceMock<Config::MockGrpcMux>>();
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                            "Unknown gRPC client cluster 'unknown_cluster'");
+}
+
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 

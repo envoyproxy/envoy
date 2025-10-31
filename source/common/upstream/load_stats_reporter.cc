@@ -35,7 +35,8 @@ void LoadStatsReporter::setRetryTimer() {
 }
 
 void LoadStatsReporter::establishNewStream() {
-  ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
+  ENVOY_LOG(debug, "Establishing new gRPC bidi stream to {} for {}", async_client_.destination(),
+            service_method_.DebugString());
   stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
   if (stream_ == nullptr) {
     ENVOY_LOG(warn, "Unable to establish new stream");
@@ -45,6 +46,18 @@ void LoadStatsReporter::establishNewStream() {
 
   request_.mutable_cluster_stats()->Clear();
   sendLoadStatsRequest();
+}
+
+void LoadStatsReporter::replaceAsyncClient(Grpc::RawAsyncClientSharedPtr&& async_client) {
+  ASSERT(async_client != nullptr);
+  ENVOY_LOG(info, "Load reporter stats client is being replaced. Disconnecting from the old one "
+                  "and connecting to the new");
+  // Disconnect from current async_client and disable the retry timer. Resetting
+  stream_->resetStream();
+
+  // Set the new async_client, and try to connect.
+  async_client_ = std::move(async_client);
+  establishNewStream();
 }
 
 void LoadStatsReporter::sendLoadStatsRequest() {

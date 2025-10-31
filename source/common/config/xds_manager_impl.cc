@@ -114,9 +114,11 @@ absl::Status createGrpcClients(Grpc::AsyncClientManager& async_client_manager,
                                Stats::Scope& stats_scope, bool skip_cluster_check,
                                bool xdstp_config_source,
                                Grpc::RawAsyncClientSharedPtr& primary_client,
-                               Grpc::RawAsyncClientSharedPtr& failover_client) {
+                               Grpc::RawAsyncClientSharedPtr& failover_client,
+                               bool create_shared_clients) {
 
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_cached_grpc_client_for_xds")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_cached_grpc_client_for_xds") ||
+      create_shared_clients) {
     RETURN_IF_NOT_OK(createSharedClients(async_client_manager, api_config_source, stats_scope,
                                          skip_cluster_check, xdstp_config_source, primary_client,
                                          failover_client));
@@ -211,6 +213,10 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
     OptRef<XdsConfigTracker> xds_config_tracker =
         makeOptRefFromPtr<XdsConfigTracker>(xds_config_tracker_.get());
 
+    // TODO(adisuissa): convert the use of create_shared_clients to a
+    // runtime-feature that will eventually be "true" by default.
+    const bool create_shared_clients =
+        bootstrap.cluster_manager().load_stats_over_ads_config_connection();
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
@@ -230,7 +236,7 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
       RETURN_IF_NOT_OK(createGrpcClients(cm_->grpcAsyncClientManager(), dyn_resources.ads_config(),
                                          *stats_.rootScope(), /*skip_cluster_check*/ false,
                                          /*xdstp_config_source*/ false, primary_client,
-                                         failover_client));
+                                         failover_client, create_shared_clients));
 
       ads_mux_ = factory->create(std::move(primary_client), std::move(failover_client),
                                  main_thread_dispatcher_, random_, *stats_.rootScope(),
@@ -256,7 +262,7 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
       RETURN_IF_NOT_OK(createGrpcClients(cm_->grpcAsyncClientManager(), dyn_resources.ads_config(),
                                          *stats_.rootScope(), /*skip_cluster_check*/ false,
                                          /*xdstp_config_source*/ false, primary_client,
-                                         failover_client));
+                                         failover_client, create_shared_clients));
       OptRef<XdsResourcesDelegate> xds_resources_delegate =
           makeOptRefFromPtr<XdsResourcesDelegate>(xds_resources_delegate_.get());
       ads_mux_ = factory->create(std::move(primary_client), std::move(failover_client),
@@ -382,6 +388,10 @@ XdsManagerImpl::setAdsConfigSource(const envoy::config::core::v3::ApiConfigSourc
   return replaceAdsMux(config_source);
 }
 
+void XdsManagerImpl::setAdsClientChangeCallback(AdsClientChangeCallback cb) {
+  ads_client_change_callback_ = std::move(cb);
+}
+
 absl::StatusOr<XdsManagerImpl::AuthorityData>
 XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& config_source,
                                 bool allow_no_authority_names) {
@@ -455,7 +465,7 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
     RETURN_IF_NOT_OK(createGrpcClients(cm_->grpcAsyncClientManager(), api_config_source,
                                        *stats_.rootScope(), /*skip_cluster_check*/ false,
                                        /*xdstp_config_source*/ true, primary_client,
-                                       failover_client));
+                                       failover_client, true));
     authority_mux = factory->create(
         std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
         *stats_.rootScope(), api_config_source, local_info_, std::move(custom_config_validators),
@@ -481,7 +491,7 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
     RETURN_IF_NOT_OK(createGrpcClients(cm_->grpcAsyncClientManager(), api_config_source,
                                        *stats_.rootScope(), /*skip_cluster_check*/ false,
                                        /*xdstp_config_source*/ true, primary_client,
-                                       failover_client));
+                                       failover_client, true));
     OptRef<XdsResourcesDelegate> xds_resources_delegate =
         makeOptRefFromPtr<XdsResourcesDelegate>(xds_resources_delegate_.get());
     authority_mux = factory->create(
@@ -556,19 +566,29 @@ XdsManagerImpl::replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ad
   absl::Status status = Config::Utility::checkTransportVersion(ads_config);
   RETURN_IF_NOT_OK(status);
 
+  // TODO(adisuissa): convert the use of create_shared_clients to a
+  // runtime-feature that will eventually be "true" by default.
+  const bool create_shared_clients =
+      bootstrap.cluster_manager().load_stats_over_ads_config_connection();
   Grpc::RawAsyncClientSharedPtr primary_client;
   Grpc::RawAsyncClientSharedPtr failover_client;
   RETURN_IF_NOT_OK(createGrpcClients(
       cm_->grpcAsyncClientManager(), ads_config, *stats_.rootScope(), /*skip_cluster_check*/ false,
-      /*xdstp_config_source*/ false, primary_client, failover_client));
+      /*xdstp_config_source*/ false, primary_client, failover_client, create_shared_clients));
 
   // Primary client must not be null, as the primary xDS source must be a valid one.
   // The failover_client may be null (no failover defined).
   ASSERT(primary_client != nullptr);
+  Grpc::RawAsyncClientSharedPtr primary_client_for_callback = primary_client;
 
   // This will cause a disconnect from the current sources, and replacement of the clients.
   status = ads_mux_->updateMuxSource(std::move(primary_client), std::move(failover_client),
                                      *stats_.rootScope(), std::move(backoff_strategy), ads_config);
+
+  // Notify an client modification watcher if defined.
+  if (status.ok() && ads_client_change_callback_) {
+    ads_client_change_callback_(std::move(primary_client_for_callback));
+  }
   return status;
 }
 

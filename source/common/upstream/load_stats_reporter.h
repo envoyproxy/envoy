@@ -44,7 +44,12 @@ public:
       std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) override;
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
+
   const LoadReporterStats& getStats() { return stats_; };
+
+  // Disconnects from the current async-client that is used by the reporter,
+  // replaces it with a new one, and connects to it.
+  void replaceAsyncClient(Grpc::RawAsyncClientSharedPtr&& async_client);
 
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_DELAY_MS = 5000;
