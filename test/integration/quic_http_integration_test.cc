@@ -282,11 +282,7 @@ TEST_P(QuicHttpIntegrationTest, MultiWorkerWithLongConnectionId) {
 
 TEST_P(QuicHttpIntegrationTest, MimicNatRebinding) {
   // Explicitly disable QUICHE to do any kind of migration.
-  migration_config_ = quic::QuicConnectionMigrationConfig{
-      .allow_port_migration = false,
-      .migrate_session_on_network_change = false,
-      .allow_server_preferred_address = false,
-  };
+  migration_config_ = quicConnectionMigrationDisableAllConfig();
   setConcurrency(2);
   initialize();
   uint32_t old_port = lookupPort("http");
@@ -366,8 +362,6 @@ public:
       migration_config_.allow_port_migration = true;
       migration_config_.migrate_session_on_network_change = false;
       migration_config_.max_port_migrations_per_session = kMaxNumSocketSwitches;
-    } else {
-      migration_config_.allow_server_preferred_address = false;
     }
   }
 };
@@ -1569,6 +1563,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
   if (version_ == Network::Address::IpVersion::v4) {
     // Most v6 platform doesn't support two loopback interfaces.
     EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
+    EXPECT_EQ("127.0.0.1", quic_connection_->self_address().host().ToString());
     test_server_->waitForCounterGe(
         "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
   }
@@ -1788,7 +1783,6 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
   EXPECT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 
-  EXPECT_EQ("127.0.0.1", quic_connection_->self_address().host().ToString());
   EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
   test_server_->waitForCounterGe(
       "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);

@@ -73,21 +73,6 @@ private:
 
 EnvoyQuicClientSession::EnvoyQuicClientSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
-    std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
-    std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, Event::Dispatcher& dispatcher,
-    uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
-    QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
-    Stats::Scope& scope,
-    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-    OptRef<Network::UpstreamTransportSocketFactory> transport_socket_factory)
-    : EnvoyQuicClientSession(
-          config, supported_versions, std::move(connection), nullptr, nullptr,
-          quic::QuicConnectionMigrationConfig{.allow_server_preferred_address = false}, server_id,
-          crypto_config, dispatcher, send_buffer_limit, crypto_stream_factory, quic_stat_names,
-          rtt_cache, scope, transport_socket_options, transport_socket_factory) {}
-
-EnvoyQuicClientSession::EnvoyQuicClientSession(
-    const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
     std::unique_ptr<EnvoyQuicClientConnection> connection,
     quic::QuicForceBlockablePacketWriter* absl_nullable writer,
     EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* absl_nullable migration_helper,
@@ -117,6 +102,7 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
       session_handles_migration_(migration_helper != nullptr) {
   ENVOY_BUG(migration_helper == nullptr || writer != nullptr,
             "writer must be set if migration helper is set");
+
   streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   if (transport_socket_options_ != nullptr &&
       !transport_socket_options_->applicationProtocolListOverride().empty()) {
@@ -324,12 +310,11 @@ void EnvoyQuicClientSession::OnNewEncryptionKeyAvailable(
 }
 void EnvoyQuicClientSession::OnServerPreferredAddressAvailable(
     const quic::QuicSocketAddress& server_preferred_address) {
-  if (session_handles_migration_) {
-    quic::QuicSpdyClientSession::OnServerPreferredAddressAvailable(server_preferred_address);
-    return;
+  quic::QuicSpdyClientSession::OnServerPreferredAddressAvailable(server_preferred_address);
+  if (!session_handles_migration_) {
+    static_cast<EnvoyQuicClientConnection*>(connection())
+        ->probeAndMigrateToServerPreferredAddress(server_preferred_address);
   }
-  static_cast<EnvoyQuicClientConnection*>(connection())
-      ->probeAndMigrateToServerPreferredAddress(server_preferred_address);
 }
 
 std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {

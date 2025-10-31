@@ -268,8 +268,8 @@ public:
     ASSERT(quic_connection_persistent_info_ != nullptr);
     OptRef<Http::HttpServerPropertiesCache> cache;
     auto session = std::make_unique<EnvoyQuicClientSession>(
-        persistent_info.quic_config_, supported_versions_, std::move(connection),
-        (quiche_handles_migration_ ? wrapper : nullptr), migration_helper, migration_config_,
+        persistent_info.quic_config_, supported_versions_, std::move(connection), wrapper,
+        migration_helper, migration_config_,
         quic::QuicServerId{
             (host.empty() ? transport_socket_factory_->clientContextConfig()->serverNameIndication()
                           : host),
@@ -515,9 +515,7 @@ protected:
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
   std::string client_alpn_;
-  quic::QuicConnectionMigrationConfig migration_config_{.allow_port_migration = false,
-                                                        .migrate_session_on_network_change = false,
-                                                        .allow_server_preferred_address = false};
+  quic::QuicConnectionMigrationConfig migration_config_{quicConnectionMigrationDisableAllConfig()};
   bool quiche_handles_migration_{false};
 };
 

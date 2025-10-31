@@ -133,32 +133,32 @@ public:
   }
 
   void SetUp() override {
-    quic_connection_ = new TestEnvoyQuicClientConnection(
-        quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_, quic_version_,
-        *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
-        connection_id_generator_);
-
-    OptRef<Http::HttpServerPropertiesCache> cache;
-    OptRef<Network::UpstreamTransportSocketFactory> uts_factory;
     quic::QuicForceBlockablePacketWriter* wrapper = nullptr;
     if (quiche_handles_migration_) {
       wrapper = new quic::QuicForceBlockablePacketWriter();
       // Owns the inner writer.
       wrapper->set_writer(&writer_);
     }
+    quic_connection_ = new TestEnvoyQuicClientConnection(
+        quic::test::TestConnectionId(), connection_helper_, alarm_factory_,
+        quiche_handles_migration_ ? *wrapper : static_cast<quic::QuicPacketWriter&>(writer_),
+        quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
+        connection_id_generator_);
+    EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* migration_helper = nullptr;
+    if (!quiche_handles_migration_) {
+      quic_connection_->setWriterFactory(writer_factory_);
+    } else {
+      migration_helper = &quic_connection_->getOrCreateMigrationHelper(writer_factory_, {});
+    }
+
+    OptRef<Http::HttpServerPropertiesCache> cache;
+    OptRef<Network::UpstreamTransportSocketFactory> uts_factory;
     envoy_quic_session_ = std::make_unique<EnvoyQuicClientSession>(
         quic_config_, quic_version_,
-        std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-        (quiche_handles_migration_ ? wrapper : nullptr),
-        quiche_handles_migration_
-            ? &quic_connection_->getOrCreateMigrationHelper(writer_factory_, {})
-            : nullptr,
+        std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_), wrapper, migration_helper,
         migration_config_, quic::QuicServerId("example.com", 443), crypto_config_, *dispatcher_,
         /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, cache,
         *store_.rootScope(), transport_socket_options_, uts_factory);
-    if (!quiche_handles_migration_) {
-      quic_connection_->setWriterFactory(writer_factory_);
-    }
 
     http_connection_ = std::make_unique<QuicHttpClientConnectionImpl>(
         *envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024, 100);
@@ -240,12 +240,13 @@ protected:
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   std::unique_ptr<QuicHttpClientConnectionImpl> http_connection_;
   bool quiche_handles_migration_;
-  quic::QuicConnectionMigrationConfig migration_config_{.allow_server_preferred_address = false};
+  quic::QuicConnectionMigrationConfig migration_config_{quicConnectionMigrationDisableAllConfig()};
   QuicClientPacketWriterFactoryImpl writer_factory_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest,
-                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
 
 TEST_P(EnvoyQuicClientSessionTest, ShutdownNoOp) { http_connection_->shutdownNotice(); }
 
@@ -538,7 +539,6 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   EXPECT_TRUE(envoy_quic_session_->HasPendingPathValidation());
   quic::QuicPathValidationContext* path_validation_context =
       quic_connection_->GetPathValidationContext();
-  EXPECT_NE(path_validation_context->self_address().ToString(), self_addr_->asString());
   const Network::Address::InstanceConstSharedPtr new_self_address =
       quicAddressToEnvoyAddressInstance(path_validation_context->self_address());
   EXPECT_NE(new_self_address->asString(), self_addr_->asString());
@@ -802,7 +802,8 @@ private:
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionDisallowMmsgTests,
                          EnvoyQuicClientSessionDisallowMmsgTest,
-                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
 
 // Ensures that the Network::Utility::readFromSocket function uses `recvmsg` for client QUIC
 // connections when GRO is not supported.
@@ -864,7 +865,8 @@ private:
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionAllowMmsgTests, EnvoyQuicClientSessionAllowMmsgTest,
-                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
 
 TEST_P(EnvoyQuicClientSessionAllowMmsgTest, UsesRecvMmsgWhenNoGroAndMmsgAllowed) {
   if (!Api::OsSysCallsSingleton::get().supportsMmsg()) {

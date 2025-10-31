@@ -420,6 +420,7 @@ envoy_cc_library(
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/runtime:runtime_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
+        "@com_github_google_quiche//:quic_core_http_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ]),
 )
@@ -492,6 +493,7 @@ envoy_cc_library(
         "@com_github_google_quiche//:quic_core_config_lib",
         "@com_github_google_quiche//:quic_core_http_header_list_lib",
         "@com_github_google_quiche//:quic_platform",
+        "@com_github_google_quiche//:quic_core_http_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ]),

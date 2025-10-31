@@ -101,9 +101,7 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     // sockets.
     connection->setWriterFactory(*info_impl->writer_factory_);
     // Disable all kinds of migration in QUICHE as the session won't be setup to handle it.
-    migration_config.allow_server_preferred_address = false;
-    migration_config.allow_port_migration = false;
-    migration_config.migrate_session_on_network_change = false;
+    migration_config = quicConnectionMigrationDisableAllConfig();
   }
   // TODO (danzh) move this temporary config and initial RTT configuration to h3 pool.
   quic::QuicConfig config = info_impl->quic_config_;
@@ -120,10 +118,10 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
 
   // QUICHE client session always use the 1st version to start handshake.
   auto session = std::make_unique<EnvoyQuicClientSession>(
-      config, quic_versions, std::move(connection), (use_migration_in_quiche ? wrapper : nullptr),
-      migration_helper, migration_config, server_id, std::move(crypto_config), dispatcher,
-      info_impl->buffer_limit_, info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache,
-      scope, transport_socket_options, transport_socket_factory);
+      config, quic_versions, std::move(connection), wrapper, migration_helper, migration_config,
+      server_id, std::move(crypto_config), dispatcher, info_impl->buffer_limit_,
+      info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache, scope,
+      transport_socket_options, transport_socket_factory);
   if (network_observer_registry != nullptr) {
     session->registerNetworkObserver(*network_observer_registry);
   }

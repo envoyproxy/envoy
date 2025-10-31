@@ -89,10 +89,6 @@ void EnvoyQuicClientConnection::EnvoyQuicClinetPathContextFactory::CreatePathVal
   QuicClientPacketWriterFactory::CreationResult result =
       writer_factory_.createSocketAndQuicPacketWriter(remote_address, network, new_local_address,
                                                       connection_.connectionSocket()->options());
-  if (!result.socket_->isOpen()) {
-    result_delegate->OnCreationFailed(network, "Failed to create socket");
-    return;
-  }
   connection_.setUpConnectionSocket(*result.socket_, connection_.delegate_);
   result_delegate->OnCreationSucceeded(std::make_unique<EnvoyQuicClientPathValidationContext>(
       envoyIpAddressToQuicSocketAddress(new_local_address->ip()), peer_address, network,
@@ -253,8 +249,10 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
 }
 
 void EnvoyQuicClientConnection::OnPathDegradingDetected() {
+  // This will trigger connection migration or port migration in QUICHE if
+  // migration_helper_ is initialized. Otherwise do it in this class.
+  QuicConnection::OnPathDegradingDetected();
   if (migration_helper_ == nullptr) {
-    QuicConnection::OnPathDegradingDetected();
     maybeMigratePort();
   }
 }
@@ -431,7 +429,6 @@ void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidat
 }
 
 void EnvoyQuicClientConnection::OnCanWrite() {
-  ASSERT(migration_helper_ == nullptr);
   quic::QuicConnection::OnCanWrite();
   onWriteEventDone();
 }
@@ -448,6 +445,7 @@ EnvoyQuicClientConnection::getOrCreateMigrationHelper(
 
 void EnvoyQuicClientConnection::probeAndMigrateToServerPreferredAddress(
     const quic::QuicSocketAddress& server_preferred_address) {
+  ASSERT(migration_helper_ == nullptr);
   probeWithNewPort(server_preferred_address,
                    quic::PathValidationReason::kServerPreferredAddressMigration);
 }

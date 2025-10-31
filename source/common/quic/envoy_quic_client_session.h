@@ -28,17 +28,6 @@ class EnvoyQuicClientSession : public QuicFilterManagerConnectionImpl,
 public:
   EnvoyQuicClientSession(
       const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
-      std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
-      std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, Event::Dispatcher& dispatcher,
-      uint32_t send_buffer_limit,
-      EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
-      QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
-      Stats::Scope& scope,
-      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-      OptRef<Network::UpstreamTransportSocketFactory> transport_socket_factory);
-
-  EnvoyQuicClientSession(
-      const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
       std::unique_ptr<EnvoyQuicClientConnection> connection,
       quic::QuicForceBlockablePacketWriter* absl_nullable writer,
       EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* absl_nullable migration_helper,
