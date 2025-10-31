@@ -68,10 +68,12 @@ function bazel_with_collection() {
     then
         pushd bazel-testlogs
         failed_logs=$(grep "  /build.*test.log" "${BAZEL_OUTPUT}" | sed -e 's/  \/build.*\/testlogs\/\(.*\)/\1/')
-        while read -r f; do
-        cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
-        done <<< "$failed_logs"
-        popd
+        if [[ -n "${failed_logs}" ]]; then
+            while read -r f; do
+                cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
+            done <<< "$failed_logs"
+            popd
+        fi
     fi
     exit "${BAZEL_STATUS}"
   fi
@@ -192,7 +194,7 @@ function bazel_envoy_api_build() {
         --//tools/api_proto_plugin:extra_args=api_version:3.7 \
         //tools/protoprint:protoprint_test
     echo "Validating API structure..."
-    "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/api:validate_structure "${PWD}/api/envoy"
     echo "Testing API..."
     bazel_with_collection \
         test "${BAZEL_BUILD_OPTIONS[@]}" \
