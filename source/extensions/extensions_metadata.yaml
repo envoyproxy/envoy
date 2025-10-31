@@ -1813,6 +1813,13 @@ envoy.load_balancing_policies.random:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.random.v3.Random
+envoy.load_balancing_policies.random_subsetting:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.random_subsetting.v3.RandomSubsetting
 envoy.load_balancing_policies.round_robin:
   categories:
   - envoy.load_balancing_policies
