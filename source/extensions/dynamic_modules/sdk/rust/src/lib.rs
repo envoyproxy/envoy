@@ -1999,8 +1999,10 @@ impl EnvoyHttpFilterImpl {
 /// Since this is primarily designed to be used from a different thread than the one
 /// where the [`HttpFilter`] instance was created, it is marked as `Send` so that
 /// the [`Box<dyn EnvoyHttpFilterScheduler>`] can be sent across threads.
+///
+/// It is also safe to be called concurrently, so it is marked as `Sync` as well.
 #[automock]
-pub trait EnvoyHttpFilterScheduler: Send {
+pub trait EnvoyHttpFilterScheduler: Send + Sync {
   /// Commit the scheduled event to the worker thread where [`HttpFilter`] is running.
   ///
   /// It accepts an `event_id` which can be used to distinguish different events
@@ -2019,6 +2021,7 @@ struct EnvoyHttpFilterSchedulerImpl {
 }
 
 unsafe impl Send for EnvoyHttpFilterSchedulerImpl {}
+unsafe impl Sync for EnvoyHttpFilterSchedulerImpl {}
 
 impl Drop for EnvoyHttpFilterSchedulerImpl {
   fn drop(&mut self) {
