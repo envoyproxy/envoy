@@ -1140,7 +1140,7 @@ TEST_P(MultiplexedIntegrationTest, BadFrame) {
   }
 }
 
-// Test graceful GoAway from L7 decoder filters with StopIteration.
+// Test GoAway from L7 decoder filters with StopIteration.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilter) {
   config_helper_.addFilter("name: send-goaway-during-decode-filter");
   initialize();
@@ -1156,7 +1156,7 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilter) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
-// Test graceful GoAway from L7 decoder filters with Continue.
+// Test GoAway from L7 decoder filters with Continue.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilterContinue) {
   config_helper_.addFilter("name: send-goaway-during-decode-filter");
   initialize();
@@ -1173,7 +1173,7 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilterContinue) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
-// Test graceful GoAway from L7 encoder filters with StopIteration.
+// Test GoAway from L7 encoder filters with StopIteration.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterStopIteration) {
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::RequestEncoder* encoder;
@@ -1201,12 +1201,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterStopIterat
                                       {"send-encoder-goaway", "true"},
                                       {"continue-encoder-filter-chain", "false"}},
       true);
-
   ASSERT_TRUE(response->waitForReset());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
-// Test graceful GoAway from L7 encoder filters with Continue.
+// Test GoAway from L7 encoder filters with Continue.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) {
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::RequestEncoder* encoder;
@@ -1234,12 +1233,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) 
                                       {"send-encoder-goaway", "true"},
                                       {"continue-encoder-filter-chain", "true"}},
       true);
-
   ASSERT_TRUE(response->waitForReset());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
-// Test immediate GoAway during SendLocalReply from L7 encoder filters.
+// Test sending GoAway during SendLocalReply from L7 encoder filters.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredInLocalReplyEncoderFilter) {
   config_helper_.addFilter("name: send-goaway-during-decode-filter");
   initialize();
@@ -1252,7 +1250,6 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredInLocalReplyEncoderFilter
       {":authority", "host"},
       {"send-local-reply", "true"},
   });
-
   ASSERT_TRUE(response->waitForReset());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }

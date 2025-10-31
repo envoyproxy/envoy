@@ -108,6 +108,9 @@ new_features:
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to
     :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`, allowing use of a different
     header for vhost matching.
+- area: http2
+  change: |
+    Added new parameter to the `sendGoAwayAndClose` to support gracefully closing of HTTP/2 connection.
 - area: logging
   change: |
     Added support for the not-equal operator in access log filter rules, in

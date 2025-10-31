@@ -1051,7 +1051,6 @@ void ConnectionImpl::goAway() {
 
 void ConnectionImpl::shutdownNotice() {
   adapter_->SubmitShutdownNotice();
-  stats_.goaway_sent_.inc();
   if (sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
@@ -2299,14 +2298,14 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
   if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
       should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
-    ConnectionImpl::shutdownNotice();
+    ConnectionImpl::goAway();
     sent_go_away_on_dispatch_ = true;
     return envoyOverloadError(
         "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
   }
   if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
       should_send_go_away_on_dispatch_->shouldShedLoad()) {
-    ConnectionImpl::shutdownNotice();
+    ConnectionImpl::goAway();
     sent_go_away_on_dispatch_ = true;
   }
   return ConnectionImpl::dispatch(data);

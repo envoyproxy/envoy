@@ -648,7 +648,7 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   EXPECT_CALL(client_callbacks_, onGoAway(_));
   server_->shutdownNotice();
   server_->goAway();
-  EXPECT_EQ(2, server_stats_store_.counter("http2.goaway_sent").value());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
@@ -3068,7 +3068,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersExceedPerHeaderLimit) {
   ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
   server_->shutdownNotice();
   server_->goAway();
-  EXPECT_EQ(2, server_stats_store_.counter("http2.goaway_sent").value());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
 
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();

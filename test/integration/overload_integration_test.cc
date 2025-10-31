@@ -1155,29 +1155,19 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
 
   auto second_request_decoder = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
-  // Complete the first request to trigger dispatch and GOAWAY sending
+  // Wait for reply of the first request which should be allowed to complete.
+  // The downstream should also receive the GOAWAY.
   Buffer::OwnedImpl first_request_body{"foo"};
   first_request_encoder.encodeData(first_request_body, true);
   ASSERT_TRUE(first_request_decoder->waitForEndStream());
 
-  // NOTE: After sending GOAWAY, the server should ignore frames on streams with identifiers
-  // higher than the last stream ID in the GOAWAY frame. However, Envoy's current
-  // implementation in ServerConnectionImpl::onBeginHeaders() may still create new
-  // streams without checking GOAWAY state. oghttp2 may continue the request and ignore
-  // goaway while nghttp2 is stricter and does a reset leading to different results.
-  // Thus we check if the stream has ended first.
-  bool second_request_completed = second_request_decoder->waitForEndStream();
-  if (second_request_completed) {
-    EXPECT_TRUE(second_request_decoder->complete());
-  } else {
-    EXPECT_TRUE(second_request_decoder->reset());
-  }
-
-  // Wait for the graceful GOAWAY timeout to expire and final GOAWAY to be sent
+  EXPECT_TRUE(codec_client_->sawGoAway());
   test_server_->waitForCounterEq("http2.goaway_sent", 1);
 
-  // Verify the client eventually receives the GOAWAY
-  EXPECT_TRUE(codec_client_->sawGoAway());
+  // The GOAWAY gets submitted with the first created stream as the last stream
+  // that will be processed on this connection, so the second stream's frames
+  // are ignored.
+  EXPECT_FALSE(second_request_decoder->complete());
 
   updateResource(0.80);
   test_server_->waitForGaugeEq(

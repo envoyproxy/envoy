@@ -780,25 +780,27 @@ void ConnectionManagerImpl::onDrainTimeout() {
   checkForDeferredClose(false);
 }
 
-void ConnectionManagerImpl::sendGoAwayAndClose(bool immediate_close) {
+void ConnectionManagerImpl::sendGoAwayAndClose(bool graceful) {
   ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggerred from filters.",
                  read_callbacks_->connection());
   if (go_away_sent_) {
     return;
   }
 
-  // For HTTP/2 connections, use graceful drain sequence for RFC-compliant shutdown
-  // unless immediate_close is requested
-  if (codec_->protocol() >= Protocol::Http2 && !immediate_close) {
+  // Use graceful drain sequence if graceful shutdown is requested.
+  // startDrainSequence() works for both HTTP/1 and HTTP/2:
+  // - HTTP/1: shutdownNotice() + goAway() provides graceful close
+  // - HTTP/2: shutdownNotice() sends GOAWAY with high stream ID, then goAway() sends final GOAWAY
+  if (graceful) {
     if (drain_state_ == DrainState::NotDraining) {
       startDrainSequence();
     }
-    // For HTTP/2, consider the "go away" process started once draining begins.
+    // Consider the "go away" process started once draining begins.
     // The actual GOAWAY frame will be sent in onDrainTimeout(), but we want to
     // prevent multiple calls to sendGoAwayAndClose() from starting multiple drain sequences.
     go_away_sent_ = true;
   } else {
-    // For HTTP/1.x connections or immediate close requested, use immediate GOAWAY and close
+    // Immediate close - send GOAWAY and close immediately
     codec_->goAway();
     go_away_sent_ = true;
     doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,

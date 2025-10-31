@@ -487,8 +487,8 @@ void ActiveStreamDecoderFilter::sendLocalReply(
   ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
-void ActiveStreamDecoderFilter::sendGoAwayAndClose(bool immediate_close) {
-  parent_.sendGoAwayAndClose(immediate_close);
+void ActiveStreamDecoderFilter::sendGoAwayAndClose(bool graceful) {
+  parent_.sendGoAwayAndClose(graceful);
 }
 
 void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers) {
