@@ -119,7 +119,7 @@ public:
 };
 
 /**
- * An always incrementing counter with latching capability. Each increment is added both to a
+ * An up-down counter with latching capability. Each increment is added both to a
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
  * clears it.
  */
@@ -128,10 +128,12 @@ public:
   ~Counter() override = default;
 
   virtual void add(uint64_t amount) PURE;
+  virtual void sub(uint64_t amount) PURE;
   virtual void inc() PURE;
-  virtual uint64_t latch() PURE;
+  virtual void dec() PURE;
+  virtual int64_t latch() PURE;
   virtual void reset() PURE;
-  virtual uint64_t value() const PURE;
+  virtual int64_t value() const PURE;
 };
 
 using CounterSharedPtr = RefcountPtr<Counter>;

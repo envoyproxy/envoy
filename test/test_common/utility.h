@@ -236,7 +236,7 @@ public:
    * AssertionFailure().
    */
   static AssertionResult
-  waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+  waitForCounterEq(Stats::Store& store, const std::string& name, int64_t value,
                    Event::TestTimeSystem& time_system,
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
                    Event::Dispatcher* dispatcher = nullptr);
@@ -252,7 +252,7 @@ public:
    * AssertionFailure().
    */
   static AssertionResult
-  waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+  waitForCounterGe(Stats::Store& store, const std::string& name, int64_t value,
                    Event::TestTimeSystem& time_system,
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 

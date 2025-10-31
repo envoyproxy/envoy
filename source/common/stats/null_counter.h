@@ -24,10 +24,13 @@ public:
   }
 
   void add(uint64_t) override {}
+  void sub(uint64_t) override {}
+
   void inc() override {}
-  uint64_t latch() override { return 0; }
+  void dec() override {}
+  int64_t latch() override { return 0; }
   void reset() override {}
-  uint64_t value() const override { return 0; }
+  int64_t value() const override { return 0; }
 
   // Metric
   bool used() const override { return false; }

@@ -158,5 +158,9 @@ new_features:
     Added QUIC protocol option :ref:`max_sessions_per_event_loop
     <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.max_sessions_per_event_loop>` to limit the maximum
     number of new QUIC sessions created per event loop. The default is 16, preserving the previous hardcoded limit.
+- area: stats
+  change: |
+    Extended the existing monotonically-increasing counter to the up-down counter.
+
 
 deprecated:

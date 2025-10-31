@@ -154,17 +154,23 @@ public:
     // Note that a reader may see a new value but an old pending_increment_ or
     // used(). From a system perspective this should be eventually consistent.
     value_ += amount;
-    pending_increment_ += amount;
+    pending_delta_ += amount;
     flags_ |= Flags::Used;
   }
   void inc() override { add(1); }
-  uint64_t latch() override { return pending_increment_.exchange(0); }
+  void sub(uint64_t amount) override {
+    value_ -= amount;
+    pending_delta_ -= amount;
+    flags_ |= Flags::Used;
+  }
+  void dec() override { sub(1); }
+  int64_t latch() override { return pending_delta_.exchange(0); }
   void reset() override { value_ = 0; }
-  uint64_t value() const override { return value_; }
+  int64_t value() const override { return value_; }
 
 private:
   std::atomic<uint64_t> value_{0};
-  std::atomic<uint64_t> pending_increment_{0};
+  std::atomic<int64_t> pending_delta_{0};
 };
 
 class GaugeImpl : public StatsSharedImpl<Gauge> {

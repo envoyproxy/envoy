@@ -188,9 +188,15 @@ public:
     condvar_.Signal();
   }
   void inc() override { add(1); }
-  uint64_t latch() override { return counter_->latch(); }
+  void sub(uint64_t amount) override {
+    counter_->sub(amount);
+    absl::MutexLock l(&mutex_);
+    condvar_.Signal();
+  }
+  void dec() override { sub(1); }
+  int64_t latch() override { return counter_->latch(); }
   void reset() override { return counter_->reset(); }
-  uint64_t value() const override { return counter_->value(); }
+  int64_t value() const override { return counter_->value(); }
   void incRefCount() override { counter_->incRefCount(); }
   bool decRefCount() override { return counter_->decRefCount(); }
   uint32_t use_count() const override { return counter_->use_count(); }

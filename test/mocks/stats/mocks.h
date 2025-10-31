@@ -138,13 +138,15 @@ public:
   ~MockCounter() override;
 
   MOCK_METHOD(void, add, (uint64_t amount));
+  MOCK_METHOD(void, sub, (uint64_t amount));
   MOCK_METHOD(void, inc, ());
-  MOCK_METHOD(uint64_t, latch, ());
+  MOCK_METHOD(void, dec, ());
+  MOCK_METHOD(int64_t, latch, ());
   MOCK_METHOD(void, reset, ());
   MOCK_METHOD(bool, used, (), (const));
   MOCK_METHOD(void, markUnused, ());
   MOCK_METHOD(bool, hidden, (), (const));
-  MOCK_METHOD(uint64_t, value, (), (const));
+  MOCK_METHOD(int64_t, value, (), (const));
 
   bool used_;
   bool hidden_;

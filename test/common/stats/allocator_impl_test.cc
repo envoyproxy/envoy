@@ -64,6 +64,27 @@ TEST_F(AllocatorImplTest, CountersWithSameName) {
   EXPECT_EQ(2, c2->value());
 }
 
+TEST_F(AllocatorImplTest, CountersWithUpDown) {
+  StatName counter_name = makeStat("counter.name");
+  CounterSharedPtr c1 = alloc_.makeCounter(counter_name, StatName(), {});
+  EXPECT_EQ(1, c1->use_count());
+  EXPECT_FALSE(c1->used());
+  c1->inc();
+  EXPECT_TRUE(c1->used());
+  c1->inc();
+  EXPECT_EQ(2, c1->value());
+  c1->dec();
+  EXPECT_EQ(1, c1->value());
+  c1->dec();
+  EXPECT_EQ(0, c1->value());
+  c1->add(10);
+  EXPECT_EQ(10, c1->value());
+  c1->sub(3);
+  EXPECT_EQ(7, c1->value());
+  c1->sub(4);
+  EXPECT_EQ(3, c1->value());
+}
+
 TEST_F(AllocatorImplTest, GaugesWithSameName) {
   StatName gauge_name = makeStat("gauges.name");
   GaugeSharedPtr g1 = alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
