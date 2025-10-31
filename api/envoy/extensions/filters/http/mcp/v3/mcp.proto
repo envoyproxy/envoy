@@ -17,7 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // This filter will inspect and get attributes from MCP traffic.
 message Mcp {
-  // Traffic handling mode for no MCP traffic.
+  // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
     // Proxies the HTTP request and response without MCP spec check.
     // This is the default mode.
