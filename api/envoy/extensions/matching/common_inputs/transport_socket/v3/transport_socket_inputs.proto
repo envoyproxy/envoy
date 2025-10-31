@@ -91,6 +91,27 @@ message LocalityMetadataInput {
   repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
+// Specifies that matching should be performed by filter state.
+// This input extracts a value from filter state that was explicitly shared from the
+// downstream connection to the upstream connection via ``TransportSocketOptions``.
+// This enables flexible downstream-connection-based transport socket selection,
+// such as matching on network namespace or any custom filter state data.
+//
+// Example: Match on network namespace stored in filter state.
+//
+// .. code-block:: yaml
+//
+//   typed_config:
+//     "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.FilterStateInput
+//     key: "envoy.network.namespace"
+//
+// [#extension: envoy.matching.inputs.filter_state]
+message FilterStateInput {
+  // The key of the filter state object to retrieve.
+  // The object must implement serializeAsString() to be used for matching.
+  string key = 1 [(validate.rules).string = {min_len: 1}];
+}
+
 // Configuration for the transport socket name action.
 // This action sets the name of the transport socket to use when the matcher matches.
 // [#extension: envoy.matching.action.transport_socket.name]

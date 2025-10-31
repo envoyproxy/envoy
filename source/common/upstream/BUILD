@@ -442,6 +442,7 @@ envoy_cc_library(
         "//source/common/matcher:matcher_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stream_info:filter_state_lib",
         "//source/extensions/matching/common_inputs/transport_socket:config_lib",
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

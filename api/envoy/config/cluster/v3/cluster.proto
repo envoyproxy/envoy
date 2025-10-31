@@ -813,26 +813,25 @@ message Cluster {
   // Optional matcher that selects a transport socket from
   // :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
   //
-  // This matcher uses the generic xDS matcher framework and may reference downstream
-  // connection attributes and endpoint metadata to select a named transport socket.
-  // This provides flexibility similar to the listener :ref:`filter_chain_matcher
-  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`.
+  // This matcher uses the generic xDS matcher framework to select a named transport socket
+  // based on various inputs available at transport socket selection time.
+  //
+  // Supported matching inputs:
+  //
+  // * ``endpoint_metadata``: Extract values from the selected endpoint's metadata.
+  // * ``locality_metadata``: Extract values from the endpoint's locality metadata.
+  // * ``filter_state``: Extract values from filter state that was explicitly shared from
+  //   downstream to upstream via ``TransportSocketOptions``. This enables flexible
+  //   downstream-connection-based matching, such as:
+  //
+  //   - Network namespace matching.
+  //   - Custom connection attributes.
+  //   - Any data explicitly passed via filter state.
   //
   // .. note::
-  //   All network-level inputs (destination IP, source IP, destination port, source port,
-  //   SNI, ALPN) refer to the **downstream connection** attributes, not the upstream connection.
-  //   For example:
-  //
-  //   * ``destination_ip``: The IP address of the upstream endpoint as seen by Envoy
-  //     (the local address of the connection on Envoy's side).
-  //   * ``source_ip``: The IP address of the downstream client.
-  //   * ``destination_port``: The port on which Envoy received the request.
-  //   * ``source_port``: The port used by the downstream client.
-  //   * ``server_name``: The SNI presented by the downstream client.
-  //   * ``application_protocols``: The ALPN protocols negotiated with the downstream client.
-  //
-  //   Additionally, endpoint-specific metadata inputs (endpoint_metadata, locality_metadata)
-  //   extract values from the selected upstream endpoint's metadata for transport socket selection.
+  //   Filter state sharing follows the same pattern as tunneling in Envoy. Filters must explicitly
+  //   share data by setting filter state with the appropriate sharing mode. The filter state is
+  //   then accessible via the ``filter_state`` input during transport socket selection.
   //
   // If this field is set, it takes precedence over legacy metadata-based selection
   // performed by :ref:`transport_socket_matches

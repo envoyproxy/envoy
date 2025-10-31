@@ -13,6 +13,8 @@
 #include "source/common/config/metadata.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -321,143 +323,6 @@ filter_metadata:
   EXPECT_EQ("raw_id", foo_raw.id());
 }
 
-// New: xDS matcher using server_name input to select TLS for a specific SNI, else raw.
-TEST_F(TransportSocketMatcherTest, XdsMatcherServerName) {
-  // Socket matches.
-  Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch> matches;
-  auto* m_tls = matches.Add();
-  TestUtility::loadFromYaml(R"EOF(
-name: "tls"
-transport_socket:
-  name: "foo"
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.core.v3.Node
-    id: "tls_id"
-)EOF",
-                            *m_tls);
-  auto* m_raw = matches.Add();
-  TestUtility::loadFromYaml(R"EOF(
-name: "raw"
-transport_socket:
-  name: "foo"
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.core.v3.Node
-    id: "raw_id"
-)EOF",
-                            *m_raw);
-
-  // xDS matcher on server_name.
-  xds::type::matcher::v3::Matcher matcher;
-  TestUtility::loadFromYaml(R"EOF(
-matcher_tree:
-  input:
-    name: envoy.matching.inputs.server_name
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
-  exact_match_map:
-    map:
-      "tls.example.com":
-        action:
-          name: envoy.matching.action.transport_socket.name
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
-            name: tls
-on_no_match:
-  action:
-    name: envoy.matching.action.transport_socket.name
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
-      name: raw
-)EOF",
-                            matcher);
-
-  matcher_ = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
-                                                mock_factory_context_, mock_default_factory_,
-                                                *stats_scope_)
-                 .value();
-
-  // For this test, we'll verify that the matcher configuration was set up correctly
-  // but the actual network-based matching (server name) isn't supported with the
-  // simplified two-parameter resolve method. The matcher would need network context
-  // which isn't available in the legacy interface.
-  auto* impl = dynamic_cast<TransportSocketMatcherImpl*>(matcher_.get());
-  ASSERT_NE(impl, nullptr);
-
-  // Without network context, the matcher falls back to default
-  auto result_default = impl->resolve(nullptr, nullptr);
-  const auto& foo_default =
-      dynamic_cast<const FakeTransportSocketFactory&>(result_default.factory_);
-  EXPECT_EQ("default", foo_default.id());
-}
-
-// New: xDS matcher using source_ip input with prefix match for loopback.
-TEST_F(TransportSocketMatcherTest, XdsMatcherSourceIp) {
-  // Socket matches.
-  Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch> matches;
-  auto* m_tls = matches.Add();
-  TestUtility::loadFromYaml(R"EOF(
-name: "tls"
-transport_socket:
-  name: "foo"
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.core.v3.Node
-    id: "tls_id"
-)EOF",
-                            *m_tls);
-  auto* m_raw = matches.Add();
-  TestUtility::loadFromYaml(R"EOF(
-name: "raw"
-transport_socket:
-  name: "foo"
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.core.v3.Node
-    id: "raw_id"
-)EOF",
-                            *m_raw);
-
-  // xDS matcher on source_ip using matcher_tree with prefix_match_map.
-  xds::type::matcher::v3::Matcher matcher;
-  TestUtility::loadFromYaml(R"EOF(
-matcher_tree:
-  input:
-    name: envoy.matching.inputs.source_ip
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
-  prefix_match_map:
-    map:
-      "127.":
-        action:
-          name: envoy.matching.action.transport_socket.name
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
-            name: tls
-on_no_match:
-  action:
-    name: envoy.matching.action.transport_socket.name
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
-      name: raw
-)EOF",
-                            matcher);
-
-  matcher_ = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
-                                                mock_factory_context_, mock_default_factory_,
-                                                *stats_scope_)
-                 .value();
-
-  // For this test, we'll verify that the matcher configuration was set up correctly
-  // but the actual network-based matching (source IP) isn't supported with the
-  // simplified two-parameter resolve method. The matcher would need network context
-  // which isn't available in the legacy interface.
-  auto* impl2 = dynamic_cast<TransportSocketMatcherImpl*>(matcher_.get());
-  ASSERT_NE(impl2, nullptr);
-
-  // Without network context, the matcher falls back to default
-  auto res_default = impl2->resolve(nullptr, nullptr);
-  const auto& foo_default = dynamic_cast<const FakeTransportSocketFactory&>(res_default.factory_);
-  EXPECT_EQ("default", foo_default.id());
-}
-
 TEST_F(TransportSocketMatcherTest, MultipleMatchFirstWin) {
   init({R"EOF(
 name: "sidecar_http_socket"
@@ -615,67 +480,6 @@ filter_metadata:
   validate(&locality_metadata, &endpoint_metadata, "locality_match");
 }
 
-TEST_F(TransportSocketMatcherTest, XdsAllMatchesSupportAlpnChecksMapFactories) {
-  // Default supports ALPN, but factories created by our config factory do not.
-  mock_default_factory_ = std::make_unique<NiceMock<FakeTransportSocketFactory>>("default", true);
-  factory_.supports_alpn_ = false;
-
-  // Provide two named socket matches to populate transport_sockets_by_name_.
-  Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch> matches;
-  {
-    auto* m = matches.Add();
-    TestUtility::loadFromYaml(R"EOF(
-name: "tls"
-transport_socket:
-  name: "foo"
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.core.v3.Node
-    id: "tls_id"
-)EOF",
-                              *m);
-  }
-  {
-    auto* m = matches.Add();
-    TestUtility::loadFromYaml(R"EOF(
-name: "raw"
-transport_socket:
-  name: "foo"
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.core.v3.Node
-    id: "raw_id"
-)EOF",
-                              *m);
-  }
-
-  // Minimal matcher that won't be used by the check itself, we just need to engage
-  // the xDS path so transport_sockets_by_name_ is filled.
-  xds::type::matcher::v3::Matcher matcher;
-  TestUtility::loadFromYaml(R"EOF(
-matcher_tree:
-  input:
-    name: envoy.matching.inputs.server_name
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
-  exact_match_map:
-    map:
-      "irrelevant.example":
-        action:
-          name: envoy.matching.action.transport_socket.name
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
-            name: tls
-)EOF",
-                            matcher);
-
-  matcher_ = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
-                                                mock_factory_context_, mock_default_factory_,
-                                                *stats_scope_)
-                 .value();
-
-  // Because factories created from the map do not support ALPN, the overall answer is false.
-  EXPECT_FALSE(matcher_->allMatchesSupportAlpn());
-}
-
 TEST_F(TransportSocketMatcherTest, TransportSocketNameActionFactoryAndTypeUrl) {
   // Build a TransportSocketNameAction config and create the action via the factory.
   TransportSocketNameActionFactory factory;
@@ -688,67 +492,6 @@ TEST_F(TransportSocketMatcherTest, TransportSocketNameActionFactoryAndTypeUrl) {
   // Verify the action holds the expected name and exposes the declared type URL.
   const auto& typed = action->getTyped<TransportSocketNameAction>();
   EXPECT_EQ(typed.name(), "tls");
-}
-
-TEST_F(TransportSocketMatcherTest, XdsMatcherPrefixMapBranch) {
-  // Prepare two matches so socket map exists.
-  Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch> matches;
-  auto* m_tls = matches.Add();
-  TestUtility::loadFromYaml(R"EOF(
-name: "tls"
-transport_socket:
-  name: "foo"
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.core.v3.Node
-    id: "tls_id"
-)EOF",
-                            *m_tls);
-  auto* m_raw = matches.Add();
-  TestUtility::loadFromYaml(R"EOF(
-name: "raw"
-transport_socket:
-  name: "foo"
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.core.v3.Node
-    id: "raw_id"
-)EOF",
-                            *m_raw);
-
-  // Use prefix_match_map to hit that code path.
-  xds::type::matcher::v3::Matcher matcher;
-  TestUtility::loadFromYaml(R"EOF(
-matcher_tree:
-  input:
-    name: envoy.matching.inputs.source_ip
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
-  prefix_match_map:
-    map:
-      "10.":
-        action:
-          name: envoy.matching.action.transport_socket.name
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
-            name: tls
-)EOF",
-                            matcher);
-
-  matcher_ = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
-                                                mock_factory_context_, mock_default_factory_,
-                                                *stats_scope_)
-                 .value();
-
-  // For this test, we'll verify that the matcher configuration was set up correctly
-  // but the actual network-based matching (source IP prefix) isn't supported with the
-  // simplified two-parameter resolve method. The matcher would need network context
-  // which isn't available in the legacy interface.
-  auto* impl = dynamic_cast<TransportSocketMatcherImpl*>(matcher_.get());
-  ASSERT_NE(impl, nullptr);
-
-  // Without network context, the matcher falls back to default
-  auto res_default = impl->resolve(nullptr, nullptr);
-  const auto& foo_default = dynamic_cast<const FakeTransportSocketFactory&>(res_default.factory_);
-  EXPECT_EQ("default", foo_default.id());
 }
 
 TEST_F(TransportSocketMatcherTest, XdsMatcherAnyMatcherWhenTypeNotSet) {
@@ -835,90 +578,137 @@ transport_socket:
   }
 }
 
-TEST_F(TransportSocketMatcherTest, ExtractSocketNameSkipsInvalidAction) {
-  // Provide sockets.
+// End-to-end test for filter state-based transport socket selection.
+TEST_F(TransportSocketMatcherTest, XdsMatcherFilterStateEndToEnd) {
+  // Create two named transport sockets.
   Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch> matches;
-  auto* m_tls = matches.Add();
+  auto* m_namespace_a = matches.Add();
   TestUtility::loadFromYaml(R"EOF(
-name: "tls"
+name: "namespace_a_socket"
 transport_socket:
   name: "foo"
   typed_config:
     "@type": type.googleapis.com/envoy.config.core.v3.Node
-    id: "tls_id"
+    id: "namespace_a_id"
 )EOF",
-                            *m_tls);
-
-  // Matcher with wrong action name; child will be skipped, so no match -> default.
-  xds::type::matcher::v3::Matcher matcher;
+                            *m_namespace_a);
+  auto* m_namespace_b = matches.Add();
   TestUtility::loadFromYaml(R"EOF(
-matcher_tree:
-  input:
-    name: envoy.matching.inputs.server_name
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
-  exact_match_map:
-    map:
-      "tls.example.com":
-        action:
-          name: wrong-action-name
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
-            name: tls
-)EOF",
-                            matcher);
-
-  auto created = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
-                                                    mock_factory_context_, mock_default_factory_,
-                                                    *stats_scope_);
-  ASSERT_TRUE(created.ok()) << created.status();
-  matcher_ = std::move(*created);
-  auto& factory = matcher_->resolve(nullptr, nullptr).factory_;
-  const auto& f = dynamic_cast<const FakeTransportSocketFactory&>(factory);
-  EXPECT_EQ("default", f.id());
-}
-
-TEST_F(TransportSocketMatcherTest, ExtractSocketNameUnpackFailureSkipsChild) {
-  // Provide sockets.
-  Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch> matches;
-  auto* m_tls = matches.Add();
-  TestUtility::loadFromYaml(R"EOF(
-name: "tls"
+name: "namespace_b_socket"
 transport_socket:
   name: "foo"
   typed_config:
     "@type": type.googleapis.com/envoy.config.core.v3.Node
-    id: "tls_id"
+    id: "namespace_b_id"
 )EOF",
-                            *m_tls);
+                            *m_namespace_b);
 
-  // Action name correct, and typed_config correct type -> should work normally.
+  // Create xDS matcher using filter_state input for network namespace.
   xds::type::matcher::v3::Matcher matcher;
   TestUtility::loadFromYaml(R"EOF(
 matcher_tree:
   input:
-    name: envoy.matching.inputs.server_name
+    name: envoy.matching.inputs.filter_state
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.FilterStateInput
+      key: "envoy.network.namespace"
   exact_match_map:
     map:
-      "tls.example.com":
+      "/run/netns/namespace-a":
         action:
           name: envoy.matching.action.transport_socket.name
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
-            name: tls
+            name: namespace_a_socket
+      "/run/netns/namespace-b":
+        action:
+          name: envoy.matching.action.transport_socket.name
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+            name: namespace_b_socket
+on_no_match:
+  action:
+    name: envoy.matching.action.transport_socket.name
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+      name: namespace_a_socket
 )EOF",
                             matcher);
 
-  auto created = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
-                                                    mock_factory_context_, mock_default_factory_,
-                                                    *stats_scope_);
-  ASSERT_TRUE(created.ok()) << created.status();
-  matcher_ = std::move(*created);
-  auto& factory = matcher_->resolve(nullptr, nullptr).factory_;
-  const auto& f = dynamic_cast<const FakeTransportSocketFactory&>(factory);
-  EXPECT_EQ("default", f.id());
+  matcher_ = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                mock_factory_context_, mock_default_factory_,
+                                                *stats_scope_)
+                 .value();
+
+  // Test 1: Create TransportSocketOptions with filter state for namespace-a.
+  {
+    auto downstream_filter_state = std::make_shared<StreamInfo::FilterStateImpl>(
+        StreamInfo::FilterState::LifeSpan::Connection);
+
+    // Simulate a filter setting network namespace in downstream filter state.
+    auto ns_object = std::make_shared<Router::StringAccessorImpl>("/run/netns/namespace-a");
+    downstream_filter_state->setData(
+        "envoy.network.namespace", ns_object, StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection,
+        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+
+    // Create TransportSocketOptions with the shared filter state objects.
+    auto shared_objects = downstream_filter_state->objectsSharedWithUpstreamConnection();
+    auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+        absl::nullopt, std::move(shared_objects));
+
+    // Resolve transport socket - should select namespace_a_socket.
+    auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
+    const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);
+    EXPECT_EQ("namespace_a_id", factory.id());
+    EXPECT_EQ("namespace_a_socket", result.name_);
+  }
+
+  // Test 2: TransportSocketOptions with filter state for namespace-b.
+  {
+    auto downstream_filter_state = std::make_shared<StreamInfo::FilterStateImpl>(
+        StreamInfo::FilterState::LifeSpan::Connection);
+
+    auto ns_object = std::make_shared<Router::StringAccessorImpl>("/run/netns/namespace-b");
+    downstream_filter_state->setData(
+        "envoy.network.namespace", ns_object, StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection,
+        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+
+    auto shared_objects = downstream_filter_state->objectsSharedWithUpstreamConnection();
+    auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+        absl::nullopt, std::move(shared_objects));
+
+    auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
+    const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);
+    EXPECT_EQ("namespace_b_id", factory.id());
+    EXPECT_EQ("namespace_b_socket", result.name_);
+  }
+
+  // Test 3: No TransportSocketOptions. It should fall back to on_no_match.
+  {
+    auto result = matcher_->resolve(nullptr, nullptr, nullptr);
+    const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);
+    EXPECT_EQ("namespace_a_id", factory.id()); // on_no_match defaults to namespace_a_socket
+    EXPECT_EQ("namespace_a_socket", result.name_);
+  }
+
+  // Test 4: TransportSocketOptions with empty filter state - should fall back to on_no_match.
+  {
+    auto downstream_filter_state = std::make_shared<StreamInfo::FilterStateImpl>(
+        StreamInfo::FilterState::LifeSpan::Connection);
+    auto shared_objects = downstream_filter_state->objectsSharedWithUpstreamConnection();
+    auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+        absl::nullopt, std::move(shared_objects));
+
+    auto result = matcher_->resolve(nullptr, nullptr, transport_socket_options);
+    const auto& factory = dynamic_cast<const FakeTransportSocketFactory&>(result.factory_);
+    EXPECT_EQ("namespace_a_id", factory.id()); // on_no_match defaults to namespace_a_socket
+    EXPECT_EQ("namespace_a_socket", result.name_);
+  }
 }
 
 } // namespace

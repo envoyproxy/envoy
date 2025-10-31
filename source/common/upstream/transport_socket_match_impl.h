@@ -60,7 +60,9 @@ public:
   };
 
   MatchData resolve(const envoy::config::core::v3::Metadata* endpoint_metadata,
-                    const envoy::config::core::v3::Metadata* locality_metadata) const override;
+                    const envoy::config::core::v3::Metadata* locality_metadata,
+                    Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
+                        nullptr) const override;
 
   bool allMatchesSupportAlpn() const override {
     if (!default_match_.factory->supportsAlpn()) {
@@ -103,10 +105,13 @@ private:
    * Resolve the transport socket configuration using the matcher if available.
    * @param endpoint_metadata the metadata of the given host.
    * @param locality_metadata the metadata of the host's locality.
+   * @param transport_socket_options optional transport socket options from downstream connection.
    * @return the match information of the transport socket selected.
    */
-  MatchData resolveUsingMatcher(const envoy::config::core::v3::Metadata* endpoint_metadata,
-                                const envoy::config::core::v3::Metadata* locality_metadata) const;
+  MatchData
+  resolveUsingMatcher(const envoy::config::core::v3::Metadata* endpoint_metadata,
+                      const envoy::config::core::v3::Metadata* locality_metadata,
+                      Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const;
 
   /**
    * Setup transport socket matcher based on the provided configuration.

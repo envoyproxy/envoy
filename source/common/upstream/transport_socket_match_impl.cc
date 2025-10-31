@@ -10,6 +10,7 @@
 #include "source/common/matcher/exact_map_matcher.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/matcher/prefix_map_matcher.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "xds/type/matcher/v3/matcher.pb.h"
 
@@ -111,10 +112,11 @@ TransportSocketMatcherImpl::generateStats(const std::string& prefix) const {
 
 TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolve(
     const envoy::config::core::v3::Metadata* endpoint_metadata,
-    const envoy::config::core::v3::Metadata* locality_metadata) const {
+    const envoy::config::core::v3::Metadata* locality_metadata,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   // If matcher is available, use matcher-based resolution.
   if (matcher_) {
-    return resolveUsingMatcher(endpoint_metadata, locality_metadata);
+    return resolveUsingMatcher(endpoint_metadata, locality_metadata, transport_socket_options);
   }
 
   // Fall back to legacy metadata-based matching.
@@ -142,8 +144,25 @@ TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolve(
 
 TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolveUsingMatcher(
     const envoy::config::core::v3::Metadata* endpoint_metadata,
-    const envoy::config::core::v3::Metadata* locality_metadata) const {
-  TransportSocketMatchingData data(endpoint_metadata, locality_metadata);
+    const envoy::config::core::v3::Metadata* locality_metadata,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
+  // Extract filter state from transport socket options if available.
+  StreamInfo::FilterStateSharedPtr filter_state;
+  if (transport_socket_options) {
+    const auto& shared_objects = transport_socket_options->downstreamSharedFilterStateObjects();
+    if (!shared_objects.empty()) {
+      // Create a temporary filter state to hold the shared objects for matching.
+      filter_state = std::make_shared<StreamInfo::FilterStateImpl>(
+          StreamInfo::FilterState::LifeSpan::Connection);
+      for (const auto& object : shared_objects) {
+        filter_state->setData(object.name_, object.data_, object.state_type_,
+                              StreamInfo::FilterState::LifeSpan::Connection,
+                              object.stream_sharing_);
+      }
+    }
+  }
+
+  TransportSocketMatchingData data(endpoint_metadata, locality_metadata, filter_state.get());
   auto on_match = Matcher::evaluateMatch(*matcher_, data);
   if (on_match.isMatch()) {
     const auto action = on_match.action();
