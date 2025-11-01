@@ -267,6 +267,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/network:connection_lib",
         "//source/common/network:listener_filter_buffer_lib",
+        "//source/common/network:upstream_network_namespace_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:active_listener_base",
     ],
