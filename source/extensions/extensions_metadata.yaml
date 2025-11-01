@@ -1743,10 +1743,13 @@ envoy.matching.inputs.locality_metadata:
   - envoy.extensions.matching.common_inputs.transport_socket.v3.LocalityMetadataInput
 envoy.matching.inputs.filter_state:
   categories:
+  - envoy.matching.http.input
   - envoy.matching.inputs
+  - envoy.matching.network.input
   security_posture: unknown
   status: stable
   type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
   - envoy.extensions.matching.common_inputs.transport_socket.v3.FilterStateInput
 envoy.matching.inputs.application_protocol:
   categories:
@@ -1756,14 +1759,6 @@ envoy.matching.inputs.application_protocol:
   status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
-envoy.matching.inputs.filter_state:
-  categories:
-  - envoy.matching.http.input
-  - envoy.matching.network.input
-  security_posture: unknown
-  status: stable
-  type_urls:
-  - envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
 envoy.matching.inputs.dynamic_metadata:
   categories:
   - envoy.matching.http.input
