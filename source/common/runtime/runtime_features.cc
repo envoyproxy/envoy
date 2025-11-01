@@ -44,6 +44,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_beh
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_stream_close_optimization);
 RUNTIME_GUARD(envoy_reloadable_features_generic_proxy_codec_buffer_limit);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_delay_reset);
