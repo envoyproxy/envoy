@@ -421,6 +421,14 @@ public:
               (Http::RequestHeaderMap & headers, const Formatter::Context& context,
                const StreamInfo::StreamInfo& stream_info, bool insert_envoy_original_path),
               (const));
+  MOCK_METHOD(void, finalizeHostAndPath,
+              (Http::RequestHeaderMap & headers, const Formatter::Context& context,
+               const StreamInfo::StreamInfo& stream_info, bool keep_original_host_or_path),
+              (const));
+  MOCK_METHOD(void, applyRequestHeaderTransforms,
+              (Http::RequestHeaderMap & headers, const Formatter::Context& context,
+               const StreamInfo::StreamInfo& stream_info),
+              (const));
   MOCK_METHOD(Http::HeaderTransforms, requestHeaderTransforms,
               (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
   MOCK_METHOD(void, finalizeResponseHeaders,
@@ -545,6 +553,14 @@ public:
   MOCK_METHOD(void, finalizeRequestHeaders,
               (Http::RequestHeaderMap & headers, const Formatter::Context& context,
                const StreamInfo::StreamInfo& stream_info, bool insert_envoy_original_path),
+              (const));
+  MOCK_METHOD(void, finalizeHostAndPath,
+              (Http::RequestHeaderMap & headers, const Formatter::Context& context,
+               const StreamInfo::StreamInfo& stream_info, bool keep_original_host_or_path),
+              (const));
+  MOCK_METHOD(void, applyRequestHeaderTransforms,
+              (Http::RequestHeaderMap & headers, const Formatter::Context& context,
+               const StreamInfo::StreamInfo& stream_info),
               (const));
   MOCK_METHOD(Http::HeaderTransforms, requestHeaderTransforms,
               (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));

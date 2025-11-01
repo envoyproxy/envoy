@@ -965,6 +965,35 @@ public:
                                       bool keep_original_host_or_path) const PURE;
 
   /**
+   * Finalizes host and path headers including host rewriting and path rewriting.
+   * This should be called early in the request processing flow (before host selection).
+   * This method is part of the implementation of finalizeRequestHeaders, split to allow
+   * proper ordering of header transformations.
+   * @param headers supplies the request headers to finalize.
+   * @param context supplies the formatter context.
+   * @param stream_info supplies the stream info.
+   * @param keep_original_host_or_path whether to preserve original host/path in x-envoy-original-*
+   * headers.
+   */
+  virtual void finalizeHostAndPath(Http::RequestHeaderMap& headers,
+                                   const Formatter::Context& context,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   bool keep_original_host_or_path) const PURE;
+
+  /**
+   * Applies request header transformations configured via request_headers_to_add.
+   * This should be called late in the request processing flow (after router-set headers).
+   * This method is part of the implementation of finalizeRequestHeaders, split to allow
+   * proper ordering of header transformations.
+   * @param headers supplies the request headers to transform.
+   * @param context supplies the formatter context.
+   * @param stream_info supplies the stream info.
+   */
+  virtual void applyRequestHeaderTransforms(Http::RequestHeaderMap& headers,
+                                            const Formatter::Context& context,
+                                            const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
    * Returns the request header transforms that would be applied if finalizeRequestHeaders were
    * called now. This is useful if you want to obtain request header transforms which was or will be
    * applied through finalizeRequestHeaders call. Note: do not use unless you are sure that there

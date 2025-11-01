@@ -600,10 +600,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   attempt_count_++;
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
-  // Finalize the request headers before the host selection.
+  // Finalize host and path headers before host selection.
+  // Note: request_headers_to_add will be applied later after router-set headers are added.
   const Formatter::Context formatter_context(&headers, {}, {}, {}, {}, &callbacks_->activeSpan());
-  route_entry_->finalizeRequestHeaders(headers, formatter_context, callbacks_->streamInfo(),
-                                       !config_->suppress_envoy_headers_);
+  route_entry_->finalizeHostAndPath(headers, formatter_context, callbacks_->streamInfo(),
+                                    !config_->suppress_envoy_headers_);
 
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
@@ -779,6 +780,12 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   if (include_attempt_count_in_request_) {
     headers.setEnvoyAttemptCount(attempt_count_);
   }
+
+  // Apply request_headers_to_add transformations now that router-set headers are present.
+  const Formatter::Context header_transform_context(&headers, {}, {}, {}, {},
+                                                    &callbacks_->activeSpan());
+  route_entry_->applyRequestHeaderTransforms(headers, header_transform_context,
+                                             callbacks_->streamInfo());
 
   FilterUtility::setUpstreamScheme(
       headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
@@ -2253,6 +2260,12 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
   FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
                                    *downstream_headers_, !config_->suppress_envoy_headers_,
                                    grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
+
+  // Apply request_headers_to_add transformations now that all router-set headers are present.
+  const Formatter::Context header_transform_context(downstream_headers_, {}, {}, {}, {},
+                                                    &callbacks_->activeSpan());
+  route_entry_->applyRequestHeaderTransforms(*downstream_headers_, header_transform_context,
+                                             callbacks_->streamInfo());
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
