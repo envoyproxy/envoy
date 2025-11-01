@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package envoy.extensions.access_loggers.stats.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.stats.v3";
+option java_outer_classname = "StatsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/stats/v3;statsv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Stats logger]
+// [#extension: envoy.access_loggers.stats]
+
+message Config {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+
+  message Tag {
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    string value_format = 2 [(validate.rules).string = {min_len: 1}];
+  }
+
+  message Stat {
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    repeated Tag tags = 2;
+  }
+
+  message Histogram {
+    enum Unit {
+      Unspecified = 0;
+
+      Bytes = 1;
+
+      Microseconds = 2;
+
+      Milliseconds = 3;
+
+      Nanoseconds = 4;
+
+      // Values are scaled to range 0-1.0, indicating 0%-100%.
+      Percent = 5;
+    }
+
+    Stat stat = 1 [(validate.rules).message = {required: true}];
+
+    Unit unit = 2 [(validate.rules).enum = {defined_only: true}];
+
+    // format string; must evaluate to a positive number
+    string value_format = 3 [(validate.rules).string = {min_len: 1 prefix: "%" suffix: "%"}];
+  }
+
+  // Increase the counter by the amount of `value`.
+  message Counter {
+    Stat stat = 1 [(validate.rules).message = {required: true}];
+
+    // Must evaluate to a numeric value.
+    // One of ``value_format`` or ``value_fixed``
+    string value_format = 2
+        [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
+
+    // For the computed set of tags, increment the counter by this fixed amount.
+    // One of ``value_format`` or ``value_fixed``
+    google.protobuf.UInt64Value value_fixed = 3;
+  }
+
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  repeated Histogram histograms = 3;
+
+  repeated Counter counters = 4;
+}
