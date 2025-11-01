@@ -174,5 +174,11 @@ new_features:
     :ref:`enforce_response_header_limits <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.enforce_response_header_limits>`
     that allows admins to enable / disable the behavior of dropping response headers once the header
     map count / size constraints have been reached.
-
+- area: http
+  change: |
+    Added :ref:`add_proxy_protocol_request_state
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.add_proxy_protocol_request_state>`
+    to propagate proxy protocol state based on the downstream information of the HTTP request. This will use the direct 
+    downstream connection details by default or will utilize ``x-forwarded-for`` details if configured. This may be 
+    useful in scenarios where a TCP connection is encapsulated in an HTTP/2 CONNECT tunnel through multiple Envoy proxies.
 deprecated:

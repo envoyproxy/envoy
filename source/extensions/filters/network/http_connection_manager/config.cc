@@ -439,7 +439,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       append_local_overload_(config.append_local_overload()),
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)),
+      add_proxy_protocol_request_state_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_request_state, false)) {
   if (!creation_status.ok()) {
     return;
   }

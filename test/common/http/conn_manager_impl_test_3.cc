@@ -2235,6 +2235,21 @@ TEST_F(HttpConnectionManagerImplTest, NoProxyProtocolAdded) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+TEST_F(HttpConnectionManagerImplTest, RequestProxyProtocolAdded) {
+  add_proxy_protocol_connection_state_ = false;
+  add_proxy_protocol_request_state_ = true;
+  setup();
+  Buffer::OwnedImpl fake_input("input");
+  conn_manager_->createCodec(fake_input);
+
+  startRequest(false);
+
+  EXPECT_TRUE(decoder_->streamInfo().filterState()->hasDataWithName(
+      Network::ProxyProtocolFilterState::key()));
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Validate that deferred streams are processed with a variety of
 // headers, data, metadata, and trailers arriving in the same I/O cycle
 TEST_F(HttpConnectionManagerImplTest, LimitWorkPerIOCycle) {
