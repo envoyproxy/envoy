@@ -248,7 +248,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                                "spiffe://lyft.com/backend-team");
   auto& quic_transport_socket_factory =
       dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*transport_socket_factory);
-  auto persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher, 0);
+  std::unique_ptr<Quic::PersistentQuicInfoImpl> persistent_info =
+      Quic::createPersistentQuicInfoForCluster(*dispatcher, *cluster);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {

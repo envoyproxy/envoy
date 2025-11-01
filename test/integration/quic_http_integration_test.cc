@@ -15,10 +15,13 @@ namespace Quic {
 
 class QuicHttpIntegrationSPATest
     : public QuicHttpIntegrationTestBase,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool, bool>> {
 public:
   QuicHttpIntegrationSPATest()
-      : QuicHttpIntegrationTestBase(std::get<0>(GetParam()), ConfigHelper::quicHttpProxyConfig()) {}
+      : QuicHttpIntegrationTestBase(std::get<0>(GetParam()), ConfigHelper::quicHttpProxyConfig()) {
+    quiche_handles_migration_ = std::get<2>(GetParam());
+    migration_config_.allow_server_preferred_address = quiche_handles_migration_;
+  }
 
   void SetUp() override {
     config_helper_.addRuntimeOverride(
@@ -37,15 +40,16 @@ INSTANTIATE_TEST_SUITE_P(QuicHttpMultiAddressesIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 static std::string SPATestParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>>& params) {
   return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)), "_",
-                      std::get<1>(params.param) ? "all_clients_impl" : "quiche_client_impl");
+                      std::get<1>(params.param) ? "all_clients_impl" : "quiche_client_impl", "_",
+                      std::get<2>(params.param) ? "migration_by_quiche" : "migration_in_house");
 }
 
 INSTANTIATE_TEST_SUITE_P(
     QuicHttpIntegrationSPATests, QuicHttpIntegrationSPATest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(true, false)),
+                     testing::Values(true, false), testing::Values(true, false)),
     SPATestParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
@@ -276,7 +280,9 @@ TEST_P(QuicHttpIntegrationTest, MultiWorkerWithLongConnectionId) {
   testRouterHeaderOnlyRequestAndResponse();
 }
 
-TEST_P(QuicHttpIntegrationTest, PortMigration) {
+TEST_P(QuicHttpIntegrationTest, MimicNatRebinding) {
+  // Explicitly disable QUICHE to do any kind of migration.
+  migration_config_ = quicConnectionMigrationDisableAllConfig();
   setConcurrency(2);
   initialize();
   uint32_t old_port = lookupPort("http");
@@ -345,7 +351,34 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   cleanupUpstreamAndDownstream();
 }
 
-TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
+class QuicHttpIntegrationPortMigrationTest
+    : public QuicHttpIntegrationTestBase,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+public:
+  QuicHttpIntegrationPortMigrationTest()
+      : QuicHttpIntegrationTestBase(std::get<0>(GetParam()), ConfigHelper::quicHttpProxyConfig()) {
+    quiche_handles_migration_ = std::get<1>(GetParam());
+    if (quiche_handles_migration_) {
+      migration_config_.allow_port_migration = true;
+      migration_config_.migrate_session_on_network_change = false;
+      migration_config_.max_port_migrations_per_session = kMaxNumSocketSwitches;
+    }
+  }
+};
+
+static std::string PortMigrationTestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+  return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)), "_",
+                      std::get<1>(params.param) ? "migration_by_quiche" : "migration_in_house");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicHttpIntegrationPortMigrationTest, QuicHttpIntegrationPortMigrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(true, false)),
+    PortMigrationTestParamsToString);
+
+TEST_P(QuicHttpIntegrationPortMigrationTest, PortMigrationOnPathDegrading) {
   setConcurrency(2);
   initialize();
   client_quic_options_.mutable_num_timeouts_to_trigger_port_migration()->set_value(2);
@@ -372,7 +405,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
 
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
 
-  for (uint8_t i = 0; i < 5; i++) {
+  for (uint8_t i = 0; i < kMaxNumSocketSwitches; i++) {
     auto old_self_addr = quic_connection_->self_address();
     EXPECT_CALL(*option, setOption(_, _)).Times(3u);
     quic_connection_->OnPathDegradingDetected();
@@ -401,9 +434,11 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
 }
 
-TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
+// Test that port migration will not be triggered if not configured.
+TEST_P(QuicHttpIntegrationPortMigrationTest, NoPortMigrationWithoutConfig) {
   setConcurrency(2);
   initialize();
+  migration_config_.allow_port_migration = false;
   client_quic_options_.mutable_num_timeouts_to_trigger_port_migration()->set_value(0);
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
@@ -440,7 +475,8 @@ TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
 }
 
-TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
+// Test that port migration will fail if the new socket is not usable.
+TEST_P(QuicHttpIntegrationPortMigrationTest, PortMigrationFailureOnPathDegrading) {
   setConcurrency(2);
   validation_failure_on_path_response_ = true;
   initialize();
@@ -1527,6 +1563,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
   if (version_ == Network::Address::IpVersion::v4) {
     // Most v6 platform doesn't support two loopback interfaces.
     EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
+    EXPECT_EQ("127.0.0.1", quic_connection_->self_address().host().ToString());
     test_server_->waitForCounterGe(
         "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
   }

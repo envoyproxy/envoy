@@ -37,6 +37,7 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   quic::QuicByteCount max_packet_length_;
   // TODO(danzh): Add a config knob to configure connection migration.
   quic::QuicConnectionMigrationConfig migration_config_;
+  QuicClientPacketWriterFactoryPtr writer_factory_;
 };
 
 std::unique_ptr<PersistentQuicInfoImpl>
