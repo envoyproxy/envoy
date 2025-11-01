@@ -208,6 +208,8 @@ public:
 
   bool emitFilterStateStats() const { return emit_filter_state_stats_; }
 
+  bool enforceResponseHeaderLimits() const { return enforce_response_header_limits_; }
+
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
   const Filters::Common::ExtAuthz::MatcherSharedPtr& allowedHeadersMatcher() const {
@@ -261,6 +263,7 @@ private:
   LabelsMap destination_labels_;
   const absl::optional<Protobuf::Struct> filter_metadata_;
   const bool emit_filter_state_stats_;
+  const bool enforce_response_header_limits_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;

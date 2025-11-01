@@ -168,5 +168,11 @@ new_features:
     Added QUIC protocol option :ref:`max_sessions_per_event_loop
     <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.max_sessions_per_event_loop>` to limit the maximum
     number of new QUIC sessions created per event loop. The default is 16, preserving the previous hardcoded limit.
+- area: ext_authz
+  change: |
+    Add a new configuration field to the http ext authz filter
+    :ref:`enforce_response_header_limits <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.enforce_response_header_limits>`
+    that allows admins to enable / disable the behavior of dropping response headers once the header
+    map count / size constraints have been reached.
 
 deprecated:
