@@ -22,14 +22,14 @@ from packaging import version
 
 from tools.api_proto_plugin import annotations, constants, plugin, traverse, visitor
 from tools.api_versioning import utils as api_version_utils
-from tools.protoxform import options as protoxform_options, utils
+from tools.protoprint import utils
 from tools.type_whisperer import type_whisperer, types_pb2
 
 from google.protobuf import descriptor_pb2
 from google.protobuf import text_format
 
 from envoy.annotations import deprecation_pb2
-from udpa.annotations import migrate_pb2, status_pb2
+from udpa.annotations import migrate_pb2, status_pb2, versioning_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
 from validate import validate_pb2
 
@@ -42,6 +42,21 @@ ENVOY_DEPRECATED_UNAVIALABLE_NAME = 'DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE'
 
 class ProtoPrintError(Exception):
     """Base error class for the protoprint module."""
+
+
+def get_versioning_annotation(options):
+    """Get the udpa.annotations.versioning option.
+
+    Used by Envoy to chain back through the message type history.
+
+    Args:
+        options: MessageOptions message.
+    Returns:
+        versioning.Annotation if set otherwise None.
+    """
+    if not options.HasExtension(versioning_pb2.versioning):
+        return None
+    return options.Extensions[versioning_pb2.versioning]
 
 
 def extract_clang_proto_style(clang_format_text):
@@ -261,7 +276,7 @@ def format_header_from_file(
     options_block = format_options(options)
 
     requires_versioning_import = any(
-        protoxform_options.get_versioning_annotation(m.options) for m in file_proto.message_type)
+        get_versioning_annotation(m.options) for m in file_proto.message_type)
 
     envoy_imports = list(envoy_proto_paths)
     google_imports = []
@@ -472,8 +487,6 @@ def format_field(type_context, field):
     Returns:
         Formatted proto field as a string.
     """
-    if protoxform_options.has_hide_option(field.options):
-        return ''
     leading_comment, trailing_comment = format_type_context_comments(type_context)
 
     return '%s%s %s = %d%s;\n%s' % (
@@ -491,8 +504,6 @@ def format_enum_value(type_context, value):
     Returns:
         Formatted proto enum value as a string.
     """
-    if protoxform_options.has_hide_option(value.options):
-        return ''
     leading_comment, trailing_comment = format_type_context_comments(type_context)
     formatted_annotations = format_options(value.options)
     return '%s%s = %d%s;\n%s' % (
@@ -612,7 +623,6 @@ class ProtoFormatVisitor(visitor.Visitor):
         The annotation is added if all the following hold:
         - The field or enum value are marked as deprecated.
         - The proto is not frozen.
-        - The field or enum value are not marked as hidden.
         - The field or enum value do not already have a version annotation.
         - The field or enum value name is not ENVOY_DEPRECATED_UNAVIALABLE_NAME.
         If a field or enum value are marked with an annotation, the
@@ -621,8 +631,7 @@ class ProtoFormatVisitor(visitor.Visitor):
         annotation value, then this value is a valid one ("X.Y" where X and Y are valid major,
         and minor versions, respectively).
         """
-        if field_or_evalue.options.deprecated and not self._frozen_proto and \
-                not protoxform_options.has_hide_option(field_or_evalue.options):
+        if field_or_evalue.options.deprecated and not self._frozen_proto:
             # If the field or enum value has annotation from deprecation.proto, need to import it.
             self._requires_deprecation_annotation_import = (
                 self._requires_deprecation_annotation_import
@@ -654,8 +663,6 @@ class ProtoFormatVisitor(visitor.Visitor):
             leading_comment, service_proto.name, options, trailing_comment, methods)
 
     def visit_enum(self, enum_proto, type_context):
-        if protoxform_options.has_hide_option(enum_proto.options):
-            return ''
         # Verify that not hidden deprecated enum values of non-frozen protos have valid version
         # annotations.
 
@@ -678,8 +685,6 @@ class ProtoFormatVisitor(visitor.Visitor):
     def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
         # Skip messages synthesized to represent map types.
         if msg_proto.options.map_entry:
-            return ''
-        if protoxform_options.has_hide_option(msg_proto.options):
             return ''
         annotation_xforms = {
             annotations.NEXT_FREE_FIELD_ANNOTATION: create_next_free_field_xform(msg_proto)

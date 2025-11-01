@@ -413,6 +413,11 @@ void Filter::handleResponseExtractionResult(const std::vector<ExtractedMessageMe
     for (const auto& field : metadata.extracted_message.fields()) {
       (*key_field->mutable_fields())[field.first] = field.second;
     }
+
+    if (metadata.num_response_items.has_value()) {
+      (*key_field->mutable_fields())["numResponseItems"].set_string_value(
+          std::to_string(*metadata.num_response_items));
+    }
   };
 
   const auto& first_metadata = result[0];
