@@ -219,6 +219,7 @@ delims
 dereferencing
 deprioritized
 differentially
+dnsrec
 dnsresolvers
 endpos
 eps
