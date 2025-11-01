@@ -56,6 +56,16 @@ Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
 }
 
 Network::FilterStatus Filter::onNewConnection() {
+  if (config_->checkOnNewConnection()) {
+    if (status_ == Status::NotStarted) {
+      callCheck();
+    }
+
+    if (status_ != Status::Complete || filter_return_ == FilterReturn::Stop) {
+      return Network::FilterStatus::StopIteration;
+    }
+  }
+
   // Wait till onData() happens.
   return Network::FilterStatus::Continue;
 }
