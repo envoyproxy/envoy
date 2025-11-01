@@ -67,6 +67,12 @@ message QuicProtocolOptions {
   // [#extension-category: envoy.quic.proof_source]
   core.v3.TypedExtensionConfig proof_source_config = 7;
 
+  // Configure which implementation of ``quic::ProofVerifier`` to be used for this listener
+  // for client certificate verification in mTLS scenarios.
+  // If not specified, the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.proof_source.v3.ProofSourceConfig>` will be used.
+  // [#extension-category: envoy.quic.server.proof_verifier]
+  core.v3.TypedExtensionConfig proof_verifier_config = 14;
+
   // Config which implementation of ``quic::ConnectionIdGeneratorInterface`` to be used for this listener.
   // If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.connection_id_generator.v3.DeterministicConnectionIdGeneratorConfig>` will be used.
   // [#extension-category: envoy.quic.connection_id_generator]

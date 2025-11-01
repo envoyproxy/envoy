@@ -44,6 +44,8 @@ public:
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override { return nullptr; }
   // Return empty string
   std::string getCaFileName() const override { return ""; }
+  // Return empty CA certificates list since platform bridge doesn't provide CA list.
+  bssl::UniquePtr<STACK_OF(X509_NAME)> getCaCertificates() const override { return nullptr; }
   // Overridden to call into platform extension API asynchronously.
   ValidationResults
   doVerifyCertChain(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
