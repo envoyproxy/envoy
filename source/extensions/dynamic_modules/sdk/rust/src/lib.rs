@@ -776,8 +776,9 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool;
 
-  /// Get the new received request body.
-  /// This should only be used in the `on_request_body` callback.
+  /// Get the received request body (the request body pieces received in the latest event).
+  /// This should only be used in the [`HttpFilter::on_request_body`] callback.
+  ///
   /// The body is represented as a list of [`EnvoyBuffer`].
   /// Memory contents pointed by each [`EnvoyBuffer`] is mutable and can be modified in place.
   /// However, the vector itself is a "copied view". For example, adding or removing
@@ -820,11 +821,12 @@ pub trait EnvoyHttpFilter {
   /// This returns None if the request body is not available.
   fn get_received_request_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
 
-  /// Similar to `get_received_request_body`, but returns the historically buffered request body.
+  /// Similar to [`get_received_request_body`], but returns the buffered request body
+  /// (the request body pieces buffered so far in the filter chain).
   fn get_buffered_request_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
 
-  /// Drain the given number of bytes from the front of the new received request body.
-  /// This should only be used in the `on_request_body` callback.
+  /// Drain the given number of bytes from the front of the received request body.
+  /// This should only be used in the [`HttpFilter::on_request_body`] callback.
   ///
   /// Returns false if the request body is not available.
   ///
@@ -832,18 +834,20 @@ pub trait EnvoyHttpFilter {
   /// content-length header if necessary.
   fn drain_received_request_body(&mut self, number_of_bytes: usize) -> bool;
 
-  /// Similar to `drain_received_request_body`, but drains from the historically buffered request
-  /// body. This should only be called by the latest data processing filter in the filter chain.
-  /// That is say the filters after this filter in the filter chain should have not accessed the
-  /// request body yet.
+  /// Similar to [`drain_received_request_body`], but drains from the buffered request body.
+  ///
+  /// This should only be called by the latest data processing filter in the filter chain.
+  /// That is say for a given filter X, if and only if the filters following filter X in the filter
+  /// chain have not yet accessed the body, filter X can safely modify the buffered body with this
+  /// method.
   ///
   /// Returns false if the request body is not available.
   /// Note that after changing the request body, it is caller's responsibility to modify the
   /// content-length header if necessary.
   fn drain_buffered_request_body(&mut self, number_of_bytes: usize) -> bool;
 
-  /// Append the given data to the end of the new received request body.
-  /// This should only be used in the `on_request_body` callback.
+  /// Append the given data to the end of the received request body.
+  /// This should only be used in the [`HttpFilter::on_request_body`] callback.
   ///
   /// Returns false if the request body is not available.
   ///
@@ -851,18 +855,21 @@ pub trait EnvoyHttpFilter {
   /// content-length header if necessary.
   fn append_received_request_body(&mut self, data: &[u8]) -> bool;
 
-  /// Similar to `append_received_request_body`, but appends to the historically buffered request
-  /// body. This should only be called by the latest data processing filter in the filter chain.
-  /// That is say the filters after this filter in the filter chain should have not accessed the
-  /// request body yet.
+  /// Similar to [`append_received_request_body`], but appends to the buffered request body.
+  ///
+  /// This should only be called by the latest data processing filter in the filter chain.
+  /// That is say for a given filter X, if and only if the filters following filter X in the filter
+  /// chain have not yet accessed the body, filter X can safely modify the buffered body with this
+  /// method.
   ///
   /// Returns false if the request body is not available.
   /// Note that after changing the request body, it is caller's responsibility to modify the
   /// content-length header if necessary.
   fn append_buffered_request_body(&mut self, data: &[u8]) -> bool;
 
-  /// Get the new received response body.
-  /// This should only be used in the `on_response_body` callback.
+  /// Get the received response body (the response body pieces received in the latest event).
+  /// This should only be used in the [`HttpFilter::on_response_body`] callback.
+  ///
   /// The body is represented as a list of
   /// [`EnvoyBuffer`]. Memory contents pointed by each [`EnvoyBuffer`] is mutable and can be
   /// modified in place. However, the buffer itself is immutable. For example, adding or removing
@@ -888,7 +895,7 @@ pub trait EnvoyHttpFilter {
   ///   .return_const(true);
   ///
   ///
-  /// // Calculate the size of the new received response body in bytes.
+  /// // Calculate the size of the received response body in bytes.
   /// let buffers = envoy_filter.get_received_response_body().unwrap();
   /// let mut size = 0;
   /// for buffer in &buffers {
@@ -896,7 +903,7 @@ pub trait EnvoyHttpFilter {
   /// }
   /// assert_eq!(size, 10);
   ///
-  /// // drain the new received response body.
+  /// // drain the received response body.
   /// assert!(envoy_filter.drain_received_response_body(10));
   ///
   /// // Now start writing new data from the beginning of the request body.
@@ -905,11 +912,12 @@ pub trait EnvoyHttpFilter {
   /// Returns None if the response body is not available.
   fn get_received_response_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
 
-  /// Similar to `get_received_response_body`, but returns the historically buffered response body.
+  /// Similar to [`get_received_response_body`], but returns the buffered response body
+  /// (the response body pieces buffered so far in the filter chain).
   fn get_buffered_response_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
 
-  /// Drain the given number of bytes from the front of the new received response body.
-  /// This should only be used in the `on_response_body` callback.
+  /// Drain the given number of bytes from the front of the received response body.
+  /// This should only be used in the [`HttpFilter::on_response_body`] callback.
   ///
   /// Returns false if the response body is not available.
   ///
@@ -917,18 +925,20 @@ pub trait EnvoyHttpFilter {
   /// content-length header if necessary.
   fn drain_received_response_body(&mut self, number_of_bytes: usize) -> bool;
 
-  /// Similar to `drain_received_response_body`, but drains from the historically buffered response
-  /// body. This should only be called by the latest data processing filter in the filter chain.
-  /// That is say the filters after this filter in the filter chain should have not accessed the
-  /// response body yet.
+  /// Similar to [`drain_received_response_body`], but drains from the buffered response body.
+  ///
+  /// This should only be called by the latest data processing filter in the filter chain.
+  /// That is say for a given filter X, if and only if the filters following filter X in the filter
+  /// chain have not yet accessed the body, filter X can safely modify the buffered body with this
+  /// method.
   ///
   /// Returns false if the response body is not available.
   /// Note that after changing the response body, it is caller's responsibility to modify the
   /// content-length header if necessary.
   fn drain_buffered_response_body(&mut self, number_of_bytes: usize) -> bool;
 
-  /// Append the given data to the end of the new received response body.
-  /// This should only be used in the `on_response_body` callback.
+  /// Append the given data to the end of the received response body.
+  /// This should only be used in the [`HttpFilter::on_response_body`] callback.
   ///
   /// Returns false if the response body is not available.
   ///
@@ -936,10 +946,12 @@ pub trait EnvoyHttpFilter {
   /// content-length header if necessary.
   fn append_received_response_body(&mut self, data: &[u8]) -> bool;
 
-  /// Similar to `append_received_response_body`, but appends to the historically buffered response
-  /// body. This should only be called by the latest data processing filter in the filter chain.
-  /// That is say the filters after this filter in the filter chain should have not accessed the
-  /// response body yet.
+  /// Similar to [`append_received_response_body`], but appends to the buffered response body.
+  ///
+  /// This should only be called by the latest data processing filter in the filter chain.
+  /// That is say for a given filter X, if and only if the filters following filter X in the filter
+  /// chain have not yet accessed the body, filter X can safely modify the buffered body with this
+  /// method.
   ///
   /// Returns false if the response body is not available.
   /// Note that after changing the response body, it is caller's responsibility to modify the

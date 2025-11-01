@@ -1378,21 +1378,21 @@ void envoy_dynamic_module_callback_http_send_response_trailers(
 // ------------------- HTTP Request/Response body callbacks --------------------
 
 /**
- * NOTE: Envoy will handle the request/response as a stream of data. Therefore, the body
- * may not be available in its entirety before the end of stream flag is set. The Envoy all
- * provides both the new received body and the buffered body (all historical
- * data received so far) to the module. The module should be aware of this distinction
- * when processing the body.
+ * NOTE: Envoy will handle the request/response as a stream of data. Therefore, the body may not be
+ * available in its entirety before the end of stream flag is set. The Envoy will provides both the
+ * received body (body pieces received in the latest event) and the buffered body (body pieces
+ * buffered so far) to the module. The module should be aware of this distinction when processing
+ * the body.
  *
- * NOTE: The new received body could only be available during the request/response body
+ * NOTE: The received body could only be available during the request/response body
  * event hooks (the envoy_dynamic_module_on_http_filter_request_body and
  * envoy_dynamic_module_on_http_filter_response_body).
- * Outside of these hooks, the new received body will be unavailable.
+ * Outside of these hooks, the received body will be unavailable.
  *
  * NOTE: The buffered body, however, is always available. But only the latest data processing filter
- * in the filter chain could modify the buffered body. That is say, for given filter X, the filters
- * after filter X in the filter chain should have not accessed the request body yet, then filter X
- * could modify the buffered body safely.
+ * in the filter chain could modify the buffered body. That is say for a given filter X, filter X
+ * can safely modify the buffered body if and only if the filters following filter X in the filter
+ * chain have not yet accessed the body.
  */
 
 /**
