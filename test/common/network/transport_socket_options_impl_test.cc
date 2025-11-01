@@ -5,6 +5,7 @@
 #include "source/common/network/application_protocol.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/upstream_network_namespace.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_subject_alt_names.h"
 #include "source/common/stream_info/filter_state_impl.h"
@@ -150,6 +151,53 @@ TEST_F(TransportSocketOptionsImplTest, DynamicObjects) {
   EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
   std::vector<std::string> sans{"www.example.com", "example.com"};
   EXPECT_EQ(sans, transport_socket_options->verifySubjectAltNameListOverride());
+}
+
+TEST_F(TransportSocketOptionsImplTest, UpstreamNetworkNamespace) {
+  const std::string network_namespace_filepath = "/var/run/netns/production";
+
+  // Create the object directly.
+  auto network_namespace_obj =
+      std::make_unique<UpstreamNetworkNamespace>(network_namespace_filepath);
+  EXPECT_EQ(network_namespace_filepath, network_namespace_obj->value());
+  EXPECT_EQ(absl::make_optional<std::string>(network_namespace_filepath),
+            network_namespace_obj->serializeAsString());
+
+  // Test key.
+  EXPECT_EQ("envoy.network.network_namespace", UpstreamNetworkNamespace::key());
+}
+
+TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceSharedWithUpstream) {
+  const std::string network_namespace_filepath = "/var/run/netns/staging";
+
+  // Set network namespace as shared with upstream connection.
+  filter_state_.setData(UpstreamNetworkNamespace::key(),
+                        std::make_unique<UpstreamNetworkNamespace>(network_namespace_filepath),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::Connection,
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, transport_socket_options);
+
+  auto objects = transport_socket_options->downstreamSharedFilterStateObjects();
+  EXPECT_EQ(1, objects.size());
+  EXPECT_EQ(UpstreamNetworkNamespace::key(), objects.at(0).name_);
+
+  // Verify we can retrieve the network namespace from the filter state object.
+  const auto* network_namespace_state =
+      dynamic_cast<const UpstreamNetworkNamespace*>(objects.at(0).data_.get());
+  ASSERT_NE(nullptr, network_namespace_state);
+  EXPECT_EQ(network_namespace_filepath, network_namespace_state->value());
+}
+
+TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceDynamicObject) {
+  setFilterStateObject(UpstreamNetworkNamespace::key(), "/var/run/netns/development");
+
+  // When network namespace is set alone without shared flag, it won't create transport socket
+  // options.
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  EXPECT_EQ(nullptr, transport_socket_options);
 }
 
 } // namespace
