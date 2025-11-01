@@ -2581,5 +2581,89 @@ typed_config:
   cleanup();
 }
 
+// Test CounterStats validates that the counters statistics are accurately reported.
+TEST_P(LuaIntegrationTest, CounterStats) {
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "Fake upstream metrics are not checked in this test";
+  }
+
+  const std::string config1 =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  stat_prefix: config1
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        request_handle:logInfo("hello")
+      end
+)EOF";
+  config_helper_.prependFilter(config1, testing_downstream_filter_);
+  config_helper_.prependFilter(config1, testing_downstream_filter_);
+
+  const std::string config2 =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  stat_prefix: config2
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        request_handle:logInfo("hello")
+      end
+      function envoy_on_response(response_handle)
+        response_handle:logInfo("hello")
+      end
+)EOF";
+  config_helper_.prependFilter(config2, testing_downstream_filter_);
+
+  const std::string config3 =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  stat_prefix: config3
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local foo = nil
+        foo["bar"] = "baz"
+      end
+)EOF";
+  config_helper_.prependFilter(config3, testing_downstream_filter_);
+
+  const std::string config4 =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  stat_prefix: config4
+  default_source_code:
+    inline_string: |
+      print("hello")
+)EOF";
+  initializeFilter(config4);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  test_server_->waitForCounterEq("http.config_test.lua.config1.executions", 2);
+  test_server_->waitForCounterEq("http.config_test.lua.config1.errors", 0);
+  test_server_->waitForCounterEq("http.config_test.lua.config2.executions", 2);
+  test_server_->waitForCounterEq("http.config_test.lua.config2.errors", 0);
+  test_server_->waitForCounterEq("http.config_test.lua.config3.executions", 1);
+  test_server_->waitForCounterEq("http.config_test.lua.config3.errors", 1);
+  test_server_->waitForCounterEq("http.config_test.lua.config4.executions", 0);
+  test_server_->waitForCounterEq("http.config_test.lua.config4.errors", 0);
+
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy

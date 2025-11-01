@@ -20,7 +20,7 @@ namespace Lua {
 /**
  * All lua stats. @see stats_macros.h
  */
-#define ALL_LUA_FILTER_STATS(COUNTER) COUNTER(errors)
+#define ALL_LUA_FILTER_STATS(COUNTER) COUNTER(errors) COUNTER(executions)
 
 /**
  * Struct definition for all Lua stats. @see stats_macros.h
