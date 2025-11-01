@@ -1400,4 +1400,95 @@ TEST_P(LoadShedPointIntegrationTest, ListenerAcceptDoesNotShedLoadWhenBypassed) 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
+TEST_P(LoadShedPointIntegrationTest, Http3ServerDispatchSendsGoAwayAndClosesConnection) {
+  // Test only applies to HTTP3.
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http3_server_go_away_and_close_on_dispatch"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto [first_request_encoder, first_request_decoder] =
+      codec_client_->startRequest(default_request_headers_);
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_http3_total", 1);
+
+  // Put envoy in overloaded state to send GOAWAY frames and close the
+  // connection.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq("overload.envoy.load_shed_points.http3_server_go_away_and_close_on_"
+                               "dispatch.scale_percent",
+                               100);
+
+  auto second_request_decoder = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // The downstream should receive the GOAWAY and the connection should be
+  // closed.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(codec_client_->sawGoAway());
+
+  // The second request will not complete.
+  EXPECT_FALSE(second_request_decoder->complete());
+}
+
+TEST_P(LoadShedPointIntegrationTest, Http3ServerDispatchSendsGoAwayCompletingPendingRequests) {
+  // Test only applies to HTTP3.
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http3_server_go_away_on_dispatch"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto [first_request_encoder, first_request_decoder] =
+      codec_client_->startRequest(default_request_headers_);
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_http3_total", 1);
+
+  // Put envoy in overloaded state to send GOAWAY frames.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http3_server_go_away_on_dispatch.scale_"
+      "percent",
+      100);
+
+  auto second_request_decoder = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Wait for reply of the first request which should be allowed to complete.
+  // The downstream should also receive the GOAWAY.
+  Buffer::OwnedImpl first_request_body{"foo"};
+  first_request_encoder.encodeData(first_request_body, true);
+  ASSERT_TRUE(first_request_decoder->waitForEndStream());
+
+  EXPECT_TRUE(codec_client_->sawGoAway());
+
+  // SendH3GoAway will process pending streams up to maximum possible,
+  // so the second request should also complete.
+  EXPECT_TRUE(second_request_decoder->waitForEndStream());
+  EXPECT_TRUE(second_request_decoder->complete());
+
+  codec_client_->close();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http3_server_go_away_on_dispatch.scale_"
+      "percent",
+      0);
+}
+
 } // namespace Envoy

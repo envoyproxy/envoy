@@ -177,6 +177,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:global_lib",
         "//test/test_common:logging_lib",
