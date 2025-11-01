@@ -89,13 +89,16 @@ public:
     std::unique_ptr<GrpcCall> header_stats_;
     std::unique_ptr<GrpcCall> trailer_stats_;
     std::unique_ptr<GrpcCallBody> body_stats_;
+    bool continue_and_replace_;
   };
 
   using GrpcCalls = struct GrpcCallStats;
 
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
-                      envoy::config::core::v3::TrafficDirection traffic_direction);
+                      envoy::config::core::v3::TrafficDirection traffic_direction,
+                      bool continue_and_replace = false);
+  void setImmediateResponse() { immediate_response_ = true; }
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
@@ -134,8 +137,8 @@ public:
 
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
-  GrpcCalls decoding_processor_grpc_calls_;
-  GrpcCalls encoding_processor_grpc_calls_;
+  GrpcCalls decoding_processor_grpc_calls_{};
+  GrpcCalls encoding_processor_grpc_calls_{};
   const Envoy::Protobuf::Struct filter_metadata_;
   // The following stats are populated for ext_proc filters using Envoy gRPC only.
   // The bytes sent and received are for the entire stream.
@@ -144,6 +147,8 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
   std::string http_response_code_details_;
+  // True if an immediate response is sent.
+  bool immediate_response_{false};
 };
 
 class ThreadLocalStreamManager;
