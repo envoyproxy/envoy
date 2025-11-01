@@ -2105,17 +2105,47 @@ TEST_F(HttpFilterTest, DeniedResponseWithBodyNotTruncatedWhenLimitIsZero) {
   EXPECT_EQ(1U, config_->stats().denied_.value());
 }
 
-// Verifies that the downstream request fails when the ext_authz response
-// would cause the request headers to exceed their limit.
-TEST_F(HttpFilterTest, DownstreamRequestFailsOnHeaderLimit) {
-  InSequence s;
+class RequestHeaderLimitTest : public HttpFilterTest {
+public:
+  RequestHeaderLimitTest() = default;
 
-  initialize(R"EOF(
-      grpc_service:
-        envoy_grpc:
-          cluster_name: "ext_authz_server"
-      )EOF");
+  void runTest(Http::RequestHeaderMap& request_headers,
+               Filters::Common::ExtAuthz::Response response) {
+    InSequence s;
 
+    initialize(R"EOF(
+        grpc_service:
+          envoy_grpc:
+            cluster_name: "ext_authz_server"
+        )EOF");
+
+    prepareCheck();
+
+    EXPECT_CALL(*client_, check(_, _, _, _))
+        .WillOnce(Invoke(
+            [&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+              filter_->decodeHeaders(request_headers, false));
+
+    // Now the test should fail, since we expect the downstream request to fail.
+    EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+                setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
+    EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _))
+        .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+          EXPECT_EQ(headers.getStatusValue(),
+                    std::to_string(enumToInt(Http::Code::InternalServerError)));
+        }));
+    EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+
+    request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+    EXPECT_EQ(1U, config_->stats().request_header_limits_reached_.value());
+  }
+};
+
+TEST_F(RequestHeaderLimitTest, HeadersToSetCount) {
   // The total number of headers in the request header map is not allowed to
   // exceed the limit.
   Http::TestRequestHeaderMapImpl request_headers({}, /*max_headers_kb=*/99999,
@@ -2124,32 +2154,77 @@ TEST_F(HttpFilterTest, DownstreamRequestFailsOnHeaderLimit) {
   request_headers.addCopy(Http::Headers::get().Path, "/");
   request_headers.addCopy(Http::Headers::get().Method, "GET");
 
-  prepareCheck();
-
-  EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
-            filter_->decodeHeaders(request_headers, false));
-
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_set = {{"foo", "bar"}, {"foo2", "bar2"}};
 
-  // Now the test should fail, since we expect the downstream request to fail.
-  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
-  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.getStatusValue(),
-                  std::to_string(enumToInt(Http::Code::InternalServerError)));
-      }));
-  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  runTest(request_headers, response);
+}
 
-  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+TEST_F(RequestHeaderLimitTest, HeadersToSetSize) {
+  // The total number of headers in the request header map is not allowed to
+  // exceed the limit.
+  Http::TestRequestHeaderMapImpl request_headers({}, /*max_headers_kb=*/1,
+                                                 /*max_headers_count=*/9999);
+  request_headers.addCopy(Http::Headers::get().Host, "host");
+  request_headers.addCopy(Http::Headers::get().Path, "/");
+  request_headers.addCopy(Http::Headers::get().Method, "GET");
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_set = {{"foo", "bar"}, {"foo2", std::string(9999, 'a')}};
+
+  runTest(request_headers, response);
+}
+
+// (headers to append can't add new headers, so it won't ever violate the count limit)
+TEST_F(RequestHeaderLimitTest, HeadersToAppendSize) {
+  // The total number of headers in the request header map is not allowed to
+  // exceed the limit.
+  Http::TestRequestHeaderMapImpl request_headers({}, /*max_headers_kb=*/1,
+                                                 /*max_headers_count=*/9999);
+  request_headers.addCopy(Http::Headers::get().Host, "host");
+  request_headers.addCopy(Http::Headers::get().Path, "/");
+  request_headers.addCopy(Http::Headers::get().Method, "GET");
+  request_headers.addCopy("foo", "original value");
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_append = {{"foo", std::string(9999, 'a')}};
+
+  runTest(request_headers, response);
+}
+
+TEST_F(RequestHeaderLimitTest, HeadersToAddCount) {
+  // The total number of headers in the request header map is not allowed to
+  // exceed the limit.
+  Http::TestRequestHeaderMapImpl request_headers({}, /*max_headers_kb=*/99999,
+                                                 /*max_headers_count=*/4);
+  request_headers.addCopy(Http::Headers::get().Host, "host");
+  request_headers.addCopy(Http::Headers::get().Path, "/");
+  request_headers.addCopy(Http::Headers::get().Method, "GET");
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_add = {{"foo", "bar"}, {"foo2", "bar2"}};
+
+  runTest(request_headers, response);
+}
+
+TEST_F(RequestHeaderLimitTest, HeadersToAddSize) {
+  // The total number of headers in the request header map is not allowed to
+  // exceed the limit.
+  Http::TestRequestHeaderMapImpl request_headers({}, /*max_headers_kb=*/1,
+                                                 /*max_headers_count=*/9999);
+  request_headers.addCopy(Http::Headers::get().Host, "host");
+  request_headers.addCopy(Http::Headers::get().Path, "/");
+  request_headers.addCopy(Http::Headers::get().Method, "GET");
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_add = {{"foo2", std::string(9999, 'a')}};
+
+  runTest(request_headers, response);
 }
 
 // Verifies that the downstream request fails when the ext_authz response
