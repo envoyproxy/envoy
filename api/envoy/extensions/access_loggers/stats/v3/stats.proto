@@ -2,9 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.stats.v3;
 
-import "envoy/config/core/v3/extension.proto";
-import "envoy/type/matcher/v3/string.proto";
-
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -21,36 +18,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Stats logger]
 // [#extension: envoy.access_loggers.stats]
 
-// [#next-free-field: 6]
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;
 
-  message TagFormatString {
-    string format_string = 1;
-
-    // Valid values for this tag. If empty, any value is allowed. Must match at least 1 matcher.
-    repeated type.matcher.v3.StringMatcher allowed_values = 2;
-  }
-
-  message TagValue {
-    // onoeof these
-    string fixed_string = 1;
-
-    TagFormatString format_string = 2;
-  }
-
   message Tag {
-    string name = 1;
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    TagValue value = 2;
+    string value_format = 2 [(validate.rules).string = {min_len: 1}];
   }
 
   message Stat {
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
     repeated Tag tags = 2;
-
-    google.protobuf.UInt32Value max_cardinality = 3;
   }
 
   message Histogram {
@@ -69,38 +49,31 @@ message Config {
       Percent = 5;
     }
 
-    Stat stat = 1;
+    Stat stat = 1 [(validate.rules).message = {required: true}];
 
-    Unit unit = 2;
+    Unit unit = 2 [(validate.rules).enum = {defined_only: true}];
 
     // format string; must evaluate to a positive number
-    string value = 3;
+    string value_format = 3 [(validate.rules).string = {min_len: 1 prefix: "%" suffix: "%"}];
   }
 
   // Increase the counter by the amount of `value`.
   message Counter {
-    Stat stat = 1;
+    Stat stat = 1 [(validate.rules).message = {required: true}];
 
-    oneof value {
-      // Must evaluate to a numeric value
-      string value_format_string = 2;
+    // Must evaluate to a numeric value.
+    // One of ``value_format`` or ``value_fixed``
+    string value_format = 2
+        [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
 
-      // For the computed set of tags, increment the counter by this fixed amount.
-      uint32 value_fixed = 3;
-    }
+    // For the computed set of tags, increment the counter by this fixed amount.
+    // One of ``value_format`` or ``value_fixed``
+    google.protobuf.UInt64Value value_fixed = 3;
   }
 
-  string stat_prefix = 1;
-
-  // Overall maximum number of stats from all types.
-  google.protobuf.UInt32Value max_stats = 2;
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   repeated Histogram histograms = 3;
 
   repeated Counter counters = 4;
-
-  // Specifies a collection of Formatter plugins that can be called from the access log configuration.
-  // See the formatters extensions documentation for details.
-  // [#extension-category: envoy.formatter]
-  repeated config.core.v3.TypedExtensionConfig formatters = 5;
 }
