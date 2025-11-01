@@ -4752,6 +4752,194 @@ TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
   EXPECT_THAT(log_content, testing::HasSubstr("response_header_latency_us"));
 }
 
+// Test the ability of the filter to completely replace a request message with a new
+// request message.
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoContinueAndReplace) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["field_request_header_cr"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_continue_and_replace)%");
+    (*json_format->mutable_fields())["field_response_header_cr"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_continue_and_replace)%");
+    (*json_format->mutable_fields())["field_immeidate_response"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:immediate_response)%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        headers_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, Server!");
+        // This special status tells us to replace the whole request
+        headers_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
+        return true;
+      });
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+
+  // Ensure that we replaced and did not append to the request.
+  EXPECT_EQ(upstream_request_->body().toString(), "Hello, Server!");
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_request_header_continue = json_log->getString("field_request_header_cr");
+  EXPECT_TRUE(field_request_header_continue.ok());
+  EXPECT_EQ(*field_request_header_continue, "1");
+  auto field_response_header_continue = json_log->getString("field_response_header_cr");
+  EXPECT_TRUE(field_response_header_continue.ok());
+  EXPECT_EQ(*field_response_header_continue, "0");
+  auto field_immediate_response = json_log->getString("field_immeidate_response");
+  EXPECT_EQ(*field_immediate_response, "0");
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Test immediate_response behavior with STREAMED request body. Even though the
+// headers have been processed, an immediate response on a request body chunk
+// should still be seen by the downstream.
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoImmediateResponse) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["field_immeidate_response"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:immediate_response)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  ConfigOptions config_options;
+  config_options.add_response_processor = true;
+  initializeConfig(config_options);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("Evil content!", absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& resp) {
+        auto* hdr = resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
+        hdr->mutable_header()->set_key("foo");
+        hdr->mutable_header()->set_raw_value("bar");
+        return true;
+      });
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
+    immediate.set_body("{\"reason\": \"Request too evil\"}");
+    immediate.set_details("Failed because I don't like this payload");
+  });
+  // ext_proc will immediately close side stream in this case, which causes it
+  // to be reset, since side stream codec had not yet observed server trailers.
+  EXPECT_TRUE(processor_stream_->waitForReset());
+
+  verifyDownstreamResponse(*response, 400);
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_immediate_response = json_log->getString("field_immeidate_response");
+  EXPECT_EQ(*field_immediate_response, "1");
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingServerHalfCloseTest) {
+  // Configure ext_proc to send both headers and body
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["server_half_closed_field"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:server_half_closed)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // The response does not really matter, it just needs to be non-empty.
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        return true;
+      });
+
+  // However right after processing headers, half-close the stream indicating that server
+  // is not interested in the request body.
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+  processor_stream_->encodeResetStream();
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_server_half_closed = json_log->getString("server_half_closed_field");
+  EXPECT_EQ(*field_server_half_closed, "1");
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingFailedOpen) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  proto_config_.set_failure_mode_allow(true);
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["failed_open_field"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:failed_open)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Travel forward 400 ms
+                                 timeSystem().advanceTimeWaitImpl(400ms);
+                                 return false;
+                               });
+
+  // We should be able to continue from here since the error was ignored
+  handleUpstreamRequest();
+  // Since we are ignoring errors, the late response to the request headers
+  // message meant that subsequent messages are spurious and the response
+  // headers message was never sent.
+  // Despite the timeout the request should succeed.
+  verifyDownstreamResponse(*response, 200);
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_server_half_closed = json_log->getString("failed_open_field");
+  EXPECT_EQ(*field_server_half_closed, "1");
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions
