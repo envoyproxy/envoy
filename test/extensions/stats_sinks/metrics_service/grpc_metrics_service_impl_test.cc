@@ -99,7 +99,7 @@ public:
 
 class MetricsServiceSinkTest : public testing::Test {
 public:
-  void addCounterToSnapshot(const std::string& name, uint64_t delta, uint64_t value,
+  void addCounterToSnapshot(const std::string& name, int64_t delta, int64_t value,
                             bool used = true) {
     counter_storage_.emplace_back(std::make_unique<NiceMock<Stats::MockCounter>>());
     counter_storage_.back()->name_ = name;

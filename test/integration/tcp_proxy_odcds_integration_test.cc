@@ -89,8 +89,8 @@ public:
   }
   void setUpShortTimeout() { odcds_timeout_ = std::chrono::milliseconds(1000); }
 
-  ::testing::AssertionResult assertOnDemandCounters(uint64_t success, uint64_t missing,
-                                                    uint64_t timeout) {
+  ::testing::AssertionResult assertOnDemandCounters(int64_t success, int64_t missing,
+                                                    int64_t timeout) {
     auto success_counter = test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_success");
     auto missing_counter = test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_missing");
     auto timeout_counter = test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_timeout");

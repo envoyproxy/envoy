@@ -17,7 +17,7 @@ class Histogram;
 class MetricSnapshot {
 public:
   struct CounterSnapshot {
-    uint64_t delta_;
+    int64_t delta_;
     std::reference_wrapper<const Counter> counter_;
   };
 

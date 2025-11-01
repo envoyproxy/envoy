@@ -135,7 +135,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   initialize();
 
   // Per-worker listener stats.
-  auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
+  auto check_listener_stats = [this](int64_t cx_active, int64_t cx_total) {
     if (version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
@@ -205,7 +205,7 @@ TEST_P(IntegrationTest, ConnectionBalanceFactory) {
 
   initialize();
 
-  auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
+  auto check_listener_stats = [this](int64_t cx_active, int64_t cx_total) {
     if (version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
@@ -257,8 +257,8 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   test_server_->waitForCounterEq(worker1_stat_name, 0);
 
   // We set the counters for the two workers to see how many connections each handles.
-  uint64_t w0_ctr = 0;
-  uint64_t w1_ctr = 0;
+  int64_t w0_ctr = 0;
+  int64_t w1_ctr = 0;
   constexpr int loops = 5;
   for (int i = 0; i < loops; i++) {
     constexpr int requests_per_loop = 4;

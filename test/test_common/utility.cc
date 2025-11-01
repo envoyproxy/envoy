@@ -162,7 +162,7 @@ Stats::ParentHistogramSharedPtr TestUtility::findHistogram(Stats::Store& store,
 }
 
 AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
-                                              uint64_t value, Event::TestTimeSystem& time_system,
+                                              int64_t value, Event::TestTimeSystem& time_system,
                                               std::chrono::milliseconds timeout,
                                               Event::Dispatcher* dispatcher) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
@@ -186,7 +186,7 @@ AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::st
 }
 
 AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name,
-                                              uint64_t value, Event::TestTimeSystem& time_system,
+                                              int64_t value, Event::TestTimeSystem& time_system,
                                               std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {

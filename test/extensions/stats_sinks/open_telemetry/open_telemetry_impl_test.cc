@@ -64,8 +64,7 @@ public:
 
   std::string getTagExtractedName(const std::string name) { return name + "-tagged"; }
 
-  void addCounterToSnapshot(const std::string& name, uint64_t delta, uint64_t value,
-                            bool used = true,
+  void addCounterToSnapshot(const std::string& name, int64_t delta, int64_t value, bool used = true,
                             const Stats::TagVector& tags = {{"counter_key", "counter_val"}}) {
     counter_storage_.emplace_back(std::make_unique<NiceMock<Stats::MockCounter>>());
     counter_storage_.back()->name_ = name;
@@ -77,7 +76,7 @@ public:
     snapshot_.counters_.push_back({delta, *counter_storage_.back()});
   }
 
-  void addHostCounterToSnapshot(const std::string& name, uint64_t delta, uint64_t value) {
+  void addHostCounterToSnapshot(const std::string& name, int64_t delta, int64_t value) {
     Stats::PrimitiveCounter counter;
     counter.add(value - delta);
     counter.latch();
