@@ -242,6 +242,7 @@ public:
   bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
+  bool addProxyProtocolRequestState() const override { return false; }
 
 private:
   friend class AdminTestingPeer;

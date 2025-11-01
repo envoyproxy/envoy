@@ -1480,6 +1480,20 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     }
 
     filter_manager_.setDownstreamRemoteAddress(mutate_result.final_remote_address);
+
+    if (connection_manager_.config_->addProxyProtocolRequestState() &&
+        !connection_manager_.read_callbacks_->connection()
+             .streamInfo()
+             .filterState()
+             ->hasData<Network::ProxyProtocolFilterState>(Network::ProxyProtocolFilterState::key())) {
+      connection_manager_.read_callbacks_->connection().streamInfo().filterState()->setData(
+          Network::ProxyProtocolFilterState::key(),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+              filter_manager_.streamInfo().downstreamAddressProvider().remoteAddress(),
+              filter_manager_.streamInfo().downstreamAddressProvider().localAddress()}),
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::Connection);
+    }
   }
   ASSERT(filter_manager_.streamInfo().downstreamAddressProvider().remoteAddress() != nullptr);
 

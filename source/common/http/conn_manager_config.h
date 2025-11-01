@@ -560,6 +560,11 @@ public:
    *         Connection Lifetime.
    */
   virtual bool addProxyProtocolConnectionState() const PURE;
+  /**
+   * @return whether the HCM will insert ProxyProtocolFilterState into the filter state at the
+   *         Request Lifetime.
+   */
+  virtual bool addProxyProtocolRequestState() const PURE;
 };
 
 using ConnectionManagerConfigSharedPtr = std::shared_ptr<ConnectionManagerConfig>;

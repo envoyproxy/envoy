@@ -277,6 +277,9 @@ public:
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;
   }
+  bool addProxyProtocolRequestState() const override {
+    return add_proxy_protocol_request_state_;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -374,6 +377,7 @@ private:
   const bool append_local_overload_;
   const bool append_x_forwarded_port_;
   const bool add_proxy_protocol_connection_state_;
+  const bool add_proxy_protocol_request_state_;
 };
 
 /**
