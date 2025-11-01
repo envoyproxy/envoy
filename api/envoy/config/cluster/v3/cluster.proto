@@ -1336,6 +1336,16 @@ message UpstreamConnectionOptions {
   // Add configs for first_address_family_version and first_address_family_count
   // when sorting destination ip addresses.
   HappyEyeballsConfig happy_eyeballs_config = 3;
+
+  // If set, sets the ``TCP_NOTSENT_LOWAT`` socket option on upstream connections.
+  // The value specifies the amount of unsent data (in bytes) that must be queued in the kernel
+  // TCP send buffer before the socket becomes writable. This is useful for controlling bufferbloat
+  // and improving HTTP/2 stream prioritization. A common recommended value is 16384 (16KB).
+  //
+  // .. note::
+  //   This option is only available on Linux kernel 3.12+. On unsupported platforms, this setting
+  //   has no effect and no error is raised.
+  google.protobuf.UInt32Value tcp_notsent_lowat = 4 [(validate.rules).uint32 = {lte: 1048576}];
 }
 
 message TrackClusterStats {
