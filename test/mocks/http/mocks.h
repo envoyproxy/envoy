@@ -707,6 +707,7 @@ public:
   MOCK_METHOD(bool, appendLocalOverload, (), (const));
   MOCK_METHOD(bool, appendXForwardedPort, (), (const));
   MOCK_METHOD(bool, addProxyProtocolConnectionState, (), (const));
+  MOCK_METHOD(bool, addProxyProtocolRequestState, (), (const));
 
   class AllowInternalAddressConfig : public Http::InternalAddressConfig {
   public:
