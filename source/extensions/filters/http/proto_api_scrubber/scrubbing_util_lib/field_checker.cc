@@ -30,7 +30,15 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
   absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(match_tree);
 
   // Preserve the field (i.e., kInclude) if there's any error in evaluating the match.
+  // This can happen in two cases:
+  // 1. The match tree is corrupt.
+  // 2. The required data to match is not present in the `matching_data_ptr_`.
+  // Ideally both of these cases shouldn't happen as:
+  // 1. The match tree is configured as part of filter config which is validated during filter initialization itself.
+  // 2. The field checker is created only after all the required data to match is received.
+  // For now, it will emit an error log and preserve the field.
   if (!match_result.ok()) {
+    ENVOY_LOG(error, "Matching failed for the field `{}`. This field would be preserved.", field_mask);
     return FieldCheckResults::kInclude;
   }
 
@@ -40,7 +48,7 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
   }
 
   // Remove the field (i.e., kExclude) if there's a match and the matched action is
-  // `RemoveFieldAction`.
+  // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`.
   if (match_result->action()->typeUrl() ==
       "envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction") {
     return FieldCheckResults::kExclude;

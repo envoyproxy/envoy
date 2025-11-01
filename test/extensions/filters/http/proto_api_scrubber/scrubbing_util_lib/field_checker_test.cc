@@ -280,6 +280,53 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
 };
 
+class MockProtoApiScrubberFilterConfig : public ProtoApiScrubberFilterConfig {
+public:
+  MockProtoApiScrubberFilterConfig() : ProtoApiScrubberFilterConfig() {}
+
+  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getRequestFieldMatcher,
+              (const std::string& method_name, const std::string& field_mask), (const));
+
+  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
+              (const std::string& method_name, const std::string& field_mask), (const));
+};
+
+TEST_F(FieldCheckerTest, IncompleteMatch) {
+  // --- Arrange ---
+  const std::string method_name = "example.v1.Service/GetFoo";
+  const std::string field_name = "user_data";
+
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config_;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  Http::Matching::HttpMatchingDataImpl http_matching_data_impl(mock_stream_info);
+  std::shared_ptr<NiceMock<Matcher::MatchTree<Http::Matching::HttpMatchingDataImpl>>> mock_match_tree_;
+  //std::shared_ptr<Matcher::MatchTree<HttpMatchingData>>
+  Protobuf::Field field;
+  field.set_name("user");
+
+  // 2. Configure the filter config to return our mock match tree
+  EXPECT_CALL(mock_filter_config_, getRequestFieldMatcher(method_name, field_name))
+      .WillOnce(Return(mock_match_tree_));
+
+  // 3. (THE KEY) Configure the mock match tree to return an incomplete result
+  Matcher::MatchResult match_result;
+
+  EXPECT_CALL(*mock_match_tree_, match(testing::Ref(http_matching_data_impl)))
+      .WillOnce(Return(Matcher::MatchResult::insufficientData()));
+
+  // 4. Create the class under test
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
+                             method_name, &mock_filter_config_);
+
+  // --- Act ---
+  FieldCheckResults result = field_checker.CheckField({}, &field);
+
+  // --- Assert ---
+  // The incomplete match should result in an absl::InternalError,
+  // which CheckField catches and converts to kInclude.
+  EXPECT_EQ(result, FieldCheckResults::kInclude);
+}
+
 // This tests CheckField() method for request fields.
 TEST_F(FieldCheckerTest, RequestFieldChecker) {
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;

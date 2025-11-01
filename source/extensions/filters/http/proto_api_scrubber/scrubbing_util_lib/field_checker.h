@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "source/common/common/logger.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
@@ -28,7 +29,8 @@ using proto_processing_lib::proto_scrubber::ScrubberContext;
  * `proto_processing_lib::proto_scrubber` library for each field of the protobuf payload to decide
  * whether to preserve, remove or traverse it further.
  */
-class FieldChecker : public FieldCheckerInterface {
+class FieldChecker : public FieldCheckerInterface,
+public Logger::Loggable<Logger::Id::filter> {
 public:
   FieldChecker(const ScrubberContext scrubber_context,
                const Envoy::StreamInfo::StreamInfo* stream_info, const std::string method_name,
