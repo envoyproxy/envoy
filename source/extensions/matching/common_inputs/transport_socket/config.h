@@ -143,7 +143,9 @@ private:
  */
 class FilterStateInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override { return "envoy.matching.inputs.filter_state"; }
+  std::string name() const override {
+    return "envoy.matching.inputs.transport_socket_filter_state";
+  }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,

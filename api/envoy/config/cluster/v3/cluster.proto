@@ -820,7 +820,7 @@ message Cluster {
   //
   // * ``endpoint_metadata``: Extract values from the selected endpoint's metadata.
   // * ``locality_metadata``: Extract values from the endpoint's locality metadata.
-  // * ``filter_state``: Extract values from filter state that was explicitly shared from
+  // * ``transport_socket_filter_state``: Extract values from filter state that was explicitly shared from
   //   downstream to upstream via ``TransportSocketOptions``. This enables flexible
   //   downstream-connection-based matching, such as:
   //
@@ -831,7 +831,7 @@ message Cluster {
   // .. note::
   //   Filter state sharing follows the same pattern as tunneling in Envoy. Filters must explicitly
   //   share data by setting filter state with the appropriate sharing mode. The filter state is
-  //   then accessible via the ``filter_state`` input during transport socket selection.
+  //   then accessible via the ``transport_socket_filter_state`` input during transport socket selection.
   //
   // If this field is set, it takes precedence over legacy metadata-based selection
   // performed by :ref:`transport_socket_matches

@@ -1744,12 +1744,17 @@ envoy.matching.inputs.locality_metadata:
 envoy.matching.inputs.filter_state:
   categories:
   - envoy.matching.http.input
-  - envoy.matching.inputs
   - envoy.matching.network.input
   security_posture: unknown
   status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+envoy.matching.inputs.transport_socket_filter_state:
+  categories:
+  - envoy.matching.inputs
+  security_posture: unknown
+  status: stable
+  type_urls:
   - envoy.extensions.matching.common_inputs.transport_socket.v3.FilterStateInput
 envoy.matching.inputs.application_protocol:
   categories:

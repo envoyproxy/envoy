@@ -162,16 +162,16 @@ new_features:
     This can avoid unnecessary load shedding or overload actions.
     To enable, set ``envoy.reloadable_features.fixed_heap_use_allocated`` to true.
     The default algorithm (heap_size - pageheap_unmapped - pageheap_free) does not discount for free memory in TCMalloc caches.
-- area: upstream
-  change: |
-    Added :ref:`transport_socket_matcher
-    <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matcher>` to clusters. This matcher
-    uses the generic xDS matcher framework to select a named transport socket from
-    :ref:`transport_socket_matches
-    <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` based on endpoint metadata,
-    locality metadata, and filter state. Filter state enables downstream-connection-based matching by
-    allowing filters to explicitly share data (e.g., network namespace) from downstream to upstream connections
-    via TransportSocketOptions, following the same pattern as tunneling in Envoy.
+  - area: upstream
+    change: |
+      Added :ref:`transport_socket_matcher
+      <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matcher>` to clusters. This matcher
+      uses the generic xDS matcher framework to select a named transport socket from
+      :ref:`transport_socket_matches
+      <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` based on endpoint metadata,
+      locality metadata, and transport socket filter state. Filter state enables downstream-connection-based
+      matching by allowing filters to explicitly share data (e.g., network namespace) from downstream to upstream
+      connections via TransportSocketOptions, following the same pattern as tunneling in Envoy.
 - area: admin
   change: |
     Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.

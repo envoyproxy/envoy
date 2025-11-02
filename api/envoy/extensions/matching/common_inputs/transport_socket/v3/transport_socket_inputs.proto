@@ -105,7 +105,7 @@ message LocalityMetadataInput {
 //     "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.FilterStateInput
 //     key: "envoy.network.namespace"
 //
-// [#extension: envoy.matching.inputs.filter_state]
+// [#extension: envoy.matching.inputs.transport_socket_filter_state]
 message FilterStateInput {
   // The key of the filter state object to retrieve.
   // The object must implement serializeAsString() to be used for matching.

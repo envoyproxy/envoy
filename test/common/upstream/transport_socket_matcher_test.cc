@@ -603,12 +603,12 @@ transport_socket:
 )EOF",
                             *m_namespace_b);
 
-  // Create xDS matcher using filter_state input for network namespace.
+  // Create xDS matcher using transport_socket_filter_state input for network namespace.
   xds::type::matcher::v3::Matcher matcher;
   TestUtility::loadFromYaml(R"EOF(
 matcher_tree:
   input:
-    name: envoy.matching.inputs.filter_state
+    name: envoy.matching.inputs.transport_socket_filter_state
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.FilterStateInput
       key: "envoy.network.namespace"
