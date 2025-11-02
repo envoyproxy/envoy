@@ -2102,7 +2102,11 @@ void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span) const 
   ASSERT(connection_manager_tracing_config_.has_value());
 
   const Tracing::HttpTraceContext trace_context(*request_headers_);
-  const Tracing::CustomTagContext ctx{trace_context, filter_manager_.streamInfo()};
+  const Formatter::Context formatter_context{
+      request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, {},
+      active_span_.get()};
+  const Tracing::CustomTagContext ctx{trace_context, filter_manager_.streamInfo(),
+                                      formatter_context};
 
   // Cache the optional custom tags from the route first.
   OptRef<const Tracing::CustomTagMap> route_custom_tags;
