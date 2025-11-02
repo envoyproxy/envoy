@@ -110,7 +110,7 @@ new_features:
     header for vhost matching.
 - area: http2
   change: |
-    Added new parameter to the `sendGoAwayAndClose` to support gracefully closing of HTTP/2 connection.
+    Added new parameter to the ``sendGoAwayAndClose`` to support gracefully closing of HTTP/2 connection.
 - area: logging
   change: |
     Added support for the not-equal operator in access log filter rules, in
