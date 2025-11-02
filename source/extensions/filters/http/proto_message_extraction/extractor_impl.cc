@@ -68,6 +68,8 @@ ExtractedMessageDirective typeMapping(const MethodExtraction::ExtractDirective& 
     return ExtractedMessageDirective::EXTRACT;
   case MethodExtraction::EXTRACT_REDACT:
     return ExtractedMessageDirective::EXTRACT_REDACT;
+  case MethodExtraction::EXTRACT_REPEATED_CARDINALITY:
+    return ExtractedMessageDirective::EXTRACT_REPEATED_CARDINALITY;
   case MethodExtraction::ExtractDirective_UNSPECIFIED:
     return ExtractedMessageDirective::EXTRACT;
   default:
@@ -80,19 +82,25 @@ ExtractedMessageDirective typeMapping(const MethodExtraction::ExtractDirective& 
 absl::Status ExtractorImpl::init() {
   FieldValueExtractorFactory extractor_factory(type_finder_);
   for (const auto& it : method_extraction_.request_extraction_by_field()) {
-    auto extractor = extractor_factory.Create(request_type_url_, it.first);
-    if (!extractor.ok()) {
-      ENVOY_LOG_MISC(debug, "Extractor status not healthy: Status: {}", extractor.status());
-      return extractor.status();
+    // TODO(adh-goog): Allow repeated field extraction in field_value_extractor.
+    if (it.second != MethodExtraction::EXTRACT_REPEATED_CARDINALITY) {
+      auto extractor = extractor_factory.Create(request_type_url_, it.first);
+      if (!extractor.ok()) {
+        ENVOY_LOG_MISC(debug, "Extractor status not healthy: Status: {}", extractor.status());
+        return extractor.status();
+      }
     }
 
     request_field_path_to_extract_type_[it.first].push_back(typeMapping(it.second));
   }
 
   for (const auto& it : method_extraction_.response_extraction_by_field()) {
-    auto extractor = extractor_factory.Create(response_type_url_, it.first);
-    if (!extractor.ok()) {
-      return extractor.status();
+    // TODO(adh-goog): Allow repeated field extraction in field_value_extractor.
+    if (it.second != MethodExtraction::EXTRACT_REPEATED_CARDINALITY) {
+      auto extractor = extractor_factory.Create(response_type_url_, it.first);
+      if (!extractor.ok()) {
+        return extractor.status();
+      }
     }
 
     response_field_path_to_extract_type_[it.first].push_back(typeMapping(it.second));

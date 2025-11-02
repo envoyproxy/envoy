@@ -2,6 +2,8 @@
 
 #include "envoy/router/router.h"
 
+#include "source/common/formatter/substitution_formatter.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -144,6 +146,30 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
   }
 }
 
+FormatterCustomTag::FormatterCustomTag(absl::string_view tag, absl::string_view value) : tag_(tag) {
+  auto formatter_or = Formatter::FormatterImpl::create(value, true);
+  THROW_IF_NOT_OK_REF(formatter_or.status());
+  formatter_ = std::move(formatter_or.value());
+}
+
+void FormatterCustomTag::applySpan(Span& span, const CustomTagContext& ctx) const {
+  // Apply the formatter to the span
+  auto formatted_value = formatter_->format(ctx.formatter_context, ctx.stream_info);
+  if (!formatted_value.empty()) {
+    span.setTag(tag_, formatted_value);
+  }
+}
+
+void FormatterCustomTag::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                                  const CustomTagContext& ctx) const {
+  // Apply the formatter to the log entry
+  auto formatted_value = formatter_->format(ctx.formatter_context, ctx.stream_info);
+  if (!formatted_value.empty()) {
+    auto& custom_tags = *entry.mutable_custom_tags();
+    custom_tags[tag_] = std::move(formatted_value);
+  }
+}
+
 CustomTagConstSharedPtr
 CustomTagUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag) {
   switch (tag.type_case()) {
@@ -155,6 +181,8 @@ CustomTagUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag
     return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
   case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
     return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
+  case envoy::type::tracing::v3::CustomTag::TypeCase::kValue:
+    return std::make_shared<const Tracing::FormatterCustomTag>(tag.tag(), tag.value());
   case envoy::type::tracing::v3::CustomTag::TypeCase::TYPE_NOT_SET:
     break; // Panic below.
   }

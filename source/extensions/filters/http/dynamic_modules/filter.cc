@@ -245,6 +245,16 @@ void DynamicModuleHttpFilter::continueEncoding() {
   }
 }
 
+void DynamicModuleHttpFilter::onAboveWriteBufferHighWatermark() {
+  config_->on_http_filter_downstream_above_write_buffer_high_watermark_(thisAsVoidPtr(),
+                                                                        in_module_filter_);
+}
+
+void DynamicModuleHttpFilter::onBelowWriteBufferLowWatermark() {
+  config_->on_http_filter_downstream_below_write_buffer_low_watermark_(thisAsVoidPtr(),
+                                                                       in_module_filter_);
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions

@@ -27,6 +27,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
+#include "absl/debugging/leak_check.h"
 #include "fmt/core.h"
 #include "library/common/internal_engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
@@ -57,6 +58,11 @@ EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
 
 EngineBuilder& EngineBuilder::setLogger(std::unique_ptr<EnvoyLogger> logger) {
   logger_ = std::move(logger);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableLogger(bool logger_on) {
+  enable_logger_ = logger_on;
   return *this;
 }
 
@@ -345,6 +351,11 @@ EngineBuilder& EngineBuilder::addRuntimeGuard(std::string guard, bool value) {
 
 EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool value) {
   restart_runtime_guards_.emplace_back(std::move(guard), value);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableStatsCollection(bool stats_collection_on) {
+  enable_stats_collection_ = stats_collection_on;
   return *this;
 }
 
@@ -919,24 +930,29 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Set up stats.
-  auto* list = bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
-  list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
-  list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
-  list->add_patterns()->set_prefix("cluster.base.upstream_cx_");
-  list->add_patterns()->set_prefix("cluster.stats.upstream_cx_");
-  list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
-  list->add_patterns()->set_exact("cluster.base.upstream_http3_broken");
-  list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
-  list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
-  list->add_patterns()->set_prefix("http.hcm.decompressor.");
-  list->add_patterns()->set_prefix("pulse.");
-  list->add_patterns()->set_prefix("runtime.load_success");
-  list->add_patterns()->set_prefix("dns_cache");
-  list->add_patterns()->mutable_safe_regex()->set_regex(
-      "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
-      "total)");
-  list->add_patterns()->set_contains("quic_connection_close_error_code");
-  list->add_patterns()->set_contains("quic_reset_stream_error_code");
+  if (enable_stats_collection_) {
+    auto* list =
+        bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
+    list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
+    list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
+    list->add_patterns()->set_prefix("cluster.base.upstream_cx_");
+    list->add_patterns()->set_prefix("cluster.stats.upstream_cx_");
+    list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
+    list->add_patterns()->set_exact("cluster.base.upstream_http3_broken");
+    list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
+    list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
+    list->add_patterns()->set_prefix("http.hcm.decompressor.");
+    list->add_patterns()->set_prefix("pulse.");
+    list->add_patterns()->set_prefix("runtime.load_success");
+    list->add_patterns()->set_prefix("dns_cache");
+    list->add_patterns()->mutable_safe_regex()->set_regex(
+        "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
+        "total)");
+    list->add_patterns()->set_contains("quic_connection_close_error_code");
+    list->add_patterns()->set_contains("quic_reset_stream_error_code");
+  } else {
+    bootstrap->mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
+  }
   bootstrap->mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
 
   // Set up watchdog
@@ -1009,9 +1025,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  InternalEngine* envoy_engine =
-      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-                         network_thread_priority_, disable_dns_refresh_on_network_change_);
+  InternalEngine* envoy_engine = absl::IgnoreLeak(new InternalEngine(
+      std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+      network_thread_priority_, disable_dns_refresh_on_network_change_, enable_logger_));
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
