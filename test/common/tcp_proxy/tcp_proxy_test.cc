@@ -2450,7 +2450,6 @@ TEST(TcpProxyConfigTest, UpstreamConnectTriggerOnDownstreamDataConfig) {
     cluster: fake_cluster
     upstream_connect_trigger:
       mode: ON_DOWNSTREAM_DATA
-      max_wait_time: 5s
       downstream_data_config:
         max_buffered_bytes: 1024
   )EOF";
@@ -2465,7 +2464,6 @@ TEST(TcpProxyConfigTest, UpstreamConnectTriggerOnDownstreamDataConfig) {
   const auto& mode = config.upstreamConnectTrigger().value();
   EXPECT_EQ(mode.mode(), envoy::extensions::filters::network::tcp_proxy::v3::
                              UpstreamConnectTrigger::ON_DOWNSTREAM_DATA);
-  EXPECT_EQ(mode.max_wait_time().seconds(), 5);
   EXPECT_TRUE(mode.has_downstream_data_config());
   EXPECT_EQ(mode.downstream_data_config().max_buffered_bytes().value(), 1024);
 }
@@ -2476,7 +2474,6 @@ TEST(TcpProxyConfigTest, UpstreamConnectTriggerOnDownstreamTlsHandshakeConfig) {
     cluster: fake_cluster
     upstream_connect_trigger:
       mode: ON_DOWNSTREAM_TLS_HANDSHAKE
-      max_wait_time: 10s
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
@@ -2489,33 +2486,6 @@ TEST(TcpProxyConfigTest, UpstreamConnectTriggerOnDownstreamTlsHandshakeConfig) {
   const auto& mode = config.upstreamConnectTrigger().value();
   EXPECT_EQ(mode.mode(), envoy::extensions::filters::network::tcp_proxy::v3::
                              UpstreamConnectTrigger::ON_DOWNSTREAM_TLS_HANDSHAKE);
-  EXPECT_EQ(mode.max_wait_time().seconds(), 10);
-}
-
-TEST(TcpProxyConfigTest, UpstreamConnectTriggerOnDownstreamDataAndTlsConfig) {
-  const std::string yaml = R"EOF(
-    stat_prefix: name
-    cluster: fake_cluster
-    upstream_connect_trigger:
-      mode: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
-      max_wait_time: 2s
-      downstream_data_config:
-        max_buffered_bytes: 512
-  )EOF";
-
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
-
-  Config config(tcp_proxy, factory_context);
-
-  EXPECT_TRUE(config.upstreamConnectTrigger().has_value());
-  const auto& mode = config.upstreamConnectTrigger().value();
-  EXPECT_EQ(mode.mode(), envoy::extensions::filters::network::tcp_proxy::v3::
-                             UpstreamConnectTrigger::ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE);
-  EXPECT_EQ(mode.max_wait_time().seconds(), 2);
-  EXPECT_TRUE(mode.has_downstream_data_config());
-  EXPECT_EQ(mode.downstream_data_config().max_buffered_bytes().value(), 512);
 }
 
 TEST(TcpProxyConfigTest, UpstreamConnectTriggerDefaultConfig) {
@@ -2532,27 +2502,6 @@ TEST(TcpProxyConfigTest, UpstreamConnectTriggerDefaultConfig) {
 
   // Should not have the mode configured.
   EXPECT_FALSE(config.upstreamConnectTrigger().has_value());
-}
-
-TEST(TcpProxyConfigTest, UpstreamConnectTriggerMillisecondTimeout) {
-  const std::string yaml = R"EOF(
-    stat_prefix: name
-    cluster: fake_cluster
-    upstream_connect_trigger:
-      mode: ON_DOWNSTREAM_DATA
-      max_wait_time: 0.5s
-  )EOF";
-
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
-
-  Config config(tcp_proxy, factory_context);
-
-  EXPECT_TRUE(config.upstreamConnectTrigger().has_value());
-  const auto& mode = config.upstreamConnectTrigger().value();
-  EXPECT_EQ(mode.max_wait_time().seconds(), 0);
-  EXPECT_EQ(mode.max_wait_time().nanos(), 500000000); // 500ms in nanoseconds.
 }
 
 TEST(TcpProxyConfigTest, UpstreamConnectTriggerDefaultDownstreamDataConfig) {
@@ -2655,29 +2604,12 @@ public:
     const std::string yaml = R"EOF(
       stat_prefix: name
       cluster: fake_cluster
-      upstream_connect_mode:
-        trigger: ON_DOWNSTREAM_TLS_HANDSHAKE
-        max_wait_time: 10s
+      upstream_connect_trigger:
+        mode: ON_DOWNSTREAM_TLS_HANDSHAKE
     )EOF";
 
     // receive_before_connect=false, expect_initial_read_disable=true
     setupFilter(yaml, false, true);
-  }
-
-  void setupTlsAndDataMode() {
-    const std::string yaml = R"EOF(
-      stat_prefix: name
-      cluster: fake_cluster
-      upstream_connect_mode:
-        trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
-        max_wait_time: 10s
-        downstream_data_config:
-          max_buffered_bytes: 1024
-          forward_buffered_data: true
-    )EOF";
-
-    // receive_before_connect=true, expect_initial_read_disable=true for TLS wait
-    setupFilter(yaml, true, true);
   }
 };
 
@@ -2740,111 +2672,6 @@ TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeMode_WithNonTlsConnection_Immediate
   EXPECT_FALSE(conn_pool_callbacks_.empty());
 }
 
-TEST_P(TcpProxyTlsHandshakeTest, TlsAndDataMode_WaitsForBothConditions) {
-  // Setup SSL connection before initializing the filter.
-  auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(ssl_connection));
-
-  // For TLS+Data mode, when receive_before_connect=true, filter does NOT call
-  // readDisable(true) during initialization.
-  setupFilter(R"EOF(
-    stat_prefix: name
-    cluster: fake_cluster
-    upstream_connect_mode:
-      trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
-      max_wait_time: 10s
-      downstream_data_config:
-        max_buffered_bytes: 1024
-        forward_buffered_data: true
-  )EOF",
-              true,   // receive_before_connect
-              false); // expect_initial_read_disable
-
-  // Call onNewConnection() to initialize the filter. Even though receive_before_connect=true,
-  // onNewConnection always returns StopIteration for TCP proxy.
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
-
-  // First, receive TLS handshake completion - should NOT connect yet.
-  filter_->onDownstreamTlsHandshakeComplete();
-
-  // Verify no connection yet.
-  EXPECT_TRUE(conn_pool_callbacks_.empty());
-
-  // Set up connection pool expectations for when both conditions are met.
-  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
-              tcpConnPool(_, _, _))
-      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
-  EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
-
-  // Now receive data - should trigger connection.
-  Buffer::OwnedImpl data("hello");
-  // The connection should read disable after receiving first data.
-  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
-
-  // Both conditions met, connection should be established.
-  EXPECT_FALSE(conn_pool_callbacks_.empty());
-}
-
-TEST_P(TcpProxyTlsHandshakeTest, TlsAndDataMode_DataFirstThenTls) {
-  // Setup SSL connection before initializing the filter.
-  auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(ssl_connection));
-
-  // For TLS+Data mode, when receive_before_connect=true, filter does NOT call
-  // readDisable(true) during initialization.
-  setupFilter(R"EOF(
-    stat_prefix: name
-    cluster: fake_cluster
-    upstream_connect_mode:
-      trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
-      max_wait_time: 10s
-      downstream_data_config:
-        max_buffered_bytes: 1024
-        forward_buffered_data: true
-  )EOF",
-              true,   // receive_before_connect
-              false); // expect_initial_read_disable
-
-  // Call onNewConnection() to initialize the filter. Even though receive_before_connect=true,
-  // onNewConnection always returns StopIteration for TCP proxy.
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
-
-  // First, receive data - should NOT connect yet.
-  Buffer::OwnedImpl data("hello");
-  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
-
-  // Verify no connection yet.
-  EXPECT_TRUE(conn_pool_callbacks_.empty());
-
-  // Set up connection pool expectations for when both conditions are met.
-  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
-              tcpConnPool(_, _, _))
-      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
-  EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
-
-  // Now receive TLS handshake completion - should trigger connection.
-  filter_->onDownstreamTlsHandshakeComplete();
-
-  // Both conditions met, connection should be established.
-  EXPECT_FALSE(conn_pool_callbacks_.empty());
-}
-
 TEST_P(TcpProxyTlsHandshakeTest, EarlyDataBufferExceedsMaxSize) {
   // Setup SSL connection before initializing the filter.
   auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -2854,12 +2681,10 @@ TEST_P(TcpProxyTlsHandshakeTest, EarlyDataBufferExceedsMaxSize) {
   setupFilter(R"EOF(
     stat_prefix: name
     cluster: fake_cluster
-    upstream_connect_mode:
-      trigger: ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE
-      max_wait_time: 10s
+    upstream_connect_trigger:
+      mode: ON_DOWNSTREAM_DATA
       downstream_data_config:
         max_buffered_bytes: 10
-        forward_buffered_data: true
   )EOF",
               true,   // receive_before_connect
               false); // expect_initial_read_disable

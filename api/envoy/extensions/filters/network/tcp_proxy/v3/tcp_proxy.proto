@@ -318,7 +318,7 @@ message TcpProxy {
   // When not specified, the filter uses the default ``IMMEDIATE`` trigger for backward compatibility.
   //
   // .. attention::
-  //   Server-first protocols (e.g., SMTP, MySQL, POP3) require ``IMMEDIATE`` trigger. Data-triggered
+  //   Server-first protocols (e.g., SMTP, MySQL, POP3) require ``IMMEDIATE`` mode. Data-triggered
   //   modes will cause connection timeouts as the client waits for the server greeting.
   UpstreamConnectTrigger upstream_connect_trigger = 21;
 }
@@ -355,19 +355,6 @@ message UpstreamConnectTrigger {
     //   This mode is only effective when the downstream connection uses TLS. For non-TLS
     //   connections, it behaves the same as ``IMMEDIATE``.
     ON_DOWNSTREAM_TLS_HANDSHAKE = 2;
-
-    // Wait for both initial data and TLS handshake completion before
-    // establishing the upstream connection. This provides maximum information about the
-    // downstream connection before connecting upstream.
-    //
-    // .. note::
-    //   This mode is primarily useful for TLS 1.3 0-RTT (early data) scenarios where
-    //   the client may send encrypted application data before the TLS handshake completes.
-    //   For non-TLS connections, this mode behaves the same as ``ON_DOWNSTREAM_DATA``.
-    //
-    // .. warning::
-    //   Like ``ON_DOWNSTREAM_DATA``, this mode is not suitable for server-first protocols.
-    ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE = 3;
   }
 
   // Configuration for the ``ON_DOWNSTREAM_DATA`` mode.
@@ -382,21 +369,7 @@ message UpstreamConnectTrigger {
   // The mode for upstream connection establishment.
   UpstreamConnectMode mode = 1 [(validate.rules).enum = {defined_only: true}];
 
-  // Optional maximum time to wait for the trigger condition before forcing the upstream connection.
-  // If not specified, the filter waits indefinitely for the trigger condition to be met,
-  // strictly respecting the configured mode.
-  //
-  // .. attention::
-  //   Use this field as a safety mechanism to prevent connection hangs due to misconfiguration
-  //   (e.g., using ``ON_DOWNSTREAM_DATA`` with a server-first protocol). For correctly configured
-  //   triggers, leaving this unset allows the filter to wait as long as needed for the condition.
-  google.protobuf.Duration max_wait_time = 2 [(validate.rules).duration = {
-    lte {seconds: 300}
-    gte {}
-  }];
-
   // Configuration specific to the ``ON_DOWNSTREAM_DATA`` mode.
-  // This field is only used when ``mode`` is set to ``ON_DOWNSTREAM_DATA`` or
-  // ``ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE``.
-  DownstreamDataConfig downstream_data_config = 3;
+  // This field is only used when ``mode`` is set to ``ON_DOWNSTREAM_DATA``.
+  DownstreamDataConfig downstream_data_config = 2;
 }

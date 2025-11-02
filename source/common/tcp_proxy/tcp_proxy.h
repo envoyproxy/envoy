@@ -683,7 +683,6 @@ protected:
   void onRetryTimer();
   void enableRetryTimer();
   void disableRetryTimer();
-  void onEstablishmentTimeout();
   void checkUpstreamConnectionTrigger();
 
 public:
@@ -741,7 +740,6 @@ protected:
 
   ConnectMode connect_mode_{
       envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::IMMEDIATE};
-  Event::TimerPtr establishment_timeout_timer_;
   bool waiting_for_tls_handshake_{false};
   bool tls_handshake_complete_{false};
   bool initial_data_received_{false};
