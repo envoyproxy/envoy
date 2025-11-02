@@ -30,7 +30,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
 
-  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeHostAndPath(_, _, _, false))
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _, false))
       .WillOnce(Invoke([this](Http::RequestHeaderMap& headers, const Formatter::Context& context,
                               const StreamInfo::StreamInfo&, bool) {
         EXPECT_EQ(context.requestHeaders().ptr(), &headers);

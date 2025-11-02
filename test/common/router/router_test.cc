@@ -476,7 +476,7 @@ TEST_F(RouterTest, Http1Upstream) {
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeHostAndPath(_, _, _, true))
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _, true))
       .WillOnce(Invoke([this](Http::RequestHeaderMap& headers, const Formatter::Context& context,
                               const StreamInfo::StreamInfo&, bool) {
         EXPECT_EQ(context.requestHeaders().ptr(), &headers);
@@ -1346,11 +1346,11 @@ TEST_F(RouterTest, RouterSetHeadersAccessibleInRequestHeadersToAdd) {
 
   expectResponseTimerCreate();
 
-  // Set up applyRequestHeaderTransforms to simulate request_headers_to_add with a reference to
+  // Set up finalizeRequestHeaders to simulate request_headers_to_add with a reference to
   // x-envoy-expected-rq-timeout-ms. This will be called AFTER router-set headers are added.
-  EXPECT_CALL(callbacks_.route_->route_entry_, applyRequestHeaderTransforms(_, _, _))
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _, _))
       .WillOnce(Invoke([](Http::RequestHeaderMap& headers, const Formatter::Context&,
-                          const StreamInfo::StreamInfo&) {
+                          const StreamInfo::StreamInfo&, bool) {
         // Simulate request_headers_to_add configuration:
         // - header:
         //     key: x-timeout
@@ -1372,7 +1372,7 @@ TEST_F(RouterTest, RouterSetHeadersAccessibleInRequestHeadersToAdd) {
   EXPECT_FALSE(headers.get_("x-envoy-expected-rq-timeout-ms").empty());
 
   // Verify that our request_headers_to_add logic was able to copy it to x-timeout.
-  // This verifies the fix: applyRequestHeaderTransforms is called AFTER router-set headers.
+  // This verifies the fix: finalizeRequestHeaders is called AFTER router-set headers.
   EXPECT_FALSE(headers.get_("x-timeout").empty());
   EXPECT_EQ(headers.get_("x-envoy-expected-rq-timeout-ms"), headers.get_("x-timeout"));
 

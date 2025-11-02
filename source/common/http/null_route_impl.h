@@ -136,10 +136,6 @@ protected:
   }
   void finalizeRequestHeaders(Http::RequestHeaderMap&, const Formatter::Context&,
                               const StreamInfo::StreamInfo&, bool) const override {}
-  void finalizeHostAndPath(Http::RequestHeaderMap&, const Formatter::Context&,
-                           const StreamInfo::StreamInfo&, bool) const override {}
-  void applyRequestHeaderTransforms(Http::RequestHeaderMap&, const Formatter::Context&,
-                                    const StreamInfo::StreamInfo&) const override {}
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo&,
                                                  bool) const override {
     return {};

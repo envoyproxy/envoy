@@ -7812,6 +7812,87 @@ request_headers_to_add:
                EnvoyException);
 }
 
+// Validate that request_headers_to_add can reference router-set headers like
+// x-envoy-expected-rq-timeout-ms and x-envoy-attempt-count.
+TEST_F(CustomRequestHeadersTest, RequestHeadersCanReferenceRouterSetHeaders) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/endpoint"
+    route:
+      cluster: www2
+      timeout: 5s
+    request_headers_to_add:
+    - header:
+        key: x-timeout-copy
+        value: "%REQ(x-envoy-expected-rq-timeout-ms)%"
+    - header:
+        key: x-attempt-copy
+        value: "%REQ(x-envoy-attempt-count)%"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/endpoint", "GET");
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+
+  // Simulate router filter setting these headers before calling finalizeRequestHeaders.
+  // This mimics the fix where router-set headers are added before request_headers_to_add.
+  headers.addCopy(Http::LowerCaseString("x-envoy-expected-rq-timeout-ms"), "5000");
+  headers.addCopy(Http::LowerCaseString("x-envoy-attempt-count"), "1");
+
+  auto formatter_context = Formatter::Context().setRequestHeaders(headers);
+  route_entry->finalizeRequestHeaders(headers, formatter_context, stream_info, true);
+
+  // Verify that request_headers_to_add was able to reference router-set headers.
+  EXPECT_EQ("5000", headers.get_("x-timeout-copy"));
+  EXPECT_EQ("1", headers.get_("x-attempt-copy"));
+}
+
+// Validate that request_headers_to_add can reference router-set headers in retry scenarios.
+TEST_F(CustomRequestHeadersTest, RequestHeadersCanReferenceRouterSetHeadersOnRetry) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/endpoint"
+    route:
+      cluster: www2
+      timeout: 5s
+      retry_policy:
+        retry_on: "5xx"
+        num_retries: 3
+    request_headers_to_add:
+    - header:
+        key: x-retry-attempt
+        value: "Attempt %REQ(x-envoy-attempt-count)% with timeout %REQ(x-envoy-expected-rq-timeout-ms)%ms"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/endpoint", "GET");
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+
+  // Simulate retry attempt where attempt count is incremented.
+  headers.addCopy(Http::LowerCaseString("x-envoy-expected-rq-timeout-ms"), "4500");
+  headers.addCopy(Http::LowerCaseString("x-envoy-attempt-count"), "2");
+
+  auto formatter_context = Formatter::Context().setRequestHeaders(headers);
+  route_entry->finalizeRequestHeaders(headers, formatter_context, stream_info, true);
+
+  // Verify that request_headers_to_add properly formatted the composite string.
+  EXPECT_EQ("Attempt 2 with timeout 4500ms", headers.get_("x-retry-attempt"));
+}
+
 TEST(MetadataMatchCriteriaImpl, Create) {
   auto v1 = Protobuf::Value();
   v1.set_string_value("v1");

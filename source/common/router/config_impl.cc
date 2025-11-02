@@ -902,10 +902,18 @@ void RouteEntryImplBase::finalizeHostHeader(Http::RequestHeaderMap& headers,
   Http::Utility::updateAuthority(headers, hostname, append_xfh_, keep_old_host);
 }
 
-void RouteEntryImplBase::finalizeHostAndPath(Http::RequestHeaderMap& headers,
-                                             const Formatter::Context& context,
-                                             const StreamInfo::StreamInfo& stream_info,
-                                             bool keep_original_host_or_path) const {
+void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                                                const Formatter::Context& context,
+                                                const StreamInfo::StreamInfo& stream_info,
+                                                bool keep_original_host_or_path) const {
+  // Apply header transformations configured via request_headers_to_add first.
+  // This is important because host/path rewriting may depend on headers added here.
+  for (const HeaderParser* header_parser : getRequestHeaderParsers(
+           /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
+    // Later evaluated header parser wins.
+    header_parser->evaluateHeaders(headers, context, stream_info);
+  }
+
   // Restore the port if this was a CONNECT request.
   // Note this will restore the port for HTTP/2 CONNECT-upgrades as well as as HTTP/1.1 style
   // CONNECT requests.
@@ -922,27 +930,6 @@ void RouteEntryImplBase::finalizeHostAndPath(Http::RequestHeaderMap& headers,
 
   // Handle path rewrite.
   finalizePathHeader(headers, context, stream_info, keep_original_host_or_path);
-}
-
-void RouteEntryImplBase::applyRequestHeaderTransforms(
-    Http::RequestHeaderMap& headers, const Formatter::Context& context,
-    const StreamInfo::StreamInfo& stream_info) const {
-  for (const HeaderParser* header_parser : getRequestHeaderParsers(
-           /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
-    // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers, context, stream_info);
-  }
-}
-
-void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
-                                                const Formatter::Context& context,
-                                                const StreamInfo::StreamInfo& stream_info,
-                                                bool keep_original_host_or_path) const {
-  // Apply host and path transformations first.
-  finalizeHostAndPath(headers, context, stream_info, keep_original_host_or_path);
-
-  // Then apply header transformations configured via request_headers_to_add.
-  applyRequestHeaderTransforms(headers, context, stream_info);
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,

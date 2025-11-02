@@ -600,11 +600,27 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   attempt_count_++;
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
-  // Finalize host and path headers before host selection.
-  // Note: request_headers_to_add will be applied later after router-set headers are added.
+  // Set hedging params before finalizeRequestHeaders so timeout calculation is correct.
+  hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
+
+  // Calculate timeout and set x-envoy-expected-rq-timeout-ms before finalizeRequestHeaders.
+  // This allows request_headers_to_add to reference the timeout header.
+  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_->suppress_envoy_headers_,
+                                         grpc_request_, hedging_params_.hedge_on_per_try_timeout_,
+                                         config_->respect_expected_rq_timeout_);
+
+  // Set x-envoy-attempt-count before finalizeRequestHeaders so it can be referenced.
+  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
+  if (include_attempt_count_in_request_) {
+    headers.setEnvoyAttemptCount(attempt_count_);
+  }
+
+  // Finalize request headers (host/path rewriting + request_headers_to_add) before host selection.
+  // At this point, router-set headers (x-envoy-expected-rq-timeout-ms, x-envoy-attempt-count)
+  // are already set, so request_headers_to_add can reference them and affect load balancing.
   const Formatter::Context formatter_context(&headers, {}, {}, {}, {}, &callbacks_->activeSpan());
-  route_entry_->finalizeHostAndPath(headers, formatter_context, callbacks_->streamInfo(),
-                                    !config_->suppress_envoy_headers_);
+  route_entry_->finalizeRequestHeaders(headers, formatter_context, callbacks_->streamInfo(),
+                                       !config_->suppress_envoy_headers_);
 
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
@@ -756,12 +772,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     return false;
   }
 
-  hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
-
-  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_->suppress_envoy_headers_,
-                                         grpc_request_, hedging_params_.hedge_on_per_try_timeout_,
-                                         config_->respect_expected_rq_timeout_);
-
+  // Handle additional header processing.
   const Http::HeaderEntry* header_max_stream_duration_entry =
       headers.EnvoyUpstreamStreamDurationMs();
   if (header_max_stream_duration_entry) {
@@ -770,22 +781,11 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     headers.removeEnvoyUpstreamStreamDurationMs();
   }
 
-  // If this header is set with any value, use an alternate response code on timeout
+  // If this header is set with any value, use an alternate response code on timeout.
   if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
     timeout_response_code_ = Http::Code::NoContent;
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
-
-  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
-  if (include_attempt_count_in_request_) {
-    headers.setEnvoyAttemptCount(attempt_count_);
-  }
-
-  // Apply request_headers_to_add transformations now that router-set headers are present.
-  const Formatter::Context header_transform_context(&headers, {}, {}, {}, {},
-                                                    &callbacks_->activeSpan());
-  route_entry_->applyRequestHeaderTransforms(headers, header_transform_context,
-                                             callbacks_->streamInfo());
 
   FilterUtility::setUpstreamScheme(
       headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
@@ -2193,6 +2193,35 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     return;
   }
 
+  // Set router-set headers before host selection so request_headers_to_add can reference them.
+  if (include_attempt_count_in_request_) {
+    downstream_headers_->setEnvoyAttemptCount(attempt_count_);
+  }
+
+  if (include_timeout_retry_header_in_request_) {
+    downstream_headers_->setEnvoyIsTimeoutRetry(is_timeout_retry == TimeoutRetry::Yes ? "true"
+                                                                                       : "false");
+  }
+
+  // Update timeout headers for the retry attempt.
+  std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
+  if (DateUtil::timePointValid(downstream_request_complete_time_)) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+  }
+
+  FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
+                                   *downstream_headers_, !config_->suppress_envoy_headers_,
+                                   grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
+
+  // Apply request_headers_to_add now that router-set headers are present.
+  const Formatter::Context header_transform_context(downstream_headers_, {}, {}, {}, {},
+                                                     &callbacks_->activeSpan());
+  route_entry_->finalizeRequestHeaders(*downstream_headers_, header_transform_context,
+                                       callbacks_->streamInfo(),
+                                       !config_->suppress_envoy_headers_);
+
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_start_ms",
       callbacks_->dispatcher().timeSource().monotonicTime());
@@ -2223,7 +2252,8 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 }
 
 void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
-                             TimeoutRetry is_timeout_retry, Upstream::HostConstSharedPtr&& host,
+                             TimeoutRetry is_timeout_retry [[maybe_unused]],
+                             Upstream::HostConstSharedPtr&& host,
                              Upstream::ThreadLocalCluster& cluster,
                              absl::optional<std::string> host_selection_details) {
   callbacks_->streamInfo().downstreamTiming().setValue(
@@ -2237,35 +2267,6 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
       allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
-
-  if (include_attempt_count_in_request_) {
-    downstream_headers_->setEnvoyAttemptCount(attempt_count_);
-  }
-
-  if (include_timeout_retry_header_in_request_) {
-    downstream_headers_->setEnvoyIsTimeoutRetry(is_timeout_retry == TimeoutRetry::Yes ? "true"
-                                                                                      : "false");
-  }
-
-  // The request timeouts only account for time elapsed since the downstream request completed
-  // which might not have happened yet (in which case zero time has elapsed.)
-  std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
-
-  if (DateUtil::timePointValid(downstream_request_complete_time_)) {
-    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-    elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-  }
-
-  FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
-                                   *downstream_headers_, !config_->suppress_envoy_headers_,
-                                   grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
-
-  // Apply request_headers_to_add transformations now that all router-set headers are present.
-  const Formatter::Context header_transform_context(downstream_headers_, {}, {}, {}, {},
-                                                    &callbacks_->activeSpan());
-  route_entry_->applyRequestHeaderTransforms(*downstream_headers_, header_transform_context,
-                                             callbacks_->streamInfo());
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);

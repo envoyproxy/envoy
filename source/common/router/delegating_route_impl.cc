@@ -43,20 +43,6 @@ void DelegatingRouteEntry::finalizeRequestHeaders(Http::RequestHeaderMap& header
                                                    insert_envoy_original_path);
 }
 
-void DelegatingRouteEntry::finalizeHostAndPath(Http::RequestHeaderMap& headers,
-                                               const Formatter::Context& context,
-                                               const StreamInfo::StreamInfo& stream_info,
-                                               bool keep_original_host_or_path) const {
-  return base_route_entry_->finalizeHostAndPath(headers, context, stream_info,
-                                                keep_original_host_or_path);
-}
-
-void DelegatingRouteEntry::applyRequestHeaderTransforms(
-    Http::RequestHeaderMap& headers, const Formatter::Context& context,
-    const StreamInfo::StreamInfo& stream_info) const {
-  return base_route_entry_->applyRequestHeaderTransforms(headers, context, stream_info);
-}
-
 Http::HeaderTransforms
 DelegatingRouteEntry::requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                               bool do_formatting) const {

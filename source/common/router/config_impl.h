@@ -613,30 +613,6 @@ public:
                               const StreamInfo::StreamInfo& stream_info,
                               bool keep_original_host_or_path) const override;
 
-  /**
-   * Finalizes host and path headers including host rewriting and path rewriting.
-   * This should be called early in the request processing flow (before host selection).
-   * @param headers supplies the request headers to finalize.
-   * @param context supplies the formatter context.
-   * @param stream_info supplies the stream info.
-   * @param keep_original_host_or_path whether to preserve original host/path in x-envoy-original-*
-   * headers.
-   */
-  void finalizeHostAndPath(Http::RequestHeaderMap& headers, const Formatter::Context& context,
-                           const StreamInfo::StreamInfo& stream_info,
-                           bool keep_original_host_or_path) const override;
-
-  /**
-   * Applies request header transformations configured via request_headers_to_add.
-   * This should be called late in the request processing flow (after router-set headers).
-   * @param headers supplies the request headers to transform.
-   * @param context supplies the formatter context.
-   * @param stream_info supplies the stream info.
-   */
-  void applyRequestHeaderTransforms(Http::RequestHeaderMap& headers,
-                                    const Formatter::Context& context,
-                                    const StreamInfo::StreamInfo& stream_info) const override;
-
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting = true) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers, const Formatter::Context& context,
