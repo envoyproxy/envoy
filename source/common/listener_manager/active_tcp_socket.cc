@@ -65,7 +65,8 @@ void ActiveTcpSocket::unlink() {
   }
   // Emit logs if a connection is not established.
   if (!connected_ && stream_info_ != nullptr) {
-    ActiveStreamListenerBase::emitLogs(*listener_.config_, *stream_info_);
+    ActiveStreamListenerBase::emitLogs(*listener_.config_, *stream_info_,
+                                       AccessLog::AccessLogType::NotConnected);
   }
   listener_.dispatcher().deferredDelete(std::move(removed));
 }
