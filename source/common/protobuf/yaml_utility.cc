@@ -164,6 +164,11 @@ absl::Status MessageUtil::loadFromJsonNoThrow(absl::string_view json, Protobuf::
   return relaxed_status;
 }
 
+absl::Status MessageUtil::loadFromJsonNoThrow(absl::string_view json, Protobuf::Struct& message) {
+  message.Clear();
+  return Protobuf::util::JsonStringToMessage(json, &message);
+}
+
 void MessageUtil::loadFromJson(absl::string_view json, Protobuf::Struct& message) {
   // No need to validate if converting to a Struct, since there are no unknown
   // fields possible.
