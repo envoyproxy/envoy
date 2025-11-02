@@ -46,6 +46,8 @@ public:
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
+  friend class MockProtoApiScrubberFilterConfig;
+
 private:
   // Private constructor to make sure that this class is used in a factory fashion using the
   // public `create` method.
