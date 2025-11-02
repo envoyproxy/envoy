@@ -2200,7 +2200,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 
   if (include_timeout_retry_header_in_request_) {
     downstream_headers_->setEnvoyIsTimeoutRetry(is_timeout_retry == TimeoutRetry::Yes ? "true"
-                                                                                       : "false");
+                                                                                      : "false");
   }
 
   // Update timeout headers for the retry attempt.
@@ -2217,10 +2217,9 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 
   // Apply request_headers_to_add now that router-set headers are present.
   const Formatter::Context header_transform_context(downstream_headers_, {}, {}, {}, {},
-                                                     &callbacks_->activeSpan());
+                                                    &callbacks_->activeSpan());
   route_entry_->finalizeRequestHeaders(*downstream_headers_, header_transform_context,
-                                       callbacks_->streamInfo(),
-                                       !config_->suppress_envoy_headers_);
+                                       callbacks_->streamInfo(), !config_->suppress_envoy_headers_);
 
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_start_ms",
