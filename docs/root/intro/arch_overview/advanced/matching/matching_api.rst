@@ -68,6 +68,30 @@ These input functions are available for matching TCP connections and HTTP reques
 * :ref:`DNS SAN <extension_envoy.matching.inputs.dns_san>`.
 * :ref:`Subject <extension_envoy.matching.inputs.subject>`.
 
+.. _extension_category_envoy.matching.inputs:
+
+Transport Socket Matching Input Functions
+******************************************
+
+These input functions are available for transport socket matching in clusters:
+
+.. _extension_envoy.matching.inputs.endpoint_metadata:
+
+* Endpoint metadata - extracts metadata from the selected endpoint for transport socket selection.
+
+.. _extension_envoy.matching.inputs.locality_metadata:
+
+* Locality metadata - extracts metadata from the endpoint's locality for transport socket selection.
+
+Additionally, the following network input functions can be used in transport socket matching context:
+
+* :ref:`Destination IP <extension_envoy.matching.inputs.destination_ip>`.
+* :ref:`Destination port <extension_envoy.matching.inputs.destination_port>`.
+* :ref:`Source IP <extension_envoy.matching.inputs.source_ip>`.
+* :ref:`Source port <extension_envoy.matching.inputs.source_port>`.
+* :ref:`Server name <extension_envoy.matching.inputs.server_name>`.
+* :ref:`Application protocol <extension_envoy.matching.inputs.application_protocol>`.
+
 Common Input Functions
 **********************
 
@@ -122,6 +146,17 @@ Network filter chain matching supports the following extensions:
       "@type": type.googleapis.com/envoy.config.core.v3.SubstitutionFormatString
       text_format_source:
         inline_string: "%DYNAMIC_METADATA(com.test_filter:test_key)%"
+
+.. _extension_category_envoy.matching.action:
+
+Matching Actions
+****************
+
+These actions are available for use with matchers:
+
+.. _extension_envoy.matching.action.transport_socket.name:
+
+* Transport socket name action - selects a named transport socket from the cluster's transport_socket_matches configuration based on matching criteria.
 
 Filter Integration
 ##################

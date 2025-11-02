@@ -18,7 +18,8 @@ public:
   MockTransportSocketMatcher(Network::UpstreamTransportSocketFactoryPtr default_factory);
   ~MockTransportSocketMatcher() override;
   MOCK_METHOD(TransportSocketMatcher::MatchData, resolve,
-              (const envoy::config::core::v3::Metadata*, const envoy::config::core::v3::Metadata*),
+              (const envoy::config::core::v3::Metadata*, const envoy::config::core::v3::Metadata*,
+               Network::TransportSocketOptionsConstSharedPtr),
               (const));
   MOCK_METHOD(bool, allMatchesSupportAlpn, (), (const));
 
