@@ -14,6 +14,11 @@ behavior_changes:
     hardware thread count and CPU affinity for worker thread calculation. Uses conservative rounding (floor)
     to account for non-worker threads and prevent container throttling, which may reduce the total number of
     connections.
+- area: dynamic modules
+  change: |
+    The dynamic module ABI has been updated to support streaming body manipulation. This change also
+    fixed potential incorrect behavior when access or modify the request or response body. See
+    https://github.com/envoyproxy/envoy/issues/40918 for more details.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -49,6 +54,12 @@ bug_fixes:
     Fixed a bug where Envoy would leak memory if an HTTP/2 stream was reset before request headers were
     sent. For example, if an upstream HTTP filter sent a local reply after the connection was established but
     before request headers were sent, the memory allocated for the stream was not released.
+- area: http2
+  change: |
+    Optimized HTTP/2 header processing by avoiding memory allocations and string copies for well-known header names.
+    For common HTTP/2 headers (such as ``:method``, ``:path``, ``:status``, ``content-type``, ``user-agent``, etc.),
+    Envoy now references static strings instead of copying header names. This reduces memory allocations and improves
+    performance for typical HTTP/2 traffic.
 - area: lua
   change: |
     Fixed a bug where Lua filters could cause Envoy to crash when setting the response body to a payload larger
@@ -72,6 +83,16 @@ bug_fixes:
     Fixed per-route configuration for composite filter to support matching on response headers and trailers.
     Previously, per-route matchers would silently fail when attempting to match on ``HttpResponseHeaderMatchInput``
     or ``HttpResponseTrailerMatchInput``, causing the delegated filter to be skipped without error.
+- area: dns
+  change: |
+    c-ares resolver: add optional ``reinit_channel_on_timeout`` to reinitialize
+    the resolver after DNS timeouts.
+- area: router
+  change: |
+    Fixed a regression where router-set headers (e.g., ``x-envoy-expected-rq-timeout-ms``, ``x-envoy-attempt-count``)
+    were not accessible in ``request_headers_to_add`` configuration on the initial request. Headers configured via
+    ``request_headers_to_add`` can now reference router-set headers using formatters like
+    ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -108,6 +129,9 @@ new_features:
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to
     :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`, allowing use of a different
     header for vhost matching.
+- area: http2
+  change: |
+    Added new parameter to the ``sendGoAwayAndClose`` to support gracefully closing of HTTP/2 connection.
 - area: logging
   change: |
     Added support for the not-equal operator in access log filter rules, in
@@ -128,6 +152,11 @@ new_features:
     - ``%RESPONSE_HEADER(X?Y):Z%`` as full name version of ``%RESP(X?Y):Z%``
     - ``%RESPONSE_TRAILER(X?Y):Z%`` as full name version of ``%TRAILER(X?Y):Z%``
     This provides a more consistent naming scheme for users to understand and use.
+- area: tracing
+  change: |
+    Added new :ref:`value <envoy_v3_api_field_type.tracing.v3.CustomTag.value>` field and
+    the :ref:`substitution format specifier <config_access_log_format>` could be used to
+    extract values from various parts of the request/response for custom tags.
 - area: lua
   change: |
     Added ``drainConnectionUponCompletion()`` to the Lua filter stream info API. This allows Lua scripts
@@ -158,6 +187,12 @@ new_features:
     Added QUIC protocol option :ref:`max_sessions_per_event_loop
     <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.max_sessions_per_event_loop>` to limit the maximum
     number of new QUIC sessions created per event loop. The default is 16, preserving the previous hardcoded limit.
+- area: ext_authz
+  change: |
+    Add a new configuration field to the http ext authz filter
+    :ref:`enforce_response_header_limits <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.enforce_response_header_limits>`
+    that allows admins to enable / disable the behavior of dropping response headers once the header
+    map count / size constraints have been reached.
 - area: ext_proc
   change: |
     Added new method processingEffects within Filter State. This mehtod returns the per HTTP event procesing_effects that occurred

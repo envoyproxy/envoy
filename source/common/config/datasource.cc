@@ -89,7 +89,7 @@ absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& s
 
 DynamicData::DynamicData(Event::Dispatcher& main_dispatcher,
                          ThreadLocal::TypedSlotPtr<ThreadLocalData> slot,
-                         Filesystem::WatcherPtr watcher)
+                         WatchedDirectoryPtr watcher)
     : dispatcher_(main_dispatcher), slot_(std::move(slot)), watcher_(std::move(watcher)) {}
 
 DynamicData::~DynamicData() {
@@ -140,13 +140,12 @@ absl::StatusOr<DataSourceProviderPtr> DataSourceProvider::create(const ProtoData
   });
 
   const auto& filename = source.filename();
-  auto watcher = main_dispatcher.createFilesystemWatcher();
-  // DynamicData will ensure that the watcher is destroyed before the slot is destroyed.
-  // TODO(wbpcode): use Config::WatchedDirectory instead of directly creating a watcher
-  // if the Config::WatchedDirectory is exception-free in the future.
-  auto watcher_status = watcher->addWatch(
-      absl::StrCat(source.watched_directory().path(), "/"), Filesystem::Watcher::Events::MovedTo,
-      [slot_ptr = slot.get(), &api, filename, allow_empty, max_size](uint32_t) -> absl::Status {
+  auto directory_watcher_or_error =
+      WatchedDirectory::create(source.watched_directory(), main_dispatcher);
+  RETURN_IF_NOT_OK_REF(directory_watcher_or_error.status());
+
+  directory_watcher_or_error.value()->setCallback(
+      [slot_ptr = slot.get(), &api, filename, allow_empty, max_size]() -> absl::Status {
         auto new_data_or_error = readFile(filename, api, allow_empty, max_size);
         if (!new_data_or_error.ok()) {
           // Log an error but don't fail the watch to avoid throwing EnvoyException at runtime.
@@ -163,10 +162,9 @@ absl::StatusOr<DataSourceProviderPtr> DataSourceProvider::create(const ProtoData
             });
         return absl::OkStatus();
       });
-  RETURN_IF_NOT_OK(watcher_status);
 
-  return std::unique_ptr<DataSourceProvider>(
-      new DataSourceProvider(DynamicData(main_dispatcher, std::move(slot), std::move(watcher))));
+  return std::unique_ptr<DataSourceProvider>(new DataSourceProvider(DynamicData(
+      main_dispatcher, std::move(slot), std::move(directory_watcher_or_error.value()))));
 }
 
 } // namespace DataSource
