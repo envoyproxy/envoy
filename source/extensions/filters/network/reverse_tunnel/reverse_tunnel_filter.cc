@@ -123,7 +123,7 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
 
   // Validate node_id if formatter is configured.
   if (node_id_formatter_) {
-    const std::string expected_node_id = node_id_formatter_->formatWithContext({}, stream_info);
+    const std::string expected_node_id = node_id_formatter_->format({}, stream_info);
     if (!expected_node_id.empty() && expected_node_id != node_id) {
       ENVOY_LOG(debug, "reverse_tunnel: node_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_node_id, node_id);
@@ -133,8 +133,7 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
 
   // Validate cluster_id if formatter is configured.
   if (cluster_id_formatter_) {
-    const std::string expected_cluster_id =
-        cluster_id_formatter_->formatWithContext({}, stream_info);
+    const std::string expected_cluster_id = cluster_id_formatter_->format({}, stream_info);
     if (!expected_cluster_id.empty() && expected_cluster_id != cluster_id) {
       ENVOY_LOG(debug, "reverse_tunnel: cluster_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_cluster_id, cluster_id);
@@ -424,8 +423,7 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   if (socket_manager != nullptr) {
     ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
     socket_manager->addConnectionSocket(std::string(node_id), std::string(cluster_id),
-                                        std::move(wrapped_socket), ping_seconds,
-                                        /*rebalanced=*/false);
+                                        std::move(wrapped_socket), ping_seconds);
     ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                    connection);
   }

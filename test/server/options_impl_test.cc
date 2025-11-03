@@ -16,10 +16,14 @@
 #include "source/common/common/utility.h"
 #include "source/extensions/filters/http/buffer/buffer_filter.h"
 #include "source/server/options_impl.h"
+#include "source/server/options_impl_platform.h"
+
+#include "absl/strings/ascii.h"
 
 #if defined(__linux__)
 #include <sched.h>
 #include "source/server/options_impl_platform_linux.h"
+#include "source/server/cgroup_cpu_util.h"
 #endif
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
@@ -583,6 +587,11 @@ using testing::DoAll;
 using testing::Return;
 using testing::SetArgPointee;
 
+class MockCgroupDetector : public CgroupDetectorImpl {
+public:
+  MOCK_METHOD(absl::optional<uint32_t>, getCpuLimit, (Filesystem::Instance & fs), (override));
+};
+
 class OptionsImplPlatformLinuxTest : public testing::Test {
 public:
 };
@@ -659,6 +668,155 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
   EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
 }
 
+// Mock-based tests for getCpuCount environment variable control
+
+TEST_F(OptionsImplPlatformLinuxTest, EnvVarDisablesCgroupDetectionMocked) {
+  // Test that ENVOY_CGROUP_CPU_DETECTION=false prevents getCpuLimit calls
+  setenv("ENVOY_CGROUP_CPU_DETECTION", "false", 1);
+
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Verify getCpuLimit is NOT called when env var disables detection
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).Times(0);
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  EXPECT_GE(result, 1U); // Should return hardware thread count
+
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION");
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, EnvVarAllowsCgroupDetectionMocked) {
+  // Test that default behavior (enabled) calls getCpuLimit
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Default: enabled
+
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Mock successful cgroup detection returning 2 CPUs
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(2)));
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Result should be influenced by the mocked cgroup limit of 2
+  EXPECT_GE(result, 1U);
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, EnvVarTrueAllowsCgroupDetectionMocked) {
+  // Test that ENVOY_CGROUP_CPU_DETECTION=true enables detection
+  setenv("ENVOY_CGROUP_CPU_DETECTION", "true", 1);
+
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Mock cgroup detection returning no limit (unlimited)
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::nullopt));
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  EXPECT_GE(result, 1U); // Should fallback to hardware thread count
+
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION");
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, CgroupLimitConstrainsResult) {
+  // Test that cgroup limit is used in min() calculation when it's the smallest value
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Enable detection
+
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Mock cgroup detection returning 2 CPUs (lower than typical hardware)
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(2)));
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Result should be constrained by cgroup limit
+  // Since we can't easily mock hardware threads and affinity in this test,
+  // we verify the cgroup limit is considered (result influenced by mock)
+  EXPECT_GE(result, 1U);
+  EXPECT_LE(result, 2U); // Should not exceed the mocked cgroup limit
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, CgroupDetectionReturnsNullopt) {
+  // Test graceful fallback when cgroup detection returns no limit (unlimited)
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Enable detection
+
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Mock cgroup detection returning nullopt (no limit/unlimited)
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::nullopt));
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Should fall back to hardware thread count when no cgroup limit
+  EXPECT_GE(result, 1U);
+  // Without cgroup constraint, should get at least hardware thread count
+  // (limited by affinity in practice, but we can't easily mock that here)
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, CgroupLimitVeryLow) {
+  // Test that very low cgroup limits are respected (heavy constraint scenario)
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Enable detection
+
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Mock cgroup detection returning 1 CPU (very constrained)
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(1)));
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Even with very low cgroup limit, Envoy guarantees at least 1 CPU
+  EXPECT_EQ(result, 1U); // Should be exactly 1 due to cgroup constraint
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, CgroupLimitHigherThanTypicalHardware) {
+  // Test when cgroup allows more CPUs than typical hardware might have
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Enable detection
+
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Mock cgroup detection returning high CPU count
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(32)));
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Result should be constrained by hardware/affinity, not the high cgroup limit
+  EXPECT_GE(result, 1U);
+  // In practice, hardware thread count or affinity will be the constraint
+  EXPECT_LE(result, 32U); // Sanity check - shouldn't exceed the mock value
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, EnvoyMinimumOneCPUGuarantee) {
+  // Test Envoy's guarantee of at least 1 CPU even with theoretical edge cases
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Enable detection
+
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Mock cgroup detection returning 0 (theoretical edge case)
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(0)));
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  // Envoy's max(1U, effective_count) should ensure at least 1 CPU
+  EXPECT_GE(result, 1U); // Must honor Envoy's minimum guarantee
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, CombinedEnvVarAndCgroupScenarios) {
+  // Test various environment variable states with different cgroup responses
+
+  // Scenario 1: Explicitly enabled with successful detection
+  setenv("ENVOY_CGROUP_CPU_DETECTION", "true", 1);
+
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Mock successful cgroup detection
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(absl::optional<uint32_t>(4)));
+
+  uint32_t result = OptionsImplPlatform::getCpuCount();
+  EXPECT_GE(result, 1U);
+  EXPECT_LE(result, 4U); // Should consider the cgroup limit
+
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION");
+}
 #endif
 
 class TestFactory : public Config::TypedFactory {

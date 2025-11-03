@@ -192,7 +192,7 @@ void RCConnectionWrapper::shutdown() {
     return;
   }
 
-  // Get connection info for logging
+  // Get connection info for logging.
   uint64_t connection_id = connection_->id();
   Network::Connection::State state = connection_->state();
   ENVOY_LOG(debug, "RCConnectionWrapper: Shutting down connection ID: {}, state: {}", connection_id,

@@ -46,7 +46,9 @@ namespace ExtAuthz {
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(invalid)                                                                                 \
   COUNTER(ignored_dynamic_metadata)                                                                \
-  COUNTER(filter_state_name_collision)
+  COUNTER(filter_state_name_collision)                                                             \
+  COUNTER(omitted_response_headers)                                                                \
+  COUNTER(request_header_limits_reached)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -207,6 +209,8 @@ public:
 
   bool emitFilterStateStats() const { return emit_filter_state_stats_; }
 
+  bool enforceResponseHeaderLimits() const { return enforce_response_header_limits_; }
+
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
   const Filters::Common::ExtAuthz::MatcherSharedPtr& allowedHeadersMatcher() const {
@@ -260,6 +264,7 @@ private:
   LabelsMap destination_labels_;
   const absl::optional<Protobuf::Struct> filter_metadata_;
   const bool emit_filter_state_stats_;
+  const bool enforce_response_header_limits_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
@@ -343,7 +348,7 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  envoy::extensions::filters::http::ext_authz::v3::CheckSettings checkSettings() const {
+  const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& checkSettings() const {
     return check_settings_;
   }
 
@@ -443,7 +448,7 @@ private:
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
     const bool skip_check_;
-    const envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
+    const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& check_settings_;
   };
   PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
 

@@ -92,7 +92,7 @@ using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBas
 class SslRedirector : public DirectResponseEntry {
 public:
   // Router::DirectResponseEntry
-  void finalizeResponseHeaders(Http::ResponseHeaderMap&, const Formatter::HttpFormatterContext&,
+  void finalizeResponseHeaders(Http::ResponseHeaderMap&, const Formatter::Context&,
                                const StreamInfo::StreamInfo&) const override {}
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
                                                   bool) const override {
@@ -609,14 +609,13 @@ public:
     }
     return HeaderParser::defaultParser();
   }
-  void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
-                              const Formatter::HttpFormatterContext& context,
+  void finalizeRequestHeaders(Http::RequestHeaderMap& headers, const Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool keep_original_host_or_path) const override;
+
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting = true) const override;
-  void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
-                               const Formatter::HttpFormatterContext& context,
+  void finalizeResponseHeaders(Http::ResponseHeaderMap& headers, const Formatter::Context& context,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;
@@ -765,12 +764,22 @@ public:
   absl::string_view sanitizePathBeforePathMatching(const absl::string_view path) const;
 
 protected:
+  const PathMatcherSharedPtr path_matcher_;
+
+  // Path rewrite related members.
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
-  const PathMatcherSharedPtr path_matcher_;
-  const PathRewriterSharedPtr path_rewriter_;
   std::string regex_rewrite_substitution_;
+  const PathRewriterSharedPtr path_rewriter_;
+  Formatter::FormatterPtr path_rewrite_formatter_;
+
+  // Host rewrite related members.
   const std::string host_rewrite_;
+  const Http::LowerCaseString host_rewrite_header_;
+  const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
+  const std::string host_rewrite_path_regex_substitution_;
+  Formatter::FormatterPtr host_rewrite_formatter_;
+
   std::unique_ptr<ConnectConfig> connect_config_;
 
   bool case_sensitive() const { return case_sensitive_; }
@@ -778,23 +787,19 @@ protected:
                                    const StreamInfo::StreamInfo& stream_info,
                                    uint64_t random_value) const;
 
-  /**
-   * Returns the correct path rewrite string for this route.
-   *
-   * The provided container may be used to store memory backing the return value
-   * therefore it must outlive any use of the return value.
-   */
-  const std::string& getPathRewrite(const Http::RequestHeaderMap& headers,
-                                    absl::optional<std::string>& container) const;
+  // Common logic for rewritePathHeader() of DirectResponseEntry.
+  void finalizePathHeaderForRedirect(Http::RequestHeaderMap& headers,
+                                     absl::string_view matched_path, bool keep_old_path) const;
 
-  void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
-                          bool insert_envoy_original_path) const;
+  void finalizePathHeader(Http::RequestHeaderMap& headers, const Formatter::Context& context,
+                          const StreamInfo::StreamInfo& stream_info, bool keep_old_host) const;
+  void finalizeHostHeader(Http::RequestHeaderMap& headers, const Formatter::Context& context,
+                          const StreamInfo::StreamInfo& stream_info, bool keep_old_host) const;
 
-  void finalizeHostHeader(Http::RequestHeaderMap& headers, bool keep_old_host) const;
-
-  absl::optional<std::string>
-  currentUrlPathAfterRewriteWithMatchedPath(const Http::RequestHeaderMap& headers,
-                                            absl::string_view matched_path) const;
+  std::string currentUrlPathAfterRewriteWithMatchedPath(const Http::RequestHeaderMap& headers,
+                                                        const Formatter::Context& context,
+                                                        const StreamInfo::StreamInfo& stream_info,
+                                                        absl::string_view matched_path) const;
 
 private:
   struct RuntimeData {
@@ -879,9 +884,6 @@ private:
   // Same with vhost_ but this could be returned as reference. vhost_ is kept to access the
   // methods that not exposed in the VirtualHost.
   const VirtualHostConstSharedPtr vhost_copy_;
-  const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;
-  const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
-  const std::string host_rewrite_path_regex_substitution_;
   const std::string cluster_name_;
   RouteStatsContextPtr route_stats_context_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
@@ -906,7 +908,7 @@ private:
   HeaderParserPtr response_headers_parser_;
   RouteMetadataPackPtr metadata_;
   const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
-  const std::vector<Envoy::Matchers::FilterStateMatcherPtr> filter_state_;
+  const std::vector<Envoy::Matchers::FilterStateMatcher> filter_state_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
@@ -952,8 +954,9 @@ public:
                          bool insert_envoy_original_path) const override;
 
   // Router::RouteEntry
-  absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+  std::string currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                                         const Formatter::Context& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   friend class RouteCreator;
@@ -986,8 +989,9 @@ public:
                          bool insert_envoy_original_path) const override;
 
   // Router::RouteEntry
-  absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+  std::string currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                                         const Formatter::Context& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   friend class RouteCreator;
@@ -1019,8 +1023,9 @@ public:
                          bool insert_envoy_original_path) const override;
 
   // Router::RouteEntry
-  absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+  std::string currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                                         const Formatter::Context& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   friend class RouteCreator;
@@ -1051,8 +1056,9 @@ public:
                          bool insert_envoy_original_path) const override;
 
   // Router::RouteEntry
-  absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+  std::string currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                                         const Formatter::Context& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   friend class RouteCreator;
@@ -1082,8 +1088,9 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override;
 
   // Router::RouteEntry
-  absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+  std::string currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                                         const Formatter::Context& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override;
 
   bool supportsPathlessHeaders() const override { return true; }
 
@@ -1115,8 +1122,9 @@ public:
                          bool insert_envoy_original_path) const override;
 
   // Router::RouteEntry
-  absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+  std::string currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                                         const Formatter::Context& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   friend class RouteCreator;
@@ -1234,6 +1242,7 @@ private:
 
   VirtualHostImplSharedPtr default_virtual_host_;
   const bool ignore_port_in_host_matching_{false};
+  const Http::LowerCaseString vhost_header_;
 };
 
 /**

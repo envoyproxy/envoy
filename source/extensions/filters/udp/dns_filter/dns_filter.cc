@@ -1,12 +1,16 @@
 #include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 
 #include "envoy/network/listener.h"
+#include "envoy/registry/registry.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "source/common/config/datasource.h"
+#include "source/common/config/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_access_log.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 namespace Envoy {
@@ -193,6 +197,15 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     }
     max_pending_lookups_ = 0;
   }
+
+  // Initialize access logs with DNS-specific command parser
+  for (const auto& log_config : config.access_log()) {
+    std::vector<Formatter::CommandParserPtr> command_parsers;
+    command_parsers.push_back(createDnsFilterCommandParser());
+    AccessLog::InstanceSharedPtr current_access_log =
+        AccessLog::AccessLogFactory::fromProto(log_config, context, std::move(command_parsers));
+    access_logs_.push_back(current_access_log);
+  }
 }
 
 void DnsFilterEnvoyConfig::addEndpointToSuffix(const absl::string_view suffix,
@@ -317,6 +330,10 @@ void DnsFilter::sendDnsResponse(DnsQueryContextPtr query_context) {
   message_parser_.buildResponseBuffer(query_context, response);
   config_->stats().downstream_tx_responses_.inc();
   config_->stats().downstream_tx_bytes_.recordValue(response.length());
+
+  // Log the DNS query
+  logQuery(query_context);
+
   Network::UdpSendData response_data{query_context->local_->ip(), *(query_context->peer_),
                                      response};
   listener_.send(response_data);
@@ -627,6 +644,29 @@ Network::FilterStatus DnsFilter::onReceiveError(Api::IoError::IoErrorCode error_
   UNREFERENCED_PARAMETER(error_code);
 
   return Network::FilterStatus::StopIteration;
+}
+
+void DnsFilter::logQuery(const DnsQueryContextPtr& context) {
+  if (config_->accessLogs().empty()) {
+    return;
+  }
+
+  // Create connection info provider with local and remote addresses
+  auto connection_info =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(context->local_, context->peer_);
+
+  // Create a StreamInfo for access logging
+  StreamInfo::StreamInfoImpl stream_info(listener_.dispatcher().timeSource(), connection_info,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Create formatter context with DNS query context extension
+  Formatter::Context formatter_context;
+  formatter_context.setExtension(*context);
+
+  // Log to all configured access loggers
+  for (const auto& access_log : config_->accessLogs()) {
+    access_log->log(formatter_context, stream_info);
+  }
 }
 
 } // namespace DnsFilter

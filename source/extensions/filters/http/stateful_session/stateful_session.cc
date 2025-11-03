@@ -72,6 +72,10 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
     }
     effective_config_ = route_config->statefulSessionConfig();
   }
+
+  // Filter is active and not disabled per-route.
+  filter_active_ = true;
+
   session_state_ = effective_config_->createSessionState(headers);
   if (session_state_ == nullptr) {
     return Http::FilterHeadersStatus::Continue;
@@ -86,6 +90,15 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
 
 Http::FilterHeadersStatus StatefulSession::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (session_state_ == nullptr) {
+    // Track requests that reached upstream without session state, but only when the filter is
+    // active. This excludes cases where the filter is explicitly disabled per-route.
+    // It measures requests that had no session cookie/header or where session extraction failed.
+    if (filter_active_) {
+      if (auto upstream_info = encoder_callbacks_->streamInfo().upstreamInfo();
+          upstream_info != nullptr && upstream_info->upstreamHost() != nullptr) {
+        markNoSession();
+      }
+    }
     return Http::FilterHeadersStatus::Continue;
   }
 

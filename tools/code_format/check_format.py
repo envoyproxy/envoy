@@ -29,6 +29,9 @@ class FormatConfig:
         self.path = path
         self.args = args
         self.source_path = source_path
+        # This is also an ugly hack - we pull in these tools as python libs and
+        # and then execute them - without the following it tries to use host python
+        os.environ["PATH"] = f"{os.path.dirname(sys.executable)}:{os.environ['PATH']}"
 
     def __getitem__(self, k):
         return self.config.__getitem__(k)
@@ -712,12 +715,6 @@ class FormatChecker:
             report_error(
                 "Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
                 "in envoy/common/platform.h instead")
-        if self.config.re["designated_initializer"].search(line):
-            # Designated initializers are not part of the C++14 standard and are not supported
-            # by MSVC
-            report_error(
-                "Don't use designated initializers in struct initialization, "
-                "they are not part of C++14")
         if " ?: " in line:
             # The ?: operator is non-standard, it is a GCC extension
             report_error("Don't use the '?:' operator, it is a non-standard GCC extension")

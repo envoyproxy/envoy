@@ -130,7 +130,7 @@ cc_library(
 
 configure_make(
     name = "luajit",
-    configure_command = "build.py",
+    configure_command = "luajit_build.sh",
     env = select({
         # This shouldn't be needed! See
         # https://github.com/envoyproxy/envoy/issues/6084
@@ -220,6 +220,7 @@ configure_make(
         "LIBS": "-l:libstdc++.a",
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
         "ARFLAGS": "r",
+        "PYTHON": "$$EXT_BUILD_ROOT/$(PYTHON3)",
     } | select({
         "//bazel/foreign_cc:parallel_builds_enabled": {
             "MAKEFLAGS": "-j ARFLAGS=r",
@@ -249,6 +250,7 @@ configure_make(
         "libicudata.a",
     ],
     tags = ["skip_on_windows"],
+    toolchains = ["@rules_python//python:current_py_toolchain"],
     alwayslink = True,
 )
 
@@ -276,6 +278,10 @@ envoy_cmake(
         "SXG_WITH_CERT_CHAIN": "off",
         "RUN_TEST": "off",
         "CMAKE_INSTALL_LIBDIR": "lib",
+        "OPENSSL_ROOT_DIR": "$$EXT_BUILD_DEPS",
+        "OPENSSL_INCLUDE_DIR": "$$EXT_BUILD_DEPS/include",
+        "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto_internal.a",
+        "OPENSSL_SSL_LIBRARY": "$$EXT_BUILD_DEPS/lib/libssl_internal.a",
     },
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {

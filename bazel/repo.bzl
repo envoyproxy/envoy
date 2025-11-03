@@ -46,7 +46,7 @@ def _envoy_repo_impl(repository_ctx):
     api_version = repository_ctx.read(api_version_path).strip()
     repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
-    repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
+    repository_ctx.file("envoy_repo.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
     repository_ctx.file("WORKSPACE", "")
     repository_ctx.file("BUILD", '''
 load("@rules_python//python:defs.bzl", "py_library")
@@ -55,7 +55,7 @@ load("//:path.bzl", "PATH")
 
 py_library(
     name = "envoy_repo",
-    srcs = ["__init__.py"],
+    srcs = ["envoy_repo.py"],
     visibility = ["//visibility:public"],
 )
 
@@ -63,7 +63,7 @@ py_console_script_binary(
     name = "get_project_json",
     pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project_data",
-    data = [":__init__.py"],
+    data = [":envoy_repo.py"],
 )
 
 genrule(
@@ -134,7 +134,7 @@ py_console_script_binary(
         "--release-message-path=$(location @envoy//changelogs:summary)",
     ],
     data = [
-        ":__init__.py",
+        ":envoy_repo.py",
         "@envoy//changelogs:summary",
     ],
     pkg = "@base_pip3//envoy_base_utils",
@@ -149,7 +149,7 @@ py_console_script_binary(
     ],
     pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    data = [":__init__.py"],
+    data = [":envoy_repo.py"],
 )
 
 py_console_script_binary(
@@ -160,7 +160,7 @@ py_console_script_binary(
     ],
     pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    data = [":__init__.py"],
+    data = [":envoy_repo.py"],
 )
 
 py_console_script_binary(
@@ -171,7 +171,7 @@ py_console_script_binary(
     ],
     pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    data = [":__init__.py"],
+    data = [":envoy_repo.py"],
 )
 
 py_console_script_binary(
@@ -182,7 +182,7 @@ py_console_script_binary(
     ],
     pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    data = [":__init__.py"],
+    data = [":envoy_repo.py"],
 )
 
 ''')
