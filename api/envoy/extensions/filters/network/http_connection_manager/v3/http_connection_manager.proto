@@ -796,7 +796,7 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
   // is SANITIZE_SET_OR_APPEND_FORWARD and the client connection is mTLS. If the client certificate matches the matcher,
   // the client certificate information will be appended to the request’s XFCC header. Otherwise, the XFCC header will be sanitized.
-  SubjectAltNameMatcher append_forward_matcher = 60;
+  xds.type.matcher.v3.Matcher append_forward_matcher = 60;
 
   // If proxy_100_continue is true, Envoy will proxy incoming "Expect:
   // 100-continue" headers upstream, and forward "100 Continue" responses
