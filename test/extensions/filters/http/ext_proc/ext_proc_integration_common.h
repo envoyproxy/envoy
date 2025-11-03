@@ -178,6 +178,7 @@ protected:
                                         bool response = false, absl::string_view body_sent = "");
   void serverSendTrailerRespDuplexStreamed();
   void prependExprocCompositeFilter();
+  void initializeLogConfig(std::string& access_log_path);
 
   std::unique_ptr<SimpleFilterConfig<DynamicMetadataToHeadersFilter>> simple_filter_config_;
   std::unique_ptr<
