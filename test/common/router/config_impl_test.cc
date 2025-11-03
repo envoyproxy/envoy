@@ -8156,6 +8156,37 @@ virtual_hosts:
   EXPECT_STREQ("content", direct_response->responseBody().c_str());
 }
 
+// Test the formatting of direct response bodies with formatting.
+TEST_F(RouteConfigurationV2, DirectResponseBodyFormatting) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: direct
+    domains: [example.com]
+    routes:
+      - match: { prefix: "/"}
+        direct_response:
+          status: 200
+          body: { inline_string: "inner" }
+          body_format:
+            text_format_source:
+              inline_string: "prefix %LOCAL_REPLY_BODY% suffix"
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  const auto* direct_response =
+      config.route(genHeaders("example.com", "/", "GET"), 0)->directResponseEntry();
+  std::string body;
+  Http::TestRequestHeaderMapImpl req_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl resp_headers;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_NE(nullptr, direct_response);
+  std::string formatted;
+  direct_response->formatBody(req_headers, resp_headers, stream_info, formatted);
+  EXPECT_EQ("prefix inner suffix", formatted);
+}
+
 // Test the parsing of a direct response configuration where the response body is too large.
 TEST_F(RouteConfigurationV2, DirectResponseTooLarge) {
   std::string response_body(4097, 'A');

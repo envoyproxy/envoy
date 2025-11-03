@@ -102,6 +102,8 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
+  void formatBody(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                  const StreamInfo::StreamInfo&, std::string&) const override {}
 };
 
 class CommonVirtualHostImpl;
@@ -743,6 +745,9 @@ public:
     return direct_response_body_provider_ != nullptr ? direct_response_body_provider_->data()
                                                      : EMPTY_STRING;
   }
+  void formatBody(const Http::RequestHeaderMap& request_headers,
+                  const Http::ResponseHeaderMap& response_headers,
+                  const StreamInfo::StreamInfo& stream_info, std::string& body) const override;
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -915,6 +920,7 @@ private:
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
   Envoy::Config::DataSource::DataSourceProviderPtr direct_response_body_provider_;
+  Formatter::FormatterPtr direct_response_body_formatter_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;

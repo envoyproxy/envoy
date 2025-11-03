@@ -103,6 +103,18 @@ public:
   virtual const std::string& responseBody() const PURE;
 
   /**
+   * Format the response body for direct responses. Implementations should set
+   * `body` to the raw body (if any) and apply any configured formatter to it.
+   * @param request_headers supplies the request headers.
+   * @param response_headers supplies the response headers.
+   * @param stream_info holds additional information about the request.
+   * @param body string to be populated/modified with the direct response body.
+   */
+  virtual void formatBody(const Http::RequestHeaderMap& request_headers,
+                          const Http::ResponseHeaderMap& response_headers,
+                          const StreamInfo::StreamInfo& stream_info, std::string& body) const PURE;
+
+  /**
    * Do potentially destructive header transforms on Path header prior to redirection. For
    * example prefix rewriting for redirects etc. This should only be called ONCE
    * immediately prior to redirecting.

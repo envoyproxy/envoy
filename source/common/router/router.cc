@@ -483,8 +483,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (direct_response != nullptr) {
     stats_.rq_direct_response_.inc();
     direct_response->rewritePathHeader(headers, !config_->suppress_envoy_headers_);
+    std::string direct_response_body;
+    if (downstream_headers_ != nullptr) {
+      direct_response->formatBody(*downstream_headers_,
+                                  *Http::StaticEmptyHeaders::get().response_headers,
+                                  callbacks_->streamInfo(), direct_response_body);
+    }
+
     callbacks_->sendLocalReply(
-        direct_response->responseCode(), direct_response->responseBody(),
+        direct_response->responseCode(), direct_response_body,
         [this, direct_response](Http::ResponseHeaderMap& response_headers) -> void {
           std::string new_uri;
           ASSERT(downstream_headers_ != nullptr);
