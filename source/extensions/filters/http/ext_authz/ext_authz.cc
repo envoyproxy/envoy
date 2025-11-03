@@ -67,7 +67,7 @@ const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& defaultChe
   CONSTRUCT_ON_FIRST_USE(envoy::extensions::filters::http::ext_authz::v3::CheckSettings);
 }
 
-bool headersWithinLimits(Http::HeaderMap& headers) {
+bool headersWithinLimits(const Http::HeaderMap& headers) {
   return headers.size() <= headers.maxHeadersCount() &&
          headers.byteSize() <= headers.maxHeadersKb() * 1024;
 }
