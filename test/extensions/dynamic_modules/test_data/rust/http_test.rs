@@ -160,7 +160,7 @@ fn test_body_callbacks_filter_on_bodies() {
   f.on_request_body(&mut envoy_filter, true);
 
   assert_eq!(
-    std::str::from_utf8(&f.get_final_readed_request_body()).unwrap(),
+    std::str::from_utf8(&f.get_final_read_request_body()).unwrap(),
     "nicenicenicenicenicenice"
   );
 
@@ -208,7 +208,7 @@ fn test_body_callbacks_filter_on_bodies() {
   f.on_response_body(&mut envoy_filter, true);
 
   assert_eq!(
-    std::str::from_utf8(&f.get_final_readed_response_body()).unwrap(),
+    std::str::from_utf8(&f.get_final_read_response_body()).unwrap(),
     "coolcoolcoolcoolcoolcool"
   );
 }
