@@ -31,6 +31,7 @@ envoy_cc_library(
     ],
     hdrs = [
         "dynatrace_sampler.h",
+        "dynatrace_tag.h",
         "sampler_config.h",
         "sampler_config_provider.h",
         "sampling_controller.h",

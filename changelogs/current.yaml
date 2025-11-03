@@ -14,6 +14,11 @@ behavior_changes:
     hardware thread count and CPU affinity for worker thread calculation. Uses conservative rounding (floor)
     to account for non-worker threads and prevent container throttling, which may reduce the total number of
     connections.
+- area: dynamic modules
+  change: |
+    The dynamic module ABI has been updated to support streaming body manipulation. This change also
+    fixed potential incorrect behavior when access or modify the request or response body. See
+    https://github.com/envoyproxy/envoy/issues/40918 for more details.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -82,6 +87,12 @@ bug_fixes:
   change: |
     c-ares resolver: add optional ``reinit_channel_on_timeout`` to reinitialize
     the resolver after DNS timeouts.
+- area: router
+  change: |
+    Fixed a regression where router-set headers (e.g., ``x-envoy-expected-rq-timeout-ms``, ``x-envoy-attempt-count``)
+    were not accessible in ``request_headers_to_add`` configuration on the initial request. Headers configured via
+    ``request_headers_to_add`` can now reference router-set headers using formatters like
+    ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -118,6 +129,9 @@ new_features:
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to
     :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`, allowing use of a different
     header for vhost matching.
+- area: http2
+  change: |
+    Added new parameter to the ``sendGoAwayAndClose`` to support gracefully closing of HTTP/2 connection.
 - area: logging
   change: |
     Added support for the not-equal operator in access log filter rules, in

@@ -906,6 +906,8 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                 const Formatter::Context& context,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool keep_original_host_or_path) const {
+  // Apply header transformations configured via request_headers_to_add first.
+  // This is important because host/path rewriting may depend on headers added here.
   for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
