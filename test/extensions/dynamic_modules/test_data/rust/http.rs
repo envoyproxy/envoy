@@ -699,7 +699,7 @@ impl BodyCallbacksFilter {
   fn get_final_read_request_body<'a>(&'a self) -> &'a Vec<u8> {
     &self.request_body
   }
-  fn get_final_readed_response_body<'a>(&'a self) -> &'a Vec<u8> {
+  fn get_final_read_response_body<'a>(&'a self) -> &'a Vec<u8> {
     &self.response_body
   }
 }
