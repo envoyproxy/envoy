@@ -17,7 +17,13 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Router {
 
-MockDirectResponseEntry::MockDirectResponseEntry() = default;
+MockDirectResponseEntry::MockDirectResponseEntry() {
+  EXPECT_CALL(*this, formatBody(_, _, _, _))
+      .WillRepeatedly(Invoke([this](const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                    const StreamInfo::StreamInfo&,
+                                    std::string& body) { body = this->responseBody(); }));
+}
+
 MockDirectResponseEntry::~MockDirectResponseEntry() = default;
 
 TestRetryPolicy::TestRetryPolicy() { num_retries_ = 1; }
