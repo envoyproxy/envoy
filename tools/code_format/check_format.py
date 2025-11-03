@@ -29,6 +29,9 @@ class FormatConfig:
         self.path = path
         self.args = args
         self.source_path = source_path
+        # This is also an ugly hack - we pull in these tools as python libs and
+        # and then execute them - without the following it tries to use host python
+        os.environ["PATH"] = f"{os.path.dirname(sys.executable)}:{os.environ['PATH']}"
 
     def __getitem__(self, k):
         return self.config.__getitem__(k)

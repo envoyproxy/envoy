@@ -61,7 +61,7 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -75,7 +75,7 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -101,7 +101,7 @@ public:
             Server::Configuration::GenericFactoryContext& context);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -114,7 +114,7 @@ public:
            Server::Configuration::GenericFactoryContext& context);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -126,7 +126,7 @@ public:
   NotHealthCheckFilter() = default;
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -136,7 +136,7 @@ public:
 class TraceableRequestFilter : public Filter {
 public:
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -149,7 +149,7 @@ public:
                 Random::RandomGenerator& random);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -169,7 +169,7 @@ public:
                Server::Configuration::CommonFactoryContext& context);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -184,7 +184,7 @@ public:
   ResponseFlagFilter(const envoy::config::accesslog::v3::ResponseFlagFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -204,7 +204,7 @@ public:
   GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatusFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -228,7 +228,7 @@ public:
 
   LogTypeFilter(const envoy::config::accesslog::v3::LogTypeFilter& filter_config);
 
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -244,7 +244,7 @@ public:
   MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config,
                  Server::Configuration::CommonFactoryContext& context);
 
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:

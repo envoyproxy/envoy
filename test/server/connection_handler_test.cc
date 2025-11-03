@@ -1038,10 +1038,9 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
 
   EXPECT_CALL(*access_log_, log(_, _))
-      .WillOnce(Invoke(
-          [&](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
-            EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
-          }));
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
+      }));
   connection->close(Network::ConnectionCloseType::NoFlush);
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
@@ -1107,10 +1106,9 @@ TEST_F(ConnectionHandlerTest, NormalRedirectWithMultiAddrs) {
   EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
 
   EXPECT_CALL(*access_log_, log(_, _))
-      .WillOnce(Invoke(
-          [&](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
-            EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
-          }));
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
+      }));
   connection->close(Network::ConnectionCloseType::NoFlush);
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());

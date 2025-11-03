@@ -90,10 +90,10 @@ public:
     return *instance;
   }
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                        const StreamInfo::StreamInfo& stream_info) const override;
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                        const StreamInfo::StreamInfo* stream_info) const;
 
   /**
@@ -105,10 +105,10 @@ public:
     evaluateHeaders(headers, {stream_info.getRequestHeaders()}, &stream_info);
   }
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const {
-    evaluateHeaders(headers,
-                    Formatter::HttpFormatterContext{
-                        stream_info == nullptr ? nullptr : stream_info->getRequestHeaders()},
-                    stream_info);
+    evaluateHeaders(
+        headers,
+        Formatter::Context{stream_info == nullptr ? nullptr : stream_info->getRequestHeaders()},
+        stream_info);
   }
 
   /*

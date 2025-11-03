@@ -68,10 +68,12 @@ function bazel_with_collection() {
     then
         pushd bazel-testlogs
         failed_logs=$(grep "  /build.*test.log" "${BAZEL_OUTPUT}" | sed -e 's/  \/build.*\/testlogs\/\(.*\)/\1/')
-        while read -r f; do
-        cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
-        done <<< "$failed_logs"
-        popd
+        if [[ -n "${failed_logs}" ]]; then
+            while read -r f; do
+                cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
+            done <<< "$failed_logs"
+            popd
+        fi
     fi
     exit "${BAZEL_STATUS}"
   fi
@@ -192,7 +194,7 @@ function bazel_envoy_api_build() {
         --//tools/api_proto_plugin:extra_args=api_version:3.7 \
         //tools/protoprint:protoprint_test
     echo "Validating API structure..."
-    "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/api:validate_structure "${PWD}/api/envoy"
     echo "Testing API..."
     bazel_with_collection \
         test "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -321,16 +323,17 @@ case $CI_TARGET in
             echo "ENVOY_CACHE_ROOT not set" >&2
             exit 1
         fi
-        BAZEL_BUILD_OPTIONS=()
         setup_clang_toolchain
         echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
         bazel --output_user_root="${ENVOY_CACHE_ROOT}" \
               --output_base="${ENVOY_CACHE_ROOT}/base" \
+              --nowrite_command_log \
               aquery "deps(${ENVOY_CACHE_TARGETS})" \
               --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
-              "${BAZEL_BUILD_OPTIONS[@]}" \
               "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" \
               > /dev/null
+          TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
+          echo "Generated cache: ${TOTAL_SIZE}"
         ;;
 
     format-api|check_and_fix_proto_format)
@@ -388,7 +391,7 @@ case $CI_TARGET in
             --define wasm=wamr \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips,-runtime-cpu \
+            --test_tag_filters=-nofips \
             --build_tests_only
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
@@ -398,7 +401,7 @@ case $CI_TARGET in
             --define admin_functionality=disabled \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips,-runtime-cpu \
+            --test_tag_filters=-nofips \
             --build_tests_only
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
@@ -450,7 +453,6 @@ case $CI_TARGET in
         fi
         setup_clang_toolchain
         bazel test \
-              --test_tag_filters=runtime-cpu \
               "${BAZEL_BUILD_OPTIONS[@]}" \
               //test/server:cgroup_cpu_simple_integration_test
         ;;

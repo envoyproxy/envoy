@@ -1053,6 +1053,121 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
   }
 }
 
+TEST_F(OtlpMetricsFlusherTests, DropMetrics) {
+  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "", {},
+                                             R"pb(
+        matcher_list {
+          matchers {
+            predicate {
+              single_predicate {
+                input {
+                  name: "stat_full_name_match_input"
+                  typed_config {
+                    [type.googleapis.com/
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
+                  }
+                }
+                value_match {
+                  safe_regex {
+                    regex: ".*drop.*"
+                  }
+                }
+              }
+            }
+            on_match {
+              action {
+                name: "otlp_metric_drop_action"
+                typed_config {
+                  [type.googleapis.com/envoy.extensions.stat_sinks
+                       .open_telemetry.v3.SinkConfig.DropAction] {}
+                }
+              }
+            }
+          }
+        }
+      )pb"));
+
+  addCounterToSnapshot("test_counter", 1, 1);
+  addCounterToSnapshot("drop_counter", 1, 1);
+  addHostCounterToSnapshot("test_host_counter", 1, 1);
+  addHostCounterToSnapshot("drop_host_counter", 1, 1);
+  addGaugeToSnapshot("test_gauge", 1);
+  addGaugeToSnapshot("drop_gauge", 1);
+  addHostGaugeToSnapshot("test_host_gauge", 4);
+  addHostGaugeToSnapshot("drop_host_gauge", 4);
+  addHistogramToSnapshot("test_histogram");
+  addHistogramToSnapshot("drop_histogram");
+
+  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  expectMetricsCount(metrics, 5);
+
+  EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_counter")));
+  EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_counter")));
+  EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_host_counter")));
+  EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_host_counter")));
+  EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_gauge")));
+  EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_gauge")));
+  EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_host_gauge")));
+  EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_host_gauge")));
+  EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_histogram")));
+  EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_histogram")));
+}
+
+TEST_F(OtlpMetricsFlusherTests, OnNoMatchDrop) {
+  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "", {},
+                                             R"pb(
+        matcher_list {
+          matchers {
+            predicate {
+              single_predicate {
+                input {
+                  name: "stat_full_name_match_input"
+                  typed_config {
+                    [type.googleapis.com/
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
+                  }
+                }
+                value_match {
+                  safe_regex {
+                    regex: ".*keep.*"
+                  }
+                }
+              }
+            }
+            on_match {
+              action {
+                name: "otlp_metric_conversion_action"
+                typed_config {
+                  [type.googleapis.com/envoy.extensions.stat_sinks
+                       .open_telemetry.v3.SinkConfig.ConversionAction] {
+                         metric_name: "new_kept_metric"
+                       }
+                }
+              }
+            }
+          }
+        }
+        on_no_match {
+          action {
+            name: "otlp_metric_drop_action"
+            typed_config {
+              [type.googleapis.com/envoy.extensions.stat_sinks
+                  .open_telemetry.v3.SinkConfig.DropAction] {}
+            }
+          }
+        }
+      )pb"));
+
+  addCounterToSnapshot("keep_counter", 1, 1);
+  addCounterToSnapshot("drop_via_on_no_match_counter", 1, 1);
+
+  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  expectMetricsCount(metrics, 1);
+
+  EXPECT_NE(nullptr, findMetric(metrics, "new_kept_metric"));
+  EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_via_on_no_match_counter")));
+}
+
 TEST_F(OtlpMetricsFlusherTests, SetResourceAttributes) {
   OtlpMetricsFlusherImpl flusher(
       otlpOptions(true, false, true, true, "", {{"key_foo", "val_foo"}}));

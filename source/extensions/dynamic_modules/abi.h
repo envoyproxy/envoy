@@ -757,6 +757,36 @@ void envoy_dynamic_module_on_http_filter_scheduled(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t event_id);
 
+/**
+ * envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark is called when
+ * the buffer for the downstream stream goes over the high watermark for a terminal filter. This may
+ * be called multiple times, in which case envoy_dynamic_module_on_above_write_buffer_low_watermark
+ * will be called an equal number of times until the write buffer is completely drained below the
+ * low watermark.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ */
+void envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark is called when
+ * any buffer for the response stream goes from over its high watermark to under its low watermark
+ * for a terminal filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ */
+void envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
 // -----------------------------------------------------------------------------
 // -------------------------------- Callbacks ----------------------------------
 // -----------------------------------------------------------------------------

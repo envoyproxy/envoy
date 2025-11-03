@@ -892,7 +892,7 @@ void RouteEntryImplBase::finalizeHostHeader(Http::RequestHeaderMap& headers,
                                                   host_rewrite_path_regex_substitution_);
     hostname = buffer;
   } else if (host_rewrite_formatter_) {
-    buffer = host_rewrite_formatter_->formatWithContext(context, stream_info);
+    buffer = host_rewrite_formatter_->format(context, stream_info);
     hostname = buffer;
   }
 
@@ -903,9 +903,11 @@ void RouteEntryImplBase::finalizeHostHeader(Http::RequestHeaderMap& headers,
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
-                                                const Formatter::HttpFormatterContext& context,
+                                                const Formatter::Context& context,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool keep_original_host_or_path) const {
+  // Apply header transformations configured via request_headers_to_add first.
+  // This is important because host/path rewriting may depend on headers added here.
   for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
@@ -931,7 +933,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
-                                                 const Formatter::HttpFormatterContext& context,
+                                                 const Formatter::Context& context,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
@@ -1002,7 +1004,7 @@ std::string RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
 
   // Handle the case where a path formatter is configured.
   if (path_rewrite_formatter_ != nullptr) {
-    const std::string new_path_only = path_rewrite_formatter_->formatWithContext(context, info);
+    const std::string new_path_only = path_rewrite_formatter_->format(context, info);
     // If formatter produces empty string then return nothing.
     if (new_path_only.empty()) {
       return {};
