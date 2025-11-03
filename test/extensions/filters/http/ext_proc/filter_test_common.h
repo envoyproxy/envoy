@@ -178,6 +178,7 @@ protected:
   bool server_closed_stream_ = false;
   bool observability_mode_ = false;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
   FilterConfigSharedPtr config_;
   std::shared_ptr<Filter> filter_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;

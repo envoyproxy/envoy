@@ -185,9 +185,14 @@ class XfccValueFormatterProvider : public ::Envoy::Formatter::FormatterProvider,
 public:
   XfccValueFormatterProvider(Http::LowerCaseString&& key) : key_(key) {}
 
-  absl::optional<std::string> formatWithContext(const Envoy::Formatter::Context& context,
-                                                const StreamInfo::StreamInfo&) const override {
-    auto status_or = parseValueFromXfccByKey(context.requestHeaders(), key_);
+  absl::optional<std::string> format(const Envoy::Formatter::Context& context,
+                                     const StreamInfo::StreamInfo&) const override {
+    const auto headers = context.requestHeaders();
+    if (!headers.has_value()) {
+      return absl::nullopt;
+    }
+
+    auto status_or = parseValueFromXfccByKey(*headers, key_);
     if (!status_or.ok()) {
       ENVOY_LOG(debug, "XFCC value extraction failure: {}", status_or.status().message());
       return absl::nullopt;
@@ -195,9 +200,9 @@ public:
     return std::move(status_or.value());
   }
 
-  Protobuf::Value formatValueWithContext(const Envoy::Formatter::Context& context,
-                                         const StreamInfo::StreamInfo& stream_info) const override {
-    absl::optional<std::string> value = formatWithContext(context, stream_info);
+  Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
+                              const StreamInfo::StreamInfo& stream_info) const override {
+    absl::optional<std::string> value = format(context, stream_info);
     if (!value.has_value()) {
       return ValueUtil::nullValue();
     }

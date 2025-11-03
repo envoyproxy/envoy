@@ -9,6 +9,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/macros.h"
 #include "source/common/common/matchers.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
@@ -61,6 +62,11 @@ void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadat
   }
 }
 
+// Default CheckSettings for requests that are not overridden by the per-route configuration.
+const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& defaultCheckSettings() {
+  CONSTRUCT_ON_FIRST_USE(envoy::extensions::filters::http::ext_authz::v3::CheckSettings);
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
@@ -71,6 +77,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
       clear_route_cache_(config.clear_route_cache()),
       max_request_bytes_(config.with_request_body().max_request_bytes()),
+      max_denied_response_body_bytes_(config.max_denied_response_body_bytes()),
 
       // `pack_as_bytes_` should be true when configured with the HTTP service because there is no
       // difference to where the body is written in http requests, and a value of false here will
@@ -93,6 +100,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
                                                     : absl::nullopt),
       emit_filter_state_stats_(config.emit_filter_state_stats()),
+      enforce_response_header_limits_(config.enforce_response_header_limits()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -402,7 +410,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   request_headers_ = &headers;
-  const auto check_settings = per_route_flags.check_settings_;
+  const auto& check_settings = per_route_flags.check_settings_;
   buffer_data_ = (config_->withRequestBody() || check_settings.has_with_request_body()) &&
                  !check_settings.disable_request_body_buffering() &&
                  !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
@@ -475,10 +483,15 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
                    "set to the encoded response:",
                    *encoder_callbacks_, response_headers_to_add_.size(),
                    response_headers_to_set_.size());
+  bool omitted_response_headers = false;
   if (!response_headers_to_add_.empty()) {
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter added header(s) to the encoded response:", *encoder_callbacks_);
     for (const auto& [key, value] : response_headers_to_add_) {
+      if (config_->enforceResponseHeaderLimits() && headers.size() >= headers.maxHeadersCount()) {
+        omitted_response_headers = true;
+        break;
+      }
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, key.get(), value);
       headers.addCopy(key, value);
     }
@@ -488,6 +501,13 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter set header(s) to the encoded response:", *encoder_callbacks_);
     for (const auto& [key, value] : response_headers_to_set_) {
+      if (config_->enforceResponseHeaderLimits() && headers.get(key).empty() &&
+          headers.size() >= headers.maxHeadersCount()) {
+        omitted_response_headers = true;
+        // Continue because there could be other existing headers that can be set without increasing
+        // the number of headers.
+        continue;
+      }
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, key.get(), value);
       headers.setCopy(key, value);
     }
@@ -497,6 +517,10 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     for (const auto& [key, value] : response_headers_to_add_if_absent_) {
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, key.get(), value);
       if (auto header_entry = headers.get(key); header_entry.empty()) {
+        if (config_->enforceResponseHeaderLimits() && headers.size() >= headers.maxHeadersCount()) {
+          omitted_response_headers = true;
+          break;
+        }
         ENVOY_STREAM_LOG(trace, "ext_authz filter added header(s) to the encoded response:",
                          *encoder_callbacks_);
         headers.addCopy(key, value);
@@ -514,6 +538,13 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       }
     }
   }
+
+  if (omitted_response_headers) {
+    ENVOY_LOG_EVERY_POW_2(
+        warn, "Some ext_authz response headers weren't added because the header map was full.");
+    stats_.omitted_response_headers_.inc();
+  }
+
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -874,7 +905,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       request_headers_->setPath(new_path);
     }
 
-    if (request_headers_->size() > request_headers_->maxHeadersCount()) {
+    if (request_headers_->size() > request_headers_->maxHeadersCount() ||
+        request_headers_->byteSize() > request_headers_->maxHeadersKb() * 1024) {
       rejectResponse();
       return;
     }
@@ -923,13 +955,21 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       }
     }
 
+    if (config_->maxDeniedResponseBodyBytes() > 0 &&
+        response->body.length() > config_->maxDeniedResponseBodyBytes()) {
+      ENVOY_STREAM_LOG(
+          trace, "ext_authz filter is truncating the response body from {} to {} bytes.",
+          *decoder_callbacks_, response->body.length(), config_->maxDeniedResponseBodyBytes());
+      response->body.resize(config_->maxDeniedResponseBodyBytes());
+    }
+
     // setResponseFlag must be called before sendLocalReply
     decoder_callbacks_->streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
-        [&headers = response->headers_to_set,
-         &callbacks = *decoder_callbacks_](Http::HeaderMap& response_headers) -> void {
+        [&headers = response->headers_to_set, &callbacks = *decoder_callbacks_,
+         this](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);
           // Firstly, remove all headers requested by the ext_authz filter, to ensure that they will
@@ -940,6 +980,14 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           // Then set all of the requested headers, allowing the same header to be set multiple
           // times, e.g. `Set-Cookie`.
           for (const auto& [key, value] : headers) {
+            if (config_->enforceResponseHeaderLimits() &&
+                response_headers.size() >= response_headers.maxHeadersCount()) {
+              stats_.omitted_response_headers_.inc();
+              ENVOY_LOG_EVERY_POW_2(
+                  warn,
+                  "Some ext_authz response headers weren't added because the header map was full.");
+              break;
+            }
             ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, key, value);
             response_headers.addCopy(Http::LowerCaseString(key), value);
           }
@@ -1021,9 +1069,7 @@ void Filter::continueDecoding() {
 
 Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr& route) const {
   if (route == nullptr) {
-    return PerRouteFlags{
-        true /*skip_check_*/,
-        envoy::extensions::filters::http::ext_authz::v3::CheckSettings() /*check_settings_*/};
+    return PerRouteFlags{true /*skip_check_*/, defaultCheckSettings()};
   }
 
   const auto* specific_check_settings =
@@ -1033,9 +1079,7 @@ Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr
                          specific_check_settings->checkSettings()};
   }
 
-  return PerRouteFlags{
-      false /*skip_check_*/,
-      envoy::extensions::filters::http::ext_authz::v3::CheckSettings() /*check_settings_*/};
+  return PerRouteFlags{false /*skip_check_*/, defaultCheckSettings()};
 }
 
 } // namespace ExtAuthz

@@ -1258,6 +1258,33 @@ TEST(Refresh, InvalidKeyInsideRefresh) {
   EXPECT_FALSE(provider_friend.getCredentials().certificatePrivateKey().has_value());
 }
 
+TEST(NeedsRefresh, ExpirationTimeInPast) {
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
+      cert_chain_data_source;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  private_key_data_source.mutable_inline_string();
+  private_key_data_source.set_inline_string(server_subordinate_private_key_ecdsa_pem);
+  certificate_data_source.mutable_inline_string();
+  certificate_data_source.set_inline_string(server_subordinate_cert_ecdsa_pem);
+  cert_chain_data_source.mutable_inline_string();
+  cert_chain_data_source.set_inline_string(server_subordinate_chain_ecdsa_pem);
+
+  auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
+      context, certificate_data_source, private_key_data_source, cert_chain_data_source);
+  auto status = provider->initialize();
+  EXPECT_TRUE(status.ok());
+
+  auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
+
+  // Set expiration time to the past
+  auto past_time = context.api().timeSource().systemTime() - std::chrono::hours(1);
+  provider_friend.setExpirationTime(past_time);
+
+  // Should return true (needs refresh) when expiration is in the past
+  EXPECT_TRUE(provider_friend.needsRefresh());
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

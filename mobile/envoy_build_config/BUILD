@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_mobile_package",
     "envoy_select_envoy_mobile_listener",
+    "envoy_select_envoy_mobile_xds",
 )
 
 licenses(["notice"])  # Apache 2
@@ -57,6 +58,13 @@ envoy_cc_library(
             "@envoy//source/extensions/udp_packet_writer/default:config",
             "@envoy//source/common/listener_manager:listener_manager_lib",
             "@envoy//source/common/listener_manager:connection_handler_lib",
+        ],
+        "@envoy",
+    ) + envoy_select_envoy_mobile_xds(
+        [
+            "@envoy//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+            "@envoy//source/extensions/config_subscription/grpc:grpc_mux_lib",
+            "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         ],
         "@envoy",
     ),

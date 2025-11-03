@@ -2,6 +2,7 @@
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 #include "envoy/http/header_evaluator.h"
+#include "envoy/server/factory_context.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -19,7 +20,7 @@ public:
          Server::Configuration::CommonFactoryContext& context);
 
   // Http::HeaderEvaluator
-  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                        const StreamInfo::StreamInfo& stream_info) const override;
 
 private:

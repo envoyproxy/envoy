@@ -104,6 +104,7 @@ protected:
   };
 
   void expectSetCustomTags(const std::vector<CustomTagCase>& cases) {
+    custom_tags.clear(); // Reset before each call to clear previous expectations.
     for (const CustomTagCase& cas : cases) {
       envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
@@ -116,7 +117,7 @@ protected:
     }
 
     EXPECT_CALL(config, modifySpan(_)).WillOnce(Invoke([this](Span& span) {
-      const CustomTagContext ctx{trace_context, stream_info};
+      const CustomTagContext ctx{trace_context, stream_info, {&request_headers_}};
       for (const auto& [_, custom_tag] : custom_tags) {
         custom_tag->applySpan(span, ctx);
       }
@@ -127,6 +128,8 @@ protected:
   NiceMock<MockConfig> config;
   Tracing::CustomTagMap custom_tags;
   Tracing::TestTraceContextImpl trace_context;
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":path", "/TestService/method"}, {":method", "POST"}, {"x-bb", "b"}};
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_{
       std::make_shared<NiceMock<Upstream::MockClusterInfo>>()};
@@ -204,6 +207,7 @@ TEST_F(FinalizerImplTest, TestAll) {
         {"{ tag: cc-1-a, environment: { name: E_CC, default_value: _c } }", true, "c"},
         {"{ tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }", true, "c2"},
         {"{ tag: cc-3, environment: { name: E_CC_NOT_FOUND} }", false, ""},
+        {"{ tag: dd, value: '%REQ(x-bb)%' }", true, "b"},
     });
 
     TracerUtility::finalizeSpan(span, stream_info, config, true);
@@ -391,7 +395,7 @@ TEST_F(TracerImplTest, MetadataCustomTagReturnsDefaultValue) {
   *testing_metadata.mutable_default_value() = "default_value";
   MetadataCustomTag tag("testing", testing_metadata);
   StreamInfo::MockStreamInfo testing_info_;
-  CustomTagContext context{trace_context_, testing_info_};
+  CustomTagContext context{trace_context_, testing_info_, {}};
   EXPECT_EQ(tag.value(context), "default_value");
 }
 

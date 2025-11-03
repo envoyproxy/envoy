@@ -780,16 +780,33 @@ void ConnectionManagerImpl::onDrainTimeout() {
   checkForDeferredClose(false);
 }
 
-void ConnectionManagerImpl::sendGoAwayAndClose() {
+void ConnectionManagerImpl::sendGoAwayAndClose(bool graceful) {
   ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggerred from filters.",
                  read_callbacks_->connection());
   if (go_away_sent_) {
     return;
   }
-  codec_->goAway();
-  go_away_sent_ = true;
-  doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
-                    "forced_goaway");
+
+  // Use graceful drain sequence if graceful shutdown is requested.
+  // startDrainSequence() works for both HTTP/1 and HTTP/2:
+  // - HTTP/1: shutdownNotice() + goAway() provides graceful close
+  // - HTTP/2: shutdownNotice() sends GOAWAY with high stream ID, then goAway() sends final GOAWAY
+  if (graceful) {
+    if (drain_state_ == DrainState::NotDraining) {
+      startDrainSequence();
+    }
+    // Consider the "go away" process started once draining begins.
+    // The actual GOAWAY frame will be sent in onDrainTimeout(), but we want to
+    // prevent multiple calls to sendGoAwayAndClose() from starting multiple drain sequences.
+    go_away_sent_ = true;
+  } else {
+    // Immediate close - send GOAWAY and close immediately
+    codec_->shutdownNotice();
+    codec_->goAway();
+    go_away_sent_ = true;
+    doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
+                      "forced_goaway");
+  }
 }
 
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,
@@ -956,7 +973,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 }
 
 void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
-  const Formatter::HttpFormatterContext log_context{
+  const Formatter::Context log_context{
       request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, type,
       active_span_.get()};
 
@@ -1901,7 +1918,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
       filter_manager_.streamInfo().shouldDrainConnectionUponCompletion()) {
     ENVOY_STREAM_LOG(debug, "closing connection due to connection close header", *this);
-    connection_manager_.drain_state_ = DrainState::Closing;
+    // For HTTP/2 and HTTP/3, send GOAWAY and allow current stream to complete.
+    // For HTTP/1.1, go directly to Closing (Connection: close header will be added below).
+    if (connection_manager_.codec_->protocol() >= Protocol::Http2) {
+      connection_manager_.startDrainSequence();
+    } else {
+      connection_manager_.drain_state_ = DrainState::Closing;
+    }
   }
 
   // If we are destroying a stream before remote is complete and the connection does not support
@@ -2096,7 +2119,11 @@ void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span) const 
   ASSERT(connection_manager_tracing_config_.has_value());
 
   const Tracing::HttpTraceContext trace_context(*request_headers_);
-  const Tracing::CustomTagContext ctx{trace_context, filter_manager_.streamInfo()};
+  const Formatter::Context formatter_context{
+      request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, {},
+      active_span_.get()};
+  const Tracing::CustomTagContext ctx{trace_context, filter_manager_.streamInfo(),
+                                      formatter_context};
 
   // Cache the optional custom tags from the route first.
   OptRef<const Tracing::CustomTagMap> route_custom_tags;

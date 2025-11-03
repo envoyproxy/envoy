@@ -6,6 +6,7 @@ import argparse
 import locale
 import math
 import os
+import pathlib
 import re
 import subprocess
 import sys
@@ -13,21 +14,10 @@ import sys
 from functools import partial
 from itertools import chain
 
-# Handle function rename between python 2/3.
-try:
-    input = raw_input
-except NameError:
-    pass
 
-try:
-    cmp
-except NameError:
+def cmp(x, y):
+    return (x > y) - (x < y)
 
-    def cmp(x, y):
-        return (x > y) - (x < y)
-
-
-CURR_DIR = os.path.dirname(os.path.realpath(__file__))
 
 # Special comment commands control behavior. These may appear anywhere
 # within a comment, but only one per line. The command applies to the
@@ -170,14 +160,14 @@ class SpellChecker:
         self.prefix_re = re.compile(r"(?:\s|^)((%s)-)" % ("|".join(prefixes)), re.IGNORECASE)
         self.suffix_re = re.compile(r"(-(%s))(?:\s|$)" % ("|".join(suffixes)), re.IGNORECASE)
 
+        pws = os.path.realpath(".aspell.en.pws")
         # Generate aspell personal dictionary.
-        pws = os.path.join(CURR_DIR, '.aspell.en.pws')
         with open(pws, 'w') as f:
             f.write("personal_ws-1.1 en %d\n" % (len(words)))
             f.writelines(words)
 
         # Start an aspell process.
-        aspell_args = ["aspell", "pipe", "--lang=en_US", "--encoding=utf-8", "--personal=" + pws]
+        aspell_args = ["aspell", "pipe", "--lang=en_US", "--encoding=utf-8", f"--personal={pws}"]
         self.aspell = subprocess.Popen(
             aspell_args,
             bufsize=4096,
@@ -774,7 +764,7 @@ if __name__ == "__main__":
     except:
         locale.setlocale(locale.LC_ALL, 'C.UTF-8')
 
-    default_dictionary = os.path.join(CURR_DIR, 'spelling_dictionary.txt')
+    default_dictionary = os.environ["ASPELL_DICT"]
 
     parser = argparse.ArgumentParser(description="Check comment spelling.")
     parser.add_argument(
@@ -782,6 +772,8 @@ if __name__ == "__main__":
         type=str,
         choices=['check', 'fix'],
         help="specify if the run should 'check' or 'fix' spelling.")
+    parser.add_argument(
+        "--target_root", type=str, help="specify the root of files for the script to process.")
     parser.add_argument(
         'target_paths', type=str, nargs="*", help="specify the files for the script to process.")
     parser.add_argument(
@@ -810,13 +802,17 @@ if __name__ == "__main__":
     DEBUG = args.debug
     MARK = args.mark
 
-    paths = args.target_paths
-    if not paths:
-        paths = ['./api', './include', './source', './test', './tools']
-
+    target_root = pathlib.Path(args.target_root or ".")
+    paths = args.target_paths or []
     # Exclude ./third_party/ directory from spell checking, even when requested through arguments.
     # Otherwise git pre-push hook checks it for merged commits.
     paths = [path for path in paths if not path.startswith('./third_party/')]
+
+    if not paths:
+        paths = [
+            target_root / "api", target_root / "include", target_root / "source",
+            target_root / "test", target_root / "tools"
+        ]
 
     exts = ['.cc', '.js', '.h', '.proto']
     if args.test_ignore_exts:

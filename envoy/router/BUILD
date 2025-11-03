@@ -89,6 +89,7 @@ envoy_cc_library(
         "//envoy/http:codes_interface",
         "//envoy/http:conn_pool_interface",
         "//envoy/http:hash_policy_interface",
+        "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
         "//envoy/rds:rds_config_interface",
         "//envoy/tcp:conn_pool_interface",

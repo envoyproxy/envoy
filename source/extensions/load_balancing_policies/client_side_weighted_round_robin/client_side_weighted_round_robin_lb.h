@@ -17,6 +17,7 @@ namespace Upstream {
 using ClientSideWeightedRoundRobinLbProto = envoy::extensions::load_balancing_policies::
     client_side_weighted_round_robin::v3::ClientSideWeightedRoundRobin;
 using OrcaLoadReportProto = xds::data::orca::v3::OrcaLoadReport;
+using CommonLbConfig = envoy::config::cluster::v3::Cluster::CommonLbConfig;
 
 /**
  * Load balancer config used to wrap the config proto.
@@ -139,7 +140,7 @@ public:
   // Thread local shim to store callbacks for weight updates of worker local lb.
   class ThreadLocalShim : public Envoy::ThreadLocal::ThreadLocalObject {
   public:
-    Common::CallbackManager<void, uint32_t> apply_weights_cb_helper_;
+    Common::CallbackManager<void> apply_weights_cb_helper_;
   };
 
   // This class is used to handle the load balancing on the worker thread.
@@ -172,7 +173,10 @@ public:
 
     bool recreateOnHostChange() const override { return false; }
 
-    void applyWeightsToAllWorkers(uint32_t priority);
+    Upstream::LoadBalancerPtr createWithCommonLbConfig(const CommonLbConfig& common_lb_config,
+                                                       Upstream::LoadBalancerParams params);
+
+    void applyWeightsToAllWorkers();
 
     std::unique_ptr<Envoy::ThreadLocal::TypedSlot<ThreadLocalShim>> tls_;
 

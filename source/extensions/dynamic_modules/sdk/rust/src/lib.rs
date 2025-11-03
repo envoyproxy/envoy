@@ -365,6 +365,18 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   ///
   /// See [`EnvoyHttpFilter::new_scheduler`] for more details on how to use this.
   fn on_scheduled(&mut self, _envoy_filter: &mut EHF, _event_id: u64) {}
+
+  /// This is called when the downstream buffer size goes above the high watermark for a
+  /// terminal filter.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  fn on_downstream_above_write_buffer_high_watermark(&mut self, _envoy_filter: &mut EHF) {}
+
+  /// This is called when the downstream buffer size goes below the low watermark for a
+  /// terminal filter.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  fn on_downstream_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut EHF) {}
 }
 
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
@@ -708,6 +720,20 @@ pub trait EnvoyHttpFilter {
     body: Option<&'a [u8]>,
   );
 
+  /// Send response headers to the downstream, optionally indicating end of stream.
+  /// Necessary pseudo headers such as :status should be present.
+  ///
+  /// The headers are passed as a list of key-value pairs.
+  fn send_response_headers<'a>(&mut self, headers: Vec<(&'a str, &'a [u8])>, end_stream: bool);
+
+  /// Send response body data to the downstream, optionally indicating end of stream.
+  fn send_response_data<'a>(&mut self, body: &'a [u8], end_stream: bool);
+
+  /// Send response trailers to the downstream. This implicitly ends the stream.
+  ///
+  /// The trailers are passed as a list of key-value pairs.
+  fn send_response_trailers<'a>(&mut self, trailers: Vec<(&'a str, &'a [u8])>);
+
   /// Get the number-typed metadata value with the given key.
   /// Use the `source` parameter to specify which metadata to use.
   /// If the metadata is not found or is the wrong type, this returns `None`.
@@ -806,15 +832,6 @@ pub trait EnvoyHttpFilter {
   /// content-length header if necessary.
   fn append_request_body(&mut self, data: &[u8]) -> bool;
 
-  /// Injects the given request data into the filter stream.
-  ///
-  /// Returns false if the request filter chain is not available.
-  ///
-  /// This must only be called from on_http_callout_done or on_scheduled callbacks.
-  /// The request filter should have been stopped and continue_decoding must not
-  /// be called.
-  fn inject_request_body(&mut self, data: &[u8], end_stream: bool) -> bool;
-
   /// Get the currently buffered response body. The body is represented as a list of
   /// [`EnvoyBuffer`]. Memory contents pointed by each [`EnvoyBuffer`] is mutable and can be
   /// modified in place. However, the buffer itself is immutable. For example, adding or removing
@@ -870,15 +887,6 @@ pub trait EnvoyHttpFilter {
   /// Note that after changing the response body, it is caller's responsibility to modify the
   /// content-length header if necessary.
   fn append_response_body(&mut self, data: &[u8]) -> bool;
-
-  /// Injects the given response data into the filter stream.
-  ///
-  /// Returns false if the response filter chain is not available.
-  ///
-  /// This must only be called from on_http_callout_done or on_scheduled callbacks.
-  /// The response filter should have been stopped and continue_encoding must not
-  /// be called.
-  fn inject_response_body(&mut self, data: &[u8], end_stream: bool) -> bool;
 
   /// Clear the route cache calculated during a previous phase of the filter chain.
   ///
@@ -981,7 +989,7 @@ pub trait EnvoyHttpFilter {
   ///   }
   /// }
   /// ```
-  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler>;
+  fn new_scheduler(&self) -> impl EnvoyHttpFilterScheduler + 'static;
 
   /// Increment the counter with the given id.
   fn increment_counter(
@@ -1241,6 +1249,59 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn send_response_headers(&mut self, headers: Vec<(&str, &[u8])>, end_stream: bool) {
+    // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
+    // not because of any formal layout guarantees but because:
+    // 1) tuples _in practice_ are laid out packed and in order
+    // 2) &str and &[u8] are fat pointers (pointers to DSTs), whose layouts _in practice_ are a
+    //    pointer and length
+    // If these assumptions change, this will break. (Vec is guaranteed to point to a contiguous
+    // array, so it's safe to cast to a pointer)
+    let headers_ptr = headers.as_ptr() as *mut abi::envoy_dynamic_module_type_module_http_header;
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_send_response_headers(
+        self.raw_ptr,
+        headers_ptr,
+        headers.len(),
+        end_stream,
+      )
+    }
+  }
+
+  fn send_response_data(&mut self, body: &[u8], end_stream: bool) {
+    let body_ptr = body.as_ptr();
+    let body_length = body.len();
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_send_response_data(
+        self.raw_ptr,
+        body_ptr as *mut _,
+        body_length,
+        end_stream,
+      )
+    }
+  }
+
+  fn send_response_trailers(&mut self, trailers: Vec<(&str, &[u8])>) {
+    // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
+    // not because of any formal layout guarantees but because:
+    // 1) tuples _in practice_ are laid out packed and in order
+    // 2) &str and &[u8] are fat pointers (pointers to DSTs), whose layouts _in practice_ are a
+    //    pointer and length
+    // If these assumptions change, this will break. (Vec is guaranteed to point to a contiguous
+    // array, so it's safe to cast to a pointer)
+    let trailers_ptr = trailers.as_ptr() as *mut abi::envoy_dynamic_module_type_module_http_header;
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_send_response_trailers(
+        self.raw_ptr,
+        trailers_ptr,
+        trailers.len(),
+      )
+    }
+  }
+
   fn get_metadata_number(
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
@@ -1413,18 +1474,6 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       )
     }
   }
-
-  fn inject_request_body(&mut self, data: &[u8], end_stream: bool) -> bool {
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_inject_request_body(
-        self.raw_ptr,
-        data.as_ptr() as *const _ as *mut _,
-        data.len(),
-        end_stream,
-      )
-    }
-  }
-
   fn get_response_body(&mut self) -> Option<Vec<EnvoyMutBuffer>> {
     let mut size: usize = 0;
     let ok = unsafe {
@@ -1460,17 +1509,6 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         self.raw_ptr,
         data.as_ptr() as *const _ as *mut _,
         data.len(),
-      )
-    }
-  }
-
-  fn inject_response_body(&mut self, data: &[u8], end_stream: bool) -> bool {
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_inject_response_body(
-        self.raw_ptr,
-        data.as_ptr() as *const _ as *mut _,
-        data.len(),
-        end_stream,
       )
     }
   }
@@ -1623,13 +1661,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler> {
+  fn new_scheduler(&self) -> impl EnvoyHttpFilterScheduler + 'static {
     unsafe {
       let scheduler_ptr =
         abi::envoy_dynamic_module_callback_http_filter_scheduler_new(self.raw_ptr);
-      Box::new(EnvoyHttpFilterSchedulerImpl {
+      EnvoyHttpFilterSchedulerImpl {
         raw_ptr: scheduler_ptr,
-      })
+      }
     }
   }
 
@@ -1961,8 +1999,10 @@ impl EnvoyHttpFilterImpl {
 /// Since this is primarily designed to be used from a different thread than the one
 /// where the [`HttpFilter`] instance was created, it is marked as `Send` so that
 /// the [`Box<dyn EnvoyHttpFilterScheduler>`] can be sent across threads.
+///
+/// It is also safe to be called concurrently, so it is marked as `Sync` as well.
 #[automock]
-pub trait EnvoyHttpFilterScheduler: Send {
+pub trait EnvoyHttpFilterScheduler: Send + Sync {
   /// Commit the scheduled event to the worker thread where [`HttpFilter`] is running.
   ///
   /// It accepts an `event_id` which can be used to distinguish different events
@@ -1981,6 +2021,7 @@ struct EnvoyHttpFilterSchedulerImpl {
 }
 
 unsafe impl Send for EnvoyHttpFilterSchedulerImpl {}
+unsafe impl Sync for EnvoyHttpFilterSchedulerImpl {}
 
 impl Drop for EnvoyHttpFilterSchedulerImpl {
   fn drop(&mut self) {
@@ -1995,6 +2036,14 @@ impl EnvoyHttpFilterScheduler for EnvoyHttpFilterSchedulerImpl {
     unsafe {
       abi::envoy_dynamic_module_callback_http_filter_scheduler_commit(self.raw_ptr, event_id);
     }
+  }
+}
+
+// Box<dyn EnvoyHttpFilterScheduler> is returned by mockall, so we need to implement
+// EnvoyHttpFilterScheduler for it as well.
+impl EnvoyHttpFilterScheduler for Box<dyn EnvoyHttpFilterScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
   }
 }
 
@@ -2283,6 +2332,26 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_scheduled(
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
   filter.on_scheduled(&mut EnvoyHttpFilterImpl::new(envoy_ptr), event_id);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
+  let filter = &mut **filter;
+  filter.on_downstream_above_write_buffer_high_watermark(&mut EnvoyHttpFilterImpl::new(envoy_ptr));
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
+  let filter = &mut **filter;
+  filter.on_downstream_below_write_buffer_low_watermark(&mut EnvoyHttpFilterImpl::new(envoy_ptr));
 }
 
 impl From<envoy_dynamic_module_type_metrics_result>

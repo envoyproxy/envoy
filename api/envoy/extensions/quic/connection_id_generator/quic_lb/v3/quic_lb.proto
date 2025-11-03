@@ -29,16 +29,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // .. warning::
 //
-//    This is still a work in progress. Performance is expected to be poor. Interoperability testing
-//    has not yet been performed.
+//    This is still a work in progress. Interoperability testing has not yet been performed.
 // [#next-free-field: 7]
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;
-
-  // Use the unencrypted mode. This is useful for testing, but allows for linking different CIDs
-  // for the same connection, and leaks information about the valid server IDs in use. This should
-  // only be used for testing.
-  bool unsafe_unencrypted_testing_mode = 1;
 
   // Must be at least 1 octet.
   // The length of server_id and nonce_length_bytes must be 18 or less.
@@ -72,4 +66,14 @@ message Config {
   // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-config-rotation.
   transport_sockets.tls.v3.SdsSecretConfig encryption_parameters = 5
       [(validate.rules).message = {required: true}];
+
+  // Use the unencrypted mode. This is useful for testing or a simplified implementation of the
+  // downstream load balancer, but allows for linking different CIDs for the same connection, and
+  // leaks information about the valid server IDs in use. This mode does not comply with the RFC.
+  //
+  // Note that in this mode, :ref:`encryption_parameters
+  // <envoy_v3_api_field_extensions.quic.connection_id_generator.quic_lb.v3.Config.encryption_parameters>`
+  // is still required because it contains ``configuration_version``, which is still
+  // needed. ``encryption_key`` can be set to ``inline_string: '0000000000000000'``.
+  bool unencrypted_mode = 1;
 }

@@ -5,14 +5,14 @@ BUILD_COMMAND = """
 set -eo pipefail
 
 # c++
-export CC=$(CC)
+export CC="$$(realpath $(CC))"
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
     export CXXFLAGS="-stdlib=libc++"
-    export LDFLAGS="-stdlib=libc++ -lc++ -lc++abi -lm -pthread"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -lc++ -lc++abi -lm -pthread"
 else
     export CXXFLAGS=""
-    export LDFLAGS="-lstdc++ -lm -pthread"
+    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread"
 fi
 
 # ninja
@@ -33,11 +33,6 @@ export PATH="$${GOPATH}/bin:$${GO_BINDIR}:$${PATH}"
 # boringssl
 BSSL_SRC=$$(realpath $$(dirname $$(dirname $(location crypto_marker))))
 export BSSL_SRC
-
-# fips expectations
-export EXPECTED_GO_VERSION="%s"
-export EXPECTED_NINJA_VERSION="%s"
-export EXPECTED_CMAKE_VERSION="%s"
 
 # We might need to make this configurable if it causes issues outside of CI
 export NINJA_CORES=$$(nproc)
@@ -61,15 +56,15 @@ set -eo pipefail
 SRC_DIR=$$(dirname $(location @fips_ninja//:configure.py))
 OUT_FILE=$$(realpath $@)
 PYTHON_BIN=$$(realpath $(PYTHON3))
-export CC=$(CC)
-export CXX=$(CC)
+export CC="$$(realpath $(CC))"
+export CXX="$$(realpath $(CC))"
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
     export CXXFLAGS="-stdlib=libc++"
-    export LDFLAGS="-stdlib=libc++ -lc++ -lc++abi -lm -pthread"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -lc++ -lc++abi -lm -pthread"
 else
     export CXXFLAGS=""
-    export LDFLAGS="-lstdc++ -lm -pthread"
+    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread"
 fi
 cd $$SRC_DIR
 OUTPUT=$$(mktemp)
@@ -91,28 +86,22 @@ def _create_boringssl_fips_build_config(lib, arch, arch_alias):
         match_all = conditions,
     )
 
-def _create_boringssl_fips_build_command(lib, arch, arch_alias, go_version, ninja_version, cmake_version):
+def _create_boringssl_fips_build_command(lib, arch, arch_alias):
     """Create the command."""
     _create_boringssl_fips_build_config(lib, arch, arch_alias)
     return BUILD_COMMAND % (
         lib,
         "@fips_cmake_linux_%s" % arch,
         "@fips_go_linux_%s" % arch_alias,
-        go_version,
-        ninja_version,
-        cmake_version,
     )
 
-def boringssl_fips_build_command(arches, libs, go_version, ninja_version, cmake_version):
+def boringssl_fips_build_command(arches, libs):
     """Create conditional commands from the cartesian product of possible arches/stdlib."""
     return {
         ":%s_%s" % (arch, lib): _create_boringssl_fips_build_command(
             lib,
             arch,
             arch_alias,
-            go_version,
-            ninja_version,
-            cmake_version,
         )
         for arch, arch_alias in arches.items()
         for lib in libs

@@ -49,6 +49,7 @@ envoy_cc_library(
         "//source/common/version:version_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
+        "@com_github_nlohmann_json//:json",
     ],
 )
 

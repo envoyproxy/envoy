@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 30]
+// [#next-free-field: 32]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -311,6 +311,30 @@ message ExtAuthz {
   // Field ``latency_us`` is exposed for CEL and logging when using gRPC or HTTP service.
   // Fields ``bytesSent`` and ``bytesReceived`` are exposed for CEL and logging only when using gRPC service.
   bool emit_filter_state_stats = 29;
+
+  // Sets the maximum size (in bytes) of the response body that the filter will send downstream
+  // when a request is denied by the external authorization service.
+  //
+  // If the authorization server returns a response body larger than this configured limit,
+  // the body will be truncated to ``max_denied_response_body_bytes`` before being sent to the
+  // downstream client.
+  //
+  // If this field is not set or is set to 0, no truncation will occur, and the entire
+  // denied response body will be forwarded.
+  uint32 max_denied_response_body_bytes = 30;
+
+  // When set to ``true``, the filter will enforce the response header map's count and size limits
+  // by dropping headers added by the external auth service. Enabling this may break applications
+  // relying on those headers!
+  //
+  // When set to ``false``, the filter will ignore the response header map's limits and add / set
+  // all response headers as specified by the external auth service.
+  //
+  // Recommendation: enable if the external authorization service is not trusted. Otherwise, leave
+  // false.
+  //
+  // Defaults to false.
+  bool enforce_response_header_limits = 31;
 }
 
 // Configuration for buffering the request data.
@@ -369,7 +393,7 @@ message BufferSettings {
 // metadata as well as body may be added to the client's response. See :ref:`allowed_client_headers
 // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationResponse.allowed_client_headers>`
 // for details.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message HttpService {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.HttpService";
@@ -387,6 +411,13 @@ message HttpService {
 
   // Settings used for controlling authorization response metadata.
   AuthorizationResponse authorization_response = 8;
+
+  // Optional retry policy for requests to the authorization server.
+  // If not set, no retries will be performed.
+  //
+  // .. note::
+  //   When this field is set, the ``ext_authz`` filter will buffer the request body for retry purposes.
+  config.core.v3.RetryPolicy retry_policy = 9;
 }
 
 message AuthorizationRequest {

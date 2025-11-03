@@ -228,7 +228,7 @@ private:
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
-  void sendGoAwayAndClose() override {}
+  void sendGoAwayAndClose(bool graceful [[maybe_unused]] = false) override {}
 
   void setDecoderBufferLimit(uint64_t) override {
     IS_ENVOY_BUG("decoder buffer limits should not be overridden on async streams.");
@@ -252,7 +252,7 @@ private:
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
   absl::optional<Upstream::LoadBalancerContext::OverrideHost>
   upstreamOverrideHost() const override {
-    return absl::nullopt;
+    return upstream_override_host_;
   }
   bool shouldLoadShed() const override { return false; }
   absl::string_view filterConfigName() const override { return ""; }
@@ -294,6 +294,9 @@ private:
   bool send_xff_{true};
   bool send_internal_{true};
   bool router_destroyed_{false};
+
+  // Upstream override host for bypassing load balancer selection
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
 
   friend class AsyncClientImpl;
   friend class AsyncClientImplUnitTest;

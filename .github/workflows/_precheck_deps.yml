@@ -40,7 +40,7 @@ jobs:
       bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      diskspace-hack: true
+      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths || '/opt/hostedtoolcache' }}
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       request: ${{ inputs.request }}
       error-match: |
@@ -55,6 +55,9 @@ jobs:
         include:
         - target: deps
           rbe: false
+          diskspace-hack-paths: |
+            /opt/hostedtoolcache
+            /usr/local/.ghcup
 
   dependency-review:
     runs-on: ubuntu-24.04
@@ -66,4 +69,4 @@ jobs:
         ref: ${{ fromJSON(inputs.request).request.sha }}
         persist-credentials: false
     - name: Dependency Review
-      uses: actions/dependency-review-action@595b5aeba73380359d98a5e087f648dbb0edce1b  # v4.7.3
+      uses: actions/dependency-review-action@40c09b7dc99638e5ddb0bfd91c1673effc064d8a  # v4.8.1
