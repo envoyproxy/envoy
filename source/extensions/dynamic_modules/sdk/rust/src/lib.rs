@@ -857,10 +857,9 @@ pub trait EnvoyHttpFilter {
 
   /// Similar to [`append_received_request_body`], but appends to the buffered request body.
   ///
-  /// This should only be called by the latest data processing filter in the filter chain.
-  /// That is say for a given filter X, if and only if the filters following filter X in the filter
-  /// chain have not yet accessed the body, filter X can safely modify the buffered body with this
-  /// method.
+  /// This method should only be used by the final data-processing filter in the chain.
+  /// In other words, a filter may safely modify the buffered body only if no later filters
+  /// in the chain have accessed it yet.
   ///
   /// Returns false if the request body is not available.
   /// Note that after changing the request body, it is caller's responsibility to modify the
