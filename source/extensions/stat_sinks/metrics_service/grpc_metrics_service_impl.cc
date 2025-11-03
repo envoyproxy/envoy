@@ -52,7 +52,7 @@ void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
 
   for (int i = 0; i < metrics->size(); ++i) {
     batch.Add()->CopyFrom((*metrics)[i]);
-    
+
     // Send batch when it reaches batch_size or at the end
     if (batch.size() >= static_cast<int>(batch_size_) || i == metrics->size() - 1) {
       sendBatch(batch, is_first_batch);

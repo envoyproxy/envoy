@@ -81,8 +81,9 @@ public:
   }
 
 private:
-  void sendBatch(const Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& batch,
-                 bool is_first_message);
+  void
+  sendBatch(const Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& batch,
+            bool is_first_message);
 
   const LocalInfo::LocalInfo& local_info_;
   const Protobuf::MethodDescriptor& service_method_;

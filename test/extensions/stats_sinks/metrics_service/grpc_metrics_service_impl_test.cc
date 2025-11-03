@@ -10,8 +10,8 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "io/prometheus/client/metrics.pb.h"
 #include "absl/strings/str_format.h"
+#include "io/prometheus/client/metrics.pb.h"
 
 using namespace std::chrono_literals;
 using testing::_;
@@ -395,7 +395,8 @@ TEST_F(MetricsServiceSinkTest, HistogramEmitModeHistogram) {
 TEST_F(GrpcMetricsStreamerImplTest, BatchingWithMultipleBatches) {
   // Create a new async client for this test to avoid shared_ptr lifecycle issues
   auto batch_async_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
-  auto batch_streamer = std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 2);
+  auto batch_streamer =
+      std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 2);
 
   InSequence s;
 
@@ -404,12 +405,12 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingWithMultipleBatches) {
   MetricsServiceCallbacks* callbacks;
   EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
       .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
-                                              Grpc::RawAsyncStreamCallbacks& cb,
-                                              const Http::AsyncClient::StreamOptions&) {
+                                             Grpc::RawAsyncStreamCallbacks& cb,
+                                             const Http::AsyncClient::StreamOptions&) {
         callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
         return &stream;
       }));
-  
+
   // First batch will have identifier (node), subsequent batches won't
   EXPECT_CALL(local_info_, node());
   // Expect 3 sendMessage calls (3 batches of 2, 2, 1 metrics)
@@ -429,7 +430,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingWithMultipleBatches) {
 // Test batching when metrics count equals batch_size
 TEST_F(GrpcMetricsStreamerImplTest, BatchingExactMatch) {
   auto batch_async_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
-  auto batch_streamer = std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 3);
+  auto batch_streamer =
+      std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 3);
 
   InSequence s;
 
@@ -437,8 +439,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingExactMatch) {
   MetricsServiceCallbacks* callbacks;
   EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
       .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
-                                              Grpc::RawAsyncStreamCallbacks& cb,
-                                              const Http::AsyncClient::StreamOptions&) {
+                                             Grpc::RawAsyncStreamCallbacks& cb,
+                                             const Http::AsyncClient::StreamOptions&) {
         callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
         return &stream;
       }));
@@ -461,7 +463,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingExactMatch) {
 // Test batching when metrics count is less than batch_size
 TEST_F(GrpcMetricsStreamerImplTest, BatchingSmallerThanBatchSize) {
   auto batch_async_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
-  auto batch_streamer = std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 100);
+  auto batch_streamer =
+      std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 100);
 
   InSequence s;
 
@@ -469,8 +472,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingSmallerThanBatchSize) {
   MetricsServiceCallbacks* callbacks;
   EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
       .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
-                                              Grpc::RawAsyncStreamCallbacks& cb,
-                                              const Http::AsyncClient::StreamOptions&) {
+                                             Grpc::RawAsyncStreamCallbacks& cb,
+                                             const Http::AsyncClient::StreamOptions&) {
         callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
         return &stream;
       }));
@@ -517,7 +520,8 @@ TEST_F(GrpcMetricsStreamerImplTest, NoBatchingWithZeroBatchSize) {
 // Test empty metrics with batching
 TEST_F(GrpcMetricsStreamerImplTest, BatchingWithEmptyMetrics) {
   auto batch_async_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
-  auto batch_streamer = std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 10);
+  auto batch_streamer =
+      std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 10);
 
   InSequence s;
 
@@ -525,8 +529,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingWithEmptyMetrics) {
   MetricsServiceCallbacks* callbacks;
   EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
       .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
-                                              Grpc::RawAsyncStreamCallbacks& cb,
-                                              const Http::AsyncClient::StreamOptions&) {
+                                             Grpc::RawAsyncStreamCallbacks& cb,
+                                             const Http::AsyncClient::StreamOptions&) {
         callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
         return &stream;
       }));
@@ -544,7 +548,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingWithEmptyMetrics) {
 // Test batching with batch_size = 1
 TEST_F(GrpcMetricsStreamerImplTest, BatchingSizeOne) {
   auto batch_async_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
-  auto batch_streamer = std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 1);
+  auto batch_streamer =
+      std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 1);
 
   InSequence s;
 
@@ -552,8 +557,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingSizeOne) {
   MetricsServiceCallbacks* callbacks;
   EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
       .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
-                                              Grpc::RawAsyncStreamCallbacks& cb,
-                                              const Http::AsyncClient::StreamOptions&) {
+                                             Grpc::RawAsyncStreamCallbacks& cb,
+                                             const Http::AsyncClient::StreamOptions&) {
         callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
         return &stream;
       }));
