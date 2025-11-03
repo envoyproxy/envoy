@@ -384,7 +384,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
   useListenerAccessLog("%ACCESS_LOG_TYPE% ");
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->mutable_access_log_options()->set_flush_on_start(true);
+    listener->mutable_access_log_options()->set_flush_access_log_on_start(true);
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 

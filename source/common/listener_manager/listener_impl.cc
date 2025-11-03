@@ -318,7 +318,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           parent.server_, validation_visitor_, config, *this,
           parent_.factory_->createDrainManager(config.drain_type()))),
       reuse_port_(getReusePortOrDefault(parent_.server_, config, socket_type_)),
-      flush_logs_on_start_(config.access_log_options().flush_on_start()),
+      flush_logs_on_start_(config.access_log_options().flush_access_log_on_start()),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config.name() +
                             ".connection_limit"),
       open_connections_(std::make_shared<BasicResourceLimitImpl>(

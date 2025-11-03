@@ -132,7 +132,7 @@ message Listener {
 
   message AccessLogOptions {
     // If set to true, the access log is flushed when a TCP connection starts.
-    bool flush_on_start = 1;
+    bool flush_access_log_on_start = 1;
   }
 
   reserved 14, 23;

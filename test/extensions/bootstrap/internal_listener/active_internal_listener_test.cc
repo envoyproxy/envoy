@@ -331,6 +331,7 @@ public:
       return *connection_balancer_;
     }
     const AccessLog::InstanceSharedPtrVector& accessLogs() const override { return access_logs_; }
+    bool flushAccessLogsOnStart() const override { return false; }
     ResourceLimit& openConnections() override { return open_connections_; }
     uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
     uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
