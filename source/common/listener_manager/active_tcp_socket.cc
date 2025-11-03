@@ -3,7 +3,7 @@
 #include "envoy/network/filter.h"
 
 #include "source/common/listener_manager/active_stream_listener_base.h"
-#include "source/common/network/upstream_network_namespace.h"
+#include "source/common/network/downstream_network_namespace.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
@@ -24,8 +24,8 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
   const auto& local_address = socket_->connectionInfoProvider().localAddress();
   if (local_address && local_address->networkNamespace().has_value() &&
       !local_address->networkNamespace()->empty()) {
-    stream_info_->filterState()->setData(Network::UpstreamNetworkNamespace::key(),
-                                         std::make_unique<Network::UpstreamNetworkNamespace>(
+    stream_info_->filterState()->setData(Network::DownstreamNetworkNamespace::key(),
+                                         std::make_unique<Network::DownstreamNetworkNamespace>(
                                              local_address->networkNamespace().value()),
                                          StreamInfo::FilterState::StateType::ReadOnly,
                                          StreamInfo::FilterState::LifeSpan::Connection);

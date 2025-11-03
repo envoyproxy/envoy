@@ -534,9 +534,9 @@ envoy_cc_library(
     hdrs = ["transport_socket_options_impl.h"],
     deps = [
         ":application_protocol_lib",
+        ":downstream_network_namespace_lib",
         ":filter_state_proxy_info_lib",
         ":proxy_protocol_filter_state_lib",
-        ":upstream_network_namespace_lib",
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
         "//envoy/common:hashable_interface",
@@ -586,9 +586,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "upstream_network_namespace_lib",
-    srcs = ["upstream_network_namespace.cc"],
-    hdrs = ["upstream_network_namespace.h"],
+    name = "downstream_network_namespace_lib",
+    srcs = ["downstream_network_namespace.cc"],
+    hdrs = ["downstream_network_namespace.h"],
     deps = [
         "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",

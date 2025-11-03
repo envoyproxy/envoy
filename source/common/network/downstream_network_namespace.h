@@ -14,9 +14,9 @@ namespace Network {
  * particularly useful for logging, routing decisions, or other filter logic in multi-tenant
  * or containerized environments.
  */
-class UpstreamNetworkNamespace : public StreamInfo::FilterState::Object {
+class DownstreamNetworkNamespace : public StreamInfo::FilterState::Object {
 public:
-  UpstreamNetworkNamespace(absl::string_view network_namespace_filepath)
+  DownstreamNetworkNamespace(absl::string_view network_namespace_filepath)
       : network_namespace_filepath_(network_namespace_filepath) {}
   const std::string& value() const { return network_namespace_filepath_; }
   absl::optional<std::string> serializeAsString() const override {
