@@ -1080,7 +1080,13 @@ void InstanceBase::terminate() {
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
 
-  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
+  // We need to do both of the following to prevent crashes during shutdown:
+  // 1. Call shutdownAll() on gRPC muxes to prevent them from sending messages during cleanup. It
+  //    avoids creating new work with potentially dangling pointers to grpc_stream_.
+  // 2. DispatcherImpl::shutdown() to properly clean up all deferred deletables, post callbacks,
+  //    and thread local deletables to ensures all cleanup work completes.
+  //
+  // Removing either one of these can cause crashes during shutdown.
   std::vector<std::string> muxes = {
       "envoy.config_mux.new_grpc_mux_factory", "envoy.config_mux.grpc_mux_factory",
       "envoy.config_mux.delta_grpc_mux_factory", "envoy.config_mux.sotw_grpc_mux_factory"};

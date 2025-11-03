@@ -1591,6 +1591,8 @@ suri
 transid
 routable
 vhosts
+deletables
+muxes
 infos
 ElastiCache
 pinterest
