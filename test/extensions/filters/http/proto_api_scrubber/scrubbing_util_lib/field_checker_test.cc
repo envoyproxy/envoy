@@ -36,7 +36,7 @@ namespace {
 
 inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
 
-// Mock class for `Matcher::MatchTree` to mimick different responses from the `match()` method.
+// Mock class for `Matcher::MatchTree` to reproduce different responses from the `match()` method.
 class MockMatchTree : public Matcher::MatchTree<HttpMatchingData> {
 public:
   MOCK_METHOD(Matcher::MatchResult, match,
