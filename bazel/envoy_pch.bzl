@@ -32,7 +32,6 @@ def envoy_pch_library(
         external_deps = [],
         testonly = False,
         repository = ""):
-
     cc_library(
         name = name + "_libs",
         visibility = ["//visibility:private"],
