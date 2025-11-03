@@ -144,8 +144,7 @@ absl::StatusOr<DataSourceProviderPtr> DataSourceProvider::create(const ProtoData
       WatchedDirectory::create(source.watched_directory(), main_dispatcher);
   RETURN_IF_NOT_OK_REF(directory_watcher_or_error.status());
 
-  auto& directory_watcher = directory_watcher_or_error.value();
-  directory_watcher->setCallback(
+  directory_watcher_or_error.value()->setCallback(
       [slot_ptr = slot.get(), &api, filename, allow_empty, max_size]() -> absl::Status {
         auto new_data_or_error = readFile(filename, api, allow_empty, max_size);
         if (!new_data_or_error.ok()) {
