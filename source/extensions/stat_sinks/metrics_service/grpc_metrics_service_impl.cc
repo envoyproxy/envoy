@@ -19,31 +19,65 @@ namespace StatSinks {
 namespace MetricsService {
 
 GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(Grpc::RawAsyncClientSharedPtr raw_async_client,
-                                                 const LocalInfo::LocalInfo& local_info)
+                                                 const LocalInfo::LocalInfo& local_info,
+                                                 uint32_t batch_size)
     : GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
                           envoy::service::metrics::v3::StreamMetricsResponse>(raw_async_client),
       local_info_(local_info),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.metrics.v3.MetricsService.StreamMetrics")) {}
+          "envoy.service.metrics.v3.MetricsService.StreamMetrics")),
+      batch_size_(batch_size) {}
 
 void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
-  envoy::service::metrics::v3::StreamMetricsMessage message;
-  message.mutable_envoy_metrics()->Reserve(metrics->size());
-  message.mutable_envoy_metrics()->MergeFrom(*metrics);
-
   if (stream_ == nullptr) {
     ENVOY_LOG(debug, "Establishing new gRPC metrics service stream");
     stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
-    // For perf reasons, the identifier is only sent on establishing the stream.
+    if (stream_ == nullptr) {
+      ENVOY_LOG(error,
+                "unable to establish metrics service stream. Will retry in the next flush cycle");
+      return;
+    }
+  }
+
+  // If batch_size is 0 or not set, send all metrics in a single message (default behavior)
+  if (batch_size_ == 0 || metrics->size() <= static_cast<int>(batch_size_)) {
+    sendBatch(*metrics, true);
+    return;
+  }
+
+  // Send metrics in batches
+  ENVOY_LOG(debug, "Batching {} metrics into messages of size {}", metrics->size(), batch_size_);
+  Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily> batch;
+  bool is_first_batch = true;
+
+  for (int i = 0; i < metrics->size(); ++i) {
+    batch.Add()->CopyFrom((*metrics)[i]);
+    
+    // Send batch when it reaches batch_size or at the end
+    if (batch.size() >= static_cast<int>(batch_size_) || i == metrics->size() - 1) {
+      sendBatch(batch, is_first_batch);
+      batch.Clear();
+      is_first_batch = false;
+    }
+  }
+}
+
+void GrpcMetricsStreamerImpl::sendBatch(
+    const Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& batch,
+    bool is_first_message) {
+  envoy::service::metrics::v3::StreamMetricsMessage message;
+  message.mutable_envoy_metrics()->Reserve(batch.size());
+  message.mutable_envoy_metrics()->MergeFrom(batch);
+
+  // For perf reasons, the identifier is only sent on the first message on the stream.
+  if (is_first_message) {
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = local_info_.node();
   }
-  if (stream_ == nullptr) {
-    ENVOY_LOG(error,
-              "unable to establish metrics service stream. Will retry in the next flush cycle");
-    return;
+
+  if (stream_ != nullptr) {
+    stream_->sendMessage(message, false);
   }
-  stream_->sendMessage(message, false);
 }
 
 MetricsPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) const {
