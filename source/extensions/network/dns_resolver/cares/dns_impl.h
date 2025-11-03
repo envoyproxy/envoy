@@ -206,6 +206,7 @@ private:
   const bool rotate_nameservers_;
   const uint32_t edns0_max_payload_size_;
   const std::chrono::milliseconds max_udp_channel_duration_;
+  const bool reinit_channel_on_timeout_;
   const absl::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
   Stats::ScopeSharedPtr scope_;

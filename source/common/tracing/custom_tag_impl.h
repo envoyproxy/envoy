@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/tracing/custom_tag.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
@@ -73,6 +74,20 @@ protected:
   const envoy::type::metadata::v3::MetadataKind::KindCase kind_;
   const Envoy::Config::MetadataKey metadata_key_;
   const std::string default_value_;
+};
+
+class FormatterCustomTag : public CustomTag {
+public:
+  FormatterCustomTag(absl::string_view tag, absl::string_view value);
+
+  absl::string_view tag() const override { return tag_; }
+  void applySpan(Span& span, const CustomTagContext& ctx) const override;
+  void applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                const CustomTagContext& ctx) const override;
+
+private:
+  const std::string tag_;
+  Formatter::FormatterPtr formatter_;
 };
 
 class CustomTagUtility {
