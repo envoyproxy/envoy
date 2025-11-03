@@ -85,8 +85,9 @@ bug_fixes:
 - area: router
   change: |
     Fixed a regression where router-set headers (e.g., ``x-envoy-expected-rq-timeout-ms``, ``x-envoy-attempt-count``)
-    were not accessible in ``request_headers_to_add`` configuration. Headers configured via ``request_headers_to_add``
-    can now reference router-set headers using formatters like ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
+    were not accessible in ``request_headers_to_add`` configuration on the initial request. Headers configured via
+    ``request_headers_to_add`` can now reference router-set headers using formatters like
+    ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

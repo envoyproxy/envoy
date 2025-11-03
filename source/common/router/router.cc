@@ -2193,34 +2193,6 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     return;
   }
 
-  // Set router-set headers before host selection so request_headers_to_add can reference them.
-  if (include_attempt_count_in_request_) {
-    downstream_headers_->setEnvoyAttemptCount(attempt_count_);
-  }
-
-  if (include_timeout_retry_header_in_request_) {
-    downstream_headers_->setEnvoyIsTimeoutRetry(is_timeout_retry == TimeoutRetry::Yes ? "true"
-                                                                                      : "false");
-  }
-
-  // Update timeout headers for the retry attempt.
-  std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
-  if (DateUtil::timePointValid(downstream_request_complete_time_)) {
-    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-    elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-  }
-
-  FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
-                                   *downstream_headers_, !config_->suppress_envoy_headers_,
-                                   grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
-
-  // Apply request_headers_to_add now that router-set headers are present.
-  const Formatter::Context header_transform_context(downstream_headers_, {}, {}, {}, {},
-                                                    &callbacks_->activeSpan());
-  route_entry_->finalizeRequestHeaders(*downstream_headers_, header_transform_context,
-                                       callbacks_->streamInfo(), !config_->suppress_envoy_headers_);
-
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_start_ms",
       callbacks_->dispatcher().timeSource().monotonicTime());
@@ -2251,8 +2223,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 }
 
 void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
-                             TimeoutRetry is_timeout_retry [[maybe_unused]],
-                             Upstream::HostConstSharedPtr&& host,
+                             TimeoutRetry is_timeout_retry, Upstream::HostConstSharedPtr&& host,
                              Upstream::ThreadLocalCluster& cluster,
                              absl::optional<std::string> host_selection_details) {
   callbacks_->streamInfo().downstreamTiming().setValue(
@@ -2266,6 +2237,29 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
       allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
+
+  if (include_attempt_count_in_request_) {
+    downstream_headers_->setEnvoyAttemptCount(attempt_count_);
+  }
+
+  if (include_timeout_retry_header_in_request_) {
+    downstream_headers_->setEnvoyIsTimeoutRetry(is_timeout_retry == TimeoutRetry::Yes ? "true"
+                                                                                      : "false");
+  }
+
+  // The request timeouts only account for time elapsed since the downstream request completed
+  // which might not have happened yet, in which case zero time has elapsed.
+  std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
+
+  if (DateUtil::timePointValid(downstream_request_complete_time_)) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+  }
+
+  FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
+                                   *downstream_headers_, !config_->suppress_envoy_headers_,
+                                   grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
