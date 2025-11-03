@@ -41,12 +41,12 @@ public:
   virtual ~ProtoApiScrubberFilterConfig() = default;
 
   // Returns the match tree for a request payload field mask.
-  virtual MatchTreeHttpMatchingDataSharedPtr getRequestFieldMatcher(const std::string& method_name,
-                                                            const std::string& field_mask) const;
+  virtual MatchTreeHttpMatchingDataSharedPtr
+  getRequestFieldMatcher(const std::string& method_name, const std::string& field_mask) const;
 
   // Returns the match tree for a response payload field mask.
-  virtual MatchTreeHttpMatchingDataSharedPtr getResponseFieldMatcher(const std::string& method_name,
-                                                             const std::string& field_mask) const;
+  virtual MatchTreeHttpMatchingDataSharedPtr
+  getResponseFieldMatcher(const std::string& method_name, const std::string& field_mask) const;
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 

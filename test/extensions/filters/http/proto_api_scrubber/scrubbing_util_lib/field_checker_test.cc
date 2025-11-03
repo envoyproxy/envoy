@@ -29,7 +29,7 @@ public:
               (const std::string& method_name, const std::string& field_mask), (const, override));
 
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
-            (const std::string& method_name, const std::string& field_mask), (const, override));
+              (const std::string& method_name, const std::string& field_mask), (const, override));
 };
 
 namespace {
@@ -319,40 +319,42 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
 
   {
     EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name))
-    .WillOnce(testing::Return(mock_match_tree));
+        .WillOnce(testing::Return(mock_match_tree));
 
     FieldChecker request_field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                               method_name, &mock_filter_config);
+                                       method_name, &mock_filter_config);
 
     EXPECT_LOG_CONTAINS(
-      "error",
-      "Matching failed for the field `user`. This field would be preserved.", // Expected Substring
-      {
+        "error",
+        "Matching failed for the field `user`. This field would be preserved.", // Expected
+                                                                                // Substring
+        {
           // Code that triggers the error log
           FieldCheckResults result = request_field_checker.CheckField({}, &field);
 
           // Assert the expected return value from the function
           EXPECT_EQ(result, FieldCheckResults::kInclude);
-      });
+        });
   }
 
   {
     EXPECT_CALL(mock_filter_config, getResponseFieldMatcher(method_name, field_name))
-    .WillOnce(testing::Return(mock_match_tree));
+        .WillOnce(testing::Return(mock_match_tree));
 
     FieldChecker response_field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info,
-                               method_name, &mock_filter_config);
+                                        method_name, &mock_filter_config);
 
     EXPECT_LOG_CONTAINS(
-      "error",
-      "Matching failed for the field `user`. This field would be preserved.", // Expected Substring
-      {
+        "error",
+        "Matching failed for the field `user`. This field would be preserved.", // Expected
+                                                                                // Substring
+        {
           // Code that triggers the error log
           FieldCheckResults result = response_field_checker.CheckField({}, &field);
 
           // Assert the expected return value from the function
           EXPECT_EQ(result, FieldCheckResults::kInclude);
-      });
+        });
   }
 }
 

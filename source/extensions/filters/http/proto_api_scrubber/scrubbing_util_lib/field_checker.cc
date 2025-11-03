@@ -34,11 +34,13 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
   // 1. The match tree is corrupt.
   // 2. The required data to match is not present in the `matching_data_ptr_`.
   // Ideally both of these cases shouldn't happen as:
-  // 1. The match tree is configured as part of filter config which is validated during filter initialization itself.
+  // 1. The match tree is configured as part of filter config which is validated during filter
+  // initialization itself.
   // 2. The field checker is created only after all the required data to match is received.
   // For now, it will emit an error log and preserve the field.
   if (!match_result.ok()) {
-    ENVOY_LOG(error, "Matching failed for the field `{}`. This field would be preserved.", field_mask);
+    ENVOY_LOG(error, "Matching failed for the field `{}`. This field would be preserved.",
+              field_mask);
     return FieldCheckResults::kInclude;
   }
 
