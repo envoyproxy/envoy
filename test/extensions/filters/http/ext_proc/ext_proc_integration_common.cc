@@ -875,7 +875,7 @@ void ExtProcIntegrationTest::prependExprocCompositeFilter() {
                                true);
 }
 
-void ExtProcIntegrationTest::initializeLogConfig (std::string& access_log_path){
+void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
   config_helper_.addConfigModifier([&](ConfigHelper::HttpConnectionManager& cm) {
     auto* access_log = cm.add_access_log();
     access_log->set_name("accesslog");
@@ -932,7 +932,6 @@ void ExtProcIntegrationTest::initializeLogConfig (std::string& access_log_path){
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_continue_and_replace)%");
     (*json_format->mutable_fields())["field_immeidate_response"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:immediate_response)%");
-    
 
     // Test non-existent field for coverage
     (*json_format->mutable_fields())["field_non_existent"].set_string_value(
