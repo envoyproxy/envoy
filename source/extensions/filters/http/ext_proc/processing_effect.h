@@ -16,7 +16,7 @@ public:
     // FULL_DUPLEX_STREAMED.
     None,
     // The processor response sent a mutation that successfully modified the body or headers.
-    // This is the dafualt value for body requests/responses using
+    // This is the defualt value for body requests/responses using
     // FULL_DUPLEX_STREAMED processing mode.
     MutationApplied,
     // The processor response sent a mutation that was attempted to modify the headers or trailers
@@ -30,7 +30,7 @@ public:
     MutationFailed,
     // Some mutations were applied while other mutations were rejected.
     // This can arise when multiple GRPC messages attempt to mutate the same part of the HTTP
-    // request/repsonse.
+    // request/response.
     PartialMutationsApplied,
   };
 };
