@@ -989,7 +989,7 @@ pub trait EnvoyHttpFilter {
   ///   }
   /// }
   /// ```
-  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler>;
+  fn new_scheduler(&self) -> impl EnvoyHttpFilterScheduler + 'static;
 
   /// Increment the counter with the given id.
   fn increment_counter(
@@ -1661,13 +1661,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler> {
+  fn new_scheduler(&self) -> impl EnvoyHttpFilterScheduler + 'static {
     unsafe {
       let scheduler_ptr =
         abi::envoy_dynamic_module_callback_http_filter_scheduler_new(self.raw_ptr);
-      Box::new(EnvoyHttpFilterSchedulerImpl {
+      EnvoyHttpFilterSchedulerImpl {
         raw_ptr: scheduler_ptr,
-      })
+      }
     }
   }
 
@@ -1999,8 +1999,10 @@ impl EnvoyHttpFilterImpl {
 /// Since this is primarily designed to be used from a different thread than the one
 /// where the [`HttpFilter`] instance was created, it is marked as `Send` so that
 /// the [`Box<dyn EnvoyHttpFilterScheduler>`] can be sent across threads.
+///
+/// It is also safe to be called concurrently, so it is marked as `Sync` as well.
 #[automock]
-pub trait EnvoyHttpFilterScheduler: Send {
+pub trait EnvoyHttpFilterScheduler: Send + Sync {
   /// Commit the scheduled event to the worker thread where [`HttpFilter`] is running.
   ///
   /// It accepts an `event_id` which can be used to distinguish different events
@@ -2019,6 +2021,7 @@ struct EnvoyHttpFilterSchedulerImpl {
 }
 
 unsafe impl Send for EnvoyHttpFilterSchedulerImpl {}
+unsafe impl Sync for EnvoyHttpFilterSchedulerImpl {}
 
 impl Drop for EnvoyHttpFilterSchedulerImpl {
   fn drop(&mut self) {
@@ -2033,6 +2036,14 @@ impl EnvoyHttpFilterScheduler for EnvoyHttpFilterSchedulerImpl {
     unsafe {
       abi::envoy_dynamic_module_callback_http_filter_scheduler_commit(self.raw_ptr, event_id);
     }
+  }
+}
+
+// Box<dyn EnvoyHttpFilterScheduler> is returned by mockall, so we need to implement
+// EnvoyHttpFilterScheduler for it as well.
+impl EnvoyHttpFilterScheduler for Box<dyn EnvoyHttpFilterScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
   }
 }
 
