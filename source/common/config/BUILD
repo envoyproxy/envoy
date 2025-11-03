@@ -51,6 +51,7 @@ envoy_cc_library(
     deps = [
         ":remote_data_fetcher_lib",
         ":utility_lib",
+        ":watched_directory_lib",
         "//envoy/api:api_interface",
         "//envoy/init:manager_interface",
         "//envoy/thread_local:thread_local_interface",

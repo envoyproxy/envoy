@@ -403,6 +403,48 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
 }
 
+TEST(DataSourceProviderTest, FileDataSourceAndWatchDirectoryCreationFailure) {
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  // Use a non-existent directory path that will cause WatchedDirectory::create() to fail.
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+    watched_directory:
+      path: "/non/existent/directory/path"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+    file << "Hello, world!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  // Creating a provider with an invalid watched directory path should return an error.
+  auto provider_or_error =
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
+  EXPECT_FALSE(provider_or_error.ok());
+  EXPECT_THAT(provider_or_error.status().message(),
+              testing::HasSubstr("/non/existent/directory/path"));
+
+  // Remove the file.
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy
