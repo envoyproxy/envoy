@@ -333,7 +333,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
-      access_log_type: NotSet
+      access_log_type: TcpConnectionEnd
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
@@ -489,7 +489,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
-      access_log_type: NotSet
+      access_log_type: TcpConnectionEnd
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
@@ -558,7 +558,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
-      access_log_type: NotSet
+      access_log_type: TcpConnectionEnd
     connection_properties:
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -623,7 +623,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
-      access_log_type: NotSet
+      access_log_type: TcpConnectionEnd
     connection_properties:
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -676,6 +676,7 @@ tcp_logs:
           address: {}
       tls_properties:
         tls_sni_hostname: sni
+      access_log_type: TcpConnectionEnd
     connection_properties:
       received_bytes: 138
       sent_bytes: 138
@@ -731,6 +732,7 @@ tcp_logs:
       tls_properties:
         tls_sni_hostname: sni
         ja3_fingerprint: "ecaf91d232e224038f510cb81aa08b94"
+      access_log_type: TcpConnectionEnd
     connection_properties:
       received_bytes: 138
       sent_bytes: 138
@@ -784,6 +786,7 @@ tcp_logs:
           address: {}
       tls_properties:
         ja3_fingerprint: "71d1f47d1125ac53c3c6a4863c087cfe"
+      access_log_type: TcpConnectionEnd
     connection_properties:
       received_bytes: 126
       sent_bytes: 126
@@ -855,6 +858,7 @@ tcp_logs:
         socket_address: {{}}
       upstream_local_address:
         socket_address: {{}}
+      access_log_type: TcpConnectionEnd
     connection_properties: {{}}
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()))));
@@ -913,6 +917,7 @@ tcp_logs:
         socket_address: {{}}
       upstream_local_address:
         socket_address: {{}}
+      access_log_type: TcpConnectionEnd
     connection_properties: {{}}
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()))));
@@ -970,6 +975,7 @@ tcp_logs:
         socket_address: {{}}
       upstream_local_address:
         socket_address: {{}}
+      access_log_type: TcpConnectionEnd
     connection_properties: {{}}
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()))));

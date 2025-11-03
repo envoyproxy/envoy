@@ -41,6 +41,9 @@ minor_behavior_changes:
   change: |
     Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.mobile_use_network_observer_registry``.
+- area: logging
+  change: |
+    Listener access log entries now have their entry type set to ``TcpConnectionEnd`` or ``NotConnected``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -105,6 +108,8 @@ new_features:
   change: |
     Added support for not-equal operator for access log filter rules, in
     :ref:`ComparisonFilter <envoy_v3_api_msg_config.accesslog.v3.ComparisonFilter>`.
+- area: logging
+    Added support to flush access logs in the listener on the start of the connections.
 - area: cel
   change: |
     Added per-expression configuration options for CEL evaluator to control string conversion, concatenation,
