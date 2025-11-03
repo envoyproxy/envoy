@@ -109,6 +109,7 @@ new_features:
     Added support for not-equal operator for access log filter rules, in
     :ref:`ComparisonFilter <envoy_v3_api_msg_config.accesslog.v3.ComparisonFilter>`.
 - area: logging
+  change: |
     Added support to flush access logs in the listener on the start of the connections.
 - area: cel
   change: |
