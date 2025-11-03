@@ -663,10 +663,9 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_permissions()->set_destination_port(456);
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("foo");
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
-  auto builder = Expr::createBuilder(nullptr);
 
-  RBAC::PolicyMatcher matcher(policy, builder, ProtobufMessage::getStrictValidationVisitor(),
-                              factory_context);
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, nullptr);
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
@@ -1496,6 +1495,353 @@ TEST(Matcher, CreatePrincipalIdentifierNotSet) {
         Matcher::create(principal, context);
       },
       "panic: corrupted enum");
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithCelConfig) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  // Test with CEL config enabling string functions.
+  {
+    envoy::config::rbac::v3::Policy policy;
+    policy.add_permissions()->set_any(true);
+    policy.add_principals()->set_any(true);
+
+    // Set up a condition that uses string functions.
+    auto* condition = policy.mutable_condition();
+    auto* call_expr = condition->mutable_call_expr();
+    call_expr->set_function("_==_");
+
+    // Left side: request.headers[":method"].lowerAscii()
+    auto* left = call_expr->add_args();
+    auto* lower_call = left->mutable_call_expr();
+    lower_call->set_function("lowerAscii");
+    auto* header_access = lower_call->mutable_target();
+    auto* header_call = header_access->mutable_call_expr();
+    header_call->set_function("_[_]");
+    auto* headers_select = header_call->add_args();
+    auto* request_ident = headers_select->mutable_select_expr();
+    request_ident->mutable_operand()->mutable_ident_expr()->set_name("request");
+    request_ident->set_field("headers");
+    header_call->add_args()->mutable_const_expr()->set_string_value(":method");
+
+    // Right side: "get"
+    call_expr->add_args()->mutable_const_expr()->set_string_value("get");
+
+    // Enable string functions in CEL config.
+    auto* cel_config = policy.mutable_cel_config();
+    cel_config->set_enable_string_functions(true);
+
+    RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                                factory_context, nullptr);
+
+    Envoy::Network::MockConnection conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}};
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    // The matcher should match because "GET".lowerAscii() == "get".
+    EXPECT_TRUE(matcher.matches(conn, headers, info));
+
+    // Test with lowercase method.
+    Envoy::Http::TestRequestHeaderMapImpl headers2{{":method", "get"}};
+    EXPECT_TRUE(matcher.matches(conn, headers2, info));
+
+    // Test with non-matching method.
+    Envoy::Http::TestRequestHeaderMapImpl headers3{{":method", "POST"}};
+    EXPECT_FALSE(matcher.matches(conn, headers3, info));
+  }
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithCelConfigStringConversion) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+
+  // Set up a condition that uses string conversion: string(response.code) == "200"
+  auto* condition = policy.mutable_condition();
+  auto* call_expr = condition->mutable_call_expr();
+  call_expr->set_function("_==_");
+
+  // Left side: string(response.code)
+  auto* left = call_expr->add_args();
+  auto* string_call = left->mutable_call_expr();
+  string_call->set_function("string");
+  auto* code_select = string_call->add_args();
+  auto* response_select = code_select->mutable_select_expr();
+  response_select->mutable_operand()->mutable_ident_expr()->set_name("response");
+  response_select->set_field("code");
+
+  // Right side: "200"
+  call_expr->add_args()->mutable_const_expr()->set_string_value("200");
+
+  // Enable string conversion in CEL config.
+  auto* cel_config = policy.mutable_cel_config();
+  cel_config->set_enable_string_conversion(true);
+
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, nullptr);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Note: The condition checks response.code which is part of the response context,
+  // but in this test context it may not be available, so the condition may evaluate to false.
+  // This test primarily verifies that the PolicyMatcher can be created with cel_config.
+  EXPECT_FALSE(matcher.matches(conn, headers, info));
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithCelConfigStringConcat) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+
+  // Set up a condition that uses string concatenation: request.headers[":path"] + "/suffix" ==
+  // "/test/suffix"
+  auto* condition = policy.mutable_condition();
+  auto* call_expr = condition->mutable_call_expr();
+  call_expr->set_function("_==_");
+
+  // Left side: request.headers[":path"] + "/suffix"
+  auto* left = call_expr->add_args();
+  auto* concat_call = left->mutable_call_expr();
+  concat_call->set_function("_+_");
+
+  // First operand: request.headers[":path"]
+  auto* header_access = concat_call->add_args();
+  auto* header_call = header_access->mutable_call_expr();
+  header_call->set_function("_[_]");
+  auto* headers_select = header_call->add_args();
+  auto* request_ident = headers_select->mutable_select_expr();
+  request_ident->mutable_operand()->mutable_ident_expr()->set_name("request");
+  request_ident->set_field("headers");
+  header_call->add_args()->mutable_const_expr()->set_string_value(":path");
+
+  // Second operand: "/suffix"
+  concat_call->add_args()->mutable_const_expr()->set_string_value("/suffix");
+
+  // Right side: "/test/suffix"
+  call_expr->add_args()->mutable_const_expr()->set_string_value("/test/suffix");
+
+  // Enable string concatenation in CEL config.
+  auto* cel_config = policy.mutable_cel_config();
+  cel_config->set_enable_string_concat(true);
+
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, nullptr);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/test"}};
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // The matcher should match because "/test" + "/suffix" == "/test/suffix".
+  EXPECT_TRUE(matcher.matches(conn, headers, info));
+
+  // Test with non-matching path.
+  Envoy::Http::TestRequestHeaderMapImpl headers2{{":path", "/other"}};
+  EXPECT_FALSE(matcher.matches(conn, headers2, info));
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithoutCelConfig) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+
+  // Set up a simple condition: request.headers[":method"] == "GET"
+  auto* condition = policy.mutable_condition();
+  auto* call_expr = condition->mutable_call_expr();
+  call_expr->set_function("_==_");
+
+  // Left side: request.headers[":method"]
+  auto* left = call_expr->add_args();
+  auto* header_call = left->mutable_call_expr();
+  header_call->set_function("_[_]");
+  auto* headers_select = header_call->add_args();
+  auto* request_ident = headers_select->mutable_select_expr();
+  request_ident->mutable_operand()->mutable_ident_expr()->set_name("request");
+  request_ident->set_field("headers");
+  header_call->add_args()->mutable_const_expr()->set_string_value(":method");
+
+  // Right side: "GET"
+  call_expr->add_args()->mutable_const_expr()->set_string_value("GET");
+
+  // No cel_config specified - create arena builder for backward compatibility.
+  Protobuf::Arena constant_arena;
+  auto builder_ptr = Extensions::Filters::Common::Expr::createBuilder({}, &constant_arena);
+  auto arena_builder = std::make_shared<Extensions::Filters::Common::Expr::BuilderInstance>(
+      std::move(builder_ptr), nullptr);
+
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, arena_builder);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}};
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // The matcher should match.
+  EXPECT_TRUE(matcher.matches(conn, headers, info));
+
+  // Test with non-matching method.
+  Envoy::Http::TestRequestHeaderMapImpl headers2{{":method", "POST"}};
+  EXPECT_FALSE(matcher.matches(conn, headers2, info));
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithEmptyCelConfig) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+
+  // Set up a simple condition.
+  auto* condition = policy.mutable_condition();
+  auto* call_expr = condition->mutable_call_expr();
+  call_expr->set_function("_==_");
+
+  // Left side: request.headers[":method"]
+  auto* left = call_expr->add_args();
+  auto* header_call = left->mutable_call_expr();
+  header_call->set_function("_[_]");
+  auto* headers_select = header_call->add_args();
+  auto* request_ident = headers_select->mutable_select_expr();
+  request_ident->mutable_operand()->mutable_ident_expr()->set_name("request");
+  request_ident->set_field("headers");
+  header_call->add_args()->mutable_const_expr()->set_string_value(":method");
+
+  // Right side: "GET"
+  call_expr->add_args()->mutable_const_expr()->set_string_value("GET");
+
+  // Set an empty cel_config (all features disabled).
+  policy.mutable_cel_config();
+
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, nullptr);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}};
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // The matcher should still work with basic expressions.
+  EXPECT_TRUE(matcher.matches(conn, headers, info));
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithAllCelFeaturesEnabled) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+
+  // Set up a complex condition using multiple string features.
+  // string(request.headers[":status"]).replace("20", "30") + "_suffix" == "300_suffix"
+  auto* condition = policy.mutable_condition();
+  auto* call_expr = condition->mutable_call_expr();
+  call_expr->set_function("_==_");
+
+  // Left side: string concatenation of replace result and suffix
+  auto* left = call_expr->add_args();
+  auto* concat_call = left->mutable_call_expr();
+  concat_call->set_function("_+_");
+
+  // First operand: string(200).replace("20", "30")
+  auto* replace_expr = concat_call->add_args();
+  auto* replace_call = replace_expr->mutable_call_expr();
+  replace_call->set_function("replace");
+
+  // Target: string(200) - simulating a numeric status code
+  auto* string_expr = replace_call->mutable_target();
+  auto* string_call = string_expr->mutable_call_expr();
+  string_call->set_function("string");
+  string_call->add_args()->mutable_const_expr()->set_int64_value(200);
+
+  // Replace arguments
+  replace_call->add_args()->mutable_const_expr()->set_string_value("20");
+  replace_call->add_args()->mutable_const_expr()->set_string_value("30");
+
+  // Second operand: "_suffix"
+  concat_call->add_args()->mutable_const_expr()->set_string_value("_suffix");
+
+  // Right side: "300_suffix"
+  call_expr->add_args()->mutable_const_expr()->set_string_value("300_suffix");
+
+  // Enable all string features in CEL config.
+  auto* cel_config = policy.mutable_cel_config();
+  cel_config->set_enable_string_conversion(true);
+  cel_config->set_enable_string_concat(true);
+  cel_config->set_enable_string_functions(true);
+
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, nullptr);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // The matcher should match because string(200).replace("20", "30") + "_suffix" == "300_suffix".
+  EXPECT_TRUE(matcher.matches(conn, headers, info));
+}
+
+TEST(PermissionMatcher, AndRulesCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Permission permission;
+  auto* and_rules = permission.mutable_and_rules();
+  and_rules->add_rules()->set_any(true);
+  and_rules->add_rules()->set_any(true);
+
+  auto matcher =
+      Matcher::create(permission, ProtobufMessage::getStrictValidationVisitor(), factory_context);
+  EXPECT_NE(matcher, nullptr);
+  checkMatcher(*matcher, true);
+}
+
+TEST(PermissionMatcher, NotRuleCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Permission permission;
+  permission.mutable_not_rule()->set_any(true);
+
+  auto matcher =
+      Matcher::create(permission, ProtobufMessage::getStrictValidationVisitor(), factory_context);
+  EXPECT_NE(matcher, nullptr);
+  checkMatcher(*matcher, false);
+}
+
+TEST(PrincipalMatcher, AndIdsCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal principal;
+  auto* and_ids = principal.mutable_and_ids();
+  and_ids->add_ids()->set_any(true);
+  and_ids->add_ids()->set_any(true);
+
+  auto matcher = Matcher::create(principal, factory_context);
+  EXPECT_NE(matcher, nullptr);
+  checkMatcher(*matcher, true);
+}
+
+TEST(PrincipalMatcher, MetadataCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal principal;
+  auto* metadata_matcher = principal.mutable_metadata();
+  metadata_matcher->set_filter("test.filter");
+  metadata_matcher->add_path()->set_key("test_key");
+  metadata_matcher->mutable_value()->mutable_string_match()->set_exact("test_value");
+
+  auto matcher = Matcher::create(principal, factory_context);
+  EXPECT_NE(matcher, nullptr);
+
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  auto label = MessageUtil::keyValueStruct("test_key", "test_value");
+  envoy::config::core::v3::Metadata metadata;
+  metadata.mutable_filter_metadata()->insert(
+      Protobuf::MapPair<std::string, Protobuf::Struct>("test.filter", label));
+  EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  checkMatcher(*matcher, true, Envoy::Network::MockConnection(),
+               Envoy::Http::TestRequestHeaderMapImpl(), info);
 }
 
 } // namespace
