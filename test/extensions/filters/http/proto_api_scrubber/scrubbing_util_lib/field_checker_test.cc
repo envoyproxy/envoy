@@ -324,17 +324,11 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
     FieldChecker request_field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
                                        method_name, &mock_filter_config);
 
-    EXPECT_LOG_CONTAINS(
-        "error",
-        "Matching failed for the field `user`. This field would be preserved.", // Expected
-                                                                                // Substring
-        {
-          // Code that triggers the error log
-          FieldCheckResults result = request_field_checker.CheckField({}, &field);
-
-          // Assert the expected return value from the function
-          EXPECT_EQ(result, FieldCheckResults::kInclude);
-        });
+    EXPECT_LOG_CONTAINS("error",
+                        "Matching failed for the field `user`. This field would be preserved.", {
+                          FieldCheckResults result = request_field_checker.CheckField({}, &field);
+                          EXPECT_EQ(result, FieldCheckResults::kInclude);
+                        });
   }
 
   {
@@ -344,17 +338,11 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
     FieldChecker response_field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info,
                                         method_name, &mock_filter_config);
 
-    EXPECT_LOG_CONTAINS(
-        "error",
-        "Matching failed for the field `user`. This field would be preserved.", // Expected
-                                                                                // Substring
-        {
-          // Code that triggers the error log
-          FieldCheckResults result = response_field_checker.CheckField({}, &field);
-
-          // Assert the expected return value from the function
-          EXPECT_EQ(result, FieldCheckResults::kInclude);
-        });
+    EXPECT_LOG_CONTAINS("error",
+                        "Matching failed for the field `user`. This field would be preserved.", {
+                          FieldCheckResults result = response_field_checker.CheckField({}, &field);
+                          EXPECT_EQ(result, FieldCheckResults::kInclude);
+                        });
   }
 }
 
