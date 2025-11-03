@@ -28,19 +28,18 @@ private:
 
   class DynamicTag {
   public:
-    DynamicTag(absl::string_view tag_name,
-               const envoy::extensions::access_loggers::stats::v3::Config::TagFormatString&
-                   tag_format_string,
+    DynamicTag(const envoy::extensions::access_loggers::stats::v3::Config::Tag& tag_cfg,
                Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands);
+    DynamicTag(DynamicTag&&) = default;
 
     bool validValue(absl::string_view value, const StreamInfo::StreamInfo& stream_info) const;
 
-    Stats::StatName name_;
-    Formatter::FormatterProviderPtr value_provider_;
-    std::vector<Matchers::StringMatcherPtr> value_matchers_;
+    const Stats::StatName name_;
+    Formatter::FormatterPtr value_formatter_;
   };
 
-  struct NameAndTags {
+  class NameAndTags {
+  public:
     NameAndTags(const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
                 Stats::StatNamePool& pool,
                 const std::vector<Formatter::CommandParserPtr>& commands);
