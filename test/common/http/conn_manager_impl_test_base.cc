@@ -145,6 +145,9 @@ public:
   bool addProxyProtocolConnectionState() const override {
     return parent_.addProxyProtocolConnectionState();
   }
+  bool addProxyProtocolRequestState() const override {
+    return parent_.addProxyProtocolRequestState();
+  }
 
 private:
   ConnectionManagerConfig& parent_;

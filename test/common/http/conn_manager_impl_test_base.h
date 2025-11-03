@@ -216,6 +216,9 @@ public:
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;
   }
+  bool addProxyProtocolRequestState() const override {
+    return add_proxy_protocol_request_state_;
+  }
 
   // Simple helper to wrapper filter to the factory function.
   FilterFactoryCb createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr filter) {
@@ -324,6 +327,7 @@ public:
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_;
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
   bool add_proxy_protocol_connection_state_ = true;
+  bool add_proxy_protocol_request_state_ = false;
 
   const LocalReply::LocalReplyPtr local_reply_;
 
