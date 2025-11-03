@@ -25,7 +25,7 @@ envoy_cc_library(
         ":matching_utils_lib",
         ":mutation_utils_lib",
         ":on_processing_response_interface",
-        ":processing_effect",
+        ":processing_effect_lib",
         ":processing_request_modifier_interface",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
