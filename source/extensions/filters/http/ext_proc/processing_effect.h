@@ -16,7 +16,7 @@ public:
     // FULL_DUPLEX_STREAMED.
     None,
     // The processor response sent a mutation that successfully modified the body or headers.
-    // This is the defualt value for body requests/responses using
+    // This is the default value for body requests/responses using
     // FULL_DUPLEX_STREAMED processing mode.
     MutationApplied,
     // The processor response sent a mutation that was attempted to modify the headers or trailers
