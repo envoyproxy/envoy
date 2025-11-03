@@ -100,6 +100,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
                                                     : absl::nullopt),
       emit_filter_state_stats_(config.emit_filter_state_stats()),
+      enforce_response_header_limits_(config.enforce_response_header_limits()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -487,7 +488,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter added header(s) to the encoded response:", *encoder_callbacks_);
     for (const auto& [key, value] : response_headers_to_add_) {
-      if (headers.size() >= headers.maxHeadersCount()) {
+      if (config_->enforceResponseHeaderLimits() && headers.size() >= headers.maxHeadersCount()) {
         omitted_response_headers = true;
         break;
       }
@@ -500,7 +501,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter set header(s) to the encoded response:", *encoder_callbacks_);
     for (const auto& [key, value] : response_headers_to_set_) {
-      if (headers.get(key).empty() && headers.size() >= headers.maxHeadersCount()) {
+      if (config_->enforceResponseHeaderLimits() && headers.get(key).empty() &&
+          headers.size() >= headers.maxHeadersCount()) {
         omitted_response_headers = true;
         // Continue because there could be other existing headers that can be set without increasing
         // the number of headers.
@@ -515,7 +517,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     for (const auto& [key, value] : response_headers_to_add_if_absent_) {
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, key.get(), value);
       if (auto header_entry = headers.get(key); header_entry.empty()) {
-        if (headers.size() >= headers.maxHeadersCount()) {
+        if (config_->enforceResponseHeaderLimits() && headers.size() >= headers.maxHeadersCount()) {
           omitted_response_headers = true;
           break;
         }
@@ -978,7 +980,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           // Then set all of the requested headers, allowing the same header to be set multiple
           // times, e.g. `Set-Cookie`.
           for (const auto& [key, value] : headers) {
-            if (response_headers.size() >= response_headers.maxHeadersCount()) {
+            if (config_->enforceResponseHeaderLimits() &&
+                response_headers.size() >= response_headers.maxHeadersCount()) {
               stats_.omitted_response_headers_.inc();
               ENVOY_LOG_EVERY_POW_2(
                   warn,
