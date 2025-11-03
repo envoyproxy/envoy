@@ -9,6 +9,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
 
@@ -19,9 +20,29 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
+
+// Mock class for `ProtoApiScrubberFilterConfig` class which allows that the match tree can be
+// mocked so that matching scenarios can be tested.
+class MockProtoApiScrubberFilterConfig : public ProtoApiScrubberFilterConfig {
+public:
+  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getRequestFieldMatcher,
+              (const std::string& method_name, const std::string& field_mask), (const, override));
+
+  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
+            (const std::string& method_name, const std::string& field_mask), (const, override));
+};
+
 namespace {
 
 inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
+
+// Mock class for `Matcher::MatchTree` to mimick different responses from the `match()` method.
+class MockMatchTree : public Matcher::MatchTree<HttpMatchingData> {
+public:
+  MOCK_METHOD(Matcher::MatchResult, match,
+              (const HttpMatchingData& matching_data, Matcher::SkippedMatchCb skipped_match_cb),
+              (override));
+};
 
 class FieldCheckerTest : public ::testing::Test {
 protected:
@@ -280,51 +301,59 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
 };
 
-class MockProtoApiScrubberFilterConfig : public ProtoApiScrubberFilterConfig {
-public:
-  MockProtoApiScrubberFilterConfig() : ProtoApiScrubberFilterConfig() {}
-
-  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getRequestFieldMatcher,
-              (const std::string& method_name, const std::string& field_mask), (const));
-
-  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
-              (const std::string& method_name, const std::string& field_mask), (const));
-};
-
+// This tests the scenarios where the underlying match tree returns incomplete matches for request
+// and response field checkers.
 TEST_F(FieldCheckerTest, IncompleteMatch) {
-  // --- Arrange ---
   const std::string method_name = "example.v1.Service/GetFoo";
-  const std::string field_name = "user_data";
+  const std::string field_name = "user";
 
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config_;
-  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  Http::Matching::HttpMatchingDataImpl http_matching_data_impl(mock_stream_info);
-  std::shared_ptr<NiceMock<Matcher::MatchTree<Http::Matching::HttpMatchingDataImpl>>> mock_match_tree_;
-  //std::shared_ptr<Matcher::MatchTree<HttpMatchingData>>
   Protobuf::Field field;
-  field.set_name("user");
+  field.set_name(field_name);
 
-  // 2. Configure the filter config to return our mock match tree
-  EXPECT_CALL(mock_filter_config_, getRequestFieldMatcher(method_name, field_name))
-      .WillOnce(Return(mock_match_tree_));
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
 
-  // 3. (THE KEY) Configure the mock match tree to return an incomplete result
-  Matcher::MatchResult match_result;
+  EXPECT_CALL(*mock_match_tree, match(testing::_, testing::Eq(nullptr)))
+      .WillRepeatedly(testing::Return(Matcher::MatchResult::insufficientData()));
 
-  EXPECT_CALL(*mock_match_tree_, match(testing::Ref(http_matching_data_impl)))
-      .WillOnce(Return(Matcher::MatchResult::insufficientData()));
+  {
+    EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name))
+    .WillOnce(testing::Return(mock_match_tree));
 
-  // 4. Create the class under test
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                             method_name, &mock_filter_config_);
+    FieldChecker request_field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
+                               method_name, &mock_filter_config);
 
-  // --- Act ---
-  FieldCheckResults result = field_checker.CheckField({}, &field);
+    EXPECT_LOG_CONTAINS(
+      "error",
+      "Matching failed for the field `user`. This field would be preserved.", // Expected Substring
+      {
+          // Code that triggers the error log
+          FieldCheckResults result = request_field_checker.CheckField({}, &field);
 
-  // --- Assert ---
-  // The incomplete match should result in an absl::InternalError,
-  // which CheckField catches and converts to kInclude.
-  EXPECT_EQ(result, FieldCheckResults::kInclude);
+          // Assert the expected return value from the function
+          EXPECT_EQ(result, FieldCheckResults::kInclude);
+      });
+  }
+
+  {
+    EXPECT_CALL(mock_filter_config, getResponseFieldMatcher(method_name, field_name))
+    .WillOnce(testing::Return(mock_match_tree));
+
+    FieldChecker response_field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info,
+                               method_name, &mock_filter_config);
+
+    EXPECT_LOG_CONTAINS(
+      "error",
+      "Matching failed for the field `user`. This field would be preserved.", // Expected Substring
+      {
+          // Code that triggers the error log
+          FieldCheckResults result = response_field_checker.CheckField({}, &field);
+
+          // Assert the expected return value from the function
+          EXPECT_EQ(result, FieldCheckResults::kInclude);
+      });
+  }
 }
 
 // This tests CheckField() method for request fields.

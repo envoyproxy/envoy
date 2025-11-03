@@ -27,6 +27,8 @@ using StringPairToMatchTreeMap =
     absl::flat_hash_map<std::pair<std::string, std::string>, MatchTreeHttpMatchingDataSharedPtr>;
 } // namespace
 
+class MockProtoApiScrubberFilterConfig;
+
 // The config for Proto API Scrubber filter. As a thread-safe class, it should be constructed only
 // once and shared among filters for better performance.
 class ProtoApiScrubberFilterConfig : public Logger::Loggable<Logger::Id::filter> {
@@ -36,19 +38,20 @@ public:
   create(const ProtoApiScrubberConfig& proto_config,
          Server::Configuration::FactoryContext& context);
 
+  virtual ~ProtoApiScrubberFilterConfig() = default;
+
   // Returns the match tree for a request payload field mask.
-  MatchTreeHttpMatchingDataSharedPtr getRequestFieldMatcher(const std::string& method_name,
+  virtual MatchTreeHttpMatchingDataSharedPtr getRequestFieldMatcher(const std::string& method_name,
                                                             const std::string& field_mask) const;
 
   // Returns the match tree for a response payload field mask.
-  MatchTreeHttpMatchingDataSharedPtr getResponseFieldMatcher(const std::string& method_name,
+  virtual MatchTreeHttpMatchingDataSharedPtr getResponseFieldMatcher(const std::string& method_name,
                                                              const std::string& field_mask) const;
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
-  friend class MockProtoApiScrubberFilterConfig;
-
 private:
+  friend class MockProtoApiScrubberFilterConfig;
   // Private constructor to make sure that this class is used in a factory fashion using the
   // public `create` method.
   ProtoApiScrubberFilterConfig() = default;
