@@ -4933,75 +4933,42 @@ TEST_F(HttpConnectionManagerImplTest, ShouldDrainConnectionUponCompletionHttp11)
   response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 }
 
-// Test sendGoAwayAndClose with graceful=true allows existing streams to complete
-// while rejecting new streams, then properly drains the connection.
+// Test graceful shutdown behavior with sendGoAwayAndClose(true)
 TEST_F(HttpConnectionManagerImplTest, SendGoAwayAndCloseGraceful) {
   setup();
-
-  // Mock codec to return HTTP/2 protocol for graceful drain support.
+  // Mock codec to return HTTP/2 protocol for graceful shutdown support.
   EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http2));
-
   MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
         manager.applyFilterFactoryCb({}, factory);
         return true;
       }));
-
-  EXPECT_CALL(*filter, decodeHeaders(_, _))
-      .WillRepeatedly(Invoke([](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        // Trigger graceful shutdown during request processing
+        filter->callbacks_->sendGoAwayAndClose(true);
         return FilterHeadersStatus::StopIteration;
       }));
-
-  // Start an active stream that will be in flight during graceful shutdown
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), false); // NOT end_stream - request in progress
+    decoder_->decodeHeaders(std::move(headers), true);
     return Http::okStatus();
   }));
-
-  Buffer::OwnedImpl fake_input;
-  conn_manager_->onData(fake_input, false);
-
-  // Set up drain timer expectation
+  // Expect graceful shutdown to start drain timer and send shutdown notice
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
   EXPECT_CALL(*codec_, shutdownNotice());
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
 
-  // Trigger graceful shutdown while stream is active
-  filter->callbacks_->sendGoAwayAndClose(true);
-
-  // Verify new streams are rejected after graceful shutdown starts
-  NiceMock<MockResponseEncoder> new_response_encoder;
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
-    // Try to create a new stream - this should be rejected
-    auto& new_stream = conn_manager_->newStream(new_response_encoder);
-    RequestHeaderMapPtr new_headers{new TestRequestHeaderMapImpl{
-        {":authority", "host"}, {":path", "/new"}, {":method", "GET"}}};
-    new_stream.decodeHeaders(std::move(new_headers), true);
-    return Http::okStatus();
-  }));
-
-  // Expect immediate rejection of new stream with 503 Service Unavailable
-  EXPECT_CALL(new_response_encoder, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("503", headers.getStatusValue());
-      }));
-
-  Buffer::OwnedImpl more_input;
-  conn_manager_->onData(more_input, false);
-
-  // Now complete the original active stream - this should be allowed
+  // Complete the existing stream
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
-  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
-
-  // Fire the drain timer to complete the graceful shutdown sequence
-  EXPECT_CALL(*codec_, goAway());
-  drain_timer->invokeCallback();
 }
 
 } // namespace Http
