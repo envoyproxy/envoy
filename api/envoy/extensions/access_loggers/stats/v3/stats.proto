@@ -57,7 +57,6 @@ message Config {
     string value_format = 3 [(validate.rules).string = {min_len: 1 prefix: "%" suffix: "%"}];
   }
 
-  // Increase the counter by the amount of `value`.
   message Counter {
     Stat stat = 1 [(validate.rules).message = {required: true}];
 
