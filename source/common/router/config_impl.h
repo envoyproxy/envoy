@@ -405,8 +405,14 @@ using HeaderMutationsPtr = std::unique_ptr<Http::HeaderMutations>;
 class ShadowPolicyImpl : public ShadowPolicy {
 public:
   using RequestMirrorPolicy = envoy::config::route::v3::RouteAction::RequestMirrorPolicy;
+  using ClusterRequestMirrorPolicy = envoy::config::cluster::v3::Cluster::RequestMirrorPolicy;
+
   static absl::StatusOr<std::shared_ptr<ShadowPolicyImpl>>
   create(const RequestMirrorPolicy& config,
+         Server::Configuration::CommonFactoryContext& factory_context);
+
+  static absl::StatusOr<std::shared_ptr<ShadowPolicyImpl>>
+  create(const ClusterRequestMirrorPolicy& config,
          Server::Configuration::CommonFactoryContext& factory_context);
 
   // Router::ShadowPolicy
@@ -423,6 +429,10 @@ public:
 
 private:
   explicit ShadowPolicyImpl(const RequestMirrorPolicy& config,
+                            Server::Configuration::CommonFactoryContext& factory_context,
+                            absl::Status& creation_status);
+
+  explicit ShadowPolicyImpl(const ClusterRequestMirrorPolicy& config,
                             Server::Configuration::CommonFactoryContext& factory_context,
                             absl::Status& creation_status);
 

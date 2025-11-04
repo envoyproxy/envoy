@@ -6218,6 +6218,223 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
   EXPECT_EQ(zone_b, hosts_per_locality.get()[1][1]->locality());
 }
 
+// Test cluster-level shadow policy configuration.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithCluster) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    request_mirror_policies:
+      - cluster: shadow_cluster
+        runtime_fraction:
+          default_value:
+            numerator: 50
+            denominator: HUNDRED
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto& shadow_policies = cluster->info()->shadowPolicies();
+  EXPECT_EQ(1, shadow_policies.size());
+
+  const auto& policy = shadow_policies[0];
+  EXPECT_EQ("shadow_cluster", policy->cluster());
+  EXPECT_EQ("", policy->clusterHeader().get());
+  EXPECT_FALSE(policy->traceSampled().has_value());
+}
+
+// Test cluster-level shadow policy with cluster_header.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithClusterHeader) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    request_mirror_policies:
+      - cluster_header: x-shadow-cluster
+        trace_sampled: true
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto& shadow_policies = cluster->info()->shadowPolicies();
+  EXPECT_EQ(1, shadow_policies.size());
+
+  const auto& policy = shadow_policies[0];
+  EXPECT_EQ("", policy->cluster());
+  EXPECT_EQ("x-shadow-cluster", policy->clusterHeader().get());
+  EXPECT_TRUE(policy->traceSampled().has_value());
+  EXPECT_TRUE(policy->traceSampled().value());
+}
+
+// Test cluster-level shadow policy with multiple policies.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterMultipleShadowPolicies) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    request_mirror_policies:
+      - cluster: shadow_cluster_1
+        runtime_fraction:
+          default_value:
+            numerator: 10
+            denominator: HUNDRED
+      - cluster: shadow_cluster_2
+        trace_sampled: false
+      - cluster_header: x-shadow-header
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto& shadow_policies = cluster->info()->shadowPolicies();
+  EXPECT_EQ(3, shadow_policies.size());
+
+  EXPECT_EQ("shadow_cluster_1", shadow_policies[0]->cluster());
+  EXPECT_EQ("shadow_cluster_2", shadow_policies[1]->cluster());
+  EXPECT_EQ("", shadow_policies[2]->cluster());
+  EXPECT_EQ("x-shadow-header", shadow_policies[2]->clusterHeader().get());
+}
+
+// Test cluster-level shadow policy with header mutations.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithHeaderMutations) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    request_mirror_policies:
+      - cluster: shadow_cluster
+        request_headers_mutations:
+          - append:
+              header:
+                key: x-shadow-header
+                value: shadow-value
+              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+          - remove: x-remove-me
+        host_rewrite_literal: shadow-host.example.com
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto& shadow_policies = cluster->info()->shadowPolicies();
+  EXPECT_EQ(1, shadow_policies.size());
+
+  const auto& policy = shadow_policies[0];
+  EXPECT_EQ("shadow_cluster", policy->cluster());
+  // Verify header evaluator was created (checking through headerEvaluator is not straightforward
+  // as it doesn't expose mutations, but successful creation implies mutations are there).
+}
+
+// Test cluster with no shadow policies.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterNoShadowPolicies) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto& shadow_policies = cluster->info()->shadowPolicies();
+  EXPECT_EQ(0, shadow_policies.size());
+}
+
+// Test cluster-level shadow policy with disable_shadow_host_suffix_append.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyDisableShadowHostSuffix) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    request_mirror_policies:
+      - cluster: shadow_cluster
+        disable_shadow_host_suffix_append: true
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto& shadow_policies = cluster->info()->shadowPolicies();
+  EXPECT_EQ(1, shadow_policies.size());
+
+  const auto& policy = shadow_policies[0];
+  EXPECT_EQ("shadow_cluster", policy->cluster());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

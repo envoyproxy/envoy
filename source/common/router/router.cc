@@ -803,11 +803,23 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   // runtime keys. Also the method CONNECT doesn't support shadowing.
   auto method = headers.getMethodValue();
   if (method != Http::Headers::get().MethodValues.Connect) {
+    // Evaluate route-level shadow policies.
     for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
       const auto& policy_ref = *shadow_policy;
       if (FilterUtility::shouldShadow(policy_ref, config_->runtime_, callbacks_->streamId())) {
         active_shadow_policies_.push_back(std::cref(policy_ref));
         shadow_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_);
+      }
+    }
+
+    // Evaluate cluster-level shadow policies.
+    for (const auto& shadow_policy : cluster_->shadowPolicies()) {
+      const auto& policy_ref = *shadow_policy;
+      if (FilterUtility::shouldShadow(policy_ref, config_->runtime_, callbacks_->streamId())) {
+        active_shadow_policies_.push_back(std::cref(policy_ref));
+        if (!shadow_headers_) {
+          shadow_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_);
+        }
       }
     }
   }

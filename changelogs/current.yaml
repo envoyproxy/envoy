@@ -197,5 +197,11 @@ new_features:
   change: |
     Added runtime guard ``envoy.reloadable_features.report_load_when_rq_active_is_non_zero``.
     When enabled, LRS continues to send locality_stats reoprt to config server when there is no request_issued in the poll cycle.
+- area: router
+  change: |
+    Added :ref:`request_mirror_policies <envoy_v3_api_field_config.cluster.v3.Cluster.request_mirror_policies>`
+    to :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`, enabling request mirroring to be configured
+    at the cluster level. When configured, all requests routed to the cluster will be mirrored according
+    to the specified policies.
 
 deprecated:
