@@ -15,6 +15,7 @@
 #include "source/common/http/http1/settings.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/config_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -235,9 +236,22 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       header_validator_factory_(std::move(header_validator_factory)),
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
-      use_alpn_(options.has_auto_config()) {
+      use_alpn_(options.has_auto_config()), shadow_policies_([&options, &server_context]() {
+        std::vector<Router::ShadowPolicyPtr> policies;
+        policies.reserve(options.request_mirror_policies().size());
+        for (const auto& mirror_policy_config : options.request_mirror_policies()) {
+          auto policy_or_error =
+              Router::ShadowPolicyImpl::create(mirror_policy_config, server_context);
+          if (!policy_or_error.ok()) {
+            throwEnvoyExceptionOrPanic(fmt::format("Failed to create shadow policy: {}",
+                                                   policy_or_error.status().message()));
+          }
+          policies.push_back(std::move(policy_or_error.value()));
+        }
+        return policies;
+      }()) {
   ASSERT(Http2::Utility::initializeAndValidateOptions(http2_options_).status().ok());
-  // Build outlier detection config
+  // Build outlier detection config.
 
   if (options.has_outlier_detection()) {
     buildMatcher(options.outlier_detection().error_matcher(), outlier_detection_http_error_matcher_,

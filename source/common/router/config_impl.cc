@@ -343,16 +343,6 @@ ShadowPolicyImpl::create(const RequestMirrorPolicy& config,
   return ret;
 }
 
-absl::StatusOr<std::shared_ptr<ShadowPolicyImpl>>
-ShadowPolicyImpl::create(const ClusterRequestMirrorPolicy& config,
-                         Server::Configuration::CommonFactoryContext& factory_context) {
-  absl::Status creation_status = absl::OkStatus();
-  auto ret = std::shared_ptr<ShadowPolicyImpl>(
-      new ShadowPolicyImpl(config, factory_context, creation_status));
-  RETURN_IF_NOT_OK(creation_status);
-  return ret;
-}
-
 ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
                                    Server::Configuration::CommonFactoryContext& factory_context,
                                    absl::Status& creation_status)
@@ -360,50 +350,6 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
       disable_shadow_host_suffix_append_(config.disable_shadow_host_suffix_append()),
       host_rewrite_literal_(config.host_rewrite_literal()) {
   SET_AND_RETURN_IF_NOT_OK(validateMirrorClusterSpecifier(config), creation_status);
-
-  if (config.has_runtime_fraction()) {
-    runtime_key_ = config.runtime_fraction().runtime_key();
-    default_value_ = config.runtime_fraction().default_value();
-  } else {
-    // If there is no runtime fraction specified, the default is 100% sampled. By leaving
-    // runtime_key_ empty and forcing the default to 100% this will yield the expected behavior.
-    default_value_.set_numerator(100);
-    default_value_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
-  }
-  // If trace sampling is not explicitly configured in shadow_policy, we pass null optional to
-  // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
-  // disabled.
-  trace_sampled_ = config.has_trace_sampled() ? absl::optional<bool>(config.trace_sampled().value())
-                                              : absl::nullopt;
-
-  // Create HeaderMutations directly from HeaderMutation rules
-  if (!config.request_headers_mutations().empty()) {
-    auto mutations_or_error =
-        Http::HeaderMutations::create(config.request_headers_mutations(), factory_context);
-    SET_AND_RETURN_IF_NOT_OK(mutations_or_error.status(), creation_status);
-    request_headers_mutations_ = std::move(mutations_or_error.value());
-  }
-}
-
-ShadowPolicyImpl::ShadowPolicyImpl(const ClusterRequestMirrorPolicy& config,
-                                   Server::Configuration::CommonFactoryContext& factory_context,
-                                   absl::Status& creation_status)
-    : cluster_(config.cluster()), cluster_header_(config.cluster_header()),
-      disable_shadow_host_suffix_append_(config.disable_shadow_host_suffix_append()),
-      host_rewrite_literal_(config.host_rewrite_literal()) {
-  // Validate cluster specifier - need to handle the cluster version manually since
-  // validateMirrorClusterSpecifier expects the route version.
-  if (!config.cluster().empty() && !config.cluster_header().empty()) {
-    creation_status =
-        absl::InvalidArgumentError(fmt::format("Only one of cluster '{}' or cluster_header '{}' "
-                                               "in request mirror policy can be specified",
-                                               config.cluster(), config.cluster_header()));
-    return;
-  } else if (config.cluster().empty() && config.cluster_header().empty()) {
-    creation_status = absl::InvalidArgumentError(
-        "Exactly one of cluster or cluster_header in request mirror policy need to be specified");
-    return;
-  }
 
   if (config.has_runtime_fraction()) {
     runtime_key_ = config.runtime_fraction().runtime_key();

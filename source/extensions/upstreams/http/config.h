@@ -9,10 +9,12 @@
 
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_validator.h"
+#include "envoy/router/router.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 
@@ -63,6 +65,7 @@ public:
   const bool use_alpn_{};
 
   std::vector<Extensions::Common::Matcher::MatcherPtr> outlier_detection_http_error_matcher_;
+  const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
 
 private:
   ProtocolOptionsConfigImpl(

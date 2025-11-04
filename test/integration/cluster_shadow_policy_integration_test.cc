@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/test_runtime.h"
@@ -31,10 +32,15 @@ public:
       cluster_1->set_name("cluster_1");
       ConfigHelper::setHttp2(*cluster_1);
 
-      // Configure cluster-level mirror policy on cluster_0.
+      // Configure cluster-level mirror policy on cluster_0 through HTTP protocol options.
       auto* main_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      auto* mirror_policy = main_cluster->add_request_mirror_policies();
+      auto& options_any = (*main_cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+      envoy::extensions::upstreams::http::v3::HttpProtocolOptions options;
+      options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+      auto* mirror_policy = options.add_request_mirror_policies();
       mirror_policy->set_cluster("cluster_1");
+      options_any.PackFrom(options);
     });
   }
 
@@ -99,12 +105,17 @@ TEST_P(ClusterShadowPolicyIntegrationTest, ClusterMirroringWithRuntimeFraction) 
     ConfigHelper::setHttp2(*cluster_1);
 
     auto* main_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    auto* mirror_policy = main_cluster->add_request_mirror_policies();
+    auto& options_any = (*main_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+    envoy::extensions::upstreams::http::v3::HttpProtocolOptions options;
+    options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    auto* mirror_policy = options.add_request_mirror_policies();
     mirror_policy->set_cluster("cluster_1");
     // Set runtime fraction to 50%.
     mirror_policy->mutable_runtime_fraction()->mutable_default_value()->set_numerator(50);
     mirror_policy->mutable_runtime_fraction()->mutable_default_value()->set_denominator(
         envoy::type::v3::FractionalPercent::HUNDRED);
+    options_any.PackFrom(options);
   });
 
   initialize();
@@ -134,7 +145,11 @@ TEST_P(ClusterShadowPolicyIntegrationTest, ClusterMirroringWithHeaderMutations) 
     ConfigHelper::setHttp2(*cluster_1);
 
     auto* main_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    auto* mirror_policy = main_cluster->add_request_mirror_policies();
+    auto& options_any = (*main_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+    envoy::extensions::upstreams::http::v3::HttpProtocolOptions options;
+    options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    auto* mirror_policy = options.add_request_mirror_policies();
     mirror_policy->set_cluster("cluster_1");
 
     // Add a header to shadow requests.
@@ -146,6 +161,7 @@ TEST_P(ClusterShadowPolicyIntegrationTest, ClusterMirroringWithHeaderMutations) 
     // Remove a header from shadow requests.
     auto* mutation2 = mirror_policy->add_request_headers_mutations();
     mutation2->set_remove("x-remove-me");
+    options_any.PackFrom(options);
   });
 
   initialize();
@@ -220,9 +236,14 @@ TEST_P(ClusterShadowPolicyIntegrationTest, ClusterMirroringDisabledShadowHostSuf
     ConfigHelper::setHttp2(*cluster_1);
 
     auto* main_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    auto* mirror_policy = main_cluster->add_request_mirror_policies();
+    auto& options_any = (*main_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+    envoy::extensions::upstreams::http::v3::HttpProtocolOptions options;
+    options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    auto* mirror_policy = options.add_request_mirror_policies();
     mirror_policy->set_cluster("cluster_1");
     mirror_policy->set_disable_shadow_host_suffix_append(true);
+    options_any.PackFrom(options);
   });
 
   initialize();

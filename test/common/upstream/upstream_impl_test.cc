@@ -6235,12 +6235,17 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithCluster) {
                   socket_address:
                     address: foo.bar.com
                     port_value: 443
-    request_mirror_policies:
-      - cluster: shadow_cluster
-        runtime_fraction:
-          default_value:
-            numerator: 50
-            denominator: HUNDRED
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        request_mirror_policies:
+          - cluster: shadow_cluster
+            runtime_fraction:
+              default_value:
+                numerator: 50
+                denominator: HUNDRED
   )EOF";
 
   auto cluster = makeCluster(yaml);
@@ -6273,9 +6278,14 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithClusterHeader) {
                   socket_address:
                     address: foo.bar.com
                     port_value: 443
-    request_mirror_policies:
-      - cluster_header: x-shadow-cluster
-        trace_sampled: true
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        request_mirror_policies:
+          - cluster_header: x-shadow-cluster
+            trace_sampled: true
   )EOF";
 
   auto cluster = makeCluster(yaml);
@@ -6309,15 +6319,20 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterMultipleShadowPolicies) {
                   socket_address:
                     address: foo.bar.com
                     port_value: 443
-    request_mirror_policies:
-      - cluster: shadow_cluster_1
-        runtime_fraction:
-          default_value:
-            numerator: 10
-            denominator: HUNDRED
-      - cluster: shadow_cluster_2
-        trace_sampled: false
-      - cluster_header: x-shadow-header
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        request_mirror_policies:
+          - cluster: shadow_cluster_1
+            runtime_fraction:
+              default_value:
+                numerator: 10
+                denominator: HUNDRED
+          - cluster: shadow_cluster_2
+            trace_sampled: false
+          - cluster_header: x-shadow-header
   )EOF";
 
   auto cluster = makeCluster(yaml);
@@ -6350,16 +6365,21 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithHeaderMutations) 
                   socket_address:
                     address: foo.bar.com
                     port_value: 443
-    request_mirror_policies:
-      - cluster: shadow_cluster
-        request_headers_mutations:
-          - append:
-              header:
-                key: x-shadow-header
-                value: shadow-value
-              append_action: OVERWRITE_IF_EXISTS_OR_ADD
-          - remove: x-remove-me
-        host_rewrite_literal: shadow-host.example.com
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        request_mirror_policies:
+          - cluster: shadow_cluster
+            request_headers_mutations:
+              - append:
+                  header:
+                    key: x-shadow-header
+                    value: shadow-value
+                  append_action: OVERWRITE_IF_EXISTS_OR_ADD
+              - remove: x-remove-me
+            host_rewrite_literal: shadow-host.example.com
   )EOF";
 
   auto cluster = makeCluster(yaml);
@@ -6419,9 +6439,14 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyDisableShadowHostSuff
                   socket_address:
                     address: foo.bar.com
                     port_value: 443
-    request_mirror_policies:
-      - cluster: shadow_cluster
-        disable_shadow_host_suffix_append: true
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        request_mirror_policies:
+          - cluster: shadow_cluster
+            disable_shadow_host_suffix_append: true
   )EOF";
 
   auto cluster = makeCluster(yaml);

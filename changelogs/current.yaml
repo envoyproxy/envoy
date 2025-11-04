@@ -199,9 +199,9 @@ new_features:
     When enabled, LRS continues to send locality_stats reoprt to config server when there is no request_issued in the poll cycle.
 - area: router
   change: |
-    Added :ref:`request_mirror_policies <envoy_v3_api_field_config.cluster.v3.Cluster.request_mirror_policies>`
-    to :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`, enabling request mirroring to be configured
-    at the cluster level. When configured, all requests routed to the cluster will be mirrored according
-    to the specified policies.
+    Added :ref:`request_mirror_policies <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
+    to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`,
+    enabling request mirroring to be configured at the cluster level for HTTP clusters. When configured,
+    all requests routed to the cluster will be mirrored according to the specified policies.
 
 deprecated:

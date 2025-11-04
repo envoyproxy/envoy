@@ -5,7 +5,6 @@ package envoy.config.cluster.v3;
 import "envoy/config/cluster/v3/circuit_breaker.proto";
 import "envoy/config/cluster/v3/filter.proto";
 import "envoy/config/cluster/v3/outlier_detection.proto";
-import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
@@ -46,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 60]
+// [#next-free-field: 59]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -752,72 +751,6 @@ message Cluster {
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
-  // Cluster-level mirroring policy configuration.
-  //
-  // The router is capable of shadowing traffic from one cluster to another. The current
-  // implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
-  // respond before returning the response from the primary cluster. All normal statistics are
-  // collected for the shadow cluster making this feature useful for testing.
-  // [#next-free-field: 8]
-  message RequestMirrorPolicy {
-    // Only one of ``cluster`` and ``cluster_header`` can be specified.
-    // Specifies the cluster that requests will be mirrored to. The cluster must
-    // exist in the cluster manager configuration.
-    string cluster = 1 [(validate.rules).string = {min_len: 1}];
-
-    // Only one of ``cluster`` and ``cluster_header`` can be specified.
-    // Envoy will determine the cluster to route to by reading the value of the
-    // HTTP header named by cluster_header from the request headers. Only the first value in header is used,
-    // and no shadow request will happen if the value is not found in headers. Envoy will not wait for
-    // the shadow cluster to respond before returning the response from the primary cluster.
-    //
-    // .. attention::
-    //
-    //   Internally, Envoy always uses the HTTP/2 ``:authority`` header to represent the HTTP/1
-    //   ``Host`` header. Thus, if attempting to match on ``Host``, match on ``:authority`` instead.
-    //
-    // .. note::
-    //
-    //   If the header appears multiple times only the first value is used.
-    string cluster_header = 2
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
-
-    // If not specified, all requests to the target cluster will be mirrored.
-    //
-    // If specified, this field takes precedence over the ``runtime_key`` field and requests must also
-    // fall under the percentage of matches indicated by this field.
-    //
-    // For some fraction N/D, a random number in the range [0,D) is selected. If the
-    // number is <= the value of the numerator N, or if the key is not present, the default
-    // value, the request will be mirrored.
-    core.v3.RuntimeFractionalPercent runtime_fraction = 3;
-
-    // Specifies whether the trace span for the shadow request should be sampled. If this field is not explicitly set,
-    // the shadow request will inherit the sampling decision of its parent span. This ensures consistency with the trace
-    // sampling policy of the original request and prevents oversampling, especially in scenarios where runtime sampling
-    // is disabled.
-    google.protobuf.BoolValue trace_sampled = 4;
-
-    // Disables appending the ``-shadow`` suffix to the shadowed ``Host`` header.
-    //
-    // Defaults to ``false``.
-    bool disable_shadow_host_suffix_append = 5;
-
-    // Specifies a list of header mutations that should be applied to each mirrored request.
-    // Header mutations are applied in the order they are specified. For more information, including
-    // details on header value syntax, see the documentation on :ref:`custom request headers
-    // <config_http_conn_man_headers_custom_request_headers>`.
-    repeated common.mutation_rules.v3.HeaderMutation request_headers_mutations = 6
-        [(validate.rules).repeated = {max_items: 1000}];
-
-    // Indicates that during mirroring, the host header will be swapped with this value.
-    // :ref:`disable_shadow_host_suffix_append
-    // <envoy_v3_api_field_config.cluster.v3.Cluster.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
-    // is implicitly enabled if this field is set.
-    string host_rewrite_literal = 7
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
-  }
-
   reserved 12, 15, 7, 11, 35;
 
   reserved "hosts", "tls_context", "extension_protocol_options";
@@ -1325,22 +1258,6 @@ message Cluster {
   // If ``connection_pool_per_downstream_connection`` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
-
-  // Specifies a list of mirroring policies to apply at the cluster level for all requests
-  // routed to this cluster. Cluster-level mirroring can be used in conjunction with or
-  // instead of route-level mirroring. When both are configured, route-level policies take
-  // precedence and cluster-level policies are evaluated second.
-  //
-  // .. note::
-  //
-  //   Shadowing will not be triggered if the primary cluster does not exist.
-  //
-  // .. note::
-  //
-  //   Shadowing doesn't support HTTP CONNECT and upgrades.
-  //
-  // [#next-major-version: Make cluster mirroring work with CONNECT and upgrades.]
-  repeated RequestMirrorPolicy request_mirror_policies = 59;
 }
 
 // Extensible load balancing policy configuration.

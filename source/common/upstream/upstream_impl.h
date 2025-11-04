@@ -798,9 +798,6 @@ public:
                                    const ClusterRequestResponseSizeStatNames& stat_names);
   static ClusterTimeoutBudgetStats
   generateTimeoutBudgetStats(Stats::Scope&, const ClusterTimeoutBudgetStatNames& stat_names);
-  static absl::StatusOr<std::vector<Router::ShadowPolicyPtr>>
-  buildShadowPolicies(const envoy::config::cluster::v3::Cluster& config,
-                      Server::Configuration::CommonFactoryContext& factory_context);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }

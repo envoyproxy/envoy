@@ -1076,19 +1076,6 @@ ClusterInfoImpl::create(Init::Manager& info,
   return ret;
 }
 
-absl::StatusOr<std::vector<Router::ShadowPolicyPtr>>
-ClusterInfoImpl::buildShadowPolicies(const envoy::config::cluster::v3::Cluster& config,
-                                     Server::Configuration::CommonFactoryContext& factory_context) {
-  std::vector<Router::ShadowPolicyPtr> shadow_policies;
-  shadow_policies.reserve(config.request_mirror_policies().size());
-  for (const auto& mirror_policy_config : config.request_mirror_policies()) {
-    auto policy_or_error = Router::ShadowPolicyImpl::create(mirror_policy_config, factory_context);
-    RETURN_IF_NOT_OK_REF(policy_or_error.status());
-    shadow_policies.push_back(std::move(policy_or_error.value()));
-  }
-  return shadow_policies;
-}
-
 ClusterInfoImpl::ClusterInfoImpl(
     Init::Manager& init_manager, Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& config,
@@ -1189,8 +1176,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                                          config.lrs_report_endpoint_metrics().begin(),
                                          config.lrs_report_endpoint_metrics().end())
                                    : nullptr),
-      shadow_policies_(THROW_OR_RETURN_VALUE(buildShadowPolicies(config, server_context),
-                                             std::vector<Router::ShadowPolicyPtr>)),
+      shadow_policies_(http_protocol_options_->shadow_policies_),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
