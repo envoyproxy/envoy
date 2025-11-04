@@ -14,7 +14,7 @@ namespace {
 #ifdef __linux__
 
 // This test runs in CI with Docker CPU limits (--cpus=2) to verify 'cgroups' detection.
-// Tagged 'runtime-cpu' to run only in controlled environments with CPU limits.
+// Tagged 'manual' to run only in controlled environments with CPU limits.
 // Tests basic cgroup detection without heavy server integration dependencies.
 class CgroupCpuSimpleIntegrationTest : public testing::Test {};
 

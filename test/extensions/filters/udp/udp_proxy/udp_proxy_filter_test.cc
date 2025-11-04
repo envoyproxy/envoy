@@ -1104,6 +1104,102 @@ matcher:
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 }
 
+// Make sure data.addresses_ is properly updated from active_session->addresses() when creating
+// a new session in per-packet load balancing mode.
+TEST_F(UdpProxyFilterTest, DataAddressesUpdatedFromActiveSessionPerPacketLoadBalancing) {
+  InSequence s;
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_per_packet_load_balancing: true
+  )EOF"));
+
+  // Test that data.addresses_ is set when creating a new session
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+
+  Network::UdpRecvData data;
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
+  data.addresses_.local_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.2:80");
+  auto original_addresses = data.addresses_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>("hello");
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  filter_->onData(data);
+
+  EXPECT_EQ(original_addresses, data.addresses_);
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
+// Make sure data.addresses_ is properly updated from active_session->addresses() when creating
+// a new session and when recreating an unhealthy session in sticky session mode.
+TEST_F(UdpProxyFilterTest, DataAddressesUpdatedFromActiveSessionStickySession) {
+  InSequence s;
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF"));
+
+  // Test that data.addresses_ is set when creating a new session
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+
+  Network::UdpRecvData data;
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
+  data.addresses_.local_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.2:80");
+  auto original_addresses = data.addresses_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>("hello");
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  filter_->onData(data);
+
+  EXPECT_EQ(original_addresses, data.addresses_);
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+
+  // Test that data.addresses_ is updated when recreating a session due to unhealthy host
+  EXPECT_CALL(
+      *factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_,
+      coarseHealth())
+      .WillRepeatedly(Return(Upstream::Host::Health::Unhealthy));
+  auto new_host_address = Network::Utility::parseInternetAddressAndPortNoThrow("20.0.0.2:443");
+  auto new_host = createHost(new_host_address);
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
+              chooseHost(_))
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{new_host})));
+  expectSessionCreate(new_host_address);
+  test_sessions_[1].expectWriteToUpstream("world", 0, nullptr, true);
+
+  Network::UdpRecvData data2;
+  data2.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
+  data2.addresses_.local_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.2:80");
+  auto original_addresses2 = data2.addresses_;
+  data2.buffer_ = std::make_unique<Buffer::OwnedImpl>("world");
+  data2.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  filter_->onData(data2);
+
+  // Verify that data.addresses_ is still properly set after session recreation
+  EXPECT_EQ(original_addresses2, data.addresses_);
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
 // Make sure socket option is set correctly if use_original_src_ip is set.
 TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
   if (!isTransparentSocketOptionsSupported()) {

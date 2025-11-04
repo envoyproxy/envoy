@@ -668,7 +668,7 @@ public:
   /**
    * Attempt to send GOAWAY and close the connection, and no filter chain will move forward.
    */
-  virtual void sendGoAwayAndClose() PURE;
+  virtual void sendGoAwayAndClose(bool graceful = false) PURE;
 
   /**
    * Adds decoded metadata. This function can only be called in
