@@ -51,7 +51,7 @@ public:
     return writer_.get();
   }
 
-  Network::ConnectionSocket& probingSocket();
+  Network::ConnectionSocket& probingSocket() { return *socket_; }
 
   quic::QuicForceBlockablePacketWriter* releaseWriter() { return writer_.release(); }
   std::unique_ptr<Network::ConnectionSocket> releaseSocket() { return std::move(socket_); }
@@ -112,6 +112,11 @@ void EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::OnMigrationToPathDone(
     envoy_context->releaseWriter();
     ++connection_.num_socket_switches_;
     connection_.setConnectionSocket(envoy_context->releaseSocket());
+    // Previous writer may have been force blocked and write events on it may have been dropped.
+    // Synthesize a write event in case this case to unblock the connection.
+    connection_.connectionSocket()->ioHandle().activateFileEvents(Event::FileReadyType::Write);
+    // Send something to notify the peer of the address change immediately.
+    connection_.SendPing();
   }
 }
 
@@ -119,30 +124,6 @@ std::unique_ptr<quic::QuicPathContextFactory>
 EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::CreateQuicPathContextFactory() {
   return std::make_unique<EnvoyQuicClinetPathContextFactory>(writer_factory_, connection_);
 }
-
-EnvoyQuicClientConnection::EnvoyQuicClientConnection(
-    const quic::QuicConnectionId& server_connection_id,
-    Network::Address::InstanceConstSharedPtr& initial_peer_address,
-    quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
-    const quic::ParsedQuicVersionVector& supported_versions,
-    Network::Address::InstanceConstSharedPtr local_addr, Event::Dispatcher& dispatcher,
-    const Network::ConnectionSocket::OptionsSharedPtr& options,
-    quic::ConnectionIdGeneratorInterface& generator)
-    : EnvoyQuicClientConnection(
-          server_connection_id, helper, alarm_factory, supported_versions, dispatcher,
-          createConnectionSocket(initial_peer_address, local_addr, options), generator) {}
-
-EnvoyQuicClientConnection::EnvoyQuicClientConnection(
-    const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
-    quic::QuicAlarmFactory& alarm_factory, const quic::ParsedQuicVersionVector& supported_versions,
-    Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket,
-    quic::ConnectionIdGeneratorInterface& generator)
-    : EnvoyQuicClientConnection(
-          server_connection_id, helper, alarm_factory,
-          new EnvoyQuicPacketWriter(
-              std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle())),
-          /*owns_writer=*/true, supported_versions, dispatcher, std::move(connection_socket),
-          generator) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
@@ -343,15 +324,21 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
   ASSERT(events & (Event::FileReadyType::Read | Event::FileReadyType::Write));
 
   if (events & Event::FileReadyType::Write) {
-    OnBlockedWriterCanWrite();
+    writer()->SetWritable();
+    // The writer might still be force blocked for migration in progress, in
+    // which case no write should be attempted.
+    WriteIfNotBlocked();
   }
 
-  bool is_probing_socket =
+  // Check if the event is on the probing socket before read.
+  const bool is_probing_socket =
       HasPendingPathValidation() &&
       (&connection_socket ==
-       &static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(
-            GetPathValidationContext())
-            ->probingSocket());
+       (writer_factory_
+            ? &static_cast<EnvoyQuicPathValidationContext*>(GetPathValidationContext())
+                   ->probingSocket()
+            : &static_cast<EnvoyQuicClientPathValidationContext*>(GetPathValidationContext())
+                   ->probingSocket()));
 
   // It's possible for a write event callback to close the connection, in such case ignore read
   // event processing.

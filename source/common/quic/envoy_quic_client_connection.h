@@ -106,18 +106,6 @@ public:
 
   using EnvoyQuicMigrationHelperPtr = std::unique_ptr<EnvoyQuicMigrationHelper>;
 
-  // A connection socket will be created with given |local_addr|. If binding
-  // port not provided in |local_addr|, pick up a random port.
-  EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
-                            Network::Address::InstanceConstSharedPtr& initial_peer_address,
-                            quic::QuicConnectionHelperInterface& helper,
-                            quic::QuicAlarmFactory& alarm_factory,
-                            const quic::ParsedQuicVersionVector& supported_versions,
-                            Network::Address::InstanceConstSharedPtr local_addr,
-                            Event::Dispatcher& dispatcher,
-                            const Network::ConnectionSocket::OptionsSharedPtr& options,
-                            quic::ConnectionIdGeneratorInterface& generator);
-
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
                             quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
@@ -219,14 +207,6 @@ private:
     QuicClientPacketWriterFactory& writer_factory_;
     EnvoyQuicClientConnection& connection_;
   };
-
-  EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
-                            quic::QuicConnectionHelperInterface& helper,
-                            quic::QuicAlarmFactory& alarm_factory,
-                            const quic::ParsedQuicVersionVector& supported_versions,
-                            Event::Dispatcher& dispatcher,
-                            Network::ConnectionSocketPtr&& connection_socket,
-                            quic::ConnectionIdGeneratorInterface& generator);
 
   void onFileEvent(uint32_t events, Network::ConnectionSocket& connection_socket);
 

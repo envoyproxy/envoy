@@ -53,12 +53,12 @@ public:
   TestEnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                                 quic::QuicConnectionHelperInterface& helper,
                                 quic::QuicAlarmFactory& alarm_factory,
-                                quic::QuicPacketWriter& writer,
+                                quic::QuicPacketWriter* writer,
                                 const quic::ParsedQuicVersionVector& supported_versions,
                                 Event::Dispatcher& dispatcher,
                                 Network::ConnectionSocketPtr&& connection_socket,
                                 quic::ConnectionIdGeneratorInterface& generator)
-      : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
+      : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, writer, true,
                                   supported_versions, dispatcher, std::move(connection_socket),
                                   generator) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
@@ -108,6 +108,7 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
         quic_version_({std::get<0>(GetParam())}),
+        writer_(new testing::NiceMock<quic::test::MockPacketWriter>()),
         peer_addr_(
             Network::Test::getCanonicalLoopbackAddress(TestEnvironment::getIpVersionsForTest()[0])),
         self_addr_(Network::Utility::getAddressWithPort(
@@ -137,11 +138,11 @@ public:
     if (quiche_handles_migration_) {
       wrapper = new quic::QuicForceBlockablePacketWriter();
       // Owns the inner writer.
-      wrapper->set_writer(&writer_);
+      wrapper->set_writer(writer_);
     }
     quic_connection_ = new TestEnvoyQuicClientConnection(
         quic::test::TestConnectionId(), connection_helper_, alarm_factory_,
-        quiche_handles_migration_ ? *wrapper : static_cast<quic::QuicPacketWriter&>(writer_),
+        (quiche_handles_migration_ ? wrapper : static_cast<quic::QuicPacketWriter*>(writer_)),
         quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
         connection_id_generator_);
     EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* migration_helper = nullptr;
@@ -167,7 +168,7 @@ public:
     EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
 
     time_system_.advanceTimeWait(std::chrono::milliseconds(1));
-    ON_CALL(writer_, WritePacket(_, _, _, _, _, _))
+    ON_CALL(*writer_, WritePacket(_, _, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
 
     envoy_quic_session_->Initialize();
@@ -213,7 +214,7 @@ protected:
   EnvoyQuicConnectionHelper connection_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
   quic::ParsedQuicVersionVector quic_version_;
-  testing::NiceMock<quic::test::MockPacketWriter> writer_;
+  testing::NiceMock<quic::test::MockPacketWriter>* writer_;
   // Initialized with port 0 and modified during peer_socket_ creation.
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
