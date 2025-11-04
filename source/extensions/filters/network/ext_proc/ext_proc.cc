@@ -157,7 +157,7 @@ Network::FilterStatus NetworkExtProcFilter::onData(Buffer::Instance& data, bool 
     return (state == StreamOpenState::Error) ? handleStreamError()
                                              : Network::FilterStatus::Continue;
   }
-
+  ENVOY_LOG(debug, "boteng calling sendRequest");
   sendRequest(data, end_stream, /*is_read=*/true);
   return Network::FilterStatus::StopIteration;
 }
@@ -411,14 +411,14 @@ void NetworkExtProcFilter::onGrpcError(Grpc::Status::GrpcStatus status,
                  status, message);
   // Mark processing as complete to avoid further gRPC calls
   processing_complete_ = true;
-  closeStream();
-  stats_.streams_grpc_error_.inc();
-
   if (read_pending_) {
     recordCallCompletion(status, true);
   } else if (write_pending_) {
     recordCallCompletion(status, false);
   }
+
+  closeStream();
+  stats_.streams_grpc_error_.inc();
 
   // If failure mode is not to allow, close the connection
   if (!config_->failureModeAllow()) {

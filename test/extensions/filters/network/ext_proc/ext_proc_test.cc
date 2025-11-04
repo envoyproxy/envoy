@@ -1008,6 +1008,55 @@ TEST_F(NetworkExtProcFilterTest, TimeoutWithBothOperationsPending) {
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
 }
 
+TEST_F(NetworkExtProcFilterTest, MessageTimeoutManagerOnTimeoutViaTimerCallback) {
+  // Setup config with timeout
+  auto config = createConfig(false);
+  config.mutable_message_timeout()->set_nanos(100000000);
+  auto filter_config = std::make_shared<Config>(config, scope_);
+
+  // Capture timer callbacks during filter initialization
+  std::vector<Event::TimerCb> timer_callbacks;
+  NiceMock<Event::MockDispatcher> dispatcher;
+
+  EXPECT_CALL(dispatcher, createTimer_(_))
+      .WillRepeatedly(Invoke([&timer_callbacks, &dispatcher](Event::TimerCb cb) {
+        timer_callbacks.push_back(cb);
+        return new NiceMock<Event::MockTimer>(&dispatcher);
+      }));
+
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+
+  // Initialize filter (this creates MessageTimeoutManager internally)
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  // Setup stream
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Return(ByMove(std::move(stream))));
+
+  // Start read operation which activates the timer
+  EXPECT_CALL(read_callbacks_, disableClose(true));
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Setup expectations for timeout
+  EXPECT_CALL(read_callbacks_, disableClose(false)).Times(2);
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
+
+  // Trigger read timer callback - this directly calls MessageTimeoutManager::onTimeout(true)
+  timer_callbacks[0]();
+
+  // Verify timeout was handled correctly
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
+}
+
 // Test that timer stops when response is received
 TEST_F(NetworkExtProcFilterTest, TimerStopsOnResponse) {
   auto config = createConfig(false);
@@ -1247,6 +1296,33 @@ TEST_F(NetworkExtProcFilterTest, LoggingInfoLatencyTracking) {
 
   EXPECT_EQ(logging_info->writeStats().grpc_calls_, 1);
   EXPECT_EQ(logging_info->writeStats().total_latency_.count(), 50000);
+}
+
+// Test gRPC call onGrpcError recording
+TEST_F(NetworkExtProcFilterTest, LoggingInfoOnError) {
+  recreateFilterWithConfig(true);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+  filter_->onGrpcError(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted, "test error");
+
+  auto& filter_state = read_callbacks_.connection().streamInfo().filterState();
+  auto logging_info =
+      filter_state->getDataReadOnly<NetworkExtProcLoggingInfo>("envoy.filters.network.ext_proc");
+
+  EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
 }
 
 } // namespace
