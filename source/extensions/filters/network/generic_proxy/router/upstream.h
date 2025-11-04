@@ -280,7 +280,7 @@ public:
       // closing is delayed.
       // So we need to manually call the onConnectionClose() here.
       //
-      // The onConnectionClose() implementation would ensure it is safe to be called
+      // The onConnectionClose() implementation MUST ensure it is safe to be called
       // multiple times.
       onConnectionClose(Network::ConnectionEvent::LocalClose);
     }
