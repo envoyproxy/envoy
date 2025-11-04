@@ -24,11 +24,12 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
   const auto& local_address = socket_->connectionInfoProvider().localAddress();
   if (local_address && local_address->networkNamespace().has_value() &&
       !local_address->networkNamespace()->empty()) {
-    stream_info_->filterState()->setData(Network::DownstreamNetworkNamespace::key(),
-                                         std::make_unique<Network::DownstreamNetworkNamespace>(
-                                             local_address->networkNamespace().value()),
-                                         StreamInfo::FilterState::StateType::ReadOnly,
-                                         StreamInfo::FilterState::LifeSpan::Connection);
+    stream_info_->filterState()->setData(
+        Network::DownstreamNetworkNamespace::key(),
+        std::make_unique<Network::DownstreamNetworkNamespace>(
+            local_address->networkNamespace().value()),
+        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection,
+        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   }
 }
 
