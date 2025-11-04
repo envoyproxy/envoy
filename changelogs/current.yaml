@@ -35,8 +35,8 @@ minor_behavior_changes:
     messages remain available in debug logs.
 - area: ext_authz
   change: |
-    Check that the response header count is less than the configured limits before applying mutations, and do not
-    add new headers if not.
+    Check that the response header count and size is less than the configured limits after applying
+    mutations and send a local reply if not.
 - area: mobile
   change: |
     Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by

@@ -48,7 +48,8 @@ namespace ExtAuthz {
   COUNTER(ignored_dynamic_metadata)                                                                \
   COUNTER(filter_state_name_collision)                                                             \
   COUNTER(omitted_response_headers)                                                                \
-  COUNTER(request_header_limits_reached)
+  COUNTER(request_header_limits_reached)                                                           \
+  COUNTER(response_header_limits_reached)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -424,6 +425,8 @@ private:
   Filters::Common::MutationRules::CheckResult
   validateAndCheckDecoderHeaderMutation(Filters::Common::MutationRules::CheckOperation operation,
                                         absl::string_view key, absl::string_view value) const;
+
+  void responseHeaderLimitsReached();
 
   // Called when the filter is configured to reject invalid responses & the authz response contains
   // invalid header or query parameters. Sends a local response with the configured rejection status
