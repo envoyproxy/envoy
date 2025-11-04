@@ -82,43 +82,62 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
   return {std::move(tags), std::move(dynamic_storage)};
 }
 
+namespace {
+absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& formatter,
+                                        const Formatter::Context& context,
+                                        const StreamInfo::StreamInfo& stream_info) {
+  Protobuf::Value computed_value = formatter.formatValue(context, stream_info);
+  uint64_t value;
+  if (computed_value.has_number_value()) {
+    value = computed_value.number_value();
+  } else if (computed_value.has_string_value()) {
+    if (!absl::SimpleAtoi(computed_value.string_value(), &value)) {
+      ENVOY_LOG_EVERY_POW_2_MISC(error,
+                                 "Stats access logger formatted a string that isn't a number: {}",
+                                 computed_value.string_value());
+      return absl::nullopt;
+    }
+  } else {
+    ENVOY_LOG_EVERY_POW_2_MISC(error, "Stats access logger computed non-number value: {}",
+                               computed_value.DebugString());
+    return absl::nullopt;
+  }
+
+  return value;
+}
+} // namespace
+
 void StatsAccessLog::emitLog(const Formatter::Context& context,
                              const StreamInfo::StreamInfo& stream_info) {
   for (auto& histogram : histograms_) {
-    Protobuf::Value computed_value = histogram.value_formatter_->formatValue(context, stream_info);
-    if (!computed_value.has_number_value()) {
-      ENVOY_LOG_EVERY_POW_2_MISC(error, "Stats access logger computed non-number value: {}",
-                                 computed_value.DebugString());
+    absl::optional<uint64_t> computed_value_opt =
+        getFormatValue(*histogram.value_formatter_, context, stream_info);
+    if (!computed_value_opt.has_value()) {
       continue;
     }
+
+    uint64_t value = *computed_value_opt;
 
     auto [tags, storage] = histogram.stat_.tags(context, stream_info, *scope_);
 
     auto& histogram_stat =
         scope_->histogramFromStatNameWithTags(histogram.stat_.name_, tags, histogram.stat_.unit_);
-    double val = computed_value.number_value();
     if (histogram.stat_.unit_ == Stats::Histogram::Unit::Percent) {
-      val *= static_cast<double>(Stats::Histogram::PercentScale);
+      value *= static_cast<double>(Stats::Histogram::PercentScale);
     }
-    histogram_stat.recordValue(val);
+    histogram_stat.recordValue(value);
   }
 
   for (auto& counter : counters_) {
     uint64_t value;
     if (counter.value_formatter_ != nullptr) {
-      Protobuf::Value computed_value = counter.value_formatter_->formatValue(context, stream_info);
-      if (!computed_value.has_number_value()) {
-        ENVOY_LOG_EVERY_POW_2_MISC(error, "Stats access logger computed non-number value: {}",
-                                   computed_value.DebugString());
+      absl::optional<uint64_t> computed_value_opt =
+          getFormatValue(*counter.value_formatter_, context, stream_info);
+      if (!computed_value_opt.has_value()) {
         continue;
       }
-      if (computed_value.number_value() < 0) {
-        ENVOY_LOG_EVERY_POW_2_MISC(
-            error, "Stats access logger computed a negative value for a counter: {}",
-            computed_value.number_value());
-        continue;
-      }
-      value = std::llround(computed_value.number_value());
+
+      value = *computed_value_opt;
     } else {
       value = counter.value_fixed_;
     }
