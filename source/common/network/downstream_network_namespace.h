@@ -10,10 +10,9 @@ namespace Network {
 /**
  * Network namespace filepath from the listener address. This filter state is automatically
  * populated when a connection is accepted if the listener's local address has a network
- * namespace configured. It is shared with upstream connections, making it available for
- * upstream connection decisions such as bind address selection. This provides read-only
- * access to the network namespace, which is particularly useful for logging, routing
- * decisions, or other filter logic in multi-tenant or containerized environments.
+ * namespace configured. It provides read-only access to the network namespace, which is
+ * particularly useful for logging, routing decisions, or other filter logic in multi-tenant
+ * or containerized environments.
  */
 class DownstreamNetworkNamespace : public StreamInfo::FilterState::Object {
 public:
