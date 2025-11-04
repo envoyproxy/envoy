@@ -26,6 +26,7 @@
 #include "source/common/config/datasource.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/hash_policy.h"
+#include "source/common/http/header_mutation.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/router/config_utility.h"
@@ -396,6 +397,7 @@ private:
 };
 
 using VirtualHostImplSharedPtr = std::shared_ptr<VirtualHostImpl>;
+using HeaderMutationsPtr = std::unique_ptr<Http::HeaderMutations>;
 
 /**
  * Implementation of ShadowPolicy that reads from the proto route config.
@@ -404,7 +406,8 @@ class ShadowPolicyImpl : public ShadowPolicy {
 public:
   using RequestMirrorPolicy = envoy::config::route::v3::RouteAction::RequestMirrorPolicy;
   static absl::StatusOr<std::shared_ptr<ShadowPolicyImpl>>
-  create(const RequestMirrorPolicy& config);
+  create(const RequestMirrorPolicy& config,
+         Server::Configuration::CommonFactoryContext& factory_context);
 
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
@@ -412,10 +415,16 @@ public:
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
   absl::optional<bool> traceSampled() const override { return trace_sampled_; }
-  bool disableShadowHostSuffixAppend() const override { return disable_shadow_host_suffix_append_; }
+  bool disableShadowHostSuffixAppend() const override {
+    return disable_shadow_host_suffix_append_ || !host_rewrite_literal_.empty();
+  }
+  const Http::HeaderEvaluator& headerEvaluator() const override;
+  absl::string_view hostRewriteLiteral() const override { return host_rewrite_literal_; }
 
 private:
-  explicit ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Status& creation_status);
+  explicit ShadowPolicyImpl(const RequestMirrorPolicy& config,
+                            Server::Configuration::CommonFactoryContext& factory_context,
+                            absl::Status& creation_status);
 
   const std::string cluster_;
   const Http::LowerCaseString cluster_header_;
@@ -423,6 +432,8 @@ private:
   envoy::type::v3::FractionalPercent default_value_;
   absl::optional<bool> trace_sampled_;
   const bool disable_shadow_host_suffix_append_;
+  const std::string host_rewrite_literal_;
+  HeaderMutationsPtr request_headers_mutations_;
 };
 
 /**

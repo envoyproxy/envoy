@@ -66,6 +66,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/http:hash_policy_lib",
+        "//source/common/http:header_mutation_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:path_utility_lib",
@@ -503,6 +504,7 @@ envoy_cc_library(
     ],
     hdrs = ["header_parser.h"],
     deps = [
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
         "//source/common/formatter:substitution_formatter_lib",

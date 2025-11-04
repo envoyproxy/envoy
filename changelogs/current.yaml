@@ -116,8 +116,11 @@ minor_behavior_changes:
     4MB could be encoded, which most upstream grpc services would, by default, treat as an error.
 - area: ext_authz
   change: |
-    Check the request header count & size in kb after applying mutations is <= the configured limits
-    and reject the response if not.
+    Check the request header count after applying mutations is <= the configured limit and reject
+    the response if not.
+- area: router
+  change: |
+    Take into account connection-level metadata under the ``envoy.lb`` namespace when computing subset load balancing matches.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -142,6 +145,10 @@ bug_fixes:
     Fixed a bug where the access log was skipped for HTTP/3 requests when the stream was half closed. This behavior can be
     reverted by setting the runtime guard
     ``envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream`` to ``false``.
+- area: load_balancing
+  change: |
+    Fixed a bug in ClientSideWeightedRoundRobinLoadBalancer with worker lbs iterating over priorities
+    included in owning thread aware lb priority set that might have different number of priorities.
 - area: http
   change: |
     Fixed a bug where premature resets of streams could result in recursive draining and a potential
@@ -321,6 +328,14 @@ new_features:
     support evictable metrics. This is done :ref:`periodically
     <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_eviction_interval>`
     during the metric flush.
+- area: http
+  change: |
+    Added statistics to the :ref:`Stateful session filter <config_http_filters_stateful_session>`
+    to help operators understand routing outcomes when session overrides are requested. The filter now
+    emits counters in the ``http.<stat_prefix>.stateful_session.[<filter_stat_prefix>.]`` namespace. An
+    optional per-filter :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.stat_prefix>` can be used
+    to disambiguate multiple instances.
 - area: tap
   change: |
     Added :ref:`record_upstream_connection <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_upstream_connection>`
@@ -585,6 +600,15 @@ new_features:
   change: |
     Added ``setUpstreamOverrideHost`` method to AsyncClient StreamOptions to enable direct host routing
     that bypasses load balancer selection.
+- area: router
+  change: |
+    Added support for :ref:`request_headers_mutations
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.request_headers_mutations>` to enable header
+    manipulation for mirror requests.
+    Added support for :ref:`host_rewrite_literal
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.host_rewrite_literal>` in
+    :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to enable
+    host header rewrite for mirror requests.
 - area: outlier detection
   change: |
     Added :ref:`outlier_detection<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.outlier_detection>`
