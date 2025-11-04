@@ -269,7 +269,7 @@ TEST_F(FinalizerImplTest, TestAllWithLegacyRequestHeader) {
   cluster_info_->observability_name_ = "my_upstream_cluster_observable_from_cluster_info";
 
   // Enable verbose logs.
-  EXPECT_CALL(config, verbose).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(config, verbose).WillOnce(Return(true));
 
   // Downstream address.
   const std::string downstream_ip = "10.0.0.100";
