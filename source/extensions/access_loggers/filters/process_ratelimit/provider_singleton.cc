@@ -76,7 +76,6 @@ RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton
 
   auto init_target =
       std::make_unique<Init::TargetImpl>(fmt::format("RateLimitConfigCallback-{}", key), []() {});
-  factory_context.initManager().add(*init_target);
 
   // Add the init target to the listener's init manager to wait for the
   // resource.

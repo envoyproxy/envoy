@@ -217,22 +217,6 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, HappyPath) {
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 2);
 }
 
-TEST_F(AccessLogImplTestWithRateLimitFilter, InitedWithDeltaUpdate) {
-  AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(
-      parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
-  ASSERT_EQ(subscriptions_.size(), 1);
-  ASSERT_EQ(callbackss_.size(), 1);
-
-  const auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
-      {{"token_bucket_name", token_bucket_resource_}});
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_TRUE(
-      callbackss_["token_bucket_name"]->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
-
-  expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
-}
-
 TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitTogether) {
   AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
