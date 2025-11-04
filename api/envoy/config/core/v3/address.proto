@@ -102,10 +102,6 @@ message SocketAddress {
   // network_namespaces``). If this field is set, Envoy will create the socket in the specified
   // network namespace.
   //
-  // When configured for a listener, the network namespace filepath is also populated into the filter
-  // state with key ``envoy.network.network_namespace`` when a connection is accepted. This provides
-  // read-only access to the network namespace for filters, access logs, and other components.
-  //
   // .. note::
   //    Setting this parameter requires Envoy to run with the ``CAP_NET_ADMIN`` capability.
   //
