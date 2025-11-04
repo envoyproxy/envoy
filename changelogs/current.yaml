@@ -139,5 +139,8 @@ new_features:
     Add a new quic configuration field, 'max_sessions_per_event_loop', to QuicProtocolOptions in Envoy listener.
     This allows tuning the maximum number of new QUIC sessions created within a single event loop.
     The default value is 16, preserving the previous hardcoded limit.
+- area: network
+  change: |
+    Add logging info for network ext_proc to filter state.
 
 deprecated:
