@@ -324,11 +324,14 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
     FieldChecker request_field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
                                        method_name, &mock_filter_config);
 
-    EXPECT_LOG_CONTAINS("error",
-                        "Matching failed for the field `user`. This field would be preserved.", {
-                          FieldCheckResults result = request_field_checker.CheckField({}, &field);
-                          EXPECT_EQ(result, FieldCheckResults::kInclude);
-                        });
+    EXPECT_LOG_CONTAINS(
+        "warn",
+        "Error encountered while matching the field `user`. This field would be preserved. Error "
+        "details: Matching couldn't complete due to insufficient data.",
+        {
+          FieldCheckResults result = request_field_checker.CheckField({}, &field);
+          EXPECT_EQ(result, FieldCheckResults::kInclude);
+        });
   }
 
   {
@@ -338,11 +341,14 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
     FieldChecker response_field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info,
                                         method_name, &mock_filter_config);
 
-    EXPECT_LOG_CONTAINS("error",
-                        "Matching failed for the field `user`. This field would be preserved.", {
-                          FieldCheckResults result = response_field_checker.CheckField({}, &field);
-                          EXPECT_EQ(result, FieldCheckResults::kInclude);
-                        });
+    EXPECT_LOG_CONTAINS(
+        "warn",
+        "Error encountered while matching the field `user`. This field would be preserved. Error "
+        "details: Matching couldn't complete due to insufficient data.",
+        {
+          FieldCheckResults result = response_field_checker.CheckField({}, &field);
+          EXPECT_EQ(result, FieldCheckResults::kInclude);
+        });
   }
 }
 
@@ -410,6 +416,24 @@ TEST_F(FieldCheckerTest, ResponseFieldChecker) {
     field.set_name("name");
     EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kExclude);
   }
+}
+
+TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  Protobuf::Field field;
+  field.set_name("user");
+
+  FieldChecker field_checker(ScrubberContext::kTestScrubbing, &mock_stream_info,
+                             "/library.BookService/GetBook", filter_config_.get());
+
+  EXPECT_LOG_CONTAINS(
+      "warn",
+      "Error encountered while matching the field `user`. This field would be preserved. Internal "
+      "error details: Unsupported scrubber context enum value: `0`. Supported values are: {1, 2}.",
+      {
+        FieldCheckResults result = field_checker.CheckField({}, &field);
+        EXPECT_EQ(result, FieldCheckResults::kInclude);
+      });
 }
 
 TEST_F(FieldCheckerTest, IncludesType) {

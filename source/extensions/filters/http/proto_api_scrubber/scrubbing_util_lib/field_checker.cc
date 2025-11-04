@@ -17,10 +17,26 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
   // name itself represents the field_mask.
   std::string field_mask = field->name();
 
-  MatchTreeHttpMatchingDataSharedPtr match_tree =
-      (scrubber_context_ == ScrubberContext::kRequestScrubbing)
-          ? filter_config_ptr_->getRequestFieldMatcher(method_name_, field_mask)
-          : filter_config_ptr_->getResponseFieldMatcher(method_name_, field_mask);
+  MatchTreeHttpMatchingDataSharedPtr match_tree;
+
+  switch (scrubber_context_) {
+  case ScrubberContext::kRequestScrubbing:
+    match_tree = filter_config_ptr_->getRequestFieldMatcher(method_name_, field_mask);
+    break;
+  case ScrubberContext::kResponseScrubbing:
+    match_tree = filter_config_ptr_->getResponseFieldMatcher(method_name_, field_mask);
+    break;
+  default:
+    ENVOY_LOG(
+        warn,
+        "Error encountered while matching the field `{}`. This field would be preserved. Internal "
+        "error details: Unsupported scrubber context enum value: `{}`. Supported values are: {{{}, "
+        "{}}}.",
+        field_mask, static_cast<int>(scrubber_context_),
+        static_cast<int>(ScrubberContext::kRequestScrubbing),
+        static_cast<int>(ScrubberContext::kResponseScrubbing));
+    return FieldCheckResults::kInclude;
+  }
 
   // Preserve the field (i.e., kInclude) if there is no match tree configured for it.
   if (match_tree == nullptr) {
@@ -39,8 +55,10 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
   // 2. The field checker is created only after all the required data to match is received.
   // For now, it will emit an error log and preserve the field.
   if (!match_result.ok()) {
-    ENVOY_LOG(error, "Matching failed for the field `{}`. This field would be preserved.",
-              field_mask);
+    ENVOY_LOG(warn,
+              "Error encountered while matching the field `{}`. This field would be preserved. "
+              "Error details: {}",
+              field_mask, match_result.status().message());
     return FieldCheckResults::kInclude;
   }
 

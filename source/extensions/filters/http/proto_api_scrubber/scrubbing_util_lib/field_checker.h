@@ -32,15 +32,11 @@ using proto_processing_lib::proto_scrubber::ScrubberContext;
 class FieldChecker : public FieldCheckerInterface, public Logger::Loggable<Logger::Id::filter> {
 public:
   FieldChecker(const ScrubberContext scrubber_context,
-               const Envoy::StreamInfo::StreamInfo* stream_info, const std::string method_name,
-               const ProtoApiScrubberFilterConfig* filter_config) {
-    stream_info_ptr_ = stream_info;
-    scrubber_context_ = scrubber_context;
-    method_name_ = method_name;
-    filter_config_ptr_ = filter_config;
-
-    matching_data_ptr_ = std::make_unique<Http::Matching::HttpMatchingDataImpl>(*stream_info_ptr_);
-  }
+               const Envoy::StreamInfo::StreamInfo* stream_info, const std::string& method_name,
+               const ProtoApiScrubberFilterConfig* filter_config)
+      : scrubber_context_(scrubber_context),
+        matching_data_ptr_(std::make_unique<Http::Matching::HttpMatchingDataImpl>(*stream_info)),
+        method_name_(method_name), filter_config_ptr_(filter_config) {}
 
   // This type is neither copyable nor movable.
   FieldChecker(const FieldChecker&) = delete;
@@ -78,11 +74,10 @@ private:
   absl::StatusOr<Matcher::MatchResult>
   tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const;
 
-  const Envoy::StreamInfo::StreamInfo* stream_info_ptr_;
-  const ProtoApiScrubberFilterConfig* filter_config_ptr_;
   ScrubberContext scrubber_context_;
+  std::unique_ptr<Http::Matching::HttpMatchingDataImpl> matching_data_ptr_;
   std::string method_name_;
-  std::unique_ptr<Http::Matching::HttpMatchingDataImpl> matching_data_ptr_ = nullptr;
+  const ProtoApiScrubberFilterConfig* filter_config_ptr_;
 };
 
 } // namespace ProtoApiScrubber

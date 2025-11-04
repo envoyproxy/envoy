@@ -27,8 +27,6 @@ using StringPairToMatchTreeMap =
     absl::flat_hash_map<std::pair<std::string, std::string>, MatchTreeHttpMatchingDataSharedPtr>;
 } // namespace
 
-class MockProtoApiScrubberFilterConfig;
-
 // The config for Proto API Scrubber filter. As a thread-safe class, it should be constructed only
 // once and shared among filters for better performance.
 class ProtoApiScrubberFilterConfig : public Logger::Loggable<Logger::Id::filter> {
@@ -40,11 +38,37 @@ public:
 
   virtual ~ProtoApiScrubberFilterConfig() = default;
 
-  // Returns the match tree for a request payload field mask.
+  /**
+   * Returns the match tree associated with a specific field in a request message.
+   *
+   * This method is called to retrieve the CEL matcher configuration that determines
+   * whether a given field (identified by `field_mask`) within a specific gRPC
+   * request (identified by `method_name`) should be scrubbed.
+   *
+   * @param method_name The full gRPC method name (e.g., "package.service/Method").
+   * @param field_mask The field mask of the field in the request payload to check (e.g.,
+   * "user.address.street").
+   * @return A MatchTreeHttpMatchingDataSharedPtr if a matcher is configured for
+   * the specific method and field mask.
+   * Returns `nullptr` if no restriction is configured for this combination.
+   */
   virtual MatchTreeHttpMatchingDataSharedPtr
   getRequestFieldMatcher(const std::string& method_name, const std::string& field_mask) const;
 
-  // Returns the match tree for a response payload field mask.
+  /**
+   * Returns the match tree associated with a specific field in a response message.
+   *
+   * This method is called to retrieve the CEL matcher configuration that determines
+   * whether a given field (identified by `field_mask`) within a specific gRPC
+   * response (identified by `method_name`) should be scrubbed.
+   *
+   * @param method_name The full gRPC method name (e.g., "package.service/Method").
+   * @param field_mask The field mask of the field in the response payload to check (e.g.,
+   * "user.address.street").
+   * @return A MatchTreeHttpMatchingDataSharedPtr if a matcher is configured for
+   * the specific method and field mask.
+   * Returns `nullptr` if no restriction is configured for this combination.
+   */
   virtual MatchTreeHttpMatchingDataSharedPtr
   getResponseFieldMatcher(const std::string& method_name, const std::string& field_mask) const;
 
