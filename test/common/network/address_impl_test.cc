@@ -859,7 +859,7 @@ TEST(AddressMetadataTest, Ipv6MetadataInstanceAddressOperations) {
   memset(&addr, 0, sizeof(addr));
   addr.sin6_family = AF_INET6;
   addr.sin6_port = htons(443);
-  // Create link-local address fe80::1.
+  // Create link-local address.
   addr.sin6_addr.s6_addr[0] = 0xfe;
   addr.sin6_addr.s6_addr[1] = 0x80;
   addr.sin6_addr.s6_addr[15] = 0x01;

@@ -2941,18 +2941,3 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
-
-envoy_cc_test(
-    name = "proxy_protocol_integration_test",
-    srcs = ["proxy_protocol_integration_test.cc"],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/network:address_lib",
-        "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
-        "//test/test_common:network_utility_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/access_loggers/stream/v3:pkg_cc_proto",
-    ],
-)

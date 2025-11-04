@@ -97,7 +97,7 @@ public:
   // class declarations.
   static StatusOr<InstanceConstSharedPtr> createMetadataIpv4Instance(const sockaddr_in* address);
   static StatusOr<InstanceConstSharedPtr> createMetadataIpv6Instance(const sockaddr_in6& address,
-                                                                      bool v6only = true);
+                                                                     bool v6only = true);
 };
 
 /**
@@ -460,7 +460,7 @@ private:
 
 // Inline definitions for metadata instance creation methods.
 // These are defined here after the class declarations.
-inline StatusOr<InstanceConstSharedPtr> 
+inline StatusOr<InstanceConstSharedPtr>
 InstanceFactory::createMetadataIpv4Instance(const sockaddr_in* address) {
   absl::Status status = absl::OkStatus();
   // Metadata-only addresses don't need SocketInterface or network namespace
@@ -476,9 +476,8 @@ inline StatusOr<InstanceConstSharedPtr>
 InstanceFactory::createMetadataIpv6Instance(const sockaddr_in6& address, bool v6only) {
   absl::Status status = absl::OkStatus();
   // Metadata-only addresses don't need SocketInterface or network namespace
-  std::shared_ptr<Ipv6Instance> instance(
-      new Ipv6Instance(status, address, v6only, nullptr, absl::nullopt, 
-                      true /* skip_validation */));
+  std::shared_ptr<Ipv6Instance> instance(new Ipv6Instance(
+      status, address, v6only, nullptr, absl::nullopt, true /* skip_validation */));
   if (!status.ok()) {
     return status;
   }
