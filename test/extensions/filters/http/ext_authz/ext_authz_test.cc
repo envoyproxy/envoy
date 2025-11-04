@@ -5382,7 +5382,7 @@ public:
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter_->encodeHeaders(response_headers, false));
 
-    EXPECT_EQ(1U, config_->stats().omitted_response_headers_.value());
+    EXPECT_EQ(1U, config_->stats().response_header_limits_reached_.value());
   }
 };
 
@@ -5517,7 +5517,7 @@ TEST_F(HttpFilterTest, EncodeHeadersLimitDisabledByDefault) {
   EXPECT_TRUE(response_headers.has("set"));
   EXPECT_TRUE(response_headers.has("add-if-absent"));
   EXPECT_EQ(response_headers.get_("overwrite-if-exists"), big_value);
-  EXPECT_EQ(0U, config_->stats().omitted_response_headers_.value());
+  EXPECT_EQ(0U, config_->stats().response_header_limits_reached_.value());
 }
 
 TEST_F(ResponseHeaderLimitTest, EncodeHeadersToOverwriteIfExistsExceedsSizeLimit) {
