@@ -198,5 +198,9 @@ new_features:
     :ref:`enforce_response_header_limits <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.enforce_response_header_limits>`
     that allows admins to enable / disable the behavior of dropping response headers once the header
     map count / size constraints have been reached.
+- area: xds
+  change: |
+    Added runtime guard ``envoy.reloadable_features.report_load_when_rq_active_is_non_zero``.
+    When enabled, LRS continues to send locality_stats reoprt to config server when there is no request_issued in the poll cycle.
 
 deprecated:
