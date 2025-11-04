@@ -76,6 +76,8 @@ public:
                const Http::ResponseHeaderMap& response_headers,
                const StreamInfo::StreamInfo& stream_info, std::string& body),
               (const));
+
+  std::string response_body_;
 };
 
 class TestCorsPolicy : public CorsPolicy {
