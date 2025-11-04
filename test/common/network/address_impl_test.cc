@@ -791,8 +791,7 @@ TEST(AddressMetadataTest, Ipv4MetadataInstanceWithoutOsSupport) {
   // Create address 192.168.1.100.
   addr.sin_addr.s_addr = htonl(0xC0A80164);
 
-  auto result =
-      InstanceFactory::createMetadataInstance<Ipv4Instance>(&addr, nullptr, absl::nullopt);
+  auto result = InstanceFactory::createMetadataIpv4Instance(&addr);
   ASSERT_TRUE(result.ok());
 
   auto instance = *result;
@@ -818,8 +817,7 @@ TEST(AddressMetadataTest, Ipv6MetadataInstanceWithoutOsSupport) {
   addr.sin6_addr.s6_addr[3] = 0xb8;
   addr.sin6_addr.s6_addr[15] = 0x01;
 
-  auto result =
-      InstanceFactory::createMetadataInstance<Ipv6Instance>(addr, true, nullptr, absl::nullopt);
+  auto result = InstanceFactory::createMetadataIpv6Instance(addr, true);
   ASSERT_TRUE(result.ok());
 
   auto instance = *result;
@@ -840,8 +838,7 @@ TEST(AddressMetadataTest, Ipv4MetadataInstanceAddressOperations) {
   addr.sin_port = htons(80);
   addr.sin_addr.s_addr = htonl(0x7F000001); // 127.0.0.1
 
-  auto result =
-      InstanceFactory::createMetadataInstance<Ipv4Instance>(&addr, nullptr, absl::nullopt);
+  auto result = InstanceFactory::createMetadataIpv4Instance(&addr);
   ASSERT_TRUE(result.ok());
 
   auto instance = *result;
@@ -867,8 +864,7 @@ TEST(AddressMetadataTest, Ipv6MetadataInstanceAddressOperations) {
   addr.sin6_addr.s6_addr[1] = 0x80;
   addr.sin6_addr.s6_addr[15] = 0x01;
 
-  auto result =
-      InstanceFactory::createMetadataInstance<Ipv6Instance>(addr, true, nullptr, absl::nullopt);
+  auto result = InstanceFactory::createMetadataIpv6Instance(addr, true);
   ASSERT_TRUE(result.ok());
 
   auto instance = *result;
@@ -892,7 +888,7 @@ TEST(AddressMetadataTest, RegularInstanceStillRequiresOsSupport) {
   addr.sin_addr.s_addr = htonl(0x7F000001);
 
   // Regular instance creation should fail when OS doesn't support the address family.
-  auto result = InstanceFactory::createInstancePtr<Ipv4Instance>(&addr, nullptr, absl::nullopt);
+  auto result = InstanceFactory::createInstancePtr<Ipv4Instance>(&addr);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().message(), "IPv4 addresses are not supported on this machine");
 }

@@ -384,10 +384,10 @@ bool Filter::parseV2Header(const char* buf) {
         // PROXY protocol header and will only be used for logging, access control, or header
         // forwarding, not for actual socket operations. The actual connection uses the real socket
         // address and does not require OS support for the address family specified in the header.
-        auto remote_address_status = Network::Address::InstanceFactory::createMetadataInstance<
-            Network::Address::Ipv4Instance>(&ra4, nullptr, absl::nullopt);
-        auto local_address_status = Network::Address::InstanceFactory::createMetadataInstance<
-            Network::Address::Ipv4Instance>(&la4, nullptr, absl::nullopt);
+        auto remote_address_status =
+            Network::Address::InstanceFactory::createMetadataIpv4Instance(&ra4);
+        auto local_address_status =
+            Network::Address::InstanceFactory::createMetadataIpv4Instance(&la4);
         if (!remote_address_status.ok() || !local_address_status.ok()) {
           ENVOY_LOG(debug, "Proxy protocol failure: {}",
                     !remote_address_status.ok() ? remote_address_status.status()
@@ -425,10 +425,10 @@ bool Filter::parseV2Header(const char* buf) {
         // PROXY protocol header and will only be used for logging, access control, or header
         // forwarding, not for actual socket operations. The actual connection uses the real socket
         // address and does not require OS support for the address family specified in the header.
-        auto remote_address_status = Network::Address::InstanceFactory::createMetadataInstance<
-            Network::Address::Ipv6Instance>(ra6, true, nullptr, absl::nullopt);
-        auto local_address_status = Network::Address::InstanceFactory::createMetadataInstance<
-            Network::Address::Ipv6Instance>(la6, true, nullptr, absl::nullopt);
+        auto remote_address_status =
+            Network::Address::InstanceFactory::createMetadataIpv6Instance(ra6, true);
+        auto local_address_status =
+            Network::Address::InstanceFactory::createMetadataIpv6Instance(la6, true);
         if (!remote_address_status.ok() || !local_address_status.ok()) {
           ENVOY_LOG(debug, "Proxy protocol failure: {}",
                     !remote_address_status.ok() ? remote_address_status.status()
