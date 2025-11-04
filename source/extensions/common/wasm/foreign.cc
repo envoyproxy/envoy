@@ -49,7 +49,7 @@ RegisterForeignFunction registerVerifySignatureForeignFunction(
     [](WasmBase&, std::string_view arguments,
        const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       envoy::source::extensions::common::wasm::VerifySignatureArguments args;
-      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+      if (args.ParseFromString(arguments)) {
         const auto& hash = args.hash_function();
         auto key_str = args.public_key();
         auto signature_str = args.signature();
@@ -118,7 +118,7 @@ RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
     [](WasmBase&, std::string_view arguments,
        const std::function<void*(size_t size)>&) -> WasmResult {
       envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments args;
-      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+      if (args.ParseFromString(arguments)) {
         auto context = static_cast<Context*>(proxy_wasm::current_context_);
         return context->setEnvoyFilterState(args.path(), args.value(),
                                             toFilterStateLifeSpan(args.span()));
@@ -302,7 +302,7 @@ public:
     WasmForeignFunction f = [self](WasmBase&, std::string_view arguments,
                                    const std::function<void*(size_t size)>&) -> WasmResult {
       envoy::source::extensions::common::wasm::DeclarePropertyArguments args;
-      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+      if (args.ParseFromString(arguments)) {
         CelStateType type = CelStateType::Bytes;
         switch (args.type()) {
         case envoy::source::extensions::common::wasm::WasmType::Bytes:

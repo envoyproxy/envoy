@@ -789,7 +789,7 @@ void TestRootContext::onTick() {
           if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
                                                             in.size(), &out, &out_size)) {
               envoy::source::extensions::common::wasm::VerifySignatureResult result;
-              if (result.ParseFromArray(out, static_cast<int>(out_size)) && result.result()) {
+              if (result.ParseFromString(absl::string_view(out, out_size)) && result.result()) {
                   logInfo("signature is valid");
               } else {
                   logError(result.error());
@@ -813,7 +813,7 @@ void TestRootContext::onTick() {
           if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
                                                             in.size(), &out, &out_size)) {
               envoy::source::extensions::common::wasm::VerifySignatureResult result;
-              if (result.ParseFromArray(out, static_cast<int>(out_size)) && result.result()) {
+              if (result.ParseFromString(absl::string_view(out, out_size)) && result.result()) {
                   logCritical("signature should not be ok");
               } else {
                   logError(result.error());
@@ -836,7 +836,7 @@ void TestRootContext::onTick() {
           if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
                                                             in.size(), &out, &out_size)) {
               envoy::source::extensions::common::wasm::VerifySignatureResult result;
-              if (result.ParseFromArray(out, static_cast<int>(out_size)) && result.result()) {
+              if (result.ParseFromString(absl::string_view(out, out_size)) && result.result()) {
                   logCritical("signature should not be ok");
               } else {
                   logError(result.error());
@@ -860,7 +860,7 @@ void TestRootContext::onTick() {
           if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
                                                             in.size(), &out, &out_size)) {
               envoy::source::extensions::common::wasm::VerifySignatureResult result;
-              if (result.ParseFromArray(out, static_cast<int>(out_size)) && result.result()) {
+              if (result.ParseFromString(absl::string_view(out, out_size)) && result.result()) {
                   logCritical("signature should not be ok");
               } else {
                   logError(result.error());
