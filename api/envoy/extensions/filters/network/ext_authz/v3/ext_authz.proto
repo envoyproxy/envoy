@@ -77,8 +77,7 @@ message ExtAuthz {
   // Defaults to ``false``.
   bool send_tls_alert_on_denial = 9;
 
-  // Moves the check request from on data to on new connection.
-  //
-  // Defaults to ``false``.
+  // When set to ``true``, the filter will perform the authorization check when the connection is first established.
+  // Subsequent filters will not be initialiazed or receive data until a decision has been reached.
   bool check_on_new_connection = 10;
 }
