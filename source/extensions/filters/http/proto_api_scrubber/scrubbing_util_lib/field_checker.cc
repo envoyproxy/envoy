@@ -38,13 +38,38 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
     return FieldCheckResults::kInclude;
   }
 
-  // Preserve the field (i.e., kInclude) if there is no match tree configured for it.
-  if (match_tree == nullptr) {
-    return FieldCheckResults::kInclude;
+  // If there's a match tree configured for the field, evaluate the match, convert the match result
+  // to FieldCheckResults and return it.
+  if (match_tree != nullptr) {
+    absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(match_tree);
+    return matchResultStatusToFieldCheckResult(match_result, field_mask);
   }
 
-  absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(match_tree);
+  // If there's no match tree configured for the field, check the field type to see if it needs to
+  // traversed further. All non-primitive field types e.g., message, enums, maps, etc., if not
+  // excluded above via match tree need to be traversed further. Returning `kPartial` makes sure
+  // that the `proto_scrubber` library traverses the child fields of this field. Currently, only
+  // message type is supported by FieldChecker. Support for other non-primitive types will be added
+  // in the future.
+  if (field->kind() == Protobuf::Field_Kind_TYPE_MESSAGE) {
+    return FieldCheckResults::kPartial;
+  }
 
+  return FieldCheckResults::kInclude;
+}
+
+absl::StatusOr<Matcher::MatchResult>
+FieldChecker::tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const {
+  Matcher::MatchResult match_result = match_tree->match(*matching_data_ptr_);
+  if (!match_result.isComplete()) {
+    return absl::InternalError("Matching couldn't complete due to insufficient data.");
+  }
+
+  return match_result;
+}
+
+FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
+    absl::StatusOr<Matcher::MatchResult>& match_result, std::string& field_mask) const {
   // Preserve the field (i.e., kInclude) if there's any error in evaluating the match.
   // This can happen in two cases:
   // 1. The match tree is corrupt.
@@ -72,19 +97,11 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
   if (match_result->action()->typeUrl() ==
       "envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction") {
     return FieldCheckResults::kExclude;
+  } else {
+    // Preserve the field (i.e., kInclude) if there's a match and the matched action is not
+    // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`.
+    return FieldCheckResults::kInclude;
   }
-
-  return FieldCheckResults::kInclude;
-}
-
-absl::StatusOr<Matcher::MatchResult>
-FieldChecker::tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const {
-  Matcher::MatchResult match_result = match_tree->match(*matching_data_ptr_);
-  if (!match_result.isComplete()) {
-    return absl::InternalError("Matching couldn't complete due to insufficient data.");
-  }
-
-  return match_result;
 }
 
 FieldCheckResults FieldChecker::CheckType(const Protobuf::Type*) const {

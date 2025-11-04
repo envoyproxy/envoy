@@ -363,6 +363,7 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
     // The field `urn` doesn't have any match tree configured.
     Protobuf::Field field;
     field.set_name("urn");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
     EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
   }
 
@@ -371,6 +372,7 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
     // Hence, no match is found and CheckField returns kInclude.
     Protobuf::Field field;
     field.set_name("shelf");
+    field.set_kind(Protobuf::Field_Kind_TYPE_INT64);
     EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
   }
 
@@ -381,7 +383,17 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
     // and hence, CheckField returns kInclude.
     Protobuf::Field field;
     field.set_name("id");
+    field.set_kind(Protobuf::Field_Kind_TYPE_INT64);
     EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kExclude);
+  }
+
+  {
+    // The field `metadata` is of message type and doesn't have any match tree configured for it.
+    // Hence, kPartial is expected.
+    Protobuf::Field field;
+    field.set_name("metadata");
+    field.set_kind(Protobuf::Field_Kind_TYPE_MESSAGE);
+    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kPartial);
   }
 }
 
@@ -396,6 +408,7 @@ TEST_F(FieldCheckerTest, ResponseFieldChecker) {
     // The field `author` doesn't have any match tree configured.
     Protobuf::Field field;
     field.set_name("author");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
     EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
   }
 
@@ -404,6 +417,7 @@ TEST_F(FieldCheckerTest, ResponseFieldChecker) {
     // Hence, no match is found and CheckField returns kInclude.
     Protobuf::Field field;
     field.set_name("publisher");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
     EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
   }
 
@@ -414,7 +428,17 @@ TEST_F(FieldCheckerTest, ResponseFieldChecker) {
     // and hence, CheckField returns kInclude.
     Protobuf::Field field;
     field.set_name("name");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
     EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kExclude);
+  }
+
+  {
+    // The field `metadata` is of message type and doesn't have any match tree configured for it.
+    // Hence, kPartial is expected.
+    Protobuf::Field field;
+    field.set_name("metadata");
+    field.set_kind(Protobuf::Field_Kind_TYPE_MESSAGE);
+    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kPartial);
   }
 }
 
@@ -422,6 +446,7 @@ TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Protobuf::Field field;
   field.set_name("user");
+  field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
 
   FieldChecker field_checker(ScrubberContext::kTestScrubbing, &mock_stream_info,
                              "/library.BookService/GetBook", filter_config_.get());
