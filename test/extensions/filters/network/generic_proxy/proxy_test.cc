@@ -1834,7 +1834,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
           }));
 
   EXPECT_CALL(*mock_decoder_filter_0, decodeHeaderFrame(_))
-      .WillOnce(Invoke([&](const RequestHeaderFrame& fame) {
+      .WillOnce(Invoke([&](const RequestHeaderFrame&) {
         EXPECT_NE(&mock_decoder_filter_0->decoder_callbacks_->activeSpan(),
                   &Tracing::NullSpan::instance());
         EXPECT_TRUE(mock_decoder_filter_0->decoder_callbacks_->tracingConfig().has_value());
