@@ -778,6 +778,125 @@ struct TestCase test_cases[] = {
 INSTANTIATE_TEST_SUITE_P(AddressCrossProduct, MixedAddressTest,
                          ::testing::Combine(::testing::ValuesIn(test_cases),
                                             ::testing::ValuesIn(test_cases)));
+
+// Tests for createMetadataInstance factory method.
+TEST(AddressMetadataTest, Ipv4MetadataInstanceWithoutOsSupport) {
+  // Create IPv4 address as metadata even when OS doesn't support IPv4.
+  Cleanup cleaner = Ipv4Instance::forceProtocolUnsupportedForTest(true);
+
+  sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(443);
+  // Create address 192.168.1.100.
+  addr.sin_addr.s_addr = htonl(0xC0A80164);
+
+  auto result =
+      InstanceFactory::createMetadataInstance<Ipv4Instance>(&addr, nullptr, absl::nullopt);
+  ASSERT_TRUE(result.ok());
+
+  auto instance = *result;
+  EXPECT_NE(instance, nullptr);
+  EXPECT_EQ(instance->type(), Type::Ip);
+  EXPECT_EQ(instance->ip()->version(), IpVersion::v4);
+  EXPECT_EQ(instance->ip()->addressAsString(), "192.168.1.100");
+  EXPECT_EQ(instance->ip()->port(), 443);
+}
+
+TEST(AddressMetadataTest, Ipv6MetadataInstanceWithoutOsSupport) {
+  // Create IPv6 address as metadata even when OS doesn't support IPv6.
+  Cleanup cleaner = Ipv6Instance::forceProtocolUnsupportedForTest(true);
+
+  sockaddr_in6 addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin6_family = AF_INET6;
+  addr.sin6_port = htons(8080);
+  // Create address 2001:db8::1.
+  addr.sin6_addr.s6_addr[0] = 0x20;
+  addr.sin6_addr.s6_addr[1] = 0x01;
+  addr.sin6_addr.s6_addr[2] = 0x0d;
+  addr.sin6_addr.s6_addr[3] = 0xb8;
+  addr.sin6_addr.s6_addr[15] = 0x01;
+
+  auto result =
+      InstanceFactory::createMetadataInstance<Ipv6Instance>(addr, true, nullptr, absl::nullopt);
+  ASSERT_TRUE(result.ok());
+
+  auto instance = *result;
+  EXPECT_NE(instance, nullptr);
+  EXPECT_EQ(instance->type(), Type::Ip);
+  EXPECT_EQ(instance->ip()->version(), IpVersion::v6);
+  EXPECT_EQ(instance->ip()->addressAsString(), "2001:db8::1");
+  EXPECT_EQ(instance->ip()->port(), 8080);
+}
+
+TEST(AddressMetadataTest, Ipv4MetadataInstanceAddressOperations) {
+  // Verify that metadata instances support all address operations.
+  Cleanup cleaner = Ipv4Instance::forceProtocolUnsupportedForTest(true);
+
+  sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(80);
+  addr.sin_addr.s_addr = htonl(0x7F000001); // 127.0.0.1
+
+  auto result =
+      InstanceFactory::createMetadataInstance<Ipv4Instance>(&addr, nullptr, absl::nullopt);
+  ASSERT_TRUE(result.ok());
+
+  auto instance = *result;
+  // Verify address properties work correctly.
+  EXPECT_FALSE(instance->ip()->isAnyAddress());
+  EXPECT_TRUE(instance->ip()->isUnicastAddress());
+  EXPECT_FALSE(instance->ip()->isLinkLocalAddress());
+
+  // Verify string representation works.
+  EXPECT_EQ(instance->asString(), "127.0.0.1:80");
+}
+
+TEST(AddressMetadataTest, Ipv6MetadataInstanceAddressOperations) {
+  // Verify that metadata instances support all address operations.
+  Cleanup cleaner = Ipv6Instance::forceProtocolUnsupportedForTest(true);
+
+  sockaddr_in6 addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin6_family = AF_INET6;
+  addr.sin6_port = htons(443);
+  // Create link-local address fe80::1.
+  addr.sin6_addr.s6_addr[0] = 0xfe;
+  addr.sin6_addr.s6_addr[1] = 0x80;
+  addr.sin6_addr.s6_addr[15] = 0x01;
+
+  auto result =
+      InstanceFactory::createMetadataInstance<Ipv6Instance>(addr, true, nullptr, absl::nullopt);
+  ASSERT_TRUE(result.ok());
+
+  auto instance = *result;
+  // Verify address properties work correctly.
+  EXPECT_FALSE(instance->ip()->isAnyAddress());
+  EXPECT_TRUE(instance->ip()->isUnicastAddress());
+  EXPECT_TRUE(instance->ip()->isLinkLocalAddress());
+
+  // Verify string representation works.
+  EXPECT_EQ(instance->asString(), "[fe80::1]:443");
+}
+
+TEST(AddressMetadataTest, RegularInstanceStillRequiresOsSupport) {
+  // Verify that regular (non-metadata) instances still require OS support.
+  Cleanup cleaner = Ipv4Instance::forceProtocolUnsupportedForTest(true);
+
+  sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(80);
+  addr.sin_addr.s_addr = htonl(0x7F000001);
+
+  // Regular instance creation should fail when OS doesn't support the address family.
+  auto result = InstanceFactory::createInstancePtr<Ipv4Instance>(&addr, nullptr, absl::nullopt);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(), "IPv4 addresses are not supported on this machine");
+}
+
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

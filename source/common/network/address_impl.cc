@@ -161,6 +161,19 @@ Ipv4Instance::Ipv4Instance(absl::Status& status, const sockaddr_in* address,
   initHelper(address);
 }
 
+Ipv4Instance::Ipv4Instance(absl::Status& status, const sockaddr_in* address,
+                           const SocketInterface* sock_interface,
+                           absl::optional<std::string> network_namespace, bool skip_validation)
+    : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface), network_namespace) {
+  if (!skip_validation) {
+    status = validateProtocolSupported();
+    if (!status.ok()) {
+      return;
+    }
+  }
+  initHelper(address);
+}
+
 bool Ipv4Instance::operator==(const Instance& rhs) const {
   const Ipv4Instance* rhs_casted = dynamic_cast<const Ipv4Instance*>(&rhs);
   return (rhs_casted && (ip_.ipv4_.address() == rhs_casted->ip_.ipv4_.address()) &&
@@ -325,6 +338,19 @@ Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bo
   status = validateProtocolSupported();
   if (!status.ok()) {
     return;
+  }
+  initHelper(address, v6only);
+}
+
+Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bool v6only,
+                           const SocketInterface* sock_interface,
+                           absl::optional<std::string> network_namespace, bool skip_validation)
+    : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface), network_namespace) {
+  if (!skip_validation) {
+    status = validateProtocolSupported();
+    if (!status.ok()) {
+      return;
+    }
   }
   initHelper(address, v6only);
 }

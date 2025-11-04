@@ -49,6 +49,11 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: proxy_protocol
+  change: |
+    Fixed PROXY protocol listener filter to work without requiring operating system support for the address family
+    specified in the PROXY protocol header. Addresses from PROXY protocol headers are now created as metadata-only
+    instances that can be used for logging, access control, and header forwarding without OS validation.
 - area: http2
   change: |
     Fixed a bug where Envoy would leak memory if an HTTP/2 stream was reset before request headers were
