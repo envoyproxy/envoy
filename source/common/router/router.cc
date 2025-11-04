@@ -1995,11 +1995,11 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   // convertRequestHeadersForInternalRedirect logs failure reasons but log
   // details for other failure modes here.
   if (!downstream_end_stream_) {
-    ENVOY_STREAM_LOG(trace, "Internal redirect failed: request incomplete", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "Internal redirect failed: request incomplete", *callbacks_);
   } else if (request_buffer_overflowed_) {
-    ENVOY_STREAM_LOG(trace, "Internal redirect failed: request body overflow", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "Internal redirect failed: request body overflow", *callbacks_);
   } else if (location == nullptr) {
-    ENVOY_STREAM_LOG(trace, "Internal redirect failed: missing location header", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "Internal redirect failed: missing location header", *callbacks_);
   }
 
   cluster_->trafficStats()->upstream_internal_redirect_failed_total_.inc();
