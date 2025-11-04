@@ -4,6 +4,7 @@ adisuissa:
   slack: UT17EMMTP
 agrawroh:
   maintainer: true
+  opsgenie: Rohit
   slack: U025KC9D7T5
 antoniovleonti:
   first-pass: true
