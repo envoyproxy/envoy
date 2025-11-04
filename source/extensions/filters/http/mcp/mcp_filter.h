@@ -21,12 +21,29 @@ namespace MetadataKeys {
 constexpr absl::string_view FilterName = "mcp_proxy";
 } // namespace MetadataKeys
 
+// MCP protocol constants
+namespace McpConstants {
+constexpr absl::string_view JsonRpcVersion = "2.0";
+} // namespace McpConstants
+
 /**
  * Configuration for the MCP filter.
  */
 class McpFilterConfig {
 public:
-  McpFilterConfig() = default;
+  explicit McpFilterConfig(const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config)
+      : traffic_mode_(proto_config.traffic_mode()) {}
+
+  envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode() const {
+    return traffic_mode_;
+  }
+
+  bool shouldRejectNonMcp() const {
+    return traffic_mode_ == envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP;
+  }
+
+private:
+  const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
 };
 
 /**
@@ -34,7 +51,16 @@ public:
  */
 class McpOverrideConfig : public Router::RouteSpecificFilterConfig {
 public:
-  McpOverrideConfig() = default;
+  explicit McpOverrideConfig(
+      const envoy::extensions::filters::http::mcp::v3::McpOverride& proto_config)
+      : traffic_mode_(proto_config.traffic_mode()) {}
+
+  envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode() const {
+    return traffic_mode_;
+  }
+
+private:
+  const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
 };
 
 using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;
@@ -64,9 +90,14 @@ public:
   }
 
 private:
+  bool isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const;
+  bool isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const;
+  bool shouldRejectRequest() const;
+
   void finalizeDynamicMetadata();
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  bool is_mcp_request_{false};
   bool is_json_post_request_{false};
   std::unique_ptr<Protobuf::Struct> metadata_;
 };

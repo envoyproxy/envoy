@@ -215,22 +215,20 @@ void BoundGenericUpstream::cleanUp(bool close_connection) {
   }
 }
 
-void BoundGenericUpstream::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::RemoteClose) {
-    if (encoder_decoder_ != nullptr) {
-      encoder_decoder_->onConnectionClose(event);
-    }
-
-    // Remove the connection event watcher callbacks since the upstream is already closed.
-    // If the upstream connection closes shortly after a frame that ends the stream is sent by the
-    // client codec, the downstream connection may end up being closed after this object has already
-    // been destroyed.
-    downstream_conn_.removeConnectionCallbacks(connection_event_watcher_);
-
-    // If the downstream connection is not closed, close it.
-    downstream_conn_.close(Network::ConnectionCloseType::FlushWrite);
+void BoundGenericUpstream::onConnectionClose(Network::ConnectionEvent) {
+  if (saw_connection_close_event_) {
+    return;
   }
+  saw_connection_close_event_ = true;
+
+  // Remove the connection event watcher callbacks since the upstream is already closed.
+  // If the upstream connection closes shortly after a frame that ends the stream is sent by the
+  // client codec, the downstream connection may end up being closed after this object has already
+  // been destroyed.
+  downstream_conn_.removeConnectionCallbacks(connection_event_watcher_);
+
+  // If the downstream connection is not closed, close it.
+  downstream_conn_.close(Network::ConnectionCloseType::FlushWrite);
 }
 
 void BoundGenericUpstream::onUpstreamSuccess() {
@@ -291,15 +289,6 @@ void OwnedGenericUpstream::removeUpstreamRequest(uint64_t) {
     encoder_decoder_->removeUpstreamRequest({});
   }
   upstream_request_ = nullptr;
-}
-
-void OwnedGenericUpstream::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::RemoteClose) {
-    if (encoder_decoder_ != nullptr) {
-      encoder_decoder_->onConnectionClose(event);
-    }
-  }
 }
 
 void OwnedGenericUpstream::onUpstreamSuccess() {

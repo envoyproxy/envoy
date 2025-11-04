@@ -73,7 +73,7 @@ format_some () {
 
     if [[ "$use_bazel" == "1" ]]; then
         bazel run //tools/code_format:check_format fix "$@"
-        ./tools/spelling/check_spelling_pedantic.py fix "$@"
+        bazel run //tools/spelling:check_spelling_pedantic fix "$@"
     else
       for arg in "$@"; do
           ./tools/code_format/check_format.py \
@@ -91,7 +91,7 @@ function format_all() {
       set -x
     fi
     bazel run //tools/code_format:check_format -- fix
-    ./tools/spelling/check_spelling_pedantic.py fix
+    bazel run //tools/spelling:check_spelling_pedantic -- fix --target_root="$PWD"
   )
 }
 
