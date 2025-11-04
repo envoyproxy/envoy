@@ -67,7 +67,7 @@ message Config {
 
     // For the computed set of tags, increment the counter by this fixed amount.
     // One of ``value_format`` or ``value_fixed``
-    google.protobuf.UInt64Value value_fixed = 3;
+    google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
   }
 
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];

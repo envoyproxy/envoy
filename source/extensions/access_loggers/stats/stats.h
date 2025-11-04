@@ -44,13 +44,28 @@ private:
                 Stats::StatNamePool& pool,
                 const std::vector<Formatter::CommandParserPtr>& commands);
 
+    std::pair<Stats::StatNameTagVector, std::vector<Stats::StatNameDynamicStorage>>
+    tags(const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info,
+         Stats::Scope& scope) const;
+
     Stats::StatName name_;
-    Stats::StatNameTagVector static_tags_;
     std::vector<DynamicTag> dynamic_tags_;
     Stats::Histogram::Unit unit_;
   };
 
-  std::vector<std::pair<NameAndTags, Formatter::FormatterProviderPtr>> histograms_;
+  struct Histogram {
+    NameAndTags stat_;
+    Formatter::FormatterProviderPtr value_formatter_;
+  };
+
+  struct Counter {
+    NameAndTags stat_;
+    Formatter::FormatterProviderPtr value_formatter_;
+    uint64_t value_fixed_;
+  };
+
+  std::vector<Histogram> histograms_;
+  std::vector<Counter> counters_;
 
   Stats::ScopeSharedPtr scope_;
   Stats::StatNamePool stat_name_pool_;
