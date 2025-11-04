@@ -4933,5 +4933,43 @@ TEST_F(HttpConnectionManagerImplTest, ShouldDrainConnectionUponCompletionHttp11)
   response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 }
 
+// Test graceful shutdown behavior with sendGoAwayAndClose(true)
+TEST_F(HttpConnectionManagerImplTest, SendGoAwayAndCloseGraceful) {
+  setup();
+  // Mock codec to return HTTP/2 protocol for graceful shutdown support.
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http2));
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        // Trigger graceful shutdown during request processing
+        filter->callbacks_->sendGoAwayAndClose(true);
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+  // Expect graceful shutdown to start drain timer and send shutdown notice
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  EXPECT_CALL(*codec_, shutdownNotice());
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // Complete the existing stream
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+}
+
 } // namespace Http
 } // namespace Envoy
