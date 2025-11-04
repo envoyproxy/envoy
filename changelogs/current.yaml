@@ -69,6 +69,9 @@ bug_fixes:
   change: |
     Fixed a bug where Lua filters could cause Envoy to crash when setting the response body to a payload larger
     than the body buffer limit.
+- area: tap
+  change: |
+    Add the missing conversion support to ensure tapped message are correctly handled for multi-event submissions.
 - area: bootstrap
   change: |
     Fixed an issue where the custom
@@ -83,6 +86,9 @@ bug_fixes:
     Fixed ``shouldDrainConnectionUponCompletion()`` to properly send ``GOAWAY`` frames for HTTP/2 and HTTP/3
     instead of aggressively closing connections. This prevents response body transmission interruption and
     ``ERR_DRAINING`` errors on the client side. HTTP/1.1 behavior remains unchanged.
+- area: udp_proxy
+  change: |
+    Fixed a few areas where the addresses might be moved from the data packet being processed.
 - area: composite
   change: |
     Fixed per-route configuration for composite filter to support matching on response headers and trailers.
