@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/access_loggers/stats/v3/stats.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
@@ -18,38 +17,34 @@ public:
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
+          const std::string config_yaml = R"EOF(
+              name: envoy.access_loggers.stats
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stat_prefix: test_stat_prefix
+                counters:
+                  - stat:
+                      name: fixedcounter
+                      tags:
+                        - name: fixed_tag
+                          value_format: fixed_value
+                        - name: dynamic_tag
+                          value_format: '%REQUEST_HEADER(tag-value)%_%PROTOCOL%'
+                    value_fixed: 42
+                  - stat:
+                      name: formatcounter
+                    value_format: '%RESPONSE_CODE%'
+                histograms:
+                  - stat:
+                      name: testhistogram
+                      tags:
+                        - name: tag
+                          value_format: '%REQUEST_HEADER(tag-value)%'
+                    value_format: '%REQUEST_HEADER(histogram-value)%'
+
+)EOF";
           auto* access_log = hcm.add_access_log();
-          access_log->set_name("stats_accesslog");
-
-          envoy::extensions::access_loggers::stats::v3::Config config;
-          config.set_stat_prefix("test_stat_prefix");
-
-          {
-            auto* counter = config.add_counters();
-            counter->mutable_stat()->set_name("fixedcounter");
-            counter->mutable_value_fixed()->set_value(42);
-            auto* tag1 = counter->mutable_stat()->add_tags();
-            tag1->set_name("fixed_tag");
-            tag1->set_value_format("fixed_value");
-            auto* tag2 = counter->mutable_stat()->add_tags();
-            tag2->set_name("dynamic_tag");
-            tag2->set_value_format("%REQUEST_HEADER(tag-value)%_%PROTOCOL%");
-          }
-          {
-            auto* counter = config.add_counters();
-            counter->mutable_stat()->set_name("formatcounter");
-            counter->set_value_format("%RESPONSE_CODE%");
-          }
-
-          {
-            auto* histogram = config.add_histograms();
-            histogram->mutable_stat()->set_name("testhistogram");
-            histogram->set_value_format("%REQUEST_HEADER(histogram-value)%");
-            auto* tag = histogram->mutable_stat()->add_tags();
-            tag->set_name("tag");
-            tag->set_value_format("%REQUEST_HEADER(tag-value)%");
-          }
-          access_log->mutable_typed_config()->PackFrom(config);
+          TestUtility::loadFromYaml(config_yaml, *access_log);
         });
 
     HttpIntegrationTest::initialize();
