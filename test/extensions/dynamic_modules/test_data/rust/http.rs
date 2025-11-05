@@ -695,6 +695,7 @@ struct BodyCallbacksFilter {
   response_body: Vec<u8>,
 }
 
+#[cfg(test)]
 impl BodyCallbacksFilter {
   fn get_final_read_request_body<'a>(&'a self) -> &'a Vec<u8> {
     &self.request_body
