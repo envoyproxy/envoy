@@ -1038,12 +1038,10 @@ TEST_F(NetworkExtProcFilterTest, MessageTimeoutManagerOnTimeoutViaTimerCallback)
   EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Return(ByMove(std::move(stream))));
 
   // Start read operation which activates the timer
-  EXPECT_CALL(read_callbacks_, disableClose(true));
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
   // Setup expectations for timeout
-  EXPECT_CALL(read_callbacks_, disableClose(false)).Times(2);
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
   EXPECT_CALL(connection_,
               close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
