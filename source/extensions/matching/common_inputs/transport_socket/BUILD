@@ -17,6 +17,7 @@ envoy_cc_library(
     deps = [
         "//envoy/matcher:matcher_interface",
         "//envoy/registry",
+        "//envoy/upstream:transport_socket_matching_data_interface",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/json:json_utility_lib",

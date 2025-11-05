@@ -5,7 +5,7 @@
 #include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.validate.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
-#include "envoy/stream_info/filter_state.h"
+#include "envoy/upstream/transport_socket_matching_data.h"
 
 #include "source/common/config/metadata.h"
 
@@ -18,36 +18,11 @@ namespace CommonInputs {
 namespace TransportSocket {
 
 /**
- * Data structure holding context for transport socket matching.
- * This provides access to:
- * - Endpoint metadata: metadata associated with the selected upstream endpoint
- * - Locality metadata: metadata associated with the endpoint's locality
- * - Filter state: shared filter state from downstream connection (via TransportSocketOptions)
- *
- * Filter state enables downstream-connection-based matching by allowing filters to explicitly
- * pass any data (e.g., network namespace, custom attributes) from downstream to upstream.
- * This follows the same pattern as tunneling in Envoy.
- */
-struct TransportSocketMatchingData {
-  static absl::string_view name() { return "transport_socket"; }
-
-  TransportSocketMatchingData(const envoy::config::core::v3::Metadata* endpoint_metadata,
-                              const envoy::config::core::v3::Metadata* locality_metadata,
-                              const StreamInfo::FilterState* filter_state = nullptr)
-      : endpoint_metadata_(endpoint_metadata), locality_metadata_(locality_metadata),
-        filter_state_(filter_state) {}
-
-  const envoy::config::core::v3::Metadata* endpoint_metadata_;
-  const envoy::config::core::v3::Metadata* locality_metadata_;
-  const StreamInfo::FilterState* filter_state_;
-};
-
-/**
  * Base class for transport socket data input implementations.
  */
-class TransportSocketInputBase : public Matcher::DataInput<TransportSocketMatchingData> {
+class TransportSocketInputBase : public Matcher::DataInput<Upstream::TransportSocketMatchingData> {
 public:
-  Matcher::DataInputGetResult get(const TransportSocketMatchingData& data) const override;
+  Matcher::DataInputGetResult get(const Upstream::TransportSocketMatchingData& data) const override;
 
 protected:
   /**
@@ -55,7 +30,8 @@ protected:
    * @param data the transport socket matching data.
    * @return the extracted string value or absl::nullopt if not available.
    */
-  virtual absl::optional<std::string> getValue(const TransportSocketMatchingData& data) const PURE;
+  virtual absl::optional<std::string>
+  getValue(const Upstream::TransportSocketMatchingData& data) const PURE;
 };
 
 /**
@@ -67,7 +43,8 @@ public:
       : filter_(filter), path_(path) {}
 
 protected:
-  absl::optional<std::string> getValue(const TransportSocketMatchingData& data) const override;
+  absl::optional<std::string>
+  getValue(const Upstream::TransportSocketMatchingData& data) const override;
 
 private:
   const std::string filter_;
@@ -83,7 +60,8 @@ public:
       : filter_(filter), path_(path) {}
 
 protected:
-  absl::optional<std::string> getValue(const TransportSocketMatchingData& data) const override;
+  absl::optional<std::string>
+  getValue(const Upstream::TransportSocketMatchingData& data) const override;
 
 private:
   const std::string filter_;
@@ -93,11 +71,12 @@ private:
 /**
  * Factory for creating endpoint metadata data inputs.
  */
-class EndpointMetadataInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
+class EndpointMetadataInputFactory
+    : public Matcher::DataInputFactory<Upstream::TransportSocketMatchingData> {
 public:
   std::string name() const override { return "envoy.matching.inputs.endpoint_metadata"; }
 
-  Matcher::DataInputFactoryCb<TransportSocketMatchingData>
+  Matcher::DataInputFactoryCb<Upstream::TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,
                            ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
@@ -109,11 +88,12 @@ public:
 /**
  * Factory for creating locality metadata data inputs.
  */
-class LocalityMetadataInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
+class LocalityMetadataInputFactory
+    : public Matcher::DataInputFactory<Upstream::TransportSocketMatchingData> {
 public:
   std::string name() const override { return "envoy.matching.inputs.locality_metadata"; }
 
-  Matcher::DataInputFactoryCb<TransportSocketMatchingData>
+  Matcher::DataInputFactoryCb<Upstream::TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,
                            ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
@@ -132,7 +112,8 @@ public:
   explicit FilterStateInput(const std::string& key) : key_(key) {}
 
 protected:
-  absl::optional<std::string> getValue(const TransportSocketMatchingData& data) const override;
+  absl::optional<std::string>
+  getValue(const Upstream::TransportSocketMatchingData& data) const override;
 
 private:
   const std::string key_;
@@ -141,13 +122,14 @@ private:
 /**
  * Factory for creating filter state data inputs.
  */
-class FilterStateInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
+class FilterStateInputFactory
+    : public Matcher::DataInputFactory<Upstream::TransportSocketMatchingData> {
 public:
   std::string name() const override {
     return "envoy.matching.inputs.transport_socket_filter_state";
   }
 
-  Matcher::DataInputFactoryCb<TransportSocketMatchingData>
+  Matcher::DataInputFactoryCb<Upstream::TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,
                            ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
@@ -189,11 +171,4 @@ public:
 } // namespace CommonInputs
 } // namespace Matching
 } // namespace Extensions
-
-// Export TransportSocketMatchingData to the Upstream namespace for backward compatibility.
-namespace Upstream {
-using TransportSocketMatchingData =
-    Extensions::Matching::CommonInputs::TransportSocket::TransportSocketMatchingData;
-} // namespace Upstream
-
 } // namespace Envoy

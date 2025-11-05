@@ -46,7 +46,8 @@ message EndpointMetadataInput {
   }
 
   // The filter name to retrieve the Struct from the endpoint metadata.
-  string filter = 1 [(validate.rules).string = {min_len: 1}];
+  // If not specified, defaults to ``envoy.lb`` which is commonly used for load balancing metadata.
+  string filter = 1;
 
   // The path to retrieve the Value from the Struct.
   repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
@@ -85,7 +86,8 @@ message LocalityMetadataInput {
   }
 
   // The filter name to retrieve the Struct from the locality metadata.
-  string filter = 1 [(validate.rules).string = {min_len: 1}];
+  // If not specified, defaults to ``envoy.lb`` which is commonly used for load balancing metadata.
+  string filter = 1;
 
   // The path to retrieve the Value from the Struct.
   repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];

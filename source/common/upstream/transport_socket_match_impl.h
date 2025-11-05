@@ -16,6 +16,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
+#include "envoy/upstream/transport_socket_matching_data.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
@@ -114,6 +115,18 @@ private:
                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const;
 
   /**
+   * Setup legacy metadata-based socket matches.
+   * @param socket_matches the socket matches configuration.
+   * @param factory_context the factory context.
+   * @param creation_status reference to store creation status.
+   */
+  void setupLegacySocketMatches(
+      const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
+          socket_matches,
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      absl::Status& creation_status);
+
+  /**
    * Setup transport socket matcher based on the provided configuration.
    * @param transport_socket_matcher the matcher configuration.
    * @param socket_matches the socket matches configuration.
@@ -135,9 +148,11 @@ private:
   using TransportSocketsByName =
       absl::flat_hash_map<std::string, Network::UpstreamTransportSocketFactoryPtr>;
   TransportSocketsByName transport_sockets_by_name_;
-  // Persistent stats for matcher-selected transport sockets keyed by name.
+  // Pre-generated stats for matcher-selected transport sockets keyed by name.
+  // Stats are created at config time to avoid calling generateStats() in the hot path.
+  // Mutable because stats counters need to be incremented in the const resolve() method.
   mutable absl::flat_hash_map<std::string, TransportSocketMatchStats> matcher_stats_by_name_;
-  std::unique_ptr<Matcher::MatchTree<TransportSocketMatchingData>> matcher_;
+  std::unique_ptr<Matcher::MatchTree<Upstream::TransportSocketMatchingData>> matcher_;
 };
 
 // Import action classes from the extension.

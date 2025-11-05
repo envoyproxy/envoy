@@ -51,21 +51,7 @@ TransportSocketMatcherImpl::TransportSocketMatcherImpl(
     absl::Status& creation_status)
     : stats_scope_(stats_scope),
       default_match_("default", std::move(default_factory), generateStats("default")) {
-  for (const auto& socket_match : socket_matches) {
-    const auto& socket_config = socket_match.transport_socket();
-    auto& config_factory = Config::Utility::getAndCheckFactory<
-        Server::Configuration::UpstreamTransportSocketConfigFactory>(socket_config);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        socket_config, factory_context.messageValidationVisitor(), config_factory);
-    auto factory_or_error = config_factory.createTransportSocketFactory(*message, factory_context);
-    SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
-    FactoryMatch factory_match(socket_match.name(), std::move(factory_or_error.value()),
-                               generateStats(absl::StrCat(socket_match.name(), ".")));
-    for (const auto& kv : socket_match.match().fields()) {
-      factory_match.label_set.emplace_back(kv.first, kv.second);
-    }
-    matches_.emplace_back(std::move(factory_match));
-  }
+  setupLegacySocketMatches(socket_matches, factory_context, creation_status);
 }
 
 TransportSocketMatcherImpl::TransportSocketMatcherImpl(
@@ -77,31 +63,11 @@ TransportSocketMatcherImpl::TransportSocketMatcherImpl(
     absl::Status& creation_status)
     : stats_scope_(stats_scope),
       default_match_("default", std::move(default_factory), generateStats("default")) {
-  // Setup transport socket matcher if provided.
   if (transport_socket_matcher.has_value()) {
     setupTransportSocketMatcher(transport_socket_matcher, socket_matches, factory_context,
                                 creation_status);
-    if (!creation_status.ok()) {
-      return;
-    }
   } else {
-    // Fall back to the legacy metadata-based matching.
-    for (const auto& socket_match : socket_matches) {
-      const auto& socket_config = socket_match.transport_socket();
-      auto& config_factory = Config::Utility::getAndCheckFactory<
-          Server::Configuration::UpstreamTransportSocketConfigFactory>(socket_config);
-      ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-          socket_config, factory_context.messageValidationVisitor(), config_factory);
-      auto factory_or_error =
-          config_factory.createTransportSocketFactory(*message, factory_context);
-      SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
-      FactoryMatch factory_match(socket_match.name(), std::move(factory_or_error.value()),
-                                 generateStats(absl::StrCat(socket_match.name(), ".")));
-      for (const auto& kv : socket_match.match().fields()) {
-        factory_match.label_set.emplace_back(kv.first, kv.second);
-      }
-      matches_.emplace_back(std::move(factory_match));
-    }
+    setupLegacySocketMatches(socket_matches, factory_context, creation_status);
   }
 }
 
@@ -142,6 +108,28 @@ TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolve(
   return {*default_match_.factory, default_match_.stats, default_match_.name};
 }
 
+void TransportSocketMatcherImpl::setupLegacySocketMatches(
+    const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
+        socket_matches,
+    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    absl::Status& creation_status) {
+  for (const auto& socket_match : socket_matches) {
+    const auto& socket_config = socket_match.transport_socket();
+    auto& config_factory = Config::Utility::getAndCheckFactory<
+        Server::Configuration::UpstreamTransportSocketConfigFactory>(socket_config);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        socket_config, factory_context.messageValidationVisitor(), config_factory);
+    auto factory_or_error = config_factory.createTransportSocketFactory(*message, factory_context);
+    SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
+    FactoryMatch factory_match(socket_match.name(), std::move(factory_or_error.value()),
+                               generateStats(absl::StrCat(socket_match.name(), ".")));
+    for (const auto& kv : socket_match.match().fields()) {
+      factory_match.label_set.emplace_back(kv.first, kv.second);
+    }
+    matches_.emplace_back(std::move(factory_match));
+  }
+}
+
 TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolveUsingMatcher(
     const envoy::config::core::v3::Metadata* endpoint_metadata,
     const envoy::config::core::v3::Metadata* locality_metadata,
@@ -162,7 +150,8 @@ TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolveUsingMatche
     }
   }
 
-  TransportSocketMatchingData data(endpoint_metadata, locality_metadata, filter_state.get());
+  Upstream::TransportSocketMatchingData data(endpoint_metadata, locality_metadata,
+                                             filter_state.get());
   auto on_match = Matcher::evaluateMatch(*matcher_, data);
   if (on_match.isMatch()) {
     const auto action = on_match.action();
@@ -171,13 +160,10 @@ TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolveUsingMatche
       const std::string& transport_socket_name = name_action.name();
       const auto it = transport_sockets_by_name_.find(transport_socket_name);
       if (it != transport_sockets_by_name_.end()) {
+        // Stats should already be pre-generated during configuration.
         auto it_stats = matcher_stats_by_name_.find(transport_socket_name);
-        if (it_stats == matcher_stats_by_name_.end()) {
-          it_stats = matcher_stats_by_name_
-                         .emplace(transport_socket_name,
-                                  generateStats(absl::StrCat(transport_socket_name, ".")))
-                         .first;
-        }
+        ASSERT(it_stats != matcher_stats_by_name_.end(),
+               "Stats should be pre-generated for all transport sockets");
         return {*it->second, it_stats->second, transport_socket_name};
       }
       ENVOY_LOG(warn, "Transport socket '{}' not found, using default", transport_socket_name);
@@ -212,14 +198,17 @@ void TransportSocketMatcherImpl::setupTransportSocketMatcher(
           config_factory.createTransportSocketFactory(*message, factory_context);
       SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
 
-      auto [_, inserted] = transport_sockets_by_name_.try_emplace(
-          socket_match.name(), std::move(factory_or_error.value()));
+      const std::string& socket_name = socket_match.name();
+      auto [_, inserted] =
+          transport_sockets_by_name_.try_emplace(socket_name, std::move(factory_or_error.value()));
       if (!inserted) {
-        creation_status = absl::InvalidArgumentError(
-            fmt::format("Duplicate transport socket name '{}' found in transport_socket_matches",
-                        socket_match.name()));
+        creation_status = absl::InvalidArgumentError(fmt::format(
+            "Duplicate transport socket name '{}' found in transport_socket_matches", socket_name));
         return;
       }
+
+      // Pre-generate stats at config time to avoid mutex contention in the hot path.
+      matcher_stats_by_name_.emplace(socket_name, generateStats(absl::StrCat(socket_name, ".")));
     }
   }
 

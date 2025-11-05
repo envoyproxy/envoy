@@ -83,14 +83,11 @@ These input functions are available for transport socket matching in clusters:
 
 * Locality metadata - extracts metadata from the endpoint's locality for transport socket selection.
 
-Additionally, the following network input functions can be used in transport socket matching context:
+.. _extension_envoy.matching.inputs.transport_socket_filter_state:
 
-* :ref:`Destination IP <extension_envoy.matching.inputs.destination_ip>`.
-* :ref:`Destination port <extension_envoy.matching.inputs.destination_port>`.
-* :ref:`Source IP <extension_envoy.matching.inputs.source_ip>`.
-* :ref:`Source port <extension_envoy.matching.inputs.source_port>`.
-* :ref:`Server name <extension_envoy.matching.inputs.server_name>`.
-* :ref:`Application protocol <extension_envoy.matching.inputs.application_protocol>`.
+* Filter state: extracts values from filter state that was explicitly shared from the downstream
+  connection to the upstream connection via transport socket options. This enables downstream
+  connection-based transport socket selection.
 
 Common Input Functions
 **********************
