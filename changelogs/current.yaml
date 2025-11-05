@@ -215,5 +215,9 @@ new_features:
   change: |
     Added runtime guard ``envoy.reloadable_features.report_load_when_rq_active_is_non_zero``.
     When enabled, LRS continues to send locality_stats reoprt to config server when there is no request_issued in the poll cycle.
+- area: routing
+  change: |
+    Added :ref:`host_rewrite_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_regex>` to allow host rewrites
+    based on regex capture of incoming host header.
 
 deprecated:
