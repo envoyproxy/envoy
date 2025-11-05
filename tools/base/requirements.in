@@ -6,7 +6,7 @@ aiodocker>=0.22.2
 aiohttp>=3.11.6
 aioquic>=0.9.21
 cffi>=1.15.0
-clang-format==18.1.8
+clang-format==21.1.5
 clang-tidy==18.1.8
 colorama
 coloredlogs
