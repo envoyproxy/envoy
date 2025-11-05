@@ -33,5 +33,6 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/extensions/access_loggers/stats/v3:pkg_cc_proto",
     ],
 )

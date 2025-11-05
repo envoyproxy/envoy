@@ -21,5 +21,6 @@ envoy_extension_cc_test(
         "//source/extensions/access_loggers/stats:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
