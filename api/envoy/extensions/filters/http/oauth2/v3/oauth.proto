@@ -126,7 +126,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 27]
+// [#next-free-field: 29]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -135,6 +135,12 @@ message OAuth2Config {
 
     // The ``client_id`` and ``client_secret`` will be sent using HTTP Basic authentication scheme.
     BASIC_AUTH = 1;
+  }
+
+  enum TokenType {
+    ACCESS_TOKEN = 0;
+    ID_TOKEN = 1;
+    REFRESH_TOKEN = 2;
   }
 
   // Endpoint on the authorization server to retrieve the access token from.
@@ -173,6 +179,9 @@ message OAuth2Config {
 
   // Forward the OAuth token as a Bearer to upstream web service.
   bool forward_bearer_token = 7;
+
+  // Type of OAuth Token to forward to Upstream, Defaults to ``ACCESS_TOKEN``.
+  TokenType forward_bearer_token_type = 28 [(validate.rules).enum = {defined_only: true}];
 
   // If set to true, preserve the existing authorization header.
   // By default the client strips the existing authorization header before forwarding upstream.

@@ -38,6 +38,9 @@ is set to true the filter will send over a
 cookie named ``BearerToken`` to the upstream. Additionally, the ``Authorization`` header will be populated
 with the same value.
 
+You can setup which kind of token to be populated with :ref:`forward_bearer_token_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token_type>`.
+Acceptable values are `ACCESS_TOKEN` (default when `forward_bearer_token` is `true`), `ID_TOKEN` or `REFRESH_TOKEN`.
+
 The OAuth filter encodes URLs in query parameters using the
 `URL encoding algorithm. <https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm>`_
 
@@ -133,6 +136,8 @@ Below is a complete code example of how we employ the filter as one of
                     uri: oauth.com/token
                     timeout: 3s
                   authorization_endpoint: https://oauth.com/oauth/authorize/
+                  forward_bearer_token: false
+                  forward_bearer_token_type: ACCESS_TOKEN
                   redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
                   redirect_path_matcher:
                     path:
@@ -159,6 +164,7 @@ Below is a complete code example of how we employ the filter as one of
                   resources:
                   - oauth2-resource
                   - http://example.com
+
             - name: envoy.router
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

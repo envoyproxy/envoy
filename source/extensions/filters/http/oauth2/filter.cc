@@ -142,6 +142,23 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
   }
 }
 
+TokenType
+getTokenType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_TokenType token_type) {
+  switch (token_type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_TokenType::
+      OAuth2Config_TokenType_ID_TOKEN:
+    return TokenType::IdToken;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_TokenType::
+      OAuth2Config_TokenType_REFRESH_TOKEN:
+    return TokenType::RefreshToken;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_TokenType::
+      OAuth2Config_TokenType_ACCESS_TOKEN:
+  default:
+    return TokenType::AccessToken;
+  }
+}
+
 // Helper function to get SameSite attribute string from proto enum.
 std::string
 getSameSiteString(envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite same_site) {
@@ -427,6 +444,7 @@ FilterConfig::FilterConfig(
                                                              DEFAULT_CSRF_TOKEN_EXPIRES_IN)),
       code_verifier_token_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(
           proto_config, code_verifier_token_expires_in, DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN)),
+      forward_bearer_token_type_(getTokenType(proto_config.forward_bearer_token_type())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
@@ -748,8 +766,20 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   validator_->setParams(headers, config_->hmacSecret());
   if (validator_->isValid()) {
     config_->stats().oauth_success_.inc();
-    if (config_->forwardBearerToken() && !validator_->token().empty()) {
+
+    if (config_->forwardBearerToken() &&
+        config_->forwardBearerTokenType() == TokenType::AccessToken &&
+        !validator_->token().empty()) {
       setBearerToken(headers, validator_->token());
+    }
+    if (config_->forwardBearerToken() && config_->forwardBearerTokenType() == TokenType::IdToken &&
+        !validator_->idToken().empty()) {
+      setBearerToken(headers, validator_->idToken());
+    }
+    if (config_->forwardBearerToken() &&
+        config_->forwardBearerTokenType() == TokenType::RefreshToken &&
+        !validator_->refreshToken().empty()) {
+      setBearerToken(headers, validator_->refreshToken());
     }
     ENVOY_LOG(debug, "skipping oauth flow due to valid hmac cookie");
     return true;
@@ -1193,10 +1223,18 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
 
   std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
   request_headers_->setReferenceKey(Http::Headers::get().Cookie, new_cookies);
-  if (config_->forwardBearerToken() && !access_token_.empty()) {
+  if (config_->forwardBearerToken() &&
+      config_->forwardBearerTokenType() == TokenType::AccessToken && !access_token_.empty()) {
     setBearerToken(*request_headers_, access_token_);
   }
-
+  if (config_->forwardBearerToken() && config_->forwardBearerTokenType() == TokenType::IdToken &&
+      !id_token_.empty()) {
+    setBearerToken(*request_headers_, id_token_);
+  }
+  if (config_->forwardBearerToken() &&
+      config_->forwardBearerTokenType() == TokenType::RefreshToken && !refresh_token_.empty()) {
+    setBearerToken(*request_headers_, refresh_token_);
+  }
   was_refresh_token_flow_ = true;
 
   config_->stats().oauth_refreshtoken_success_.inc();
