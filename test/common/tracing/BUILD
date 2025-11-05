@@ -87,6 +87,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/tracing:tracer_config_lib",
     ],
 )
