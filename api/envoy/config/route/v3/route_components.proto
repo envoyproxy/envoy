@@ -805,7 +805,7 @@ message CorsPolicy {
   google.protobuf.BoolValue forward_not_matching_preflights = 13;
 }
 
-// [#next-free-field: 46]
+// [#next-free-field: 47]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -1351,6 +1351,24 @@ message RouteAction {
     // If the final output of the host rewrite is empty, then the update will be ignored and the
     // original host header will be preserved.
     string host_rewrite = 44;
+
+    // Indicates that during forwarding, the host header will be swapped with
+    // the result of the regex substitution executed on the host header.
+    // This is useful for extracting a subdomain from the host header.
+    //
+    // For example with the following config:
+    //
+    //   .. code-block:: yaml
+    //
+    //     host_rewrite_regex:
+    //       pattern:
+    //         google_re2: {}
+    //         regex: "([^.]+\\.[^.]+)(?:\\.[^.]+){2}\\.com$"
+    //       substitution: \\1
+    //
+    // Would rewrite the host header to ``capture.this`` given the host header
+    // ``a.b.c.capture.this.any.pair.com``.
+    type.matcher.v3.RegexMatchAndSubstitute host_rewrite_regex = 46;
   }
 
   // If set, then a host rewrite action (one of

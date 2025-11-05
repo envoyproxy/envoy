@@ -456,6 +456,16 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           route.route().has_host_rewrite_path_regex()
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
+      host_rewrite_regex_(
+          route.route().has_host_rewrite_regex()
+              ? THROW_OR_RETURN_VALUE(
+                    Regex::Utility::parseRegex(route.route().host_rewrite_regex().pattern(),
+                                               factory_context.regexEngine()),
+                    Regex::CompiledMatcherPtr)
+              : nullptr),
+      host_rewrite_regex_substitution_(route.route().has_host_rewrite_regex()
+                                           ? route.route().host_rewrite_regex().substitution()
+                                           : ""),
       vhost_(vhost), vhost_copy_(vhost), cluster_name_(route.route().cluster()),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
@@ -893,6 +903,10 @@ void RouteEntryImplBase::finalizeHostHeader(Http::RequestHeaderMap& headers,
     hostname = buffer;
   } else if (host_rewrite_formatter_) {
     buffer = host_rewrite_formatter_->format(context, stream_info);
+    hostname = buffer;
+  } else if (host_rewrite_regex_) {
+    buffer =
+        host_rewrite_regex_->replaceAll(headers.getHostValue(), host_rewrite_regex_substitution_);
     hostname = buffer;
   }
 

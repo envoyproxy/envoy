@@ -713,6 +713,15 @@ virtual_hosts:
       host_rewrite: "%REQ(host-from-header):8%"
       append_x_forwarded_host: true
   - match:
+      path: "/rewrite-host-with-regex"
+    route:
+      cluster: ats
+      host_rewrite_regex:
+        pattern:
+          regex: "(.*)\\.boogle\\.com$"
+        substitution: \1
+      append_x_forwarded_host: true
+  - match:
       prefix: "/"
       filter_state:
       - key: envoy.address
@@ -1126,6 +1135,19 @@ virtual_hosts:
     EXPECT_EQ("test.com", headers.get_(Http::Headers::get().Host));
     EXPECT_EQ("api.lyft.com", headers.getEnvoyOriginalHostValue());
     EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().ForwardedHost));
+  }
+
+  // Rewrites host using regex.
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("sub.domain.boogle.com", "/rewrite-host-with-regex", "GET");
+    const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+
+    const Formatter::Context formatter_context(&headers);
+    route_entry->finalizeRequestHeaders(headers, formatter_context, stream_info, true);
+    EXPECT_EQ("sub.domain", headers.get_(Http::Headers::get().Host));
+    EXPECT_EQ("sub.domain.boogle.com", headers.getEnvoyOriginalHostValue());
+    EXPECT_EQ("sub.domain.boogle.com", headers.get_(Http::Headers::get().ForwardedHost));
   }
 
   // Case sensitive rewrite matching test.
