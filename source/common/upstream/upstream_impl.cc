@@ -222,19 +222,6 @@ buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_config
             cluster_config.upstream_connection_options().tcp_notsent_lowat().value()));
   }
 
-  // Apply `TCP_NOTSENT_LOWAT` from TCP protocol options if configured.
-  auto tcp_options_it = cluster_config.typed_extension_protocol_options().find(
-      "envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions");
-  if (tcp_options_it != cluster_config.typed_extension_protocol_options().end()) {
-    envoy::extensions::upstreams::tcp::v3::TcpProtocolOptions tcp_options;
-    if (MessageUtil::unpackTo(tcp_options_it->second, tcp_options).ok() &&
-        tcp_options.has_tcp_notsent_lowat()) {
-      Network::Socket::appendOptions(base_options,
-                                     Network::SocketOptionFactory::buildTcpNotsentLowatOptions(
-                                         tcp_options.tcp_notsent_lowat().value()));
-    }
-  }
-
   return base_options;
 }
 

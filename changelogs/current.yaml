@@ -130,13 +130,14 @@ new_features:
     Added support for dropping stats via
     :ref:`DropAction <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during
     custom metric conversion.
-- area: upstream
+- area: connection
   change: |
-    Added support for setting ``TCP_NOTSENT_LOWAT`` socket option on upstream connections via
+    Added support for setting ``TCP_NOTSENT_LOWAT`` socket option on both upstream and downstream connections via
     :ref:`tcp_notsent_lowat <envoy_v3_api_field_config.cluster.v3.UpstreamConnectionOptions.tcp_notsent_lowat>`
-    in cluster configuration or
-    :ref:`tcp_notsent_lowat <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.tcp_notsent_lowat>`
-    in TCP protocol options. This helps improve HTTP/2 stream prioritization by controlling kernel send buffer behavior.
+    in cluster configuration for upstream, and
+    :ref:`tcp_notsent_lowat <envoy_v3_api_field_config.listener.v3.Listener.tcp_notsent_lowat>`
+    in listener configuration for downstream. This helps improve HTTP/2 stream prioritization and reduce bufferbloat
+    by controlling kernel send buffer behavior on both request and response streams.
 - area: http
   change: |
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to

@@ -1161,6 +1161,9 @@ TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
       [](envoy::config::listener::v3::Listener& l) { l.mutable_freebind()->set_value(true); },
       [](envoy::config::listener::v3::Listener& l) { l.mutable_tcp_backlog_size(); },
       [](envoy::config::listener::v3::Listener& l) { l.mutable_tcp_fast_open_queue_length(); },
+      [](envoy::config::listener::v3::Listener& l) {
+        l.mutable_tcp_notsent_lowat()->set_value(16384);
+      },
       [](envoy::config::listener::v3::Listener& l) { l.mutable_transparent()->set_value(true); },
 
   };
@@ -2416,6 +2419,37 @@ address:
     port_value: 1234
 enable_reuse_port: true
 tcp_fast_open_queue_length: 20
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithTcpNotsentLowatChange) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+tcp_notsent_lowat: 16384
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+tcp_notsent_lowat: 32768
 filter_chains:
 - filters: []
   )EOF";
@@ -6331,6 +6365,66 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, FastOpenListenerEnabled) {
 
   testSocketOption(listener, envoy::config::core::v3::SocketOption::STATE_LISTENING,
                    ENVOY_SOCKET_TCP_FASTOPEN, /* expected_value */ 1);
+}
+
+// Validate that when `tcp_notsent_lowat` is set in the Listener, we see the socket option
+// propagated to setsockopt().
+TEST_P(ListenerManagerImplWithRealFiltersTest, TcpNotsentLowatListenerEnabled) {
+  const auto expected_option = ENVOY_SOCKET_TCP_NOTSENT_LOWAT;
+  if (!expected_option.hasValue()) {
+    // Skip test if `tcp_notsent_lowat` is not supported on this platform.
+    GTEST_SKIP() << "TCP_NOTSENT_LOWAT is not supported on this platform";
+  }
+
+  auto listener = createIPv4Listener("TcpNotsentLowatListener");
+  listener.mutable_tcp_notsent_lowat()->set_value(16384);
+  listener.mutable_enable_reuse_port()->set_value(false);
+
+  // On platforms with `SO_NOSIGPIPE`, there will be 2 options set i.e. `SO_NOSIGPIPE`,
+  // and `tcp_notsent_lowat`.
+  const uint32_t expected_num_options = ENVOY_SOCKET_SO_NOSIGPIPE.hasValue() ? 2 : 1;
+  testSocketOption(listener, envoy::config::core::v3::SocketOption::STATE_BOUND,
+                   ENVOY_SOCKET_TCP_NOTSENT_LOWAT, /* expected_value */ 16384,
+                   expected_num_options);
+}
+
+// Validate that when `tcp_notsent_lowat` is set to a different value, the socket option reflects
+// it.
+TEST_P(ListenerManagerImplWithRealFiltersTest, TcpNotsentLowatListenerDifferentValue) {
+  const auto expected_option = ENVOY_SOCKET_TCP_NOTSENT_LOWAT;
+  if (!expected_option.hasValue()) {
+    // Skip test if `tcp_notsent_lowat` is not supported on this platform.
+    GTEST_SKIP() << "TCP_NOTSENT_LOWAT is not supported on this platform";
+  }
+
+  auto listener = createIPv4Listener("TcpNotsentLowatListener");
+  listener.mutable_tcp_notsent_lowat()->set_value(4096);
+  listener.mutable_enable_reuse_port()->set_value(false);
+
+  // On platforms with `SO_NOSIGPIPE`, there will be 2 options set i.e. `SO_NOSIGPIPE`,
+  // and `tcp_notsent_lowat`.
+  const uint32_t expected_num_options = ENVOY_SOCKET_SO_NOSIGPIPE.hasValue() ? 2 : 1;
+  testSocketOption(listener, envoy::config::core::v3::SocketOption::STATE_BOUND,
+                   ENVOY_SOCKET_TCP_NOTSENT_LOWAT, /* expected_value */ 4096, expected_num_options);
+}
+
+// Validate that when `tcp_notsent_lowat` is set to zero, the socket option is applied.
+TEST_P(ListenerManagerImplWithRealFiltersTest, TcpNotsentLowatListenerZeroValue) {
+  const auto expected_option = ENVOY_SOCKET_TCP_NOTSENT_LOWAT;
+  if (!expected_option.hasValue()) {
+    // Skip test if `tcp_notsent_lowat` is not supported on this platform.
+    GTEST_SKIP() << "TCP_NOTSENT_LOWAT is not supported on this platform";
+  }
+
+  auto listener = createIPv4Listener("TcpNotsentLowatListener");
+  listener.mutable_tcp_notsent_lowat()->set_value(0);
+  listener.mutable_enable_reuse_port()->set_value(false);
+
+  // On platforms with `SO_NOSIGPIPE`, there will be 2 options set i.e. `SO_NOSIGPIPE`,
+  // and `tcp_notsent_lowat`.
+  const uint32_t expected_num_options = ENVOY_SOCKET_SO_NOSIGPIPE.hasValue() ? 2 : 1;
+  testSocketOption(listener, envoy::config::core::v3::SocketOption::STATE_BOUND,
+                   ENVOY_SOCKET_TCP_NOTSENT_LOWAT, /* expected_value */ 0, expected_num_options);
 }
 
 // Validate that when reuse_port is set in the Listener, we see the socket option

@@ -3,10 +3,8 @@ syntax = "proto3";
 package envoy.extensions.upstreams.tcp.v3;
 
 import "google/protobuf/duration.proto";
-import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.upstreams.tcp.v3";
 option java_outer_classname = "TcpProtocolOptionsProto";
@@ -44,17 +42,4 @@ message TcpProtocolOptions {
   //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
   //   FIN packets, etc.
   google.protobuf.Duration idle_timeout = 1;
-
-  // Sets the ``TCP_NOTSENT_LOWAT`` socket option on upstream connections. The value specifies
-  // the amount of unsent data (in bytes) that must be queued in the kernel TCP send buffer before
-  // the socket becomes writable. This is useful for controlling bufferbloat and improving HTTP/2
-  // stream prioritization by preventing the kernel from buffering excessive data.
-  //
-  // If not set, the OS default is used. A common recommended value is 16384 (16KB) for improved
-  // HTTP/2 prioritization. Setting to 0 explicitly disables the feature.
-  //
-  // .. note::
-  //   This option is only available on Linux kernel 3.12+. On unsupported platforms, this setting
-  //   has no effect and no error is raised.
-  google.protobuf.UInt32Value tcp_notsent_lowat = 2 [(validate.rules).uint32 = {lte: 1048576}];
 }

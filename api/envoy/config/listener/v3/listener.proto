@@ -54,7 +54,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -370,6 +370,17 @@ message Listener {
   // The maximum length a tcp listener's pending connections queue can grow to. If no value is
   // provided net.core.somaxconn will be used on Linux and 128 otherwise.
   google.protobuf.UInt32Value tcp_backlog_size = 24;
+
+  // If set, sets the ``TCP_NOTSENT_LOWAT`` socket option on downstream connections.
+  // The value specifies the amount of unsent data (in bytes) that must be queued in the kernel
+  // TCP send buffer before the socket becomes writable. This is useful for controlling bufferbloat
+  // and improving HTTP/2 stream prioritization on response streams. A common recommended value is
+  // 16384 (16KB).
+  //
+  // .. note::
+  //   This option is only available on Linux kernel 3.12+. On unsupported platforms, this setting
+  //   has no effect and no error is raised.
+  google.protobuf.UInt32Value tcp_notsent_lowat = 37 [(validate.rules).uint32 = {lte: 1048576}];
 
   // The maximum number of connections to accept from the kernel per socket
   // event. Envoy may decide to close these connections after accepting them
