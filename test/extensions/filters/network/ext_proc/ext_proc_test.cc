@@ -1009,7 +1009,6 @@ TEST_F(NetworkExtProcFilterTest, TimeoutWithBothOperationsPending) {
 }
 
 TEST_F(NetworkExtProcFilterTest, MessageTimeoutManagerOnTimeoutViaTimerCallback) {
-  // Setup config with timeout
   auto config = createConfig(false);
   config.mutable_message_timeout()->set_nanos(100000000);
   auto filter_config = std::make_shared<Config>(config, scope_);
@@ -1049,7 +1048,7 @@ TEST_F(NetworkExtProcFilterTest, MessageTimeoutManagerOnTimeoutViaTimerCallback)
   EXPECT_CALL(connection_,
               close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
 
-  // Trigger read timer callback - this directly calls MessageTimeoutManager::onTimeout(true)
+  // Trigger read timer callback.
   timer_callbacks[0]();
 
   // Verify timeout was handled correctly
