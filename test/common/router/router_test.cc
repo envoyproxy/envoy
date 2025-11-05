@@ -5969,8 +5969,8 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
   EXPECT_TRUE(upstream_timing.first_upstream_rx_body_byte_received_.has_value());
 }
 
-// Verify that first upstream body timing and histogram are recorded correctly.
-TEST_F(RouterTest, UpstreamFirstBodyTimingAndHistogram) {
+// Verify that first upstream body timing is recorded correctly.
+TEST_F(RouterTest, UpstreamFirstBodyTiming) {
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
@@ -6056,9 +6056,15 @@ TEST_F(RouterTest, UpstreamFirstBodyTimingForStreaming) {
   EXPECT_GE(body_delay, std::chrono::milliseconds(100));
   EXPECT_LT(body_delay, std::chrono::milliseconds(110));
 
+  // Capture the first body byte timestamp before sending more data.
+  auto first_body_byte_time = upstream_timing.first_upstream_rx_body_byte_received_.value();
+
   // Continue streaming more response chunks.
   test_time_.advanceTimeWait(std::chrono::milliseconds(20));
   response_decoder->decodeData(response_data, false);
+
+  // Verify that the first body byte timestamp hasn't changed after the second data chunk.
+  EXPECT_EQ(upstream_timing.first_upstream_rx_body_byte_received_.value(), first_body_byte_time);
 
   // End the stream with trailers.
   Http::ResponseTrailerMapPtr response_trailers(
