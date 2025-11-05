@@ -33,7 +33,8 @@ private:
 class ConnectionManagerTracingConfig {
 public:
   ConnectionManagerTracingConfig(envoy::config::core::v3::TrafficDirection traffic_direction,
-                                 const ConnectionManagerTracingConfigProto& tracing_config) {
+                                 const ConnectionManagerTracingConfigProto& tracing_config,
+                                 const Formatter::CommandParserPtrVector& command_parsers = {}) {
 
     // Listener level traffic direction overrides the operation name
     switch (traffic_direction) {
@@ -54,7 +55,8 @@ public:
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(tracing_config, spawn_upstream_span, false);
 
     for (const auto& tag : tracing_config.custom_tags()) {
-      custom_tags_.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
+      custom_tags_.emplace(tag.tag(),
+                           Tracing::CustomTagUtility::createCustomTag(tag, command_parsers));
     }
 
     client_sampling_.set_numerator(

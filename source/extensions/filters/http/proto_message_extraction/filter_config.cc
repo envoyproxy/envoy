@@ -58,6 +58,29 @@ void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
           "couldn't find the gRPC method `{}` defined in the proto descriptor", it.first));
     }
 
+    for (const auto& request_field : it.second.request_extraction_by_field()) {
+      if (request_field.second == ::envoy::extensions::filters::http::proto_message_extraction::v3::
+                                      MethodExtraction::EXTRACT_REPEATED_CARDINALITY) {
+        throw EnvoyException(fmt::format(
+            "method `{}`: EXTRACT_REPEATED_CARDINALITY is not supported for request fields.",
+            it.first));
+      }
+    }
+
+    int response_extract_cardinality_count = 0;
+    for (const auto& response_field : it.second.response_extraction_by_field()) {
+      if (response_field.second == ::envoy::extensions::filters::http::proto_message_extraction::
+                                       v3::MethodExtraction::EXTRACT_REPEATED_CARDINALITY) {
+        response_extract_cardinality_count++;
+      }
+    }
+
+    if (response_extract_cardinality_count > 1) {
+      throw EnvoyException(fmt::format("method `{}`: only one field can be tagged with "
+                                       "EXTRACT_REPEATED_CARDINALITY for response.",
+                                       it.first));
+    }
+
     auto extractor = extractor_factory.createExtractor(
         *type_helper_, *type_finder_,
         absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", method->input_type()->full_name()),
