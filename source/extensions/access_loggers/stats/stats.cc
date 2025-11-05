@@ -58,6 +58,11 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
   for (const auto& counter_cfg : config.counters()) {
     Counter& inserted = counters_.emplace_back(
         NameAndTags(counter_cfg.stat(), stat_name_pool_, commands), nullptr, 0);
+    if (!counter_cfg.value_format().empty() && counter_cfg.has_value_fixed()) {
+      throw EnvoyException(
+          "Stats logger cannot have both `value_format` and `value_fixed` configured.");
+    }
+
     if (!counter_cfg.value_format().empty()) {
       inserted.value_formatter_ = parseValueFormat(counter_cfg.value_format(), commands);
     } else if (counter_cfg.has_value_fixed()) {
