@@ -6380,12 +6380,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TcpNotsentLowatListenerEnabled) {
   listener.mutable_tcp_notsent_lowat()->set_value(16384);
   listener.mutable_enable_reuse_port()->set_value(false);
 
-  // On platforms with `SO_NOSIGPIPE`, there will be 2 options set i.e. `SO_NOSIGPIPE`,
-  // and `tcp_notsent_lowat`.
-  const uint32_t expected_num_options = ENVOY_SOCKET_SO_NOSIGPIPE.hasValue() ? 2 : 1;
+  // tcp_notsent_lowat uses STATE_BOUND, which means the socket option is applied to
+  // multiple sockets (dual-stack IPv4/IPv6), so setSocketOption() is called twice.
+  // The expected_num_options parameter specifies how many times setSocketOption is called
+  // for this specific option, which is 2 regardless of platform.
   testSocketOption(listener, envoy::config::core::v3::SocketOption::STATE_BOUND,
                    ENVOY_SOCKET_TCP_NOTSENT_LOWAT, /* expected_value */ 16384,
-                   expected_num_options);
+                   /* expected_num_options */ 2);
 }
 
 // Validate that when `tcp_notsent_lowat` is set to a different value, the socket option reflects
@@ -6401,11 +6402,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TcpNotsentLowatListenerDifferentV
   listener.mutable_tcp_notsent_lowat()->set_value(4096);
   listener.mutable_enable_reuse_port()->set_value(false);
 
-  // On platforms with `SO_NOSIGPIPE`, there will be 2 options set i.e. `SO_NOSIGPIPE`,
-  // and `tcp_notsent_lowat`.
-  const uint32_t expected_num_options = ENVOY_SOCKET_SO_NOSIGPIPE.hasValue() ? 2 : 1;
+  // tcp_notsent_lowat uses STATE_BOUND, which means the socket option is applied to
+  // multiple sockets (dual-stack IPv4/IPv6), so setSocketOption() is called twice.
+  // The expected_num_options parameter specifies how many times setSocketOption is called
+  // for this specific option, which is 2 regardless of platform.
   testSocketOption(listener, envoy::config::core::v3::SocketOption::STATE_BOUND,
-                   ENVOY_SOCKET_TCP_NOTSENT_LOWAT, /* expected_value */ 4096, expected_num_options);
+                   ENVOY_SOCKET_TCP_NOTSENT_LOWAT, /* expected_value */ 4096,
+                   /* expected_num_options */ 2);
 }
 
 // Validate that when `tcp_notsent_lowat` is set to zero, the socket option is applied.
@@ -6420,11 +6423,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TcpNotsentLowatListenerZeroValue)
   listener.mutable_tcp_notsent_lowat()->set_value(0);
   listener.mutable_enable_reuse_port()->set_value(false);
 
-  // On platforms with `SO_NOSIGPIPE`, there will be 2 options set i.e. `SO_NOSIGPIPE`,
-  // and `tcp_notsent_lowat`.
-  const uint32_t expected_num_options = ENVOY_SOCKET_SO_NOSIGPIPE.hasValue() ? 2 : 1;
+  // tcp_notsent_lowat uses STATE_BOUND, which means the socket option is applied to
+  // multiple sockets (dual-stack IPv4/IPv6), so setSocketOption() is called twice.
+  // The expected_num_options parameter specifies how many times setSocketOption is called
+  // for this specific option, which is 2 regardless of platform.
   testSocketOption(listener, envoy::config::core::v3::SocketOption::STATE_BOUND,
-                   ENVOY_SOCKET_TCP_NOTSENT_LOWAT, /* expected_value */ 0, expected_num_options);
+                   ENVOY_SOCKET_TCP_NOTSENT_LOWAT, /* expected_value */ 0,
+                   /* expected_num_options */ 2);
 }
 
 // Validate that when reuse_port is set in the Listener, we see the socket option
