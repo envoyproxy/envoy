@@ -163,6 +163,13 @@ new_features:
     Added new :ref:`value <envoy_v3_api_field_type.tracing.v3.CustomTag.value>` field and
     the :ref:`substitution format specifier <config_access_log_format>` could be used to
     extract values from various parts of the request/response for custom tags.
+- area: generic_proxy
+  change: |
+    Added custom substitution format specifiers support in the tracing custom tags of the
+    :ref:`generic_proxy
+    filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
+    Now the ``%REQUEST_PROPERTY%``, ``%RESPONSE_PROPERTY%`` etc. can be used in the
+    :ref:`value <envoy_v3_api_field_type.tracing.v3.CustomTag.value>` field for generic proxy.
 - area: lua
   change: |
     Added ``drainConnectionUponCompletion()`` to the Lua filter stream info API. This allows Lua scripts
