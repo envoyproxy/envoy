@@ -44,8 +44,9 @@ TEST(ConnectionManagerTracingConfigImplTest, SimpleTest) {
     auto* custom_tag = tracing_config.add_custom_tags();
     custom_tag->set_tag("foo");
     custom_tag->mutable_literal()->set_value("bar");
-    custom_tag->set_tag("dynamic_foo");
-    custom_tag->set_value("%REQ(X-FOO)%");
+    auto* custom_tag2 = tracing_config.add_custom_tags();
+    custom_tag2->set_tag("dynamic_foo");
+    custom_tag2->set_value("%REQ(X-FOO)%");
 
     ConnectionManagerTracingConfig config(traffic_direction, tracing_config);
 
