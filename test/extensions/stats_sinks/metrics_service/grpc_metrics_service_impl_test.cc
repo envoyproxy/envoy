@@ -62,7 +62,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BasicFlow) {
   MetricsServiceCallbacks* callbacks1;
   expectStreamStart(stream1, &callbacks1);
   EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream1, sendMessageRaw_(_, false));
+  // Expect 2 sendMessage calls: one for identifier, one for metrics
+  EXPECT_CALL(stream1, sendMessageRaw_(_, false)).Times(2);
   auto metrics =
       std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
   streamer_->send(std::move(metrics));
@@ -411,10 +412,10 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingWithMultipleBatches) {
         return &stream;
       }));
 
-  // First batch will have identifier (node), subsequent batches won't
+  // Identifier sent separately, then 3 metric batches
   EXPECT_CALL(local_info_, node());
-  // Expect 3 sendMessage calls (3 batches of 2, 2, 1 metrics)
-  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(3);
+  // Expect 4 sendMessage calls (1 identifier + 3 batches of 2, 2, 1 metrics)
+  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(4);
 
   // Create 5 metrics - should result in 3 batches (2, 2, 1)
   auto metrics =
@@ -446,8 +447,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingExactMatch) {
       }));
 
   EXPECT_CALL(local_info_, node());
-  // Should result in 1 batch
-  EXPECT_CALL(stream, sendMessageRaw_(_, false));
+  // Should result in 1 identifier + 1 batch
+  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(2);
 
   // Create exactly 3 metrics
   auto metrics =
@@ -479,8 +480,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingSmallerThanBatchSize) {
       }));
 
   EXPECT_CALL(local_info_, node());
-  // Should send all in one batch
-  EXPECT_CALL(stream, sendMessageRaw_(_, false));
+  // Should send identifier + all metrics in one batch
+  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(2);
 
   // Create only 5 metrics (less than batch_size)
   auto metrics =
@@ -503,8 +504,8 @@ TEST_F(GrpcMetricsStreamerImplTest, NoBatchingWithZeroBatchSize) {
   expectStreamStart(stream, &callbacks);
 
   EXPECT_CALL(local_info_, node());
-  // Should send all in one message (no batching)
-  EXPECT_CALL(stream, sendMessageRaw_(_, false));
+  // Should send identifier + all in one message (no batching)
+  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(2);
 
   // Create many metrics
   auto metrics =
@@ -536,8 +537,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingWithEmptyMetrics) {
       }));
 
   EXPECT_CALL(local_info_, node());
-  // Should still send one message (even though empty)
-  EXPECT_CALL(stream, sendMessageRaw_(_, false));
+  // Should send identifier + one empty metrics message
+  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(2);
 
   auto metrics =
       std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
@@ -564,8 +565,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingSizeOne) {
       }));
 
   EXPECT_CALL(local_info_, node());
-  // Expect 3 separate calls for 3 batches
-  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(3);
+  // Expect 1 identifier + 3 separate calls for 3 metric batches
+  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(4);
 
   // Create 3 metrics - should result in 3 batches of 1 each
   auto metrics =

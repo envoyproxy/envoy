@@ -32,47 +32,47 @@ void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
   if (stream_ == nullptr) {
     ENVOY_LOG(debug, "Establishing new gRPC metrics service stream");
     stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
+    
     if (stream_ == nullptr) {
       ENVOY_LOG(error,
                 "unable to establish metrics service stream. Will retry in the next flush cycle");
       return;
     }
+    
+    // For perf reasons, the identifier is only sent once when establishing the stream.
+    envoy::service::metrics::v3::StreamMetricsMessage identifier_message;
+    auto* identifier = identifier_message.mutable_identifier();
+    *identifier->mutable_node() = local_info_.node();
+    stream_->sendMessage(identifier_message, false);
   }
 
   // If batch_size is 0 or not set, send all metrics in a single message (default behavior)
   if (batch_size_ == 0 || metrics->size() <= static_cast<int>(batch_size_)) {
-    sendBatch(*metrics, true);
+    sendBatch(*metrics, 0, metrics->size());
     return;
   }
 
   // Send metrics in batches
   ENVOY_LOG(debug, "Batching {} metrics into messages of size {}", metrics->size(), batch_size_);
-  Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily> batch;
-  bool is_first_batch = true;
+  int start_idx = 0;
 
-  for (int i = 0; i < metrics->size(); ++i) {
-    batch.Add()->CopyFrom((*metrics)[i]);
-
-    // Send batch when it reaches batch_size or at the end
-    if (batch.size() >= static_cast<int>(batch_size_) || i == metrics->size() - 1) {
-      sendBatch(batch, is_first_batch);
-      batch.Clear();
-      is_first_batch = false;
-    }
+  while (start_idx < metrics->size()) {
+    int end_idx = std::min(start_idx + static_cast<int>(batch_size_), metrics->size());
+    sendBatch(*metrics, start_idx, end_idx);
+    start_idx = end_idx;
   }
 }
 
 void GrpcMetricsStreamerImpl::sendBatch(
-    const Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& batch,
-    bool is_first_message) {
+    const Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& metrics,
+    int start_idx, int end_idx) {
   envoy::service::metrics::v3::StreamMetricsMessage message;
-  message.mutable_envoy_metrics()->Reserve(batch.size());
-  message.mutable_envoy_metrics()->MergeFrom(batch);
-
-  // For perf reasons, the identifier is only sent on the first message on the stream.
-  if (is_first_message) {
-    auto* identifier = message.mutable_identifier();
-    *identifier->mutable_node() = local_info_.node();
+  int batch_size = end_idx - start_idx;
+  message.mutable_envoy_metrics()->Reserve(batch_size);
+  
+  // Copy directly from source metrics to message, avoiding intermediate buffer
+  for (int i = start_idx; i < end_idx; ++i) {
+    message.mutable_envoy_metrics()->Add()->CopyFrom(metrics[i]);
   }
 
   if (stream_ != nullptr) {
