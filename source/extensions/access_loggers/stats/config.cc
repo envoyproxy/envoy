@@ -1,8 +1,8 @@
 #include "source/extensions/access_loggers/stats/config.h"
 
 #include "envoy/registry/registry.h"
+#include "envoy/extensions/access_loggers/stats/v3/stats.pb.validate.h"
 
-#include "source/common/formatter/substitution_format_string.h"
 #include "source/extensions/access_loggers/stats/stats.h"
 
 namespace Envoy {

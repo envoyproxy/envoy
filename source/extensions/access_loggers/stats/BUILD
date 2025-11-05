@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/access_log:access_log_interface",
         "//envoy/stats:tag_interface",
         "//source/common/access_log:access_log_lib",
+        "//source/common/formatter:substitution_format_string_lib",
         "//source/extensions/access_loggers/common:access_log_base",
         "@envoy_api//envoy/extensions/access_loggers/stats/v3:pkg_cc_proto",
     ],
@@ -31,7 +32,6 @@ envoy_cc_extension(
         "//envoy/access_log:access_log_config_interface",
         "//envoy/registry",
         "//source/common/config:config_provider_lib",
-        "//source/common/formatter:substitution_format_string_lib",
         "//source/common/protobuf",
     ],
 )

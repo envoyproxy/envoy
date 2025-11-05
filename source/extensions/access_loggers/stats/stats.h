@@ -1,12 +1,8 @@
 #pragma once
 
-#include <chrono>
-
 #include "envoy/extensions/access_loggers/stats/v3/stats.pb.h"
-#include "envoy/extensions/access_loggers/stats/v3/stats.pb.validate.h"
 #include "envoy/stats/tag.h"
 
-#include "source/common/formatter/substitution_formatter.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
 
 namespace Envoy {

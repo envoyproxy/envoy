@@ -1,6 +1,6 @@
 #include "source/extensions/access_loggers/stats/stats.h"
 
-// #include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
 
 namespace Envoy {
 namespace Extensions {
