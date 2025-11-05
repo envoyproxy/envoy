@@ -51,7 +51,20 @@ jobs:
     name: "[${{ inputs.arch }}] Prime Bazel cache"
     if: ${{ ! fromJSON(inputs.caches).bazel[inputs.arch] }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.28
+      with:
+        mounts: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/workspace
+            target: /source
+            chown: "runner:docker"
+          # Simulate container build directory
+          - src: /mnt/build
+            target: /build
+            chown: "runner:docker"
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.28
       id: checkout-target
       name: Checkout Envoy repository (target branch)
       with:
@@ -59,24 +72,19 @@ jobs:
         config: |
           fetch-depth: 1
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.28
       id: appauth
       name: Appauth (mutex lock)
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
 
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.28
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cache-key }}
         force-install: ${{ contains(fromJSON('["envoy-arm64-medium", "github-arm64-2c-8gb"]'), inputs.runs-on) }}
-    - run: |
-        # Simulate container build directory
-        sudo mkdir /build
-        sudo chown runner:docker /build
-        echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV
-    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.28
       id: bazel-cache
       name: Prime Bazel cache
       with:
@@ -84,11 +92,7 @@ jobs:
         # TODO(phlax): add loop for multiple targets
         command: |
           # Simulate container source directory
-          sudo mkdir /source
-          sudo chown runner:docker /source
           cd /source
-          git clone "$GITHUB_WORKSPACE" .
-
           export BAZEL_BUILD_EXTRA_OPTIONS="--config=ci ${{ inputs.bazel-extra }}"
           export ENVOY_CACHE_ROOT=/build/bazel_root
           export ENVOY_CACHE_TARGETS=$(echo "${{ inputs.targets }}" | sed 's/ / + /g')
@@ -102,3 +106,5 @@ jobs:
         mount-tmpfs: false
         path: /build/bazel_root
         run-as-sudo: false
+      env:
+        GITHUB_TOKEN: ${{ github.token }}

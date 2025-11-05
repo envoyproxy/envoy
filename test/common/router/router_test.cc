@@ -72,9 +72,7 @@ class TestAccessLog : public AccessLog::Instance {
 public:
   explicit TestAccessLog(std::function<void(const StreamInfo::StreamInfo&)> func) : func_(func) {}
 
-  void log(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& info) override {
-    func_(info);
-  }
+  void log(const Formatter::Context&, const StreamInfo::StreamInfo& info) override { func_(info); }
 
 private:
   std::function<void(const StreamInfo::StreamInfo&)> func_;
@@ -479,11 +477,10 @@ TEST_F(RouterTest, Http1Upstream) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _, true))
-      .WillOnce(Invoke([this](Http::RequestHeaderMap& headers,
-                              const Formatter::HttpFormatterContext& context,
+      .WillOnce(Invoke([this](Http::RequestHeaderMap& headers, const Formatter::Context& context,
                               const StreamInfo::StreamInfo&, bool) {
-        EXPECT_EQ(&context.requestHeaders(), &headers);
-        EXPECT_EQ(&context.activeSpan(), &span_);
+        EXPECT_EQ(context.requestHeaders().ptr(), &headers);
+        EXPECT_EQ(context.activeSpan().ptr(), &span_);
       }));
 
   router_->decodeHeaders(headers, true);
@@ -1328,6 +1325,61 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseNotOverwritten) {
       /* set_include_attempt_count_in_response */ false,
       /* preset_count */ 123,
       /* expected_count */ 123);
+}
+
+// Validate that router-set headers like x-envoy-expected-rq-timeout-ms are accessible in
+// request_headers_to_add configuration.
+TEST_F(RouterTest, RouterSetHeadersAccessibleInRequestHeadersToAdd) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+
+  expectResponseTimerCreate();
+
+  // Set up finalizeRequestHeaders to simulate request_headers_to_add with a reference to
+  // x-envoy-expected-rq-timeout-ms. This will be called AFTER router-set headers are added.
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _, _))
+      .WillOnce(Invoke([](Http::RequestHeaderMap& headers, const Formatter::Context&,
+                          const StreamInfo::StreamInfo&, bool) {
+        // Simulate request_headers_to_add configuration:
+        // - header:
+        //     key: x-timeout
+        //     value: '%REQ(x-envoy-expected-rq-timeout-ms)%'
+        //   append_action: ADD_IF_ABSENT
+        const auto timeout_header =
+            headers.get(Http::LowerCaseString("x-envoy-expected-rq-timeout-ms"));
+        if (!timeout_header.empty()) {
+          headers.addCopy(Http::LowerCaseString("x-timeout"),
+                          timeout_header[0]->value().getStringView());
+        }
+      }));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Verify that x-envoy-expected-rq-timeout-ms was set by the router.
+  EXPECT_FALSE(headers.get_("x-envoy-expected-rq-timeout-ms").empty());
+
+  // Verify that our request_headers_to_add logic was able to copy it to x-timeout.
+  // This verifies the fix: finalizeRequestHeaders is called AFTER router-set headers.
+  EXPECT_FALSE(headers.get_("x-timeout").empty());
+  EXPECT_EQ(headers.get_("x-envoy-expected-rq-timeout-ms"), headers.get_("x-timeout"));
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
 // Validate that x-envoy-attempt-count is present in local replies after an upstream attempt is

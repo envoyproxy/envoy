@@ -20,7 +20,7 @@ public:
          Server::Configuration::CommonFactoryContext& context);
 
   // Http::HeaderEvaluator
-  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                        const StreamInfo::StreamInfo& stream_info) const override;
 
 private:

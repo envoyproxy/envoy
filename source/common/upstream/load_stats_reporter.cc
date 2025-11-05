@@ -145,11 +145,16 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           }
         }
 
-        bool should_send_locality_stats = rq_success + rq_error + rq_active != 0;
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.report_load_with_rq_issued")) {
-          should_send_locality_stats = rq_issued != 0;
+        bool should_send_locality_stats = rq_issued != 0;
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
+                                           "report_load_when_rq_active_is_non_zero")) {
+          // If rq_active is non-zero, we should send the locality stats even if
+          // rq_issued is zero (no new requests have been issued in this poll
+          // window). This is needed to report long-lived connections/requests (e.g., when
+          // web-sockets are used).
+          should_send_locality_stats = should_send_locality_stats || (rq_active != 0);
         }
+
         if (should_send_locality_stats) {
           locality_stats.set_total_successful_requests(rq_success);
           locality_stats.set_total_error_requests(rq_error);

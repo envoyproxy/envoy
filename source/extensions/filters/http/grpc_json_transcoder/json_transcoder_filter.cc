@@ -711,7 +711,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (per_route_config_->isStreamSSEStyleDelimited()) {
+  if (method_->descriptor_->server_streaming() && per_route_config_->isStreamSSEStyleDelimited()) {
     headers.setContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
   } else {
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);

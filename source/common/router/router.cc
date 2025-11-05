@@ -498,8 +498,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           if (!new_uri.empty() && add_location) {
             response_headers.addReferenceKey(Http::Headers::get().Location, new_uri);
           }
-          const Formatter::HttpFormatterContext formatter_context(
-              downstream_headers_, &response_headers, {}, {}, {}, &callbacks_->activeSpan());
+          const Formatter::Context formatter_context(downstream_headers_, &response_headers, {}, {},
+                                                     {}, &callbacks_->activeSpan());
           direct_response->finalizeResponseHeaders(response_headers, formatter_context,
                                                    callbacks_->streamInfo());
         },
@@ -600,9 +600,25 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   attempt_count_++;
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
-  // Finalize the request headers before the host selection.
-  const Formatter::HttpFormatterContext formatter_context(&headers, {}, {}, {}, {},
-                                                          &callbacks_->activeSpan());
+  // Set hedging params before finalizeRequestHeaders so timeout calculation is correct.
+  hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
+
+  // Calculate timeout and set x-envoy-expected-rq-timeout-ms before finalizeRequestHeaders.
+  // This allows request_headers_to_add to reference the timeout header.
+  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_->suppress_envoy_headers_,
+                                         grpc_request_, hedging_params_.hedge_on_per_try_timeout_,
+                                         config_->respect_expected_rq_timeout_);
+
+  // Set x-envoy-attempt-count before finalizeRequestHeaders so it can be referenced.
+  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
+  if (include_attempt_count_in_request_) {
+    headers.setEnvoyAttemptCount(attempt_count_);
+  }
+
+  // Finalize request headers (host/path rewriting + request_headers_to_add) before host selection.
+  // At this point, router-set headers (x-envoy-expected-rq-timeout-ms, x-envoy-attempt-count)
+  // are already set, so request_headers_to_add can reference them and affect load balancing.
+  const Formatter::Context formatter_context(&headers, {}, {}, {}, {}, &callbacks_->activeSpan());
   route_entry_->finalizeRequestHeaders(headers, formatter_context, callbacks_->streamInfo(),
                                        !config_->suppress_envoy_headers_);
 
@@ -756,12 +772,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     return false;
   }
 
-  hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
-
-  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_->suppress_envoy_headers_,
-                                         grpc_request_, hedging_params_.hedge_on_per_try_timeout_,
-                                         config_->respect_expected_rq_timeout_);
-
+  // Handle additional header processing.
   const Http::HeaderEntry* header_max_stream_duration_entry =
       headers.EnvoyUpstreamStreamDurationMs();
   if (header_max_stream_duration_entry) {
@@ -770,15 +781,10 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     headers.removeEnvoyUpstreamStreamDurationMs();
   }
 
-  // If this header is set with any value, use an alternate response code on timeout
+  // If this header is set with any value, use an alternate response code on timeout.
   if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
     timeout_response_code_ = Http::Code::NoContent;
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
-  }
-
-  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
-  if (include_attempt_count_in_request_) {
-    headers.setEnvoyAttemptCount(attempt_count_);
   }
 
   FilterUtility::setUpstreamScheme(
@@ -1156,7 +1162,7 @@ absl::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& p
 
 void Filter::applyShadowPolicyHeaders(const ShadowPolicy& shadow_policy,
                                       Http::RequestHeaderMap& headers) const {
-  const Envoy::Formatter::HttpFormatterContext formatter_context{&headers};
+  const Envoy::Formatter::Context formatter_context{&headers};
   shadow_policy.headerEvaluator().evaluateHeaders(headers, formatter_context,
                                                   callbacks_->streamInfo());
 
@@ -1849,8 +1855,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
-  const Formatter::HttpFormatterContext formatter_context(downstream_headers_, headers.get(), {},
-                                                          {}, {}, &callbacks_->activeSpan());
+  const Formatter::Context formatter_context(downstream_headers_, headers.get(), {}, {}, {},
+                                             &callbacks_->activeSpan());
   route_entry_->finalizeResponseHeaders(*headers, formatter_context, callbacks_->streamInfo());
   modify_headers_(*headers);
 
@@ -2242,7 +2248,7 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
   }
 
   // The request timeouts only account for time elapsed since the downstream request completed
-  // which might not have happened yet (in which case zero time has elapsed.)
+  // which might not have happened yet, in which case zero time has elapsed.
   std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
 
   if (DateUtil::timePointValid(downstream_request_complete_time_)) {

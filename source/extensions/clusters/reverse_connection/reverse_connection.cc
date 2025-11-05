@@ -40,7 +40,7 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
   }
 
   // Format the host identifier using the configured formatter.
-  const Envoy::Formatter::HttpFormatterContext formatter_context{
+  const Envoy::Formatter::Context formatter_context{
       context->downstreamHeaders(),     nullptr /* response_headers */,
       nullptr /* response_trailers */,  "" /* local_reply_body */,
       AccessLog::AccessLogType::NotSet, nullptr /* active_span */};
@@ -50,8 +50,7 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
                                                   ? *context->requestStreamInfo()
                                                   : context->downstreamConnection()->streamInfo();
 
-  const std::string host_id =
-      parent_->host_id_formatter_->formatWithContext(formatter_context, stream_info);
+  const std::string host_id = parent_->host_id_formatter_->format(formatter_context, stream_info);
 
   // Treat "-" (formatter default for missing) as empty as well.
   if (host_id.empty() || host_id == "-") {
@@ -71,7 +70,7 @@ Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_v
   ASSERT(socket_manager != nullptr, "Socket manager should be initialized before request handling");
 
   // Use SocketManager to resolve the key to a node ID.
-  std::string node_id = socket_manager->getNodeID(std::string(host_id));
+  std::string node_id = socket_manager->getNodeWithSocket(std::string(host_id));
   ENVOY_LOG(debug, "reverse_connection: resolved key '{}' to node: '{}'", host_id, node_id);
 
   {
@@ -103,7 +102,7 @@ Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_v
   auto host_result = Upstream::HostImpl::create(
       info(), absl::StrCat(info()->name(), static_cast<std::string>(node_id)),
       std::move(host_address), nullptr /* endpoint_metadata */, nullptr /* locality_metadata */,
-      1 /* initial_weight */, envoy::config::core::v3::Locality().default_instance(),
+      1 /* initial_weight */, std::make_shared<const envoy::config::core::v3::Locality>(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
       0 /* priority */, envoy::config::core::v3::UNKNOWN);
 

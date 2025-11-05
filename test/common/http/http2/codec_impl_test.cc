@@ -252,6 +252,7 @@ public:
     driveToCompletion();
 
     EXPECT_CALL(server_callbacks_, newStream(_, _))
+        .Times(AnyNumber())
         .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
@@ -1007,6 +1008,14 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   }
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
   driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ResetBeforeHeadersSent) {
+  initialize();
+
+  EXPECT_EQ(1, TestUtility::findGauge(client_stats_store_, "http2.streams_active")->value());
+  request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  EXPECT_EQ(0, TestUtility::findGauge(client_stats_store_, "http2.streams_active")->value());
 }
 
 TEST_P(Http2CodecImplTest, InvalidHeadersFrameMissing) {
@@ -2712,6 +2721,65 @@ TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
     value2.setCopy("c=d", 3);
     EXPECT_TRUE(Utility::reconstituteCrumbledCookies(key2, value2, cookies));
     EXPECT_EQ(cookies, "a=b; c=d");
+  }
+}
+
+// Verify that well-known header names use references to static strings and not copies.
+TEST(Http2CodecUtility, staticHeaderNameOptimization) {
+  // Test common HTTP/2 pseudo-headers.
+  {
+    HeaderString method_header(Headers::get().Method);
+    HeaderString path_header(Headers::get().Path);
+    HeaderString status_header(Headers::get().Status);
+    HeaderString authority_header(Headers::get().Host);
+    HeaderString scheme_header(Headers::get().Scheme);
+
+    // Verify these are references (not copies).
+    EXPECT_TRUE(method_header.isReference());
+    EXPECT_TRUE(path_header.isReference());
+    EXPECT_TRUE(status_header.isReference());
+    EXPECT_TRUE(authority_header.isReference());
+    EXPECT_TRUE(scheme_header.isReference());
+
+    // Verify the string values are correct.
+    EXPECT_EQ(method_header.getStringView(), ":method");
+    EXPECT_EQ(path_header.getStringView(), ":path");
+    EXPECT_EQ(status_header.getStringView(), ":status");
+    EXPECT_EQ(authority_header.getStringView(), ":authority");
+    EXPECT_EQ(scheme_header.getStringView(), ":scheme");
+  }
+
+  // Test common request headers.
+  {
+    HeaderString content_type_header(Headers::get().ContentType);
+    HeaderString content_length_header(Headers::get().ContentLength);
+    HeaderString user_agent_header(Headers::get().UserAgent);
+
+    EXPECT_TRUE(content_type_header.isReference());
+    EXPECT_TRUE(content_length_header.isReference());
+    EXPECT_TRUE(user_agent_header.isReference());
+
+    EXPECT_EQ(content_type_header.getStringView(), "content-type");
+    EXPECT_EQ(content_length_header.getStringView(), "content-length");
+    EXPECT_EQ(user_agent_header.getStringView(), "user-agent");
+  }
+
+  // Test that custom headers without static mappings are copied.
+  {
+    HeaderString custom_header;
+    custom_header.setCopy("x-custom-header", 15);
+
+    EXPECT_FALSE(custom_header.isReference());
+    EXPECT_EQ(custom_header.getStringView(), "x-custom-header");
+  }
+
+  // Test that when using setReference directly with a static string, it works correctly.
+  {
+    HeaderString ref_header;
+    ref_header.setReference(Headers::get().UserAgent.get());
+
+    EXPECT_TRUE(ref_header.isReference());
+    EXPECT_EQ(ref_header.getStringView(), "user-agent");
   }
 }
 
