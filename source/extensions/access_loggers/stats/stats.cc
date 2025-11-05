@@ -20,6 +20,25 @@ parseValueFormat(absl::string_view format,
   }
   return std::move(formatters[0]);
 }
+
+Stats::Histogram::Unit
+convertUnitEnum(envoy::extensions::access_loggers::stats::v3::Config::Histogram::Unit unit) {
+  switch (unit) {
+  case envoy::extensions::access_loggers::stats::v3::Config::Histogram::Unspecified:
+    return Stats::Histogram::Unit::Unspecified;
+  case envoy::extensions::access_loggers::stats::v3::Config::Histogram::Bytes:
+    return Stats::Histogram::Unit::Bytes;
+  case envoy::extensions::access_loggers::stats::v3::Config::Histogram::Microseconds:
+    return Stats::Histogram::Unit::Microseconds;
+  case envoy::extensions::access_loggers::stats::v3::Config::Histogram::Milliseconds:
+    return Stats::Histogram::Unit::Milliseconds;
+  case envoy::extensions::access_loggers::stats::v3::Config::Histogram::Percent:
+    return Stats::Histogram::Unit::Percent;
+  default:
+    throw EnvoyException(fmt::format("Unknown histogram unit value in stats logger: {}",
+                                     static_cast<int64_t>(unit)));
+  }
+}
 } // namespace
 
 StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v3::Config& config,
@@ -32,6 +51,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
 
   for (const auto& hist_cfg : config.histograms()) {
     histograms_.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands),
+                             convertUnitEnum(hist_cfg.unit()),
                              parseValueFormat(hist_cfg.value_format(), commands));
   }
 
@@ -117,14 +137,14 @@ void StatsAccessLog::emitLog(const Formatter::Context& context,
     }
 
     uint64_t value = *computed_value_opt;
+    if (histogram.unit_ == Stats::Histogram::Unit::Percent) {
+      value *= Stats::Histogram::PercentScale;
+    }
 
     auto [tags, storage] = histogram.stat_.tags(context, stream_info, *scope_);
 
     auto& histogram_stat =
-        scope_->histogramFromStatNameWithTags(histogram.stat_.name_, tags, histogram.stat_.unit_);
-    if (histogram.stat_.unit_ == Stats::Histogram::Unit::Percent) {
-      value *= static_cast<double>(Stats::Histogram::PercentScale);
-    }
+        scope_->histogramFromStatNameWithTags(histogram.stat_.name_, tags, histogram.unit_);
     histogram_stat.recordValue(value);
   }
 

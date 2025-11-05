@@ -43,10 +43,8 @@ message Config {
 
       Milliseconds = 3;
 
-      Nanoseconds = 4;
-
       // Values are scaled to range 0-1.0, indicating 0%-100%.
-      Percent = 5;
+      Percent = 4;
     }
 
     Stat stat = 1 [(validate.rules).message = {required: true}];

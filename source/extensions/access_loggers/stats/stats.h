@@ -50,11 +50,11 @@ private:
 
     Stats::StatName name_;
     std::vector<DynamicTag> dynamic_tags_;
-    Stats::Histogram::Unit unit_;
   };
 
   struct Histogram {
     NameAndTags stat_;
+    Stats::Histogram::Unit unit_;
     Formatter::FormatterProviderPtr value_formatter_;
   };
 
