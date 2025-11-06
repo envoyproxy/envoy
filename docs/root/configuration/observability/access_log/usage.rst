@@ -1401,6 +1401,10 @@ UDP
 %FILTER_CHAIN_NAME%
   The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
 
+%DOWNSTREAM_NETWORK_NAMESPACE%
+  The Linux network namespace filepath of the downstream connection's local address. This value is only populated when the
+  listener's local address has a configured network namespace.
+
 .. _config_access_log_format_access_log_type:
 
 %ACCESS_LOG_TYPE%

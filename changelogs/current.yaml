@@ -162,9 +162,12 @@ new_features:
 - area: formatter
   change: |
     Added support for the following new access log formatters:
-    - ``%REQUEST_HEADER(X?Y):Z%`` as full name version of ``%REQ(X?Y):Z%``
-    - ``%RESPONSE_HEADER(X?Y):Z%`` as full name version of ``%RESP(X?Y):Z%``
-    - ``%RESPONSE_TRAILER(X?Y):Z%`` as full name version of ``%TRAILER(X?Y):Z%``
+
+    #. ``%REQUEST_HEADER(X?Y):Z%`` as full name version of ``%REQ(X?Y):Z%``.
+    #. ``%RESPONSE_HEADER(X?Y):Z%`` as full name version of ``%RESP(X?Y):Z%``.
+    #. ``%RESPONSE_TRAILER(X?Y):Z%`` as full name version of ``%TRAILER(X?Y):Z%``.
+    #. ``%DOWNSTREAM_NETWORK_NAMESPACE%`` to log the Linux network namespace filepath of the downstream connection.
+
     This provides a more consistent naming scheme for users to understand and use.
 - area: tracing
   change: |

@@ -5,6 +5,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_utility.h"
+#include "source/common/network/downstream_network_namespace.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 
@@ -1739,6 +1740,21 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                       if (!info->name().empty()) {
                         return std::string(info->name());
                       }
+                    }
+                    return absl::nullopt;
+                  });
+            }}},
+          {"DOWNSTREAM_NETWORK_NAMESPACE",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+                    const auto* network_namespace =
+                        stream_info.filterState()
+                            .getDataReadOnly<Network::DownstreamNetworkNamespace>(
+                                Network::DownstreamNetworkNamespace::key());
+                    if (network_namespace) {
+                      return network_namespace->value();
                     }
                     return absl::nullopt;
                   });

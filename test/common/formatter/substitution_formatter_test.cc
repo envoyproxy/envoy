@@ -16,6 +16,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/downstream_network_namespace.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
@@ -1296,6 +1297,32 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     StreamInfoFormatter upstream_format("FILTER_CHAIN_NAME");
 
     EXPECT_EQ("mock_filter_chain_name", upstream_format.format({}, stream_info));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter formatter("DOWNSTREAM_NETWORK_NAMESPACE");
+
+    // Test with network namespace present in filter state.
+    const std::string network_namespace_path = "/var/run/netns/production";
+    stream_info.filter_state_->setData(
+        Network::DownstreamNetworkNamespace::key(),
+        std::make_unique<Network::DownstreamNetworkNamespace>(network_namespace_path),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+
+    EXPECT_EQ(network_namespace_path, formatter.format({}, stream_info));
+    EXPECT_THAT(formatter.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue(network_namespace_path)));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter formatter("DOWNSTREAM_NETWORK_NAMESPACE");
+
+    // Test without network namespace in filter state.
+    EXPECT_EQ(absl::nullopt, formatter.format({}, stream_info));
+    EXPECT_THAT(formatter.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
   }
 
   {
@@ -4310,6 +4337,29 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     FormatterPtr formatter = *FormatterImpl::create(format, false);
 
     EXPECT_EQ("\"test_value\"|-|\"test_va|-", formatter->format(formatter_context, stream_info));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+    const std::string network_namespace_path = "/var/run/netns/staging";
+    stream_info.filter_state_->setData(
+        Network::DownstreamNetworkNamespace::key(),
+        std::make_unique<Network::DownstreamNetworkNamespace>(network_namespace_path),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+    const std::string format = "netns=%DOWNSTREAM_NETWORK_NAMESPACE%";
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
+
+    EXPECT_EQ("netns=/var/run/netns/staging", formatter->format(formatter_context, stream_info));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    const std::string format = "netns=%DOWNSTREAM_NETWORK_NAMESPACE%";
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
+
+    EXPECT_EQ("netns=-", formatter->format(formatter_context, stream_info));
   }
 
   {

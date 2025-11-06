@@ -1959,4 +1959,56 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
   EXPECT_EQ(downstream_resumes, 1);
 }
 
+// Test that the DOWNSTREAM_NETWORK_NAMESPACE formatter logs the network namespace correctly.
+TEST_P(TcpProxyIntegrationTest, AccessLogDownstreamNetworkNamespace) {
+  std::string access_log_path = TestEnvironment::temporaryPath(fmt::format(
+      "access_log_netns{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+      TestUtility::uniqueFilename()));
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    // Add access log with DOWNSTREAM_NETWORK_NAMESPACE formatter.
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "netns=%DOWNSTREAM_NETWORK_NAMESPACE% "
+        "filter_state=%FILTER_STATE(envoy.network.network_namespace:PLAIN)%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+
+  // Make a connection and send some data.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("hello", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world", true));
+  tcp_client->waitForData("world");
+  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Guarantee client is done writing to the log.
+  test_server_.reset();
+  auto log_result = waitForAccessLog(access_log_path);
+
+  // Right now this should return "-" as network namespace is not configured
+  // in the test setup.
+  EXPECT_THAT(log_result, testing::HasSubstr("netns=- filter_state=-"));
+}
+
 } // namespace Envoy
