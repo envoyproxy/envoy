@@ -93,6 +93,10 @@ bug_fixes:
     were not accessible in ``request_headers_to_add`` configuration on the initial request. Headers configured via
     ``request_headers_to_add`` can now reference router-set headers using formatters like
     ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
+- area: router
+  change: |
+    Fixed an upstream HTTP filter issue if route retries on 5xx and the filter returns
+    FilterHeadersStatus::StopIteration in its encodeHeaders() method.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
