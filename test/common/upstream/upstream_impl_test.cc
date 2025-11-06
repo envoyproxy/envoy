@@ -3516,7 +3516,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                .address_->asString());
   }
 
@@ -3537,13 +3537,13 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                .address_->asString());
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("[2001::1]:0", cluster->info()
                                  ->getUpstreamLocalAddressSelector()
-                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                  .address_->asString());
   }
 
@@ -3561,7 +3561,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                .address_->asString());
   }
 
@@ -3649,7 +3649,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         *Network::Address::PipeInstance::create("/test");
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                .address_->asString());
   }
 
@@ -3665,7 +3665,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3727,7 +3727,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3746,7 +3746,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                                   ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3795,13 +3795,13 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                .address_->asString());
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("[2001::1]:0", cluster->info()
                                  ->getUpstreamLocalAddressSelector()
-                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                  .address_->asString());
   }
 
@@ -3818,7 +3818,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                .address_->asString());
   }
 
@@ -3880,7 +3880,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         *Network::Address::PipeInstance::create("/test");
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                .address_->asString());
   }
 
@@ -3917,7 +3917,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3978,17 +3978,17 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
       std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
   EXPECT_EQ("[2001::1]:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                .address_->asString());
   Network::Address::InstanceConstSharedPtr remote_address =
       std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
   EXPECT_EQ("1.2.3.6:0", cluster->info()
                              ->getUpstreamLocalAddressSelector()
-                             ->getUpstreamLocalAddress(remote_address, nullptr)
+                             ->getUpstreamLocalAddress(remote_address, nullptr, {})
                              .address_->asString());
   EXPECT_EQ("1.2.3.5:0", cluster->info()
                              ->getUpstreamLocalAddressSelector()
-                             ->getUpstreamLocalAddress(remote_address, nullptr)
+                             ->getUpstreamLocalAddress(remote_address, nullptr, {})
                              .address_->asString());
 }
 
