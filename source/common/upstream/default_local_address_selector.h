@@ -24,7 +24,8 @@ public:
 
   // UpstreamLocalAddressSelector
   UpstreamLocalAddress getUpstreamLocalAddressImpl(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address) const override;
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const override;
 
 private:
   std::vector<UpstreamLocalAddress> upstream_local_addresses_;

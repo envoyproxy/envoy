@@ -37,9 +37,39 @@ message XffConfig {
   // When the remote IP address matches a trusted CIDR and the
   // :ref:`config_http_conn_man_headers_x-forwarded-for` header was sent, each entry
   // in the ``x-forwarded-for`` header is evaluated from right to left and the first
-  // public non-trusted address is used as the original client address. If all
+  // non-trusted address is used as the original client address. If all
   // addresses in ``x-forwarded-for`` are within the trusted list, the first (leftmost)
   // entry is used.
+  //
+  // .. warning::
+  //
+  //   Starting with Envoy v1.33.0, private IP address ranges are **not** automatically skipped
+  //   when determining the original client address. We'll return the first address that is not
+  //   in the ``xff_trusted_cidrs`` list, even if it is a private IP address.
+  //
+  //   If you want to skip private IP addresses, explicitly add them to the ``xff_trusted_cidrs``
+  //   list. For example:
+  //
+  //   .. code-block:: yaml
+  //
+  //     xff_trusted_cidrs:
+  //       cidrs:
+  //         - address_prefix: "10.0.0.0"
+  //           prefix_len: 8
+  //         - address_prefix: "172.16.0.0"
+  //           prefix_len: 12
+  //         - address_prefix: "192.168.0.0"
+  //           prefix_len: 16
+  //         - address_prefix: "127.0.0.0"
+  //           prefix_len: 8
+  //         - address_prefix: "fc00::"
+  //           prefix_len: 7
+  //         - address_prefix: "::1"
+  //           prefix_len: 128
+  //
+  //   See :ref:`internal_address_config
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
+  //   for more information about the v1.33.0 behavior change.
   //
   // This is typically used when requests are proxied by a
   // `CDN <https://en.wikipedia.org/wiki/Content_delivery_network>`_.
