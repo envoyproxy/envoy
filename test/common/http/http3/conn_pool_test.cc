@@ -62,9 +62,11 @@ public:
     Network::ConnectionSocket::OptionsSharedPtr options =
         std::make_shared<Network::Socket::Options>();
     options->push_back(socket_option_);
-    ON_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_))
+    ON_CALL(*mockHost().cluster_.upstream_local_address_selector_,
+            getUpstreamLocalAddressImpl(_, _))
         .WillByDefault(Invoke(
-            [](const Network::Address::InstanceConstSharedPtr&) -> Upstream::UpstreamLocalAddress {
+            [](const Network::Address::InstanceConstSharedPtr&,
+               OptRef<const Network::TransportSocketOptions>) -> Upstream::UpstreamLocalAddress {
               return Upstream::UpstreamLocalAddress({nullptr, nullptr});
             }));
     Network::TransportSocketOptionsConstSharedPtr transport_options;
@@ -186,19 +188,21 @@ void Http3ConnPoolImplTest::createNewStream() {
   mockHost().cluster_.cluster_socket_options_ = std::make_shared<Network::Socket::Options>();
   std::shared_ptr<Network::MockSocketOption> cluster_socket_option{new Network::MockSocketOption()};
   mockHost().cluster_.cluster_socket_options_->push_back(cluster_socket_option);
-  EXPECT_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_))
-      .WillOnce(Invoke([&](const Network::Address::InstanceConstSharedPtr& address)
-                           -> Upstream::UpstreamLocalAddress {
-        if (happy_eyeballs_ && address_list_->size() == 2) {
-          EXPECT_EQ(address, (*address_list_)[1]);
-        } else {
-          EXPECT_EQ(address, test_address_);
-        }
-        Network::ConnectionSocket::OptionsSharedPtr options =
-            std::make_shared<Network::ConnectionSocket::Options>();
-        Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
-        return Upstream::UpstreamLocalAddress({nullptr, options});
-      }));
+  EXPECT_CALL(*mockHost().cluster_.upstream_local_address_selector_,
+              getUpstreamLocalAddressImpl(_, _))
+      .WillOnce(Invoke(
+          [&](const Network::Address::InstanceConstSharedPtr& address,
+              OptRef<const Network::TransportSocketOptions>) -> Upstream::UpstreamLocalAddress {
+            if (happy_eyeballs_ && address_list_->size() == 2) {
+              EXPECT_EQ(address, (*address_list_)[1]);
+            } else {
+              EXPECT_EQ(address, test_address_);
+            }
+            Network::ConnectionSocket::OptionsSharedPtr options =
+                std::make_shared<Network::ConnectionSocket::Options>();
+            Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
+            return Upstream::UpstreamLocalAddress({nullptr, options});
+          }));
   EXPECT_CALL(*cluster_socket_option, setOption(_, _)).Times(3u);
   EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
