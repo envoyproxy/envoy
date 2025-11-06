@@ -8,8 +8,9 @@ Configuration
 
 Access logs are configured as part of the :ref:`HTTP connection manager config
 <config_http_conn_man>`, :ref:`TCP Proxy <config_network_filters_tcp_proxy>`,
-:ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>` or
-:ref:`Thrift Proxy <config_network_filters_thrift_proxy>`.
+:ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`,
+:ref:`Thrift Proxy <config_network_filters_thrift_proxy>` or
+:ref:`listener <envoy_v3_api_field_config.listener.v3.Listener.access_log>`
 
 * :ref:`v3 API reference <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
 
@@ -1409,19 +1410,21 @@ UDP
 
   * TcpUpstreamConnected - When TCP Proxy filter has successfully established an upstream connection.
   * TcpPeriodic - On any TCP Proxy filter periodic log record.
-  * TcpConnectionEnd - When a TCP connection is ended on TCP Proxy filter.
+  * TcpConnectionStart - When a TCP connection is started by a listener.
+  * TcpConnectionEnd - When a TCP connection is ended on TCP Proxy filter or a listener.
   * DownstreamStart - When HTTP Connection Manager filter receives a new HTTP request.
   * DownstreamTunnelSuccessfullyEstablished - When the HTTP Connection Manager sends response headers
-                                              indicating a successful HTTP tunnel.
+    indicating a successful HTTP tunnel.
   * DownstreamPeriodic - On any HTTP Connection Manager periodic log record.
   * DownstreamEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
   * UpstreamPoolReady - When a new HTTP request is received by the HTTP Router filter.
   * UpstreamPeriodic - On any HTTP Router filter periodic log record.
   * UpstreamEnd - When an HTTP request is finished on the HTTP Router filter.
   * UdpTunnelUpstreamConnected - When UDP Proxy filter has successfully established an upstream connection.
-                                 Note: It is only relevant for UDP tunneling over HTTP.
+    Note: It is only relevant for UDP tunneling over HTTP.
   * UdpPeriodic - On any UDP Proxy filter periodic log record.
   * UdpSessionEnd - When a UDP session is ended on UDP Proxy filter.
+  * NotConnected - When a TCP connection fails to be established by a listener.
 
 %UNIQUE_ID%
    A unique identifier (UUID) that is generated dynamically.

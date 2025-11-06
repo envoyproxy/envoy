@@ -176,6 +176,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
+  EXPECT_CALL(listener_config_, flushAccessLogsOnStart());
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
   EXPECT_CALL(conn_handler_, decNumConnections());
   connection->close(Network::ConnectionCloseType::NoFlush);
@@ -224,6 +225,7 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
+  EXPECT_CALL(listener_config_, flushAccessLogsOnStart());
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(conn_handler_, decNumConnections());
@@ -331,6 +333,7 @@ public:
       return *connection_balancer_;
     }
     const AccessLog::InstanceSharedPtrVector& accessLogs() const override { return access_logs_; }
+    bool flushAccessLogsOnStart() const override { return false; }
     ResourceLimit& openConnections() override { return open_connections_; }
     uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
     uint32_t maxConnectionsToAcceptPerSocketEvent() const override {

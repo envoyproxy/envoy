@@ -54,7 +54,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -128,6 +128,11 @@ message Listener {
     // .. note::
     //   This discovery service only supports ``AGGREGATED_GRPC`` API type.
     core.v3.ConfigSource config_source = 2;
+  }
+
+  message AccessLogOptions {
+    // If set to true, the access log is flushed when a TCP connection starts.
+    bool flush_access_log_on_start = 1;
   }
 
   reserved 14, 23;
@@ -363,9 +368,15 @@ message Listener {
   //   is warned similar to macOS. It is left enabled for UDP with undefined behavior currently.
   google.protobuf.BoolValue enable_reuse_port = 29;
 
-  // Configuration for :ref:`access logs <arch_overview_access_logs>`
-  // emitted by this listener.
+  // Configuration for :ref:`access logs <arch_overview_access_logs>` emitted by this listener. By
+  // default, the log is flushed at the end of the TCP connections, or when the TCP connection is
+  // not established. See :ref:`access_log_options
+  // <envoy_v3_api_field_config.listener.v3.Listener.access_log_options>` for additional
+  // configuration.
   repeated accesslog.v3.AccessLog access_log = 22;
+
+  // Additional access log options for the listener.
+  AccessLogOptions access_log_options = 37;
 
   // The maximum length a tcp listener's pending connections queue can grow to. If no value is
   // provided net.core.somaxconn will be used on Linux and 128 otherwise.

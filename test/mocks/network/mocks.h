@@ -530,6 +530,8 @@ public:
     return empty_access_logs_;
   }
 
+  MOCK_METHOD(bool, flushAccessLogsOnStart, (), (const));
+
   const ListenerInfoConstSharedPtr& listenerInfo() const override { return listener_info_; }
 
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;

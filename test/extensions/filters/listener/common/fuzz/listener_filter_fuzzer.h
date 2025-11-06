@@ -72,6 +72,7 @@ public:
   const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
     return empty_access_logs_;
   }
+  bool flushAccessLogsOnStart() const override { return false; }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
   uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
     return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
