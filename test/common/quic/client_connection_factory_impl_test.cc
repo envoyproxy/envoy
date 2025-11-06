@@ -14,6 +14,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
@@ -36,6 +37,9 @@ protected:
     auto* protocol_options = cluster_->http3_options_.mutable_quic_protocol_options();
     protocol_options->mutable_max_concurrent_streams()->set_value(43);
     protocol_options->mutable_initial_stream_window_size()->set_value(65555);
+    if (set_num_timeouts_to_trigger_port_migration_) {
+      protocol_options->mutable_num_timeouts_to_trigger_port_migration()->set_value(2);
+    }
     protocol_options->set_connection_options("5RTO,ACKD");
     protocol_options->set_client_connection_options("6RTO,AKD4");
     quic_info_ = createPersistentQuicInfoForCluster(dispatcher_, *cluster_);
@@ -62,6 +66,12 @@ protected:
       quic_ccopts.append(quic::QuicTagToString(ccopt));
     }
     EXPECT_EQ(quic_ccopts, "6RTOAKD4");
+    // Verify the default migration config used by QUICHE implemented migration.
+    // Migration to Server Preferred Address should be allowed by default.
+    EXPECT_TRUE(quic_info_->migration_config_.allow_server_preferred_address);
+    EXPECT_EQ(set_num_timeouts_to_trigger_port_migration_,
+              quic_info_->migration_config_.allow_port_migration);
+    EXPECT_EQ(quic_info_->migration_config_.max_port_migrations_per_session, kMaxNumSocketSwitches);
 
     test_address_ = *Network::Utility::resolveUrl(absl::StrCat(
         "tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":", PEER_PORT));
@@ -83,6 +93,7 @@ protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<PersistentQuicInfoImpl> quic_info_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  bool set_num_timeouts_to_trigger_port_migration_{false};
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
@@ -112,6 +123,37 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   EXPECT_EQ(absl::nullopt, session->unixSocketPeerCredentials());
   EXPECT_NE(absl::nullopt, session->lastRoundTripTime());
   EXPECT_THAT(session->GetAlpnsToOffer(), testing::ElementsAre("h3"));
+  client_connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
+TEST_P(QuicNetworkConnectionTest, QuicheHandlesMigration) {
+  // This would enable port migration in the QUICHE.
+  set_num_timeouts_to_trigger_port_migration_ = true;
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.reloadable_features.use_migration_in_quiche", "true"}});
+  initialize();
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      *quic_info_, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
+      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
+      nullptr, connection_id_generator_, *factory_);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  EXPECT_TRUE(client_connection->connecting());
+  ASSERT(session != nullptr);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_migration_in_quiche")) {
+    // Session should have a handle to the writer if quiche handles migration.
+    EXPECT_NE(session->writer(), nullptr);
+    // Port migration should be configured.
+    EXPECT_TRUE(session->GetConnectionMigrationConfig().allow_port_migration);
+  } else {
+    EXPECT_EQ(session->writer(), nullptr);
+    // QUICHE migration config should have all kinds of migration disabled.
+    EXPECT_FALSE(session->GetConnectionMigrationConfig().allow_server_preferred_address);
+    EXPECT_FALSE(session->GetConnectionMigrationConfig().allow_port_migration);
+    EXPECT_FALSE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
+  }
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -240,7 +282,7 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
   EXPECT_CALL(rtt_cache, getSrtt(_, false)).WillOnce(Return(std::chrono::microseconds(5)));
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
-      info, crypto_config_,
+      *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, *store_.rootScope(),
       nullptr, nullptr, connection_id_generator_, *factory_);
