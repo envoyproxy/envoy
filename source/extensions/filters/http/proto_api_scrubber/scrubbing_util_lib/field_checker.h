@@ -34,8 +34,7 @@ public:
   FieldChecker(const ScrubberContext scrubber_context,
                const Envoy::StreamInfo::StreamInfo* stream_info, const std::string& method_name,
                const ProtoApiScrubberFilterConfig* filter_config)
-      : scrubber_context_(scrubber_context),
-        matching_data_(*stream_info),
+      : scrubber_context_(scrubber_context), matching_data_(*stream_info),
         method_name_(method_name), filter_config_ptr_(filter_config) {}
 
   // This type is neither copyable nor movable.
