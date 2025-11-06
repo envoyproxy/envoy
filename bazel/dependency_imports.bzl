@@ -151,8 +151,9 @@ def envoy_dependency_imports(
     go_repository(
         name = "com_github_cncf_xds_go",
         importpath = "github.com/cncf/xds/go",
-        sum = "h1:B/lvg4tQ5hfFZd4V2hcSfFVfUvAK6GSFKxIIzwnkv8g=",
-        version = "v0.0.0-20220520190051-1e77728a1eaa",
+        replace = ["github.com/cncf/xds=github.com/mmorel-35/xds@v0.0.0-20251101232711-f91b30e2bf01"],
+        version = "v0.0.0-20251101232711-f91b30e2bf01",
+        sum = "h1:hjA+cc/LeLob2/15tu/jY1SappFOM0Ia6OqAO9ohhAs=",
         build_external = "external",
     )
     go_repository(
