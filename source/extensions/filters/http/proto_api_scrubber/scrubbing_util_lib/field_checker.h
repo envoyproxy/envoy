@@ -33,6 +33,10 @@ public:
   FieldChecker& operator=(const FieldChecker&) = delete;
   ~FieldChecker() override {}
 
+  // Make all the overloads from the base class visible here so the one explicit
+  // override doesn't hide the other signatures.
+  using FieldCheckerInterface::CheckField;
+
   /**
    * Returns whether the `field` should be included (kInclude), excluded (kExclude)
    * or traversed further (kPartial).

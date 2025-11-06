@@ -38,8 +38,8 @@ ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const 
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id,
                   address_list_[next_address_]->asStringView());
   auto& address = address_list_[next_address_++];
-  auto upstream_local_address =
-      upstream_local_address_selector_->getUpstreamLocalAddress(address, options_);
+  auto upstream_local_address = upstream_local_address_selector_->getUpstreamLocalAddress(
+      address, options_, makeOptRefFromPtr(transport_socket_options_.get()));
 
   return dispatcher_.createClientConnection(
       address, upstream_local_address.address_,
