@@ -449,6 +449,69 @@ TEST_P(ConnectTerminationIntegrationTest, IgnoreH11HostField) {
       sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, true););
 }
 
+TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reject_early_connect_data", "true");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Send CONNECT request and immediately send some data without waiting for 200
+  // response from Envoy.
+  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  codec_client_->sendData(*request_encoder_, "premature data", false);
+  response_ = std::move(encoder_decoder.second);
+
+  // Envoy will try top open upstream connection before the premature CONNECT data is detected.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
+
+  response_->waitForHeaders();
+  EXPECT_EQ(response_->headers().getStatusValue(), "400");
+  EXPECT_TRUE(response_->waitForEndStream());
+
+  // Because the downstream connection is closed by Envoy without sending any data the
+  // upstream connection will remain in the pool and will not be closed.
+  // However it should not have any data in it.
+  EXPECT_FALSE(fake_raw_upstream_connection_->hasData());
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataAllowedByDefault) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Send CONNECT request and immediately send some data without waiting for 200
+  // response from Envoy.
+  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  codec_client_->sendData(*request_encoder_, "premature data", false);
+  response_ = std::move(encoder_decoder.second);
+
+  // Wait for the data to arrive upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForData(
+      FakeRawConnection::waitForInexactMatch("premature data")));
+
+  // Send some data downstream.
+  ASSERT_TRUE(fake_raw_upstream_connection_->write("upstream_send_data"));
+
+  // Wait for the headers and data to arrive downstream.
+  response_->waitForHeaders();
+  response_->waitForBodyData(strlen("upstream_send_data"));
+  EXPECT_EQ("upstream_send_data", response_->body());
+
+  codec_client_->sendData(*request_encoder_, "", true);
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+
+  ASSERT_TRUE(fake_raw_upstream_connection_->close());
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForEndStream());
+    ASSERT_FALSE(response_->reset());
+  }
+  cleanupUpstreamAndDownstream();
+}
+
 INSTANTIATE_TEST_SUITE_P(HttpAndIpVersions, ConnectTerminationIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
