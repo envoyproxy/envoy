@@ -457,8 +457,6 @@ TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithoutSessionName) {
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityCreatesWatchedDirectoryFromEnv) {
-  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/test/path/token", 1);
-  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _))
       .WillRepeatedly(Return(mock_provider_));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _))
@@ -480,6 +478,12 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityCreatesWatchedDirectoryFr
           })));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()
+      ->mutable_web_identity_token_data_source()
+      ->set_filename("/test/path/token");
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()->set_role_arn(
+      "aws:iam::123456789012:role/arn");
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
   EXPECT_EQ(filename, "/test/path/token");
@@ -487,7 +491,6 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityCreatesWatchedDirectoryFr
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityAddsWatchedDirectoryWhenMissing) {
-  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _))
       .WillRepeatedly(Return(mock_provider_));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _))
@@ -509,9 +512,12 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityAddsWatchedDirectoryWhenM
           })));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+
   credential_provider_config.mutable_assume_role_with_web_identity_provider()
       ->mutable_web_identity_token_data_source()
       ->set_filename("/test/path/token");
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()->set_role_arn(
+      "aws:iam::123456789012:role/arn");
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
   EXPECT_EQ(filename, "/test/path/token");
@@ -519,7 +525,6 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityAddsWatchedDirectoryWhenM
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityPreservesExistingWatchedDirectory) {
-  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _))
       .WillRepeatedly(Return(mock_provider_));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _))
@@ -539,10 +544,16 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityPreservesExistingWatchedD
           })));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
-  auto* web_identity = credential_provider_config.mutable_assume_role_with_web_identity_provider();
-  web_identity->mutable_web_identity_token_data_source()->set_filename("/test/path/token");
-  web_identity->mutable_web_identity_token_data_source()->mutable_watched_directory()->set_path(
-      "/custom/watch/dir");
+
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()
+      ->mutable_web_identity_token_data_source()
+      ->set_filename("/test/path/token");
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()
+      ->mutable_web_identity_token_data_source()
+      ->mutable_watched_directory()
+      ->set_path("/custom/watch/dir");
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()->set_role_arn(
+      "aws:iam::123456789012:role/arn");
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
   EXPECT_EQ(filename, "/test/path/token");
