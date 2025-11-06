@@ -24,11 +24,13 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
 * The HTTP protocol :ref:`idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`
   is defined in a generic message used by both the HTTP connection manager as well as upstream
   cluster HTTP connections. The idle timeout is defined as the period in which there are no active
-  requests or streams. When the idle timeout is reached, the connection will be closed. For HTTP/2
-  downstream connections, a drain sequence will occur prior to closing the connection (see
-  :ref:`drain_timeout <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`
-  below). For other connection types, the connection terminates directly. Note that idle timeout
-  only fires when there are no active streams, unlike :ref:`max_connection_duration
+  requests or streams at the HTTP protocol layer. This timeout is independent of TCP-level activity
+  such as TCP keepalive packets. When the idle timeout is reached, the connection will be closed.
+  For HTTP/2 downstream connections, when idle timeout is reached, a drain sequence begins immediately,
+  lasting for the configured :ref:`drain_timeout
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`
+  period (see below). For other connection types, the connection terminates directly. Note that idle
+  timeout only fires when there are no active streams, unlike :ref:`max_connection_duration
   <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` which can trigger
   while streams are active. The default idle timeout if not otherwise specified is *1 hour*. To modify
   the idle timeout for downstream connections use the :ref:`common_http_protocol_options
@@ -65,7 +67,7 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   stream IDs and prevents a race with the final GOAWAY frame. During this grace period, Envoy will continue
   to accept new streams. After the grace period elapses, a final GOAWAY frame is sent and Envoy will start
   refusing new streams. At that moment, if no active streams exist, the connection closes immediately. If
-  active streams still exist, the connection remains open indefinitely until all streams complete naturally,
+  active streams still exist, the connection remains open until all streams complete naturally,
   then closes. The drain sequence never forcefully terminates active streams. Draining occurs either when a
   connection hits the :ref:`idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`,
   when :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`
