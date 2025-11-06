@@ -12,7 +12,23 @@ def external_http_archive(name, **kwargs):
         **kwargs
     )
 
-def api_dependencies():
+def api_dependencies(bzlmod = False):
+    # Dependencies needed for both WORKSPACE and bzlmod
+    external_http_archive(
+        name = "prometheus_metrics_model",
+        build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "com_github_chrusty_protoc_gen_jsonschema",
+    )
+    external_http_archive(
+        name = "envoy_toolshed",
+    )
+
+    # WORKSPACE-only dependencies (available in BCR for bzlmod or not needed)
+    if bzlmod:
+        return
+
     external_http_archive(
         name = "bazel_skylib",
     )
@@ -31,10 +47,6 @@ def api_dependencies():
         name = "com_github_cncf_xds",
     )
     external_http_archive(
-        name = "prometheus_metrics_model",
-        build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
-    )
-    external_http_archive(
         name = "rules_buf",
     )
     external_http_archive(
@@ -50,9 +62,6 @@ def api_dependencies():
     )
     external_http_archive(
         name = "dev_cel",
-    )
-    external_http_archive(
-        name = "com_github_chrusty_protoc_gen_jsonschema",
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
