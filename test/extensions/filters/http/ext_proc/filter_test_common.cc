@@ -65,6 +65,8 @@ static constexpr absl::string_view filter_config_name = "envoy.filters.http.ext_
 static constexpr uint32_t BufferSize = 100000;
 
 void HttpFilterTest::initialize(std::string&& yaml, bool is_upstream_filter) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_stream_close_optimization", "true"}});
   client_ = std::make_unique<MockClient>();
   route_ = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));

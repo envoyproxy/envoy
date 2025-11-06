@@ -446,8 +446,12 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersServerHalfClosesFirst) {
         return true;
       });
 
-  // Envoy closes the side stream in this case.
-  EXPECT_TRUE(processor_stream_->waitForReset());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+    // Envoy closes the side stream in this case.
+    EXPECT_TRUE(processor_stream_->waitForReset());
+  }
+
   // ext_proc server indicates that it is not expecting any more messages
   // from ext_proc filter and half-closes the stream.
   processor_stream_->finishGrpcStream(Grpc::Status::Ok);
