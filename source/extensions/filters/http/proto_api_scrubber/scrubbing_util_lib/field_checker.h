@@ -35,7 +35,7 @@ public:
                const Envoy::StreamInfo::StreamInfo* stream_info, const std::string& method_name,
                const ProtoApiScrubberFilterConfig* filter_config)
       : scrubber_context_(scrubber_context),
-        matching_data_ptr_(std::make_unique<Http::Matching::HttpMatchingDataImpl>(*stream_info)),
+        matching_data_(*stream_info),
         method_name_(method_name), filter_config_ptr_(filter_config) {}
 
   // This type is neither copyable nor movable.
@@ -79,7 +79,7 @@ private:
                                       std::string& field_mask) const;
 
   ScrubberContext scrubber_context_;
-  std::unique_ptr<Http::Matching::HttpMatchingDataImpl> matching_data_ptr_;
+  Http::Matching::HttpMatchingDataImpl matching_data_;
   std::string method_name_;
   const ProtoApiScrubberFilterConfig* filter_config_ptr_;
 };
