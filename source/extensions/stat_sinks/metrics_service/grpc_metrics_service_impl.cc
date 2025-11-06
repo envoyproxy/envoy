@@ -29,6 +29,8 @@ GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(Grpc::RawAsyncClientSharedPtr r
       batch_size_(batch_size) {}
 
 void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
+  bool send_identifier = false;
+
   if (stream_ == nullptr) {
     ENVOY_LOG(debug, "Establishing new gRPC metrics service stream");
     stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
@@ -38,17 +40,12 @@ void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
                 "unable to establish metrics service stream. Will retry in the next flush cycle");
       return;
     }
-
-    // For perf reasons, the identifier is only sent once when establishing the stream.
-    envoy::service::metrics::v3::StreamMetricsMessage identifier_message;
-    auto* identifier = identifier_message.mutable_identifier();
-    *identifier->mutable_node() = local_info_.node();
-    stream_->sendMessage(identifier_message, false);
+    send_identifier = true;
   }
 
   // If batch_size is 0 or not set, send all metrics in a single message (default behavior)
   if (batch_size_ == 0 || metrics->size() <= static_cast<int>(batch_size_)) {
-    sendBatch(*metrics, 0, metrics->size());
+    sendBatch(*metrics, 0, metrics->size(), send_identifier);
     return;
   }
 
@@ -58,14 +55,15 @@ void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
 
   while (start_idx < metrics->size()) {
     int end_idx = std::min(start_idx + static_cast<int>(batch_size_), metrics->size());
-    sendBatch(*metrics, start_idx, end_idx);
+    sendBatch(*metrics, start_idx, end_idx, send_identifier);
+    send_identifier = false; // Only send with first batch
     start_idx = end_idx;
   }
 }
 
 void GrpcMetricsStreamerImpl::sendBatch(
     const Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& metrics,
-    int start_idx, int end_idx) {
+    int start_idx, int end_idx, bool send_identifier) {
   envoy::service::metrics::v3::StreamMetricsMessage message;
   int batch_size = end_idx - start_idx;
   message.mutable_envoy_metrics()->Reserve(batch_size);
@@ -73,6 +71,12 @@ void GrpcMetricsStreamerImpl::sendBatch(
   // Copy directly from source metrics to message, avoiding intermediate buffer
   for (int i = start_idx; i < end_idx; ++i) {
     message.mutable_envoy_metrics()->Add()->CopyFrom(metrics[i]);
+  }
+
+  // For perf reasons, the identifier is only sent with the first batch on a new stream
+  if (send_identifier) {
+    auto* identifier = message.mutable_identifier();
+    *identifier->mutable_node() = local_info_.node();
   }
 
   if (stream_ != nullptr) {

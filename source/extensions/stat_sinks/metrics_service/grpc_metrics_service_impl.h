@@ -83,7 +83,7 @@ public:
 private:
   void
   sendBatch(const Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& metrics,
-            int start_idx, int end_idx);
+            int start_idx, int end_idx, bool send_identifier);
 
   const LocalInfo::LocalInfo& local_info_;
   const Protobuf::MethodDescriptor& service_method_;
