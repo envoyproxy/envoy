@@ -12,6 +12,7 @@ load(":repository_locations_utils.bzl", "load_repository_locations_spec")
 licenses(["notice"])  # Apache 2
 
 exports_files([
+    "extensions.bzl",
     "repository_locations.bzl",
     "repository_locations_utils.bzl",
     "utils.bzl",
