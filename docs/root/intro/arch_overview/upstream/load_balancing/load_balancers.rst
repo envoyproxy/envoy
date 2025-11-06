@@ -23,6 +23,31 @@ endpoints in a locality, then a weighted round robin schedule is used, where
 higher weighted endpoints will appear more often in the rotation to achieve the
 effective weighting.
 
+.. _arch_overview_load_balancing_types_client_side_weighted_round_robin:
+
+Client-side weighted round robin
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Envoy also provides a client-side weighted round robin policy implemented as an
+extension: :ref:`ClientSideWeightedRoundRobin
+<envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`.
+Unlike classic round robin, endpoint weights are derived from load reports sent by
+upstreams via ORCA (Open Request Cost Aggregation), incorporating queries-per-second (QPS),
+errors-per-second (EPS) and utilization to adaptively balance load.
+
+This policy supports:
+
+- :ref:`Slow start <arch_overview_load_balancing_slow_start>` via
+  :ref:`SlowStartConfig
+  <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.SlowStartConfig>`, allowing
+  new or recovered endpoints to ramp up traffic gradually.
+- :ref:`Locality-aware routing <arch_overview_load_balancing_zone_aware_routing>` and
+  :ref:`locality weighted load balancing <arch_overview_load_balancing_locality_weighted_lb>` via
+  :ref:`LocalityLbConfig
+  <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.LocalityLbConfig>`.
+
+See the API reference above for full configuration details.
+
 .. _arch_overview_load_balancing_types_least_request:
 
 Weighted least request
