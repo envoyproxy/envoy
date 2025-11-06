@@ -182,6 +182,14 @@ struct BodyCallbacksFilter {
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
   fn on_request_body(
     &mut self,
     envoy_filter: &mut EHF,
@@ -194,23 +202,46 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     }
     self.seen_request_body = true;
 
-    let request_body = envoy_filter
-      .get_request_body()
-      .expect("request body not available");
-    let mut body = String::new();
-    for chunk in request_body {
-      body.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+    let mut received_body_len: usize = 0;
+    let mut buffered_body_len: usize = 0;
+    let mut body_content = String::new();
+
+    let buffered_body = envoy_filter.get_buffered_request_body();
+    if buffered_body.is_some() {
+      for chunk in buffered_body.unwrap() {
+        buffered_body_len += chunk.as_slice().len();
+        body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+      }
     }
-    assert_eq!(body, "request_body");
+
+    let received_body = envoy_filter.get_received_request_body();
+    if received_body.is_some() {
+      for chunk in received_body.unwrap() {
+        received_body_len += chunk.as_slice().len();
+        body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+      }
+    }
+
+    assert_eq!(body_content, "request_body");
 
     // Drain the request body.
-    envoy_filter.drain_request_body(body.len());
+    envoy_filter.drain_received_request_body(received_body_len);
+    envoy_filter.drain_buffered_request_body(buffered_body_len);
+
     // Append the new request body.
-    envoy_filter.append_request_body(b"new_request_body");
+    envoy_filter.append_received_request_body(b"new_request_body");
     // Plus we need to set the content length.
     envoy_filter.set_request_header("content-length", b"16");
 
     envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
   }
 
   fn on_response_body(
@@ -224,19 +255,33 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     }
     self.seen_response_body = true;
 
-    let response_body = envoy_filter
-      .get_response_body()
-      .expect("response body not available");
-    let mut body = String::new();
-    for chunk in response_body {
-      body.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+    let mut buffered_body_len: usize = 0;
+    let mut received_body_len: usize = 0;
+    let mut body_content = String::new();
+
+    let buffered_body = envoy_filter.get_buffered_response_body();
+    if buffered_body.is_some() {
+      for chunk in buffered_body.unwrap() {
+        buffered_body_len += chunk.as_slice().len();
+        body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+      }
     }
-    assert_eq!(body, "response_body");
+
+    let received_body = envoy_filter.get_received_response_body();
+    if received_body.is_some() {
+      for chunk in received_body.unwrap() {
+        received_body_len += chunk.as_slice().len();
+        body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+      }
+    }
+
+    assert_eq!(body_content, "response_body");
 
     // Drain the response body.
-    envoy_filter.drain_response_body(body.len());
+    envoy_filter.drain_received_response_body(received_body_len);
+    envoy_filter.drain_buffered_response_body(buffered_body_len);
     // Append the new response body.
-    envoy_filter.append_response_body(b"new_response_body");
+    envoy_filter.append_received_response_body(b"new_response_body");
     // Plus we need to set the content length.
     envoy_filter.set_response_header("content-length", b"17");
 
