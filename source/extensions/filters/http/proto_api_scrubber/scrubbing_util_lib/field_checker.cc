@@ -15,7 +15,7 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
                                            const Protobuf::Field* field) const {
   // Currently, this method only checks the top level request/response fields and hence, the field
   // name itself represents the field_mask.
-  std::string field_mask = field->name();
+  const std::string field_mask = field->name();
 
   MatchTreeHttpMatchingDataSharedPtr match_tree;
 
@@ -48,7 +48,7 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
   // Preserve the field (i.e., kInclude) if there's any error in evaluating the match.
   // This can happen in two cases:
   // 1. The match tree is corrupt.
-  // 2. The required data to match is not present in the `matching_data_ptr_`.
+  // 2. The required data to match is not present in the `matching_data_`.
   // Ideally both of these cases shouldn't happen as:
   // 1. The match tree is configured as part of filter config which is validated during filter
   // initialization itself.
@@ -79,7 +79,7 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
 
 absl::StatusOr<Matcher::MatchResult>
 FieldChecker::tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const {
-  Matcher::MatchResult match_result = match_tree->match(*matching_data_ptr_);
+  Matcher::MatchResult match_result = match_tree->match(matching_data_);
   if (!match_result.isComplete()) {
     return absl::InternalError("Matching couldn't complete due to insufficient data.");
   }
