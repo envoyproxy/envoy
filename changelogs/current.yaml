@@ -42,6 +42,10 @@ minor_behavior_changes:
   change: |
     Check that the response header count is less than the configured limits before applying mutations, and do not
     add new headers if not.
+- area: quic
+  change: |
+    Switch to use QUICHE provided migration logic to handle port migration upon path degrading and migration to Server
+    Preferred Address. This behavior can be reverted by setting ``envoy.reloadable_features.use_migration_in_quiche``.
 - area: mobile
   change: |
     Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
