@@ -701,7 +701,10 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, CredentialExpiration) {
                 server_root_chain_rsa_pem);
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::minutes(10)), nullptr))
+  // 10 minutes - 60s grace period = 540 seconds
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::minutes(10)) -
+                                       std::chrono::milliseconds(std::chrono::seconds(60)),
+                                   nullptr))
       .Times(2);
 
   // Kick off a refresh
@@ -771,7 +774,8 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, InvalidExpiration) {
                 server_root_chain_rsa_pem);
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3595)), nullptr));
+  // 1 hour - 60s grace period = 3540 seconds
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3540)), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);

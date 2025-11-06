@@ -12,9 +12,9 @@ namespace Fluentd {
 FluentdFormatterImpl::FluentdFormatterImpl(Formatter::FormatterPtr json_formatter)
     : json_formatter_(std::move(json_formatter)) {}
 
-std::vector<uint8_t> FluentdFormatterImpl::format(const Formatter::HttpFormatterContext& context,
+std::vector<uint8_t> FluentdFormatterImpl::format(const Formatter::Context& context,
                                                   const StreamInfo::StreamInfo& stream_info) const {
-  auto json_string = json_formatter_->formatWithContext(context, stream_info);
+  auto json_string = json_formatter_->format(context, stream_info);
   return Json::Factory::jsonToMsgpack(json_string);
 }
 

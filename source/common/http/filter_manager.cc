@@ -50,7 +50,7 @@ void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& 
                      ResponseHeaderMap& headers) {
   const Router::RouteConstSharedPtr& route = stream_info.route();
   if (route != nullptr && route->routeEntry() != nullptr) {
-    const Formatter::HttpFormatterContext formatter_context{
+    const Formatter::Context formatter_context{
         callbacks.requestHeaders().ptr(), &headers, {}, {}, {}, &callbacks.activeSpan()};
     route->routeEntry()->finalizeResponseHeaders(headers, formatter_context, stream_info);
   }
@@ -487,7 +487,9 @@ void ActiveStreamDecoderFilter::sendLocalReply(
   ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
-void ActiveStreamDecoderFilter::sendGoAwayAndClose() { parent_.sendGoAwayAndClose(); }
+void ActiveStreamDecoderFilter::sendGoAwayAndClose(bool graceful) {
+  parent_.sendGoAwayAndClose(graceful);
+}
 
 void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers) {
   // If Envoy is not configured to proxy 100-Continue responses, swallow the 100 Continue

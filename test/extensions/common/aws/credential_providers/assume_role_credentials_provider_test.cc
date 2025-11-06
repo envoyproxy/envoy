@@ -389,8 +389,9 @@ TEST_F(AssumeRoleCredentialsProviderTest, ExpiredTokenException) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  // bad expiration format will cause a refresh of 1 hour - 5s (3595 seconds) by default
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3595)), nullptr));
+  // bad expiration format will cause a refresh of 1 hour - 60s grace period (3540 seconds) by
+  // default
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3540)), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -433,8 +434,9 @@ TEST_F(AssumeRoleCredentialsProviderTest, BadExpirationFormat) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  // bad expiration format will cause a refresh of 1 hour - 5s (3595 seconds) by default
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3595)), nullptr));
+  // bad expiration format will cause a refresh of 1 hour - 60s grace period (3540 seconds) by
+  // default
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3540)), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -470,8 +472,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, FullCachedCredentialsWithMissingExpira
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  // No expiration should fall back to a one hour - 5s (3595s) refresh
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3595)), nullptr));
+  // No expiration should fall back to a one hour - 60s grace period (3540s) refresh
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3540)), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -505,7 +507,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(2)), nullptr));
+  // 2 hours - 60s grace period = 7140 seconds
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(7140000), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -539,7 +542,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, RefreshOnNormalCredentialExpirationInt
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(2)), nullptr));
+  // 2 hours - 60s grace period = 7140 seconds
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(7140000), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);

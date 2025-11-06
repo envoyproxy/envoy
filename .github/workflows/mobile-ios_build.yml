@@ -48,6 +48,7 @@ jobs:
     name: ios-build
     with:
       args: ${{ matrix.args }}
+      bind-mount: false
       command: ./bazelw
       container-command:
       docker-ipv6: false

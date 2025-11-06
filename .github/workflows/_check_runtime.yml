@@ -38,7 +38,6 @@ jobs:
       bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      diskspace-hack: ${{ matrix.diskspace-hack || false }}
       docker-cpus: ${{ matrix.docker-cpus }}
       error-match: |
         ERROR

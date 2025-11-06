@@ -52,7 +52,6 @@ jobs:
         --config=mobile-remote-release-clang-android
         //:android_dist
       container: ${{ needs.load.outputs.build-image && fromJSON(needs.load.outputs.build-image).mobile || '' }}
-      diskspace-hack: true
       request: ${{ needs.load.outputs.request }}
       timeout-minutes: 90
       target: build

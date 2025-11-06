@@ -17,11 +17,10 @@ public:
   ReqWithoutQuery(absl::string_view main_header, absl::string_view alternative_header,
                   absl::optional<size_t> max_length);
 
-  absl::optional<std::string>
-  formatWithContext(const Envoy::Formatter::HttpFormatterContext& context,
-                    const StreamInfo::StreamInfo&) const override;
-  Protobuf::Value formatValueWithContext(const Envoy::Formatter::HttpFormatterContext& context,
-                                         const StreamInfo::StreamInfo&) const override;
+  absl::optional<std::string> format(const Envoy::Formatter::Context& context,
+                                     const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
+                              const StreamInfo::StreamInfo&) const override;
 
 private:
   const Http::HeaderEntry* findHeader(OptRef<const Http::HeaderMap> headers) const;
