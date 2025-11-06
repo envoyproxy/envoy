@@ -182,7 +182,7 @@ public:
   void initialize() {
     quic_connection_persistent_info_ =
 #ifdef ENVOY_ENABLE_QUIC
-        std::make_unique<Quic::PersistentQuicInfoImpl>(dispatcher_, 0);
+        Quic::createPersistentQuicInfoForCluster(dispatcher_, *cluster_);
 #else
         std::make_unique<PersistentQuicInfo>();
 #endif

@@ -49,6 +49,7 @@ public:
             new NiceMock<Ssl::MockClientContextConfig>),
         context_);
     factory_->initialize();
+    quic_info_ = Quic::createPersistentQuicInfoForCluster(dispatcher_, mockHost().cluster_);
   }
 
   void initialize() {
@@ -71,7 +72,7 @@ public:
         allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                          transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                          makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
-                         quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
+                         *quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
     EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
@@ -81,7 +82,7 @@ public:
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  Quic::PersistentQuicInfoImpl quic_info_{dispatcher_, 45};
+  std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
@@ -135,7 +136,7 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                        transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
-                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), *quic_info_,
                        {observers_}, overload_manager_);
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
@@ -163,7 +164,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                        transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
-                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), *quic_info_,
                        {observers_}, overload_manager_);
 
   MockResponseDecoder decoder;
@@ -282,7 +283,7 @@ TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
 }
 
 TEST_F(Http3ConnPoolImplTest, MigrationEnabledNoDrain) {
-  quic_info_.migration_config_.migrate_session_on_network_change = true;
+  quic_info_->migration_config_.migrate_session_on_network_change = true;
   createNewStream();
   EXPECT_FALSE(pool_->isIdle());
   // Draining non-migratable connections should not drain the connection which might be able to
