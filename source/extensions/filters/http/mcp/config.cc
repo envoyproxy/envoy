@@ -10,10 +10,10 @@ namespace HttpFilters {
 namespace Mcp {
 
 Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::mcp::v3::Mcp&, const std::string&,
+    const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config, const std::string&,
     Server::Configuration::FactoryContext&) {
 
-  auto config = std::make_shared<McpFilterConfig>();
+  auto config = std::make_shared<McpFilterConfig>(proto_config);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<McpFilter>(config));
@@ -22,9 +22,9 @@ Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 McpFilterConfigFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::mcp::v3::McpOverride&,
+    const envoy::extensions::filters::http::mcp::v3::McpOverride& proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const McpOverrideConfig>();
+  return std::make_shared<McpOverrideConfig>(proto_config);
 }
 
 /**

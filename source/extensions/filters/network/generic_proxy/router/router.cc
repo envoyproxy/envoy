@@ -21,8 +21,8 @@ namespace Router {
 namespace {
 
 struct ReasonViewAndFlag {
-  absl::string_view view{};
-  absl::optional<StreamInfo::CoreResponseFlag> flag{};
+  absl::string_view view;
+  absl::optional<StreamInfo::CoreResponseFlag> flag;
 };
 
 static constexpr ReasonViewAndFlag ReasonViewAndFlags[] = {

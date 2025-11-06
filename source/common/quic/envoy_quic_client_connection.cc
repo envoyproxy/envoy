@@ -6,7 +6,6 @@
 
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
-#include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -24,29 +23,107 @@ private:
   std::unique_ptr<Network::ConnectionSocket> socket_;
 };
 
-EnvoyQuicClientConnection::EnvoyQuicClientConnection(
-    const quic::QuicConnectionId& server_connection_id,
-    Network::Address::InstanceConstSharedPtr& initial_peer_address,
-    quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
-    const quic::ParsedQuicVersionVector& supported_versions,
-    Network::Address::InstanceConstSharedPtr local_addr, Event::Dispatcher& dispatcher,
-    const Network::ConnectionSocket::OptionsSharedPtr& options,
-    quic::ConnectionIdGeneratorInterface& generator)
-    : EnvoyQuicClientConnection(
-          server_connection_id, helper, alarm_factory, supported_versions, dispatcher,
-          createConnectionSocket(initial_peer_address, local_addr, options), generator) {}
+class EnvoyQuicClientPathValidationContext : public quic::QuicClientPathValidationContext {
+public:
+  EnvoyQuicClientPathValidationContext(quic::QuicSocketAddress self_address,
+                                       quic::QuicSocketAddress peer_address,
+                                       quic::QuicNetworkHandle network,
+                                       std::unique_ptr<EnvoyQuicPacketWriter>&& writer,
+                                       Network::ConnectionSocketPtr&& socket,
+                                       Event::Dispatcher& dispatcher)
+      : quic::QuicClientPathValidationContext(self_address, peer_address, network),
+        writer_(std::make_unique<quic::QuicForceBlockablePacketWriter>()),
+        socket_(std::move(socket)), dispatcher_(dispatcher) {
+    // Owns the writer.
+    writer_->set_writer(writer.release());
+  }
 
-EnvoyQuicClientConnection::EnvoyQuicClientConnection(
-    const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
-    quic::QuicAlarmFactory& alarm_factory, const quic::ParsedQuicVersionVector& supported_versions,
-    Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket,
-    quic::ConnectionIdGeneratorInterface& generator)
-    : EnvoyQuicClientConnection(
-          server_connection_id, helper, alarm_factory,
-          new EnvoyQuicPacketWriter(
-              std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle())),
-          /*owns_writer=*/true, supported_versions, dispatcher, std::move(connection_socket),
-          generator) {}
+  ~EnvoyQuicClientPathValidationContext() override {
+    if (socket_ != nullptr) {
+      // The socket wasn't used by the connection, the path validation must have failed. Now
+      // deferred delete it to avoid deleting IoHandle in a read loop.
+      dispatcher_.deferredDelete(std::make_unique<DeferredDeletableSocket>(std::move(socket_)));
+    }
+  }
+
+  bool ShouldConnectionOwnWriter() const override { return true; }
+  quic::QuicForceBlockablePacketWriter* ForceBlockableWriterToUse() override {
+    return writer_.get();
+  }
+
+  Network::ConnectionSocket& probingSocket() { return *socket_; }
+
+  quic::QuicForceBlockablePacketWriter* releaseWriter() { return writer_.release(); }
+  std::unique_ptr<Network::ConnectionSocket> releaseSocket() { return std::move(socket_); }
+
+private:
+  std::unique_ptr<quic::QuicForceBlockablePacketWriter> writer_;
+  Network::ConnectionSocketPtr socket_;
+  Event::Dispatcher& dispatcher_;
+};
+
+void EnvoyQuicClientConnection::EnvoyQuicClinetPathContextFactory::CreatePathValidationContext(
+    quic::QuicNetworkHandle network, quic::QuicSocketAddress peer_address,
+    std::unique_ptr<quic::QuicPathContextFactory::CreationResultDelegate> result_delegate) {
+  Network::Address::InstanceConstSharedPtr new_local_address;
+  if (network == quic::kInvalidNetworkHandle) {
+    // If there isn't a meaningful network handle to bind to, bind to the
+    // local address of the current socket.
+    Network::Address::InstanceConstSharedPtr current_local_address =
+        connection_.connectionSocket()->connectionInfoProvider().localAddress();
+    if (current_local_address->ip()->version() == Network::Address::IpVersion::v4) {
+      new_local_address = std::make_shared<Network::Address::Ipv4Instance>(
+          current_local_address->ip()->addressAsString(),
+          &current_local_address->socketInterface());
+    } else {
+      new_local_address = std::make_shared<Network::Address::Ipv6Instance>(
+          current_local_address->ip()->addressAsString(),
+          &current_local_address->socketInterface());
+    }
+  }
+  Network::Address::InstanceConstSharedPtr remote_address =
+      (connection_.peer_address() == peer_address)
+          ? connection_.connectionSocket()->connectionInfoProvider().remoteAddress()
+          : quicAddressToEnvoyAddressInstance(peer_address);
+  // new_local_address will be re-assigned if it is nullptr.
+  QuicClientPacketWriterFactory::CreationResult result =
+      writer_factory_.createSocketAndQuicPacketWriter(remote_address, network, new_local_address,
+                                                      connection_.connectionSocket()->options());
+  connection_.setUpConnectionSocket(*result.socket_, connection_.delegate_);
+  result_delegate->OnCreationSucceeded(std::make_unique<EnvoyQuicClientPathValidationContext>(
+      envoyIpAddressToQuicSocketAddress(new_local_address->ip()), peer_address, network,
+      std::move(result.writer_), std::move(result.socket_), connection_.dispatcher_));
+}
+
+quic::QuicNetworkHandle EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::FindAlternateNetwork(
+    quic::QuicNetworkHandle /*network*/) {
+  return quic::kInvalidNetworkHandle;
+}
+
+quic::QuicNetworkHandle EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::GetDefaultNetwork() {
+  return quic::kInvalidNetworkHandle;
+}
+
+void EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::OnMigrationToPathDone(
+    std::unique_ptr<quic::QuicClientPathValidationContext> context, bool success) {
+  if (success) {
+    auto* envoy_context = static_cast<EnvoyQuicClientPathValidationContext*>(context.get());
+    // Connection already owns the writer.
+    envoy_context->releaseWriter();
+    ++connection_.num_socket_switches_;
+    connection_.setConnectionSocket(envoy_context->releaseSocket());
+    // Previous writer may have been force blocked and write events on it may have been dropped.
+    // Synthesize a write event in case this case to unblock the connection.
+    connection_.connectionSocket()->ioHandle().activateFileEvents(Event::FileReadyType::Write);
+    // Send something to notify the peer of the address change immediately.
+    connection_.SendPing();
+  }
+}
+
+std::unique_ptr<quic::QuicPathContextFactory>
+EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::CreateQuicPathContextFactory() {
+  return std::make_unique<EnvoyQuicClinetPathContextFactory>(writer_factory_, connection_);
+}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
@@ -153,8 +230,12 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
 }
 
 void EnvoyQuicClientConnection::OnPathDegradingDetected() {
+  // This will trigger connection migration or port migration in QUICHE if
+  // migration_helper_ is initialized. Otherwise do it in this class.
   QuicConnection::OnPathDegradingDetected();
-  maybeMigratePort();
+  if (migration_helper_ == nullptr) {
+    maybeMigratePort();
+  }
 }
 
 void EnvoyQuicClientConnection::maybeMigratePort() {
@@ -181,18 +262,20 @@ void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& 
   }
 
   // The probing socket will have the same host but a different port.
-  auto probing_socket = createConnectionSocket(
-      peer_addr == peer_address() ? connectionSocket()->connectionInfoProvider().remoteAddress()
-                                  : quicAddressToEnvoyAddressInstance(peer_addr),
-      new_local_address, connectionSocket()->options());
-  setUpConnectionSocket(*probing_socket, delegate_);
-  auto writer = std::make_unique<EnvoyQuicPacketWriter>(
-      std::make_unique<Network::UdpDefaultWriter>(probing_socket->ioHandle()));
+  ASSERT(migration_helper_ == nullptr && writer_factory_.has_value());
+  QuicClientPacketWriterFactory::CreationResult creation_result =
+      writer_factory_->createSocketAndQuicPacketWriter(
+          (peer_addr == peer_address()
+               ? connectionSocket()->connectionInfoProvider().remoteAddress()
+               : quicAddressToEnvoyAddressInstance(peer_addr)),
+          quic::kInvalidNetworkHandle, new_local_address, connectionSocket()->options());
+  setUpConnectionSocket(*creation_result.socket_, delegate_);
+  auto writer = std::move(creation_result.writer_);
   quic::QuicSocketAddress self_address = envoyIpAddressToQuicSocketAddress(
-      probing_socket->connectionInfoProvider().localAddress()->ip());
+      creation_result.socket_->connectionInfoProvider().localAddress()->ip());
 
   auto context = std::make_unique<EnvoyQuicPathValidationContext>(
-      self_address, peer_addr, std::move(writer), std::move(probing_socket));
+      self_address, peer_addr, std::move(writer), std::move(creation_result.socket_));
   ValidatePath(std::move(context), std::make_unique<EnvoyPathValidationResultDelegate>(*this),
                reason);
 }
@@ -241,15 +324,21 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
   ASSERT(events & (Event::FileReadyType::Read | Event::FileReadyType::Write));
 
   if (events & Event::FileReadyType::Write) {
-    OnBlockedWriterCanWrite();
+    writer()->SetWritable();
+    // The writer might still be force blocked for migration in progress, in
+    // which case no write should be attempted.
+    WriteIfNotBlocked();
   }
 
-  bool is_probing_socket =
+  // Check if the event is on the probing socket before read.
+  const bool is_probing_socket =
       HasPendingPathValidation() &&
       (&connection_socket ==
-       &static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(
-            GetPathValidationContext())
-            ->probingSocket());
+       (writer_factory_
+            ? &static_cast<EnvoyQuicPathValidationContext*>(GetPathValidationContext())
+                   ->probingSocket()
+            : &static_cast<EnvoyQuicClientPathValidationContext*>(GetPathValidationContext())
+                   ->probingSocket()));
 
   // It's possible for a write event callback to close the connection, in such case ignore read
   // event processing.
@@ -331,8 +420,19 @@ void EnvoyQuicClientConnection::OnCanWrite() {
   onWriteEventDone();
 }
 
+EnvoyQuicClientConnection::EnvoyQuicMigrationHelper&
+EnvoyQuicClientConnection::getOrCreateMigrationHelper(
+    QuicClientPacketWriterFactory& writer_factory,
+    OptRef<EnvoyQuicNetworkObserverRegistry> registry) {
+  if (migration_helper_ == nullptr) {
+    migration_helper_ = std::make_unique<EnvoyQuicMigrationHelper>(*this, registry, writer_factory);
+  }
+  return *migration_helper_;
+}
+
 void EnvoyQuicClientConnection::probeAndMigrateToServerPreferredAddress(
     const quic::QuicSocketAddress& server_preferred_address) {
+  ASSERT(migration_helper_ == nullptr);
   probeWithNewPort(server_preferred_address,
                    quic::PathValidationReason::kServerPreferredAddressMigration);
 }
