@@ -42,6 +42,11 @@ minor_behavior_changes:
   change: |
     Check that the response header count is less than the configured limits before applying mutations, and do not
     add new headers if not.
+- area: ext_authz
+  change: |
+    Fixed HTTP ext_authz service to properly propagate headers (such as ``set-cookie``) back to clients. The
+    filter now correctly uses ``allowed_client_headers`` for denied responses and ``allowed_client_headers_on_success``
+    for successful authorization responses.
 - area: mobile
   change: |
     Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
