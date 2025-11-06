@@ -4,6 +4,7 @@ adisuissa:
   slack: UT17EMMTP
 agrawroh:
   maintainer: true
+  opsgenie: Rohit
   slack: U025KC9D7T5
 antoniovleonti:
   first-pass: true
@@ -17,6 +18,7 @@ daixiang0:
   slack: U020CJG6UU8
 danzh2010:
   maintainer: true
+  opsgenie: Dan
   slack: UDR2MA31P
 ggreenway:
   maintainer: true

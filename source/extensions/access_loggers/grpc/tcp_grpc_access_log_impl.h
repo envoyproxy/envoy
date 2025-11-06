@@ -12,6 +12,7 @@
 #include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
 #include "source/extensions/access_loggers/grpc/grpc_access_log_impl.h"
+#include "source/extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,6 +49,7 @@ private:
   const TcpGrpcAccessLogConfigConstSharedPtr config_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
+  const GrpcCommon::CommonPropertiesConfig common_properties_config_;
 };
 
 } // namespace TcpGrpc

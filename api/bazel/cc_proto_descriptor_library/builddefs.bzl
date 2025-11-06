@@ -3,6 +3,9 @@
 """
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
+load("@com_google_protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
 # begin:google_only
 # load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
