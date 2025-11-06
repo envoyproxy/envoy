@@ -273,5 +273,12 @@ new_features:
   change: |
     Added new ``US_RX_BODY_BEG`` time point to the ``%COMMON_DURATION%`` to indicate
     the time point of upstream response body receiving begin.
+- area: outlier_detection
+  change: |
+    Added :ref:`detect_degraded <envoy_v3_api_field_config.cluster.v3.OutlierDetection.detect_degraded>`
+    to enable passive degraded host detection. When enabled, outlier detection marks hosts as degraded when they return
+    the ``x-envoy-degraded`` header with successful (2xx) responses. Degraded hosts are deprioritized in load balancing
+    but remain in rotation (not ejected). The feature uses the same backoff algorithm as ejection with configurable
+    base and maximum timeout parameters. Defaults to false.
 
 deprecated:

@@ -406,6 +406,7 @@ public:
 
     // If any of the degraded flags are set, host is degraded.
     if (healthFlagsGet(enumToInt(HealthFlag::DEGRADED_ACTIVE_HC) |
+                       enumToInt(HealthFlag::DEGRADED_OUTLIER_DETECTION) |
                        enumToInt(HealthFlag::DEGRADED_EDS_HEALTH))) {
       return Host::Health::Degraded;
     }

@@ -125,8 +125,11 @@ public:
 
   void eject(MonotonicTime ejection_time);
   void uneject(MonotonicTime ejection_time);
+  void degrade(MonotonicTime degraded_time);
+  void undegrade(MonotonicTime degraded_time);
 
   uint32_t& ejectTimeBackoff() { return eject_time_backoff_; }
+  uint32_t& degradeTimeBackoff() { return degrade_time_backoff_; }
 
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
   void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
@@ -141,8 +144,12 @@ public:
   const absl::optional<MonotonicTime>& lastUnejectionTime() override {
     return last_unejection_time_;
   }
+  const absl::optional<MonotonicTime>& lastDegradedTime() const { return last_degraded_time_; }
+  const absl::optional<MonotonicTime>& lastUndegradedTime() const { return last_undegraded_time_; }
+  uint32_t numDegradations() const { return num_degradations_; }
 
   void putHttpResponseCode(uint64_t response_code);
+  void putHttpResponseCodeDegraded(uint64_t response_code);
 
   const SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) const {
     return (SuccessRateMonitorType::ExternalOrigin == type) ? external_origin_sr_monitor_
@@ -183,6 +190,15 @@ private:
   // the eject_time_backoff is incremented. The value is decremented
   // each time the node was healthy and not ejected.
   uint32_t eject_time_backoff_{};
+
+  // Degradation tracking (similar to ejection)
+  absl::optional<MonotonicTime> last_degraded_time_;
+  absl::optional<MonotonicTime> last_undegraded_time_;
+  uint32_t num_degradations_{};
+  // Determines degradation time. Each time a node is degraded,
+  // the degrade_time_backoff is incremented. The value is decremented
+  // each time the node was healthy and not degraded.
+  uint32_t degrade_time_backoff_{};
 
   // counters for externally generated failures
   std::atomic<uint32_t> consecutive_5xx_{0};
@@ -318,6 +334,7 @@ public:
   bool successfulActiveHealthCheckUnejectHost() const {
     return successful_active_health_check_uneject_host_;
   }
+  bool detectDegraded() const { return detect_degraded_; }
 
 private:
   const uint64_t interval_ms_;
@@ -344,6 +361,7 @@ private:
   const uint64_t max_ejection_time_ms_;
   const uint64_t max_ejection_time_jitter_ms_;
   const bool successful_active_health_check_uneject_host_;
+  const bool detect_degraded_;
 
   static constexpr uint64_t DEFAULT_INTERVAL_MS = 10000;
   static constexpr uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;
@@ -387,6 +405,8 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
   void unejectHost(HostSharedPtr host);
+  void setHostDegraded(HostSharedPtr host);
+  void clearHostDegraded(HostSharedPtr host);
 
   // Upstream::Outlier::Detector
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
@@ -429,6 +449,8 @@ private:
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();
   void checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor, MonotonicTime now);
+  void checkHostForUndegrade(HostSharedPtr host, DetectorHostMonitorImpl* monitor,
+                             MonotonicTime now);
   void ejectHost(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type);
   static DetectionStats generateStats(Stats::Scope& scope);
   void initialize(Cluster& cluster);
@@ -436,6 +458,10 @@ private:
                                 envoy::data::cluster::v3::OutlierEjectionType type);
   void notifyMainThreadConsecutiveError(HostSharedPtr host,
                                         envoy::data::cluster::v3::OutlierEjectionType type);
+  void notifyMainThreadHostDegraded(HostSharedPtr host);
+  void notifyMainThreadHostUndegraded(HostSharedPtr host);
+  void setHostDegradedMainThread(HostSharedPtr host);
+  void clearHostDegradedMainThread(HostSharedPtr host);
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
   bool enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type);

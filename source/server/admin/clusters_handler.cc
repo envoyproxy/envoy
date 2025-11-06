@@ -104,6 +104,10 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
       health_status.set_eds_health_status(envoy::config::core::v3::DRAINING);
     }
     break;
+  case Upstream::Host::HealthFlag::DEGRADED_OUTLIER_DETECTION:
+    health_status.set_failed_outlier_degraded_detection(
+        host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+    break;
   }
 }
 

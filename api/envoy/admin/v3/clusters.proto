@@ -153,7 +153,7 @@ message HostStatus {
 }
 
 // Health status for a host.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message HostHealthStatus {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.HostHealthStatus";
@@ -180,6 +180,9 @@ message HostHealthStatus {
 
   // The host failed active health check due to timeout.
   bool active_hc_timeout = 8;
+
+  // The host is currently being marked as degraded through outlier detection.
+  bool failed_outlier_degraded_detection = 9;
 
   // Health status as reported by EDS.
   //
