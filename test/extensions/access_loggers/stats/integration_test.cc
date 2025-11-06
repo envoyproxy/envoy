@@ -13,11 +13,25 @@ class StatsAccessLogIntegrationTest : public HttpIntegrationTest,
 public:
   StatsAccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  void initialize() override {
+  void init(const std::string& config_yaml) {
+    autonomous_upstream_ = true;
     config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) {
-          const std::string config_yaml = R"EOF(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          auto* access_log = hcm.add_access_log();
+          TestUtility::loadFromYaml(config_yaml, *access_log);
+        });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, StatsAccessLogIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(StatsAccessLogIntegrationTest, Basic) {
+  const std::string config_yaml = R"EOF(
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
@@ -43,21 +57,8 @@ public:
                     value_format: '%REQUEST_HEADER(histogram-value)%'
 
 )EOF";
-          auto* access_log = hcm.add_access_log();
-          TestUtility::loadFromYaml(config_yaml, *access_log);
-        });
 
-    HttpIntegrationTest::initialize();
-  }
-};
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, StatsAccessLogIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-TEST_P(StatsAccessLogIntegrationTest, Basic) {
-  autonomous_upstream_ = true;
-  initialize();
+  init(config_yaml);
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},       {":authority", "envoyproxy.io"}, {":path", "/test/long/url"},
@@ -79,6 +80,41 @@ TEST_P(StatsAccessLogIntegrationTest, Basic) {
   EXPECT_EQ(1, TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram));
   EXPECT_EQ(2, static_cast<uint32_t>(
                    TestUtility::readSampleSum(test_server_->server().dispatcher(), *histogram)));
+}
+
+TEST_P(StatsAccessLogIntegrationTest, PercentHistogram) {
+  const std::string config_yaml = R"EOF(
+              name: envoy.access_loggers.stats
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stat_prefix: test_stat_prefix
+                histograms:
+                  - stat:
+                      name: testhistogram
+                    unit: Percent
+                    value_format: '%REQUEST_HEADER(histogram-value)%'
+
+)EOF";
+
+  init(config_yaml);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":authority", "envoyproxy.io"}, {":path", "/test/long/url"},
+      {":scheme", "http"}, {"histogram-value", "0.1"},
+  };
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  test_server_->waitUntilHistogramHasSamples("test_stat_prefix.testhistogram");
+
+  auto histogram = test_server_->histogram("test_stat_prefix.testhistogram");
+  EXPECT_EQ(1, TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram));
+
+  double p100 = histogram->cumulativeStatistics().computedQuantiles().back();
+  EXPECT_NEAR(0.1, p100, 0.05);
 }
 
 } // namespace

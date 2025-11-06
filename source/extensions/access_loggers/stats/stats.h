@@ -60,11 +60,11 @@ private:
     uint64_t value_fixed_;
   };
 
-  std::vector<Histogram> histograms_;
-  std::vector<Counter> counters_;
-
-  Stats::ScopeSharedPtr scope_;
+  const Stats::ScopeSharedPtr scope_;
   Stats::StatNamePool stat_name_pool_;
+
+  const std::vector<Histogram> histograms_;
+  const std::vector<Counter> counters_;
 };
 
 } // namespace StatsAccessLog

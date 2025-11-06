@@ -47,32 +47,36 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                const std::vector<Formatter::CommandParserPtr>& commands)
     : Common::ImplBase(std::move(filter)),
       scope_(context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
-      stat_name_pool_(scope_->symbolTable()) {
+      stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
+        std::vector<Histogram> histograms;
+        for (const auto& hist_cfg : config.histograms()) {
+          histograms.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands),
+                                  convertUnitEnum(hist_cfg.unit()),
+                                  parseValueFormat(hist_cfg.value_format(), commands));
+        }
+        return histograms;
+      }()),
+      counters_([&]() {
+        std::vector<Counter> counters;
+        for (const auto& counter_cfg : config.counters()) {
+          Counter& inserted = counters.emplace_back(
+              NameAndTags(counter_cfg.stat(), stat_name_pool_, commands), nullptr, 0);
+          if (!counter_cfg.value_format().empty() && counter_cfg.has_value_fixed()) {
+            throw EnvoyException(
+                "Stats logger cannot have both `value_format` and `value_fixed` configured.");
+          }
 
-  for (const auto& hist_cfg : config.histograms()) {
-    histograms_.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands),
-                             convertUnitEnum(hist_cfg.unit()),
-                             parseValueFormat(hist_cfg.value_format(), commands));
-  }
-
-  for (const auto& counter_cfg : config.counters()) {
-    Counter& inserted = counters_.emplace_back(
-        NameAndTags(counter_cfg.stat(), stat_name_pool_, commands), nullptr, 0);
-    if (!counter_cfg.value_format().empty() && counter_cfg.has_value_fixed()) {
-      throw EnvoyException(
-          "Stats logger cannot have both `value_format` and `value_fixed` configured.");
-    }
-
-    if (!counter_cfg.value_format().empty()) {
-      inserted.value_formatter_ = parseValueFormat(counter_cfg.value_format(), commands);
-    } else if (counter_cfg.has_value_fixed()) {
-      inserted.value_fixed_ = counter_cfg.value_fixed().value();
-    } else {
-      throw EnvoyException(
-          "Stats logger counter must have either `value_format` or `value_fixed`.");
-    }
-  }
-}
+          if (!counter_cfg.value_format().empty()) {
+            inserted.value_formatter_ = parseValueFormat(counter_cfg.value_format(), commands);
+          } else if (counter_cfg.has_value_fixed()) {
+            inserted.value_fixed_ = counter_cfg.value_fixed().value();
+          } else {
+            throw EnvoyException(
+                "Stats logger counter must have either `value_format` or `value_fixed`.");
+          }
+        }
+        return counters;
+      }()) {}
 
 StatsAccessLog::NameAndTags::NameAndTags(
     const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
@@ -110,24 +114,29 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
 namespace {
 absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& formatter,
                                         const Formatter::Context& context,
-                                        const StreamInfo::StreamInfo& stream_info) {
+                                        const StreamInfo::StreamInfo& stream_info,
+                                        bool is_percent) {
   Protobuf::Value computed_value = formatter.formatValue(context, stream_info);
-  uint64_t value;
+  double value;
   if (computed_value.has_number_value()) {
     value = computed_value.number_value();
   } else if (computed_value.has_string_value()) {
-    if (!absl::SimpleAtoi(computed_value.string_value(), &value)) {
-      ENVOY_LOG_EVERY_POW_2_MISC(error,
-                                 "Stats access logger formatted a string that isn't a number: {}",
-                                 computed_value.string_value());
+    if (!absl::SimpleAtod(computed_value.string_value(), &value)) {
+      ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
+                              "Stats access logger formatted a string that isn't a number: {}",
+                              computed_value.string_value());
       return absl::nullopt;
     }
   } else {
-    ENVOY_LOG_EVERY_POW_2_MISC(error, "Stats access logger computed non-number value: {}",
-                               computed_value.DebugString());
+    ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
+                            "Stats access logger computed non-number value: {}",
+                            computed_value.DebugString());
     return absl::nullopt;
   }
 
+  if (is_percent) {
+    value *= Stats::Histogram::PercentScale;
+  }
   return value;
 }
 } // namespace
@@ -136,18 +145,15 @@ void StatsAccessLog::emitLog(const Formatter::Context& context,
                              const StreamInfo::StreamInfo& stream_info) {
   for (auto& histogram : histograms_) {
     absl::optional<uint64_t> computed_value_opt =
-        getFormatValue(*histogram.value_formatter_, context, stream_info);
+        getFormatValue(*histogram.value_formatter_, context, stream_info,
+                       histogram.unit_ == Stats::Histogram::Unit::Percent);
     if (!computed_value_opt.has_value()) {
       continue;
     }
 
     uint64_t value = *computed_value_opt;
-    if (histogram.unit_ == Stats::Histogram::Unit::Percent) {
-      value *= Stats::Histogram::PercentScale;
-    }
 
     auto [tags, storage] = histogram.stat_.tags(context, stream_info, *scope_);
-
     auto& histogram_stat =
         scope_->histogramFromStatNameWithTags(histogram.stat_.name_, tags, histogram.unit_);
     histogram_stat.recordValue(value);
@@ -157,7 +163,7 @@ void StatsAccessLog::emitLog(const Formatter::Context& context,
     uint64_t value;
     if (counter.value_formatter_ != nullptr) {
       absl::optional<uint64_t> computed_value_opt =
-          getFormatValue(*counter.value_formatter_, context, stream_info);
+          getFormatValue(*counter.value_formatter_, context, stream_info, false);
       if (!computed_value_opt.has_value()) {
         continue;
       }
