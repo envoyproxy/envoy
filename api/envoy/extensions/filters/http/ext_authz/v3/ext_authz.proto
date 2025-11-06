@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 31]
+// [#next-free-field: 32]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -322,6 +322,19 @@ message ExtAuthz {
   // If this field is not set or is set to 0, no truncation will occur, and the entire
   // denied response body will be forwarded.
   uint32 max_denied_response_body_bytes = 30;
+
+  // When set to ``true``, the filter will enforce the response header map's count and size limits
+  // by dropping headers added by the external auth service. Enabling this may break applications
+  // relying on those headers!
+  //
+  // When set to ``false``, the filter will ignore the response header map's limits and add / set
+  // all response headers as specified by the external auth service.
+  //
+  // Recommendation: enable if the external authorization service is not trusted. Otherwise, leave
+  // false.
+  //
+  // Defaults to false.
+  bool enforce_response_header_limits = 31;
 }
 
 // Configuration for buffering the request data.
