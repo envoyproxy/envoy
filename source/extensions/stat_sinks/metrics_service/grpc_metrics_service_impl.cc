@@ -32,13 +32,13 @@ void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
   if (stream_ == nullptr) {
     ENVOY_LOG(debug, "Establishing new gRPC metrics service stream");
     stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
-    
+
     if (stream_ == nullptr) {
       ENVOY_LOG(error,
                 "unable to establish metrics service stream. Will retry in the next flush cycle");
       return;
     }
-    
+
     // For perf reasons, the identifier is only sent once when establishing the stream.
     envoy::service::metrics::v3::StreamMetricsMessage identifier_message;
     auto* identifier = identifier_message.mutable_identifier();
@@ -69,7 +69,7 @@ void GrpcMetricsStreamerImpl::sendBatch(
   envoy::service::metrics::v3::StreamMetricsMessage message;
   int batch_size = end_idx - start_idx;
   message.mutable_envoy_metrics()->Reserve(batch_size);
-  
+
   // Copy directly from source metrics to message, avoiding intermediate buffer
   for (int i = start_idx; i < end_idx; ++i) {
     message.mutable_envoy_metrics()->Add()->CopyFrom(metrics[i]);
