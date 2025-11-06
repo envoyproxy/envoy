@@ -14,6 +14,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
@@ -106,7 +107,8 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
  */
 class Filter : public Network::ReadFilter,
                public Network::ConnectionCallbacks,
-               public Filters::Common::ExtAuthz::RequestCallbacks {
+               public Filters::Common::ExtAuthz::RequestCallbacks,
+               protected Logger::Loggable<Logger::Id::filter> {
   using LabelsMap = std::map<std::string, std::string>;
 
 public:
@@ -117,10 +119,7 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
-    filter_callbacks_ = &callbacks;
-    filter_callbacks_->connection().addConnectionCallbacks(*this);
-  }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;

@@ -7,6 +7,8 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tls/connection_info_impl_base.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
@@ -22,6 +24,34 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
   const std::string final_prefix = fmt::format("ext_authz.{}.", name);
   return {ALL_TCP_EXT_AUTHZ_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                   POOL_GAUGE_PREFIX(scope, final_prefix))};
+}
+
+void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+  filter_callbacks_ = &callbacks;
+  filter_callbacks_->connection().addConnectionCallbacks(*this);
+
+  // When checking on new connection with a tcp proxy filter we need to prevent the proxy filter
+  // from disabling reads during initializeReadFilterCallbacks. Otherwise, when using a transport
+  // sockets the `onNewConnection` callback will never be called because the socket will not pass
+  // any events to the filter chain (e.g. when using tls sockets the handshake will never complete)
+  if (config_->checkOnNewConnection()) {
+    const StreamInfo::BoolAccessorImpl* tcpState =
+        filter_callbacks_->connection()
+            .streamInfo()
+            .filterState()
+            ->getDataReadOnly<StreamInfo::BoolAccessorImpl>(TcpProxy::ReceiveBeforeConnectKey);
+    if (tcpState == nullptr) {
+      filter_callbacks_->connection().streamInfo().filterState()->setData(
+          TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
+          StreamInfo::FilterState::StateType::Mutable,
+          StreamInfo::FilterState::LifeSpan::Connection);
+    } else if (!tcpState->value()) {
+      ENVOY_CONN_LOG(error, "invalid filter state for ext_authz with check_on_new_connection",
+                     filter_callbacks_->connection())
+      filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                            "ext_authz_bad_state_close");
+    }
+  }
 }
 
 void Filter::callCheck() {

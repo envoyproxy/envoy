@@ -454,6 +454,65 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedTcpConnectionWithCheckOnNewConnect
     fake_ext_authz_connection_ = nullptr;
   }
 }
+
+// Test that the upstream connection only gets made after the check request passes when using tls
+TEST_P(ExtAuthzNetworkIntegrationTest, AllowedTcpConnectionWithCheckOnNewConnectionAndTls) {
+  initializeTest(false /* send_tls_alert_on_denial */, true /* with_tls */,
+                 true /* check_on_new_connection */);
+
+  setupSslConnection();
+  ASSERT_TRUE(connect_callbacks_.connected());
+
+  Buffer::OwnedImpl data("some_data");
+  ssl_client_->write(data, false);
+
+  // When check_on_new_connection is true the tcp_proxy filter is forced to wait for the authz
+  // request to complete.
+  AssertionResult result = fake_upstreams_[0]->assertPendingConnectionsEmpty();
+  RELEASE_ASSERT(result, result.message());
+
+  result = waitForExtAuthzConnection();
+  RELEASE_ASSERT(result, result.message());
+  result = waitForExtAuthzRequest();
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::Ok);
+
+  test_server_->waitForCounterGe("ext_authz.ext_authz.ok", 1);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
+  RELEASE_ASSERT(result, result.message());
+
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  result = fake_upstream_connection->waitForData(9);
+  RELEASE_ASSERT(result, result.message());
+
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  payload_reader_->setDataToWaitFor("world");
+  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  while (!connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+
+  EXPECT_EQ("world", payload_reader_->data());
+
+  // Clean up the ext_authz gRPC connection.
+  if (fake_ext_authz_connection_ != nullptr) {
+    AssertionResult result = fake_ext_authz_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = fake_ext_authz_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    fake_ext_authz_connection_ = nullptr;
+  }
+}
 // Test that denial works without TLS. No alert sent, but connection still closes.
 TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithCheckOnNewConnection) {
   initializeTest(true /* send_tls_alert_on_denial */, false /* with_tls */,
