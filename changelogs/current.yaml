@@ -99,6 +99,10 @@ bug_fixes:
     were not accessible in ``request_headers_to_add`` configuration on the initial request. Headers configured via
     ``request_headers_to_add`` can now reference router-set headers using formatters like
     ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
+- area: aws
+  change: |
+    Changes web identity token file watching behavior in the aws signing common components. This ensures that if the token file is rotated,
+    the new token will be picked up.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
