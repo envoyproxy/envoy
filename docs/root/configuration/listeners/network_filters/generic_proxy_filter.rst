@@ -153,6 +153,7 @@ are supported in the access log format. In addition, the generic proxy also supp
 * ``%RESPONSE_PROPERTY(X)%``: The response property of generic response. The ``X`` is the property name. The value value depends on the
   application codec implementation.
 
+The above custom substitution format specifiers could be used in the access log format and also the tracing custom tags value field.
 
 Generic proxy statistics
 ------------------------

@@ -1,3 +1,5 @@
+# DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
+# Envoy library targets
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load(
@@ -5,9 +7,7 @@ load(
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_CONFIG_VISIBILITY",
 )
-
-# DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
-# Envoy library targets
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
@@ -38,7 +38,7 @@ def tcmalloc_external_deps(repository):
 # all envoy targets pass through an envoy-declared Starlark function where they can be modified
 # before being passed to a native bazel function.
 def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
-    native.cc_library(
+    cc_library(
         name = name,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
         **kargs
@@ -62,7 +62,7 @@ def envoy_cc_extension(
         alwayslink = alwayslink,
         **kwargs
     )
-    native.cc_library(
+    cc_library(
         name = ext_name,
         tags = tags,
         deps = select({
@@ -117,7 +117,7 @@ def envoy_cc_library(
             "//conditions:default": 1,
         })
 
-    native.cc_library(
+    cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
@@ -140,7 +140,7 @@ def envoy_cc_library(
 
     # Intended for usage by external consumers. This allows them to disambiguate
     # include paths via `external/envoy...`
-    native.cc_library(
+    cc_library(
         name = name + "_with_external_headers",
         hdrs = hdrs,
         copts = envoy_copts(repository) + copts,
