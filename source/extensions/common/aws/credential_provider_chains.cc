@@ -166,7 +166,7 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
           absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE)));
     }
 
-    // Ensure we have a watched directory set for file-based token sources. This allows us to
+    // Ensure we always have a watched directory configured for file-based token sources. This ensures we
     // automatically pick up tokens replaced on the filesystem.
     if (web_identity.web_identity_token_data_source().has_filename() &&
         !web_identity.web_identity_token_data_source().has_watched_directory()) {

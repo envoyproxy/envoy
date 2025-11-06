@@ -457,7 +457,7 @@ TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithoutSessionName) {
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityCreatesWatchedDirectoryFromEnv) {
-  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/var/run/secrets/token", 1);
+  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/test/path/token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _))
       .WillRepeatedly(Return(mock_provider_));
@@ -482,8 +482,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityCreatesWatchedDirectoryFr
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
-  EXPECT_EQ(filename, "/var/run/secrets/token");
-  EXPECT_EQ(watched_dir, "/var/run/secrets");
+  EXPECT_EQ(filename, "/test/path/token");
+  EXPECT_EQ(watched_dir, "/test/path");
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityAddsWatchedDirectoryWhenMissing) {
@@ -511,11 +511,11 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityAddsWatchedDirectoryWhenM
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
   credential_provider_config.mutable_assume_role_with_web_identity_provider()
       ->mutable_web_identity_token_data_source()
-      ->set_filename("/etc/tokens/web_token");
+      ->set_filename("/test/path/token");
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
-  EXPECT_EQ(filename, "/etc/tokens/web_token");
-  EXPECT_EQ(watched_dir, "/etc/tokens");
+  EXPECT_EQ(filename, "/test/path/token");
+  EXPECT_EQ(watched_dir, "/test/path");
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityPreservesExistingWatchedDirectory) {
@@ -540,12 +540,12 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityPreservesExistingWatchedD
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
   auto* web_identity = credential_provider_config.mutable_assume_role_with_web_identity_provider();
-  web_identity->mutable_web_identity_token_data_source()->set_filename("/opt/app/token");
+  web_identity->mutable_web_identity_token_data_source()->set_filename("/test/path/token");
   web_identity->mutable_web_identity_token_data_source()->mutable_watched_directory()->set_path(
       "/custom/watch/dir");
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
-  EXPECT_EQ(filename, "/opt/app/token");
+  EXPECT_EQ(filename, "/test/path/token");
   EXPECT_EQ(watched_dir, "/custom/watch/dir");
 }
 
