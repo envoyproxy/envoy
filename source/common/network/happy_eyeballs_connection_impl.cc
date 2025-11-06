@@ -39,7 +39,7 @@ ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const 
                   address_list_[next_address_]->asStringView());
   auto& address = address_list_[next_address_++];
   auto upstream_local_address = upstream_local_address_selector_->getUpstreamLocalAddress(
-      address, options_, *transport_socket_options_);
+      address, options_, makeOptRefFromPtr(transport_socket_options_.get()));
 
   return dispatcher_.createClientConnection(
       address, upstream_local_address.address_,

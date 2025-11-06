@@ -152,7 +152,7 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
   const auto& transport_options = transportSocketOptions();
   auto upstream_local_address_selector = host()->cluster().getUpstreamLocalAddressSelector();
   auto upstream_local_address = upstream_local_address_selector->getUpstreamLocalAddress(
-      address, socketOptions(), *transport_options);
+      address, socketOptions(), makeOptRefFromPtr(transport_options.get()));
 
   return Quic::createQuicNetworkConnection(
       quic_info_, std::move(crypto_config), server_id_, dispatcher(), address,
