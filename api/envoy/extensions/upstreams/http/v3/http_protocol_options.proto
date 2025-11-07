@@ -188,7 +188,7 @@ message HttpProtocolOptions {
   OutlierDetection outlier_detection = 8;
 
   // Specifies a list of HTTP-level mirroring policies for requests routed to this cluster.
-  // Cluster-level policies override route-level policies when both are configured.
+  // Cluster-level policies override route-level policies when they both are configured.
   //
   // .. note::
   //

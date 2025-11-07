@@ -6218,7 +6218,7 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
   EXPECT_EQ(zone_b, hosts_per_locality.get()[1][1]->locality());
 }
 
-// Test cluster-level shadow policy configuration.
+// Test cluster-level mirroring policy configuration.
 TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithCluster) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
@@ -6244,7 +6244,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithCluster) {
           - cluster: shadow_cluster
             runtime_fraction:
               default_value:
-                numerator: 50
+                numerator: 60
                 denominator: HUNDRED
   )EOF";
 
@@ -6261,7 +6261,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithCluster) {
   EXPECT_FALSE(policy->traceSampled().has_value());
 }
 
-// Test cluster-level shadow policy with cluster_header.
+// Test cluster-level mirroring policy with cluster_header.
 TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithClusterHeader) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
@@ -6302,7 +6302,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithClusterHeader) {
   EXPECT_TRUE(policy->traceSampled().value());
 }
 
-// Test cluster-level shadow policy with multiple policies.
+// Test cluster-level mirroring policy with multiple policies.
 TEST_P(ParametrizedClusterInfoImplTest, ClusterMultipleShadowPolicies) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
@@ -6328,7 +6328,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterMultipleShadowPolicies) {
           - cluster: shadow_cluster_1
             runtime_fraction:
               default_value:
-                numerator: 10
+                numerator: 11
                 denominator: HUNDRED
           - cluster: shadow_cluster_2
             trace_sampled: false
@@ -6348,7 +6348,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterMultipleShadowPolicies) {
   EXPECT_EQ("x-shadow-header", shadow_policies[2]->clusterHeader().get());
 }
 
-// Test cluster-level shadow policy with header mutations.
+// Test cluster-level mirroring policy with header mutations.
 TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithHeaderMutations) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
@@ -6391,11 +6391,28 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithHeaderMutations) 
 
   const auto& policy = shadow_policies[0];
   EXPECT_EQ("shadow_cluster", policy->cluster());
-  // Verify header evaluator was created (checking through headerEvaluator is not straightforward
-  // as it doesn't expose mutations, but successful creation implies mutations are there).
+
+  // Create headers, formatter context, and stream info for header evaluation.
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/test"}, {"x-remove-me", "should-be-removed"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  const Envoy::Formatter::Context formatter_context{&headers};
+
+  // Apply header mutations.
+  policy->headerEvaluator().evaluateHeaders(headers, formatter_context, stream_info);
+
+  // Verify the shadow policy header mutations were applied correctly.
+  EXPECT_TRUE(headers.has("x-shadow-header"));
+  EXPECT_EQ("shadow-value", headers.get_("x-shadow-header"));
+
+  // Verify the header removal works correctly.
+  EXPECT_FALSE(headers.has("x-remove-me"));
+
+  // Verify the host rewrite literal is configured correctly.
+  EXPECT_EQ("shadow-host.example.com", policy->hostRewriteLiteral());
 }
 
-// Test cluster with no shadow policies.
+// Test cluster with no mirroring policies.
 TEST_P(ParametrizedClusterInfoImplTest, ClusterNoShadowPolicies) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
@@ -6422,7 +6439,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterNoShadowPolicies) {
   EXPECT_EQ(0, shadow_policies.size());
 }
 
-// Test cluster-level shadow policy with disable_shadow_host_suffix_append.
+// Test cluster-level mirroring policy with disable_shadow_host_suffix_append.
 TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyDisableShadowHostSuffix) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
