@@ -84,6 +84,7 @@ public:
 
 using CommandParserPtr = std::unique_ptr<CommandParser>;
 using CommandParsers = std::vector<CommandParserPtr>;
+using CommandParserPtrVector = std::vector<CommandParserPtr>;
 
 class CommandParserFactory : public Config::TypedFactory {
 public:
