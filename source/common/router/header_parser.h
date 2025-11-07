@@ -25,7 +25,7 @@ using HeaderValue = envoy::config::core::v3::HeaderValue;
 struct HeadersToAddEntry {
   static absl::StatusOr<std::unique_ptr<HeadersToAddEntry>>
   create(const HeaderValue& header_value, HeaderAppendAction append_action,
-         const Formatter::CommandParsers& command_parsers = {}) {
+         const Formatter::CommandParserPtrVector& command_parsers = {}) {
     absl::Status creation_status = absl::OkStatus();
     auto ret = std::unique_ptr<HeadersToAddEntry>(
         new HeadersToAddEntry(header_value, append_action, command_parsers, creation_status));
@@ -34,7 +34,7 @@ struct HeadersToAddEntry {
   }
   static absl::StatusOr<std::unique_ptr<HeadersToAddEntry>>
   create(const HeaderValueOption& header_value_option,
-         const Formatter::CommandParsers& command_parsers = {}) {
+         const Formatter::CommandParserPtrVector& command_parsers = {}) {
     absl::Status creation_status = absl::OkStatus();
     auto ret = std::unique_ptr<HeadersToAddEntry>(
         new HeadersToAddEntry(header_value_option, command_parsers, creation_status));
@@ -50,10 +50,10 @@ struct HeadersToAddEntry {
 
 protected:
   HeadersToAddEntry(const HeaderValue& header_value, HeaderAppendAction append_action,
-                    const Formatter::CommandParsers& command_parsers,
+                    const Formatter::CommandParserPtrVector& command_parsers,
                     absl::Status& creation_status);
   HeadersToAddEntry(const HeaderValueOption& header_value_option,
-                    const Formatter::CommandParsers& command_parsers,
+                    const Formatter::CommandParserPtrVector& command_parsers,
                     absl::Status& creation_status);
 };
 

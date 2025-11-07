@@ -17,7 +17,8 @@ using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
 class AppendMutation : public HeaderEvaluator, public Envoy::Router::HeadersToAddEntry {
 public:
   AppendMutation(const HeaderValueOption& header_value_option,
-                 const Formatter::CommandParsers& command_parsers, absl::Status& creation_status)
+                 const Formatter::CommandParserPtrVector& command_parsers,
+                 absl::Status& creation_status)
       : HeadersToAddEntry(header_value_option, command_parsers, creation_status),
         header_name_(header_value_option.header().key()) {}
 
@@ -90,7 +91,7 @@ private:
 absl::StatusOr<std::unique_ptr<HeaderMutations>>
 HeaderMutations::create(const ProtoHeaderMutatons& header_mutations,
                         Server::Configuration::CommonFactoryContext& context,
-                        const Formatter::CommandParsers& command_parsers) {
+                        const Formatter::CommandParserPtrVector& command_parsers) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<HeaderMutations>(
       new HeaderMutations(header_mutations, context, command_parsers, creation_status));
@@ -100,7 +101,7 @@ HeaderMutations::create(const ProtoHeaderMutatons& header_mutations,
 
 HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations,
                                  Server::Configuration::CommonFactoryContext& context,
-                                 const Formatter::CommandParsers& command_parsers,
+                                 const Formatter::CommandParserPtrVector& command_parsers,
                                  absl::Status& creation_status) {
   for (const auto& mutation : header_mutations) {
     switch (mutation.action_case()) {

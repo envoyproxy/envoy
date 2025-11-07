@@ -25,7 +25,7 @@ namespace {
 
 absl::StatusOr<Formatter::FormatterPtr>
 parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_value,
-                         const Formatter::CommandParsers& command_parsers) {
+                         const Formatter::CommandParserPtrVector& command_parsers) {
   const std::string& key = header_value.key();
   // PGV constraints provide this guarantee.
   ASSERT(!key.empty());
@@ -57,7 +57,7 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
 } // namespace
 
 HeadersToAddEntry::HeadersToAddEntry(const HeaderValueOption& header_value_option,
-                                     const Formatter::CommandParsers& command_parsers,
+                                     const Formatter::CommandParserPtrVector& command_parsers,
                                      absl::Status& creation_status)
     : original_value_(header_value_option.header().value()),
       add_if_empty_(header_value_option.keep_empty_value()) {
@@ -84,7 +84,7 @@ HeadersToAddEntry::HeadersToAddEntry(const HeaderValueOption& header_value_optio
 
 HeadersToAddEntry::HeadersToAddEntry(const HeaderValue& header_value,
                                      HeaderAppendAction append_action,
-                                     const Formatter::CommandParsers& command_parsers,
+                                     const Formatter::CommandParserPtrVector& command_parsers,
                                      absl::Status& creation_status)
     : original_value_(header_value.value()), append_action_(append_action) {
   auto formatter_or_error = parseHttpHeaderFormatter(header_value, command_parsers);

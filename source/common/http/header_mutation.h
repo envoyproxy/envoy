@@ -17,7 +17,7 @@ public:
   static absl::StatusOr<std::unique_ptr<HeaderMutations>>
   create(const ProtoHeaderMutatons& header_mutations,
          Server::Configuration::CommonFactoryContext& context,
-         const Formatter::CommandParsers& command_parsers = {});
+         const Formatter::CommandParserPtrVector& command_parsers = {});
 
   // Http::HeaderEvaluator
   void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
@@ -26,7 +26,8 @@ public:
 private:
   HeaderMutations(const ProtoHeaderMutatons& header_mutations,
                   Server::Configuration::CommonFactoryContext& context,
-                  const Formatter::CommandParsers& command_parsers, absl::Status& creation_status);
+                  const Formatter::CommandParserPtrVector& command_parsers,
+                  absl::Status& creation_status);
 
   std::vector<std::unique_ptr<HeaderEvaluator>> header_mutations_;
 };
