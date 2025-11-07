@@ -469,7 +469,7 @@ public:
     }
 
     // Create 4 autonomous upstream servers that will be used as endpoints.
-    // While typipcally this is invoked prior to initialize(), it is ok to
+    // While typically this is invoked prior to initialize(), it is ok to
     // invoke it here as it will create the autonomous upstreams next.
     fake_upstreams_count_ = 4;
     createUpstreams();
