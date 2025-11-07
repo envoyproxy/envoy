@@ -778,6 +778,8 @@ protected:
   const Http::LowerCaseString host_rewrite_header_;
   const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
   const std::string host_rewrite_path_regex_substitution_;
+  const Regex::CompiledMatcherPtr host_rewrite_regex_;
+  const std::string host_rewrite_regex_substitution_;
   Formatter::FormatterPtr host_rewrite_formatter_;
 
   std::unique_ptr<ConnectConfig> connect_config_;
