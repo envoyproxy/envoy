@@ -537,6 +537,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, in
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::bind(Address::InstanceConstSharedPtr address) {
+  // Reject metadata-only addresses that cannot be used for socket operations.
+  if (address->isMetadataOnly()) {
+    ENVOY_LOG_MISC(error, "Attempted to bind() with metadata-only address: {}",
+                   address->asString());
+    return Api::SysCallIntResult{-1, EINVAL};
+  }
   return Api::OsSysCallsSingleton::get().bind(fd_, address->sockAddr(), address->sockAddrLen());
 }
 
@@ -554,6 +560,13 @@ IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
+  // Reject metadata-only addresses that cannot be used for socket operations.
+  if (address->isMetadataOnly()) {
+    ENVOY_LOG_MISC(error, "Attempted to connect() with metadata-only address: {}",
+                   address->asString());
+    return Api::SysCallIntResult{-1, EINVAL};
+  }
+
   auto sockaddr_to_use = address->sockAddr();
   auto sockaddr_len_to_use = address->sockAddrLen();
 #if defined(__APPLE__) || defined(__ANDROID_API__)

@@ -49,6 +49,32 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "metadata_address_test",
+    srcs = ["metadata_address_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//envoy/network:address_interface",
+        "//source/common/network:address_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "socket_metadata_test",
+    srcs = ["socket_metadata_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//envoy/network:address_interface",
+        "//source/common/network:address_lib",
+        "//source/common/network:socket_interface_lib",
+        "//source/common/network:socket_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "address_impl_speed_test",
     srcs = ["address_impl_speed_test.cc"],
