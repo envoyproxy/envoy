@@ -101,7 +101,6 @@ public:
   std::string newUri(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
-  const std::string& responseBody() const override { return EMPTY_STRING; }
   std::string formatBody(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                          const StreamInfo::StreamInfo&) const override {
     return EMPTY_STRING;
@@ -744,10 +743,6 @@ public:
   std::string newUri(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
-  const std::string& responseBody() const override {
-    return direct_response_body_provider_ != nullptr ? direct_response_body_provider_->data()
-                                                     : EMPTY_STRING;
-  }
   std::string formatBody(const Http::RequestHeaderMap& request_headers,
                          const Http::ResponseHeaderMap& response_headers,
                          const StreamInfo::StreamInfo& stream_info) const override;

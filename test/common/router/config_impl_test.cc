@@ -6134,6 +6134,9 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
+  Http::TestResponseHeaderMapImpl response_headers;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
   EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0).route);
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
@@ -6191,26 +6194,35 @@ virtual_hosts:
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("direct.example.com", "/gone", true, false);
     EXPECT_EQ(Http::Code::Gone, config.route(headers, 0)->directResponseEntry()->responseCode());
-    EXPECT_EQ("Example text 1", config.route(headers, 0)->directResponseEntry()->responseBody());
+    EXPECT_EQ("Example text 1", config.route(headers, 0)
+                                    ->directResponseEntry()
+                                    ->formatBody(headers, response_headers, stream_info));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("direct.example.com", "/error", true, false);
     EXPECT_EQ(Http::Code::InternalServerError,
               config.route(headers, 0)->directResponseEntry()->responseCode());
-    EXPECT_EQ("Example text 2", config.route(headers, 0)->directResponseEntry()->responseBody());
+    EXPECT_EQ("Example text 2", config.route(headers, 0)
+                                    ->directResponseEntry()
+                                    ->formatBody(headers, response_headers, stream_info));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("direct.example.com", "/no_body", true, false);
     EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
-    EXPECT_TRUE(config.route(headers, 0)->directResponseEntry()->responseBody().empty());
+    EXPECT_TRUE(config.route(headers, 0)
+                    ->directResponseEntry()
+                    ->formatBody(headers, response_headers, stream_info)
+                    .empty());
   }
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("direct.example.com", "/static", true, false);
     EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
-    EXPECT_EQ("Example text 3", config.route(headers, 0)->directResponseEntry()->responseBody());
+    EXPECT_EQ("Example text 3", config.route(headers, 0)
+                                    ->directResponseEntry()
+                                    ->formatBody(headers, response_headers, stream_info));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
@@ -8107,8 +8119,12 @@ virtual_hosts:
                         creation_status_);
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("direct.example.com", "/", true, false);
+  Http::TestResponseHeaderMapImpl response_headers;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
-  EXPECT_EQ(response_body, config.route(headers, 0)->directResponseEntry()->responseBody());
+  EXPECT_EQ(response_body, config.route(headers, 0)
+                               ->directResponseEntry()
+                               ->formatBody(headers, response_headers, stream_info));
 }
 
 TEST_F(RouteConfigurationDirectResponseBodyTest, DirectResponseBodySizeTooLarge) {
@@ -8193,9 +8209,11 @@ virtual_hosts:
 
   const auto* direct_response =
       config.route(genHeaders("example.com", "/", "GET"), 0)->directResponseEntry();
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_NE(nullptr, direct_response);
   EXPECT_EQ(Http::Code::OK, direct_response->responseCode());
-  EXPECT_STREQ("content", direct_response->responseBody().c_str());
+  EXPECT_EQ("content", direct_response->formatBody(request_headers, response_headers, _));
 }
 
 // Test the parsing of a direct response configuration where the response body is too large.

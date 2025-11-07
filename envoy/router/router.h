@@ -96,13 +96,6 @@ public:
   virtual std::string newUri(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
-   * Returns the response body to send with direct responses.
-   * @return std::string& the response body specified in the route configuration,
-   *         or an empty string if no response body is specified.
-   */
-  virtual const std::string& responseBody() const PURE;
-
-  /**
    * Format the response body for direct responses. Implementations should set
    * `body` to the raw body (if any) and apply any configured formatter to it.
    * @param request_headers supplies the request headers.

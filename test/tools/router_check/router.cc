@@ -213,8 +213,11 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
 
   bool is_grpc = false;
   bool is_head_request = false;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   Envoy::Http::Utility::LocalReplyData local_reply_data{
-      is_grpc, entry.responseCode(), entry.responseBody(), absl::nullopt, is_head_request};
+      is_grpc, entry.responseCode(),
+      entry.formatBody(tool_config.request_headers_, tool_config.response_headers_, stream_info),
+      absl::nullopt, is_head_request};
 
   Envoy::Http::Utility::sendLocalReply(false, encode_functions, local_reply_data);
 }

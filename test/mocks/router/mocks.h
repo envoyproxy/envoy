@@ -70,14 +70,11 @@ public:
   MOCK_METHOD(void, rewritePathHeader,
               (Http::RequestHeaderMap & headers, bool insert_envoy_original_path), (const));
   MOCK_METHOD(Http::Code, responseCode, (), (const));
-  MOCK_METHOD(const std::string&, responseBody, (), (const));
   MOCK_METHOD(std::string, formatBody,
               (const Http::RequestHeaderMap& request_headers,
                const Http::ResponseHeaderMap& response_headers,
                const StreamInfo::StreamInfo& stream_info),
               (const));
-
-  std::string response_body_;
 };
 
 class TestCorsPolicy : public CorsPolicy {
