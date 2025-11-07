@@ -8,8 +8,8 @@
 namespace Envoy {
 namespace Server {
 void InstanceImpl::maybeCreateHeapShrinker() {
-  heap_shrinker_ =
-      std::make_unique<Memory::HeapShrinker>(dispatcher(), overloadManager(), *stats().rootScope());
+  heap_shrinker_ = std::make_unique<Memory::HeapShrinker>(
+      dispatcher(), overloadManager(), *stats().rootScope(), memoryAllocatorManager());
 }
 
 absl::StatusOr<std::unique_ptr<OverloadManager>> InstanceImpl::createOverloadManager() {

@@ -24,6 +24,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/memory.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
@@ -88,7 +89,8 @@ public:
         /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_)};
+        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+        /*allocator_manager_=*/allocator_manager_};
     if (isUnifiedMuxTest()) {
       grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context, false);
       return;
@@ -194,6 +196,7 @@ public:
   bool should_use_unified_;
   MockEdsResourcesCache* eds_resources_cache_{nullptr};
   const bool using_xds_failover_;
+  NiceMock<Server::MockMemoryAllocatorManager> allocator_manager_;
 };
 
 class NewGrpcMuxImplTest : public NewGrpcMuxImplTestBase {
@@ -975,13 +978,14 @@ TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {
   NiceMock<Stats::MockStore> store;
   Stats::MockScope& scope{store.mockScope()};
   NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Server::MockMemoryAllocatorManager> allocator_manager;
   envoy::config::core::v3::ApiConfigSource ads_config;
   ads_config.mutable_rate_limit_settings()->mutable_max_tokens()->set_value(100);
   ads_config.mutable_rate_limit_settings()->mutable_fill_rate()->set_value(
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
                                random, scope, ads_config, local_info, nullptr, nullptr,
-                               absl::nullopt, absl::nullopt, false),
+                               absl::nullopt, absl::nullopt, false, allocator_manager),
                EnvoyException);
 }
 

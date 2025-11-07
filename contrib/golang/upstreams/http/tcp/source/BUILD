@@ -81,7 +81,6 @@ envoy_cc_contrib_extension(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/memory:utils_lib",
         "//source/common/network:connection_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:load_balancer_context_base_lib",

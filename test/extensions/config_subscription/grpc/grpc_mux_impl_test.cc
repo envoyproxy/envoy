@@ -24,6 +24,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/memory.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
@@ -88,7 +89,8 @@ public:
             SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
             random_),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_)};
+        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+        /*allocator_manager_=*/allocator_manager_};
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(grpc_mux_context, true);
   }
 
@@ -137,6 +139,7 @@ public:
   Stats::Gauge& control_plane_connected_state_;
   Stats::Gauge& control_plane_pending_requests_;
   MockEdsResourcesCache* eds_resources_cache_{nullptr};
+  NiceMock<Server::MockMemoryAllocatorManager> allocator_manager_;
 };
 
 class GrpcMuxImplTest : public GrpcMuxImplTestBase {
@@ -1052,7 +1055,8 @@ TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
       std::make_unique<JitteredExponentialBackOffStrategy>(
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
-      /*eds_resources_cache_=*/nullptr};
+      /*eds_resources_cache_=*/nullptr,
+      /*allocator_manager_=*/allocator_manager_};
   EXPECT_THROW_WITH_MESSAGE(
       GrpcMuxImpl(grpc_mux_context, true), EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
@@ -1078,7 +1082,8 @@ TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       std::make_unique<JitteredExponentialBackOffStrategy>(
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
-      /*eds_resources_cache_=*/nullptr};
+      /*eds_resources_cache_=*/nullptr,
+      /*allocator_manager_=*/allocator_manager_};
   EXPECT_THROW_WITH_MESSAGE(
       GrpcMuxImpl(grpc_mux_context, true), EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
@@ -1584,13 +1589,14 @@ TEST(GrpcMuxFactoryTest, InvalidRateLimit) {
   NiceMock<Stats::MockStore> store;
   Stats::MockScope& scope{store.mockScope()};
   NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Server::MockMemoryAllocatorManager> allocator_manager;
   envoy::config::core::v3::ApiConfigSource ads_config;
   ads_config.mutable_rate_limit_settings()->mutable_max_tokens()->set_value(100);
   ads_config.mutable_rate_limit_settings()->mutable_fill_rate()->set_value(
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
                                random, scope, ads_config, local_info, nullptr, nullptr,
-                               absl::nullopt, absl::nullopt, false),
+                               absl::nullopt, absl::nullopt, false, allocator_manager),
                EnvoyException);
 }
 

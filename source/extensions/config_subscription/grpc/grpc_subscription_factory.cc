@@ -47,8 +47,8 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
       /*xds_config_tracker_=*/data.xds_config_tracker_,
       /*backoff_strategy_=*/std::move(backoff_strategy),
       /*target_xds_authority_=*/control_plane_id,
-      /*eds_resources_cache_=*/nullptr // EDS cache is only used for ADS.
-  };
+      /*eds_resources_cache_=*/nullptr, // EDS cache is only used for ADS.
+      /*allocator_manager_=*/data.allocator_manager_};
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
     mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
@@ -98,8 +98,8 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
       /*xds_config_tracker_=*/data.xds_config_tracker_,
       /*backoff_strategy_=*/std::move(backoff_strategy),
       /*target_xds_authority_=*/"",
-      /*eds_resources_cache_=*/nullptr // EDS cache is only used for ADS.
-  };
+      /*eds_resources_cache_=*/nullptr, // EDS cache is only used for ADS.
+      /*allocator_manager_=*/data.allocator_manager_};
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
     mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(

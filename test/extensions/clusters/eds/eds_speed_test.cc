@@ -27,6 +27,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/memory.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -67,7 +68,8 @@ public:
         /*xds_config_tracker_=*/Config::XdsConfigTrackerOptRef(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/nullptr};
+        /*eds_resources_cache_=*/nullptr,
+        /*allocator_manager_=*/allocator_manager_};
     if (use_unified_mux_) {
       grpc_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
     } else {
@@ -191,6 +193,7 @@ public:
   Config::GrpcMuxSharedPtr grpc_mux_;
   Config::GrpcSubscriptionImplPtr subscription_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
+  NiceMock<Server::MockMemoryAllocatorManager> allocator_manager_;
 };
 
 } // namespace Upstream

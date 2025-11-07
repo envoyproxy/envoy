@@ -51,5 +51,6 @@ envoy_cc_test(
         "//test/extensions/config_subscription/filesystem:filesystem_subscription_test_harness",
         "//test/extensions/config_subscription/grpc:delta_subscription_test_harness",
         "//test/extensions/config_subscription/rest:http_subscription_test_harness",
+        "//test/mocks/server:memory_mocks",
     ],
 )

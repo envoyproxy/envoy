@@ -9,6 +9,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/memory.h"
 #include "envoy/stats/scope.h"
 
 #include "xds/core/v3/resource_locator.pb.h"
@@ -129,6 +130,7 @@ public:
     // An optional ADS gRPC mux to be used. Must be provided if ADS
     // is used.
     GrpcMuxSharedPtr ads_grpc_mux_;
+    Server::MemoryAllocatorManager& allocator_manager_;
   };
 
   std::string category() const override { return "envoy.config_subscription"; }
@@ -147,7 +149,8 @@ public:
          const LocalInfo::LocalInfo& local_info,
          std::unique_ptr<CustomConfigValidators>&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, OptRef<XdsConfigTracker> xds_config_tracker,
-         OptRef<XdsResourcesDelegate> xds_resources_delegate, bool use_eds_resources_cache) PURE;
+         OptRef<XdsResourcesDelegate> xds_resources_delegate, bool use_eds_resources_cache,
+         Server::MemoryAllocatorManager& allocator_manager) PURE;
 };
 
 } // namespace Config

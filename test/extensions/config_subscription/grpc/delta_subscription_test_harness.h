@@ -20,6 +20,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/memory.h"
 #include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"
@@ -63,7 +64,8 @@ public:
         /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/nullptr};
+        /*eds_resources_cache_=*/nullptr,
+        /*allocator_manager_=*/allocator_manager_};
     if (should_use_unified_) {
       xds_context_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(grpc_mux_context, false);
     } else {
@@ -245,6 +247,7 @@ public:
   std::queue<std::string> nonce_acks_sent_;
   bool subscription_started_{};
   bool should_use_unified_;
+  NiceMock<Server::MockMemoryAllocatorManager> allocator_manager_;
 };
 
 } // namespace

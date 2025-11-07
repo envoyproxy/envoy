@@ -21,6 +21,7 @@ envoy_cc_library(
     hdrs = ["stats.h"],
     tcmalloc_dep = 1,
     deps = [
+        "//envoy/server:memory_interface",
         "//envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
@@ -31,21 +32,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "utils_lib",
-    srcs = ["utils.cc"],
-    hdrs = ["utils.h"],
-    tcmalloc_dep = 1,
-    deps = [
-        ":stats_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "heap_shrinker_lib",
     srcs = ["heap_shrinker.cc"],
     hdrs = ["heap_shrinker.h"],
     deps = [
-        ":utils_lib",
+        ":stats_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/stats:stats_interface",

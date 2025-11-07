@@ -1,6 +1,6 @@
 #include "source/common/memory/heap_shrinker.h"
 
-#include "source/common/memory/utils.h"
+#include "source/common/memory/stats.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "absl/strings/str_cat.h"
@@ -12,7 +12,9 @@ namespace Memory {
 constexpr std::chrono::milliseconds kTimerInterval = std::chrono::milliseconds(10000);
 
 HeapShrinker::HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManager& overload_manager,
-                           Stats::Scope& stats) {
+                           Envoy::Stats::Scope& stats,
+                           Envoy::Server::MemoryAllocatorManager& allocator_manager)
+    : allocator_manager_(allocator_manager) {
   const auto action_name = Server::OverloadActionNames::get().ShrinkHeap;
   if (overload_manager.registerForAction(
           action_name, dispatcher,
@@ -30,7 +32,7 @@ HeapShrinker::HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManage
 
 void HeapShrinker::shrinkHeap() {
   if (active_) {
-    Utils::releaseFreeMemory();
+    allocator_manager_.releaseFreeMemory();
     shrink_counter_->inc();
   }
 }

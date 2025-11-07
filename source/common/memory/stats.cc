@@ -127,6 +127,8 @@ AllocatorManager::AllocatorManager(
     : bytes_to_release_(config.bytes_to_release()),
       memory_release_interval_msec_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(config, memory_release_interval, 1000))),
+      minimum_unfreed_memory_bytes_threshold_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, minimum_unfreed_memory_bytes_threshold, 100 * 1024 * 1024)),
       allocator_manager_stats_(MemoryAllocatorManagerStats{
           MEMORY_ALLOCATOR_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "tcmalloc."))}),
       api_(api) {
@@ -142,6 +144,25 @@ AllocatorManager::~AllocatorManager() {
     tcmalloc_thread_->join();
     tcmalloc_thread_.reset();
   }
+#endif
+}
+
+void AllocatorManager::maybeReleaseFreeMemory() {
+#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
+  auto total_physical_bytes = Stats::totalPhysicalBytes();
+  auto allocated_size_by_app = Stats::totalCurrentlyAllocated();
+  if (total_physical_bytes >= allocated_size_by_app &&
+      (total_physical_bytes - allocated_size_by_app) >= minimum_unfreed_memory_bytes_threshold_) {
+    releaseFreeMemory();
+  }
+#endif
+}
+
+void AllocatorManager::releaseFreeMemory() {
+#if defined(TCMALLOC)
+  tcmallocRelease();
+#elif defined(GPERFTOOLS_TCMALLOC)
+  MallocExtension::instance()->ReleaseFreeMemory();
 #endif
 }
 

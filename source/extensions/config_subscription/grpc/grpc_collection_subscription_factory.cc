@@ -43,8 +43,8 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
       /*xds_config_tracker_=*/data.xds_config_tracker_,
       /*backoff_strategy_=*/std::move(backoff_strategy),
       /*target_xds_authority_=*/"",
-      /*eds_resources_cache_=*/nullptr // No EDS resources cache needed from collections.
-  };
+      /*eds_resources_cache_=*/nullptr, // No EDS resources cache needed from collections.
+      /*allocator_manager_=*/data.allocator_manager_};
   return std::make_unique<GrpcCollectionSubscriptionImpl>(
       data.collection_locator_.value(), std::make_shared<Config::NewGrpcMuxImpl>(grpc_mux_context),
       data.callbacks_, data.resource_decoder_, data.stats_, data.dispatcher_,

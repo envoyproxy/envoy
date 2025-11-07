@@ -141,6 +141,15 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "memory_mocks",
+    srcs = ["memory.cc"],
+    hdrs = ["memory.h"],
+    deps = [
+        "//envoy/server:memory_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "server_lifecycle_notifier_mocks",
     srcs = ["server_lifecycle_notifier.cc"],
     hdrs = ["server_lifecycle_notifier.h"],
@@ -184,6 +193,7 @@ envoy_cc_mock(
     hdrs = ["instance.h"],
     rbe_pool = "6gig",
     deps = [
+        ":memory_mocks",
         ":server_factory_context_mocks",
         "//envoy/server:instance_interface",
         "//source/common/secret:secret_manager_impl_lib",

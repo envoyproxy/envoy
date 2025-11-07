@@ -22,7 +22,7 @@ public:
   SubscriptionFactoryImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                           Upstream::ClusterManager& cm,
                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                          const Server::Instance& server,
+                          Server::Instance& server,
                           XdsResourcesDelegateOptRef xds_resources_delegate,
                           XdsConfigTrackerOptRef xds_config_tracker);
 
@@ -48,7 +48,7 @@ private:
   Upstream::ClusterManager& cm_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
-  const Server::Instance& server_;
+  Server::Instance& server_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   XdsConfigTrackerOptRef xds_config_tracker_;
 };

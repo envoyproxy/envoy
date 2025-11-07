@@ -4,6 +4,7 @@
 
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/http/http_server_properties_cache.h"
+#include "test/mocks/server/memory.h"
 #include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
@@ -17,6 +18,7 @@ public:
   ~MockInstance() override;
 
   Secret::SecretManager& secretManager() override { return *(secret_manager_); }
+  MemoryAllocatorManager& memoryAllocatorManager() override { return memory_allocator_manager_; }
 
   MOCK_METHOD(OptRef<Admin>, admin, ());
   MOCK_METHOD(void, run, ());
@@ -99,6 +101,7 @@ public:
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   testing::NiceMock<MockOverloadManager> null_overload_manager_;
+  testing::NiceMock<MockMemoryAllocatorManager> memory_allocator_manager_;
   Singleton::ManagerPtr singleton_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
