@@ -90,6 +90,7 @@ build --@com_googlesource_googleurl//build_config:system_icu=0
 # Common flags for sanitizers
 build:sanitizer --define tcmalloc=disabled
 build:sanitizer --linkopt -ldl
+test:sanitizer --build_tests_only
 
 # Common flags for Clang (shared between all clang variants)
 build:clang-common --action_env=BAZEL_COMPILER=clang
