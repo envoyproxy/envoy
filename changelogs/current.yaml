@@ -107,6 +107,10 @@ bug_fixes:
   change: |
     Fixed an upstream HTTP filter issue if route retries on 5xx and the filter returns
     FilterHeadersStatus::StopIteration in its encodeHeaders() method.
+- area: ext_proc
+  change: |
+    Fixed a bug where attributes based on request headers (e.g. ``request.host``) were not sent to
+    the ext_proc server if ext_proc was configured to only run on the encode path.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
