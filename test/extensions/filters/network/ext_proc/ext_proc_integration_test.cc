@@ -412,8 +412,6 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDefaultMessageTimeout) {
 
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(250));
 
-  tcp_client->waitForDisconnect();
-
   verifyCounters({{"streams_started", 1},
                   {"stream_msgs_sent", 1},
                   {"stream_msgs_received", 0}, // No response received due to timeout
@@ -421,6 +419,8 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDefaultMessageTimeout) {
                   {"message_timeouts", 1}}); // Message timeout counter
 
   ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+
+  tcp_client->close();
 }
 
 TEST_P(NetworkExtProcFilterIntegrationTest, MultipleClientConnections) {
