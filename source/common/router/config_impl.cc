@@ -526,7 +526,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     direct_response_body_provider_ = std::move(provider_or_error.value());
   }
 
-  if (route.has_direct_response() && route.direct_response().has_body_format()) {
+  if (route.direct_response().has_body_format()) {
     Server::GenericFactoryContextImpl generic_context(factory_context,
                                                       factory_context.messageValidationVisitor());
     auto formatter_or_error = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
