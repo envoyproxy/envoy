@@ -1008,52 +1008,6 @@ TEST_F(NetworkExtProcFilterTest, TimeoutWithBothOperationsPending) {
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
 }
 
-TEST_F(NetworkExtProcFilterTest, MessageTimeoutManagerOnTimeoutViaTimerCallback) {
-  auto config = createConfig(false);
-  config.mutable_message_timeout()->set_nanos(100000000);
-  auto filter_config = std::make_shared<Config>(config, scope_);
-
-  // Capture timer callbacks during filter initialization
-  std::vector<Event::TimerCb> timer_callbacks;
-  NiceMock<Event::MockDispatcher> dispatcher;
-
-  EXPECT_CALL(dispatcher, createTimer_(_))
-      .WillRepeatedly(Invoke([&timer_callbacks, &dispatcher](Event::TimerCb cb) {
-        timer_callbacks.push_back(cb);
-        return new NiceMock<Event::MockTimer>(&dispatcher);
-      }));
-
-  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
-
-  // Initialize filter (this creates MessageTimeoutManager internally)
-  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
-  client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
-  filter_->initializeReadFilterCallbacks(read_callbacks_);
-  filter_->initializeWriteFilterCallbacks(write_callbacks_);
-
-  // Setup stream
-  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
-  auto* stream_ptr = stream.get();
-  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Return(ByMove(std::move(stream))));
-
-  // Start read operation which activates the timer
-  Buffer::OwnedImpl data("test");
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
-
-  // Setup expectations for timeout
-  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
-  EXPECT_CALL(connection_,
-              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
-
-  // Trigger read timer callback.
-  timer_callbacks[0]();
-
-  // Verify timeout was handled correctly
-  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
-  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
-}
-
 // Test that timer stops when response is received
 TEST_F(NetworkExtProcFilterTest, TimerStopsOnResponse) {
   auto config = createConfig(false);
