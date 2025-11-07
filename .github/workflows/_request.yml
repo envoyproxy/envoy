@@ -29,6 +29,7 @@ on:
           WORKSPACE
           **/*.bzl
           .github/workflows/_request_cache_bazel.yml
+          !mobile/**/*
       config-file:
         type: string
         default: ./.github/config.yml

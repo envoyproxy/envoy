@@ -827,7 +827,10 @@ def _com_github_grpc_grpc():
     external_http_archive(
         "build_bazel_rules_apple",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:rules_apple.patch"],
+        patches = [
+            "@envoy//bazel:rules_apple.patch",
+            "@envoy//bazel:rules_apple_py.patch",
+        ],
     )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
@@ -920,7 +923,6 @@ def _com_github_luajit_luajit():
         build_file_content = BUILD_ALL_CONTENT,
         patches = ["@envoy//bazel/foreign_cc:luajit.patch"],
         patch_args = ["-p1"],
-        patch_cmds = ["chmod u+x build.py"],
     )
 
 def _com_github_google_tcmalloc():
