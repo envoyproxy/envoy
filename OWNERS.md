@@ -54,6 +54,8 @@ routing PRs, questions, etc. to the right place.
   * Request mirroring, data plane
 * Mike Krinkin ([krinkinmu](https://github.com/krinkinmu)) (krinkin.m.u@gmail.com)
   * Build, tooling.
+* Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
+  * CI, Build.
 
 # Envoy mobile maintainers
 
