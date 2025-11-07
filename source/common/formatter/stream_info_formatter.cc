@@ -593,6 +593,9 @@ public:
   StreamInfoStringFormatterProvider(FieldExtractor f) : field_extractor_(f) {}
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     return field_extractor_(stream_info);
   }
@@ -613,6 +616,9 @@ public:
   StreamInfoDurationFormatterProvider(FieldExtractor f) : field_extractor_(f) {}
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     const auto millis = extractMillis(stream_info);
     if (!millis) {
@@ -650,6 +656,9 @@ public:
   StreamInfoUInt64FormatterProvider(FieldExtractor f) : field_extractor_(f) {}
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     return fmt::format_int(field_extractor_(stream_info)).str();
   }
@@ -687,6 +696,9 @@ public:
       : field_extractor_(f), extraction_type_(extraction_type) {}
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
     if (!address) {
