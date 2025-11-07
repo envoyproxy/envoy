@@ -226,8 +226,7 @@ new_features:
 - area: router
   change: |
     Added :ref:`request_mirror_policies <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
-    to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`,
-    enabling request mirroring to be configured at the cluster level for HTTP clusters. When configured,
-    all requests routed to the cluster will be mirrored according to the specified policies.
+    to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
+    cluster-level request mirroring. Cluster-level policies override route-level policies when both are configured.
 
 deprecated:
