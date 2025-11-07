@@ -20,3 +20,7 @@ removed_config_or_runtime:
 new_features:
 
 deprecated:
+- area: tls
+  change: |
+    Fixed an issue where SANs of type ``OTHERNAME`` in a TLS cert were truncated if there was
+    an embedded null octet, leading to incorrect SAN validation.
