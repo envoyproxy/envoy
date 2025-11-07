@@ -103,6 +103,10 @@ bug_fixes:
     were not accessible in ``request_headers_to_add`` configuration on the initial request. Headers configured via
     ``request_headers_to_add`` can now reference router-set headers using formatters like
     ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
+- area: ext_proc
+  change: |
+    Fixed a bug where attributes based on request headers (e.g. ``request.host``) were not sent to
+    the ext_proc server if ext_proc was configured to only run on the encode path.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -208,6 +212,13 @@ new_features:
     Added QUIC protocol option :ref:`max_sessions_per_event_loop
     <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.max_sessions_per_event_loop>` to limit the maximum
     number of new QUIC sessions created per event loop. The default is 16, preserving the previous hardcoded limit.
+- area: metrics_service
+  change: |
+    Added :ref:`batch_size <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.batch_size>` configuration
+    to the Metrics Service to allow batching metrics into multiple gRPC messages. When set to a positive value,
+    metrics will be batched with at most ``batch_size`` metric families per message. This helps avoid hitting
+    gRPC message size limits (typically 4MB) when sending large numbers of metrics. If not set or set to 0,
+    all metrics will be sent in a single message, preserving the current behavior.
 - area: network
   change: |
     Added a change to start populating the filter state ``envoy.network.network_namespace`` when a connection is accepted on a
@@ -223,5 +234,6 @@ new_features:
   change: |
     Added runtime guard ``envoy.reloadable_features.report_load_when_rq_active_is_non_zero``.
     When enabled, LRS continues to send locality_stats reoprt to config server when there is no request_issued in the poll cycle.
+
 
 deprecated:
