@@ -60,7 +60,7 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
 
 absl::StatusOr<Matcher::MatchResult>
 FieldChecker::tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const {
-  Matcher::MatchResult match_result = match_tree->match(*matching_data_ptr_);
+  Matcher::MatchResult match_result = match_tree->match(*matching_data_ptr);
   if (!match_result.isComplete()) {
     return absl::InternalError("Matching couldn't complete due to insufficient data.");
   }
