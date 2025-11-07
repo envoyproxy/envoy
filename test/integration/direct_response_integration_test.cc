@@ -75,7 +75,7 @@ public:
     ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
-    EXPECT_EQ("prefix - suffix", response->body());
+    EXPECT_EQ("prefix  suffix", response->body());
   }
 
   // Test direct response with a body and a body_format that uses %LOCAL_REPLY_BODY%.
