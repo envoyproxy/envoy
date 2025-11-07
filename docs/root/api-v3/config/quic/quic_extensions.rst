@@ -7,6 +7,7 @@ Quic extensions
 
   ../../extensions/quic/crypto_stream/v3/*
   ../../extensions/quic/proof_source/v3/*
+  ../../extensions/quic/proof_verifier/v3/*
   ../../extensions/quic/connection_id_generator/v3/*
   ../../extensions/quic/connection_id_generator/quic_lb/v3/*
   ../../extensions/quic/server_preferred_address/v3/*

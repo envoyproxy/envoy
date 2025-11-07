@@ -34,6 +34,8 @@
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
+#include "absl/container/node_hash_set.h"
+#include "absl/strings/str_join.h"
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
@@ -568,12 +570,13 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to load trusted client CA certificates from ", config_->caCertPath()));
   }
+
   SSL_CTX_set_client_CA_list(ctx, list.release());
 
   if (require_client_cert) {
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
-  // Set the verify_depth
+  // Set the verify_depth.
   if (config_->maxVerifyDepth().has_value()) {
     uint32_t max_verify_depth = std::min(config_->maxVerifyDepth().value(), uint32_t{INT_MAX});
     // Older BoringSSLs behave like OpenSSL 1.0.x and exclude the leaf from the

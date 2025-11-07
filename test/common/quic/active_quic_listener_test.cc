@@ -2,6 +2,7 @@
 #include <memory>
 
 #include "envoy/config/listener/v3/quic_config.pb.validate.h"
+#include "envoy/extensions/quic/proof_verifier/v3/proof_verifier.pb.h"
 #include "envoy/network/exception.h"
 
 #include "source/common/common/logger.h"
@@ -85,12 +86,14 @@ protected:
       uint32_t packets_to_read_to_connection_count_ratio,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
       EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+      EnvoyQuicServerProofVerifierFactoryInterface& proof_verifier_factory,
       QuicConnectionIdGeneratorPtr&& cid_generator) override {
     return std::make_unique<TestActiveQuicListener>(
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
         packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
-        proof_source_factory, std::move(cid_generator), testWorkerSelector, std::nullopt);
+        proof_source_factory, proof_verifier_factory, std::move(cid_generator), testWorkerSelector,
+        std::nullopt);
   }
 };
 
@@ -770,6 +773,26 @@ TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
   auto debug_visitor_factory =
       ActiveQuicListenerFactoryPeer::debugVisitorFactory(listener_factory.get());
   EXPECT_TRUE(debug_visitor_factory.has_value());
+}
+
+TEST_F(ActiveQuicListenerFactoryTest, DefaultProofVerifierConfig) {
+  // When proof_verifier_config is not specified, it should default to the filter chain verifier.
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  auto factory = createQuicListenerFactory(options);
+  // The factory should be created successfully with default proof verifier.
+  EXPECT_NE(factory, nullptr);
+}
+
+TEST_F(ActiveQuicListenerFactoryTest, ExplicitProofVerifierConfig) {
+  // Test with explicitly configured proof verifier.
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_proof_verifier_config()->set_name(
+      "envoy.quic.server.proof_verifier.filter_chain");
+  envoy::extensions::quic::proof_verifier::v3::ProofVerifierConfig proof_verifier_config;
+  options.mutable_proof_verifier_config()->mutable_typed_config()->PackFrom(proof_verifier_config);
+
+  auto factory = createQuicListenerFactory(options);
+  EXPECT_NE(factory, nullptr);
 }
 
 } // namespace Quic
