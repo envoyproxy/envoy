@@ -88,6 +88,11 @@ envoy.tls.key_providers.qat:
   - envoy.tls.key_providers
   security_posture: robust_to_untrusted_downstream
   status: alpha
+envoy.tls.key_providers.kae:
+  categories:
+  - envoy.tls.key_providers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
 envoy.bootstrap.vcl:
   categories:
   - envoy.bootstrap
