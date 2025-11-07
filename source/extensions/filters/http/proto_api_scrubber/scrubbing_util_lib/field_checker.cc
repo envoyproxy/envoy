@@ -61,7 +61,7 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
 
 
 FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
-    absl::StatusOr<Matcher::MatchResult>& match_result, cstd::string& field_mask) const {
+    absl::StatusOr<Matcher::MatchResult>& match_result, const std::string& field_mask) const {
   // Preserve the field (i.e., kInclude) if there's any error in evaluating the match.
   // This can happen in two cases:
   // 1. The match tree is corrupt.
@@ -94,6 +94,16 @@ FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
     // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`.
     return FieldCheckResults::kInclude;
   }
+}
+
+absl::StatusOr<Matcher::MatchResult>
+FieldChecker::tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const {
+  Matcher::MatchResult match_result = match_tree->match(matching_data_);
+  if (!match_result.isComplete()) {
+    return absl::InternalError("Matching couldn't complete due to insufficient data.");
+  }
+
+  return match_result;
 }
 
 FieldCheckResults FieldChecker::CheckType(const Protobuf::Type*) const {

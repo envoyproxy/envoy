@@ -79,7 +79,7 @@ private:
 
   FieldCheckResults
   matchResultStatusToFieldCheckResult(absl::StatusOr<Matcher::MatchResult>& match_result,
-                                      std::string& field_mask) const;
+                                      const std::string& field_mask) const;
 
   ScrubberContext scrubber_context_;
   Http::Matching::HttpMatchingDataImpl matching_data_;
