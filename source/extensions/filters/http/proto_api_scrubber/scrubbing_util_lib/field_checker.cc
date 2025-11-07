@@ -61,7 +61,7 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
 
 
 FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
-    absl::StatusOr<Matcher::MatchResult>& match_result, std::string& field_mask) const {
+    absl::StatusOr<Matcher::MatchResult>& match_result, cstd::string& field_mask) const {
   // Preserve the field (i.e., kInclude) if there's any error in evaluating the match.
   // This can happen in two cases:
   // 1. The match tree is corrupt.
