@@ -58,8 +58,6 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
   return FieldCheckResults::kInclude;
 }
 
-
-
 FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
     absl::StatusOr<Matcher::MatchResult>& match_result, const std::string& field_mask) const {
   // Preserve the field (i.e., kInclude) if there's any error in evaluating the match.
