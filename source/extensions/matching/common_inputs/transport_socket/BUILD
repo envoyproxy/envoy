@@ -13,7 +13,10 @@ envoy_cc_library(
     name = "config_lib",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    visibility = ["//visibility:public"],
+    visibility = [
+        "//source/common/upstream:__pkg__",
+        "//test:__subpackages__",
+    ],
     deps = [
         "//envoy/matcher:matcher_interface",
         "//envoy/registry",

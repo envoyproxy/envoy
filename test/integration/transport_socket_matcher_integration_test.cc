@@ -251,38 +251,6 @@ TEST_F(TransportSocketMatcherIntegrationTest, XdsMatcherEndpointMetadata) {
   }
 }
 
-// Note: Tests using network inputs (source_ip, server_name, etc.) have been removed as
-// transport socket matching operates on endpoint/locality metadata and filter state only.
-// Network connection details are not available at endpoint selection time.
-
-// Send multiple sequential requests to verify stability.
-TEST_F(TransportSocketMatcherIntegrationTest, XdsMatcherMultipleRequests) {
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  for (int i = 0; i < 5; i++) {
-    {
-      IntegrationStreamDecoderPtr response =
-          codec_client_->makeHeaderOnlyRequest(tls_request_headers_);
-      ASSERT_TRUE(response->waitForEndStream());
-      EXPECT_EQ("200", response->headers().getStatusValue());
-      const auto header_entry = response->headers().get(Http::LowerCaseString{host_type_header_});
-      EXPECT_FALSE(header_entry.empty());
-      EXPECT_EQ("tls", header_entry[0]->value().getStringView());
-    }
-    {
-      IntegrationStreamDecoderPtr response =
-          codec_client_->makeHeaderOnlyRequest(raw_request_headers_);
-      ASSERT_TRUE(response->waitForEndStream());
-      EXPECT_EQ("200", response->headers().getStatusValue());
-      const auto header_entry = response->headers().get(Http::LowerCaseString{host_type_header_});
-      EXPECT_FALSE(header_entry.empty());
-      EXPECT_EQ("raw", header_entry[0]->value().getStringView());
-    }
-  }
-}
-
 // Simple smoke test to ensure multiple sequential requests work.
 TEST_F(TransportSocketMatcherIntegrationTest, XdsMatcherSequentialSmoke) {
   initialize();

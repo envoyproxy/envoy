@@ -1731,14 +1731,14 @@ envoy.matching.inputs.transport_protocol:
   - envoy.extensions.matching.common_inputs.network.v3.TransportProtocolInput
 envoy.matching.inputs.endpoint_metadata:
   categories:
-  - envoy.matching.inputs
+  - envoy.matching.transport_socket.input
   security_posture: unknown
   status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.transport_socket.v3.EndpointMetadataInput
 envoy.matching.inputs.locality_metadata:
   categories:
-  - envoy.matching.inputs
+  - envoy.matching.transport_socket.input
   security_posture: unknown
   status: stable
   type_urls:
@@ -1753,7 +1753,7 @@ envoy.matching.inputs.filter_state:
   - envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
 envoy.matching.inputs.transport_socket_filter_state:
   categories:
-  - envoy.matching.inputs
+  - envoy.matching.transport_socket.input
   security_posture: unknown
   status: stable
   type_urls:

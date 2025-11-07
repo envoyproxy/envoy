@@ -68,7 +68,7 @@ These input functions are available for matching TCP connections and HTTP reques
 * :ref:`DNS SAN <extension_envoy.matching.inputs.dns_san>`.
 * :ref:`Subject <extension_envoy.matching.inputs.subject>`.
 
-.. _extension_category_envoy.matching.inputs:
+.. _extension_category_envoy.matching.transport_socket.input:
 
 Transport Socket Matching Input Functions
 ******************************************

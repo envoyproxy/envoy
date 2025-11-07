@@ -134,7 +134,7 @@ private:
    * @param creation_status reference to store creation status.
    */
   void setupTransportSocketMatcher(
-      OptRef<const xds::type::matcher::v3::Matcher> transport_socket_matcher,
+      const xds::type::matcher::v3::Matcher& transport_socket_matcher,
       const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
           socket_matches,
       Server::Configuration::TransportSocketFactoryContext& factory_context,
