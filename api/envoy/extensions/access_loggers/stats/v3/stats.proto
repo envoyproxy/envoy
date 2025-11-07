@@ -16,7 +16,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/acc
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Stats logger]
-// Configuration for an access logger that emits customEnvoy stats according to its
+// Configuration for an access logger that emits custom Envoy stats according to its
 // configuration. The stats can have tags and values derived from
 // :ref:`command operators <config_access_log_command_operators>`.
 // [#extension: envoy.access_loggers.stats]
@@ -91,7 +91,7 @@ message Config {
     google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
   }
 
-  // The stat prefix for all stats in this logger.
+  // The stat prefix for the generated stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The histograms this logger will emit.

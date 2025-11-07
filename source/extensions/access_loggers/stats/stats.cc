@@ -92,7 +92,7 @@ StatsAccessLog::DynamicTag::DynamicTag(
     Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands)
     : name_(pool.add(tag_cfg.name())),
       value_formatter_(THROW_OR_RETURN_VALUE(
-          Formatter::FormatterImpl::create(tag_cfg.value_format(), false, commands),
+          Formatter::FormatterImpl::create(tag_cfg.value_format(), true, commands),
           Formatter::FormatterPtr)) {}
 
 std::pair<Stats::StatNameTagVector, std::vector<Stats::StatNameDynamicStorage>>
@@ -143,7 +143,12 @@ absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& form
 
 void StatsAccessLog::emitLog(const Formatter::Context& context,
                              const StreamInfo::StreamInfo& stream_info) {
-  for (auto& histogram : histograms_) {
+  emitLogConst(context, stream_info);
+}
+
+void StatsAccessLog::emitLogConst(const Formatter::Context& context,
+                                  const StreamInfo::StreamInfo& stream_info) const {
+  for (const auto& histogram : histograms_) {
     absl::optional<uint64_t> computed_value_opt =
         getFormatValue(*histogram.value_formatter_, context, stream_info,
                        histogram.unit_ == Stats::Histogram::Unit::Percent);
@@ -159,7 +164,7 @@ void StatsAccessLog::emitLog(const Formatter::Context& context,
     histogram_stat.recordValue(value);
   }
 
-  for (auto& counter : counters_) {
+  for (const auto& counter : counters_) {
     uint64_t value;
     if (counter.value_formatter_ != nullptr) {
       absl::optional<uint64_t> computed_value_opt =

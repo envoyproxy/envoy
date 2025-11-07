@@ -22,6 +22,11 @@ private:
   void emitLog(const Formatter::Context& context,
                const StreamInfo::StreamInfo& stream_info) override;
 
+  // `emitLog` is called concurrently from different works. Move all the logic into a const function
+  // to ensure there are no data races in mutation of class members.
+  void emitLogConst(const Formatter::Context& context,
+                    const StreamInfo::StreamInfo& stream_info) const;
+
   class DynamicTag {
   public:
     DynamicTag(const envoy::extensions::access_loggers::stats::v3::Config::Tag& tag_cfg,

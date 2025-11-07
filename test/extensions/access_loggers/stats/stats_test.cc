@@ -43,12 +43,11 @@ public:
   }
 
   void initialize(const envoy::extensions::access_loggers::stats::v3::Config& config) {
-    // ON_CALL(context_, statsScope()).WillByDefault(testing::ReturnRef(root_scope_));
     ON_CALL(context_, statsScope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
     EXPECT_CALL(store_.mockScope(), createScope_(_))
         .WillOnce(Invoke([this](const std::string& name) {
           Stats::StatNameDynamicStorage storage(name, context_.store_.symbolTable());
-          scope_ = std::make_shared<Stats::MockScope>(storage.statName(), store_);
+          scope_ = std::make_shared<NiceMock<Stats::MockScope>>(storage.statName(), store_);
           return scope_;
         }));
 
@@ -217,6 +216,24 @@ TEST_F(StatsAccessLoggerTest, NumberStringValueFormatted) {
   logger_->log(formatter_context_, stream_info_);
 }
 
+TEST_F(StatsAccessLoggerTest, CounterValueFixed) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    counters:
+      - stat:
+          name: counter
+        value_fixed: 42
+)EOF";
+
+  initialize(yaml);
+
+  absl::optional<std::string> a_number{"42"};
+  EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
+  EXPECT_CALL(store_, counter(_));
+  EXPECT_CALL(store_.counter_, add(42));
+  logger_->log(formatter_context_, stream_info_);
+}
+
 // Histogram values are in the range 0-1.0, so ensure that fractional values work.
 TEST_F(StatsAccessLoggerTest, HistogramPercent) {
   const std::string yaml = R"EOF(
@@ -245,6 +262,38 @@ TEST_F(StatsAccessLoggerTest, HistogramPercent) {
             return *histogram;
           }));
 
+  logger_->log(formatter_context_, stream_info_);
+}
+
+// Test that a tag formatter that doesn't have a value becomes an empty string.
+TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    counters:
+      - stat:
+          name: counter
+          tags:
+            - name: tag
+              value_format: '%RESPONSE_CODE_DETAILS%:%RESPONSE_CODE%'
+        value_fixed: 1
+)EOF";
+
+  initialize(yaml);
+
+  absl::optional<std::string> nullopt{absl::nullopt};
+  EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(nullopt));
+  EXPECT_CALL(stream_info_, responseCode())
+      .WillRepeatedly(testing::Return(absl::optional<uint32_t>{200}));
+  EXPECT_CALL(*scope_, counterFromStatNameWithTags(_, _))
+      .WillOnce(
+          testing::Invoke([this](const Stats::StatName& name,
+                                 Stats::StatNameTagVectorOptConstRef tags) -> Stats::Counter& {
+            EXPECT_EQ("counter", scope_->symbolTable().toString(name));
+            EXPECT_EQ(1, tags->get().size());
+            EXPECT_EQ(":200", scope_->symbolTable().toString(tags->get().front().second));
+
+            return scope_->counterFromStatNameWithTags_(name, tags);
+          }));
   logger_->log(formatter_context_, stream_info_);
 }
 
