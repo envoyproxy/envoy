@@ -57,3 +57,7 @@ modify_only
   It may be desirable to set *modify_only* on egress listeners so they only drain during
   modifications while relying on ingress listener draining to perform full server draining when
   attempting to do a controlled shutdown.
+
+Note that Envoy also drains upstream connections when the upstream clusters are modified. The behavior
+depends on the protocols used for the connection pools.
+
