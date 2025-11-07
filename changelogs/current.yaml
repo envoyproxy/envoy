@@ -17,6 +17,10 @@ bug_fixes:
   change: |
     Fixed a connection leak in the TCP proxy when the ``receive_before_connect`` feature is enabled and the
     downstream connection closes before the upstream connection is established.
+- area: tls
+  change: |
+    Fixed an issue where SANs of type ``OTHERNAME`` in a TLS cert were truncated if there was
+    an embedded null octet, leading to incorrect SAN validation.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
