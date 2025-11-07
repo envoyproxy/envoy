@@ -1870,18 +1870,17 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
 void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
                             bool end_stream) {
-  // In normal situations, upstream_requests_ should have size 1 because when
-  // we saw headers we either reset the stream (hence wouldn't have made it to
-  // onUpstreamData) or all other in-flight streams.
-  // There is one exception when route retry policy is configured and a HTTP
-  // filter is in the upstream filter chain
-  // and it's encodeHeaders() is returning FilterHeadersStatus::StopIteration.
-  // In this case, onUpstreamData() might get called with
-  // upstream_requests_.size() == 0 and we should just return.
-  if (upstream_requests_.size() != 1) {
+  // When route retry policy is configured and an upstream filter is returning StopIteration
+  // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
+  // and we should just return.
+  if (upstream_requests_.size() == 0) {
     return;
   }
 
+  // Other than above case, this should be true because when we saw headers we
+  // either reset the stream (hence wouldn't have made it to onUpstreamData) or
+  // all other in-flight streams.
+  ASSERT(upstream_requests_.size() == 1);
   if (end_stream) {
     // gRPC request termination without trailers is an error.
     if (upstream_request.grpcRqSuccessDeferred()) {
@@ -1895,17 +1894,17 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
 
 void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
                                 UpstreamRequest& upstream_request) {
-  // In normal situations, upstream_requests_ should have size 1 because when
-  // we saw headers we either reset the stream (hence wouldn't have made it to
-  // onUpstreamTrailers) or all other in-flight streams.
-  // There is one exception when route retry policy is configured and a HTTP
-  // filter is in the upstream filter chain
-  // and it's encodeHeaders() is returning FilterHeadersStatus::StopIteration.
-  // In this case, onUpstreamTrailers() might get called with
-  // upstream_requests_.size() == 0 and we should just return.
-  if (upstream_requests_.size() != 1) {
+  // When route retry policy is configured and an upstream filter is returning StopIteration
+  // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
+  // and we should just return.
+  if (upstream_requests_.size() == 0) {
     return;
   }
+
+  // Other than above case, this should be true because when we saw headers we
+  // either reset the stream (hence wouldn't have made it to onUpstreamTrailers) or
+  // all other in-flight streams.
+  ASSERT(upstream_requests_.size() == 1);
 
   if (upstream_request.grpcRqSuccessDeferred()) {
     absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
