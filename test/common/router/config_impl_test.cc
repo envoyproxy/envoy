@@ -8211,9 +8211,10 @@ virtual_hosts:
       config.route(genHeaders("example.com", "/", "GET"), 0)->directResponseEntry();
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   EXPECT_NE(nullptr, direct_response);
   EXPECT_EQ(Http::Code::OK, direct_response->responseCode());
-  EXPECT_EQ("content", direct_response->formatBody(request_headers, response_headers, _));
+  EXPECT_EQ("content", direct_response->formatBody(request_headers, response_headers, stream_info));
 }
 
 // Test the parsing of a direct response configuration where the response body is too large.
