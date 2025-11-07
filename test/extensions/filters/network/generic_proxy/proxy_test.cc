@@ -56,14 +56,19 @@ public:
       const std::string tracing_config_yaml = R"EOF(
       max_path_tag_length: 256
       spawn_upstream_span: true
+      custom_tags:
+      - tag: "x-key"
+        value: "%REQUEST_PROPERTY(x-key)%"
       )EOF";
 
       Tracing::ConnectionManagerTracingConfigProto tracing_config;
 
       TestUtility::loadFromYaml(tracing_config_yaml, tracing_config);
 
+      std::vector<Formatter::CommandParserPtr> command_parsers;
+      command_parsers.push_back(createGenericProxyCommandParser());
       tracing_config_ = std::make_unique<Tracing::ConnectionManagerTracingConfig>(
-          envoy::config::core::v3::TrafficDirection::OUTBOUND, tracing_config);
+          envoy::config::core::v3::TrafficDirection::OUTBOUND, tracing_config, command_parsers);
     }
 
     std::vector<NamedFilterFactoryCb> factories;
@@ -73,6 +78,9 @@ public:
       mock_decoder_filters_.push_back(
           {"mock_default_decoder_filter", std::make_shared<NiceMock<MockDecoderFilter>>()});
     }
+
+    factories.reserve(mock_decoder_filters_.size() + mock_encoder_filters_.size() +
+                      mock_stream_filters_.size());
 
     for (const auto& filter : mock_stream_filters_) {
       factories.push_back({filter.first, [f = filter.second](FilterChainFactoryCallbacks& cb) {
@@ -1814,6 +1822,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
   initializeFilter(true);
 
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  request->data_["x-key"] = "x-value"; // The custom tag will extract this key-value pair.
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
@@ -1841,7 +1850,12 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  absl::flat_hash_map<std::string, std::string> final_tags;
+  EXPECT_CALL(*span, setTag(_, _))
+      .WillRepeatedly(
+          testing::Invoke([&final_tags](absl::string_view key, absl::string_view value) {
+            final_tags[key] = std::string(value);
+          }));
   EXPECT_CALL(*span, finishSpan());
 
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
@@ -1863,6 +1877,9 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   active_stream->onResponseHeaderFrame(std::move(response));
+
+  // Check the tracing tags after the stream is completed.
+  EXPECT_EQ(final_tags["x-key"], "x-value");
 }
 
 TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracingAndSamplingToTrue) {

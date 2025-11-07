@@ -14,7 +14,18 @@ import tap2pcap
 # a golden output file for the tshark dump. Since we run tap2pcap in a
 # subshell with a limited environment, the inferred time zone should be UTC.
 if __name__ == '__main__':
-    srcdir = os.path.join(os.getenv('TEST_SRCDIR'), 'envoy_api')
+    test_srcdir = os.getenv('TEST_SRCDIR')
+    # In bzlmod, the main repository is '_main', in WORKSPACE it's 'envoy_api'
+    # Try both to support both build systems
+    for workspace_name in ['_main', 'envoy_api']:
+        candidate_dir = os.path.join(test_srcdir, workspace_name)
+        if os.path.isdir(candidate_dir):
+            srcdir = candidate_dir
+            break
+    else:
+        # Fallback to _main if neither exists (shouldn't happen)
+        srcdir = os.path.join(test_srcdir, '_main')
+
     tap_path = os.path.join(srcdir, 'tools/data/tap2pcap_h2_ipv4.pb_text')
     expected_path = os.path.join(srcdir, 'tools/data/tap2pcap_h2_ipv4.txt')
     pcap_path = os.path.join(os.getenv('TEST_TMPDIR'), 'generated.pcap')
