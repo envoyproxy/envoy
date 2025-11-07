@@ -46,7 +46,7 @@ public:
   }
 
   // Test direct response with a body_format that uses %LOCAL_REPLY_BODY%, and no body is specified.
-  void testDirectResponseWithBodyFormat() {
+  void testDirectResponseWithBodyFormatAndNoBody() {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
@@ -193,6 +193,10 @@ TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeLarge) {
 
 TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeSmall) {
   testDirectResponseBodySize(1);
+}
+
+TEST_P(DirectResponseIntegrationTest, DirectResponseWithBodyFormatAndNoBody) {
+  testDirectResponseWithBodyFormatAndNoBody();
 }
 
 TEST_P(DirectResponseIntegrationTest, DirectResponseWithBodyFormat) {
