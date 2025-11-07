@@ -11,8 +11,11 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/qui
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: QUIC proof verifier configuration]
+// [#extension: envoy.quic.server.proof_verifier.filter_chain]
 
-// Configuration for default QUIC server proof verifier.
-// This message is an empty placeholder for now.
+// Configuration for QUIC server proof verifier.
+// The default proof verifier validates client certificates using the filter chain's
+// TLS context. No additional configuration is currently required.
 message ProofVerifierConfig {
 }
+

@@ -496,10 +496,10 @@ envoy_cc_library(
         "//source/extensions/quic/connection_id_generator/deterministic:envoy_deterministic_connection_id_generator_config",
         "//source/server:active_udp_listener",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/quic/proof_verifier/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/connection_id_generator/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/proof_source/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/proof_verifier/v3:pkg_cc_proto",
     ]),
 )
 
