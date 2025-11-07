@@ -5736,6 +5736,138 @@ TEST_F(HttpFilterTest, DeniedResponseLocalReplyExceedsLimitDisabled) {
   EXPECT_EQ(0U, config_->stats().omitted_response_headers_.value());
 }
 
+// Test that set-cookie headers from successful authorization are properly added to the client
+// response using allowed_client_headers_on_success.
+TEST_F(HttpFilterTest, SetCookieHeaderOnSuccessfulAuthorization) {
+  InSequence s;
+
+  initialize(R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz_server"
+      timeout: 0.5s
+    authorization_response:
+      allowed_client_headers_on_success:
+        patterns:
+        - exact: "set-cookie"
+          ignore_case: true
+        - exact: "x-custom-header"
+          ignore_case: true
+  )EOF");
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_add = {{"set-cookie", "session=abc123"},
+                                      {"x-custom-header", "custom-value"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
+// Test that set-cookie headers from denied authorization are properly added to the client response
+// using allowed_client_headers.
+TEST_F(HttpFilterTest, SetCookieHeaderOnDeniedAuthorization) {
+  InSequence s;
+
+  initialize(R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz_server"
+      timeout: 0.5s
+    authorization_response:
+      allowed_client_headers:
+        patterns:
+        - exact: "set-cookie"
+          ignore_case: true
+        - exact: "www-authenticate"
+          ignore_case: true
+  )EOF");
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // Verify headers are present in the local reply (including extra headers added by sendLocalReply)
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, false))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ(headers.getStatusValue(), "403");
+        EXPECT_EQ(headers.get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView(),
+                  "error=invalid");
+        EXPECT_EQ(
+            headers.get(Http::LowerCaseString("www-authenticate"))[0]->value().getStringView(),
+            "Bearer realm=\"example\"");
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true))
+      .WillOnce(Invoke(
+          [&](Buffer::Instance& data, bool) { EXPECT_EQ(data.toString(), "Unauthorized"); }));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Forbidden;
+  response.body = "Unauthorized";
+  response.headers_to_set = {{"set-cookie", "error=invalid"},
+                             {"www-authenticate", "Bearer realm=\"example\""}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+// Test that multiple set-cookie headers from successful authorization are properly propagated.
+TEST_F(HttpFilterTest, MultipleSetCookieHeadersOnSuccess) {
+  InSequence s;
+
+  initialize(R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz_server"
+      timeout: 0.5s
+    authorization_response:
+      allowed_client_headers_on_success:
+        patterns:
+        - exact: "set-cookie"
+          ignore_case: true
+  )EOF");
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_add = {{"set-cookie", "session=abc123"},
+                                      {"set-cookie", "user=john"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters
