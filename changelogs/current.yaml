@@ -208,6 +208,13 @@ new_features:
     Added QUIC protocol option :ref:`max_sessions_per_event_loop
     <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.max_sessions_per_event_loop>` to limit the maximum
     number of new QUIC sessions created per event loop. The default is 16, preserving the previous hardcoded limit.
+- area: metrics_service
+  change: |
+    Added :ref:`batch_size <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.batch_size>` configuration
+    to the Metrics Service to allow batching metrics into multiple gRPC messages. When set to a positive value,
+    metrics will be batched with at most ``batch_size`` metric families per message. This helps avoid hitting
+    gRPC message size limits (typically 4MB) when sending large numbers of metrics. If not set or set to 0,
+    all metrics will be sent in a single message, preserving the current behavior.
 - area: network
   change: |
     Added a change to start populating the filter state ``envoy.network.network_namespace`` when a connection is accepted on a
@@ -228,5 +235,6 @@ new_features:
     Added :ref:`request_mirror_policies <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
     to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
     cluster-level request mirroring. Cluster-level policies override route-level policies when both are configured.
+
 
 deprecated:
