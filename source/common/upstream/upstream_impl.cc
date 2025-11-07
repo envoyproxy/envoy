@@ -636,8 +636,8 @@ Host::CreateConnectionData HostImplBase::createConnection(
   // be redirected to a proxy, create the TCP connection to the proxy's address not the host's
   // address.
   if (proxy_address.has_value()) {
-    auto upstream_local_address =
-        source_address_selector->getUpstreamLocalAddress(address, options);
+    auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(
+        address, options, makeOptRefFromPtr(transport_socket_options.get()));
     ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy at {}",
               proxy_address.value()->asString());
     connection = dispatcher.createClientConnection(
@@ -657,8 +657,8 @@ Host::CreateConnectionData HostImplBase::createConnection(
         dispatcher, *address_list_or_null, source_address_selector, socket_factory,
         transport_socket_options, host, options, happy_eyeballs_config);
   } else {
-    auto upstream_local_address =
-        source_address_selector->getUpstreamLocalAddress(address, options);
+    auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(
+        address, options, makeOptRefFromPtr(transport_socket_options.get()));
     connection = dispatcher.createClientConnection(
         address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),

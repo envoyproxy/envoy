@@ -68,6 +68,8 @@ public:
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override;
+  // Don't hide the other structure of formatValue.
+  using StreamInfoFormatterProvider::formatValue;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
@@ -127,6 +129,9 @@ public:
                        absl::string_view field_name = {});
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
@@ -155,6 +160,9 @@ public:
         duration_precision_(duration_precision) {}
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
@@ -209,6 +217,9 @@ public:
   SystemTimeFormatter(absl::string_view format, TimeFieldExtractorPtr f, bool local_time = false);
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
@@ -271,6 +282,9 @@ public:
   EnvironmentFormatter(absl::string_view key, absl::optional<size_t> max_length);
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
