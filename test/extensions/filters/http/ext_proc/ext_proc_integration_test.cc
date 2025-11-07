@@ -445,15 +445,16 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersServerHalfClosesFirst) {
         mut1->mutable_header()->set_raw_value("new");
         return true;
       });
-  // ext_proc is configured to only send request headers. In this case, server indicates that it is
-  // not expecting any more messages from ext_proc filter and half-closes the stream.
-  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
-  // ext_proc will immediately close side stream in this case, because by default Envoy gRPC client
-  // will reset the stream if the server half-closes before the client. Note that the ext_proc
-  // filter has not yet half-closed the sidestream, since it is doing it during its destruction.
-  // This is expected behavior for gRPC protocol.
-  EXPECT_TRUE(processor_stream_->waitForReset());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+    // Envoy closes the side stream in this case.
+    EXPECT_TRUE(processor_stream_->waitForReset());
+  }
+
+  // ext_proc server indicates that it is not expecting any more messages
+  // from ext_proc filter and half-closes the stream.
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
