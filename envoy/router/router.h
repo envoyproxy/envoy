@@ -108,11 +108,10 @@ public:
    * @param request_headers supplies the request headers.
    * @param response_headers supplies the response headers.
    * @param stream_info holds additional information about the request.
-   * @param body string to be populated/modified with the direct response body.
    */
-  virtual void formatBody(const Http::RequestHeaderMap& request_headers,
-                          const Http::ResponseHeaderMap& response_headers,
-                          const StreamInfo::StreamInfo& stream_info, std::string& body) const PURE;
+  virtual std::string formatBody(const Http::RequestHeaderMap& request_headers,
+                                 const Http::ResponseHeaderMap& response_headers,
+                                 const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * Do potentially destructive header transforms on Path header prior to redirection. For

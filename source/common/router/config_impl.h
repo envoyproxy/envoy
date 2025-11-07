@@ -102,8 +102,10 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
-  void formatBody(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                  const StreamInfo::StreamInfo&, std::string&) const override {}
+  std::string formatBody(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                         const StreamInfo::StreamInfo&) const override {
+    return EMPTY_STRING;
+  };
 };
 
 class CommonVirtualHostImpl;
@@ -746,9 +748,9 @@ public:
     return direct_response_body_provider_ != nullptr ? direct_response_body_provider_->data()
                                                      : EMPTY_STRING;
   }
-  void formatBody(const Http::RequestHeaderMap& request_headers,
-                  const Http::ResponseHeaderMap& response_headers,
-                  const StreamInfo::StreamInfo& stream_info, std::string& body) const override;
+  std::string formatBody(const Http::RequestHeaderMap& request_headers,
+                         const Http::ResponseHeaderMap& response_headers,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;

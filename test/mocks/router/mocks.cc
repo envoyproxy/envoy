@@ -20,10 +20,10 @@ namespace Router {
 MockDirectResponseEntry::MockDirectResponseEntry() {
   ON_CALL(*this, responseBody()).WillByDefault(ReturnRef(response_body_));
 
-  EXPECT_CALL(*this, formatBody(_, _, _, _))
-      .WillRepeatedly(Invoke([this](const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                    const StreamInfo::StreamInfo&,
-                                    std::string& body) { body = this->response_body_; }));
+  EXPECT_CALL(*this, formatBody(_, _, _))
+      .WillRepeatedly(
+          Invoke([this](const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                        const StreamInfo::StreamInfo&) { return this->response_body_; }));
 }
 
 MockDirectResponseEntry::~MockDirectResponseEntry() = default;

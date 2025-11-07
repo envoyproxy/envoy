@@ -1049,10 +1049,10 @@ std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers) co
       headers);
 }
 
-void RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& request_headers,
-                                    const Http::ResponseHeaderMap& response_headers,
-                                    const StreamInfo::StreamInfo& stream_info,
-                                    std::string& body) const {
+std::string RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& request_headers,
+                                           const Http::ResponseHeaderMap& response_headers,
+                                           const StreamInfo::StreamInfo& stream_info) const {
+  std::string body;
   if (direct_response_body_provider_ != nullptr) {
     body = direct_response_body_provider_->data();
   }
@@ -1061,6 +1061,7 @@ void RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& request_header
     body = direct_response_body_formatter_->format(
         {&request_headers, &response_headers, nullptr, body}, stream_info);
   }
+  return body;
 }
 
 std::multimap<std::string, std::string>
