@@ -81,8 +81,6 @@ public:
                            ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-
-  std::string category() const override { return "envoy.matching.inputs"; }
 };
 
 /**
@@ -98,8 +96,6 @@ public:
                            ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-
-  std::string category() const override { return "envoy.matching.inputs"; }
 };
 
 /**
@@ -134,8 +130,6 @@ public:
                            ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-
-  std::string category() const override { return "envoy.matching.inputs"; }
 };
 
 /**
