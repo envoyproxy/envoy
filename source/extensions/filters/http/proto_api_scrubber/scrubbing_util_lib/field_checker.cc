@@ -84,7 +84,7 @@ FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
 
   // Remove the field (i.e., kExclude) if there's a match and the matched action is
   // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`.
-  if (match_result->action()->typeUrl() ==
+  if (match_result->action() != nullptr && match_result->action()->typeUrl() ==
       "envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction") {
     return FieldCheckResults::kExclude;
   } else {
