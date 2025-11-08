@@ -379,6 +379,14 @@ struct StreamInfoImpl : public StreamInfo {
     ASSERT(downstream_bytes_meter_.get() == downstream_bytes_meter.get());
   }
 
+  void setStreamId(int32_t stream_id) override {
+    stream_id_ = stream_id;
+  }
+
+  int32_t getStreamId() const override {
+    return stream_id_;
+  }
+
   // This function is used to persist relevant information from the original
   // stream into to the new one, when recreating the stream. Generally this
   // includes information about the downstream stream, but not the upstream
@@ -515,6 +523,7 @@ private:
   uint64_t bytes_retransmitted_{};
   uint64_t packets_retransmitted_{};
   uint64_t bytes_sent_{};
+  int32_t stream_id_;
   Tracing::Reason trace_reason_;
   bool health_check_request_{};
   bool should_scheme_match_upstream_{false};

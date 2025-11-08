@@ -165,6 +165,8 @@ public:
   MOCK_METHOD(const BytesMeterSharedPtr&, getDownstreamBytesMeter, (), (const));
   MOCK_METHOD(void, setUpstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
+  MOCK_METHOD(void, setStreamId, (int32_t));
+  MOCK_METHOD(int32_t, getStreamId, (), (const));
   MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
   MOCK_METHOD(bool, isShadow, (), (const, override));
   MOCK_METHOD(void, setDownstreamTransportFailureReason, (absl::string_view failure_reason));

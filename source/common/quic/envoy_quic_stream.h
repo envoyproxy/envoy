@@ -187,6 +187,10 @@ public:
 
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
+  int32_t streamId() const override {
+    return static_cast<int32_t>(const_cast<EnvoyQuicStream*>(this)->streamId());
+  }
+
   QuicStatsGatherer* statsGatherer() { return stats_gatherer_.get(); }
 
 protected:

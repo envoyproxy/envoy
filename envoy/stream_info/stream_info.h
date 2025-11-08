@@ -977,6 +977,10 @@ public:
    */
   virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
 
+  virtual void setStreamId(int32_t stream_id) PURE;
+
+  virtual int32_t getStreamId() const PURE;
+
   virtual bool isShadow() const PURE;
 
   static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,

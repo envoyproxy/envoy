@@ -463,6 +463,8 @@ public:
    * Get the bytes meter for this stream.
    */
   virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
+
+  virtual int32_t streamId() const PURE;
 };
 
 /**
