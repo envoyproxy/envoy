@@ -6,6 +6,7 @@
 !\.bazelrc
 !\.bazelproject
 !\.bazelversion
+!\.bcr
 !\.circleci
 !\.clang-format
 !\.clang-tidy
@@ -24,6 +25,7 @@
 !\.zuul
 !\.zuul.yaml
 
+/api/bazel-*
 /bazel-*
 /mobile/bazel-*
 BROWSE
