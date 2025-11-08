@@ -5822,7 +5822,7 @@ TEST_F(RouterTest, DirectResponseWithBody) {
   NiceMock<MockDirectResponseEntry> direct_response;
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
   const std::string response_body("static response");
-  EXPECT_CALL(direct_response, formatBody(_, _, _)).WillRepeatedly(ReturnRef(response_body));
+  EXPECT_CALL(direct_response, formatBody(_, _, _)).WillRepeatedly(Return(response_body));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
 
   Http::TestResponseHeaderMapImpl response_headers{
