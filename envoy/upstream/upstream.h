@@ -37,6 +37,11 @@ namespace Http {
 class FilterChainManager;
 }
 
+namespace Router {
+class ShadowPolicy;
+using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
+} // namespace Router
+
 namespace Upstream {
 
 /**
@@ -1231,6 +1236,12 @@ public:
    * @return Reference to the optional config for LRS endpoint metric reporting.
    */
   virtual OptRef<const std::vector<std::string>> lrsReportMetricNames() const PURE;
+
+  /**
+   * @return const std::vector<Router::ShadowPolicyPtr>& the shadow policies configured for this
+   * cluster.
+   */
+  virtual const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const PURE;
 
 protected:
   /**
