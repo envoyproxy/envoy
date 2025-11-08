@@ -273,5 +273,12 @@ new_features:
   change: |
     Added new ``US_RX_BODY_BEG`` time point to the ``%COMMON_DURATION%`` to indicate
     the time point of upstream response body receiving begin.
+- area: listener
+  change: |
+    Added support for configuring TCP keepalive settings on both primary and additional addresses
+    by setting :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.Listener.tcp_keepalive>`.
+    It is possible to override the TCP keepalive settings for additional addresses by setting
+    :ref:`tcp_keepalive_override <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive_override>`
+    on additional addresses.
 
 deprecated:

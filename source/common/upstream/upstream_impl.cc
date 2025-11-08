@@ -85,16 +85,6 @@ std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
   return address->asString();
 }
 
-Network::TcpKeepaliveConfig
-parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
-  const envoy::config::core::v3::TcpKeepalive& options =
-      config.upstream_connection_options().tcp_keepalive();
-  return Network::TcpKeepaliveConfig{
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_probes, absl::optional<uint32_t>()),
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_time, absl::optional<uint32_t>()),
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
-}
-
 absl::StatusOr<ProtocolOptionsConfigConstSharedPtr>
 createProtocolOptionsConfig(const std::string& name, const Protobuf::Any& typed_config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
@@ -210,9 +200,10 @@ buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_config
                                    Network::SocketOptionFactory::buildIpFreebindOptions());
   }
   if (cluster_config.upstream_connection_options().has_tcp_keepalive()) {
-    Network::Socket::appendOptions(base_options,
-                                   Network::SocketOptionFactory::buildTcpKeepaliveOptions(
-                                       parseTcpKeepaliveConfig(cluster_config)));
+    Network::Socket::appendOptions(
+        base_options,
+        Network::SocketOptionFactory::buildTcpKeepaliveOptions(Network::parseTcpKeepaliveConfig(
+            cluster_config.upstream_connection_options().tcp_keepalive())));
   }
 
   return base_options;
