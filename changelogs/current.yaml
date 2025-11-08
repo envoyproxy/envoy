@@ -38,10 +38,22 @@ minor_behavior_changes:
     <envoy_v3_api_msg_service.ext_proc.v3.HeaderMutation>` fails. Removing
     request-specific details allows grouping by similar failure types. Detailed
     messages remain available in debug logs.
+- area: ext_proc
+  change: |
+    Closing the gRPC stream if Envoy detects no more external processing needed.
+    This doesn't apply to BUFFERED and BUFFERED_PARTIAL mode and a few corner cases for now.
+    For those cases, the stream will be closed during the filter destruction.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.ext_proc_stream_close_optimization`` to ``false``.
 - area: ext_authz
   change: |
     Check that the response header count is less than the configured limits before applying mutations, and do not
     add new headers if not.
+- area: ext_authz
+  change: |
+    Fixed HTTP ext_authz service to properly propagate headers (such as ``set-cookie``) back to clients. The
+    filter now correctly uses ``allowed_client_headers`` for denied responses and ``allowed_client_headers_on_success``
+    for successful authorization responses.
 - area: quic
   change: |
     Switch to use QUICHE provided migration logic to handle port migration upon path degrading and migration to Server
@@ -106,6 +118,10 @@ bug_fixes:
     were not accessible in ``request_headers_to_add`` configuration on the initial request. Headers configured via
     ``request_headers_to_add`` can now reference router-set headers using formatters like
     ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
+- area: ext_proc
+  change: |
+    Fixed a bug where attributes based on request headers (e.g. ``request.host``) were not sent to
+    the ext_proc server if ext_proc was configured to only run on the encode path.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -200,6 +216,14 @@ new_features:
     This can avoid unnecessary load shedding or overload actions.
     To enable, set ``envoy.reloadable_features.fixed_heap_use_allocated`` to true.
     The default algorithm (heap_size - pageheap_unmapped - pageheap_free) does not discount for free memory in TCMalloc caches.
+- area: upstream
+  change: |
+    Added :ref:`transport_socket_matcher
+    <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matcher>` to clusters. This matcher
+    uses the generic xDS matcher framework to select a named transport socket from
+    :ref:`transport_socket_matches
+    <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` based on endpoint metadata,
+    locality metadata, and transport socket filter state.
 - area: admin
   change: |
     Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.
@@ -211,6 +235,13 @@ new_features:
     Added QUIC protocol option :ref:`max_sessions_per_event_loop
     <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.max_sessions_per_event_loop>` to limit the maximum
     number of new QUIC sessions created per event loop. The default is 16, preserving the previous hardcoded limit.
+- area: metrics_service
+  change: |
+    Added :ref:`batch_size <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.batch_size>` configuration
+    to the Metrics Service to allow batching metrics into multiple gRPC messages. When set to a positive value,
+    metrics will be batched with at most ``batch_size`` metric families per message. This helps avoid hitting
+    gRPC message size limits (typically 4MB) when sending large numbers of metrics. If not set or set to 0,
+    all metrics will be sent in a single message, preserving the current behavior.
 - area: network
   change: |
     Added a change to start populating the filter state ``envoy.network.network_namespace`` when a connection is accepted on a
@@ -226,5 +257,6 @@ new_features:
   change: |
     Added runtime guard ``envoy.reloadable_features.report_load_when_rq_active_is_non_zero``.
     When enabled, LRS continues to send locality_stats reoprt to config server when there is no request_issued in the poll cycle.
+
 
 deprecated:
