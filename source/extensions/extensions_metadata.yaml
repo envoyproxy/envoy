@@ -674,6 +674,13 @@ envoy.filters.http.header_mutation:
   type_urls:
   - envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
   - envoy.extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute
+envoy.filters.http.transform:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.transform.v3.TransformConfig
 envoy.filters.listener.http_inspector:
   categories:
   - envoy.filters.listener

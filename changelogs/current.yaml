@@ -142,6 +142,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: http filter
+  change: |
+    Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request
+    and response bodies in any position of HTTP filter chain.
+    This also make it possible to refresh routes based on the attributes in the request body.
 - area: access_log
   change: |
     Support process-level rate limiting on access log emission by
@@ -260,5 +265,9 @@ new_features:
     to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
     cluster-level request mirroring. Cluster-level policies override route-level policies when both are configured.
 
+- area: formatter
+  change: |
+    Added new ``US_RX_BODY_BEG`` time point to the ``%COMMON_DURATION%`` to indicate
+    the time point of upstream response body receiving begin.
 
 deprecated:
