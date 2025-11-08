@@ -45,6 +45,7 @@ public:
   QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
+  const std::deque<QueuedChunkPtr>& queue() const { return queue_; }
 
 private:
   std::deque<QueuedChunkPtr> queue_;
@@ -100,6 +101,7 @@ public:
 
   bool completeBodyAvailable() const { return complete_body_available_; }
   void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
+  bool hasNoBody() const { return no_body_; }
   void setHasNoBody(bool b) { no_body_ = b; }
   bool bodyReplaced() const { return body_replaced_; }
   bool bodyReceived() const { return body_received_; }
@@ -591,6 +593,12 @@ public:
   evaluateAttributes(const ExpressionManager& mgr,
                      const Filters::Common::Expr::Activation& activation) const override {
     return mgr.evaluateResponseAttributes(activation);
+  }
+
+  // Check whether external processing is configured in the encoding path.
+  bool noExternalProcess() const {
+    return (!send_headers_ && !send_trailers_ &&
+            body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
   }
 
 private:

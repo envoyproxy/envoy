@@ -16,8 +16,10 @@ using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
 // to reuse the formatter after the router's formatter is completely removed.
 class AppendMutation : public HeaderEvaluator, public Envoy::Router::HeadersToAddEntry {
 public:
-  AppendMutation(const HeaderValueOption& header_value_option, absl::Status& creation_status)
-      : HeadersToAddEntry(header_value_option, creation_status),
+  AppendMutation(const HeaderValueOption& header_value_option,
+                 const Formatter::CommandParserPtrVector& command_parsers,
+                 absl::Status& creation_status)
+      : HeadersToAddEntry(header_value_option, command_parsers, creation_status),
         header_name_(header_value_option.header().key()) {}
 
   void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
@@ -88,22 +90,24 @@ private:
 
 absl::StatusOr<std::unique_ptr<HeaderMutations>>
 HeaderMutations::create(const ProtoHeaderMutatons& header_mutations,
-                        Server::Configuration::CommonFactoryContext& context) {
+                        Server::Configuration::CommonFactoryContext& context,
+                        const Formatter::CommandParserPtrVector& command_parsers) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<HeaderMutations>(
-      new HeaderMutations(header_mutations, context, creation_status));
+      new HeaderMutations(header_mutations, context, command_parsers, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations,
                                  Server::Configuration::CommonFactoryContext& context,
+                                 const Formatter::CommandParserPtrVector& command_parsers,
                                  absl::Status& creation_status) {
   for (const auto& mutation : header_mutations) {
     switch (mutation.action_case()) {
     case envoy::config::common::mutation_rules::v3::HeaderMutation::ActionCase::kAppend:
       header_mutations_.emplace_back(
-          std::make_unique<AppendMutation>(mutation.append(), creation_status));
+          std::make_unique<AppendMutation>(mutation.append(), command_parsers, creation_status));
       if (!creation_status.ok()) {
         return;
       }

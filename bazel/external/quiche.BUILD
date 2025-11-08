@@ -9,6 +9,7 @@ load(
 load(
     "@envoy//bazel/external:quiche.bzl",
     "envoy_quic_cc_library",
+    "envoy_quic_cc_test",
     "envoy_quic_cc_test_library",
     "envoy_quiche_platform_impl_cc_library",
     "envoy_quiche_platform_impl_cc_test_library",
@@ -1810,13 +1811,10 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_bandwidth_lib",
     srcs = ["quiche/quic/core/quic_bandwidth.cc"],
     hdrs = ["quiche/quic/core/quic_bandwidth.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_constants_lib",
         ":quic_core_time_lib",
@@ -2381,13 +2379,10 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_constants_lib",
     srcs = ["quiche/quic/core/quic_constants.cc"],
     hdrs = ["quiche/quic/core/quic_constants.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_platform_export",
@@ -2876,7 +2871,7 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_frames_frames_lib",
     srcs = [
         "quiche/quic/core/frames/quic_ack_frame.cc",
@@ -2934,15 +2929,12 @@ envoy_cc_library(
         "quiche/quic/core/frames/quic_streams_blocked_frame.h",
         "quiche/quic/core/frames/quic_window_update_frame.h",
     ],
-    copts = quiche_copts,
     # TODO: Work around initializer in anonymous union in fastbuild build.
     # Remove this after upstream fix.
     defines = select({
         "@envoy//bazel:windows_x86_64": ["QUIC_FRAME_DEBUG=0"],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_constants_lib",
         ":quic_core_error_codes_lib",
@@ -3517,7 +3509,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_packets_lib",
     srcs = [
         "quiche/quic/core/quic_packets.cc",
@@ -3527,9 +3519,6 @@ envoy_cc_library(
         "quiche/quic/core/quic_packets.h",
         "quiche/quic/core/quic_write_blocked_list.h",
     ],
-    copts = quiche_copts,
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":http2_core_priority_write_scheduler_lib",
         ":quic_core_ack_listener_interface_lib",
@@ -3930,7 +3919,7 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_stream_priority_lib",
     srcs = [
         "quiche/quic/core/quic_stream_priority.cc",
@@ -3938,10 +3927,7 @@ envoy_cc_library(
     hdrs = [
         "quiche/quic/core/quic_stream_priority.h",
     ],
-    copts = quiche_copts,
     external_deps = ["ssl"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_platform_export",
@@ -4233,7 +4219,7 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_types_lib",
     srcs = [
         "quiche/quic/core/quic_connection_id.cc",
@@ -4245,10 +4231,7 @@ envoy_cc_library(
         "quiche/quic/core/quic_packet_number.h",
         "quiche/quic/core/quic_types.h",
     ],
-    copts = quiche_copts,
     external_deps = ["ssl"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_crypto_random_lib",
         ":quic_core_error_codes_lib",
@@ -4321,13 +4304,10 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_utils_lib",
     srcs = ["quiche/quic/core/quic_utils.cc"],
     hdrs = ["quiche/quic/core/quic_utils.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_constants_lib",
         ":quic_core_crypto_random_lib",
@@ -4352,13 +4332,10 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_versions_lib",
     srcs = ["quiche/quic/core/quic_versions.cc"],
     hdrs = ["quiche/quic/core/quic_versions.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_crypto_random_lib",
         ":quic_core_tag_lib",
@@ -5195,14 +5172,12 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test(
+envoy_quic_cc_test(
     name = "quiche_common_test",
     srcs = [
         "quiche/common/quiche_linked_hash_map_test.cc",
         "quiche/common/quiche_mem_slice_storage_test.cc",
     ],
-    copts = quiche_copts,
-    repository = "@envoy",
     deps = [
         ":quiche_common_lib",
         ":quiche_common_mem_slice_storage",
@@ -5223,12 +5198,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quiche_common_mem_slice_storage",
     srcs = ["quiche/common/quiche_mem_slice_storage.cc"],
     hdrs = ["quiche/common/quiche_mem_slice_storage.h"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
