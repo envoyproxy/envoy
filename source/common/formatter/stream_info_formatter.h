@@ -193,6 +193,8 @@ private:
       "US_TX_END"; // Upstream request sending end.
   static constexpr absl::string_view FirstUpstreamRxByteReceived =
       "US_RX_BEG"; // Upstream response receiving begin.
+  static constexpr absl::string_view FirstUpstreamRxBodyReceived =
+      "US_RX_BODY_BEG"; // Upstream response body receiving begin.
   static constexpr absl::string_view LastUpstreamRxByteReceived =
       "US_RX_END"; // Upstream response receiving end.
   static constexpr absl::string_view FirstDownstreamTxByteSent =
