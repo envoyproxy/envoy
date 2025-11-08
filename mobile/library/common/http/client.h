@@ -272,6 +272,8 @@ private:
 
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
+    int32_t streamId() const override { return -1; }
+
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override;
 
