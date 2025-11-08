@@ -67,9 +67,10 @@ public:
                     absl::optional<size_t> max_length, GetMetadataFunction get);
 
   // StreamInfoFormatterProvider
-  absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override;
-  // Don't hide the other structure of formatValue.
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
   using StreamInfoFormatterProvider::formatValue;
+  absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
