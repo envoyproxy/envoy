@@ -157,7 +157,6 @@ Network::FilterStatus NetworkExtProcFilter::onData(Buffer::Instance& data, bool 
     return (state == StreamOpenState::Error) ? handleStreamError()
                                              : Network::FilterStatus::Continue;
   }
-  ENVOY_LOG(debug, "boteng calling sendRequest");
   sendRequest(data, end_stream, /*is_read=*/true);
   return Network::FilterStatus::StopIteration;
 }
