@@ -184,7 +184,7 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
     if (tool_config.route_->directResponseEntry() != nullptr) {
       tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.request_headers_,
                                                                    true);
-      sendLocalReply(tool_config, *tool_config.route_->directResponseEntry());
+      sendLocalReply(tool_config, *tool_config.route_->directResponseEntry(), stream_info);
       tool_config.route_->directResponseEntry()->finalizeResponseHeaders(
           *tool_config.response_headers_, formatter_context, stream_info);
     } else if (tool_config.route_->routeEntry() != nullptr) {
@@ -199,7 +199,8 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
 }
 
 void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
-                                     const Router::DirectResponseEntry& entry) {
+                                     const Router::DirectResponseEntry& entry,
+                                     Envoy::StreamInfo::StreamInfoImpl& stream_info) {
   auto encode_functions = Envoy::Http::Utility::EncodeFunctions{
       nullptr, nullptr,
       [&](Envoy::Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
@@ -213,7 +214,6 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
 
   bool is_grpc = false;
   bool is_head_request = false;
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   std::string direct_response_body =
       entry.formatBody(*tool_config.request_headers_, *tool_config.response_headers_, stream_info);
 
