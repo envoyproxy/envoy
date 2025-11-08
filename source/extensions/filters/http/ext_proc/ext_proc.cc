@@ -693,6 +693,16 @@ void Filter::deferredCloseStream() {
   config_->threadLocalStreamManager().deferredErase(stream_, filter_callbacks_->dispatcher());
 }
 
+void Filter::closeStreamMaybeGraceful() {
+  processing_complete_ = true;
+  if (config_->gracefulGrpcClose()) {
+    halfCloseAndWaitForRemoteClose();
+  } else {
+    // Perform immediate close on the stream otherwise.
+    closeStream();
+  }
+}
+
 void Filter::onDestroy() {
   ENVOY_STREAM_LOG(debug, "onDestroy", *decoder_callbacks_);
   // Make doubly-sure we no longer use the stream, as
@@ -720,12 +730,7 @@ void Filter::onDestroy() {
     // Second, perform stream deferred closure.
     deferredCloseStream();
   } else {
-    if (config_->gracefulGrpcClose()) {
-      halfCloseAndWaitForRemoteClose();
-    } else {
-      // Perform immediate close on the stream otherwise.
-      closeStream();
-    }
+    closeStreamMaybeGraceful();
   }
 }
 
@@ -1239,6 +1244,13 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   if (!processing_complete_ && encoding_state_.shouldRemoveContentLength()) {
     headers.removeContentLength();
   }
+
+  // If there is no external processing configured in the encoding path,
+  // closing the gRPC stream if it is still open.
+  if (encoding_state_.noExternalProcess()) {
+    closeStreamMaybeGraceful();
+  }
+
   return status;
 }
 
@@ -1440,7 +1452,8 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
 
   auto activation_ptr = Filters::Common::Expr::createActivation(
       &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
-      state.requestHeaders(), dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
+      state.callbacks()->streamInfo().getRequestHeaders(),
+      dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
       dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
   auto attributes = state.evaluateAttributes(config_->expressionManager(), *activation_ptr);
 
@@ -1525,7 +1538,96 @@ ProcessingMode effectiveModeOverride(const ProcessingMode& target_override,
   return mode_override;
 }
 
+// Returns true if this body response is the last message in the current direction (request or
+// response path). This means no further body chunks or trailers are expected in this direction.
+// For now, such check is only done for STREAMED or FULL_DUPLEX_STREAMED body mode. For any
+// other body mode, it always return false.
+bool isLastBodyResponse(ProcessorState& state,
+                        const envoy::service::ext_proc::v3::BodyResponse& body_response) {
+  switch (state.bodyMode()) {
+  case ProcessingMode::BUFFERED:
+  case ProcessingMode::BUFFERED_PARTIAL:
+    // TODO: - skip stream closing optimization for BUFFERED and BUFFERED_PARTIAL for now.
+    return false;
+  case ProcessingMode::STREAMED:
+    if (!state.chunkQueue().empty()) {
+      return state.chunkQueue().queue().front()->end_stream;
+    }
+    return false;
+  case ProcessingMode::FULL_DUPLEX_STREAMED: {
+    if (body_response.has_response() && body_response.response().has_body_mutation()) {
+      const auto& body_mutation = body_response.response().body_mutation();
+      if (body_mutation.has_streamed_response()) {
+        return body_mutation.streamed_response().end_of_stream();
+      }
+    }
+    return false;
+  }
+  default:
+    break;
+  }
+  return false;
+}
+
 } // namespace
+
+void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
+                                               const bool is_last_body_resp) {
+  // Bail out if the gRPC stream has already been closed. This can happen in scenarios
+  // like immediate responses or rejected header mutations.
+  if (stream_ == nullptr || !Runtime::runtimeFeatureEnabled(
+                                "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+    return;
+  }
+
+  bool last_response = false;
+
+  switch (response.response_case()) {
+  case ProcessingResponse::ResponseCase::kRequestHeaders:
+    if ((decoding_state_.hasNoBody() ||
+         (decoding_state_.bodyMode() == ProcessingMode::NONE && !decoding_state_.sendTrailers())) &&
+        encoding_state_.noExternalProcess()) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kRequestBody:
+    if (is_last_body_resp && encoding_state_.noExternalProcess()) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kRequestTrailers:
+    if (encoding_state_.noExternalProcess()) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kResponseHeaders:
+    if (encoding_state_.hasNoBody() ||
+        (encoding_state_.bodyMode() == ProcessingMode::NONE && !encoding_state_.sendTrailers())) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kResponseBody:
+    if (is_last_body_resp) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kResponseTrailers:
+    last_response = true;
+    break;
+  case ProcessingResponse::ResponseCase::kImmediateResponse:
+    // Immediate response currently may close the stream immediately.
+    // Leave it as it is for now.
+    break;
+  default:
+    break;
+  }
+
+  if (last_response) {
+    ENVOY_STREAM_LOG(debug, "Closing gRPC stream after receiving last response",
+                     *decoder_callbacks_);
+    closeStreamMaybeGraceful();
+  }
+}
 
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
@@ -1594,6 +1696,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   ENVOY_STREAM_LOG(debug, "Received {} response", *decoder_callbacks_,
                    responseCaseToString(response->response_case()));
+
+  bool is_last_body_resp = false;
   absl::Status processing_status;
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
@@ -1605,10 +1709,12 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
+    is_last_body_resp = isLastBodyResponse(decoding_state_, response->request_body());
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
+    is_last_body_resp = isLastBodyResponse(encoding_state_, response->response_body());
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
     break;
@@ -1634,11 +1740,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       ENVOY_STREAM_LOG(debug, "Sending immediate response", *decoder_callbacks_);
       processing_complete_ = true;
       onFinishProcessorCalls(Grpc::Status::Ok);
-      if (config_->gracefulGrpcClose()) {
-        halfCloseAndWaitForRemoteClose();
-      } else {
-        closeStream();
-      }
+      closeStreamMaybeGraceful();
       if (on_processing_response_) {
         on_processing_response_->afterReceivingImmediateResponse(
             response->immediate_response(), absl::OkStatus(), decoder_callbacks_->streamInfo());
@@ -1682,6 +1784,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     stats_.stream_msgs_received_.inc();
     handleErrorResponse(processing_status);
   }
+
+  // Close the gRPC stream if no more external processing needed.
+  closeGrpcStreamIfLastRespReceived(*response, is_last_body_resp);
 }
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& message) {
@@ -1716,6 +1821,10 @@ void Filter::onGrpcClose() { onGrpcCloseWithStatus(Grpc::Status::Aborted); }
 
 void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
   ENVOY_STREAM_LOG(debug, "Received gRPC stream close", *decoder_callbacks_);
+
+  if (processing_complete_) {
+    return;
+  }
 
   processing_complete_ = true;
   stats_.streams_closed_.inc();

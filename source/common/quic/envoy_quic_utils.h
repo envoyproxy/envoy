@@ -13,6 +13,7 @@
 
 #include "openssl/ssl.h"
 #include "quiche/common/http/http_header_block.h"
+#include "quiche/quic/core/http/quic_connection_migration_manager.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_config.h"
 #include "quiche/quic/core/quic_error_codes.h"
@@ -46,6 +47,14 @@ public:
   static constexpr absl::string_view inconsistent_content_length =
       "http3.inconsistent_content_length";
 };
+
+constexpr quic::QuicConnectionMigrationConfig quicConnectionMigrationDisableAllConfig() {
+  return quic::QuicConnectionMigrationConfig{
+      .allow_port_migration = false,
+      .migrate_session_on_network_change = false,
+      .allow_server_preferred_address = false,
+  };
+}
 
 // TODO(danzh): this is called on each write. Consider to return an address instance on the stack if
 // the heap allocation is too expensive.
