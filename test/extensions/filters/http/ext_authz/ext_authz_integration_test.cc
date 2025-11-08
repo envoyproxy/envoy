@@ -43,9 +43,10 @@ struct GrpcInitializeConfigOpts {
   uint32_t max_denied_response_body_bytes = 0;
   // In some tests a request is never sent. If a request is never sent, stats are not set. In those
   // tests, we need to be able to override this to false.
-  absl::optional<bool> expect_stats_override;
+  absl::optional<bool> expect_stats_override = absl::nullopt;
   // In timeout tests we expect zero response bytes.
   bool stats_expect_response_bytes = true;
+  bool enforce_response_header_limits = false;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -141,6 +142,10 @@ public:
         proto_config_.set_emit_filter_state_stats(true);
         *(*proto_config_.mutable_filter_metadata()->mutable_fields())["foo"]
              .mutable_string_value() = "bar";
+      }
+
+      if (opts.enforce_response_header_limits) {
+        proto_config_.set_enforce_response_header_limits(true);
       }
 
       // Add labels and verify they are passed.
@@ -2100,7 +2105,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAddExceedsLimit) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
       });
 
-  initializeConfig();
+  initializeConfig({.enforce_response_header_limits = true});
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
 
@@ -2144,7 +2149,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToSetExceedsLimit) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
       });
 
-  initializeConfig();
+  initializeConfig({.enforce_response_header_limits = true});
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
 
@@ -2195,7 +2200,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAppendIfAbsentExceedsLimit) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
       });
 
-  initializeConfig();
+  initializeConfig({.enforce_response_header_limits = true});
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
 

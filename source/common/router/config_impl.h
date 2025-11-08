@@ -405,6 +405,7 @@ using HeaderMutationsPtr = std::unique_ptr<Http::HeaderMutations>;
 class ShadowPolicyImpl : public ShadowPolicy {
 public:
   using RequestMirrorPolicy = envoy::config::route::v3::RouteAction::RequestMirrorPolicy;
+
   static absl::StatusOr<std::shared_ptr<ShadowPolicyImpl>>
   create(const RequestMirrorPolicy& config,
          Server::Configuration::CommonFactoryContext& factory_context);
@@ -612,6 +613,7 @@ public:
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers, const Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool keep_original_host_or_path) const override;
+
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting = true) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers, const Formatter::Context& context,
