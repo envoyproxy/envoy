@@ -391,6 +391,38 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamClose) {
   tcp_client->close();
 }
 
+// Test default message timeout (200ms) handling for TCP proxy
+TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDefaultMessageTimeout) {
+  initialize();
+
+  Envoy::IntegrationTcpClientPtr tcp_client =
+      makeTcpConnection(lookupPort("network_ext_proc_filter"));
+
+  Envoy::FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send data from client
+  ASSERT_TRUE(tcp_client->write("client_data_timeout_test", false));
+
+  // Wait for the processing request from ext_proc filter
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+  EXPECT_EQ(request.has_read_data(), true);
+  EXPECT_EQ(request.read_data().data(), "client_data_timeout_test");
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(250));
+
+  verifyCounters({{"streams_started", 1},
+                  {"stream_msgs_sent", 1},
+                  {"stream_msgs_received", 0}, // No response received due to timeout
+                  {"read_data_sent", 1},
+                  {"message_timeouts", 1}}); // Message timeout counter
+
+  ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+
+  tcp_client->close();
+}
+
 TEST_P(NetworkExtProcFilterIntegrationTest, MultipleClientConnections) {
   initialize();
 
