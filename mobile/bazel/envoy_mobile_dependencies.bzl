@@ -2,6 +2,8 @@ load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependen
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@build_bazel_rules_swift//swift:repositories.bzl", "swift_rules_dependencies")
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
+load("@rules_android//:prereqs.bzl", "rules_android_prereqs")
+load("@rules_android//:defs.bzl", "rules_android_workspace")
 load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
 load("@rules_java//java:repositories.bzl", "rules_java_dependencies")
 load("@rules_jvm_external//:defs.bzl", "maven_install")
@@ -48,8 +50,19 @@ def envoy_mobile_dependencies(extra_maven_dependencies = []):
     if not native.existing_rule("envoy_mobile_extra_jni_deps"):
         _default_extra_jni_deps(name = "envoy_mobile_extra_jni_deps")
 
+    android_dependencies()
     swift_dependencies()
     kotlin_dependencies(extra_maven_dependencies)
+
+def android_dependencies():
+    """Initialize rules_android dependencies and toolchains."""
+    rules_android_prereqs()
+    rules_android_workspace()
+    
+    native.register_toolchains(
+        "@rules_android//toolchains/android:android_default_toolchain",
+        "@rules_android//toolchains/android_sdk:android_sdk_tools",
+    )
 
 def swift_dependencies():
     apple_support_dependencies()
