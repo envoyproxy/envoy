@@ -523,7 +523,7 @@ private:
   uint64_t bytes_retransmitted_{};
   uint64_t packets_retransmitted_{};
   uint64_t bytes_sent_{};
-  int32_t stream_id_;
+  int32_t stream_id_{-1};
   Tracing::Reason trace_reason_;
   bool health_check_request_{};
   bool should_scheme_match_upstream_{false};
