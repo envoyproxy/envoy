@@ -1617,7 +1617,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "libpfm4-{version}",
         use_category = ["test_only"],
         urls = ["https://github.com/wcohen/libpfm4/archive/refs/tags/v{version}.tar.gz"],
-        release_date = "2020-11-02",
+        release_date = "2020-09-02",
     ),
     rules_license = dict(
         project_name = "rules_license",
