@@ -13,15 +13,8 @@ tasks:
     platform: ${{ unix_platform }}
     bazel: ${{ bazel }}
     build_targets:
-    - "@envoy_api//envoy/..."
+    - "@envoy_mobile//library/..."
     build_flags:
-    - "--java_runtime_version=remotejdk_21"
-    - "--cxxopt=-std=c++20"
-    - "--host_cxxopt=-std=c++20"
-    test_targets:
-    - "@envoy_api//test/..."
-    - "@envoy_api//tools/..."
-    test_flags:
     - "--java_runtime_version=remotejdk_21"
     - "--cxxopt=-std=c++20"
     - "--host_cxxopt=-std=c++20"
