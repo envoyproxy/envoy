@@ -36,7 +36,7 @@ AsyncFileManagerThreadPool::AsyncFileManagerThreadPool(
 
 AsyncFileManagerThreadPool::~AsyncFileManagerThreadPool() ABSL_LOCKS_EXCLUDED(queue_mutex_) {
   {
-    absl::MutexLock lock(&queue_mutex_);
+    absl::MutexLock lock(queue_mutex_);
     terminate_ = true;
   }
   // This destructor will be blocked by this loop until all queued file actions are complete.
@@ -54,7 +54,7 @@ void AsyncFileManagerThreadPool::waitForIdle() {
   const auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(queue_mutex_) {
     return active_workers_ == 0 && queue_.empty() && cleanup_queue_.empty();
   };
-  absl::MutexLock lock(&queue_mutex_);
+  absl::MutexLock lock(queue_mutex_);
   queue_mutex_.Await(absl::Condition(&condition));
 }
 
@@ -66,14 +66,14 @@ AsyncFileManagerThreadPool::enqueue(Event::Dispatcher* dispatcher,
     ASSERT(dispatcher == nullptr || dispatcher->isThreadSafe());
     state->store(QueuedAction::State::Cancelled);
   };
-  absl::MutexLock lock(&queue_mutex_);
+  absl::MutexLock lock(queue_mutex_);
   queue_.push(std::move(entry));
   return cancel_func;
 }
 
 void AsyncFileManagerThreadPool::postCancelledActionForCleanup(
     std::unique_ptr<AsyncFileAction> action) {
-  absl::MutexLock lock(&queue_mutex_);
+  absl::MutexLock lock(queue_mutex_);
   cleanup_queue_.push(std::move(action));
 }
 
@@ -136,14 +136,14 @@ void AsyncFileManagerThreadPool::worker() {
     return !queue_.empty() || !cleanup_queue_.empty() || terminate_;
   };
   {
-    absl::MutexLock lock(&queue_mutex_);
+    absl::MutexLock lock(queue_mutex_);
     active_workers_++;
   }
   while (true) {
     QueuedAction action;
     std::unique_ptr<AsyncFileAction> cleanup_action;
     {
-      absl::MutexLock lock(&queue_mutex_);
+      absl::MutexLock lock(queue_mutex_);
       active_workers_--;
       queue_mutex_.Await(absl::Condition(&condition));
       if (terminate_ && queue_.empty() && cleanup_queue_.empty()) {
