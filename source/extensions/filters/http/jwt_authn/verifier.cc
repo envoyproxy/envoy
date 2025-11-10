@@ -372,7 +372,8 @@ public:
   ExtractOnlyVerifierImpl(const AuthFactory& factory, const JwtProviderList& providers,
                           const BaseVerifierImpl* parent)
       : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)) {
-    ENVOY_LOG(info, "JWT filter configured for claim extraction only - signature validation is disabled");
+    ENVOY_LOG(info,
+              "JWT filter configured for claim extraction only - signature validation is disabled");
   }
 
   void verify(ContextSharedPtr context) const override {
@@ -382,25 +383,25 @@ public:
     // Set allow_failed=true and allow_missing=true to bypass validation
     // The key difference is we're telling the authenticator to extract claims
     // even when signature validation would fail
-    auto auth = auth_factory_.create(nullptr, absl::nullopt, 
-                                     true /* allow failed - this is critical */,
-                                     true /* allow missing */);
-    
+    auto auth =
+        auth_factory_.create(nullptr, absl::nullopt, true /* allow failed - this is critical */,
+                             true /* allow missing */);
+
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
         [&ctximpl](const std::string& name, const Protobuf::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
-        [this, &ctximpl](const Status& status) { 
+        [this, &ctximpl](const Status& status) {
           // Always treat as success for extract-only mode
           // This ensures claims are forwarded even if signature validation failed
-          ENVOY_LOG(debug, "JWT extraction completed with status: {}, treating as success", 
+          ENVOY_LOG(debug, "JWT extraction completed with status: {}, treating as success",
                     static_cast<int>(status));
-          onComplete(Status::Ok, ctximpl); 
+          onComplete(Status::Ok, ctximpl);
         },
         [&ctximpl]() { ctximpl.callback()->clearRouteCache(); });
-    
+
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {
