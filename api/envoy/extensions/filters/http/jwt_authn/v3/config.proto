@@ -611,9 +611,8 @@ message JwtRequirement {
     //
     // This mode will NOT:
     // - Verify the JWT signature
-    // - Validate the issuer (iss claim)
-    // - Check token expiration (exp claim)
-    // - Validate audience (aud claim)
+    // - Validate the (issuer) claim
+    // - Validate the (audience) claim
     // - Check not-before time (nbf claim)
     google.protobuf.Empty extract_only = 7;
   }
