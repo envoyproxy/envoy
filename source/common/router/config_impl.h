@@ -747,7 +747,7 @@ public:
   std::string& formatBody(const Http::RequestHeaderMap& request_headers,
                           const Http::ResponseHeaderMap& response_headers,
                           const StreamInfo::StreamInfo& stream_info,
-                          std::string& body) const override;
+                          std::string& body_out) const override;
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
