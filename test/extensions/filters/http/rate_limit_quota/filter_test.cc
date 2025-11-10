@@ -51,6 +51,7 @@ using ::testing::NiceMock;
 
 enum class MatcherConfigType {
   Valid,
+  ValidPreview,
   Invalid,
   Empty,
   NoMatcher,
@@ -61,6 +62,8 @@ enum class MatcherConfigType {
 class FilterTest : public testing::Test {
 public:
   FilterTest() {
+    // Enable keep_matching support for preview matcher testing.
+    visitor_.setSupportKeepMatching(true);
     // Add the grpc service config.
     TestUtility::loadFromYaml(std::string(GoogleGrpcConfig), config_);
   }
@@ -68,7 +71,7 @@ public:
   void addMatcherConfig(xds::type::matcher::v3::Matcher& matcher) {
     config_.mutable_bucket_matchers()->MergeFrom(matcher);
     match_tree_ = matcher_factory_.create(matcher)();
-    EXPECT_TRUE(visitor_.errors().empty());
+    ASSERT_TRUE(visitor_.errors().empty()) << "First error: " << visitor_.errors().at(0);
   }
 
   void addMatcherConfig(MatcherConfigType config_type) {
@@ -77,6 +80,10 @@ public:
     switch (config_type) {
     case MatcherConfigType::Valid: {
       TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
+      break;
+    }
+    case MatcherConfigType::ValidPreview: {
+      TestUtility::loadFromYaml(std::string(ValidPreviewMatcherConfig), matcher);
       break;
     }
     case MatcherConfigType::ValidOnNoMatchConfig: {
@@ -664,6 +671,142 @@ TEST_F(FilterTest, DecodeHeaderWithTokenBucketDeny) {
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
   EXPECT_EQ(bucket->quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 1);
   EXPECT_EQ(bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed), 1);
+}
+
+TEST_F(FilterTest, DecodeHeaderWithPreviewBucket) {
+  addMatcherConfig(MatcherConfigType::ValidPreview);
+  createFilter();
+  // Define the key value pairs that is used to build the bucket_id dynamically
+  // via `custom_value` in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+  buildCustomHeader(custom_value_pairs);
+
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({{"name", "prod"}});
+  absl::flat_hash_map<std::string, std::string> expected_preview_bucket_ids(expected_bucket_ids);
+  // The low priority config has a different bucket id intentionally.
+  expected_preview_bucket_ids.insert({{"preview_name", "preview_test"}});
+
+  // Expect request processing to check for an existing bucket, find none, and
+  // go through bucket creation for the preview bucket.
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  BucketId preview_bucket_id = bucketIdFromMap(expected_preview_bucket_ids);
+  size_t preview_bucket_id_hash = MessageUtil::hash(preview_bucket_id);
+
+  // Expect the new actionable bucket to fallback to DENY_ALL without a
+  // configured no_assignment_behavior & the preview bucket to fallback to
+  // ALLOW_ALL.
+  BucketAction expected_action;
+  expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::DENY_ALL);
+  *expected_action.mutable_bucket_id() = bucket_id;
+  BucketAction preview_expected_action;
+  preview_expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  *preview_expected_action.mutable_bucket_id() = preview_bucket_id;
+
+  // The bucket creation shouldn't try to include a fallback or
+  // no-assignment-default action as neither is set in the BucketMatcher.
+  EXPECT_CALL(*mock_local_client_, getBucket(preview_bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(preview_bucket_id),
+                           preview_bucket_id_hash, ProtoEq(preview_expected_action),
+                           testing::IsNull(), std::chrono::milliseconds::zero(), true))
+      .WillOnce(Return());
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id), bucket_id_hash,
+                           ProtoEq(expected_action), testing::IsNull(),
+                           std::chrono::milliseconds::zero(), false))
+      .WillOnce(Return());
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(FilterTest, DecodeHeaderWithPreviewTokenBucket) {
+  addMatcherConfig(MatcherConfigType::ValidPreview);
+  createFilter();
+  // Define the key value pairs that is used to build the bucket_id dynamically
+  // via `custom_value` in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+  buildCustomHeader(custom_value_pairs);
+
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({{"name", "prod"}});
+  absl::flat_hash_map<std::string, std::string> expected_preview_bucket_ids(expected_bucket_ids);
+
+  // The low priority config has a different bucket id intentionally.
+  expected_preview_bucket_ids.insert({{"preview_name", "preview_test"}});
+  // Expect request processing to check for both buckets, and create the missing actionable bucket.
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  // The preview bucket will have a pre-cached TokenBucket for testing.
+  BucketId preview_bucket_id = bucketIdFromMap(expected_preview_bucket_ids);
+  size_t preview_bucket_id_hash = MessageUtil::hash(preview_bucket_id);
+
+  // Expect the new actionable bucket to fallback to ALLOW_ALL.
+  // The preview bucket's TokenBucket should log a DENY action, but the actionable bucket should
+  // allow the traffic anyway.
+  BucketAction expected_action;
+  expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  *expected_action.mutable_bucket_id() = bucket_id;
+  BucketAction preview_expected_action;
+  preview_expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  *preview_expected_action.mutable_bucket_id() = preview_bucket_id;
+
+  auto cached_preview_action = std::make_unique<RateLimitQuotaResponse::BucketAction>();
+  TokenBucket* preview_token_bucket = cached_preview_action->mutable_quota_assignment_action()
+                                          ->mutable_rate_limit_strategy()
+                                          ->mutable_token_bucket();
+  preview_token_bucket->set_max_tokens(1);
+  preview_token_bucket->mutable_tokens_per_fill()->set_value(1);
+  preview_token_bucket->mutable_fill_interval()->set_seconds(60);
+  std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter =
+      std::make_shared<AtomicTokenBucketImpl>(1, dispatcher_.timeSource(), 1 / 60);
+  // All subsequent requests should deny for 60 (mock) seconds.
+  EXPECT_TRUE(token_bucket_limiter->consume());
+
+  RateLimitQuotaResponse::BucketAction no_assignment_action;
+  no_assignment_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+
+  std::shared_ptr<CachedBucket> cached_preview_bucket = std::make_shared<CachedBucket>(
+      preview_bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
+      std::move(cached_preview_action), nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, token_bucket_limiter);
+  // The actionable bucket has an allow-all no_assignment_action and no cached
+  // assignment, so the traffic should be allowed regardless of the previewed TokenBucket.
+  std::shared_ptr<CachedBucket> cached_allow_all_bucket = std::make_shared<CachedBucket>(
+      bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)), nullptr, nullptr,
+      std::chrono::milliseconds::zero(), no_assignment_action, nullptr);
+
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash))
+      .WillOnce(Return(cached_allow_all_bucket));
+  EXPECT_CALL(*mock_local_client_, getBucket(preview_bucket_id_hash))
+      .WillOnce(Return(cached_preview_bucket));
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(
+      cached_preview_bucket->quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 1);
+  EXPECT_EQ(cached_preview_bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed),
+            1);
+  EXPECT_EQ(
+      cached_allow_all_bucket->quota_usage->num_requests_allowed.load(std::memory_order_relaxed),
+      2);
+  EXPECT_EQ(
+      cached_allow_all_bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed), 0);
 }
 
 TEST_F(FilterTest, UnsupportedRequestsPerTimeUnit) {

@@ -674,6 +674,13 @@ envoy.filters.http.header_mutation:
   type_urls:
   - envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
   - envoy.extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute
+envoy.filters.http.transform:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.transform.v3.TransformConfig
 envoy.filters.listener.http_inspector:
   categories:
   - envoy.filters.listener
@@ -1729,13 +1736,20 @@ envoy.matching.inputs.transport_protocol:
   status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.TransportProtocolInput
-envoy.matching.inputs.application_protocol:
+envoy.matching.inputs.endpoint_metadata:
   categories:
-  - envoy.matching.network.input
+  - envoy.matching.transport_socket.input
   security_posture: unknown
   status: stable
   type_urls:
-  - envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+  - envoy.extensions.matching.common_inputs.transport_socket.v3.EndpointMetadataInput
+envoy.matching.inputs.locality_metadata:
+  categories:
+  - envoy.matching.transport_socket.input
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.transport_socket.v3.LocalityMetadataInput
 envoy.matching.inputs.filter_state:
   categories:
   - envoy.matching.http.input
@@ -1744,6 +1758,20 @@ envoy.matching.inputs.filter_state:
   status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+envoy.matching.inputs.transport_socket_filter_state:
+  categories:
+  - envoy.matching.transport_socket.input
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.transport_socket.v3.FilterStateInput
+envoy.matching.inputs.application_protocol:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
 envoy.matching.inputs.dynamic_metadata:
   categories:
   - envoy.matching.http.input
@@ -1897,6 +1925,13 @@ envoy.matching.actions.format_string:
   status: stable
   type_urls:
   - envoy.config.core.v3.SubstitutionFormatString
+envoy.matching.action.transport_socket.name:
+  categories:
+  - envoy.matching.action
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
 envoy.http.custom_response.redirect_policy:
   categories:
   - envoy.http.custom_response
