@@ -4,7 +4,6 @@ load(
     "envoy_cc_test_library",
     "envoy_contrib_package",
 )
-
 load(
     "//contrib:all_contrib_extensions.bzl",
     "envoy_contrib_linux_aarch64_constraints",

@@ -16,8 +16,8 @@ envoy_contrib_package()
 configure_make(
     name = "uadklib",
     autogen = True,
-    configure_in_place = True,
     configure_command = "conf.sh",
+    configure_in_place = True,
     lib_source = "@com_github_huawei_uadk//:all",
     out_shared_libs = [
         "libwd.so",

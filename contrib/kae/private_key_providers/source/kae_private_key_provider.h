@@ -1,18 +1,19 @@
 #pragma once
 
-#include <memory>
 #include <openssl/ossl_typ.h>
+
+#include <memory>
 
 #include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/private_key/private_key_config.h"
 
-#include "kae.h"
 #include "source/common/common/logger.h"
 
 #include "contrib/envoy/extensions/private_key_providers/kae/v3alpha/kae.pb.h"
 #include "contrib/kae/private_key_providers/source/libuadk.h"
+#include "kae.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +28,7 @@ public:
   void unregisterCallback();
   KaeHandle& getHandle() { return handle_; }
   EVP_PKEY* getPrivateKey() { return pkey_.get(); }
-  
+
 private:
   Ssl::PrivateKeyConnectionCallbacks& cb_;
   Event::Dispatcher& dispatcher_;
@@ -35,7 +36,7 @@ private:
   KaeHandle& handle_;
   bssl::UniquePtr<EVP_PKEY> pkey_;
 };
- 
+
 class KaePrivateKeyMethodProvider : public virtual Ssl::PrivateKeyMethodProvider,
                                     public Logger::Loggable<Logger::Id::connection> {
 public:

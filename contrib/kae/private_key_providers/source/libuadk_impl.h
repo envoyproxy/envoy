@@ -1,16 +1,16 @@
 #pragma once
 
-#include "contrib/kae/private_key_providers/source/libuadk.h"
-
-#include "uadk/v1/wd_rsa.h"
-#include "uadk/v1/wd.h"
-
-#include <cctype>
-#include <cstring>
-#include <fstream>
-#include <cstdint>
 #include <dirent.h>
 #include <sys/stat.h>
+
+#include <cctype>
+#include <cstdint>
+#include <cstring>
+#include <fstream>
+
+#include "contrib/kae/private_key_providers/source/libuadk.h"
+#include "uadk/v1/wd.h"
+#include "uadk/v1/wd_rsa.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -66,7 +66,7 @@ public:
       if (!all_digits) {
         continue;
       }
-      
+
       std::string file_path = std::string(KAE_PATH) + "/" + name + "/available_instances";
       std::ifstream infile(file_path);
       if (!infile.is_open()) {
@@ -127,9 +127,7 @@ public:
     return wd_get_available_dev_num(algorithm);
   }
 
-  int kaeRequestQueue(WdHandle handle) override {
-    return wd_request_queue(handle);
-  }
+  int kaeRequestQueue(WdHandle handle) override { return wd_request_queue(handle); }
 };
 
 } // namespace Kae
