@@ -78,7 +78,8 @@ protected:
 
 class FormatterCustomTag : public CustomTag {
 public:
-  FormatterCustomTag(absl::string_view tag, absl::string_view value);
+  FormatterCustomTag(absl::string_view tag, absl::string_view value,
+                     const Formatter::CommandParserPtrVector& command_parsers = {});
 
   absl::string_view tag() const override { return tag_; }
   void applySpan(Span& span, const CustomTagContext& ctx) const override;
@@ -96,7 +97,9 @@ public:
    * Create a custom tag according to the configuration.
    * @param tag a tracing custom tag configuration.
    */
-  static CustomTagConstSharedPtr createCustomTag(const envoy::type::tracing::v3::CustomTag& tag);
+  static CustomTagConstSharedPtr
+  createCustomTag(const envoy::type::tracing::v3::CustomTag& tag,
+                  const Formatter::CommandParserPtrVector& command_parsers = {});
 };
 
 } // namespace Tracing

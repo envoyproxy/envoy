@@ -69,3 +69,4 @@ HTTP filters
   thrift_to_metadata_filter
   upstream_codec_filter
   wasm_filter
+  transform_filter

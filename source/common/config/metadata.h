@@ -38,6 +38,15 @@ struct MetadataKey {
 class Metadata {
 public:
   /**
+   * Lookup value by a multi-key path in a Struct. If path is empty will return the entire struct.
+   * @param struct_value reference.
+   * @param path multi-key path.
+   * @return const Protobuf::Value& value if found, empty if not found.
+   */
+  static const Protobuf::Value& structValue(const Protobuf::Struct& struct_value,
+                                            const std::vector<std::string>& path);
+
+  /**
    * Lookup value of a key for a given filter in Metadata.
    * @param metadata reference.
    * @param filter name.

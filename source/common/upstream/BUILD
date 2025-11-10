@@ -431,14 +431,23 @@ envoy_cc_library(
 envoy_cc_library(
     name = "transport_socket_match_lib",
     srcs = ["transport_socket_match_impl.cc"],
+    hdrs = ["transport_socket_match_impl.h"],
     deps = [
         ":upstream_includes",
+        "//envoy/matcher:matcher_interface",
+        "//envoy/server:factory_context_interface",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
+        "//source/common/matcher:field_matcher_lib",
+        "//source/common/matcher:matcher_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//source/extensions/matching/common_inputs/transport_socket:config_lib",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/transport_socket/v3:pkg_cc_proto",
     ],
 )
 
@@ -480,11 +489,13 @@ envoy_cc_library(
         "//source/common/http/http2:codec_stats_lib",
         "//source/common/http/http3:codec_stats_lib",
         "//source/common/init:manager_lib",
+        "//source/common/matcher:matcher_lib",
         "//source/common/orca:orca_load_metrics_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/stats:deferred_creation",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/matching/common_inputs/transport_socket:config_lib",
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
@@ -492,6 +503,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/transport_socket/v3:pkg_cc_proto",
     ],
 )
 

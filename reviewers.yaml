@@ -26,6 +26,10 @@ ggreenway:
   slack: U78MBV869
 jmarantz:
   slack: U80HPLBPG
+jwendell:
+  maintainer: true
+  opsgenie: Jonh
+  slack: U7ZNNV4HF
 KBaichoo:
   maintainer: true
   opsgenie: Kevin

@@ -703,6 +703,25 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cluster_shadow_policy_integration_test",
+    size = "large",
+    srcs = ["cluster_shadow_policy_integration_test.cc"],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "upstream_http_filter_integration_test",
     size = "large",
     srcs = ["upstream_http_filter_integration_test.cc"],
@@ -827,6 +846,39 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "transport_socket_matcher_integration_test",
+    size = "large",
+    srcs = [
+        "transport_socket_matcher_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/matcher:matcher_lib",
+        "//source/common/upstream:transport_socket_match_lib",
+        "//source/extensions/load_balancing_policies/subset:config",
+        "//source/extensions/matching/common_inputs/transport_socket:config_lib",
+        "//source/extensions/matching/network/common:inputs_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//test/common/upstream:utility_lib",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],
 )
 
@@ -1802,7 +1854,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "extension_discovery_integration_test",
     size = "large",
-    srcs = ["extension_discovery_integration_test.cc"],
+    srcs = envoy_select_enable_http3(["extension_discovery_integration_test.cc"]),
     rbe_pool = "6gig",
     deps = [
         ":http_integration_lib",
@@ -1825,7 +1877,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_extension_discovery_integration_test",
     size = "large",
-    srcs = ["listener_extension_discovery_integration_test.cc"],
+    srcs = envoy_select_enable_http3(["listener_extension_discovery_integration_test.cc"]),
     rbe_pool = "2core",
     deps = [
         ":http_integration_lib",
@@ -2231,9 +2283,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_integration_test",
     size = "large",
-    srcs = envoy_select_admin_functionality([
-        "xds_integration_test.cc",
-    ]),
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//bazel:disable_admin_functionality": [],
+        "//conditions:default": ["xds_integration_test.cc"],
+    }),
     data = [
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
