@@ -628,6 +628,7 @@ public:
   MOCK_METHOD(socklen_t, sockAddrLen, (), (const));
   MOCK_METHOD(absl::string_view, addressType, (), (const));
   MOCK_METHOD(absl::optional<std::string>, networkNamespace, (), (const));
+  MOCK_METHOD(Address::InstanceConstSharedPtr, withNetworkNamespace, (const std::string&), (const));
 
   const std::string& asString() const override { return physical_; }
   absl::string_view asStringView() const override { return physical_; }
