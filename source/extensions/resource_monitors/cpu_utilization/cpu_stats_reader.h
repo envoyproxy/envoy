@@ -18,9 +18,11 @@ namespace CpuUtilizationMonitor {
 
 struct CpuTimes {
   bool is_valid;
+  bool is_cgroup_v2; // true if cgroup v2 is used, false if cgroup v1 is used
   double work_time; // For container cpu mode, to support normalisation of cgroup cpu usage stat per
                     // cpu core by dividing with available cpu limit
   uint64_t total_time;
+  double effective_cores; // number of effective cores available to the container
 };
 
 class CpuStatsReader {

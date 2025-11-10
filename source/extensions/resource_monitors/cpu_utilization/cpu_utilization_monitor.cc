@@ -50,7 +50,21 @@ void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks&
     callbacks.onFailure(error);
     return;
   }
-  const double current_utilization = work_over_period / total_over_period;
+  double current_utilization = 0.0;
+  if (cpu_times.is_cgroup_v2) {
+    const double total_over_period_seconds = total_over_period / 1000000000.0;
+    current_utilization =
+        ((work_over_period / 1000000.0) /
+         (total_over_period_seconds * cpu_times.effective_cores)); // Produces fraction 0.0-1.0
+    current_utilization = std::clamp(current_utilization, 0.0, 1.0);
+    ENVOY_LOG_MISC(trace, "cgroupsv2 current_utilization: {}", current_utilization);
+    ENVOY_LOG_MISC(trace, "cgroupsv2 work_over_period: {}", work_over_period);
+    ENVOY_LOG_MISC(trace, "cgroupsv2 total_over_period: {}", total_over_period);
+    ENVOY_LOG_MISC(trace, "cgroupsv2 effective_cores: {}", cpu_times.effective_cores);
+  } else { // cgroup v1
+    ENVOY_LOG_MISC(trace, "cgroupsv1 using old formula");
+    current_utilization = work_over_period / total_over_period;
+  }
   ENVOY_LOG_MISC(trace, "Prev work={}, Cur work={}, Prev Total={}, Cur Total={}",
                  previous_cpu_times_.work_time, cpu_times.work_time, previous_cpu_times_.total_time,
                  cpu_times.total_time);
