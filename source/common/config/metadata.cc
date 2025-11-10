@@ -32,7 +32,12 @@ const Protobuf::Value& Metadata::metadataValue(const envoy::config::core::v3::Me
   if (filter_it == metadata->filter_metadata().end()) {
     return Protobuf::Value::default_instance();
   }
-  const Protobuf::Struct* data_struct = &(filter_it->second);
+  return structValue(filter_it->second, path);
+}
+
+const Protobuf::Value& Metadata::structValue(const Protobuf::Struct& struct_value,
+                                             const std::vector<std::string>& path) {
+  const Protobuf::Struct* data_struct = &struct_value;
   const Protobuf::Value* val = nullptr;
   // go through path to select sub entries
   for (const auto& p : path) {
