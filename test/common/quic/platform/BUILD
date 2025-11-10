@@ -15,7 +15,7 @@ envoy_package()
 envoy_cc_test(
     name = "quic_platform_test",
     srcs = select({
-        "//bazel:linux": ["quic_platform_test.cc"],
+        "//bazel:http3_enabled_and_linux": ["quic_platform_test.cc"],
         "//conditions:default": [],
     }),
     copts = select({

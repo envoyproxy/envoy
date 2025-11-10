@@ -6020,6 +6020,111 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
   EXPECT_EQ(upstream_timing.last_upstream_tx_byte_sent_.value() -
                 upstream_timing.first_upstream_tx_byte_sent_.value(),
             std::chrono::milliseconds(32));
+  // Verify that first_upstream_rx_body_byte_received_ is set when response body arrives.
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_body_byte_received_.has_value());
+}
+
+// Verify that first upstream body timing is recorded correctly.
+TEST_F(RouterTest, UpstreamFirstBodyTiming) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+  ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  Http::TestRequestHeaderMapImpl headers{};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  test_time_.advanceTimeWait(std::chrono::milliseconds(10));
+  Buffer::OwnedImpl data;
+  router_->decodeData(data, true);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  // Advance time before sending response body to create measurable duration.
+  test_time_.advanceTimeWait(std::chrono::milliseconds(50));
+  // This triggers the body timing to be recorded.
+  response_decoder->decodeData(data, true);
+
+  // Verify timing was recorded.
+  auto& upstream_timing = stream_info.upstreamInfo()->upstreamTiming();
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_body_byte_received_.has_value());
+
+  // Verify the body timing is after header timing.
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_byte_received_.has_value());
+  EXPECT_GE(upstream_timing.first_upstream_rx_body_byte_received_.value(),
+            upstream_timing.first_upstream_rx_byte_received_.value());
+}
+
+// Verify streaming response scenario where headers and body arrive separately.
+TEST_F(RouterTest, UpstreamFirstBodyTimingForStreaming) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http2);
+  expectResponseTimerCreate();
+
+  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+  ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  // Simulate a streaming request.
+  Http::TestRequestHeaderMapImpl headers{};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  test_time_.advanceTimeWait(std::chrono::milliseconds(10));
+  Buffer::OwnedImpl data("request_data");
+  router_->decodeData(data, true);
+
+  // Simulate upstream sending response headers immediately.
+  test_time_.advanceTimeWait(std::chrono::milliseconds(5));
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+
+  // Verify first byte received timing is set (from headers).
+  auto& upstream_timing = stream_info.upstreamInfo()->upstreamTiming();
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_byte_received_.has_value());
+  EXPECT_FALSE(upstream_timing.first_upstream_rx_body_byte_received_.has_value());
+
+  // Simulate delay before first response body arrives.
+  test_time_.advanceTimeWait(std::chrono::milliseconds(100));
+
+  // First response body arrives.
+  Buffer::OwnedImpl response_data("first_response_chunk");
+  response_decoder->decodeData(response_data, false);
+
+  // Verify body timing is now set and is after headers.
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_body_byte_received_.has_value());
+  // The key assertion: body arrived later than headers.
+  EXPECT_GT(upstream_timing.first_upstream_rx_body_byte_received_.value(),
+            upstream_timing.first_upstream_rx_byte_received_.value());
+
+  // Verify the duration is approximately the time we waited (100ms).
+  auto body_delay = upstream_timing.first_upstream_rx_body_byte_received_.value() -
+                    upstream_timing.first_upstream_rx_byte_received_.value();
+  EXPECT_GE(body_delay, std::chrono::milliseconds(100));
+  EXPECT_LT(body_delay, std::chrono::milliseconds(110));
+
+  // Capture the first body byte timestamp before sending more data.
+  auto first_body_byte_time = upstream_timing.first_upstream_rx_body_byte_received_.value();
+
+  // Continue streaming more response chunks.
+  test_time_.advanceTimeWait(std::chrono::milliseconds(20));
+  response_decoder->decodeData(response_data, false);
+
+  // Verify that the first body byte timestamp hasn't changed after the second data chunk.
+  EXPECT_EQ(upstream_timing.first_upstream_rx_body_byte_received_.value(), first_body_byte_time);
+
+  // End the stream with trailers.
+  Http::ResponseTrailerMapPtr response_trailers(
+      new Http::TestResponseTrailerMapImpl{{"x-custom-trailer", "value"}});
+  response_decoder->decodeTrailers(std::move(response_trailers));
 }
 
 // Verify that upstream timing information is set into the StreamInfo when a

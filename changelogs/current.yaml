@@ -38,10 +38,22 @@ minor_behavior_changes:
     <envoy_v3_api_msg_service.ext_proc.v3.HeaderMutation>` fails. Removing
     request-specific details allows grouping by similar failure types. Detailed
     messages remain available in debug logs.
+- area: ext_proc
+  change: |
+    Closing the gRPC stream if Envoy detects no more external processing needed.
+    This doesn't apply to BUFFERED and BUFFERED_PARTIAL mode and a few corner cases for now.
+    For those cases, the stream will be closed during the filter destruction.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.ext_proc_stream_close_optimization`` to ``false``.
 - area: ext_authz
   change: |
     Check that the response header count is less than the configured limits before applying mutations, and do not
     add new headers if not.
+- area: ext_authz
+  change: |
+    Fixed HTTP ext_authz service to properly propagate headers (such as ``set-cookie``) back to clients. The
+    filter now correctly uses ``allowed_client_headers`` for denied responses and ``allowed_client_headers_on_success``
+    for successful authorization responses.
 - area: quic
   change: |
     Switch to use QUICHE provided migration logic to handle port migration upon path degrading and migration to Server
@@ -93,10 +105,6 @@ bug_fixes:
     Fixed per-route configuration for composite filter to support matching on response headers and trailers.
     Previously, per-route matchers would silently fail when attempting to match on ``HttpResponseHeaderMatchInput``
     or ``HttpResponseTrailerMatchInput``, causing the delegated filter to be skipped without error.
-- area: dns
-  change: |
-    c-ares resolver: add optional ``reinit_channel_on_timeout`` to reinitialize
-    the resolver after DNS timeouts.
 - area: router
   change: |
     Fixed a regression where router-set headers (e.g., ``x-envoy-expected-rq-timeout-ms``, ``x-envoy-attempt-count``)
@@ -130,6 +138,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: http filter
+  change: |
+    Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request
+    and response bodies in any position of HTTP filter chain.
+    This also make it possible to refresh routes based on the attributes in the request body.
 - area: access_log
   change: |
     Support process-level rate limiting on access log emission by
@@ -154,6 +167,10 @@ new_features:
   change: |
     Added support for the not-equal operator in access log filter rules, in
     :ref:`ComparisonFilter <envoy_v3_api_msg_config.accesslog.v3.ComparisonFilter>`.
+- area: c-ares
+  change: |
+    Add an optional ``reinit_channel_on_timeout`` to the c-ares resolver to reinitialize the channel
+    after DNS timeouts.
 - area: cel
   change: |
     Added per-expression configuration options for CEL evaluator to control string conversion, concatenation,
@@ -166,9 +183,11 @@ new_features:
 - area: formatter
   change: |
     Added support for the following new access log formatters:
-    - ``%REQUEST_HEADER(X?Y):Z%`` as full name version of ``%REQ(X?Y):Z%``
-    - ``%RESPONSE_HEADER(X?Y):Z%`` as full name version of ``%RESP(X?Y):Z%``
-    - ``%RESPONSE_TRAILER(X?Y):Z%`` as full name version of ``%TRAILER(X?Y):Z%``
+
+    #. ``%REQUEST_HEADER(X?Y):Z%`` as full name version of ``%REQ(X?Y):Z%``.
+    #. ``%RESPONSE_HEADER(X?Y):Z%`` as full name version of ``%RESP(X?Y):Z%``.
+    #. ``%RESPONSE_TRAILER(X?Y):Z%`` as full name version of ``%TRAILER(X?Y):Z%``.
+
     This provides a more consistent naming scheme for users to understand and use.
 - area: tracing
   change: |
@@ -201,6 +220,14 @@ new_features:
     This can avoid unnecessary load shedding or overload actions.
     To enable, set ``envoy.reloadable_features.fixed_heap_use_allocated`` to true.
     The default algorithm (heap_size - pageheap_unmapped - pageheap_free) does not discount for free memory in TCMalloc caches.
+- area: upstream
+  change: |
+    Added :ref:`transport_socket_matcher
+    <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matcher>` to clusters. This matcher
+    uses the generic xDS matcher framework to select a named transport socket from
+    :ref:`transport_socket_matches
+    <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` based on endpoint metadata,
+    locality metadata, and transport socket filter state.
 - area: admin
   change: |
     Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.
@@ -238,5 +265,17 @@ new_features:
   change: |
     Added :ref:`forward_bearer_token_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token_type>`
     to define with token type to forward.
+- area: router
+  change: |
+    Added :ref:`request_mirror_policies <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
+    to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
+    cluster-level request mirroring. Cluster-level policies override route-level policies when both are configured.
+- area: network
+  change: |
+    Add logging info for network ext_proc to filter state.
+- area: formatter
+  change: |
+    Added new ``US_RX_BODY_BEG`` time point to the ``%COMMON_DURATION%`` to indicate
+    the time point of upstream response body receiving begin.
 
 deprecated:

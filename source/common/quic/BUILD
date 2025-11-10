@@ -1,4 +1,3 @@
-load("@bazel_skylib//lib:selects.bzl", "selects")
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "LEGACY_ALWAYSLINK",
@@ -12,15 +11,6 @@ load(
 )
 
 licenses(["notice"])  # Apache 2
-
-# Create a condition for HTTP3 enabled AND Linux
-selects.config_setting_group(
-    name = "http3_enabled_and_linux",
-    match_all = [
-        "//bazel:linux",
-        "//bazel:enable_http3",
-    ],
-)
 
 # TODO(mattklein123): Default visibility for this package should not be public. We should have
 # default by private to within this package and package tests, and then only expose the libraries
@@ -599,7 +589,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "udp_gso_batch_writer_lib",
     srcs = select({
-        ":http3_enabled_and_linux": ["udp_gso_batch_writer.cc"],
+        "//bazel:http3_enabled_and_linux": ["udp_gso_batch_writer.cc"],
         "//conditions:default": [],
     }),
     hdrs = envoy_select_enable_http3(["udp_gso_batch_writer.h"]),
@@ -611,7 +601,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "@com_github_google_quiche//:quic_platform",
     ]) + select({
-        ":http3_enabled_and_linux": ["@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib"],
+        "//bazel:http3_enabled_and_linux": ["@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib"],
         "//conditions:default": [],
     }),
 )
