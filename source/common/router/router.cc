@@ -2386,13 +2386,13 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
         *cluster_->lrsReportMetricNames(), *orca_load_report, upstream_host->loadMetricStats());
   }
   if (host_lb_policy_data.has_value()) {
-    ENVOY_LOG(trace, "orca_load_report for {} report = {}", upstream_host->address()->asString(),
-              (*orca_load_report).DebugString());
+    ENVOY_STREAM_LOG(trace, "orca_load_report for {} report = {}", *callbacks_,
+                     upstream_host->address()->asString(), (*orca_load_report).DebugString());
     const absl::Status status =
         host_lb_policy_data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
     if (!status.ok()) {
-      ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
-                       status.message());
+      ENVOY_LOG_EVERY_POW_2(error, "Failed to invoke OrcaLoadReportCallbacks: {}",
+                            status.message());
     }
   }
 }
