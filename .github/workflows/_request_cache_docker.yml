@@ -39,7 +39,7 @@ on:
 # For a job that does, you can restore with something like:
 #
 #    steps:
-#    - uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.26
+#    - uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.29
 #      with:
 #        key: "${{ needs.env.outputs.build-image }}"
 #
@@ -51,13 +51,13 @@ jobs:
     name: "[${{ inputs.arch }}] Prime Docker cache"
     if: ${{ ! fromJSON(inputs.caches).docker[inputs.arch] }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.29
       id: appauth
       name: Appauth (mutex lock)
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/gh-actions/docker/cache/prime@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/docker/cache/prime@actions-v0.3.29
       id: docker
       name: Prime Docker cache (${{ inputs.image-tag }}${{ inputs.cache-suffix }})
       with:
@@ -65,7 +65,7 @@ jobs:
         key-suffix: ${{ inputs.cache-suffix }}
         lock-token: ${{ steps.appauth.outputs.token }}
         lock-repository: ${{ inputs.lock-repository }}
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.29
       id: data
       name: Cache data
       with:
@@ -73,7 +73,7 @@ jobs:
         input: |
           cached: ${{ steps.docker.outputs.cached }}
           key: ${{ inputs.image-tag }}${{ inputs.cache-suffix }}
-    - uses: envoyproxy/toolshed/gh-actions/json/table@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/json/table@actions-v0.3.29
       name: Summary
       with:
         json: ${{ steps.data.outputs.value }}
