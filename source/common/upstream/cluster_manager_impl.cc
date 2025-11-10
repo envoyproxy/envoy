@@ -1886,6 +1886,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
     const HostSharedPtr& host, absl::optional<ConnectionPool::DrainBehavior> drain_behavior) {
+  ENVOY_LOG(info, "draing or close all connections");
   // Drain or close any HTTP connection pool for the host.
   {
     const auto container = getHttpConnPoolsContainer(host);
