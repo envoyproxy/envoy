@@ -37,6 +37,13 @@ message CookieConfig {
 
   // The value used for the SameSite cookie attribute.
   SameSite same_site = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // The path attribute for the cookie.
+  // This controls the scope of the cookie and is useful for path-based routing scenarios
+  // where different logical boundaries or applications may operate with different OAuth2 clients.
+  //
+  // If not specified, defaults to ``/``.
+  string path = 2;
 }
 
 // [#next-free-field: 8]
