@@ -84,5 +84,10 @@ void Utility::appendValueToString(const Protobuf::Value& value, std::string& des
   }
 }
 
+void Utility::appendStructToString(const Protobuf::Struct& struct_value, std::string& dest) {
+  StringStreamer streamer(dest);
+  structValueToJson(struct_value, *streamer.makeRootMap());
+}
+
 } // namespace Json
 } // namespace Envoy

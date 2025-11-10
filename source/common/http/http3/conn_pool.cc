@@ -149,14 +149,15 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
 
   Network::Address::InstanceConstSharedPtr address =
       getHostAddress(host(), attempt_happy_eyeballs_);
+  const auto& transport_options = transportSocketOptions();
   auto upstream_local_address_selector = host()->cluster().getUpstreamLocalAddressSelector();
-  auto upstream_local_address =
-      upstream_local_address_selector->getUpstreamLocalAddress(address, socketOptions());
+  auto upstream_local_address = upstream_local_address_selector->getUpstreamLocalAddress(
+      address, socketOptions(), makeOptRefFromPtr(transport_options.get()));
 
   return Quic::createQuicNetworkConnection(
       quic_info_, std::move(crypto_config), server_id_, dispatcher(), address,
       upstream_local_address.address_, quic_stat_names, rtt_cache, scope,
-      upstream_local_address.socket_options_, transportSocketOptions(), connection_id_generator_,
+      upstream_local_address.socket_options_, transport_options, connection_id_generator_,
       host_->transportSocketFactory(), network_observer_registry_.ptr());
 }
 

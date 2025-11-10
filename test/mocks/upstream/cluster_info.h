@@ -57,7 +57,9 @@ public:
   MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address);
 
   MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddressImpl,
-              (const Network::Address::InstanceConstSharedPtr& address), (const));
+              (const Network::Address::InstanceConstSharedPtr& address,
+               OptRef<const Network::TransportSocketOptions>),
+              (const));
 
   Network::Address::InstanceConstSharedPtr& address_;
 };
@@ -176,6 +178,7 @@ public:
       OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
       happyEyeballsConfig, (), (const));
   MOCK_METHOD(OptRef<const std::vector<std::string>>, lrsReportMetricNames, (), (const));
+  MOCK_METHOD(const std::vector<Router::ShadowPolicyPtr>&, shadowPolicies, (), (const));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -243,6 +246,7 @@ public:
   absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
       happy_eyeballs_config_;
   const std::unique_ptr<Envoy::Orca::LrsReportMetricNames> lrs_report_metric_names_;
+  std::vector<Router::ShadowPolicyPtr> shadow_policies_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
