@@ -168,7 +168,7 @@ bool KaeHandle::initKaeInstance(LibUadkCryptoSharedPtr libuadk) {
   // Init Rsa Ctx
   rsa_setup_.is_crt = true;
   rsa_setup_.cb = static_cast<wcrypto_cb>(rsaCb);
-  rsa_setup_.key_bits = 2048; 
+  rsa_setup_.key_bits = 2048;
   rsa_setup_.br.alloc = kaeWdAllocBlk;
   rsa_setup_.br.free = kaeWdFreeBlk;
   rsa_setup_.br.iova_map = kaeDmaMap;
@@ -358,7 +358,7 @@ bool KaeContext::buildRsaOpBuf(int from_len, const unsigned char* from, RSA* rsa
     return false;
   }
   (*op_data)->in_bytes = padding != RSA_NO_PADDING ? rsa_len : from_len;
-  (*op_data)->op_type = WCRYPTO_RSA_SIGN; 
+  (*op_data)->op_type = WCRYPTO_RSA_SIGN;
 
   // Add RSA PKCS 1.5 padding if needed. The RSA PSS padding is already added.
   if (padding == RSA_PKCS1_PADDING) {

@@ -1,14 +1,14 @@
 #pragma once
 
+#include <openssl/ssl.h>
+#include <uadk/v1/wd.h>
+#include <uadk/v1/wd_rsa.h>
+
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/private_key/private_key_config.h"
 
 #include "contrib/kae/private_key_providers/source/libuadk.h"
-
-#include <openssl/ssl.h>
-#include <uadk/v1/wd.h>
-#include <uadk/v1/wd_rsa.h>
 
 namespace Envoy {
 namespace Extensions {

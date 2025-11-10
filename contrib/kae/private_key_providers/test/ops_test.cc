@@ -1,3 +1,11 @@
+#include <uadk/v1/wd.h>
+#include <uadk/v1/wd_rsa.h>
+
+#include <cstddef>
+#include <cstdlib>
+#include <memory>
+#include <string>
+
 #include "source/common/tls/private_key/private_key_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -9,13 +17,6 @@
 #include "contrib/kae/private_key_providers/source/kae_private_key_provider.h"
 #include "fake_factory.h"
 #include "gtest/gtest.h"
-
-#include <cstddef>
-#include <cstdlib>
-#include <memory>
-#include <string>
-#include <uadk/v1/wd.h>
-#include <uadk/v1/wd_rsa.h>
 
 namespace Envoy {
 namespace Extensions {

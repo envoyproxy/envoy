@@ -1,5 +1,12 @@
 #include "fake_factory.h"
 
+#include <uadk/v1/wd.h>
+#include <uadk/v1/wd_rsa.h>
+
+#include <cstdint>
+#include <cstdlib>
+#include <memory>
+
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
@@ -11,15 +18,8 @@
 #include "contrib/envoy/extensions/private_key_providers/kae/v3alpha/kae.pb.h"
 #include "contrib/envoy/extensions/private_key_providers/kae/v3alpha/kae.pb.validate.h"
 #include "contrib/kae/private_key_providers/source/kae_private_key_provider.h"
-
 #include "openssl/rsa.h"
 #include "openssl/ssl.h"
-
-#include <cstdint>
-#include <cstdlib>
-#include <memory>
-#include <uadk/v1/wd.h>
-#include <uadk/v1/wd_rsa.h>
 
 struct wcrypto_rsa_prikey { // NOLINT(readability-identifier-naming)
   struct wd_dtb p;
@@ -171,10 +171,14 @@ int FakeLibUadkCryptoImpl::kaeDoRsa(void* ctx, wcrypto_rsa_op_data* opdata, void
 
   decrypt_cb_ = rsa_setup_->cb;
 
-  BIGNUM* p = BN_bin2bn(reinterpret_cast<unsigned char*>(prikey_->p.data), prikey_->p.dsize, nullptr);
-  BIGNUM* q = BN_bin2bn(reinterpret_cast<unsigned char*>(prikey_->q.data), prikey_->q.dsize, nullptr);
-  BIGNUM* dmp1 = BN_bin2bn(reinterpret_cast<unsigned char*>(prikey_->dp.data), prikey_->dp.dsize, nullptr);
-  BIGNUM* dmq1 = BN_bin2bn(reinterpret_cast<unsigned char*>(prikey_->dq.data), prikey_->dq.dsize, nullptr);
+  BIGNUM* p =
+      BN_bin2bn(reinterpret_cast<unsigned char*>(prikey_->p.data), prikey_->p.dsize, nullptr);
+  BIGNUM* q =
+      BN_bin2bn(reinterpret_cast<unsigned char*>(prikey_->q.data), prikey_->q.dsize, nullptr);
+  BIGNUM* dmp1 =
+      BN_bin2bn(reinterpret_cast<unsigned char*>(prikey_->dp.data), prikey_->dp.dsize, nullptr);
+  BIGNUM* dmq1 =
+      BN_bin2bn(reinterpret_cast<unsigned char*>(prikey_->dq.data), prikey_->dq.dsize, nullptr);
   BIGNUM* iqmp =
       BN_bin2bn(reinterpret_cast<unsigned char*>(prikey_->qinv.data), prikey_->qinv.dsize, nullptr);
 

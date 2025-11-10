@@ -1,4 +1,3 @@
-#include "gmock/gmock.h"
 #include <string>
 
 #include "source/common/common/random_generator.h"
@@ -16,6 +15,7 @@
 
 #include "contrib/kae/private_key_providers/source/kae_private_key_provider.h"
 #include "fake_factory.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
