@@ -424,7 +424,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/path/uri_template_lib/proto @wbpcode @yanjunxiang-google
 
 # mobile
-/mobile/ @RyanTheOptimist @abeyad @fredyw
+/mobile/ @RyanTheOptimist @abeyad @danzh2010
 
 # Contrib
 /contrib/exe/ @mattklein123 @wbpcode
