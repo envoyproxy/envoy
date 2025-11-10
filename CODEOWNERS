@@ -369,7 +369,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @yanavlasov
 # Body transform
-/*/extensions/filters/http/transform @wbpcode @UNOWNED
+/*/extensions/filters/http/transform @wbpcode @yanavlasov @adisuissa
 # Health checkers
 /*/extensions/health_checkers/grpc @zuercher @botengyao
 /*/extensions/health_checkers/http @zuercher @botengyao

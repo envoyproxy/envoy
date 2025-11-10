@@ -105,10 +105,6 @@ bug_fixes:
     Fixed per-route configuration for composite filter to support matching on response headers and trailers.
     Previously, per-route matchers would silently fail when attempting to match on ``HttpResponseHeaderMatchInput``
     or ``HttpResponseTrailerMatchInput``, causing the delegated filter to be skipped without error.
-- area: dns
-  change: |
-    c-ares resolver: add optional ``reinit_channel_on_timeout`` to reinitialize
-    the resolver after DNS timeouts.
 - area: router
   change: |
     Fixed a regression where router-set headers (e.g., ``x-envoy-expected-rq-timeout-ms``, ``x-envoy-attempt-count``)
@@ -171,6 +167,10 @@ new_features:
   change: |
     Added support for the not-equal operator in access log filter rules, in
     :ref:`ComparisonFilter <envoy_v3_api_msg_config.accesslog.v3.ComparisonFilter>`.
+- area: c-ares
+  change: |
+    Add an optional ``reinit_channel_on_timeout`` to the c-ares resolver to reinitialize the channel
+    after DNS timeouts.
 - area: cel
   change: |
     Added per-expression configuration options for CEL evaluator to control string conversion, concatenation,
@@ -183,9 +183,11 @@ new_features:
 - area: formatter
   change: |
     Added support for the following new access log formatters:
-    - ``%REQUEST_HEADER(X?Y):Z%`` as full name version of ``%REQ(X?Y):Z%``
-    - ``%RESPONSE_HEADER(X?Y):Z%`` as full name version of ``%RESP(X?Y):Z%``
-    - ``%RESPONSE_TRAILER(X?Y):Z%`` as full name version of ``%TRAILER(X?Y):Z%``
+
+    #. ``%REQUEST_HEADER(X?Y):Z%`` as full name version of ``%REQ(X?Y):Z%``.
+    #. ``%RESPONSE_HEADER(X?Y):Z%`` as full name version of ``%RESP(X?Y):Z%``.
+    #. ``%RESPONSE_TRAILER(X?Y):Z%`` as full name version of ``%TRAILER(X?Y):Z%``.
+
     This provides a more consistent naming scheme for users to understand and use.
 - area: tracing
   change: |
@@ -259,6 +261,11 @@ new_features:
   change: |
     Added runtime guard ``envoy.reloadable_features.report_load_when_rq_active_is_non_zero``.
     When enabled, LRS continues to send locality_stats reoprt to config server when there is no request_issued in the poll cycle.
+- area: router
+  change: |
+    Added :ref:`request_mirror_policies <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
+    to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
+    cluster-level request mirroring. Cluster-level policies override route-level policies when both are configured.
 - area: network
   change: |
     Add logging info for network ext_proc to filter state.
