@@ -9,6 +9,19 @@
 
 #include "xds/type/matcher/v3/http_inputs.pb.h"
 
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "absl/container/flat_hash_map.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/matcher/matcher.h"
+#include "envoy/server/factory_context.h"
+#include "source/common/protobuf/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -16,6 +29,8 @@ namespace ProtoApiScrubber {
 namespace {
 using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionConfig;
+using envoy::extensions::filters::http::proto_api_scrubber::v3::MethodRestrictions;
+using envoy::extensions::filters::http::proto_api_scrubber::v3::MessageRestrictions;
 using Http::HttpMatchingData;
 using Protobuf::Map;
 using xds::type::matcher::v3::HttpAttributesCelMatchInput;
@@ -36,17 +51,64 @@ public:
   create(const ProtoApiScrubberConfig& proto_config,
          Server::Configuration::FactoryContext& context);
 
-  // Returns the match tree for a request payload field mask.
-  MatchTreeHttpMatchingDataSharedPtr getRequestFieldMatcher(const std::string& method_name,
-                                                            const std::string& field_mask) const;
+  virtual ~ProtoApiScrubberFilterConfig() = default;
 
-  // Returns the match tree for a response payload field mask.
-  MatchTreeHttpMatchingDataSharedPtr getResponseFieldMatcher(const std::string& method_name,
-                                                             const std::string& field_mask) const;
+  /**
+   * Returns the match tree associated with a specific field in a request message.
+   *
+   * This method is called to retrieve the CEL matcher configuration that determines
+   * whether a given field (identified by `field_mask`) within a specific gRPC
+   * request (identified by `method_name`) should be scrubbed.
+   *
+   * @param method_name The full gRPC method name (e.g., "package.service/Method").
+   * @param field_mask The field mask of the field in the request payload to check (e.g.,
+   * "user.address.street").
+   * @return A MatchTreeHttpMatchingDataSharedPtr if a matcher is configured for
+   * the specific method and field mask.
+   * Returns `nullptr` if no restriction is configured for this combination.
+   */
+  virtual MatchTreeHttpMatchingDataSharedPtr
+  getRequestFieldMatcher(const std::string& method_name, const std::string& field_mask) const;
+
+  /**
+   * Returns the match tree associated with a specific field in a response message.
+   *
+   * This method is called to retrieve the CEL matcher configuration that determines
+   * whether a given field (identified by `field_mask`) within a specific gRPC
+   * response (identified by `method_name`) should be scrubbed.
+   *
+   * @param method_name The full gRPC method name (e.g., "package.service/Method").
+   * @param field_mask The field mask of the field in the response payload to check (e.g.,
+   * "user.address.street").
+   * @return A MatchTreeHttpMatchingDataSharedPtr if a matcher is configured for
+   * the specific method and field mask.
+   * Returns `nullptr` if no restriction is configured for this combination.
+   */
+  virtual MatchTreeHttpMatchingDataSharedPtr
+  getResponseFieldMatcher(const std::string& method_name, const std::string& field_mask) const;
+
+  /**
+   * Returns the match tree associated with an entire method.
+   * @param method_name The full gRPC method name (e.g., "/package.service.Method").
+   * @return A MatchTreeHttpMatchingDataSharedPtr if a method-level matcher is configured.
+   * Returns `nullptr` otherwise.
+   */
+  virtual MatchTreeHttpMatchingDataSharedPtr
+  getMethodMatcher(const std::string& method_name) const;
+
+  /**
+   * Returns the match tree associated with a specific message type.
+   * @param message_name The fully qualified message name (e.g., "package.MyMessage").
+   * @return A MatchTreeHttpMatchingDataSharedPtr if a message-level matcher is configured.
+   * Returns `nullptr` otherwise.
+   */
+  virtual MatchTreeHttpMatchingDataSharedPtr
+  getMessageMatcher(const std::string& message_name) const;
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
 private:
+  friend class MockProtoApiScrubberFilterConfig;
   // Private constructor to make sure that this class is used in a factory fashion using the
   // public `create` method.
   ProtoApiScrubberFilterConfig() = default;
@@ -60,6 +122,9 @@ private:
   // For any invalid method name, it returns absl::InvalidArgument with an appropriate error
   // message.
   absl::Status validateMethodName(absl::string_view);
+
+  // Validates the fully qualified message name.
+  absl::Status validateMessageName(absl::string_view message_name);
 
   // Validates the field mask in the filter config.
   // The currently supported field mask is of format 'a.b.c'
@@ -77,10 +142,20 @@ private:
 
   // Initializes the method's request and response restrictions using the restrictions configured
   // in the proto config.
-  absl::Status initializeMethodRestrictions(absl::string_view method_name,
+  absl::Status initializeMethodFieldRestrictions(absl::string_view method_name,
                                             StringPairToMatchTreeMap& field_restrictions,
                                             const Map<std::string, RestrictionConfig>& restrictions,
                                             Server::Configuration::FactoryContext& context);
+
+  // Initializes the method-level restrictions.
+  absl::Status initializeMethodLevelRestrictions(
+      absl::string_view method_name, const MethodRestrictions& method_config,
+      Envoy::Server::Configuration::FactoryContext& context);
+
+  // Initializes the message-level restrictions.
+  absl::Status initializeMessageRestrictions(
+      const Map<std::string, MessageRestrictions>& message_configs,
+      Envoy::Server::Configuration::FactoryContext& context);
 
   FilteringMode filtering_mode_;
 
@@ -91,6 +166,12 @@ private:
 
   // A map from {method_name, field_mask} to the respective match tree for response fields.
   StringPairToMatchTreeMap response_field_restrictions_;
+
+  // A map from method_name to the respective match tree for method-level restrictions.
+  absl::flat_hash_map<std::string, MatchTreeHttpMatchingDataSharedPtr> method_level_restrictions_;
+
+  // A map from message_name to the respective match tree for message-level restrictions.
+  absl::flat_hash_map<std::string, MatchTreeHttpMatchingDataSharedPtr> message_level_restrictions_;
 };
 
 // A class to validate the input type specified for the unified matcher in the config.
