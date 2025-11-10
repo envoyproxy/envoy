@@ -102,7 +102,7 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   std::string& formatBody(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                          const StreamInfo::StreamInfo&, std::string& body) const override {
+                          const StreamInfo::StreamInfo&, std::string&) const override {
     return EMPTY_STRING;
   };
 };

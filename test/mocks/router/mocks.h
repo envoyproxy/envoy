@@ -73,7 +73,8 @@ public:
   MOCK_METHOD(std::string, formatBody,
               (const Http::RequestHeaderMap& request_headers,
                const Http::ResponseHeaderMap& response_headers,
-               const StreamInfo::StreamInfo& stream_info),
+               const StreamInfo::StreamInfo& stream_info,
+               std::string& body_out),
               (const));
 };
 

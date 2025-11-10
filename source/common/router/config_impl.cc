@@ -1052,22 +1052,15 @@ std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers) co
 std::string& RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& request_headers,
                                             const Http::ResponseHeaderMap& response_headers,
                                             const StreamInfo::StreamInfo& stream_info,
-                                            std::string& body) const {
-  if (direct_response_body_provider_ != nullptr) {
-    if (direct_response_body_formatter_ == nullptr) {
-      // No formatting, return the body from the provider directly.
-      return direct_response_body_provider_->data();
-    }
-    // Get a copy of the body from the provider for formatting.
-    body = direct_response_body_provider_->data();
+                                            std::string& body_out) const {
+  std::string& direct_body = direct_response_body_provider_ != nullptr ? direct_response_body_provider_->data() : EMPTY_STRING;
+  if (direct_response_body_formatter_ == nullptr) {
+      return direct_body;
   }
 
-  // If there is a formatter with or without a body, apply it.
-  if (direct_response_body_formatter_ != nullptr) {
-    body = direct_response_body_formatter_->format(
-        {&request_headers, &response_headers, nullptr, body}, stream_info);
-  }
-  return body;
+  body_out = direct_response_body_formatter_->format(
+        {&request_headers, &response_headers, nullptr, direct_body}, stream_info);
+  return body_out;
 }
 
 std::multimap<std::string, std::string>
