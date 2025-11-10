@@ -36,6 +36,12 @@ namespace {
 
 inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
 
+// Mock class for Matcher::Action to simulate actions other than RemoveFieldAction.
+class MockAction : public Matcher::Action {
+public:
+  MOCK_METHOD(absl::string_view, typeUrl, (), (const, override));
+};
+
 // Mock class for `Matcher::MatchTree` to reproduce different responses from the `match()` method.
 class MockMatchTree : public Matcher::MatchTree<HttpMatchingData> {
 public:
@@ -349,6 +355,63 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
           FieldCheckResults result = response_field_checker.CheckField({}, &field);
           EXPECT_EQ(result, FieldCheckResults::kInclude);
         });
+  }
+}
+
+// Tests that the field should be preserved if the action configured in the respective matcher is
+// unsupported by the ProtoApiScrubber filter. Ideally, this should not happen as it would fail
+// during filter initialization itself. However, to future-proof the runtime code, this test case is
+// added.
+TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
+  const std::string method_name = "example.v1.Service/GetFoo";
+  const std::string field_name = "user";
+
+  Protobuf::Field field;
+  field.set_name(field_name);
+
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+
+  {
+    // No match-action is configured.
+    Matcher::MatchResult match_result(Matcher::ActionConstSharedPtr{nullptr});
+
+    auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+    EXPECT_CALL(*mock_match_tree, match(testing::_, testing::Eq(nullptr)))
+        .WillRepeatedly(testing::Return(match_result));
+
+    EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name))
+        .WillOnce(testing::Return(mock_match_tree));
+
+    FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method_name,
+                               &mock_filter_config);
+
+    // Assert that kInclude is returned because standard matching behavior dictates that
+    // if an action is unknown to this specific filter, it should default to preserving the field.
+    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
+  }
+
+  {
+    // A match-action different from `RemoveFieldAction` is configured.
+    auto mock_action = std::make_shared<NiceMock<MockAction>>();
+    ON_CALL(*mock_action, typeUrl())
+        .WillByDefault(testing::Return("type.googleapis.com/google.protobuf.Empty"));
+
+    Matcher::MatchResult match_result(mock_action);
+
+    auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+    EXPECT_CALL(*mock_match_tree, match(testing::_, testing::Eq(nullptr)))
+        .WillRepeatedly(testing::Return(match_result));
+
+    EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name))
+        .WillOnce(testing::Return(mock_match_tree));
+
+    FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method_name,
+                               &mock_filter_config);
+
+    // Assert that kInclude is returned because standard matching behavior dictates that
+    // if an action is unknown to this specific filter, it should default to preserving the field.
+    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
   }
 }
 
