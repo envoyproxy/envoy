@@ -1049,14 +1049,20 @@ std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers) co
       headers);
 }
 
-std::string RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& request_headers,
-                                           const Http::ResponseHeaderMap& response_headers,
-                                           const StreamInfo::StreamInfo& stream_info) const {
-  std::string body;
+std::string& RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& request_headers,
+                                            const Http::ResponseHeaderMap& response_headers,
+                                            const StreamInfo::StreamInfo& stream_info,
+                                            std::string& body) const {
   if (direct_response_body_provider_ != nullptr) {
+    if (direct_response_body_formatter_ == nullptr) {
+      // No formatting, return the body from the provider directly.
+      return direct_response_body_provider_->data();
+    }
+    // Get a copy of the body from the provider for formatting.
     body = direct_response_body_provider_->data();
   }
 
+  // If there is a formatter with or without a body, apply it.
   if (direct_response_body_formatter_ != nullptr) {
     body = direct_response_body_formatter_->format(
         {&request_headers, &response_headers, nullptr, body}, stream_info);

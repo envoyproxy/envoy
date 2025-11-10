@@ -214,8 +214,9 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
 
   bool is_grpc = false;
   bool is_head_request = false;
-  std::string direct_response_body =
-      entry.formatBody(*tool_config.request_headers_, *tool_config.response_headers_, stream_info);
+  std::string body;
+  std::string& direct_response_body = entry.formatBody(
+      *tool_config.request_headers_, *tool_config.response_headers_, stream_info, body);
 
   Envoy::Http::Utility::LocalReplyData local_reply_data{
       is_grpc, entry.responseCode(), direct_response_body, absl::nullopt, is_head_request};

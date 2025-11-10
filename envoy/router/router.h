@@ -96,15 +96,20 @@ public:
   virtual std::string newUri(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
-   * Format the response body for direct responses. Implementations should set
-   * `body` to the raw body (if any) and apply any configured formatter to it.
+   * Format the response body for direct responses. Users should pass
+   * a string reference to populate, `body`, and the return value may
+   * or may not be the same reference based on if a formatter is applied.
+   * If a formatter is applied, the return value will be the same reference.
+   * If no formatter is applied, the return value will be the configured body.
    * @param request_headers supplies the request headers.
    * @param response_headers supplies the response headers.
    * @param stream_info holds additional information about the request.
+   * @param body the formatted body to be returned.
    */
-  virtual std::string formatBody(const Http::RequestHeaderMap& request_headers,
-                                 const Http::ResponseHeaderMap& response_headers,
-                                 const StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual std::string& formatBody(const Http::RequestHeaderMap& request_headers,
+                                  const Http::ResponseHeaderMap& response_headers,
+                                  const StreamInfo::StreamInfo& stream_info,
+                                  std::string& body) const PURE;
 
   /**
    * Do potentially destructive header transforms on Path header prior to redirection. For
