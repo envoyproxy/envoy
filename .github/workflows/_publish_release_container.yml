@@ -56,7 +56,7 @@ jobs:
     - name: Generate manifest configuration (dev)
       id: dev-config
       if: ${{ inputs.dev && inputs.target-branch == 'main' }}
-      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.28
+      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.29
       with:
         input-format: yaml
         filter: >-
@@ -126,7 +126,7 @@ jobs:
             - tools-dev-${{ github.sha }}
 
     - name: Generate manifest configuration (release)
-      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.28
+      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.29
       id: release-config
       if: ${{ ! inputs.dev || ! inputs.target-branch != 'main' }}
       with:
@@ -198,7 +198,7 @@ jobs:
             - tools-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
 
     - name: Collect and push OCI artifacts
-      uses: envoyproxy/toolshed/gh-actions/oci/collector@actions-v0.3.28
+      uses: envoyproxy/toolshed/gh-actions/oci/collector@actions-v0.3.29
       with:
         artifacts-pattern: oci.*
         manifest-config: ${{ steps.dev-config.outputs.value || steps.release-config.outputs.value }}
