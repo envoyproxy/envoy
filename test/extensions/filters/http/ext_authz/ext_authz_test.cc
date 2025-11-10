@@ -3052,6 +3052,77 @@ TEST_F(HttpFilterTest, FilterEnabledAndMetadataEnabled) {
             filter_->decodeHeaders(request_headers_, false));
 }
 
+// Test that filter_enabled_metadata correctly disables the filter at runtime when
+// metadata does not match.
+TEST_F(HttpFilterTest, DisabledByDefaultWithMetadataNotMatching) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled_metadata:
+    filter: "abc.xyz"
+    path:
+    - key: "k1"
+    value:
+      string_match:
+        exact: "check"
+  )EOF");
+
+  // Metadata doesn't match the required value.
+  const std::string yaml = R"EOF(
+  filter_metadata:
+    abc.xyz:
+      k1: skip
+  )EOF";
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(yaml, metadata);
+  ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(metadata));
+
+  // Make sure check is not called, and filter is disabled.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+  EXPECT_EQ(0, config_->stats().disabled_.value());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  // Disabled stat should have been incremented.
+  EXPECT_EQ(1, config_->stats().disabled_.value());
+}
+
+// Test that filter_enabled_metadata correctly enables the filter at runtime when
+// metadata matches.
+TEST_F(HttpFilterTest, DisabledByDefaultWithMetadataMatching) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled_metadata:
+    filter: "abc.xyz"
+    path:
+    - key: "k1"
+    value:
+      string_match:
+        exact: "check"
+  )EOF");
+
+  // Metadata matches the required value.
+  const std::string yaml = R"EOF(
+  filter_metadata:
+    abc.xyz:
+      k1: check
+  )EOF";
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(yaml, metadata);
+  ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(metadata));
+
+  prepareCheck();
+
+  // Make sure check is called once.
+  EXPECT_CALL(*client_, check(_, _, _, _));
+  // Filter should be enabled.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
 // Test that filter can deny for protected path when filter is disabled via filter_enabled field.
 TEST_F(HttpFilterTest, FilterDenyAtDisable) {
   initialize(R"EOF(
