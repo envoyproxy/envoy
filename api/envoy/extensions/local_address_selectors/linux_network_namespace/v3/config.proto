@@ -13,9 +13,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Linux Network Namespace Local Address Selector]
 // [#extension: envoy.upstream.local_address_selector.linux_network_namespace]
 
-// Overrides the upstream Linux network namespace using a filter state object with the key
-// ``envoy.network.upstream_network_namespace`` passed from the downstream over the :ref:`default
-// address selector <extension_envoy.upstream.local_address_selector.default_local_address_selecto>`
+// Overrides the upstream Linux network namespace using a filter state object
+// with the key ``envoy.network.upstream_network_namespace`` passed from the
+// downstream. The override applies over the :ref:`default address selector
+// <extension_envoy.upstream.local_address_selector.default_local_address_selector>`
 message Config {
 }
 
