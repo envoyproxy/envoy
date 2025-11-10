@@ -46,7 +46,7 @@ void KaeManager::kaePoll(KaeHandle& handle, std::chrono::milliseconds poll_delay
     }
     handle.getLibuadk()->kaeRsaPoll(handle.getHandle(), 0);
 
-    std::this_thread::sleep_for(poll_delay);
+    std::this_thread::sleep_for(poll_delay); // NO_CHECK_FORMAT(real_time)
   }
   ENVOY_LOG(debug, "join kae polling thread");
 }
