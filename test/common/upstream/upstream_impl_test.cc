@@ -6477,6 +6477,279 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyDisableShadowHostSuff
   EXPECT_EQ("shadow_cluster", policy->cluster());
 }
 
+// Test cluster-level hash policy with header hash.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterHashPolicyHeader) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: RING_HASH
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        hash_policy:
+          - header:
+              header_name: x-user-id
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* hash_policy = cluster->info()->hashPolicy();
+  ASSERT_NE(hash_policy, nullptr);
+
+  // Test hash generation with header.
+  Http::TestRequestHeaderMapImpl headers{{"x-user-id", "user123"}};
+  auto hash = hash_policy->generateHash(headers, {}, nullptr);
+  EXPECT_TRUE(hash.has_value());
+  EXPECT_NE(0, hash.value());
+
+  // Test that same header value produces same hash.
+  Http::TestRequestHeaderMapImpl headers2{{"x-user-id", "user123"}};
+  auto hash2 = hash_policy->generateHash(headers2, {}, nullptr);
+  EXPECT_TRUE(hash2.has_value());
+  EXPECT_EQ(hash.value(), hash2.value());
+
+  // Test that different header value produces different hash.
+  Http::TestRequestHeaderMapImpl headers3{{"x-user-id", "user456"}};
+  auto hash3 = hash_policy->generateHash(headers3, {}, nullptr);
+  EXPECT_TRUE(hash3.has_value());
+  EXPECT_NE(hash.value(), hash3.value());
+}
+
+// Test cluster-level hash policy with connection properties (source IP).
+TEST_P(ParametrizedClusterInfoImplTest, ClusterHashPolicySourceIp) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: RING_HASH
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        hash_policy:
+          - connection_properties:
+              source_ip: true
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* hash_policy = cluster->info()->hashPolicy();
+  ASSERT_NE(hash_policy, nullptr);
+}
+
+// Test cluster-level hash policy with cookie hash.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterHashPolicyCookie) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        hash_policy:
+          - cookie:
+              name: session-id
+              ttl: 3600s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* hash_policy = cluster->info()->hashPolicy();
+  ASSERT_NE(hash_policy, nullptr);
+}
+
+// Test cluster-level hash policy with query parameter hash.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterHashPolicyQueryParam) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: RING_HASH
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        hash_policy:
+          - query_parameter:
+              name: user_id
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* hash_policy = cluster->info()->hashPolicy();
+  ASSERT_NE(hash_policy, nullptr);
+}
+
+// Test cluster-level hash policy with multiple policies.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterMultipleHashPolicies) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: RING_HASH
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        hash_policy:
+          - header:
+              header_name: x-user-id
+            terminal: false
+          - header:
+              header_name: x-session-id
+            terminal: true
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* hash_policy = cluster->info()->hashPolicy();
+  ASSERT_NE(hash_policy, nullptr);
+
+  // Test that first policy is used when header is present.
+  Http::TestRequestHeaderMapImpl headers{{"x-user-id", "user123"}};
+  auto hash = hash_policy->generateHash(headers, {}, nullptr);
+  EXPECT_TRUE(hash.has_value());
+
+  // Test that second policy is used when first is absent.
+  Http::TestRequestHeaderMapImpl headers2{{"x-session-id", "session456"}};
+  auto hash2 = hash_policy->generateHash(headers2, {}, nullptr);
+  EXPECT_TRUE(hash2.has_value());
+
+  // Hashes should be different since they're based on different headers.
+  EXPECT_NE(hash.value(), hash2.value());
+}
+
+// Test cluster with no hash policy.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterNoHashPolicy) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* hash_policy = cluster->info()->hashPolicy();
+  EXPECT_EQ(nullptr, hash_policy);
+}
+
+// Test cluster-level hash policy with filter state hash.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterHashPolicyFilterState) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: RING_HASH
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        hash_policy:
+          - filter_state:
+              key: io.envoy.test.hashable_object
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* hash_policy = cluster->info()->hashPolicy();
+  ASSERT_NE(hash_policy, nullptr);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
