@@ -359,6 +359,9 @@ envoy_cmake(
         # More details https://github.com/envoyproxy/envoy-mobile/issues/116
         "_GNU_SOURCE": "on",
     },
+    env = {
+        "LDFLAGS": "$${LDFLAGS} -fuse-ld=lld",
+    },
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {
             "Pool": "linux_x64_large",
