@@ -122,7 +122,8 @@ TEST(ConfigTest, NamespaceOverrideEffective) {
   }
   {
     SCOPED_TRACE("IPv4 try to override with a bad filter state");
-    validateNamespaceOverride(BadValue, false, "1.2.3.4", 8000, nullptr, "/var/run/netns/2");
+    validateNamespaceOverride(std::string(BadValue), false, "1.2.3.4", 8000, nullptr,
+                              "/var/run/netns/2");
   }
   {
     SCOPED_TRACE("IPv6 override present");

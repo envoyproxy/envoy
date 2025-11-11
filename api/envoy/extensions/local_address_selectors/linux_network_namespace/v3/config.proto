@@ -5,7 +5,7 @@ package envoy.extensions.local_address_selectors.linux_network_namespace.v3;
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.local_address_selectors.linux_network_namespace.v3";
-option java_outer_classname = "Config";
+option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/local_address_selectors/linux_network_namespace/v3;linux_network_namespacev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
@@ -19,4 +19,3 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <extension_envoy.upstream.local_address_selector.default_local_address_selector>`
 message Config {
 }
-
