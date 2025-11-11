@@ -484,7 +484,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     stats_.rq_direct_response_.inc();
     direct_response->rewritePathHeader(headers, !config_->suppress_envoy_headers_);
     std::string body;
-    std::string& direct_response_body = direct_response->formatBody(
+    absl::string_view direct_response_body = direct_response->formatBody(
         (downstream_headers_ == nullptr) ? *Http::StaticEmptyHeaders::get().request_headers
                                          : *downstream_headers_,
         *Http::StaticEmptyHeaders::get().response_headers, callbacks_->streamInfo(), body);
