@@ -243,15 +243,16 @@ public:
     autonomous_upstream_ = false;
     config_helper_.prependFilter(R"EOF(
 name: encode-headers-return-stop-iteration-filter
-)EOF", false);
+)EOF",
+                                 false);
 
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-           hcm) {
+               hcm) {
           auto* route = hcm.mutable_route_config()
-                        ->mutable_virtual_hosts(0)
-                        ->mutable_routes(0)
-                        ->mutable_route();
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_route();
           route->mutable_timeout()->set_seconds(60);
           auto* retry_policy = route->mutable_retry_policy();
           retry_policy->set_retry_on("5xx,connect-failure,refused-stream");

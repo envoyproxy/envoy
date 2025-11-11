@@ -1,10 +1,6 @@
-#include <chrono>
-#include <string>
-
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-#include "test/integration/filters/common.h"
 
-#include "gtest/gtest.h"
+#include "test/integration/filters/common.h"
 
 namespace Envoy {
 
@@ -21,8 +17,10 @@ public:
 };
 
 static Registry::RegisterFactory<SimpleFilterConfig<EncodeHeadersReturnStopIterationFilter>,
-    Server::Configuration::NamedHttpFilterConfigFactory> register_;
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
+    register_;
 static Registry::RegisterFactory<SimpleFilterConfig<EncodeHeadersReturnStopIterationFilter>,
-    Server::Configuration::UpstreamHttpFilterConfigFactory> register_upstream_;
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 
 } // namespace Envoy
