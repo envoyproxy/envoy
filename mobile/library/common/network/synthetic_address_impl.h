@@ -56,9 +56,7 @@ public:
 
   absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
 
-  InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
-    return nullptr;
-  }
+  InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override { return nullptr; }
 
 private:
   const std::string address_{"synthetic"};
