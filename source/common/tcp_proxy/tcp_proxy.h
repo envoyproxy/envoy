@@ -361,10 +361,12 @@ public:
     return shared_config_->proxyProtocolTLVs();
   }
 
-  const absl::optional<envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger>&
-  upstreamConnectTrigger() const {
-    return upstream_connect_trigger_;
+  envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode
+  upstreamConnectMode() const {
+    return upstream_connect_mode_;
   }
+
+  const absl::optional<uint32_t>& maxEarlyDataBytes() const { return max_early_data_bytes_; }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -418,8 +420,9 @@ private:
   Random::RandomGenerator& random_generator_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
   Regex::Engine& regex_engine_; // Static lifetime object, safe to store as a reference
-  absl::optional<envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger>
-      upstream_connect_trigger_;
+  envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode upstream_connect_mode_{
+      envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE};
+  absl::optional<uint32_t> max_early_data_bytes_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -735,11 +738,8 @@ protected:
   HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
 
   // Connection establishment mode configuration.
-  using ConnectMode = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::
-      UpstreamConnectMode;
-
-  ConnectMode connect_mode_{
-      envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger::IMMEDIATE};
+  envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode connect_mode_{
+      envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE};
   bool waiting_for_tls_handshake_{false};
   bool tls_handshake_complete_{false};
   bool initial_data_received_{false};

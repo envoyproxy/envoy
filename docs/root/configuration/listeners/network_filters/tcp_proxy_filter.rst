@@ -55,31 +55,37 @@ There are two ways to configure delayed upstream connection establishment:
 Explicit configuration
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The preferred method is to use the :ref:`upstream_connect_trigger
-<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_trigger>`
-configuration field. This provides explicit control over when the upstream connection is established.
+The preferred method is to use :ref:`upstream_connect_mode
+<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`
+and :ref:`max_early_data_bytes
+<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>`
+configuration fields. These provide explicit control over when the upstream connection is established
+and how early data is buffered.
 
-The following modes are supported:
+**Upstream Connection Modes:**
 
 * ``IMMEDIATE`` (Default): Establish the upstream connection immediately when the downstream connection is accepted.
   This provides the lowest latency and is the default behavior for backward compatibility.
 * ``ON_DOWNSTREAM_DATA``: Wait for initial data from the downstream connection before establishing the upstream
   connection. This allows preceding filters to inspect the initial data before the upstream connection is established.
-  The filter buffers downstream data until the upstream connection is ready.
+  This mode **requires** ``max_early_data_bytes`` to be set.
 * ``ON_DOWNSTREAM_TLS_HANDSHAKE``: Wait for the downstream TLS handshake to complete before establishing the upstream
   connection. This allows access to the full TLS connection information, including client certificates and negotiated
   parameters. This mode is only effective when the downstream connection uses TLS. For non-TLS connections, it behaves
   the same as ``IMMEDIATE``.
-* ``ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE``: Wait for both initial data and TLS handshake completion before establishing
-  the upstream connection. This provides maximum information about the downstream connection before connecting upstream.
-  For non-TLS connections, this mode behaves the same as ``ON_DOWNSTREAM_DATA``.
 
-Additional configuration options:
+**Early Data Buffering:**
 
-* ``max_wait_time``: Maximum time to wait for the trigger condition before forcing the upstream connection. This prevents
-  indefinite waiting if the trigger condition is never met.
-* ``downstream_data_config``: Configuration specific to data-triggered modes i.e., ``ON_DOWNSTREAM_DATA`` and
-  ``ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE``.
+The ``max_early_data_bytes`` field controls whether the filter chain can read downstream data before the upstream
+connection is established (``receive_before_connect`` mode). When set, downstream data is buffered up to the specified
+limit and forwarded once the upstream connection is ready. When the buffer exceeds this limit, the downstream connection
+is read-disabled to prevent excessive memory usage.
+
+This field is **independent** of ``upstream_connect_mode``. You can enable early data buffering with any connection mode:
+
+* ``IMMEDIATE`` with early data buffering: Connect immediately but still buffer early data for filter inspection
+* ``ON_DOWNSTREAM_TLS_HANDSHAKE`` with early data buffering: Wait for TLS handshake while buffering data
+* ``ON_DOWNSTREAM_DATA``: Must have early data buffering enabled (validated at config load time)
 
 Example configuration:
 
@@ -90,17 +96,13 @@ Example configuration:
     "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
     stat_prefix: tcp
     cluster: upstream_cluster
-    upstream_connect_trigger:
-      mode: ON_DOWNSTREAM_DATA
-      max_wait_time: 5s
-      downstream_data_config:
-        max_buffered_bytes: 8192
+    upstream_connect_mode: ON_DOWNSTREAM_DATA
+    max_early_data_bytes: 8192
 
 .. attention::
 
-  Data-triggered modes (``ON_DOWNSTREAM_DATA`` and ``ON_DOWNSTREAM_DATA_AND_TLS_HANDSHAKE``) are not suitable for
-  server-first protocols where the server sends the initial greeting (e.g., SMTP, MySQL, POP3). For such protocols,
-  use ``IMMEDIATE`` mode or the connection will wait until timeout.
+  The ``ON_DOWNSTREAM_DATA`` mode is not suitable for server-first protocols where the server sends the initial
+  greeting (e.g., SMTP, MySQL, POP3). For such protocols, use ``IMMEDIATE`` mode.
 
 Filter state configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -120,7 +122,7 @@ established. This is to protect the early buffer from overflowing.
 
 .. note::
 
-  When using the explicit configuration method (``upstream_connect_trigger``), the filter state approach
+  When using the explicit configuration method (``max_early_data_bytes``), the filter state approach
   is ignored. The two methods are mutually exclusive, with the explicit configuration taking precedence.
 
 .. _config_network_filters_tcp_proxy_tunneling_over_http:

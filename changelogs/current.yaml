@@ -161,10 +161,13 @@ new_features:
     custom metric conversion.
 - area: tcp_proxy
   change: |
-    Added :ref:`upstream_connect_trigger
-    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_trigger>`
-    to control when upstream connections are established. This enables use cases like extracting
-    TLS certificate information or SNI before establishing upstream connections.
+    Added :ref:`upstream_connect_mode
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`
+    and :ref:`max_early_data_bytes
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>`
+    to control when upstream connections are established and early data buffering behavior.
+    This enables use cases like extracting TLS certificate information or SNI before establishing
+    upstream connections.
 - area: http
   change: |
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to

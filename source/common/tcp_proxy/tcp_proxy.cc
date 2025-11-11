@@ -241,8 +241,19 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     hash_policy_ = std::make_unique<Network::HashPolicyImpl>(config.hash_policy());
   }
 
-  if (config.has_upstream_connect_trigger()) {
-    upstream_connect_trigger_ = config.upstream_connect_trigger();
+  // Parse upstream connection establishment configuration.
+  upstream_connect_mode_ = config.upstream_connect_mode();
+
+  if (config.has_max_early_data_bytes()) {
+    max_early_data_bytes_ = config.max_early_data_bytes().value();
+  }
+
+  // Validate: ON_DOWNSTREAM_DATA requires max_early_data_bytes to be set.
+  if (upstream_connect_mode_ ==
+          envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA &&
+      !max_early_data_bytes_.has_value()) {
+    throw EnvoyException(
+        "max_early_data_bytes must be set when upstream_connect_mode is ON_DOWNSTREAM_DATA");
   }
 }
 
@@ -401,62 +412,46 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   ASSERT(getStreamInfo().getUpstreamBytesMeter() != nullptr);
 
   // Initialize connection establishment mode.
-  if (config_->upstreamConnectTrigger().has_value()) {
-    const auto& trigger_config = config_->upstreamConnectTrigger().value();
-    connect_mode_ = trigger_config.mode();
+  connect_mode_ = config_->upstreamConnectMode();
 
-    // Parse downstream data config if applicable.
-    using Trigger = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger;
-
-    if (connect_mode_ == Trigger::ON_DOWNSTREAM_DATA &&
-        trigger_config.has_downstream_data_config()) {
-      const auto& data_config = trigger_config.downstream_data_config();
-      max_buffered_bytes_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(data_config, max_buffered_bytes, 65536);
-    }
-
-    // Determine if we should wait for data/TLS.
-    const bool should_wait_for_data = connect_mode_ == Trigger::ON_DOWNSTREAM_DATA;
-    const bool should_wait_for_tls = connect_mode_ == Trigger::ON_DOWNSTREAM_TLS_HANDSHAKE;
-
-    if (should_wait_for_data) {
-      receive_before_connect_ = true;
-      ENVOY_CONN_LOG(debug, "waiting for downstream data before connecting",
-                     read_callbacks_->connection());
-    }
-
-    if (should_wait_for_tls) {
-      // Check if the downstream connection actually uses TLS.
-      // If not, we should not wait for TLS handshake.
-      const auto ssl_connection = read_callbacks_->connection().ssl();
-      if (ssl_connection != nullptr) {
-        waiting_for_tls_handshake_ = true;
-        ENVOY_CONN_LOG(debug, "waiting for downstream TLS handshake before connecting",
-                       read_callbacks_->connection());
-        // TODO: Register callback for TLS handshake completion.
-      } else {
-        // Non-TLS connection - TLS handshake mode behaves as IMMEDIATE.
-        ENVOY_CONN_LOG(debug,
-                       "downstream connection is not TLS, treating TLS handshake mode as IMMEDIATE",
-                       read_callbacks_->connection());
-        // TLS mode becomes IMMEDIATE for non-TLS.
-        connect_mode_ = Trigger::IMMEDIATE;
-      }
-    }
+  // Check if early data buffering is enabled.
+  if (config_->maxEarlyDataBytes().has_value()) {
+    receive_before_connect_ = true;
+    max_buffered_bytes_ = config_->maxEarlyDataBytes().value();
+    ENVOY_CONN_LOG(debug, "receive_before_connect enabled with max buffer size: {}",
+                   read_callbacks_->connection(), max_buffered_bytes_);
   } else {
-    // Legacy behavior to check filter state for receive_before_connect.
+    // Legacy behavior: check filter state for receive_before_connect.
     const StreamInfo::BoolAccessor* receive_before_connect =
         read_callbacks_->connection()
             .streamInfo()
             .filterState()
             ->getDataReadOnly<StreamInfo::BoolAccessor>(ReceiveBeforeConnectKey);
 
-    // If receive_before_connect is set, we will not read disable the downstream connection
-    // as a filter before TCP_PROXY has set this state so that it can process data before
-    // the upstream connection is established.
     if (receive_before_connect != nullptr && receive_before_connect->value()) {
       ENVOY_CONN_LOG(debug, "receive_before_connect is enabled (legacy)",
                      read_callbacks_->connection());
       receive_before_connect_ = true;
+      // Use default buffer size for legacy mode.
+      max_buffered_bytes_ = 65536;
+    }
+  }
+
+  // Handle TLS handshake wait mode.
+  using Mode = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode;
+  if (connect_mode_ == Mode::ON_DOWNSTREAM_TLS_HANDSHAKE) {
+    const auto ssl_connection = read_callbacks_->connection().ssl();
+    if (ssl_connection != nullptr) {
+      waiting_for_tls_handshake_ = true;
+      ENVOY_CONN_LOG(debug, "waiting for downstream TLS handshake before connecting",
+                     read_callbacks_->connection());
+      // TODO: Register callback for TLS handshake completion.
+    } else {
+      // Non-TLS connection - TLS handshake mode behaves as IMMEDIATE.
+      ENVOY_CONN_LOG(debug,
+                     "downstream connection is not TLS, treating TLS handshake mode as IMMEDIATE",
+                     read_callbacks_->connection());
+      connect_mode_ = Mode::IMMEDIATE;
     }
   }
 
@@ -979,31 +974,23 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     ENVOY_CONN_LOG(trace, "Early data received. Length: {}", read_callbacks_->connection(),
                    data.length());
 
-    // Mark that we've received initial data.
-    if (!initial_data_received_ && data.length() > 0) {
-      initial_data_received_ = true;
-      // Check if we should now establish the upstream connection.
-      checkUpstreamConnectionTrigger();
-    }
-
     // Buffer data received before upstream connection exists.
     early_data_buffer_.move(data);
 
+    // Mark that we've received initial data and trigger connection if needed.
+    if (!initial_data_received_ && early_data_buffer_.length() > 0) {
+      initial_data_received_ = true;
+      ENVOY_CONN_LOG(trace,
+                     "Initial data received, checking if upstream connection should be triggered",
+                     read_callbacks_->connection());
+      checkUpstreamConnectionTrigger();
+    }
+
     // Check if we've exceeded the maximum buffer size.
+    // If so, read-disable the downstream to prevent excessive buffering.
     if (early_data_buffer_.length() > max_buffered_bytes_) {
-      ENVOY_CONN_LOG(debug, "Early data buffer exceeded max size {}, forcing upstream connection",
+      ENVOY_CONN_LOG(debug, "Early data buffer exceeded max size {}, read-disabling downstream",
                      read_callbacks_->connection(), max_buffered_bytes_);
-      // Force upstream connection establishment.
-      route_ = pickRoute();
-      establishUpstreamConnection();
-    } else {
-      // TCP_PROXY cannot correctly make a decision on the amount of data
-      // the preceding filters need to read before the upstream connection is established.
-      // Hence, to protect the early data buffer, TCP_PROXY read disables the downstream on
-      // receiving the first chunk of data. The filter setting the receive_before_connect state
-      // should have a limit on the amount of data it needs to read before the upstream connection
-      // is established and pause the filter chain (by returning `StopIteration`) till it has read
-      // the data it needs or a max limit has been reached.
       read_callbacks_->connection().readDisable(true);
     }
 
@@ -1064,18 +1051,24 @@ Network::FilterStatus Filter::onNewConnection() {
   ASSERT(upstream_ == nullptr);
 
   // Check if we should delay upstream connection establishment.
-  using Trigger = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger;
+  using Mode = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode;
 
-  if (connect_mode_ != Trigger::IMMEDIATE && config_->upstreamConnectTrigger().has_value()) {
-    // Delayed connection establishment based on mode.
-    ENVOY_CONN_LOG(debug, "Delaying upstream connection establishment based on configured mode",
-                   read_callbacks_->connection());
-    return Network::FilterStatus::StopIteration;
+  if (connect_mode_ == Mode::IMMEDIATE) {
+    // Immediate connection establishment. This is the default behavior.
+    route_ = pickRoute();
+    return establishUpstreamConnection();
   }
 
-  // Immediate connection establishment (default behavior).
-  route_ = pickRoute();
-  return establishUpstreamConnection();
+  // For ON_DOWNSTREAM_DATA or ON_DOWNSTREAM_TLS_HANDSHAKE modes, delay the connection.
+  // We must continue iteration to allow reading from downstream (for ON_DOWNSTREAM_DATA)
+  // or to let the TLS handshake complete (for ON_DOWNSTREAM_TLS_HANDSHAKE).
+  ENVOY_CONN_LOG(debug, "Delaying upstream connection establishment based on configured mode: {}",
+                 read_callbacks_->connection(), static_cast<int>(connect_mode_));
+
+  // StopIteration prevents further filters from processing but still allows reading.
+  // For ON_DOWNSTREAM_DATA with receive_before_connect, reading is already enabled.
+  // For ON_DOWNSTREAM_TLS_HANDSHAKE, we'll detect handshake completion via Connected event.
+  return Network::FilterStatus::StopIteration;
 }
 
 bool Filter::startUpstreamSecureTransport() {
@@ -1345,20 +1338,20 @@ void Filter::disableRetryTimer() {
 
 void Filter::checkUpstreamConnectionTrigger() {
   // Check if we should establish the upstream connection based on current state.
-  using Trigger = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectTrigger;
+  using Mode = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode;
 
   bool should_connect = false;
 
   switch (connect_mode_) {
-  case Trigger::IMMEDIATE:
+  case Mode::IMMEDIATE:
     // Should have already connected.
     return;
 
-  case Trigger::ON_DOWNSTREAM_DATA:
+  case Mode::ON_DOWNSTREAM_DATA:
     should_connect = initial_data_received_;
     break;
 
-  case Trigger::ON_DOWNSTREAM_TLS_HANDSHAKE:
+  case Mode::ON_DOWNSTREAM_TLS_HANDSHAKE:
     should_connect = tls_handshake_complete_ || !waiting_for_tls_handshake_;
     break;
 
