@@ -7,9 +7,9 @@ load(
 load(
     "//contrib:all_contrib_extensions.bzl",
     "ARM64_SKIP_CONTRIB_TARGETS",
-    "X86_SKIP_CONTRIB_TARGETS",
     "FIPS_LINUX_X86_SKIP_CONTRIB_TARGETS",
     "PPC_SKIP_CONTRIB_TARGETS",
+    "X86_SKIP_CONTRIB_TARGETS",
     "envoy_all_contrib_extensions",
 )
 
