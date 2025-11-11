@@ -1,12 +1,22 @@
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_rust//rust:defs.bzl", "rust_clippy", "rust_shared_library", "rust_test", "rustfmt_test")
 
-def test_program(name):
+def test_program(name, features = []):
     srcs = [name + ".rs"]
     if name + "_test.rs" in native.glob(["*.rs"]):
         srcs = srcs + [name + "_test.rs"]
 
     _name = "_" + name
+
+    # Add TLS crate dependencies if needed.
+    extra_deps = []
+    if "tls" in features:
+        extra_deps = [
+            "@dynamic_modules_rust_sdk_crate_index//:rustls",
+            "@dynamic_modules_rust_sdk_crate_index//:rustls-pemfile",
+            "@dynamic_modules_rust_sdk_crate_index//:webpki-roots",
+        ]
+
     rust_shared_library(
         name = _name,
         srcs = srcs,
@@ -14,7 +24,7 @@ def test_program(name):
         crate_root = name + ".rs",
         deps = [
             "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
-        ],
+        ] + extra_deps,
         rustc_flags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"],
     )
 
@@ -40,7 +50,7 @@ def test_program(name):
         edition = "2021",
         deps = [
             "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
-        ],
+        ] + extra_deps,
         tags = [
             # It is a known issue that TSAN detectes a false positive in the test runner of Rust toolchain:
             # https://github.com/rust-lang/rust/issues/39608

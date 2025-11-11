@@ -597,8 +597,9 @@ EXTENSIONS = {
     "envoy.generic_proxy.codecs.dubbo":                         "//source/extensions/filters/network/generic_proxy/codecs/dubbo:config",
     "envoy.generic_proxy.codecs.http1":                         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
 
-    # Dynamic mocules
+    # Dynamic modules
     "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
+    "envoy.transport_sockets.dynamic_modules":                 "//source/extensions/transport_sockets/dynamic_modules:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

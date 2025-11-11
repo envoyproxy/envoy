@@ -50,6 +50,6 @@ Test only
 ---------
 
 Below we provide the status of the C/C++ dependencies that are only used in tests. Tests also
-include additional Java, Rust and Python dependencies that are not tracked below.
+include additional Java, Rust (via crate_universe) and Python dependencies that are not tracked below.
 
 .. include:: external_dep_test_only.rst

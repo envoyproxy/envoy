@@ -16,6 +16,7 @@ cargo_build_script(
     data = [
         "//source/extensions/dynamic_modules:abi.h",
         "//source/extensions/dynamic_modules:abi_version.h",
+        "//source/extensions/dynamic_modules:transport_socket_abi.h",
     ],
     edition = "2021",
     deps = all_crate_deps(

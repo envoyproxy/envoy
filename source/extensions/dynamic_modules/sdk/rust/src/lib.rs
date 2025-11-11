@@ -4,9 +4,12 @@
 #![allow(dead_code)]
 
 pub mod buffer;
+pub mod transport_socket;
+
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
 use mockall::*;
+pub use transport_socket::*;
 
 #[cfg(test)]
 #[path = "./lib_test.rs"]

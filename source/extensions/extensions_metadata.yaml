@@ -1495,6 +1495,15 @@ envoy.transport_sockets.http_11_proxy:
   status: alpha
   type_urls:
   - envoy.extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport
+envoy.transport_sockets.dynamic_modules:
+  categories:
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.dynamic_modules.v3.DynamicModuleUpstreamTransportSocket
+  - envoy.extensions.transport_sockets.dynamic_modules.v3.DynamicModuleDownstreamTransportSocket
 envoy.upstreams.http.generic:
   categories:
   - envoy.upstreams
