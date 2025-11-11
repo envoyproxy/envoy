@@ -137,29 +137,21 @@ initUntypedReceivingNamespaces(const ExtProcPerRoute& config) {
 absl::optional<std::vector<std::string>>
 initUntypedClusterMetadataForwardingNamespaces(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
-      !config.overrides()
-           .metadata_options()
-           .has_cluster_metadata_forwarding_namespaces()) {
+      !config.overrides().metadata_options().has_cluster_metadata_forwarding_namespaces()) {
     return absl::nullopt;
   }
-  return {initNamespaces(config.overrides()
-                             .metadata_options()
-                             .cluster_metadata_forwarding_namespaces()
-                             .untyped())};
+  return {initNamespaces(
+      config.overrides().metadata_options().cluster_metadata_forwarding_namespaces().untyped())};
 }
 
 absl::optional<std::vector<std::string>>
 initTypedClusterMetadataForwardingNamespaces(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
-      !config.overrides()
-           .metadata_options()
-           .has_cluster_metadata_forwarding_namespaces()) {
+      !config.overrides().metadata_options().has_cluster_metadata_forwarding_namespaces()) {
     return absl::nullopt;
   }
-  return {initNamespaces(config.overrides()
-                             .metadata_options()
-                             .cluster_metadata_forwarding_namespaces()
-                             .typed())};
+  return {initNamespaces(
+      config.overrides().metadata_options().cluster_metadata_forwarding_namespaces().typed())};
 }
 
 absl::optional<ProcessingMode> mergeProcessingMode(const FilterConfigPerRoute& less_specific,
@@ -285,23 +277,11 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
           config.metadata_options().receiving_namespaces().untyped().begin(),
           config.metadata_options().receiving_namespaces().untyped().end()),
       untyped_cluster_metadata_forwarding_namespaces_(
-          config.metadata_options()
-              .cluster_metadata_forwarding_namespaces()
-              .untyped()
-              .begin(),
-          config.metadata_options()
-              .cluster_metadata_forwarding_namespaces()
-              .untyped()
-              .end()),
+          config.metadata_options().cluster_metadata_forwarding_namespaces().untyped().begin(),
+          config.metadata_options().cluster_metadata_forwarding_namespaces().untyped().end()),
       typed_cluster_metadata_forwarding_namespaces_(
-          config.metadata_options()
-              .cluster_metadata_forwarding_namespaces()
-              .typed()
-              .begin(),
-          config.metadata_options()
-              .cluster_metadata_forwarding_namespaces()
-              .typed()
-              .end()),
+          config.metadata_options().cluster_metadata_forwarding_namespaces().typed().begin(),
+          config.metadata_options().cluster_metadata_forwarding_namespaces().typed().end()),
       allowed_override_modes_(config.allowed_override_modes().begin(),
                               config.allowed_override_modes().end()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
@@ -554,7 +534,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
       untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)),
-            untyped_cluster_metadata_forwarding_namespaces_(
+      untyped_cluster_metadata_forwarding_namespaces_(
           initUntypedClusterMetadataForwardingNamespaces(config)),
       typed_cluster_metadata_forwarding_namespaces_(
           initTypedClusterMetadataForwardingNamespaces(config)),
@@ -1494,25 +1474,19 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
   // Also forward cluster metadata if so configured.
   const auto& cluster_info = cb->streamInfo().upstreamClusterInfo();
   if (cluster_info.has_value() && cluster_info.value() != nullptr) {
-    const auto& cluster_metadata =
-        cluster_info.value()->metadata().filter_metadata();
-    for (const auto& context_key :
-         state.untypedClusterMetadataForwardingNamespaces()) {
+    const auto& cluster_metadata = cluster_info.value()->metadata().filter_metadata();
+    for (const auto& context_key : state.untypedClusterMetadataForwardingNamespaces()) {
       if (const auto metadata_it = cluster_metadata.find(context_key);
           metadata_it != cluster_metadata.end()) {
-        (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] =
-            metadata_it->second;
+        (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
       }
     }
 
-    const auto& cluster_typed_metadata =
-        cluster_info.value()->metadata().typed_filter_metadata();
-    for (const auto& context_key :
-         state.typedClusterMetadataForwardingNamespaces()) {
+    const auto& cluster_typed_metadata = cluster_info.value()->metadata().typed_filter_metadata();
+    for (const auto& context_key : state.typedClusterMetadataForwardingNamespaces()) {
       if (const auto metadata_it = cluster_typed_metadata.find(context_key);
           metadata_it != cluster_typed_metadata.end()) {
-        (*forwarding_metadata
-              .mutable_typed_filter_metadata())[metadata_it->first] =
+        (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
             metadata_it->second;
       }
     }

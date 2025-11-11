@@ -3643,40 +3643,30 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
   verifyDownstreamResponse(*response, 200);
 }
 
-
-TEST_P(ExtProcIntegrationTest, SendAndReceiveClusterMetadata) {
-  proto_config_.mutable_processing_mode()->set_request_header_mode(
-      ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(
-      ProcessingMode::SKIP);
+TEST_P(ExtProcIntegrationTest, SendClusterMetadata) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
   auto* md_opts = proto_config_.mutable_metadata_options();
-  md_opts->mutable_cluster_metadata_forwarding_namespaces()->add_untyped(
-      "cluster_ns_untyped");
-  md_opts->mutable_cluster_metadata_forwarding_namespaces()->add_typed(
-      "cluster_ns_typed");
+  md_opts->mutable_cluster_metadata_forwarding_namespaces()->add_untyped("cluster_ns_untyped");
+  md_opts->mutable_cluster_metadata_forwarding_namespaces()->add_typed("cluster_ns_typed");
 
   ConfigOptions config_option = {};
   config_option.add_metadata = true;
   initializeConfig(config_option);
 
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-        // Add some metadata to cluster_0
-        auto* cluster =
-            bootstrap.mutable_static_resources()->mutable_clusters(0);
-        auto* metadata = cluster->mutable_metadata();
-        ProtobufWkt::Struct struct_val;
-        (*struct_val.mutable_fields())["some_string"].set_string_value(
-            "some_value");
-        (*metadata->mutable_filter_metadata())["cluster_ns_untyped"] =
-            struct_val;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add some metadata to cluster_0
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* metadata = cluster->mutable_metadata();
+    Protobuf::Struct struct_val;
+    (*struct_val.mutable_fields())["some_string"].set_string_value("some_value");
+    (*metadata->mutable_filter_metadata())["cluster_ns_untyped"] = struct_val;
 
-        ProtobufWkt::Any any_val;
-        any_val.PackFrom(struct_val);
-        (*metadata->mutable_typed_filter_metadata())["cluster_ns_typed"] =
-            any_val;
-      });
+    Protobuf::Any any_val;
+    any_val.PackFrom(struct_val);
+    (*metadata->mutable_typed_filter_metadata())["cluster_ns_typed"] = any_val;
+  });
 
   HttpIntegrationTest::initialize();
 
@@ -3688,10 +3678,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveClusterMetadata) {
   const auto& received_metadata = request_headers_msg.metadata_context();
 
   const auto& filter_metadata = received_metadata.filter_metadata();
-  EXPECT_EQ(filter_metadata.at("cluster_ns_untyped")
-                .fields()
-                .at("some_string")
-                .string_value(),
+  EXPECT_EQ(filter_metadata.at("cluster_ns_untyped").fields().at("some_string").string_value(),
             "some_value");
 
   const auto& typed_filter_metadata = received_metadata.typed_filter_metadata();
