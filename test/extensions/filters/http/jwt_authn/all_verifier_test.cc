@@ -619,6 +619,349 @@ TEST_F(AllowMissingInAndOfOrListTest, BadAndGoodJwts) {
   EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
+// =============================================================================
+// Extract-Only Tests
+// =============================================================================
+
+// Tests extract_only in a single requirement by itself
+class ExtractOnlyInSingleRequirementTest : public AllVerifierTest {
+protected:
+  void SetUp() override {
+    AllVerifierTest::SetUp();
+    proto_config_.mutable_rules(0)->mutable_requires_()->mutable_extract_only();
+    createVerifier();
+  }
+};
+
+TEST_F(ExtractOnlyInSingleRequirementTest, NoJwt) {
+  // Should succeed even with no JWT
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
+TEST_F(ExtractOnlyInSingleRequirementTest, BadJwt) {
+  // Should succeed even with expired JWT
+  // Note: allow_failed behavior - succeeds but may not extract payload on validation failure
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Payload extraction behavior matches allow_missing_or_failed
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+TEST_F(ExtractOnlyInSingleRequirementTest, MissingIssToken) {
+  // Should succeed even with unknown issuer
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ES256WithoutIssToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Payload extraction behavior matches allow_missing_or_failed
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+TEST_F(ExtractOnlyInSingleRequirementTest, OneGoodJwt) {
+  // Should succeed and extract claims from valid JWT
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+}
+
+TEST_F(ExtractOnlyInSingleRequirementTest, TwoGoodJwts) {
+  // Should extract claims from both JWTs
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
+}
+
+TEST_F(ExtractOnlyInSingleRequirementTest, GoodAndBadJwts) {
+  // Should extract from good JWT and still succeed despite bad JWT
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, ExpiredToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  // Bad JWT - payload not extracted (matches allow_missing_or_failed behavior)
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
+}
+
+TEST_F(ExtractOnlyInSingleRequirementTest, InvalidFormatJwt) {
+  // Should succeed even with malformed JWT
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, NonExistKidToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // May or may not extract depending on how malformed - key point is it succeeds
+}
+
+// Tests extract_only in an OR-list of requirements
+class ExtractOnlyInOrListTest : public AllVerifierTest {
+protected:
+  void SetUp() override {
+    AllVerifierTest::SetUp();
+    const char extract_only_yaml[] = R"(
+requires_any:
+  requirements:
+  - provider_name: "example_provider"
+  - extract_only: {}
+)";
+    modifyRequirement(extract_only_yaml);
+    createVerifier();
+  }
+};
+
+TEST_F(ExtractOnlyInOrListTest, NoJwt) {
+  // extract_only allows missing, so should succeed
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
+TEST_F(ExtractOnlyInOrListTest, BadJwt) {
+  // extract_only allows failed verification, so should succeed
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Payload not extracted from bad JWT (matches allow_missing_or_failed behavior)
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+TEST_F(ExtractOnlyInOrListTest, OneGoodJwt) {
+  // First requirement (example_provider) should succeed
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+}
+
+TEST_F(ExtractOnlyInOrListTest, TwoGoodJwts) {
+  // First requirement satisfied, other JWT ignored
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
+}
+
+TEST_F(ExtractOnlyInOrListTest, WrongIssuer) {
+  // Provider requirement fails with wrong issuer, but extract_only fallback succeeds
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Wrong issuer - payload not extracted (matches allow_missing_or_failed behavior)
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+// Tests extract_only in an AND-list of requirements
+class ExtractOnlyInAndListTest : public AllVerifierTest {
+protected:
+  void SetUp() override {
+    AllVerifierTest::SetUp();
+    const char extract_only_yaml[] = R"(
+requires_all:
+  requirements:
+  - provider_name: "example_provider"
+  - extract_only: {}
+)";
+    modifyRequirement(extract_only_yaml);
+    createVerifier();
+  }
+};
+
+TEST_F(ExtractOnlyInAndListTest, NoJwt) {
+  // AND requires both: example_provider will fail with JwtMissed
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed));
+  auto headers = Http::TestRequestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
+TEST_F(ExtractOnlyInAndListTest, BadJwt) {
+  // example_provider will fail verification
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // extract_only would extract, but AND short-circuits on first failure
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+TEST_F(ExtractOnlyInAndListTest, OneGoodJwt) {
+  // Both requirements satisfied (example_provider validates, extract_only extracts)
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+}
+
+TEST_F(ExtractOnlyInAndListTest, TwoGoodJwts) {
+  // Both providers' JWTs extracted
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
+}
+
+// Tests extract_only in complex nested requirements
+class ExtractOnlyInNestedListTest : public AllVerifierTest {
+protected:
+  void SetUp() override {
+    AllVerifierTest::SetUp();
+    const char extract_only_yaml[] = R"(
+requires_all:
+  requirements:
+  - requires_any:
+      requirements:
+      - provider_name: "example_provider"
+      - extract_only: {}
+  - requires_any:
+      requirements:
+      - provider_name: "other_provider"
+      - extract_only: {}
+)";
+    modifyRequirement(extract_only_yaml);
+    createVerifier();
+  }
+};
+
+TEST_F(ExtractOnlyInNestedListTest, NoJwt) {
+  // Both OR-lists have extract_only fallback, so should succeed
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
+TEST_F(ExtractOnlyInNestedListTest, BadJwt) {
+  // extract_only fallback in both OR-lists allows this to succeed
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Bad JWT - payload not extracted (matches allow_missing_or_failed behavior)
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+TEST_F(ExtractOnlyInNestedListTest, OneGoodJwt) {
+  // First OR satisfied by example_provider, second OR satisfied by extract_only
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+}
+
+TEST_F(ExtractOnlyInNestedListTest, TwoGoodJwts) {
+  // Both OR-lists satisfied by their respective providers
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
+}
+
+TEST_F(ExtractOnlyInNestedListTest, WrongIssuers) {
+  // Both have wrong issuers but extract_only fallback allows success
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, OtherGoodToken},
+                                                {kOtherHeader, GoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Wrong issuers - payloads not extracted (matches allow_missing_or_failed behavior)
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
+}
+
+// Test extract_only with allow_missing comparison
+class ExtractOnlyVsAllowMissingTest : public AllVerifierTest {
+protected:
+  void SetUp() override {
+    AllVerifierTest::SetUp();
+  }
+};
+
+TEST_F(ExtractOnlyVsAllowMissingTest, ExtractOnlyWithBadJwt) {
+  // extract_only should succeed with bad JWT (but may not extract payload)
+  const char extract_only_yaml[] = R"(
+requires_any:
+  requirements:
+  - provider_name: "example_provider"
+  - extract_only: {}
+)";
+  modifyRequirement(extract_only_yaml);
+  createVerifier();
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // extract_only succeeds but doesn't extract from bad JWT (same as allow_missing_or_failed)
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+TEST_F(ExtractOnlyVsAllowMissingTest, AllowMissingWithBadJwt) {
+  // allow_missing should FAIL with bad JWT
+  const char allow_missing_yaml[] = R"(
+requires_any:
+  requirements:
+  - provider_name: "example_provider"
+  - allow_missing: {}
+)";
+  modifyRequirement(allow_missing_yaml);
+  createVerifier();
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, NonExistKidToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+TEST_F(ExtractOnlyVsAllowMissingTest, ExtractOnlyWithNoJwt) {
+  // extract_only succeeds with no JWT
+  const char extract_only_yaml[] = "extract_only: {}";
+  modifyRequirement(extract_only_yaml);
+  createVerifier();
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
+TEST_F(ExtractOnlyVsAllowMissingTest, AllowMissingWithNoJwt) {
+  // allow_missing also succeeds with no JWT
+  const char allow_missing_yaml[] = "allow_missing: {}";
+  modifyRequirement(allow_missing_yaml);
+  createVerifier();
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
