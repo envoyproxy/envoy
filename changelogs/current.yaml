@@ -275,7 +275,7 @@ new_features:
     Add logging info for network ext_proc to filter state.
 - area: upstream
   change: |
-    Added an extension to override the `ref:`upstream Linux network namespace
+    Added an extension to override the :ref:`upstream Linux network namespace
     <extension_envoy.upstream.local_address_selector.linux_network_namespace>` using a shared filter
     state object.
 - area: formatter

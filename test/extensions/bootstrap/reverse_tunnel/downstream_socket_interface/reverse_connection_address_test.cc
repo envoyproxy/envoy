@@ -143,6 +143,7 @@ TEST_F(ReverseConnectionAddressTest, NetworkNamespace) {
   // Should not have a network namespace.
   auto namespace_opt = address.networkNamespace();
   EXPECT_FALSE(namespace_opt.has_value());
+  EXPECT_EQ(nullptr, address.withNetworkNamespace("/var/run/netns/1"));
 }
 
 // Test socket interface.
