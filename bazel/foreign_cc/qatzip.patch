@@ -1,0 +1,22 @@
+diff --git a/configure.ac b/configure.ac
+index 39c6c95..52a8d45 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -188,7 +188,7 @@ AS_IF([test ! -z "${ICP_ROOT}"],
+ 
+     AC_CHECK_LIB(qat, cpaDcCompressData2, ,
+         [ AC_MSG_ERROR([cpaDcCompressData2 not found])],
+-	[-lusdm -lcrypto])
++	[-lusdm -lcrypto_internal])
+ 
+     #check for icp_adf_get_numDevices/icp_sal_userIsQatAvailable
+     AC_CHECK_LIB(qat, icp_adf_get_numDevices,
+@@ -199,7 +199,7 @@ AS_IF([test ! -z "${ICP_ROOT}"],
+                 [SAL_CFLAGS="-DSAL_DEV_API"
+                  AC_SUBST(SAL_CFLAGS)],
+                 [AC_MSG_ERROR([icp_sal_userIsQatAvailable/icp_adf_get_numDevices not found])],
+-		[-lusdm -lcrypto]
++		[-lusdm -lcrypto_internal]
+             )
+         ]
+     )

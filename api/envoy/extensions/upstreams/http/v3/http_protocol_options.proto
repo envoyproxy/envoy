@@ -5,6 +5,7 @@ package envoy.extensions.upstreams.http.v3;
 import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
+import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 
 import "udpa/annotations/status.proto";
@@ -60,7 +61,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //             http2_protocol_options:
 //               max_concurrent_streams: 100
 //        .... [further cluster config]
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
   // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
@@ -185,4 +186,13 @@ message HttpProtocolOptions {
 
   // Defines http specific outlier detection parameters.
   OutlierDetection outlier_detection = 8;
+
+  // Specifies a list of HTTP-level mirroring policies for requests routed to this cluster.
+  // Cluster-level policies override route-level policies when they both are configured.
+  //
+  // .. note::
+  //
+  //   Mirroring will not be triggered if the :ref:`primary cluster
+  //   <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` does not exist.
+  repeated config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 9;
 }
