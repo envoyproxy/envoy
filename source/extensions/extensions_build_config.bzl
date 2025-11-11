@@ -190,6 +190,7 @@ EXTENSIONS = {
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
     "envoy.filters.http.mcp":                           "//source/extensions/filters/http/mcp:config",
     "envoy.filters.http.rate_limit_quota":              "//source/extensions/filters/http/rate_limit_quota:config",
+    "envoy.filters.http.sampling_decision":             "//source/extensions/filters/http/sampling_decision:config",
     # Disabled by default. kill_request is not built into most prebuilt images.
     # For instructions for building with disabled-by-default filters enabled, see
     # https://github.com/envoyproxy/envoy/blob/main/bazel/README.md#enabling-and-disabling-extensions

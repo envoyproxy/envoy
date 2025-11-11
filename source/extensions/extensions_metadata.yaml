@@ -540,6 +540,13 @@ envoy.filters.http.jwt_authn:
   type_urls:
   - envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
   - envoy.extensions.filters.http.jwt_authn.v3.PerRouteConfig
+envoy.filters.http.sampling_decision:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.sampling_decision.v3.SamplingDecision
 envoy.filters.http.kill_request:
   categories:
   - envoy.filters.http
