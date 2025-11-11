@@ -41,7 +41,7 @@ jobs:
       bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths || '/opt/hostedtoolcache' }}
+      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths }}
       error-match: |
         ERROR
         error:
@@ -52,7 +52,7 @@ jobs:
       request: ${{ inputs.request }}
       runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/gcs/artefact/sync@actions-v0.3.26
+        - uses: envoyproxy/toolshed/gh-actions/gcs/artefact/sync@actions-v0.3.29
           with:
             bucket: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
             path: generated/${{ matrix.target }}/html
@@ -72,8 +72,8 @@ jobs:
         include:
         - target: coverage
           name: Coverage
-          diskspace-hack-paths: |
-            /opt/hostedtoolcache
-            /usr/local/.ghcup
+          diskspace-hack-paths:
         - target: fuzz_coverage
           name: Fuzz coverage
+          diskspace-hack-paths: |
+            /opt/hostedtoolcache
