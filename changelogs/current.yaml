@@ -150,6 +150,10 @@ new_features:
 - area: udp_sink
   change: |
     Enhanced the UDP sink to support tapped messages larger than 64 KB.
+- area: access_log
+  change: |
+    Added a new :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>` which emits
+    configurable metrics.
 - area: otlp_stat_sink
   change: |
     Added support for dropping stats via

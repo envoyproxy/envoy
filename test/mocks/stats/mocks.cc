@@ -82,10 +82,16 @@ MockSinkPredicates::MockSinkPredicates() = default;
 MockSinkPredicates::~MockSinkPredicates() = default;
 
 MockScope::MockScope(StatName prefix, MockStore& store)
-    : TestUtil::TestScope(prefix, store), mock_store_(store) {}
+    : TestUtil::TestScope(prefix, store), mock_store_(store) {
+  ON_CALL(*this, counterFromStatNameWithTags(_, _))
+      .WillByDefault(
+          Invoke([this](const StatName& name, StatNameTagVectorOptConstRef tags) -> Counter& {
+            return counterFromStatNameWithTags_(name, tags);
+          }));
+}
 
-Counter& MockScope::counterFromStatNameWithTags(const StatName& name,
-                                                StatNameTagVectorOptConstRef) {
+Counter& MockScope::counterFromStatNameWithTags_(const StatName& name,
+                                                 StatNameTagVectorOptConstRef) {
   // We always just respond with the mocked counter, so the tags don't matter.
   return mock_store_.counter(symbolTable().toString(name));
 }
@@ -121,7 +127,7 @@ MockStore::MockStore() {
 MockStore::~MockStore() = default;
 
 ScopeSharedPtr MockStore::makeScope(StatName prefix) {
-  return std::make_shared<MockScope>(prefix, *this);
+  return std::make_shared<NiceMock<MockScope>>(prefix, *this);
 }
 
 MockIsolatedStatsStore::MockIsolatedStatsStore() = default;

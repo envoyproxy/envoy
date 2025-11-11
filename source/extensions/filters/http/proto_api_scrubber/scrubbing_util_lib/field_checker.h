@@ -77,6 +77,10 @@ private:
   absl::StatusOr<Matcher::MatchResult>
   tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const;
 
+  FieldCheckResults
+  matchResultStatusToFieldCheckResult(absl::StatusOr<Matcher::MatchResult>& match_result,
+                                      const std::string& field_mask) const;
+
   ScrubberContext scrubber_context_;
   Http::Matching::HttpMatchingDataImpl matching_data_;
   std::string method_name_;
