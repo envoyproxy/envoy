@@ -31,9 +31,10 @@ MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
     Network::Address::InstanceConstSharedPtr& address)
     : address_(address) {
-  ON_CALL(*this, getUpstreamLocalAddressImpl(_))
+  ON_CALL(*this, getUpstreamLocalAddressImpl(_, _))
       .WillByDefault(
-          Invoke([&](const Network::Address::InstanceConstSharedPtr&) -> UpstreamLocalAddress {
+          Invoke([&](const Network::Address::InstanceConstSharedPtr&,
+                     OptRef<const Network::TransportSocketOptions>) -> UpstreamLocalAddress {
             UpstreamLocalAddress ret;
             ret.address_ = address_;
             ret.socket_options_ = nullptr;
@@ -175,6 +176,7 @@ MockClusterInfo::MockClusterInfo()
         return makeOptRefFromPtr<const Envoy::Orca::LrsReportMetricNames>(
             lrs_report_metric_names_.get());
       }));
+  ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;

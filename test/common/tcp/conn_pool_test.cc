@@ -243,7 +243,7 @@ public:
   }
 
   void initialize() {
-    ON_CALL(*cluster_->upstream_local_address_selector_, getUpstreamLocalAddressImpl(_))
+    ON_CALL(*cluster_->upstream_local_address_selector_, getUpstreamLocalAddressImpl(_, _))
         .WillByDefault(
             Return(Upstream::UpstreamLocalAddress({cluster_->source_address_, options_})));
     conn_pool_ = std::make_unique<ConnPoolBase>(dispatcher_, host_, upstream_ready_cb_, options_,
