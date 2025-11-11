@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // See the :ref:`architecture overview <arch_overview_outlier_detection>` for
 // more information on outlier detection.
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message OutlierDetection {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.cluster.OutlierDetection";
@@ -177,4 +177,12 @@ message OutlierDetection {
   // If enabled, at least one host is ejected regardless of the value of :ref:`max_ejection_percent<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_percent>`.
   // Defaults to false.
   google.protobuf.BoolValue always_eject_one_host = 25;
+
+  // If set to true, outlier detection will mark hosts as degraded when they return
+  // the ``x-envoy-degraded`` header with a successful (HTTP 200) response.
+  // Degraded hosts are deprioritized in load balancing but are not ejected from the cluster.
+  // When the host returns a successful response without the degraded header, it will be
+  // unmarked as degraded.
+  // Defaults to false.
+  google.protobuf.BoolValue detect_degraded = 26;
 }
