@@ -69,6 +69,9 @@ on:
       docker-cpus:
         type: number
         default: 0
+      docker-ci:
+        type: boolean
+        default: true
       docker-ipv6:
         default: true
         type: boolean
@@ -411,3 +414,4 @@ jobs:
         CI_TARGET_BRANCH: ${{ fromJSON(inputs.request).request.target-branch }}
         MOUNT_GPG_HOME: ${{ inputs.import-gpg && 1 || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
+        ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}
