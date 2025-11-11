@@ -101,8 +101,8 @@ public:
   std::string newUri(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
-  std::string& formatBody(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                          const StreamInfo::StreamInfo&, std::string&) const override {
+  absl::string_view formatBody(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                               const StreamInfo::StreamInfo&, std::string&) const override {
     return EMPTY_STRING;
   };
 };
@@ -744,10 +744,10 @@ public:
   std::string newUri(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
-  std::string& formatBody(const Http::RequestHeaderMap& request_headers,
-                          const Http::ResponseHeaderMap& response_headers,
-                          const StreamInfo::StreamInfo& stream_info,
-                          std::string& body_out) const override;
+  absl::string_view formatBody(const Http::RequestHeaderMap& request_headers,
+                               const Http::ResponseHeaderMap& response_headers,
+                               const StreamInfo::StreamInfo& stream_info,
+                               std::string& body_out) const override;
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;

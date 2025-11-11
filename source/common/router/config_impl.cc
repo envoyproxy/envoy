@@ -1049,17 +1049,19 @@ std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers) co
       headers);
 }
 
-std::string& RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& request_headers,
-                                            const Http::ResponseHeaderMap& response_headers,
-                                            const StreamInfo::StreamInfo& stream_info,
-                                            std::string& body_out) const {
-  std::string& direct_body = direct_response_body_provider_ != nullptr ? direct_response_body_provider_->data() : EMPTY_STRING;
+absl::string_view RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& request_headers,
+                                                 const Http::ResponseHeaderMap& response_headers,
+                                                 const StreamInfo::StreamInfo& stream_info,
+                                                 std::string& body_out) const {
+  absl::string_view direct_body = direct_response_body_provider_ != nullptr
+                                      ? direct_response_body_provider_->data()
+                                      : EMPTY_STRING;
   if (direct_response_body_formatter_ == nullptr) {
-      return direct_body;
+    return direct_body;
   }
 
   body_out = direct_response_body_formatter_->format(
-        {&request_headers, &response_headers, nullptr, direct_body}, stream_info);
+      {&request_headers, &response_headers, nullptr, direct_body}, stream_info);
   return body_out;
 }
 
