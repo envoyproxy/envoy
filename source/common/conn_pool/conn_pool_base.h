@@ -419,6 +419,12 @@ private:
   Event::SchedulableCallbackPtr upstream_ready_cb_;
   Common::DebugRecursionChecker recursion_checker_;
   Server::LoadShedPoint* create_new_connection_load_shed_{nullptr};
+
+  struct EndpointOptions {
+    bool use_round_robin{false};
+    float preconnect_ratio{0};
+  };
+  EndpointOptions endpoint_options_;
 };
 
 } // namespace ConnectionPool

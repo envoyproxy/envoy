@@ -63,6 +63,22 @@ ConnPoolImplBase::ConnPoolImplBase(
   ENVOY_LOG_ONCE_IF(trace, create_new_connection_load_shed_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.connection_pool_new_connection is not "
                     "found. Is it configured?");
+  const auto metadata = host_->metadata();
+  
+  if (metadata && metadata->filter_metadata().contains("connection_pool_options")) {
+    const auto& options = metadata->filter_metadata().at("connection_pool_options").fields();
+    if (options.contains("round_robin")) {
+      endpoint_options_.use_round_robin = options.at("round_robin").bool_value();
+    }
+    if (options.contains("preconnect_ratio")) {
+      endpoint_options_.preconnect_ratio = static_cast<float>(options.at("preconnect_ratio").number_value());
+    }
+
+    ENVOY_LOG(info, "endpoint {} has specific options: rr={}, preconnect_ratio={}", host_->address() ? host_->address()->asString() : "without address", endpoint_options_.use_round_robin, endpoint_options_.preconnect_ratio);
+  } else {
+    ENVOY_LOG(info, "endpoint {} has no specific options",  host_->address() ? host_->address()->asString() : "without address");
+  }
+
 }
 
 ConnPoolImplBase::~ConnPoolImplBase() {
@@ -120,8 +136,19 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
     return pending_streams_.size() > connecting_stream_capacity_;
   }
 
+  if (endpoint_options_.preconnect_ratio != 0) {
+    bool result =
+        shouldConnect(pending_streams_.size(), num_active_streams_,
+                      connecting_and_connected_stream_capacity_, endpoint_options_.preconnect_ratio);
+    ENVOY_LOG(trace,
+              "endpoint-specific shouldCreateNewConnection returns {} for pending {} active {} "
+              "connecting_and_connected_capacity {} connecting_capacity {} ratio {}",
+              result, pending_streams_.size(), num_active_streams_,
+              connecting_and_connected_stream_capacity_, connecting_stream_capacity_,
+              global_preconnect_ratio);
+    return result;
   // Determine if we are trying to prefetch for global preconnect or local preconnect.
-  if (global_preconnect_ratio != 0) {
+  } else if (global_preconnect_ratio != 0) {
     // If global preconnecting is on, and this connection is within the global
     // preconnect limit, preconnect.
     // For global preconnect, we anticipate an incoming stream to this pool, since it is
@@ -301,6 +328,15 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
       incrConnectingAndConnectedStreamCapacity(1, client);
     }
   }
+
+  // // Here if the endpoint contains metadata, we kill the stream.
+  // if (host_->metadata()) {
+  //   ENVOY_CONN_LOG(debug, "endpoint contains metadta, destroying client as stream just closed",
+  //                  client);
+  //   client.close();
+  //   return;
+  // }
+
   if (client.state() == ActiveClient::State::Draining && client.numActiveStreams() == 0) {
     // Close out the draining client if we no longer have active streams.
     client.close();
@@ -326,7 +362,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
   assertCapacityCountsAreCorrect();
 
   if (!ready_clients_.empty()) {
-    ActiveClient& client = *ready_clients_.front();
+    ActiveClient& client = endpoint_options_.use_round_robin ? *ready_clients_.back() : *ready_clients_.front();
     ENVOY_CONN_LOG(debug, "using existing fully connected connection", client);
     attachStreamToClient(client, context);
     // Even if there's a ready client, we may want to preconnect to handle the next incoming stream.
