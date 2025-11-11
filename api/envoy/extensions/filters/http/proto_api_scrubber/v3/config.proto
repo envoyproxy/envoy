@@ -65,7 +65,7 @@ message Restrictions {
 
   // Specifies the message restrictions.
   // Key - Fully qualified message name e.g.,
-  //       `endpoints.examples.bookstore.Book`.
+  //       ``endpoints.examples.bookstore.Book``.
   // Value - Message restrictions.
   map<string, MessageRestrictions> message_restrictions = 2;
 }
