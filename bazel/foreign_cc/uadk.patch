@@ -24,3 +24,48 @@ index c361fbc..da24702 100755
 -	$COMPILE_TYPE
 +	$COMPILE_TYPE \
 +	"${EXTRA_ARGS[@]}"
+diff --git a/configure.ac b/configure.ac
+index 592b868..c81115f 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -4,6 +4,11 @@ AC_CONFIG_SRCDIR([wd.c])
+ AM_INIT_AUTOMAKE([1.10 no-define])
+ 
+ AC_CONFIG_MACRO_DIR([m4])
++
++# Suppress AC_DEFINE error messages
++m4_pattern_allow([AC_DEFINE])
++m4_pattern_allow([PKG_CHECK_MODULES])
++
+ AC_CONFIG_HEADERS([config.h])
+ 
+ # Checks for programs.
+@@ -50,12 +55,23 @@ AC_CHECK_LIB(z, zlibVersion,
+ 	     [ have_zlib=false ])
+ AM_CONDITIONAL([HAVE_ZLIB], [test "x$have_zlib" = "xtrue"])
+ 
+-PKG_CHECK_MODULES(libcrypto, libcrypto < 3.0 libcrypto >= 1.1,
+-	     [ AC_DEFINE(HAVE_CRYPTO, 1, [Have crypto])
+-	       have_crypto=true ],
+-	     [ have_crypto=false ])
+-AM_CONDITIONAL([HAVE_CRYPTO], [test "x$have_crypto" = "xtrue"])
++# Replace pkg-config
++AC_CHECK_HEADER([openssl/crypto.h],
++    [ have_crypto_header=yes ],
++    [ have_crypto_header=no ])
+ 
++AC_CHECK_LIB([crypto], [CRYPTO_set_locking_callback],
++    [ have_crypto_lib=yes ],
++    [ have_crypto_lib=no ])
++
++AS_IF([test "x$have_crypto_header" = "xyes" -a "x$have_crypto_lib" = "xyes"], [
++    AC_DEFINE([HAVE_CRYPTO], [1], [Have crypto])
++    have_crypto=true
++], [
++    have_crypto=false
++])
++
++AM_CONDITIONAL([HAVE_CRYPTO], [test "x$have_crypto" = "xtrue"])
+ AC_ARG_WITH(log_file,
+ 	AS_HELP_STRING([--with-log_file], [File to write log]),
+ 	WITH_LOG_FILE=$withvar, WITH_LOG_FILE=)
