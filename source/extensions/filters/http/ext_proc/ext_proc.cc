@@ -1430,6 +1430,27 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
   auto* cb = state.callbacks();
   envoy::config::core::v3::Metadata forwarding_metadata;
 
+  // Forward cluster metadata if so configured.
+  const auto& cluster_info = cb->streamInfo().upstreamClusterInfo();
+  if (cluster_info.has_value() && cluster_info.value() != nullptr) {
+    const auto& cluster_metadata = cluster_info.value()->metadata().filter_metadata();
+    for (const auto& context_key : state.untypedClusterMetadataForwardingNamespaces()) {
+      if (const auto metadata_it = cluster_metadata.find(context_key);
+          metadata_it != cluster_metadata.end()) {
+        (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+      }
+    }
+
+    const auto& cluster_typed_metadata = cluster_info.value()->metadata().typed_filter_metadata();
+    for (const auto& context_key : state.typedClusterMetadataForwardingNamespaces()) {
+      if (const auto metadata_it = cluster_typed_metadata.find(context_key);
+          metadata_it != cluster_typed_metadata.end()) {
+        (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
+            metadata_it->second;
+      }
+    }
+  }
+
   // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_proc
   // service. If metadata key is set in both the connection and request metadata then the value
   // will be the request metadata value. The metadata will only be searched for the callbacks
@@ -1465,27 +1486,6 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
           cb->connection().value().get().streamInfo().dynamicMetadata().typed_filter_metadata();
       if (const auto metadata_it = connection_typed_metadata.find(context_key);
           metadata_it != connection_typed_metadata.end()) {
-        (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
-            metadata_it->second;
-      }
-    }
-  }
-
-  // Also forward cluster metadata if so configured.
-  const auto& cluster_info = cb->streamInfo().upstreamClusterInfo();
-  if (cluster_info.has_value() && cluster_info.value() != nullptr) {
-    const auto& cluster_metadata = cluster_info.value()->metadata().filter_metadata();
-    for (const auto& context_key : state.untypedClusterMetadataForwardingNamespaces()) {
-      if (const auto metadata_it = cluster_metadata.find(context_key);
-          metadata_it != cluster_metadata.end()) {
-        (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-      }
-    }
-
-    const auto& cluster_typed_metadata = cluster_info.value()->metadata().typed_filter_metadata();
-    for (const auto& context_key : state.typedClusterMetadataForwardingNamespaces()) {
-      if (const auto metadata_it = cluster_typed_metadata.find(context_key);
-          metadata_it != cluster_typed_metadata.end()) {
         (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
             metadata_it->second;
       }
