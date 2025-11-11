@@ -77,12 +77,12 @@ The following lists the filter state object keys used by the Envoy extensions to
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
 
 ``envoy.network.upstream_network_namespace``
-  Allows overriding the network namespace on the upstream connections using the
-  :ref:`Linux network namespace local address selector
+  Allows overriding the network namespace on the upstream connections using the :ref:`Linux network
+  namespace local address selector
   <envoy_v3_api_msg_extensions.local_address_selectors.linux_network_namespace.v3.Config>`
-  extension. The object should serialize to the path to the network namespace, and the empty value
-  clears the network namespace. This object is expected to be shared from the downstream filters with
-  the upstream connections.
+  extension. The object should serialize to the path to the network namespace, and the empty string
+  value clears the network namespace. This object is expected to be shared from the downstream
+  filters with the upstream connections.
 
 Filter state object factories
 -----------------------------

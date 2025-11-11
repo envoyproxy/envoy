@@ -85,67 +85,66 @@ void validateNamespaceOverride(absl::optional<std::string> netns, bool ipv6, Arg
     if (netns->empty()) {
       // Override with empty string clear the namespace.
       EXPECT_EQ(absl::nullopt, result.address_->networkNamespace());
-      else if (*netns == BadValue) {
-        // Override with a bad filter state object is a no-op.
-        EXPECT_EQ(upstream_address->networkNamespace(), result.address_->networkNamespace());
-      }
-      else {
-        // Override with any other value sets that value.
-        EXPECT_EQ(*netns, result.address_->networkNamespace());
-      }
-    } else {
-      // No override means the bind address namespace is preserved.
+    } else if (*netns == BadValue) {
+      // Override with a bad filter state object is a no-op.
       EXPECT_EQ(upstream_address->networkNamespace(), result.address_->networkNamespace());
+    } else {
+      // Override with any other value sets that value.
+      EXPECT_EQ(*netns, result.address_->networkNamespace());
     }
+  } else {
+    // No override means the bind address namespace is preserved.
+    EXPECT_EQ(upstream_address->networkNamespace(), result.address_->networkNamespace());
   }
+}
 
-  TEST(ConfigTest, NamespaceOverrideEffective) {
-    {
-      SCOPED_TRACE("IPv4 override present");
-      validateNamespaceOverride("/var/run/netns/1", false, "1.2.3.4", 8000);
-    }
-    {
-      SCOPED_TRACE("IPv4 override present with existing namespace");
-      validateNamespaceOverride("/var/run/netns/1", false, "1.2.3.4", 8000, nullptr,
-                                "/var/run/netns/2");
-    }
-    {
-      SCOPED_TRACE("IPv4 override absent");
-      validateNamespaceOverride({}, false, "1.2.3.4", 8000);
-    }
-    {
-      SCOPED_TRACE("IPv4 override absent with existing namespace");
-      validateNamespaceOverride({}, false, "1.2.3.4", 8000, nullptr, "/var/run/netns/2");
-    }
-    {
-      SCOPED_TRACE("IPv4 empty override present with existing namespace");
-      validateNamespaceOverride("", false, "1.2.3.4", 8000, nullptr, "/var/run/netns/2");
-    }
-    {
-      SCOPED_TRACE("IPv4 try to override with a bad filter state");
-      validateNamespaceOverride(BadValue, false, "1.2.3.4", 8000, nullptr, "/var/run/netns/2");
-    }
-    {
-      SCOPED_TRACE("IPv6 override present");
-      validateNamespaceOverride("/var/run/netns/1", true, "::0001", 8000);
-    }
-    {
-      SCOPED_TRACE("IPv6 override present with existing namespace");
-      validateNamespaceOverride("/var/run/netns/1", true, "::0001", nullptr, "/var/run/netns/3");
-    }
-    {
-      SCOPED_TRACE("IPv6 override absent");
-      validateNamespaceOverride({}, true, "::0001", 8000);
-    }
-    {
-      SCOPED_TRACE("IPv6 override absent with existing namespace");
-      validateNamespaceOverride({}, true, "::0001", nullptr, "/var/run/netns/3");
-    }
-    {
-      SCOPED_TRACE("IPv6 empty override present with existing namespace");
-      validateNamespaceOverride("", true, "::0001", nullptr, "/var/run/netns/3");
-    }
+TEST(ConfigTest, NamespaceOverrideEffective) {
+  {
+    SCOPED_TRACE("IPv4 override present");
+    validateNamespaceOverride("/var/run/netns/1", false, "1.2.3.4", 8000);
   }
+  {
+    SCOPED_TRACE("IPv4 override present with existing namespace");
+    validateNamespaceOverride("/var/run/netns/1", false, "1.2.3.4", 8000, nullptr,
+                              "/var/run/netns/2");
+  }
+  {
+    SCOPED_TRACE("IPv4 override absent");
+    validateNamespaceOverride({}, false, "1.2.3.4", 8000);
+  }
+  {
+    SCOPED_TRACE("IPv4 override absent with existing namespace");
+    validateNamespaceOverride({}, false, "1.2.3.4", 8000, nullptr, "/var/run/netns/2");
+  }
+  {
+    SCOPED_TRACE("IPv4 empty override present with existing namespace");
+    validateNamespaceOverride("", false, "1.2.3.4", 8000, nullptr, "/var/run/netns/2");
+  }
+  {
+    SCOPED_TRACE("IPv4 try to override with a bad filter state");
+    validateNamespaceOverride(BadValue, false, "1.2.3.4", 8000, nullptr, "/var/run/netns/2");
+  }
+  {
+    SCOPED_TRACE("IPv6 override present");
+    validateNamespaceOverride("/var/run/netns/1", true, "::0001", 8000);
+  }
+  {
+    SCOPED_TRACE("IPv6 override present with existing namespace");
+    validateNamespaceOverride("/var/run/netns/1", true, "::0001", nullptr, "/var/run/netns/3");
+  }
+  {
+    SCOPED_TRACE("IPv6 override absent");
+    validateNamespaceOverride({}, true, "::0001", 8000);
+  }
+  {
+    SCOPED_TRACE("IPv6 override absent with existing namespace");
+    validateNamespaceOverride({}, true, "::0001", nullptr, "/var/run/netns/3");
+  }
+  {
+    SCOPED_TRACE("IPv6 empty override present with existing namespace");
+    validateNamespaceOverride("", true, "::0001", nullptr, "/var/run/netns/3");
+  }
+}
 
 } // namespace
 } // namespace LinuxNetworkNamespace
