@@ -36,7 +36,7 @@ MappedAttributeBuilder::MappedAttributeBuilder(
 
 bool MappedAttributeBuilder::modifyRequest(
     const Params& params, envoy::service::ext_proc::v3::ProcessingRequest& request) {
-  bool is_inbound = params.traffic_direction = envoy::config::core::v3::TrafficDirection::INBOUND;
+  bool is_inbound = params.traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND;
   if (is_inbound) {
     if (config_.mapped_request_attributes().empty() || sent_request_attributes_) {
       return false;
@@ -57,7 +57,7 @@ bool MappedAttributeBuilder::modifyRequest(
   const auto evaled_attributes = is_inbound ?
     expression_manager_.evaluateRequestAttributes(*activation_ptr) :
     expression_manager_.evaluateResponseAttributes(*activation_ptr);
-  auto& attributes_map = is_inbound ? config_.mapped_request_attributes() :
+  const auto& attributes_map = is_inbound ? config_.mapped_request_attributes() :
     config_.mapped_response_attributes();
 
   Protobuf::Struct& remapped_attributes =

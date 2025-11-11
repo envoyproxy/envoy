@@ -165,10 +165,10 @@ TEST_F(MappedAttributeBuilderTest, ModifiedOnce) {
   EXPECT_EQ(0, req2.attributes_size());
 }
 
-TEST_F(MappedAttributeBuilderTest, ModifiedOnlyForInbound) {
+TEST_F(MappedAttributeBuilderTest, ModifiedForOutbound) {
   initialize(R"EOF(
-  mapped_request_attributes:
-    "key": "response.code"
+  mapped_response_attributes:
+    "key": "'bar'"
   )EOF");
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -180,10 +180,12 @@ TEST_F(MappedAttributeBuilderTest, ModifiedOnlyForInbound) {
       nullptr,
   };
 
-  // Call should do nothing and return false
   envoy::service::ext_proc::v3::ProcessingRequest req;
-  EXPECT_FALSE(builder_->modifyRequest(params, req));
-  EXPECT_EQ(0, req.attributes_size());
+  EXPECT_TRUE(builder_->modifyRequest(params, req));
+  const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
+  EXPECT_EQ(1, attributes.fields_size());
+  EXPECT_TRUE(attributes.fields().contains("key"));
+  EXPECT_EQ("bar", attributes.fields().at("key").string_value());
 }
 
 TEST_F(MappedAttributeBuilderTest, CelEvalFailure) {
