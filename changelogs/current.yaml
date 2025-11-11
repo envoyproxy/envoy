@@ -156,6 +156,9 @@ new_features:
     configurable metrics.
 - area: otlp_stat_sink
   change: |
+    Fix start_time_unix_nano for the metrics exported.
+- area: otlp_stat_sink
+  change: |
     Added support for dropping stats via
     :ref:`DropAction <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during
     custom metric conversion.

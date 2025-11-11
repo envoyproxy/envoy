@@ -47,7 +47,7 @@ void MetricAggregator::addGauge(
     NumberDataPoint* data_point = metric.mutable_gauge()->add_data_points();
     setCommonNumberDataPoint(*data_point, attributes);
     data_point->set_as_int(value);
-    data_point->set_start_time_unix_nano(start_time_unix_nano_);
+    data_point->set_time_unix_nano(snapshot_time_ns_);
     non_aggregated_metrics_.push_back(std::move(metric));
     return;
   }
@@ -73,7 +73,7 @@ void MetricAggregator::addGauge(
   metric_data.gauge_points[key] = data_point;
   setCommonNumberDataPoint(*data_point, attributes);
   data_point->set_as_int(value);
-  data_point->set_start_time_unix_nano(start_time_unix_nano_);
+  data_point->set_time_unix_nano(snapshot_time_ns_);
 }
 
 void MetricAggregator::addCounter(
@@ -86,7 +86,11 @@ void MetricAggregator::addCounter(
     metric.mutable_sum()->set_is_monotonic(true);
     metric.mutable_sum()->set_aggregation_temporality(temporality);
     NumberDataPoint* data_point = metric.mutable_sum()->add_data_points();
-    data_point->set_start_time_unix_nano(start_time_unix_nano_);
+    data_point->set_start_time_unix_nano(
+        temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
+            ? delta_start_time_ns_
+            : cumulative_start_time_ns_);
+    data_point->set_time_unix_nano(snapshot_time_ns_);
     setCommonNumberDataPoint(*data_point, attributes);
     data_point->set_as_int(
         (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value);
@@ -100,6 +104,7 @@ void MetricAggregator::addCounter(
   if (it != metric_data.counter_points.end()) {
     // If the data point exists, update it and return.
     NumberDataPoint* data_point = it->second;
+    // Update time for the existing data point.
     data_point->set_time_unix_nano(snapshot_time_ns_);
 
     // For DELTA, add the change since the last export. For CUMULATIVE, add the
@@ -115,7 +120,11 @@ void MetricAggregator::addCounter(
   metric_data.metric.mutable_sum()->set_is_monotonic(true);
   metric_data.metric.mutable_sum()->set_aggregation_temporality(temporality);
   metric_data.counter_points[key] = data_point;
-  data_point->set_start_time_unix_nano(start_time_unix_nano_);
+  data_point->set_start_time_unix_nano(temporality ==
+                                               AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
+                                           ? delta_start_time_ns_
+                                           : cumulative_start_time_ns_);
+  data_point->set_time_unix_nano(snapshot_time_ns_);
   setCommonNumberDataPoint(*data_point, attributes);
   data_point->set_as_int(
       (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value);
@@ -132,7 +141,11 @@ void MetricAggregator::addHistogram(
     HistogramDataPoint* data_point = metric.mutable_histogram()->add_data_points();
     data_point->set_time_unix_nano(snapshot_time_ns_);
     data_point->mutable_attributes()->CopyFrom(attributes);
-    data_point->set_start_time_unix_nano(start_time_unix_nano_);
+    data_point->set_start_time_unix_nano(
+        temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
+            ? delta_start_time_ns_
+            : cumulative_start_time_ns_);
+    data_point->set_time_unix_nano(snapshot_time_ns_);
 
     data_point->set_count(stats.sampleCount());
     data_point->set_sum(stats.sampleSum());
@@ -184,9 +197,12 @@ void MetricAggregator::addHistogram(
   metric_data.metric.mutable_histogram()->set_aggregation_temporality(temporality);
   metric_data.histogram_points[key] = data_point;
   // Set common fields directly here
-  data_point->set_time_unix_nano(snapshot_time_ns_);
   data_point->mutable_attributes()->CopyFrom(attributes);
-  data_point->set_start_time_unix_nano(start_time_unix_nano_);
+  data_point->set_start_time_unix_nano(temporality ==
+                                               AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
+                                           ? delta_start_time_ns_
+                                           : cumulative_start_time_ns_);
+  data_point->set_time_unix_nano(snapshot_time_ns_);
 
   data_point->set_count(stats.sampleCount());
   data_point->set_sum(stats.sampleSum());
@@ -343,14 +359,15 @@ OtlpMetricsFlusherImpl::getCombinedAttributes(
 }
 
 MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& snapshot,
-                                                      int64_t last_flush_time_ns) const {
+                                                      int64_t delta_start_time_ns,
+                                                      int64_t cumulative_start_time_ns) const {
   auto request = std::make_unique<MetricsExportRequest>();
   MetricAggregator aggregator =
       MetricAggregator(config_->enableMetricAggregation(),
                        std::chrono::duration_cast<std::chrono::nanoseconds>(
                            snapshot.snapshotTime().time_since_epoch())
                            .count(),
-                       last_flush_time_ns);
+                       delta_start_time_ns, cumulative_start_time_ns);
 
   // Process Gauges
   for (const auto& gauge : snapshot.gauges()) {

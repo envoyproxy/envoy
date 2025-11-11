@@ -45,9 +45,10 @@ public:
   using AttributesMap = absl::flat_hash_map<std::string, std::string>;
 
   explicit MetricAggregator(bool enable_metric_aggregation, int64_t snapshot_time_ns,
-                            int64_t start_time_unix_nano)
+                            int64_t delta_start_time_ns, int64_t cumulative_start_time_ns)
       : enable_metric_aggregation_(enable_metric_aggregation), snapshot_time_ns_(snapshot_time_ns),
-        start_time_unix_nano_(start_time_unix_nano) {}
+        delta_start_time_ns_(delta_start_time_ns),
+        cumulative_start_time_ns_(cumulative_start_time_ns) {}
 
   // Key used to group data points by their attributes.
   struct DataPointKey {
@@ -113,7 +114,8 @@ private:
 
   const bool enable_metric_aggregation_;
   const int64_t snapshot_time_ns_;
-  const int64_t start_time_unix_nano_;
+  const int64_t delta_start_time_ns_;
+  const int64_t cumulative_start_time_ns_;
   absl::flat_hash_map<std::string, MetricData> metrics_;
 
   // Currently, the metrics without defined in `custom_metric_conversions` won't be aggregated and
@@ -163,7 +165,8 @@ public:
    * @param snapshot supplies the metrics snapshot to send.
    */
   virtual MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot,
-                                        int64_t last_flush_time_ns) const PURE;
+                                        int64_t delta_start_time_ns,
+                                        int64_t cumulative_start_time_ns) const PURE;
 };
 
 using OtlpMetricsFlusherSharedPtr = std::shared_ptr<OtlpMetricsFlusher>;
@@ -179,8 +182,8 @@ public:
                                              [](const auto& metric) { return metric.used(); })
       : config_(config), predicate_(predicate) {}
 
-  MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot,
-                                int64_t last_flush_time_ns) const override;
+  MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
+                                int64_t cumulative_start_time_ns) const override;
 
 private:
   struct MetricConfig {
@@ -272,14 +275,15 @@ public:
                         int64_t create_time_ns)
       : metrics_flusher_(otlp_metrics_flusher), metrics_exporter_(grpc_metrics_exporter),
         // Use the time when the sink is created as the last flush time for the first flush.
-        last_flush_time_ns_(create_time_ns) {}
+        last_flush_time_ns_(create_time_ns), proxy_start_time_ns_(create_time_ns) {}
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot& snapshot) override {
     const int64_t current_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                         snapshot.snapshotTime().time_since_epoch())
                                         .count();
-    metrics_exporter_->send(metrics_flusher_->flush(snapshot, last_flush_time_ns_));
+    metrics_exporter_->send(
+        metrics_flusher_->flush(snapshot, last_flush_time_ns_, proxy_start_time_ns_));
     last_flush_time_ns_ = current_time_ns;
   }
 
@@ -289,6 +293,7 @@ private:
   const OtlpMetricsFlusherSharedPtr metrics_flusher_;
   const OpenTelemetryGrpcMetricsExporterSharedPtr metrics_exporter_;
   int64_t last_flush_time_ns_;
+  int64_t proxy_start_time_ns_;
 };
 } // namespace OpenTelemetry
 } // namespace StatSinks
