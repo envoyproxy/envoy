@@ -1944,7 +1944,7 @@ message DirectResponseAction {
   //   :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost`.
   core.v3.DataSource body = 2;
 
-  // Specifies a format string for the response body. If present, the contents of 
+  // Specifies a format string for the response body. If present, the contents of
   // ``body_format`` will be formatted and used as the response body, where the
   // contents of ``body`` (may be empty) will be passed as the variable ``%LOCAL_REPLY_BODY%``.
   // If neither are provided, no body is included in the generated response.
