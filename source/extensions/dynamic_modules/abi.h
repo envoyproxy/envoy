@@ -55,13 +55,14 @@ extern "C" {
 // allocated by Envoy.
 
 /**
- * envoy_dynamic_module_type_abi_version_envoy_ptr represents a null-terminated string that
+ * envoy_dynamic_module_type_abi_version_module_ptr represents a null-terminated string that
  * contains the ABI version of the dynamic module. This is used to ensure that the dynamic module is
  * built against the compatible version of the ABI.
  *
- * OWNERSHIP: Envoy owns the pointer.
+ * OWNERSHIP: Module owns the pointer. The string must remain valid until the end of
+ * envoy_dynamic_module_on_program_init function.
  */
-typedef const char* envoy_dynamic_module_type_abi_version_envoy_ptr;
+typedef const char* envoy_dynamic_module_type_abi_version_module_ptr;
 
 /**
  * envoy_dynamic_module_type_http_filter_config_envoy_ptr is a raw pointer to
@@ -147,6 +148,16 @@ typedef void* envoy_dynamic_module_type_http_filter_scheduler_module_ptr;
 typedef char* envoy_dynamic_module_type_buffer_module_ptr;
 
 /**
+ * envoy_dynamic_module_type_buffer_module_ptr is a pointer to a buffer in the module. A buffer
+ * represents a contiguous block of memory in bytes.
+ * The buffer is read-only.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. It depends on the
+ * context where the buffer is used. See for the specific event hook or callback for more details.
+ */
+typedef const char* envoy_dynamic_module_type_const_buffer_module_ptr;
+
+/**
  * envoy_dynamic_module_type_buffer_envoy_ptr is a pointer to a buffer in Envoy. A buffer represents
  * a contiguous block of memory in bytes.
  *
@@ -154,6 +165,16 @@ typedef char* envoy_dynamic_module_type_buffer_module_ptr;
  * See for the specific event hook or callback for more details.
  */
 typedef char* envoy_dynamic_module_type_buffer_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_buffer_envoy_ptr is a pointer to a buffer in Envoy. A buffer represents
+ * a contiguous block of memory in bytes.
+ * The buffer is read-only.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The lifetime depends on the context where the buffer is used.
+ * See for the specific event hook or callback for more details.
+ */
+typedef const char* envoy_dynamic_module_type_const_buffer_envoy_ptr;
 
 /**
  * envoy_dynamic_module_type_envoy_buffer represents a buffer owned by Envoy.
@@ -503,10 +524,10 @@ typedef enum envoy_dynamic_module_type_metrics_result {
  * to check compatibility and gracefully fail the initialization because there is no way to
  * report an error to Envoy.
  *
- * @return envoy_dynamic_module_type_abi_version_envoy_ptr is the ABI version of the dynamic
+ * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version of the dynamic
  * module. Null means the error and the module will be unloaded immediately.
  */
-envoy_dynamic_module_type_abi_version_envoy_ptr envoy_dynamic_module_on_program_init(void);
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void);
 
 /**
  * envoy_dynamic_module_on_http_filter_config_new is called by the main thread when the http
@@ -526,7 +547,8 @@ envoy_dynamic_module_type_abi_version_envoy_ptr envoy_dynamic_module_on_program_
 envoy_dynamic_module_type_http_filter_config_module_ptr
 envoy_dynamic_module_on_http_filter_config_new(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    const char* name_ptr, size_t name_size, const char* config_ptr, size_t config_size);
+    envoy_dynamic_module_type_const_buffer_envoy_ptr name_ptr, size_t name_size,
+    envoy_dynamic_module_type_const_buffer_envoy_ptr config_ptr, size_t config_size);
 
 /**
  * envoy_dynamic_module_on_http_filter_config_destroy is called when the HTTP filter configuration
@@ -552,22 +574,9 @@ void envoy_dynamic_module_on_http_filter_config_destroy(
  * module. When it fails, the filter configuration will be rejected.
  */
 envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
-envoy_dynamic_module_on_http_filter_per_route_config_new(const char* name_ptr, size_t name_size,
-                                                         const char* config_ptr,
-                                                         size_t config_size);
-
-/**
- * envoy_dynamic_module_callback_get_most_specific_route_config may be called by an HTTP filter
- * to retrieve the most specific per-route filter (based on the route object hierarchy).
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the corresponding
- * HTTP filter.
- * @return null if no per-route config exist. Otherwise, a pointer to the per-route config is
- * returned.
- */
-envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
-envoy_dynamic_module_callback_get_most_specific_route_config(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+envoy_dynamic_module_on_http_filter_per_route_config_new(
+    envoy_dynamic_module_type_const_buffer_envoy_ptr name_ptr, size_t name_size,
+    envoy_dynamic_module_type_const_buffer_envoy_ptr config_ptr, size_t config_size);
 
 /**
  * envoy_dynamic_module_on_http_filter_config_destroy is called when the HTTP per-route filter
@@ -805,8 +814,9 @@ void envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_water
  * @param message_length is the length of the message.
  *
  */
-void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
-                                       const char* message_ptr, size_t message_length);
+void envoy_dynamic_module_callback_log(
+    envoy_dynamic_module_type_log_level level,
+    envoy_dynamic_module_type_const_buffer_module_ptr message_ptr, size_t message_length);
 
 /**
  * envoy_dynamic_module_callback_log_enabled is called by the module to check if the log level is
@@ -1963,6 +1973,19 @@ void envoy_dynamic_module_callback_http_filter_continue_decoding(
  * corresponding HTTP filter.
  */
 void envoy_dynamic_module_callback_http_filter_continue_encoding(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_get_most_specific_route_config may be called by an HTTP filter
+ * to retrieve the most specific per-route filter (based on the route object hierarchy).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the corresponding
+ * HTTP filter.
+ * @return null if no per-route config exist. Otherwise, a pointer to the per-route config is
+ * returned.
+ */
+envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
+envoy_dynamic_module_callback_get_most_specific_route_config(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 #ifdef __cplusplus

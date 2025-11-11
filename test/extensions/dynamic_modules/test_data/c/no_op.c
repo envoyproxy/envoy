@@ -10,7 +10,7 @@ int getSomeVariable(void) {
   return some_variable;
 }
 
-envoy_dynamic_module_type_abi_version_envoy_ptr envoy_dynamic_module_on_program_init(void) {
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
   return kAbiVersion;
 }
 
