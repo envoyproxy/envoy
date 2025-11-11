@@ -547,9 +547,7 @@ TEST_P(ExtProcIntegrationTest, ServerHalfClosesDuringBodyStream) {
 
   // Even if the gRPC server half-closed, processing of the main request still continues.
   // Verify that data made it to upstream.
-  // codec_client_->sendData(*request_encoder_, 0, true);
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
-
   handleUpstreamRequest();
   EXPECT_EQ(upstream_request_->bodyLength(), 7);
   verifyDownstreamResponse(*response, 200);
