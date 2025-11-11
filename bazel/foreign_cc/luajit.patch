@@ -88,6 +88,15 @@ index 00000000..3b4f8eca
 +export MACOSX_DEPLOYMENT_TARGET="10.8"
 +export DEFAULT_CC="${CC:-}"
 +export TARGET_CFLAGS="${CFLAGS:-} -fno-function-sections -fno-data-sections"
++if [[ "$(uname -s)" == "Linux" ]]; then
++    TARGET_AR="${AR} rcus"
++    export TARGET_LDFLAGS="${LDFLAGS:-} -fno-function-sections -fno-data-sections"
++    export CFLAGS=""
++else
++    export TARGET_LDFLAGS="${CFLAGS:-} -fno-function-sections -fno-data-sections"
++    export CFLAGS=""
++    export LDFLAGS=""
++fi
 +
 +# Don't strip the binary - it doesn't work when cross-compiling
 +export TARGET_STRIP="@echo"
@@ -98,15 +107,6 @@ index 00000000..3b4f8eca
 +    BLOCK_PATH=$(realpath clang-asan-blocklist.txt)
 +    export TARGET_CFLAGS="${TARGET_CFLAGS} -fsanitize-blacklist=${BLOCK_PATH}"
 +    echo "fun:*" > clang-asan-blocklist.txt
-+fi
-+if [[ "$(uname -s)" == "Linux" ]]; then
-+    TARGET_AR="${AR} rcus"
-+    export TARGET_LDFLAGS="${LDFLAGS:-} -fno-function-sections -fno-data-sections"
-+    export CFLAGS=""
-+else
-+    export TARGET_LDFLAGS="${CFLAGS:-} -fno-function-sections -fno-data-sections"
-+    export CFLAGS=""
-+    export LDFLAGS=""
 +fi
 +
 +# Run make with all available cores
