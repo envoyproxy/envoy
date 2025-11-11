@@ -64,6 +64,12 @@ jobs:
           - src: /mnt/build
             target: /build
             chown: "runner:docker"
+    - name: Free diskspace
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.29
+      if: inputs.arch == 'x64' && github.event.repository.private
+      with:
+        to_remove: |
+          /opt/hostedtoolcache
     - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.29
       id: checkout-target
       name: Checkout Envoy repository (target branch)

@@ -40,6 +40,13 @@ envoy.access_loggers.open_telemetry:
   status: stable
   type_urls:
   - envoy.extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig
+envoy.access_loggers.stats:
+  categories:
+  - envoy.access_loggers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+  type_urls:
+  - envoy.extensions.access_loggers.stats.v3.Config
 envoy.access_loggers.stdout:
   categories:
   - envoy.access_loggers
