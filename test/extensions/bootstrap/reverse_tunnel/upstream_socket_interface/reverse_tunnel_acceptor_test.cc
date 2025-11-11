@@ -111,6 +111,10 @@ protected:
       socklen_t sockAddrLen() const override { return 0; }
       absl::string_view addressType() const override { return "test"; }
       absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+      Network::Address::InstanceConstSharedPtr
+      withNetworkNamespace(absl::string_view) const override {
+        return nullptr;
+      }
       const Network::SocketInterface& socketInterface() const override {
         return Network::SocketInterfaceSingleton::get();
       }

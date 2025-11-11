@@ -23,16 +23,13 @@ public:
       OptRef<const Network::TransportSocketOptions> transport_socket_options) const {
     const auto upstream_address =
         inner_->getUpstreamLocalAddress(endpoint_address, socket_options, transport_socket_options);
-    if (transport_socket_options) {
+    if (transport_socket_options && upstream_address.address_) {
       for (const auto& obj : transport_socket_options->downstreamSharedFilterStateObjects()) {
         if (obj.name_ == "envoy.network.upstream_network_namespace") {
           if (const auto data = obj.data_->serializeAsString(); data.has_value()) {
             const auto new_address = upstream_address.address_->withNetworkNamespace(*data);
             if (new_address) {
               return {.address_ = new_address, .socket_options_ = upstream_address.socket_options_};
-            } else {
-              ENVOY_LOG(trace, "Failed to apply override {} to {}", *data,
-                        upstream_address.address_->asStringView());
             }
           } else {
             ENVOY_LOG(trace, "Failed to serialize filter state as string");

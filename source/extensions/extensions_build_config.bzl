@@ -598,6 +598,9 @@ EXTENSIONS = {
 
     # Dynamic mocules
     "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
+
+    # Local address selectors
+    "envoy.upstream.local_address_selector.linux_network_namespace": "//source/extensions/local_address_selectors/linux_network_namespace:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

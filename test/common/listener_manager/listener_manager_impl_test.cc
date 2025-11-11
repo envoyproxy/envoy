@@ -8431,6 +8431,9 @@ public:
     return nullptr;
   }
   absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
+    return nullptr;
+  }
   const sockaddr* sockAddr() const override { return ipv4_instance_->sockAddr(); }
   socklen_t sockAddrLen() const override { return ipv4_instance_->sockAddrLen(); }
   absl::string_view addressType() const override { return "test_custom"; }
@@ -8464,6 +8467,9 @@ public:
     return nullptr;
   }
   absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
+    return nullptr;
+  }
   const sockaddr* sockAddr() const override { return ipv4_instance_->sockAddr(); }
   socklen_t sockAddrLen() const override { return ipv4_instance_->sockAddrLen(); }
   absl::string_view addressType() const override { return "test_default"; }
