@@ -52,7 +52,7 @@ public:
    * Currently, this method only checks the top level request/response fields. The logic for nested
    * fields will be added in the future.
    */
-  FieldCheckResults CheckField(const std::vector<std::string>&,
+  FieldCheckResults CheckField(const std::vector<std::string>& path,
                                const Protobuf::Field* field) const override;
 
   /**

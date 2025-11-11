@@ -142,7 +142,109 @@ protected:
               }
             }
             request_field_restrictions: {
+              key: "filter_criteria.publication_details.original_release_info.year"
+              value: {
+                matcher: {
+                  matcher_list: {
+                    matchers: {
+                      predicate: {
+                        single_predicate: {
+                          input: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
+                            }
+                          }
+                          custom_match: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                                expr_match: {
+                                  cel_expr_parsed: {
+                                    expr: {
+                                      id: 1
+                                      const_expr: {
+                                        bool_value: false
+                                      }
+                                    }
+                                    source_info: {
+                                      syntax_version: "cel1"
+                                      location: "inline_expression"
+                                      positions: {
+                                        key: 1
+                                        value: 0
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                      on_match: {
+                        action: {
+                          typed_config: {
+                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            request_field_restrictions: {
               key: "id"
+              value: {
+                matcher: {
+                  matcher_list: {
+                    matchers: {
+                      predicate: {
+                        single_predicate: {
+                          input: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
+                            }
+                          }
+                          custom_match: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                                expr_match: {
+                                  cel_expr_parsed: {
+                                    expr: {
+                                      id: 1
+                                      const_expr: {
+                                        bool_value: true
+                                      }
+                                    }
+                                    source_info: {
+                                      syntax_version: "cel1"
+                                      location: "inline_expression"
+                                      positions: {
+                                        key: 1
+                                        value: 0
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                      on_match: {
+                        action: {
+                          typed_config: {
+                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            request_field_restrictions: {
+              key: "filter_criteria.publication_details.original_release_info.region_code"
               value: {
                 matcher: {
                   matcher_list: {
@@ -244,7 +346,109 @@ protected:
               }
             }
             response_field_restrictions: {
+              key: "fulfillment.primary_location.exact_coordinates.aisle"
+              value: {
+                matcher: {
+                  matcher_list: {
+                    matchers: {
+                      predicate: {
+                        single_predicate: {
+                          input: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
+                            }
+                          }
+                          custom_match: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                                expr_match: {
+                                  cel_expr_parsed: {
+                                    expr: {
+                                      id: 1
+                                      const_expr: {
+                                        bool_value: false
+                                      }
+                                    }
+                                    source_info: {
+                                      syntax_version: "cel1"
+                                      location: "inline_expression"
+                                      positions: {
+                                        key: 1
+                                        value: 0
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                      on_match: {
+                        action: {
+                          typed_config: {
+                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            response_field_restrictions: {
               key: "name"
+              value: {
+                matcher: {
+                  matcher_list: {
+                    matchers: {
+                      predicate: {
+                        single_predicate: {
+                          input: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
+                            }
+                          }
+                          custom_match: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                                expr_match: {
+                                  cel_expr_parsed: {
+                                    expr: {
+                                      id: 1
+                                      const_expr: {
+                                        bool_value: true
+                                      }
+                                    }
+                                    source_info: {
+                                      syntax_version: "cel1"
+                                      location: "inline_expression"
+                                      positions: {
+                                        key: 1
+                                        value: 0
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                      on_match: {
+                        action: {
+                          typed_config: {
+                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            response_field_restrictions: {
+              key: "fulfillment.primary_location.exact_coordinates.bin_number"
               value: {
                 matcher: {
                   matcher_list: {
@@ -335,7 +539,7 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
         "Error encountered while matching the field `user`. This field would be preserved. Error "
         "details: Matching couldn't complete due to insufficient data.",
         {
-          FieldCheckResults result = request_field_checker.CheckField({}, &field);
+          FieldCheckResults result = request_field_checker.CheckField({"user"}, &field);
           EXPECT_EQ(result, FieldCheckResults::kInclude);
         });
   }
@@ -352,7 +556,7 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
         "Error encountered while matching the field `user`. This field would be preserved. Error "
         "details: Matching couldn't complete due to insufficient data.",
         {
-          FieldCheckResults result = response_field_checker.CheckField({}, &field);
+          FieldCheckResults result = response_field_checker.CheckField({"user"}, &field);
           EXPECT_EQ(result, FieldCheckResults::kInclude);
         });
   }
@@ -388,7 +592,7 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
 
     // Assert that kInclude is returned because standard matching behavior dictates that
     // if an action is unknown to this specific filter, it should default to preserving the field.
-    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
+    EXPECT_EQ(field_checker.CheckField({"user"}, &field), FieldCheckResults::kInclude);
   }
 
   {
@@ -411,7 +615,7 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
 
     // Assert that kInclude is returned because standard matching behavior dictates that
     // if an action is unknown to this specific filter, it should default to preserving the field.
-    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
+    EXPECT_EQ(field_checker.CheckField({"user"}, &field), FieldCheckResults::kInclude);
   }
 }
 
@@ -427,7 +631,19 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
     Protobuf::Field field;
     field.set_name("urn");
     field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
-    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
+    EXPECT_EQ(field_checker.CheckField({"urn"}, &field), FieldCheckResults::kInclude);
+  }
+
+  {
+    // The field `filter_criteria.publication_details.original_release_info.language` doesn't have
+    // any match tree configured.
+    Protobuf::Field field;
+    field.set_name("filter_criteria.publication_details.original_release_info.language");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    EXPECT_EQ(field_checker.CheckField(
+                  {"filter_criteria", "publication_details", "original_release_info", "language"},
+                  &field),
+              FieldCheckResults::kInclude);
   }
 
   {
@@ -436,7 +652,20 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
     Protobuf::Field field;
     field.set_name("shelf");
     field.set_kind(Protobuf::Field_Kind_TYPE_INT64);
-    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
+    EXPECT_EQ(field_checker.CheckField({"shelf"}, &field), FieldCheckResults::kInclude);
+  }
+
+  {
+    // The field `filter_criteria.publication_details.original_release_info.year` has a match tree
+    // configured which always evaluates to false. Hence, no match is found and CheckField returns
+    // kInclude.
+    Protobuf::Field field;
+    field.set_name("filter_criteria.publication_details.original_release_info.year");
+    field.set_kind(Protobuf::Field_Kind_TYPE_INT64);
+    EXPECT_EQ(
+        field_checker.CheckField(
+            {"filter_criteria", "publication_details", "original_release_info", "year"}, &field),
+        FieldCheckResults::kInclude);
   }
 
   {
@@ -447,7 +676,18 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
     Protobuf::Field field;
     field.set_name("id");
     field.set_kind(Protobuf::Field_Kind_TYPE_INT64);
-    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kExclude);
+    EXPECT_EQ(field_checker.CheckField({"id"}, &field), FieldCheckResults::kExclude);
+  }
+
+  {
+    // The field `filter_criteria.publication_details.original_release_info.region_code` has a match
+    // tree configured which always evaluates to true and has a match action configured of type
+    // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`
+    // and hence, CheckField returns kInclude.
+    Protobuf::Field field;
+    field.set_name("filter_criteria.publication_details.original_release_info.region_code");
+    field.set_kind(Protobuf::Field_Kind_TYPE_INT64);
+    EXPECT_EQ(field_checker.CheckField({"id"}, &field), FieldCheckResults::kExclude);
   }
 
   {
@@ -456,7 +696,18 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
     Protobuf::Field field;
     field.set_name("metadata");
     field.set_kind(Protobuf::Field_Kind_TYPE_MESSAGE);
-    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kPartial);
+    EXPECT_EQ(field_checker.CheckField({"metadata"}, &field), FieldCheckResults::kPartial);
+  }
+
+  {
+    // The field `filter_criteria.publication_details.original_release_info` is of message type and
+    // doesn't have any match tree configured for it. Hence, kPartial is expected.
+    Protobuf::Field field;
+    field.set_name("filter_criteria.publication_details.original_release_info");
+    field.set_kind(Protobuf::Field_Kind_TYPE_MESSAGE);
+    EXPECT_EQ(field_checker.CheckField(
+                  {"filter_criteria", "publication_details", "original_release_info"}, &field),
+              FieldCheckResults::kPartial);
   }
 }
 
@@ -472,7 +723,18 @@ TEST_F(FieldCheckerTest, ResponseFieldChecker) {
     Protobuf::Field field;
     field.set_name("author");
     field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
-    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
+    EXPECT_EQ(field_checker.CheckField({"author"}, &field), FieldCheckResults::kInclude);
+  }
+
+  {
+    // The field `fulfillment.primary_location.exact_coordinates.shelf_level` doesn't have any match
+    // tree configured.
+    Protobuf::Field field;
+    field.set_name("fulfillment.primary_location.exact_coordinates.shelf_level");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    EXPECT_EQ(field_checker.CheckField(
+                  {"fulfillment", "primary_location", "exact_coordinates", "shelf_level"}, &field),
+              FieldCheckResults::kInclude);
   }
 
   {
@@ -481,7 +743,18 @@ TEST_F(FieldCheckerTest, ResponseFieldChecker) {
     Protobuf::Field field;
     field.set_name("publisher");
     field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
-    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kInclude);
+    EXPECT_EQ(field_checker.CheckField({"publisher"}, &field), FieldCheckResults::kInclude);
+  }
+
+  {
+    // The field `fulfillment.primary_location.exact_coordinates.aisle` has a match tree configured
+    // which always evaluates to false. Hence, no match is found and CheckField returns kInclude.
+    Protobuf::Field field;
+    field.set_name("fulfillment.primary_location.exact_coordinates.aisle");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    EXPECT_EQ(field_checker.CheckField(
+                  {"fulfillment", "primary_location", "exact_coordinates", "aisle"}, &field),
+              FieldCheckResults::kInclude);
   }
 
   {
@@ -492,7 +765,20 @@ TEST_F(FieldCheckerTest, ResponseFieldChecker) {
     Protobuf::Field field;
     field.set_name("name");
     field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
-    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kExclude);
+    EXPECT_EQ(field_checker.CheckField({"name"}, &field), FieldCheckResults::kExclude);
+  }
+
+  {
+    // The field `fulfillment.primary_location.exact_coordinates.bin_number` has a match tree
+    // configured which always evaluates to true and has a match action configured of type
+    // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`
+    // and hence, CheckField returns kInclude.
+    Protobuf::Field field;
+    field.set_name("fulfillment.primary_location.exact_coordinates.bin_number");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    EXPECT_EQ(field_checker.CheckField(
+                  {"fulfillment", "primary_location", "exact_coordinates", "bin_number"}, &field),
+              FieldCheckResults::kExclude);
   }
 
   {
@@ -501,7 +787,18 @@ TEST_F(FieldCheckerTest, ResponseFieldChecker) {
     Protobuf::Field field;
     field.set_name("metadata");
     field.set_kind(Protobuf::Field_Kind_TYPE_MESSAGE);
-    EXPECT_EQ(field_checker.CheckField({}, &field), FieldCheckResults::kPartial);
+    EXPECT_EQ(field_checker.CheckField({"metadata"}, &field), FieldCheckResults::kPartial);
+  }
+
+  {
+    // The field `fulfillment.primary_location.exact_coordinates` is of message type and doesn't
+    // have any match tree configured for it. Hence, kPartial is expected.
+    Protobuf::Field field;
+    field.set_name("fulfillment.primary_location.exact_coordinates");
+    field.set_kind(Protobuf::Field_Kind_TYPE_MESSAGE);
+    EXPECT_EQ(
+        field_checker.CheckField({"fulfillment", "primary_location", "exact_coordinates"}, &field),
+        FieldCheckResults::kPartial);
   }
 }
 
@@ -519,7 +816,7 @@ TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
       "Error encountered while matching the field `user`. This field would be preserved. Internal "
       "error details: Unsupported scrubber context enum value: `0`. Supported values are: {1, 2}.",
       {
-        FieldCheckResults result = field_checker.CheckField({}, &field);
+        FieldCheckResults result = field_checker.CheckField({"user"}, &field);
         EXPECT_EQ(result, FieldCheckResults::kInclude);
       });
 }
