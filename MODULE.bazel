@@ -1,0 +1,23 @@
+module(
+    name = "envoy",
+    version = "1.37.0-dev",
+)
+
+bazel_dep(name = "envoy_api", version = "1.37.0-dev")
+bazel_dep(name = "envoy_build_config", version = "1.37.0-dev")
+bazel_dep(name = "envoy_mobile", version = "1.37.0-dev")
+
+local_path_override(
+    module_name = "envoy_api",
+    path = "api",
+)
+
+local_path_override(
+    module_name = "envoy_build_config",
+    path = "mobile/envoy_build_config",
+)
+
+local_path_override(
+    module_name = "envoy_mobile",
+    path = "mobile",
+)

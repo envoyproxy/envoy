@@ -67,9 +67,10 @@ public:
                     absl::optional<size_t> max_length, GetMetadataFunction get);
 
   // StreamInfoFormatterProvider
-  absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override;
-  // Don't hide the other structure of formatValue.
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
   using StreamInfoFormatterProvider::formatValue;
+  absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
@@ -193,6 +194,8 @@ private:
       "US_TX_END"; // Upstream request sending end.
   static constexpr absl::string_view FirstUpstreamRxByteReceived =
       "US_RX_BEG"; // Upstream response receiving begin.
+  static constexpr absl::string_view FirstUpstreamRxBodyReceived =
+      "US_RX_BODY_BEG"; // Upstream response body receiving begin.
   static constexpr absl::string_view LastUpstreamRxByteReceived =
       "US_RX_END"; // Upstream response receiving end.
   static constexpr absl::string_view FirstDownstreamTxByteSent =

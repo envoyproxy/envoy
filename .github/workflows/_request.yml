@@ -58,14 +58,14 @@ jobs:
       caches: ${{ steps.caches.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.29
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.29
       id: checkout
       name: Checkout Envoy repository (requested)
       with:
@@ -79,7 +79,7 @@ jobs:
     # *ALL* variables collected should be treated as untrusted and should be sanitized before
     # use
     - name: Generate environment variables from commit
-      uses: envoyproxy/toolshed/gh-actions/envoy/ci/request@actions-v0.3.28
+      uses: envoyproxy/toolshed/gh-actions/envoy/ci/request@actions-v0.3.29
       id: env
       with:
         branch-name: ${{ steps.checkout.outputs.branch-name }}
@@ -90,7 +90,7 @@ jobs:
         vars: ${{ toJSON(vars) }}
         working-directory: requested
 
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.29
       id: checkout-target
       name: Checkout Envoy repository (target branch)
       with:
@@ -98,7 +98,7 @@ jobs:
         config: |
           fetch-depth: 1
           path: target
-    - uses: envoyproxy/toolshed/gh-actions/hashfiles@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/hashfiles@actions-v0.3.29
       id: bazel-cache-hash
       name: Bazel cache hash
       with:
@@ -107,7 +107,7 @@ jobs:
 
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/gh-actions/github/env/summary@actions-v0.3.28
+      uses: envoyproxy/toolshed/gh-actions/github/env/summary@actions-v0.3.29
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -123,7 +123,7 @@ jobs:
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
 
     - name: Environment data
-      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.28
+      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.29
       id: data
       with:
         input: |
@@ -166,18 +166,18 @@ jobs:
         path: /tmp/cache
         key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}-arm64
 
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.29
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cache-key }}
 
-    - uses: envoyproxy/toolshed/gh-actions/gcs/cache/exists@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/gcs/cache/exists@actions-v0.3.29
       name: Check GCS bucket cache (x64)
       id: cache-exists-bazel-x64
       with:
         bucket: ${{ inputs.gcs-cache-bucket }}
         key: ${{ fromJSON(steps.data.outputs.value).config.ci.cache.bazel }}-x64
-    - uses: envoyproxy/toolshed/gh-actions/gcs/cache/exists@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/gcs/cache/exists@actions-v0.3.29
       name: Check GCS bucket cache (arm64)
       id: cache-exists-bazel-arm64
       with:
@@ -185,7 +185,7 @@ jobs:
         key: ${{ fromJSON(steps.data.outputs.value).config.ci.cache.bazel }}-arm64
 
     - name: Caches
-      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.28
+      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.29
       id: caches
       with:
         input-format: yaml

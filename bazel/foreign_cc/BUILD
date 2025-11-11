@@ -159,11 +159,6 @@ configure_make(
         "--disable-shared",
         "--enable-static",
     ],
-    # Workaround for the issue with statically linked libstdc++
-    # using -l:libstdc++.a.
-    env = {
-        "CXXFLAGS": "--static -lstdc++ -Wno-unused-command-line-argument",
-    },
     lib_source = "@net_colm_open_source_colm//:all",
     out_binaries = ["colm"],
     tags = ["skip_on_windows"],
@@ -181,11 +176,6 @@ configure_make(
         "--enable-static",
         "--with-colm=$$EXT_BUILD_DEPS/colm",
     ],
-    # Workaround for the issue with statically linked libstdc++
-    # using -l:libstdc++.a.
-    env = {
-        "CXXFLAGS": "--static -lstdc++ -Wno-unused-command-line-argument",
-    },
     lib_source = "@net_colm_open_source_ragel//:all",
     out_binaries = ["ragel"],
     tags = ["skip_on_windows"],
