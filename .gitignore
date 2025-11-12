@@ -1,75 +1,130 @@
-# Dot files, disallow by default, and enable explicitly
-\.*
-!\.azure-pipelines
-!\.bazelci
-!\.bazelignore
-!\.bazelrc
-!\.bazelproject
-!\.bazelversion
-!\.circleci
-!\.clang-format
-!\.clang-tidy
-!\.coveragerc
-!\.devcontainer
-!\.dockerignore
-!\.eslintrc.yml
-!\.flake8
-!\.gitattributes
-!\.github
-!\.gitignore
-!\.python-version
-!\.style.yapf
-!\.yamllint
-!\.yapfignore
-!\.zuul
-!\.zuul.yaml
+#############################
+# Repository ignore strategy
+# - Global rules live here.
+# - Dotfiles are ignored by default; explicitly allow tracked ones below.
+# - Subdirectory .gitignore files should contain only folder-specific exceptions
+#   not covered by the root rules.
+# - Prefer short, commented sections; avoid duplicates.
+#############################
 
+#############################
+# Dotfiles: ignore by default
+#############################
+\.*
+!.azure-pipelines
+!.bazelci
+!.bazelignore
+!.bazelrc
+!.bazelproject
+!.bazelversion
+!.bcr
+!.circleci
+!.clang-format
+!.clang-tidy
+!.coveragerc
+!.devcontainer
+!.dockerignore
+!.eslintrc.yml
+!.flake8
+!.gitattributes
+!.github
+!.gitignore
+!.python-version
+!.style.yapf
+!.yamllint
+!.yapfignore
+!.zuul
+!.zuul.yaml
+
+#############################
+# Bazel & build system
+#############################
+/api/bazel-*
 /bazel-*
+/ci/bazel-*
 /mobile/bazel-*
-BROWSE
+bazel.output.txt
+clang.bazelrc
+compile_commands.json
+user.bazelrc
+*.bzlc
+
+#############################
+# Build artifacts and tooling
+#############################
 /build
 /build_*
-*.bzlc
-/ci/bazel-*
-compile_commands.json
-cscope.*
-/docs/landing_source/.bundle
-/generated
-*.pyc
-**/pyformat
-SOURCE_VERSION
-*.swap*
-tags
-TAGS
-/test/coverage/BUILD
-/tools/spelling/.aspell.en.pws
-clang-tidy-fixes.yaml
-clang.bazelrc
-user.bazelrc
+BROWSE
 CMakeLists.txt
 cmake-build-debug
-/linux
-bazel.output.txt
-*~
-**/.DS_Store
-**/*.iml
-tools/dev/src
-distribution/custom
-examples/websocket/certs
-/contrib/golang/**/test_data/go.sum
-/contrib/golang/**/test_data/*/go.sum
+cscope.*
+/clang-tidy-fixes.yaml
+/generated
+SOURCE_VERSION
+/test/coverage/BUILD
+/tools/spelling/.aspell.en.pws
+tags
+TAGS
 
-examples/single-page-app/xds/lds.yml
-!examples/single-page-app/ui/.env
+#############################
+# Language-specific
+#############################
+# Python
+*.pyc
+__pycache__/
+**/pyformat
+
+# Node / frontend
+dist
+node_modules
+
+# Java/JetBrains
+**/*.iml
+
+# Rust
+**/rust/**/target
+
+#############################
+# OS/editor cruft
+#############################
+**/.DS_Store
+*~
+*.bak
+*.swap*
+*.swp
+*.swo
+
+#############################
 # Logs
-logs
+#############################
 *.log
+lerna-debug.log*
+logs
 npm-debug.log*
+pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-node_modules
-dist
-*.bak
+
+#############################
+# Project-specific
+#############################
+/contrib/golang/**/test_data/go.sum
+/contrib/golang/**/test_data/*/go.sum
+/devcontainer/devcontainer.env
+/docs/landing_source/.bundle
+/linux
+distribution/custom
+examples/single-page-app/xds/lds.yml
+examples/websocket/certs
+tools/dev/src
 tools/dependency/cve_data
+mobile/build_*
+mobile/generated
+mobile/test/coverage/BUILD
+mobile/tmp
+mobile/*.xcodeproj
+mobile/*.xcframework
+mobile/*.doccarchive
+mobile/*.tulsiconf-user
+mobile/tulsi-workspace
+test/extensions/dynamic_modules/test_data/rust/Cargo.lock

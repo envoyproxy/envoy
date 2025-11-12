@@ -5069,11 +5069,11 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
 class AllowForceFail : public Api::OsSysCallsImpl {
 public:
   void startFailing() {
-    absl::MutexLock m(&mutex_);
+    absl::MutexLock m(mutex_);
     fail_ = true;
   }
   Api::SysCallSocketResult socket(int domain, int type, int protocol) override {
-    absl::MutexLock m(&mutex_);
+    absl::MutexLock m(mutex_);
     if (fail_) {
       return {-1, 1};
     }

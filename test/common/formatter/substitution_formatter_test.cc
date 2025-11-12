@@ -4249,14 +4249,16 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     const std::string format = "{{%PROTOCOL%}}   %RESP(not_exist)%++%RESP(test)% "
-                               "%REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%"
-                               "\t@%TRAILER(THIRD)%@\t%TRAILER(TEST?TEST-2)%[]";
+                               "%REQ(FIRST?SECOND)%/%REQUEST_HEADER(FIRST?SECOND)% "
+                               "%RESP(FIRST?SECOND)%/%RESPONSE_HEADER(FIRST?SECOND)% "
+                               "\t@%TRAILER(THIRD)%@\t%TRAILER(TEST?TEST-2)%[] "
+                               "%RESPONSE_TRAILER(THIRD)%";
     FormatterPtr formatter = *FormatterImpl::create(format, false);
 
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-    EXPECT_EQ("{{HTTP/1.1}}   -++test GET PUT\t@POST@\ttest-2[]",
+    EXPECT_EQ("{{HTTP/1.1}}   -++test GET/GET PUT/PUT \t@POST@\ttest-2[] POST",
               formatter->format(formatter_context, stream_info));
   }
 

@@ -516,18 +516,6 @@ public:
                              absl::Status status,
                              envoy::config::core::v3::TrafficDirection traffic_direction);
 
-  Envoy::Http::LocalErrorStatus
-  onLocalReply(const Envoy::Http::StreamFilterBase::LocalReplyData&) override {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_ext_proc_on_local_reply")) {
-      ENVOY_STREAM_LOG(debug,
-                       "When onLocalReply() is called, set processing_complete_ to true to skip "
-                       "external processing",
-                       *decoder_callbacks_);
-      processing_complete_ = true;
-    }
-    return ::Envoy::Http::LocalErrorStatus::Continue;
-  }
-
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
@@ -589,6 +577,15 @@ private:
       const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& config,
       Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
       Server::Configuration::CommonFactoryContext& context);
+
+  // Gracefully close the gRPC stream based on configuration.
+  void closeStreamMaybeGraceful();
+
+  // Closing the gRPC stream if the last ProcessingResponse is received.
+  // This stream closing optimization only applies to STREAMED or FULL_DUPLEX_STREAMED body modes.
+  // For other body modes like BUFFERED or BUFFERED_PARTIAL, it is ignored.
+  void closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
+                                         const bool is_last_body_resp);
 
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;

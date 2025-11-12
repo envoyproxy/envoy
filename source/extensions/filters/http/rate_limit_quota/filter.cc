@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -31,11 +32,15 @@ namespace HttpFilters {
 namespace RateLimitQuota {
 
 const char kBucketMetadataNamespace[] = "envoy.extensions.http_filters.rate_limit_quota.bucket";
+const char kPreviewBucketMetadataNamespace[] =
+    "envoy.extensions.http_filters.rate_limit_quota.preview_bucket";
 
 using envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
 using envoy::type::v3::RateLimitStrategy;
 using NoAssignmentBehavior = RateLimitQuotaBucketSettings::NoAssignmentBehavior;
 using DenyResponseSettings = RateLimitQuotaBucketSettings::DenyResponseSettings;
+
+namespace {
 
 // Returns whether or not to allow a request based on the no-assignment-behavior
 // & populates an action.
@@ -47,14 +52,37 @@ bool noAssignmentBehaviorShouldAllow(const NoAssignmentBehavior& no_assignment_b
 }
 
 // Translate from the HttpStatus Code enum to the Envoy::Http::Code enum.
-inline Envoy::Http::Code getDenyResponseCode(const DenyResponseSettings& settings) {
+Envoy::Http::Code getDenyResponseCode(const DenyResponseSettings& settings) {
   if (!settings.has_http_status()) {
     return Envoy::Http::Code::TooManyRequests;
   }
   return static_cast<Envoy::Http::Code>(static_cast<uint64_t>(settings.http_status().code()));
 }
 
-inline std::function<void(Http::ResponseHeaderMap&)>
+// Helper function to determine the gRPC status based on settings
+absl::optional<Grpc::Status::GrpcStatus> getGrpcStatus(const DenyResponseSettings& settings) {
+  // If explicit gRPC status is set, use it
+  if (settings.has_grpc_status()) {
+    return static_cast<Grpc::Status::GrpcStatus>(settings.grpc_status().code());
+  }
+
+  // Default behavior - let Envoy determine gRPC status from HTTP status
+  return absl::nullopt;
+}
+
+// Helper function to get the response body text (gRPC message for gRPC requests,
+// HTTP body for HTTP)
+std::string getResponseBodyText(const DenyResponseSettings& settings) {
+  // For gRPC requests with custom message, use the gRPC message as body text
+  if (settings.has_grpc_status() && !settings.grpc_status().message().empty()) {
+    return settings.grpc_status().message();
+  }
+
+  // Otherwise use the configured HTTP body
+  return settings.http_body().value();
+}
+
+std::function<void(Http::ResponseHeaderMap&)>
 addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
   if (settings.response_headers_to_add().empty()) {
     return nullptr;
@@ -70,33 +98,21 @@ addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
 Http::FilterHeadersStatus sendDenyResponse(Http::StreamDecoderFilterCallbacks* cb,
                                            const DenyResponseSettings& settings,
                                            StreamInfo::CoreResponseFlag flag) {
-  cb->sendLocalReply(getDenyResponseCode(settings),
-                     MessageUtil::bytesToString(settings.http_body().value()),
-                     addDenyResponseHeadersCb(settings), absl::nullopt, "");
+  cb->sendLocalReply(
+      getDenyResponseCode(settings), MessageUtil::bytesToString(getResponseBodyText(settings)),
+      addDenyResponseHeadersCb(settings), getGrpcStatus(settings), "rate_limited_by_quota");
   cb->streamInfo().setResponseFlag(flag);
   return Envoy::Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
-                                                              bool end_stream) {
-  ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
-  // First, perform the request matching.
-  absl::StatusOr<Matcher::ActionConstSharedPtr> match_result = requestMatching(headers);
-  if (!match_result.ok()) {
-    // When the request is not matched by any matchers, it is ALLOWED by default
-    // (i.e., fail-open) and its quota usage will not be reported to RLQS
-    // server.
-    // TODO(tyxia) Add stats here and other places throughout the filter. e.g.
-    // request allowed/denied, matching succeed/fail and so on.
-    ENVOY_LOG(debug,
-              "The request is not matched by any matchers: ", match_result.status().message());
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  }
+} // namespace
 
-  // Second, generate the bucket id for this request based on match action when
+Http::FilterHeadersStatus
+RateLimitQuotaFilter::recordBucketUsage(const Matcher::ActionConstSharedPtr& matched,
+                                        bool is_preview_match) {
+  // Generate the bucket id for this request based on match action when
   // the request matching succeeds.
-  const RateLimitOnMatchAction& match_action =
-      match_result.value()->getTyped<RateLimitOnMatchAction>();
+  const RateLimitOnMatchAction& match_action = matched->getTyped<RateLimitOnMatchAction>();
   absl::StatusOr<BucketId> ret =
       match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
   if (!ret.ok()) {
@@ -117,7 +133,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   for (const auto& bucket : bucket_id_proto.bucket()) {
     (*bucket_log_fields)[bucket.first] = ValueUtil::stringValue(bucket.second);
   }
-  callbacks_->streamInfo().setDynamicMetadata(kBucketMetadataNamespace, bucket_log);
+  callbacks_->streamInfo().setDynamicMetadata(
+      is_preview_match ? kPreviewBucketMetadataNamespace : kBucketMetadataNamespace, bucket_log);
 
   // Settings needed if a cached bucket or default behavior decides to deny.
   const DenyResponseSettings& deny_response_settings =
@@ -176,12 +193,45 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   ENVOY_LOG(debug, "Requesting addition to the global RLQS bucket cache: ",
             bucket_id_proto.ShortDebugString());
 
-  if (shouldAllowInitialRequest) {
+  if (shouldAllowInitialRequest || is_preview_match) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
   return sendDenyResponse(callbacks_, deny_response_settings,
                           StreamInfo::CoreResponseFlag::ResponseFromCacheFilter);
+}
+
+Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                              bool end_stream) {
+  ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
+  // First, perform the request matching.
+  absl::StatusOr<Matcher::ActionConstSharedPtr> match_result = requestMatching(headers);
+  if (!match_result.ok()) {
+    // When the request is not matched by any matchers, it is ALLOWED by default
+    // (i.e., fail-open) and its quota usage will not be reported to RLQS
+    // server.
+    // TODO(tyxia) Add stats here and other places throughout the filter. e.g.
+    // request allowed/denied, matching succeed/fail and so on.
+    ENVOY_LOG(debug,
+              "The request is not matched by any matchers: ", match_result.status().message());
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+
+  return recordBucketUsage(std::move(*match_result), false);
+}
+
+void RateLimitQuotaFilter::handlePreviewMatch(const Matcher::ActionConstSharedPtr& skipped_action) {
+  // The first skipped match is the one that would have been hit if the matcher
+  // wasn't in preview mode.
+  if (!first_skipped_match_) {
+    return;
+  }
+  first_skipped_match_ = false;
+
+  // Assumes non-nullptr input.
+  Http::FilterHeadersStatus status = recordBucketUsage(skipped_action, true);
+  ENVOY_LOG(debug, "Previewed matcher would have resulted in FilterHeadersStatus::{}",
+            (status == Http::FilterHeadersStatus::Continue) ? "Continue" : "StopIteration");
 }
 
 // TODO(tyxia) Currently request matching is only performed on the request
@@ -207,14 +257,20 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   }
 
   // Perform the matching.
-  Matcher::MatchResult match_result =
-      Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
+  Matcher::MatchResult match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(
+      *matcher_, *data_ptr_, [&](const Matcher::ActionConstSharedPtr& skipped_action) {
+        // The filter handles Matchers with keep_matching as if they're previewing changes.
+        return handlePreviewMatch(skipped_action);
+      });
   if (!match_result.isComplete()) {
     // The returned state from `evaluateMatch` function is `InsufficientData` here.
     return absl::InternalError("Unable to match due to the required data not being available.");
   }
-  if (!match_result.isMatch()) {
+  if (match_result.isNoMatch()) {
     return absl::NotFoundError("Matching completed but no match result was found.");
+  }
+  if (match_result.isInsufficientData()) {
+    return absl::InternalError("Matching completed but insufficient data was given.");
   }
   // Return the matched result for `on_match` case.
   return match_result.actionByMove();

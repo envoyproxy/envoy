@@ -1006,6 +1006,10 @@ public:
     return *lrs_report_metric_names_;
   }
 
+  const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override {
+    return shadow_policies_;
+  }
+
 protected:
   ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
                   const envoy::config::cluster::v3::Cluster& config,
@@ -1104,6 +1108,7 @@ private:
       const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
       happy_eyeballs_config_;
   const std::unique_ptr<const Envoy::Orca::LrsReportMetricNames> lrs_report_metric_names_;
+  const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
 
   // Keep small values like bools and enums at the end of the class to reduce
   // overhead via alignment

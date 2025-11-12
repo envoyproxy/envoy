@@ -1,18 +1,28 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 licenses(["notice"])  # Apache 2
 
 cc_library(
     name = "libprotobuf_mutator",
     srcs = glob(
         [
-            "src/**/*.cc",
-            "src/**/*.h",
-            "port/protobuf.h",
+            "src/*.cc",
+            "src/libfuzzer/*.cc",
         ],
-        exclude = ["**/*_test.cc"],
+        exclude = [
+            "src/*_test.cc",
+            "src/libfuzzer/*_test.cc",
+        ],
     ),
-    hdrs = ["src/libfuzzer/libfuzzer_macro.h"],
+    hdrs = glob([
+        "src/*.h",
+        "port/*.h",
+        "src/libfuzzer/*.h",
+    ]),
     include_prefix = "libprotobuf_mutator",
     includes = ["."],
     visibility = ["//visibility:public"],
-    deps = ["//external:protobuf"],
+    deps = [
+        "@com_google_protobuf//:protobuf",
+    ],
 )

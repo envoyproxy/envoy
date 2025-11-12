@@ -54,6 +54,8 @@ routing PRs, questions, etc. to the right place.
   * Request mirroring, data plane
 * Mike Krinkin ([krinkinmu](https://github.com/krinkinmu)) (krinkin.m.u@gmail.com)
   * Build, tooling.
+* Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
+  * CI, Build.
 
 # Envoy mobile maintainers
 
@@ -78,6 +80,8 @@ without further review.
   * Golang
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
   * Wasm, JWT, gRPC-JSON transcoder
+* Kuo-Chung Hsu ([juniorhsu](https://github.com/juniorhsu)) (CuveeHsu@gmail.com)
+  * Thrift
 
 # Envoy security team
 

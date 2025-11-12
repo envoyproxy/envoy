@@ -1,0 +1,48 @@
+diff --git a/Makefile.am b/Makefile.am
+index 7ccae53..691cb1f 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -1,13 +1,13 @@
+ ################################################################
+ #   BSD LICENSE
+-# 
++#
+ #   Copyright(c) 2007-2022 Intel Corporation. All rights reserved.
+ #   All rights reserved.
+-# 
++#
+ #   Redistribution and use in source and binary forms, with or without
+ #   modification, are permitted provided that the following conditions
+ #   are met:
+-# 
++#
+ #     * Redistributions of source code must retain the above copyright
+ #       notice, this list of conditions and the following disclaimer.
+ #     * Redistributions in binary form must reproduce the above copyright
+@@ -17,7 +17,7 @@
+ #     * Neither the name of Intel Corporation nor the names of its
+ #       contributors may be used to endorse or promote products derived
+ #       from this software without specific prior written permission.
+-# 
++#
+ #   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ #   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ #   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+@@ -29,7 +29,7 @@
+ #   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ #   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ #   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-# 
++#
+ ################################################################
+ 
+ ACLOCAL_AMFLAGS = -Im4
+@@ -245,7 +245,7 @@ lib@LIBQATNAME@_la_CFLAGS = -I$(srcdir)/quickassist/utilities/libusdm_drv \
+ 			    -D USER_SPACE \
+ 			    -D LAC_BYTE_ORDER=__LITTLE_ENDIAN \
+ 			    $(COMMON_FLAGS)
+-lib@LIBQATNAME@_la_LIBADD = libosal.la libadf.la lib@LIBUSDMNAME@.la -lcrypto
++lib@LIBQATNAME@_la_LIBADD = libosal.la libadf.la lib@LIBUSDMNAME@.la -lcrypto_internal
+ if !USE_CCODE_CRC
+ lib@LIBQATNAME@_la_LIBADD += crc32_gzip_refl_by8.lo crc64_ecma_norm_by8.lo
+ endif
