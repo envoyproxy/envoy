@@ -107,13 +107,28 @@ private:
   // Gets or creates a MetricData object for a given metric name.
   MetricData& getOrCreateMetric(absl::string_view metric_name);
 
-  // Sets common fields for a NumberDataPoint. For gauge metrics,
+  // Sets common fields for a data point.
+  // For gauge metrics,
   // temporality should be AGGREGATION_TEMPORALITY_UNSPECIFIED.
-  // When updating an existing data point during aggregation, attributes should be nullptr.
-  void setCommonNumberDataPoint(
-      ::opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
+  // For the aggregation case, attributes should be nullptr as they have already been
+  // set.
+  template <typename DataPoint>
+  void setCommonDataPoint(
+      DataPoint& data_point,
       const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>* attributes,
-      ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality);
+      ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality) {
+    data_point.set_time_unix_nano(snapshot_time_ns_);
+    if (attributes) {
+      data_point.mutable_attributes()->CopyFrom(*attributes);
+      // When attributes are present, set the start time for delta/cumulative metrics.
+      if (temporality != AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED) {
+        data_point.set_start_time_unix_nano(
+            temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
+                ? delta_start_time_ns_
+                : cumulative_start_time_ns_);
+      }
+    }
+  }
 
   const bool enable_metric_aggregation_;
   const int64_t snapshot_time_ns_;
