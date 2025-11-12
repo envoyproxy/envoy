@@ -103,6 +103,7 @@ common:clang-common --incompatible_enable_cc_toolchain_resolution=false
 # Clang with libc++ (default)
 common:clang --config=clang-common
 common:clang --config=libc++
+common:clang --action_env=LDFLAGS="-fuse-ld=lld"
 
 build:arm64-clang --config=clang
 
@@ -223,15 +224,12 @@ build:msan --copt -O1
 build:msan --copt -fno-optimize-sibling-calls
 
 common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
-common:libc++ --action_env=LDFLAGS=-stdlib=libc++
+common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
 common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 common:libc++ --define force_libcpp=enabled
 common:libc++ --@envoy//bazel:libc++=true
-
-
-
 
 # Optimize build for binary size reduction.
 build:sizeopt -c opt --copt -Os
