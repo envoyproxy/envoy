@@ -69,6 +69,9 @@ on:
       docker-cpus:
         type: number
         default: 0
+      docker-ci:
+        type: boolean
+        default: true
       docker-ipv6:
         default: true
         type: boolean
@@ -139,7 +142,7 @@ on:
       summary-post:
         type: string
         default: |
-          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@actions-v0.3.26
+          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@actions-v0.3.29
             with:
               context: %{{ inputs.context }}
       steps-pre:
@@ -201,7 +204,7 @@ jobs:
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.29
       id: started
       name: Create timestamp
       with:
@@ -209,7 +212,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.29
       name: Context
       id: context
       with:
@@ -231,12 +234,12 @@ jobs:
 
     - run: |
         mkdir ${{ runner.temp }}/container
-    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.29
       if: inputs.bind-mount
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.28
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.29
       if: inputs.diskspace-hack || github.event.repository.private
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
@@ -255,13 +258,13 @@ jobs:
       if: ${{ inputs.docker-ipv6 }}
 
     # Caches
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.29
       name: Setup GCP (cache)
       if: ${{ inputs.gcs-cache-bucket }}
       with:
         key: ${{ secrets.gcs-cache-key }}
         force-install: ${{ contains(fromJSON('["envoy-arm64-medium", "github-arm64-2c-8gb"]'), inputs.runs-on) }}
-    - uses: envoyproxy/toolshed/gh-actions/cache/restore@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/cache/restore@actions-v0.3.29
       if: ${{ inputs.gcs-cache-bucket }}
       name: >-
         Restore Bazel cache
@@ -281,12 +284,13 @@ jobs:
         key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
     - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.28
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.29
       with:
         image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
+        bind-mount: /mnt/docker
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.29
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -297,7 +301,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.29
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -314,7 +318,7 @@ jobs:
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.29
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -323,7 +327,7 @@ jobs:
         ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
 
     - name: Import GPG key
-      uses: envoyproxy/toolshed/gh-actions/gpg/import@actions-v0.3.28
+      uses: envoyproxy/toolshed/gh-actions/gpg/import@actions-v0.3.29
       if: ${{ inputs.import-gpg }}
       with:
         key: ${{ secrets.gpg-key }}
@@ -336,19 +340,12 @@ jobs:
       name: Configure PR Bazel settings
       if: >-
         ${{ fromJSON(inputs.request).request.pr != '' }}
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.28
-      name: Setup GCP (artefacts/rbe)
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.29
+      name: Setup GCP (artefacts)
       id: gcp
       with:
         key: ${{ secrets.gcp-key }}
         key-copy: ${{ inputs.rbe-google && runner.temp || '' }}
-    - run: |
-        GCP_SERVICE_ACCOUNT_KEY_FILE="$(basename "${{ steps.gcp.outputs.key-copy-path }}")"
-        echo "GCP_SERVICE_ACCOUNT_KEY_PATH=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE}" >> "$GITHUB_ENV"
-        BAZEL_BUILD_EXTRA_OPTIONS="--google_credentials=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE} --config=rbe-google"
-        echo "BAZEL_BUILD_EXTRA_OPTIONS=${BAZEL_BUILD_EXTRA_OPTIONS}" >> "$GITHUB_ENV"
-      if: ${{ steps.gcp.outputs.key-copy-path }}
-      name: Setup Google RBE
     - run: |
         echo "${{ vars.ENVOY_CI_BAZELRC }}" > repo.bazelrc
       if: ${{ vars.ENVOY_CI_BAZELRC }}
@@ -356,7 +353,7 @@ jobs:
 
     # NOTE: This is where untrusted code can be run!!!
     #  It MUST be the last step in the workflow
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.28
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.29
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
         args: ${{ inputs.args != '--' && inputs.args || inputs.target }}
@@ -410,3 +407,4 @@ jobs:
         CI_TARGET_BRANCH: ${{ fromJSON(inputs.request).request.target-branch }}
         MOUNT_GPG_HOME: ${{ inputs.import-gpg && 1 || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
+        ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}

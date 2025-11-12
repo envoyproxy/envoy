@@ -28,7 +28,11 @@ class EnvoyQuicClientSession : public QuicFilterManagerConnectionImpl,
 public:
   EnvoyQuicClientSession(
       const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
-      std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
+      std::unique_ptr<EnvoyQuicClientConnection> connection,
+      quic::QuicForceBlockablePacketWriter* absl_nullable writer,
+      EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* absl_nullable migration_helper,
+      const quic::QuicConnectionMigrationConfig& migration_config,
+      const quic::QuicServerId& server_id,
       std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, Event::Dispatcher& dispatcher,
       uint32_t send_buffer_limit,
       EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
@@ -68,6 +72,9 @@ public:
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
+
+  // quic::QuicClientSessionWithMigration
+  void StartDraining() override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
   std::vector<std::string> GetAlpnsToOffer() const override;
@@ -130,6 +137,7 @@ private:
   OptRef<QuicTransportSocketFactoryBase> transport_socket_factory_;
   std::vector<std::string> configured_alpns_;
   quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
+  const bool session_handles_migration_;
   QuicNetworkConnectivityObserverPtr network_connectivity_observer_;
   OptRef<EnvoyQuicNetworkObserverRegistry> registry_;
 };

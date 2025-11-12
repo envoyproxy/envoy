@@ -10,6 +10,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
+#include "absl/strings/str_format.h"
 #include "io/prometheus/client/metrics.pb.h"
 
 using namespace std::chrono_literals;
@@ -30,9 +31,11 @@ public:
   using MetricsServiceCallbacks =
       Grpc::AsyncStreamCallbacks<envoy::service::metrics::v3::StreamMetricsResponse>;
 
-  GrpcMetricsStreamerImplTest() {
+  GrpcMetricsStreamerImplTest() : GrpcMetricsStreamerImplTest(0) {}
+
+  explicit GrpcMetricsStreamerImplTest(uint32_t batch_size) {
     streamer_ = std::make_unique<GrpcMetricsStreamerImpl>(
-        Grpc::RawAsyncClientSharedPtr{async_client_}, local_info_);
+        Grpc::RawAsyncClientSharedPtr{async_client_}, local_info_, batch_size);
   }
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
@@ -79,7 +82,7 @@ TEST_F(GrpcMetricsStreamerImplTest, StreamFailure) {
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
           }));
-  EXPECT_CALL(local_info_, node());
+  ON_CALL(local_info_, node()).WillByDefault(testing::ReturnRef(local_info_.node_));
   auto metrics =
       std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
   streamer_->send(std::move(metrics));
@@ -386,6 +389,193 @@ TEST_F(MetricsServiceSinkTest, HistogramEmitModeHistogram) {
     EXPECT_TRUE(metric1.has_histogram());
   }));
   sink.flush(snapshot_);
+}
+
+// Test batching with batch_size > 0
+TEST_F(GrpcMetricsStreamerImplTest, BatchingWithMultipleBatches) {
+  // Create a new async client for this test to avoid shared_ptr lifecycle issues
+  auto batch_async_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
+  auto batch_streamer =
+      std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 2);
+
+  InSequence s;
+
+  // Start a stream and send batched metrics
+  MockMetricsStream stream;
+  MetricsServiceCallbacks* callbacks;
+  EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
+      .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
+                                             Grpc::RawAsyncStreamCallbacks& cb,
+                                             const Http::AsyncClient::StreamOptions&) {
+        callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
+        return &stream;
+      }));
+
+  // Identifier sent with first batch, then 2 more batches
+  EXPECT_CALL(local_info_, node());
+  // Expect 3 sendMessage calls (3 batches of 2, 2, 1 metrics)
+  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(3);
+
+  // Create 5 metrics - should result in 3 batches (2, 2, 1)
+  auto metrics =
+      std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
+  for (int i = 0; i < 5; i++) {
+    auto* metric = metrics->Add();
+    metric->set_name(absl::StrFormat("metric_%d", i));
+  }
+
+  batch_streamer->send(std::move(metrics));
+}
+
+// Test batching when metrics count equals batch_size
+TEST_F(GrpcMetricsStreamerImplTest, BatchingExactMatch) {
+  auto batch_async_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
+  auto batch_streamer =
+      std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 3);
+
+  InSequence s;
+
+  MockMetricsStream stream;
+  MetricsServiceCallbacks* callbacks;
+  EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
+      .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
+                                             Grpc::RawAsyncStreamCallbacks& cb,
+                                             const Http::AsyncClient::StreamOptions&) {
+        callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
+        return &stream;
+      }));
+
+  EXPECT_CALL(local_info_, node());
+  // Should result in 1 batch (with identifier included)
+  EXPECT_CALL(stream, sendMessageRaw_(_, false));
+
+  // Create exactly 3 metrics
+  auto metrics =
+      std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
+  for (int i = 0; i < 3; i++) {
+    auto* metric = metrics->Add();
+    metric->set_name(absl::StrFormat("metric_%d", i));
+  }
+
+  batch_streamer->send(std::move(metrics));
+}
+
+// Test batching when metrics count is less than batch_size
+TEST_F(GrpcMetricsStreamerImplTest, BatchingSmallerThanBatchSize) {
+  auto batch_async_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
+  auto batch_streamer =
+      std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 100);
+
+  InSequence s;
+
+  MockMetricsStream stream;
+  MetricsServiceCallbacks* callbacks;
+  EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
+      .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
+                                             Grpc::RawAsyncStreamCallbacks& cb,
+                                             const Http::AsyncClient::StreamOptions&) {
+        callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
+        return &stream;
+      }));
+
+  EXPECT_CALL(local_info_, node());
+  // Should send all in one batch (with identifier included)
+  EXPECT_CALL(stream, sendMessageRaw_(_, false));
+
+  // Create only 5 metrics (less than batch_size)
+  auto metrics =
+      std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
+  for (int i = 0; i < 5; i++) {
+    auto* metric = metrics->Add();
+    metric->set_name(absl::StrFormat("metric_%d", i));
+  }
+
+  batch_streamer->send(std::move(metrics));
+}
+
+// Test no batching with batch_size = 0 (default behavior)
+TEST_F(GrpcMetricsStreamerImplTest, NoBatchingWithZeroBatchSize) {
+  // Default constructor uses batch_size = 0
+  InSequence s;
+
+  MockMetricsStream stream;
+  MetricsServiceCallbacks* callbacks;
+  expectStreamStart(stream, &callbacks);
+
+  EXPECT_CALL(local_info_, node());
+  // Should send all in one message (no batching, with identifier included)
+  EXPECT_CALL(stream, sendMessageRaw_(_, false));
+
+  // Create many metrics
+  auto metrics =
+      std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
+  for (int i = 0; i < 1000; i++) {
+    auto* metric = metrics->Add();
+    metric->set_name(absl::StrFormat("metric_%d", i));
+  }
+
+  streamer_->send(std::move(metrics));
+}
+
+// Test empty metrics with batching
+TEST_F(GrpcMetricsStreamerImplTest, BatchingWithEmptyMetrics) {
+  auto batch_async_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
+  auto batch_streamer =
+      std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 10);
+
+  InSequence s;
+
+  MockMetricsStream stream;
+  MetricsServiceCallbacks* callbacks;
+  EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
+      .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
+                                             Grpc::RawAsyncStreamCallbacks& cb,
+                                             const Http::AsyncClient::StreamOptions&) {
+        callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
+        return &stream;
+      }));
+
+  EXPECT_CALL(local_info_, node());
+  // Should send one message (with identifier included)
+  EXPECT_CALL(stream, sendMessageRaw_(_, false));
+
+  auto metrics =
+      std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
+
+  batch_streamer->send(std::move(metrics));
+}
+
+// Test batching with batch_size = 1
+TEST_F(GrpcMetricsStreamerImplTest, BatchingSizeOne) {
+  auto batch_async_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
+  auto batch_streamer =
+      std::make_unique<GrpcMetricsStreamerImpl>(batch_async_client, local_info_, 1);
+
+  InSequence s;
+
+  MockMetricsStream stream;
+  MetricsServiceCallbacks* callbacks;
+  EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
+      .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
+                                             Grpc::RawAsyncStreamCallbacks& cb,
+                                             const Http::AsyncClient::StreamOptions&) {
+        callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
+        return &stream;
+      }));
+
+  EXPECT_CALL(local_info_, node());
+  // Expect 3 batches (first one includes identifier)
+  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(3);
+
+  // Create 3 metrics - should result in 3 batches of 1 each
+  auto metrics =
+      std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
+  for (int i = 0; i < 3; i++) {
+    auto* metric = metrics->Add();
+    metric->set_name(absl::StrFormat("metric_%d", i));
+  }
+
+  batch_streamer->send(std::move(metrics));
 }
 
 } // namespace

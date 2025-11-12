@@ -41,6 +41,9 @@ jobs:
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       downloads: ${{ matrix.downloads }}
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
@@ -57,6 +60,19 @@ jobs:
           downloads: |
             oci.arm64: container/build_images
             oci.x64: container/build_images
+          bind-mounts: |
+            - src: /mnt/workspace
+              target: GITHUB_WORKSPACE
+              chown: "runner:runner"
+            - src: /mnt/runner
+              target: RUNNER_TEMP/container/bazel_root
+              chown: "runner:runner"
+            - src: /mnt/docker
+              target: /var/lib/docker
+              rm: true
+              command-pre: sudo systemctl stop docker
+              command-post: sudo systemctl start docker
+
           rbe: false
           source: |
             export NO_BUILD_SETUP=1
@@ -145,6 +161,9 @@ jobs:
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ./ci/run_envoy_docker.sh
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       downloads: |
         release.signed: container/release.signed
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}

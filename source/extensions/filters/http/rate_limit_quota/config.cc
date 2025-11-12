@@ -42,12 +42,16 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
 
   RateLimitOnMatchActionContext action_context;
   RateLimitQuotaValidationVisitor visitor;
+  visitor.setSupportKeepMatching(true);
   Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext> matcher_factory(
       action_context, context.serverFactoryContext(), visitor);
 
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher = nullptr;
   if (config->has_bucket_matchers()) {
     matcher = matcher_factory.create(config->bucket_matchers())();
+  }
+  if (!visitor.errors().empty()) {
+    throw EnvoyException(absl::StrJoin(visitor.errors(), "\n"));
   }
 
   std::string rlqs_server_target = config->rlqs_server().has_envoy_grpc()
