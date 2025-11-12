@@ -1526,7 +1526,7 @@ envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_http_callout(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t callout_id,
     envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
-    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size,
     uint64_t timeout_milliseconds) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
