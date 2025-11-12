@@ -89,9 +89,9 @@ message MethodRestrictions {
   // rule takes precedence for the method itself over field-level or
   // message-level rules. The 'matcher' within RestrictionConfig will determine
   // if the method is denied/scrubbed. If the matcher evaluates to true:
-  // - The request is **rejected early** by the filter returning
-  //   Envoy::Http::FilterHeadersStatus::StopIteration and sending a local
-  //   reply (e.g., HTTP 404 Not Found).
+  // - The request is **denied**, and further processing is stopped.
+  // - The implementation should generate an immediate error response
+  //   (e.g., an HTTP 403 Forbidden status) and send it to the client.
   RestrictionConfig method_restriction = 3;
 }
 

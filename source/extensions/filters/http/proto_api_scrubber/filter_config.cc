@@ -87,37 +87,18 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
     for (const auto& method_restriction_pair : proto_config.restrictions().method_restrictions()) {
       const std::string& method_name = method_restriction_pair.first;
       const auto& method_config = method_restriction_pair.second;
-      absl::Status name_status = validateMethodName(method_name);
-      if (!name_status.ok()) {
-        return name_status;
-      }
-
-      absl::Status req_field_status =
-          initializeMethodFieldRestrictions(method_name, request_field_restrictions_,
-                                            method_config.request_field_restrictions(), context);
-      if (!req_field_status.ok()) {
-        return req_field_status;
-      }
-
-      absl::Status res_field_status =
-          initializeMethodFieldRestrictions(method_name, response_field_restrictions_,
-                                            method_config.response_field_restrictions(), context);
-      if (!res_field_status.ok()) {
-        return res_field_status;
-      }
-
-      absl::Status method_level_status =
-          initializeMethodLevelRestrictions(method_name, method_config, context);
-      if (!method_level_status.ok()) {
-        return method_level_status;
-      }
+      RETURN_IF_ERROR(validateMethodName(method_name));
+      RETURN_IF_ERROR(initializeMethodFieldRestrictions(method_name, request_field_restrictions_,
+                                                        method_config.request_field_restrictions(),
+                                                        context));
+      RETURN_IF_ERROR(initializeMethodFieldRestrictions(method_name, response_field_restrictions_,
+                                                        method_config.response_field_restrictions(),
+                                                        context));
+      RETURN_IF_ERROR(initializeMethodLevelRestrictions(method_name, method_config, context));
     }
 
-    absl::Status msg_status =
-        initializeMessageRestrictions(proto_config.restrictions().message_restrictions(), context);
-    if (!msg_status.ok()) {
-      return msg_status;
-    }
+    RETURN_IF_ERROR(
+        initializeMessageRestrictions(proto_config.restrictions().message_restrictions(), context));
   }
 
   ENVOY_LOG(trace, "Filter config initialized successfully.");
