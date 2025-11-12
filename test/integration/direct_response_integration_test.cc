@@ -45,6 +45,74 @@ public:
     EXPECT_EQ(body_content, response->body());
   }
 
+  // Test direct response with a body_format that uses %LOCAL_REPLY_BODY%, and no body is specified.
+  void testDirectResponseWithBodyFormatAndNoBody() {
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
+          auto* route_config = hcm.mutable_route_config();
+          auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
+
+          route->mutable_match()->set_prefix("/directfmt");
+
+          auto* direct_response = route->mutable_direct_response();
+          direct_response->set_status(200);
+          auto* body_format = direct_response->mutable_body_format();
+          body_format->mutable_text_format_source()->set_inline_string(
+              "prefix %LOCAL_REPLY_BODY% suffix");
+        });
+
+    initialize();
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+        {":method", "POST"},
+        {":path", "/directfmt"},
+        {":scheme", "http"},
+        {":authority", "host"},
+    });
+    auto response = std::move(encoder_decoder.second);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ("prefix  suffix", response->body());
+  }
+
+  // Test direct response with a body and a body_format that uses %LOCAL_REPLY_BODY%.
+  void testDirectResponseWithBodyFormat() {
+    const std::string body_content = "inner";
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
+          auto* route_config = hcm.mutable_route_config();
+          auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
+
+          route->mutable_match()->set_prefix("/directfmt");
+
+          auto* direct_response = route->mutable_direct_response();
+          direct_response->set_status(200);
+          direct_response->mutable_body()->set_inline_string(body_content);
+          auto* body_format = direct_response->mutable_body_format();
+          body_format->mutable_text_format_source()->set_inline_string(
+              "prefix %LOCAL_REPLY_BODY% suffix");
+        });
+
+    initialize();
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+        {":method", "POST"},
+        {":path", "/directfmt"},
+        {":scheme", "http"},
+        {":authority", "host"},
+    });
+    auto response = std::move(encoder_decoder.second);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ("prefix inner suffix", response->body());
+  }
+
   // Test direct response with a file as the body.
   void testDirectResponseFile() {
     TestEnvironment::writeStringToFileForTest("file_direct.txt", "dummy");
@@ -125,6 +193,14 @@ TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeLarge) {
 
 TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeSmall) {
   testDirectResponseBodySize(1);
+}
+
+TEST_P(DirectResponseIntegrationTest, DirectResponseWithBodyFormatAndNoBody) {
+  testDirectResponseWithBodyFormatAndNoBody();
+}
+
+TEST_P(DirectResponseIntegrationTest, DirectResponseWithBodyFormat) {
+  testDirectResponseWithBodyFormat();
 }
 
 TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseFile) { testDirectResponseFile(); }
