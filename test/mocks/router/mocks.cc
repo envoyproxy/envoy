@@ -18,6 +18,7 @@ namespace Envoy {
 namespace Router {
 
 MockDirectResponseEntry::MockDirectResponseEntry() = default;
+
 MockDirectResponseEntry::~MockDirectResponseEntry() = default;
 
 TestRetryPolicy::TestRetryPolicy() { num_retries_ = 1; }
