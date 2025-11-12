@@ -97,44 +97,6 @@ initGrpcService(const ExtProcPerRoute& config) {
   return absl::nullopt;
 }
 
-std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
-  std::vector<std::string> namespaces;
-  for (const auto& single_ns : ns) {
-    namespaces.emplace_back(single_ns);
-  }
-  return namespaces;
-}
-
-absl::optional<std::vector<std::string>>
-initUntypedForwardingNamespaces(const ExtProcPerRoute& config) {
-  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
-      !config.overrides().metadata_options().has_forwarding_namespaces()) {
-    return absl::nullopt;
-  }
-
-  return {initNamespaces(config.overrides().metadata_options().forwarding_namespaces().untyped())};
-}
-
-absl::optional<std::vector<std::string>>
-initTypedForwardingNamespaces(const ExtProcPerRoute& config) {
-  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
-      !config.overrides().metadata_options().has_forwarding_namespaces()) {
-    return absl::nullopt;
-  }
-
-  return {initNamespaces(config.overrides().metadata_options().forwarding_namespaces().typed())};
-}
-
-absl::optional<std::vector<std::string>>
-initUntypedReceivingNamespaces(const ExtProcPerRoute& config) {
-  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
-      !config.overrides().metadata_options().has_receiving_namespaces()) {
-    return absl::nullopt;
-  }
-
-  return {initNamespaces(config.overrides().metadata_options().receiving_namespaces().untyped())};
-}
-
 absl::optional<ProcessingMode> mergeProcessingMode(const FilterConfigPerRoute& less_specific,
                                                    const FilterConfigPerRoute& more_specific) {
   if (more_specific.disabled()) {
@@ -223,18 +185,21 @@ ProcessingMode allDisabledMode() {
 
 } // namespace
 
-FilterConfig::FilterConfig(const ExternalProcessor& config,
-                           const std::chrono::milliseconds message_timeout,
-                           const uint32_t max_message_timeout_ms, Stats::Scope& scope,
-                           const std::string& stats_prefix, bool is_upstream,
-                           Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-                           Server::Configuration::CommonFactoryContext& context)
-    : failure_mode_allow_(config.failure_mode_allow()),
+FilterConfig::FilterConfig(
+    const ExternalProcessor& config,
+    const std::chrono::milliseconds message_timeout,
+    const uint32_t max_message_timeout_ms, Stats::Scope& scope,
+    const std::string& stats_prefix, bool is_upstream,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+    Server::Configuration::CommonFactoryContext& context)
+    : proto_config_(config),
+      failure_mode_allow_(config.failure_mode_allow()),
       observability_mode_(config.observability_mode()),
       route_cache_action_(config.route_cache_action()),
-      deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
-                                                         DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
-      message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
+      deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
+          config, deferred_close_timeout, DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
+      message_timeout_(message_timeout),
+      max_message_timeout_ms_(max_message_timeout_ms),
       grpc_service_(getFilterGrpcService(config)),
       send_body_without_waiting_for_header_response_(
           config.send_body_without_waiting_for_header_response()),
@@ -244,22 +209,17 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       filter_metadata_(config.filter_metadata()),
       allow_mode_override_(config.allow_mode_override()),
       disable_immediate_response_(config.disable_immediate_response()),
-      allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
-      disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
-      is_upstream_(is_upstream), graceful_grpc_close_(Runtime::runtimeFeatureEnabled(
-                                     "envoy.reloadable_features.ext_proc_graceful_grpc_close")),
-      untyped_forwarding_namespaces_(
-          config.metadata_options().forwarding_namespaces().untyped().begin(),
-          config.metadata_options().forwarding_namespaces().untyped().end()),
-      typed_forwarding_namespaces_(
-          config.metadata_options().forwarding_namespaces().typed().begin(),
-          config.metadata_options().forwarding_namespaces().typed().end()),
-      untyped_receiving_namespaces_(
-          config.metadata_options().receiving_namespaces().untyped().begin(),
-          config.metadata_options().receiving_namespaces().untyped().end()),
+      allowed_headers_(initHeaderMatchers(
+          config.forward_rules().allowed_headers(), context)),
+      disallowed_headers_(initHeaderMatchers(
+          config.forward_rules().disallowed_headers(), context)),
+      is_upstream_(is_upstream),
+      graceful_grpc_close_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_graceful_grpc_close")),
       allowed_override_modes_(config.allowed_override_modes().begin(),
                               config.allowed_override_modes().end()),
-      expression_manager_(builder, context.localInfo(), config.request_attributes(),
+      expression_manager_(builder, context.localInfo(),
+                          config.request_attributes(),
                           config.response_attributes()),
       processing_request_modifier_factory_cb_(
           createProcessingRequestModifierCb(config, builder, context)),
@@ -502,36 +462,68 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     const ExtProcPerRoute& config,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     Server::Configuration::CommonFactoryContext& context)
-    : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
+    : disabled_(config.disabled()),
+      processing_mode_(initProcessingMode(config)),
       grpc_service_(initGrpcService(config)),
       grpc_initial_metadata_(config.overrides().grpc_initial_metadata().begin(),
                              config.overrides().grpc_initial_metadata().end()),
-      untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
-      typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
-      untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)),
+      untyped_forwarding_namespaces_(
+          (!config.has_overrides() ||
+           !config.overrides().has_metadata_options() ||
+           !config.overrides().metadata_options().has_forwarding_namespaces())
+              ? nullptr
+              : &config.overrides()
+                     .metadata_options()
+                     .forwarding_namespaces()
+                     .untyped()),
+      typed_forwarding_namespaces_(
+          (!config.has_overrides() ||
+           !config.overrides().has_metadata_options() ||
+           !config.overrides().metadata_options().has_forwarding_namespaces())
+              ? nullptr
+              : &config.overrides()
+                     .metadata_options()
+                     .forwarding_namespaces()
+                     .typed()),
+      untyped_receiving_namespaces_(
+          (!config.has_overrides() ||
+           !config.overrides().has_metadata_options() ||
+           !config.overrides().metadata_options().has_receiving_namespaces())
+              ? nullptr
+              : &config.overrides()
+                     .metadata_options()
+                     .receiving_namespaces()
+                     .untyped()),
       failure_mode_allow_(
           config.overrides().has_failure_mode_allow()
-              ? absl::optional<bool>(config.overrides().failure_mode_allow().value())
+              ? absl::optional<bool>(
+                    config.overrides().failure_mode_allow().value())
               : absl::nullopt),
-      processing_request_modifier_factory_cb_(
-          createProcessingRequestModifierCb(config.overrides(), builder, context)) {}
+      processing_request_modifier_factory_cb_(createProcessingRequestModifierCb(
+          config.overrides(), builder, context)) {}
 
-FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
-                                           const FilterConfigPerRoute& more_specific)
+FilterConfigPerRoute::FilterConfigPerRoute(
+    const FilterConfigPerRoute& less_specific,
+    const FilterConfigPerRoute& more_specific)
     : disabled_(more_specific.disabled()),
       processing_mode_(mergeProcessingMode(less_specific, more_specific)),
-      grpc_service_(more_specific.grpcService().has_value() ? more_specific.grpcService()
-                                                            : less_specific.grpcService()),
-      grpc_initial_metadata_(mergeGrpcInitialMetadata(less_specific, more_specific)),
-      untyped_forwarding_namespaces_(more_specific.untypedForwardingMetadataNamespaces().has_value()
-                                         ? more_specific.untypedForwardingMetadataNamespaces()
-                                         : less_specific.untypedForwardingMetadataNamespaces()),
-      typed_forwarding_namespaces_(more_specific.typedForwardingMetadataNamespaces().has_value()
-                                       ? more_specific.typedForwardingMetadataNamespaces()
-                                       : less_specific.typedForwardingMetadataNamespaces()),
-      untyped_receiving_namespaces_(more_specific.untypedReceivingMetadataNamespaces().has_value()
-                                        ? more_specific.untypedReceivingMetadataNamespaces()
-                                        : less_specific.untypedReceivingMetadataNamespaces()),
+      grpc_service_(more_specific.grpcService().has_value()
+                        ? more_specific.grpcService()
+                        : less_specific.grpcService()),
+      grpc_initial_metadata_(
+          mergeGrpcInitialMetadata(less_specific, more_specific)),
+      untyped_forwarding_namespaces_(
+          more_specific.untypedForwardingMetadataNamespaces() != nullptr
+              ? more_specific.untypedForwardingMetadataNamespaces()
+              : less_specific.untypedForwardingMetadataNamespaces()),
+      typed_forwarding_namespaces_(
+          more_specific.typedForwardingMetadataNamespaces() != nullptr
+              ? more_specific.typedForwardingMetadataNamespaces()
+              : less_specific.typedForwardingMetadataNamespaces()),
+      untyped_receiving_namespaces_(
+          more_specific.untypedReceivingMetadataNamespaces() != nullptr
+              ? more_specific.untypedReceivingMetadataNamespaces()
+              : less_specific.untypedReceivingMetadataNamespaces()),
       failure_mode_allow_(more_specific.failureModeAllow().has_value()
                               ? more_specific.failureModeAllow()
                               : less_specific.failureModeAllow()),
@@ -1964,32 +1956,37 @@ void Filter::mergePerRouteConfig() {
   // For metadata namespaces, we only override the existing value if we have a
   // value from our merged config. We indicate a lack of value from the merged
   // config with absl::nullopt
-
-  if (merged_config->untypedForwardingMetadataNamespaces().has_value()) {
-    untyped_forwarding_namespaces_ = merged_config->untypedForwardingMetadataNamespaces().value();
-    ENVOY_STREAM_LOG(
-        trace, "Setting new untyped forwarding metadata namespaces from per-route configuration",
-        *decoder_callbacks_);
-    decoding_state_.setUntypedForwardingMetadataNamespaces(untyped_forwarding_namespaces_);
-    encoding_state_.setUntypedForwardingMetadataNamespaces(untyped_forwarding_namespaces_);
+  if (merged_config->untypedForwardingMetadataNamespaces() != nullptr) {
+    ENVOY_STREAM_LOG(trace,
+                     "Setting new untyped forwarding metadata namespaces from "
+                     "per-route configuration",
+                     *decoder_callbacks_);
+    decoding_state_.setUntypedForwardingMetadataNamespaces(
+        *merged_config->untypedForwardingMetadataNamespaces());
+    encoding_state_.setUntypedForwardingMetadataNamespaces(
+        *merged_config->untypedForwardingMetadataNamespaces());
   }
 
-  if (merged_config->typedForwardingMetadataNamespaces().has_value()) {
-    typed_forwarding_namespaces_ = merged_config->typedForwardingMetadataNamespaces().value();
-    ENVOY_STREAM_LOG(
-        trace, "Setting new typed forwarding metadata namespaces from per-route configuration",
-        *decoder_callbacks_);
-    decoding_state_.setTypedForwardingMetadataNamespaces(typed_forwarding_namespaces_);
-    encoding_state_.setTypedForwardingMetadataNamespaces(typed_forwarding_namespaces_);
+  if (merged_config->typedForwardingMetadataNamespaces() != nullptr) {
+    ENVOY_STREAM_LOG(trace,
+                     "Setting new typed forwarding metadata namespaces from "
+                     "per-route configuration",
+                     *decoder_callbacks_);
+    decoding_state_.setTypedForwardingMetadataNamespaces(
+        *merged_config->typedForwardingMetadataNamespaces());
+    encoding_state_.setTypedForwardingMetadataNamespaces(
+        *merged_config->typedForwardingMetadataNamespaces());
   }
 
-  if (merged_config->untypedReceivingMetadataNamespaces().has_value()) {
-    untyped_receiving_namespaces_ = merged_config->untypedReceivingMetadataNamespaces().value();
-    ENVOY_STREAM_LOG(
-        trace, "Setting new untyped receiving metadata namespaces from per-route configuration",
-        *decoder_callbacks_);
-    decoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
-    encoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
+  if (merged_config->untypedReceivingMetadataNamespaces() != nullptr) {
+    ENVOY_STREAM_LOG(trace,
+                     "Setting new untyped receiving metadata namespaces from "
+                     "per-route configuration",
+                     *decoder_callbacks_);
+    decoding_state_.setUntypedReceivingMetadataNamespaces(
+        *merged_config->untypedReceivingMetadataNamespaces());
+    encoding_state_.setUntypedReceivingMetadataNamespaces(
+        *merged_config->untypedReceivingMetadataNamespaces());
   }
 
   if (merged_config->failureModeAllow().has_value()) {

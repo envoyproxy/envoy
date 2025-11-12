@@ -3607,6 +3607,7 @@ TEST_P(ExtProcIntegrationTest, SendBodyBufferedPartialWithTrailer) {
   processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
   handleUpstreamRequest();
+
   verifyDownstreamResponse(*response, 200);
 }
 
