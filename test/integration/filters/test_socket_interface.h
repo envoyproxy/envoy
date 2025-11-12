@@ -45,7 +45,7 @@ public:
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     dispatcher_ = &dispatcher;
     Test::IoSocketHandlePlatformImpl::initializeFileEvent(dispatcher, cb, trigger, events);
   }
@@ -54,7 +54,7 @@ public:
   // that this operation is inherently racy, nothing guarantees that the TestIoSocketHandle is not
   // deleted before the posted callback executes.
   void activateInDispatcherThread(uint32_t events) {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     RELEASE_ASSERT(dispatcher_ != nullptr, "null dispatcher");
     dispatcher_->post([this, events]() { activateFileEvents(events); });
   }

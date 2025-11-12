@@ -58,9 +58,7 @@ jobs:
         --//distribution:x64-release=//distribution:custom/x64/bin/release.tar.zst
         --//distribution:arm64-release=//distribution:custom/arm64/bin/release.tar.zst
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      diskspace-hack-paths: |
-        /opt/hostedtoolcache
-        /usr/local/.ghcup
+      diskspace-hack-paths:
       downloads: |
         packages.arm64: container/envoy/arm64/
         packages.x64: container/envoy/x64/

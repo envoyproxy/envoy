@@ -100,7 +100,7 @@ public:
 
   // Total bytes currently buffered across all known buffers.
   uint64_t totalBytesBuffered() const {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return total_buffer_size_;
   }
 

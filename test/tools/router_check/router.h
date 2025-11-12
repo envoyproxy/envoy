@@ -121,7 +121,8 @@ private:
   /*
    * Performs direct-response reply actions for a response entry.
    */
-  void sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry);
+  void sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry,
+                      Envoy::StreamInfo::StreamInfoImpl& stream_info);
 
   /**
    * Apply dynamic metadata to stream_info, similar to how the set_metadata filter works.

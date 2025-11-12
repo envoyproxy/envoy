@@ -839,7 +839,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
     for (size_t i = 0; i < upstreams.size(); ++i) {
       FakeUpstream& upstream = *upstreams[i];
       {
-        absl::MutexLock lock(&upstream.lock_);
+        absl::MutexLock lock(upstream.lock_);
         if (!upstream.isInitialized()) {
           return absl::InternalError(
               "Must initialize the FakeUpstream first by calling initializeServer().");
@@ -855,7 +855,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       }
 
       EXPECT_TRUE(upstream.runOnDispatcherThreadAndWait([&]() {
-        absl::MutexLock lock(&upstream.lock_);
+        absl::MutexLock lock(upstream.lock_);
         connection = std::make_unique<FakeHttpConnection>(
             upstream, upstream.consumeConnection(), upstream.http_type_, upstream.timeSystem(),
             Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,

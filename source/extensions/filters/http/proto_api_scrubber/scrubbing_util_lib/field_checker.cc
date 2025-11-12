@@ -4,6 +4,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
+#include "absl/strings/str_join.h"
 #include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
 
 namespace Envoy {
@@ -11,11 +12,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 
-FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
+FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
                                            const Protobuf::Field* field) const {
-  // Currently, this method only checks the top level request/response fields and hence, the field
-  // name itself represents the field_mask.
-  const std::string field_mask = field->name();
+  const std::string field_mask = absl::StrJoin(path, ".");
 
   MatchTreeHttpMatchingDataSharedPtr match_tree;
 
