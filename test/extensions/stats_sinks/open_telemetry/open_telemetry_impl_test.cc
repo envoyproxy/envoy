@@ -283,6 +283,7 @@ public:
     EXPECT_EQ(1, metric.gauge().data_points().size());
     EXPECT_EQ(value, metric.gauge().data_points()[0].as_int());
     EXPECT_EQ(expected_time_ns_, metric.gauge().data_points()[0].time_unix_nano());
+    EXPECT_EQ(0, metric.gauge().data_points()[0].start_time_unix_nano());
   }
 
   void expectSum(const opentelemetry::proto::metrics::v1::Metric& metric, std::string name,

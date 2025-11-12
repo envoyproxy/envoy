@@ -33,9 +33,19 @@ MetricAggregator::MetricData& MetricAggregator::getOrCreateMetric(absl::string_v
 
 void MetricAggregator::setCommonNumberDataPoint(
     NumberDataPoint& data_point,
-    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
+    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>* attributes,
+    AggregationTemporality temporality) {
   data_point.set_time_unix_nano(snapshot_time_ns_);
-  data_point.mutable_attributes()->CopyFrom(attributes);
+  if (attributes) {
+    data_point.mutable_attributes()->CopyFrom(*attributes);
+  }
+
+  if (temporality != AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED) {
+    data_point.set_start_time_unix_nano(
+        temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
+            ? delta_start_time_ns_
+            : cumulative_start_time_ns_);
+  }
 }
 
 void MetricAggregator::addGauge(
@@ -45,9 +55,9 @@ void MetricAggregator::addGauge(
     Metric metric;
     metric.set_name(metric_name);
     NumberDataPoint* data_point = metric.mutable_gauge()->add_data_points();
-    setCommonNumberDataPoint(*data_point, attributes);
+    setCommonNumberDataPoint(*data_point, &attributes,
+                             AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED);
     data_point->set_as_int(value);
-    data_point->set_time_unix_nano(snapshot_time_ns_);
     non_aggregated_metrics_.push_back(std::move(metric));
     return;
   }
@@ -59,8 +69,8 @@ void MetricAggregator::addGauge(
   if (it != metric_data.gauge_points.end()) {
     // If the data point exists, update it and return.
     NumberDataPoint* data_point = it->second;
-    // Update time for the existing data point.
-    data_point->set_time_unix_nano(snapshot_time_ns_);
+    setCommonNumberDataPoint(*data_point, nullptr,
+                             AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED);
 
     // Multiple stats are mapped to the same metric and we
     // aggregate by summing the new value to the existing one.
@@ -71,7 +81,8 @@ void MetricAggregator::addGauge(
   // If the data point does not exist, create a new one.
   NumberDataPoint* data_point = metric_data.metric.mutable_gauge()->add_data_points();
   metric_data.gauge_points[key] = data_point;
-  setCommonNumberDataPoint(*data_point, attributes);
+  setCommonNumberDataPoint(*data_point, &attributes,
+                           AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED);
   data_point->set_as_int(value);
   data_point->set_time_unix_nano(snapshot_time_ns_);
 }
@@ -86,12 +97,7 @@ void MetricAggregator::addCounter(
     metric.mutable_sum()->set_is_monotonic(true);
     metric.mutable_sum()->set_aggregation_temporality(temporality);
     NumberDataPoint* data_point = metric.mutable_sum()->add_data_points();
-    data_point->set_start_time_unix_nano(
-        temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
-            ? delta_start_time_ns_
-            : cumulative_start_time_ns_);
-    data_point->set_time_unix_nano(snapshot_time_ns_);
-    setCommonNumberDataPoint(*data_point, attributes);
+    setCommonNumberDataPoint(*data_point, &attributes, temporality);
     data_point->set_as_int(
         (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value);
     non_aggregated_metrics_.push_back(std::move(metric));
@@ -105,7 +111,7 @@ void MetricAggregator::addCounter(
     // If the data point exists, update it and return.
     NumberDataPoint* data_point = it->second;
     // Update time for the existing data point.
-    data_point->set_time_unix_nano(snapshot_time_ns_);
+    setCommonNumberDataPoint(*data_point, nullptr, temporality);
 
     // For DELTA, add the change since the last export. For CUMULATIVE, add the
     // total value.
@@ -120,12 +126,7 @@ void MetricAggregator::addCounter(
   metric_data.metric.mutable_sum()->set_is_monotonic(true);
   metric_data.metric.mutable_sum()->set_aggregation_temporality(temporality);
   metric_data.counter_points[key] = data_point;
-  data_point->set_start_time_unix_nano(temporality ==
-                                               AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
-                                           ? delta_start_time_ns_
-                                           : cumulative_start_time_ns_);
-  data_point->set_time_unix_nano(snapshot_time_ns_);
-  setCommonNumberDataPoint(*data_point, attributes);
+  setCommonNumberDataPoint(*data_point, &attributes, temporality);
   data_point->set_as_int(
       (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value);
 }

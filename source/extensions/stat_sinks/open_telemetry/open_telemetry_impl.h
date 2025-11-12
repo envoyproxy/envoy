@@ -107,10 +107,13 @@ private:
   // Gets or creates a MetricData object for a given metric name.
   MetricData& getOrCreateMetric(absl::string_view metric_name);
 
-  // Sets common fields for a NumberDataPoint.
+  // Sets common fields for a NumberDataPoint. For gauge metrics,
+  // temporality should be AGGREGATION_TEMPORALITY_UNSPECIFIED.
+  // When updating an existing data point during aggregation, attributes should be nullptr.
   void setCommonNumberDataPoint(
       ::opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>* attributes,
+      ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality);
 
   const bool enable_metric_aggregation_;
   const int64_t snapshot_time_ns_;
