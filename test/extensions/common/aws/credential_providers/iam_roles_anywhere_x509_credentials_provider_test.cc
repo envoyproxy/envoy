@@ -41,7 +41,6 @@ namespace Aws {
 //             Not After : Sep 25 10:16:07 2225 GMT
 //         Subject: C = XX, L = Default City, O = Default Company Ltd, CN = test-ecdsa.test
 //         Subject Public Key Info:
-//             Public Key Algorithm: id-ecPublicKey
 //                 Public-Key: (256 bit)
 //                 pub:
 //                     04:39:bd:3c:e8:92:d4:8f:10:d1:c6:f3:49:d0:02:
@@ -54,13 +53,10 @@ namespace Aws {
 //         X509v3 extensions:
 //             X509v3 Basic Constraints:
 //                 CA:FALSE
-//             X509v3 Authority Key Identifier:
-//                 keyid:F0:07:E9:48:15:D4:27:CA:BD:3D:52:B9:63:34:37:40:02:34:6D:2C
 //
 //             X509v3 Subject Key Identifier:
 //                 7E:13:23:B2:E5:45:55:18:E9:A2:9A:2D:60:88:E8:A0:4E:0D:B7:3F
 //             X509v3 Key Usage: critical
-//                 Digital Signature, Key Encipherment
 //             X509v3 Extended Key Usage:
 //                 TLS Web Server Authentication, TLS Web Client Authentication
 //     Signature Algorithm: ecdsa-with-SHA256
@@ -122,7 +118,6 @@ gZN3HWhC93c56uUZnMumIQej8nRciHTrdA==
 //             Not After : Sep 25 12:08:33 2225 GMT
 //         Subject: C = XX, L = Default City, O = Default Company Ltd, CN =
 //         test-ecdsa-p256-subordinate Subject Public Key Info:
-//             Public Key Algorithm: id-ecPublicKey
 //                 Public-Key: (256 bit)
 //                 pub:
 //                     04:c7:d0:66:fc:ce:dc:5e:11:30:ea:f9:7d:74:11:
@@ -137,8 +132,6 @@ gZN3HWhC93c56uUZnMumIQej8nRciHTrdA==
 //                 CA:TRUE
 //             X509v3 Subject Key Identifier:
 //                 2B:BC:CF:4E:63:DA:9F:12:54:04:FB:4A:B8:58:0B:A8:89:34:77:97
-//             X509v3 Authority Key Identifier:
-//                 keyid:F0:07:E9:48:15:D4:27:CA:BD:3D:52:B9:63:34:37:40:02:34:6D:2C
 //
 //     Signature Algorithm: ecdsa-with-SHA256
 //          30:44:02:20:21:24:51:54:36:42:1e:84:d2:77:e1:6f:b0:63:
@@ -269,13 +262,10 @@ BAUwAwEB/zAKBggqhkjOPQQDAgNIADBFAiB/JDje83oo4l2iXb8CtRo2KYKNDqTIvDkiYPjFHOA3
 //         X509v3 extensions:
 //             X509v3 Basic Constraints:
 //                 CA:FALSE
-//             X509v3 Authority Key Identifier:
-//                 keyid:62:4E:C4:FE:16:06:58:FF:82:87:43:6D:75:8F:2C:0A:C0:8A:71:27
 //
 //             X509v3 Subject Key Identifier:
 //                 2D:09:1B:BA:63:C2:4F:1A:88:0A:8D:0E:52:F4:42:17:76:9E:10:27
 //             X509v3 Key Usage: critical
-//                 Digital Signature, Key Encipherment
 //             X509v3 Extended Key Usage:
 //                 TLS Web Server Authentication, TLS Web Client Authentication
 //     Signature Algorithm: sha256WithRSAEncryption
