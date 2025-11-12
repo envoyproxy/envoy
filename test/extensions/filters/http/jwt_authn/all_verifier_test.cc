@@ -838,8 +838,8 @@ TEST_F(ExtractOnlyInNestedListTest, TwoGoodJwts) {
 
 TEST_F(ExtractOnlyInNestedListTest, WrongIssuers) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
-  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, OtherGoodToken},
-                                                {kOtherHeader, GoodToken}};
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{kExampleHeader, OtherGoodToken}, {kOtherHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
@@ -848,9 +848,7 @@ TEST_F(ExtractOnlyInNestedListTest, WrongIssuers) {
 
 class ExtractOnlyVsAllowMissingTest : public AllVerifierTest {
 protected:
-  void SetUp() override {
-    AllVerifierTest::SetUp();
-  }
+  void SetUp() override { AllVerifierTest::SetUp(); }
 };
 
 TEST_F(ExtractOnlyVsAllowMissingTest, ExtractOnlyWithBadJwt) {
@@ -911,9 +909,7 @@ TEST_F(ExtractOnlyVsAllowMissingTest, AllowMissingWithNoJwt) {
 
 class ExtractOnlyEdgeCasesTest : public AllVerifierTest {
 protected:
-  void SetUp() override {
-    AllVerifierTest::SetUp();
-  }
+  void SetUp() override { AllVerifierTest::SetUp(); }
 };
 
 TEST_F(ExtractOnlyEdgeCasesTest, ExtractOnlyWithMultipleProviders) {
