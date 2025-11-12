@@ -418,6 +418,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   if (config_->maxEarlyDataBytes().has_value()) {
     receive_before_connect_ = true;
     max_buffered_bytes_ = config_->maxEarlyDataBytes().value();
+    using_new_api_ = true;
     ENVOY_CONN_LOG(debug, "receive_before_connect enabled with max buffer size: {}",
                    read_callbacks_->connection(), max_buffered_bytes_);
   } else {
@@ -432,6 +433,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
       ENVOY_CONN_LOG(debug, "receive_before_connect is enabled (legacy)",
                      read_callbacks_->connection());
       receive_before_connect_ = true;
+      using_new_api_ = false; // Legacy mode
       // Use default buffer size for legacy mode.
       max_buffered_bytes_ = 65536;
     }
@@ -621,8 +623,13 @@ void Filter::UpstreamCallbacks::drain(Drainer& drainer) {
 
 Network::FilterStatus Filter::establishUpstreamConnection() {
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
+  ENVOY_CONN_LOG(debug, "establishUpstreamConnection called: cluster_name={}, route_={}",
+                 read_callbacks_->connection(), cluster_name, route_ != nullptr);
   Upstream::ThreadLocalCluster* thread_local_cluster =
       cluster_manager_.getThreadLocalCluster(cluster_name);
+
+  ENVOY_CONN_LOG(debug, "establishUpstreamConnection: thread_local_cluster={}",
+                 read_callbacks_->connection(), thread_local_cluster != nullptr);
 
   if (!thread_local_cluster) {
     auto odcds = config_->onDemandCds();
@@ -693,16 +700,29 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   }
 
   if (!maybeTunnel(*thread_local_cluster)) {
-    // Either cluster is unknown or there are no healthy hosts. tcpConnPool() increments
-    // cluster->trafficStats()->upstream_cx_none_healthy in the latter case.
+    // Either cluster is unknown, factory doesn't exist, there are no healthy hosts, or
+    // createGenericConnPool returned nullptr. Handle this gracefully.
     getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
     return Network::FilterStatus::StopIteration;
   }
-  // If receive before connect is set, allow the FilterChain iteration to
-  // continue so that the other filters in the filter chain can process the data.
-  return receive_before_connect_ ? Network::FilterStatus::Continue
-                                 : Network::FilterStatus::StopIteration;
+  // Determine the return status based on connection mode and early data buffering.
+  using Mode = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode;
+
+  if (connect_mode_ == Mode::ON_DOWNSTREAM_DATA) {
+    // For ON_DOWNSTREAM_DATA mode, always return Continue to allow reading data
+    // which will trigger the connection.
+    return Network::FilterStatus::Continue;
+  } else if (connect_mode_ == Mode::ON_DOWNSTREAM_TLS_HANDSHAKE) {
+    // For ON_DOWNSTREAM_TLS_HANDSHAKE mode, return StopIteration to wait for the TLS handshake.
+    return Network::FilterStatus::StopIteration;
+  } else {
+    // For IMMEDIATE mode, return Continue if receive_before_connect is set to allow
+    // reading and buffering data while the connection is being established.
+    // Otherwise, return StopIteration to wait for the connection to be established.
+    return receive_before_connect_ ? Network::FilterStatus::Continue
+                                   : Network::FilterStatus::StopIteration;
+  }
 }
 
 void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status) {
@@ -759,21 +779,25 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   }
   Upstream::HostConstSharedPtr host =
       Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(cluster.chooseHost(this));
-  if (host) {
-    generic_conn_pool_ = factory->createGenericConnPool(
-        host, cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
-        upstream_decoder_filter_callbacks_, getStreamInfo());
+  if (!host) {
+    // No healthy host available.
+    return false;
   }
-  if (generic_conn_pool_) {
-    connecting_ = true;
-    connect_attempts_++;
-    getStreamInfo().setAttemptCount(connect_attempts_);
-    generic_conn_pool_->newStream(*this);
-    // Because we never return open connections to the pool, this either has a handle waiting on
-    // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
-    return true;
+  generic_conn_pool_ = factory->createGenericConnPool(
+      host, cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
+      upstream_decoder_filter_callbacks_, getStreamInfo());
+  if (!generic_conn_pool_) {
+    // createGenericConnPool returned nullptr, which means TcpConnPool::valid() returned false.
+    // This can happen when tcpConnPool() returns absl::nullopt (e.g., no healthy hosts).
+    return false;
   }
-  return false;
+  connecting_ = true;
+  connect_attempts_++;
+  getStreamInfo().setAttemptCount(connect_attempts_);
+  generic_conn_pool_->newStream(*this);
+  // Because we never return open connections to the pool, this either has a handle waiting on
+  // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
+  return true;
 }
 
 void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -833,6 +857,25 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
   }
   upstream_info.setUpstreamHost(host);
   upstream_info.setUpstreamSslConnection(ssl_info);
+
+  // If downstream is already closed, close the upstream connection immediately.
+  if (downstream_closed_) {
+    if (upstream_) {
+      Tcp::ConnectionPool::ConnectionData* conn_data =
+          upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
+      if (conn_data != nullptr &&
+          conn_data->connection().state() != Network::Connection::State::Closed) {
+        config_->drainManager().add(config_->sharedConfig(),
+                                    Tcp::ConnectionPool::ConnectionDataPtr(conn_data),
+                                    std::move(upstream_callbacks_), std::move(idle_timer_),
+                                    idle_timeout_, read_callbacks_->upstreamHost());
+      }
+      upstream_.reset();
+      disableIdleTimer();
+    }
+    return;
+  }
+
   onUpstreamConnection();
   read_callbacks_->continueReading();
   if (info) {
@@ -962,8 +1005,11 @@ void Filter::onConnectTimeout() {
 }
 
 Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}, has upstream {}",
-                 read_callbacks_->connection(), data.length(), end_stream, upstream_ != nullptr);
+  ENVOY_CONN_LOG(debug,
+                 "onData: received {} bytes, end_stream={}, has upstream {}, "
+                 "receive_before_connect_={}, connect_mode_={}",
+                 read_callbacks_->connection(), data.length(), end_stream, upstream_ != nullptr,
+                 receive_before_connect_, static_cast<int>(connect_mode_));
   getStreamInfo().getDownstreamBytesMeter()->addWireBytesReceived(data.length());
 
   if (upstream_) {
@@ -971,24 +1017,39 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     upstream_->encodeData(data, end_stream);
     resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   } else if (receive_before_connect_) {
-    ENVOY_CONN_LOG(trace, "Early data received. Length: {}", read_callbacks_->connection(),
-                   data.length());
-
     // Buffer data received before upstream connection exists.
     early_data_buffer_.move(data);
+    ASSERT(early_data_buffer_.length() > 0 || data.length() == 0);
+
+    // If no data was received, return Continue to allow filter chain to continue.
+    if (early_data_buffer_.length() == 0) {
+      return Network::FilterStatus::Continue;
+    }
 
     // Mark that we've received initial data and trigger connection if needed.
     if (!initial_data_received_ && early_data_buffer_.length() > 0) {
       initial_data_received_ = true;
-      ENVOY_CONN_LOG(trace,
-                     "Initial data received, checking if upstream connection should be triggered",
-                     read_callbacks_->connection());
+      using Mode = envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode;
+      ASSERT(connect_mode_ == Mode::ON_DOWNSTREAM_DATA || connect_mode_ == Mode::IMMEDIATE);
+      ENVOY_CONN_LOG(debug,
+                     "Initial data received, checking if upstream connection should be triggered. "
+                     "connect_mode_={}, early_data_buffer_.length()={}",
+                     read_callbacks_->connection(), static_cast<int>(connect_mode_),
+                     early_data_buffer_.length());
       checkUpstreamConnectionTrigger();
     }
 
-    // Check if we've exceeded the maximum buffer size.
-    // If so, read-disable the downstream to prevent excessive buffering.
-    if (early_data_buffer_.length() > max_buffered_bytes_) {
+    // Read-disable downstream when receiving early data to prevent excessive buffering.
+    // For legacy mode, always read-disable (backward compatibility).
+    // For new API, read-disable only when buffer exceeds limit to prevent excessive memory usage.
+    // Note: We track read_disabled_due_to_buffer_ to know whether to re-enable reading
+    // when the upstream connection is established.
+    if (!using_new_api_) {
+      // Legacy behavior: always read-disable when receiving early data.
+      read_callbacks_->connection().readDisable(true);
+      read_disabled_due_to_buffer_ = true;
+    } else if (early_data_buffer_.length() > max_buffered_bytes_) {
+      // read-disable only when buffer exceeds limit to prevent excessive memory usage.
       ENVOY_CONN_LOG(debug, "Early data buffer exceeded max size {}, read-disabling downstream",
                      read_callbacks_->connection(), max_buffered_bytes_);
       read_callbacks_->connection().readDisable(true);
@@ -1063,6 +1124,8 @@ Network::FilterStatus Filter::onNewConnection() {
   // For ON_DOWNSTREAM_DATA or ON_DOWNSTREAM_TLS_HANDSHAKE modes, delay the connection.
   if (connect_mode_ == Mode::ON_DOWNSTREAM_DATA) {
     // ON_DOWNSTREAM_DATA requires receiving data from downstream to trigger connection.
+    // Pre-pick the route so it's available when connection is triggered.
+    route_ = pickRoute();
     // Return Continue to allow the filter chain to continue reading data.
     ENVOY_CONN_LOG(debug, "Delaying upstream connection establishment until initial data received",
                    read_callbacks_->connection());
@@ -1361,6 +1424,8 @@ void Filter::checkUpstreamConnectionTrigger() {
 
   case Mode::ON_DOWNSTREAM_DATA:
     should_connect = initial_data_received_;
+    ASSERT(should_connect); // If we're calling this for ON_DOWNSTREAM_DATA, initial_data_received_
+                            // must be true.
     break;
 
   case Mode::ON_DOWNSTREAM_TLS_HANDSHAKE:
@@ -1373,13 +1438,16 @@ void Filter::checkUpstreamConnectionTrigger() {
     return;
   }
 
-  if (should_connect && !connecting_ && !upstream_) {
-    ENVOY_CONN_LOG(debug, "trigger condition met, establishing upstream connection",
-                   read_callbacks_->connection());
+  ASSERT(should_connect); // We should only call this when we want to connect.
+  ASSERT(!connecting_);   // We shouldn't be connecting already.
+  ASSERT(!upstream_);     // We shouldn't have an upstream already.
 
+  // Route should already be set in onNewConnection(), but set it again if not.
+  if (route_ == nullptr) {
     route_ = pickRoute();
-    establishUpstreamConnection();
   }
+  ASSERT(route_ != nullptr);
+  establishUpstreamConnection();
 }
 
 void Filter::onDownstreamTlsHandshakeComplete() {

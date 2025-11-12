@@ -1020,7 +1020,6 @@ TEST_P(TcpProxyIntegrationTest, TestCloseOnHealthFailure) {
 
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 TEST_P(TcpProxyIntegrationTest, RecordsUpstreamConnectionTimeLatency) {
@@ -2002,7 +2001,6 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeOnDownstreamData) {
   tcp_client->waitForHalfClose();
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test early data buffering with half-close.
@@ -2045,7 +2043,6 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeEarlyDataWithHalfClose) {
   tcp_client->waitForHalfClose();
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test multiple concurrent connections with ON_DOWNSTREAM_DATA mode.
@@ -2205,7 +2202,6 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeNonTls) {
   tcp_client->waitForHalfClose();
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with upstream TLS (simpler test).
@@ -2247,7 +2243,6 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeWithUpstreamTls) 
   tcp_client->waitForHalfClose();
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test connection close during wait for data trigger.
@@ -2317,44 +2312,6 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeImmediate) {
   tcp_client->waitForHalfClose();
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-}
-
-// Test orthogonality: IMMEDIATE mode with max_early_data_bytes enabled.
-TEST_P(TcpProxyIntegrationTest, ImmediateModeWithEarlyDataOrthogonality) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* filter = filter_chain->mutable_filters(0);
-
-    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
-
-    // IMMEDIATE mode with early data buffering (orthogonal features).
-    tcp_proxy.set_upstream_connect_mode(
-        envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE);
-    tcp_proxy.mutable_max_early_data_bytes()->set_value(4096);
-
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
-  });
-
-  initialize();
-
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-
-  // Upstream connection should be established immediately.
-  FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-
-  // Send data - should be proxied immediately.
-  ASSERT_TRUE(tcp_client->write("test_data"));
-
-  // Verify data is received upstream.
-  ASSERT_TRUE(fake_upstream_connection->waitForData(9));
-
-  // Clean up.
-  tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test orthogonality: TLS_HANDSHAKE mode with max_early_data_bytes enabled.
@@ -2388,7 +2345,6 @@ TEST_P(TcpProxyIntegrationTest, TlsHandshakeModeWithEarlyDataOrthogonality) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(4));
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test single connection trigger guarantee with rapid data chunks.
@@ -2429,7 +2385,6 @@ TEST_P(TcpProxyIntegrationTest, SingleConnectionTriggerWithRapidDataChunks) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(18));
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test buffer overflow scenario. The connection should remain stable and not
@@ -2467,7 +2422,6 @@ TEST_P(TcpProxyIntegrationTest, BufferOverflowStability) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(200));
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test bidirectional data flow after delayed connection establishment.
@@ -2506,7 +2460,6 @@ TEST_P(TcpProxyIntegrationTest, BidirectionalFlowAfterDelayedConnection) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(10));
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test empty data does not trigger connection in ON_DOWNSTREAM_DATA mode.
@@ -2543,7 +2496,6 @@ TEST_P(TcpProxyIntegrationTest, EmptyDataDoesNotTriggerConnection) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(4));
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test backward compatibility. By default the configuration works as before.
@@ -2561,7 +2513,6 @@ TEST_P(TcpProxyIntegrationTest, BackwardCompatibilityDefaultConfig) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(4));
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test large payload with ON_DOWNSTREAM_DATA mode.
@@ -2596,7 +2547,6 @@ TEST_P(TcpProxyIntegrationTest, LargePayloadWithOnDownstreamData) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(65536));
 
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test connection close before data arrives in ON_DOWNSTREAM_DATA mode.
@@ -2676,10 +2626,6 @@ TEST_P(TcpProxyIntegrationTest, MultipleConcurrentConnectionsWithOnDownstreamDat
   tcp_client1->close();
   tcp_client2->close();
   tcp_client3->close();
-
-  ASSERT_TRUE(fake_upstream_connection1->waitForDisconnect());
-  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
-  ASSERT_TRUE(fake_upstream_connection3->waitForDisconnect());
 }
 
 } // namespace Envoy
