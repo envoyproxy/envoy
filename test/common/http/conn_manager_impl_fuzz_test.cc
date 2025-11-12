@@ -12,6 +12,7 @@
 // * Idle/drain timeouts.
 // * HTTP 1.0 special cases
 // * Fuzz config settings
+#include <algorithm>
 #include <chrono>
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -647,7 +648,11 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
 
   std::vector<FuzzStreamPtr> streams;
 
-  for (const auto& action : input.actions()) {
+  // Limiting the number of actions processed to avoid excessively long executions
+  constexpr int kMaxActions = 1024;
+  const int num_actions = std::min<int>(kMaxActions, input.actions_size());
+  for (int i = 0; i < num_actions; ++i) {
+    const auto& action = input.actions(i);
     ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
     if (!connection_alive) {
       ENVOY_LOG_MISC(trace, "skipping due to dead connection");
