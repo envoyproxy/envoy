@@ -1,36 +1,35 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
+#include "envoy/matcher/matcher.h"
+#include "envoy/server/factory_context.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
 #include "source/common/matcher/matcher.h"
-
-#include "xds/type/matcher/v3/http_inputs.pb.h"
-
-#include <memory>
-#include <string>
-#include <utility>
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/matcher/matcher.h"
-#include "envoy/server/factory_context.h"
-#include "source/common/protobuf/utility.h"
+#include "xds/type/matcher/v3/http_inputs.pb.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
+using envoy::extensions::filters::http::proto_api_scrubber::v3::MessageRestrictions;
+using envoy::extensions::filters::http::proto_api_scrubber::v3::MethodRestrictions;
 using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionConfig;
-using envoy::extensions::filters::http::proto_api_scrubber::v3::MethodRestrictions;
-using envoy::extensions::filters::http::proto_api_scrubber::v3::MessageRestrictions;
 using Http::HttpMatchingData;
 using Protobuf::Map;
 using xds::type::matcher::v3::HttpAttributesCelMatchInput;
@@ -93,8 +92,7 @@ public:
    * @return A MatchTreeHttpMatchingDataSharedPtr if a method-level matcher is configured.
    * Returns `nullptr` otherwise.
    */
-  virtual MatchTreeHttpMatchingDataSharedPtr
-  getMethodMatcher(const std::string& method_name) const;
+  virtual MatchTreeHttpMatchingDataSharedPtr getMethodMatcher(const std::string& method_name) const;
 
   /**
    * Returns the match tree associated with a specific message type.
@@ -142,20 +140,22 @@ private:
 
   // Initializes the method's request and response restrictions using the restrictions configured
   // in the proto config.
-  absl::Status initializeMethodFieldRestrictions(absl::string_view method_name,
-                                            StringPairToMatchTreeMap& field_restrictions,
-                                            const Map<std::string, RestrictionConfig>& restrictions,
-                                            Server::Configuration::FactoryContext& context);
+  absl::Status
+  initializeMethodFieldRestrictions(absl::string_view method_name,
+                                    StringPairToMatchTreeMap& field_restrictions,
+                                    const Map<std::string, RestrictionConfig>& restrictions,
+                                    Server::Configuration::FactoryContext& context);
 
   // Initializes the method-level restrictions.
-  absl::Status initializeMethodLevelRestrictions(
-      absl::string_view method_name, const MethodRestrictions& method_config,
-      Envoy::Server::Configuration::FactoryContext& context);
+  absl::Status
+  initializeMethodLevelRestrictions(absl::string_view method_name,
+                                    const MethodRestrictions& method_config,
+                                    Envoy::Server::Configuration::FactoryContext& context);
 
   // Initializes the message-level restrictions.
-  absl::Status initializeMessageRestrictions(
-      const Map<std::string, MessageRestrictions>& message_configs,
-      Envoy::Server::Configuration::FactoryContext& context);
+  absl::Status
+  initializeMessageRestrictions(const Map<std::string, MessageRestrictions>& message_configs,
+                                Envoy::Server::Configuration::FactoryContext& context);
 
   FilteringMode filtering_mode_;
 

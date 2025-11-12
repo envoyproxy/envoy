@@ -10,7 +10,6 @@
 #include "envoy/matcher/matcher.h"
 
 #include "source/common/matcher/matcher.h"
-#include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"

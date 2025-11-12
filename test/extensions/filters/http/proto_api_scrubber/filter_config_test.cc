@@ -6,13 +6,13 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
-#include "absl/status/status.h"
 
 namespace Envoy {
 namespace Extensions {
