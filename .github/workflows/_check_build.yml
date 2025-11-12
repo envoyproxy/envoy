@@ -38,6 +38,8 @@ jobs:
       bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
+      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths || '/opt/hostedtoolcache' }}
+      docker-ci: ${{ matrix.docker-ci || false }}
       error-match: |
         ERROR
         error:
@@ -56,5 +58,9 @@ jobs:
           name: API
         - target: compile_time_options
           name: Compile time options
+          docker-ci: true
         - target: gcc
           name: GCC
+          diskspace-hack-paths: |
+            /opt/hostedtoolcache
+            /usr/local/.ghcup
