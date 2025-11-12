@@ -138,6 +138,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: listener
+  change: |
+    Marked the :ref:`filter_chain_matcher <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
+    field as stable by removing the work-in-progress annotation. The xDS matcher API for filter chain selection
+    has been thoroughly tested and should be ready for production use now.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request
