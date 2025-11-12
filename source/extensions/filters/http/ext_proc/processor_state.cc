@@ -171,7 +171,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
     onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp(common_response), true);
     return handleHeaderContinueAndReplace(response);
   } else {
-    onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp(common_response));
+    onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp(common_response),
+                          false);
   }
 
   filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());

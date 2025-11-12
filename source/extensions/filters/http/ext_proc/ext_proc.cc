@@ -510,13 +510,13 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
     return static_cast<int64_t>(bytes_received_);
   }
   if (field_name == ImmediateResponseField) {
-    return bool(immediate_response_);
+    return immediate_response_;
   }
   if (field_name == RequestHeaderContinueAndReplaceField) {
-    return bool(decoding_processor_grpc_calls_.continue_and_replace_);
+    return decoding_processor_grpc_calls_.continue_and_replace_;
   }
   if (field_name == ResponseHeaderContinueAndReplaceField) {
-    return bool(encoding_processor_grpc_calls_.continue_and_replace_);
+    return encoding_processor_grpc_calls_.continue_and_replace_;
   }
   return {};
 }
