@@ -234,11 +234,9 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
     ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
                                 "sending GOAWAY and close on dispatch");
     SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
-    h3_go_away_sent_ = true;
     closeConnectionImmediately();
-  }
-  if (should_send_go_away_on_dispatch_ != nullptr &&
-      should_send_go_away_on_dispatch_->shouldShedLoad() && !h3_go_away_sent_) {
+  } else if (should_send_go_away_on_dispatch_ != nullptr &&
+             should_send_go_away_on_dispatch_->shouldShedLoad() && !h3_go_away_sent_) {
     ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
                                 "sending GOAWAY on dispatch");
     SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
