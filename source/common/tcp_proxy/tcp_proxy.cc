@@ -1061,14 +1061,18 @@ Network::FilterStatus Filter::onNewConnection() {
   }
 
   // For ON_DOWNSTREAM_DATA or ON_DOWNSTREAM_TLS_HANDSHAKE modes, delay the connection.
-  // We must continue iteration to allow reading from downstream (for ON_DOWNSTREAM_DATA)
-  // or to let the TLS handshake complete (for ON_DOWNSTREAM_TLS_HANDSHAKE).
-  ENVOY_CONN_LOG(debug, "Delaying upstream connection establishment based on configured mode: {}",
-                 read_callbacks_->connection(), static_cast<int>(connect_mode_));
+  if (connect_mode_ == Mode::ON_DOWNSTREAM_DATA) {
+    // ON_DOWNSTREAM_DATA requires receiving data from downstream to trigger connection.
+    // Return Continue to allow the filter chain to continue reading data.
+    ENVOY_CONN_LOG(debug, "Delaying upstream connection establishment until initial data received",
+                   read_callbacks_->connection());
+    return Network::FilterStatus::Continue;
+  }
 
-  // StopIteration prevents further filters from processing but still allows reading.
-  // For ON_DOWNSTREAM_DATA with receive_before_connect, reading is already enabled.
-  // For ON_DOWNSTREAM_TLS_HANDSHAKE, we'll detect handshake completion via Connected event.
+  // For ON_DOWNSTREAM_TLS_HANDSHAKE, return StopIteration to wait for TLS handshake completion.
+  // StopIteration prevents further filters from processing but allows TLS handshake to proceed.
+  ENVOY_CONN_LOG(debug, "Delaying upstream connection establishment until TLS handshake completes",
+                 read_callbacks_->connection());
   return Network::FilterStatus::StopIteration;
 }
 
