@@ -52,6 +52,12 @@ envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    defines = select({
+        "//bazel:linux_aarch64": [],
+        "//conditions:default": [
+            "KAE_DISABLED=1",
+        ],
+    }),
     deps = [
         "//envoy/protobuf:message_validator_interface",
         "//envoy/registry",
