@@ -29,7 +29,35 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 22]
+// Specifies when the TCP proxy establishes the upstream connection.
+enum UpstreamConnectMode {
+  // Establish the upstream connection immediately when the downstream connection is accepted.
+  // This is the default behavior and provides the lowest latency.
+  IMMEDIATE = 0;
+
+  // Wait for initial data from the downstream connection before establishing the upstream connection.
+  // This allows preceding filters to inspect the initial data (e.g., extracting SNI from TLS ClientHello)
+  // before the upstream connection is established.
+  //
+  // This mode requires ``max_early_data_bytes`` to be set.
+  //
+  // .. warning::
+  //   This mode is not suitable for server-first protocols (e.g., SMTP, MySQL, POP3) where the
+  //   server sends the initial greeting. For such protocols, use ``IMMEDIATE`` mode.
+  ON_DOWNSTREAM_DATA = 1;
+
+  // Wait for the downstream TLS handshake to complete before establishing the upstream connection.
+  // This allows access to the full TLS connection information, including client certificates
+  // and negotiated parameters, which can be used for routing decisions or passed as metadata
+  // to the upstream.
+  //
+  // .. note::
+  //   This mode is only effective when the downstream connection uses TLS. For non-TLS
+  //   connections, it behaves the same as ``IMMEDIATE``.
+  ON_DOWNSTREAM_TLS_HANDSHAKE = 2;
+}
+
+// [#next-free-field: 23]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -335,34 +363,5 @@ message TcpProxy {
   // .. note::
   //   Use this carefully with server-first protocols. The upstream may send data before
   //   receiving anything from downstream, which could fill the early data buffer.
-  google.protobuf.UInt32Value max_early_data_bytes = 22
-      [(validate.rules).uint32 = {lte: 1048576}];
-}
-
-// Specifies when the TCP proxy establishes the upstream connection.
-enum UpstreamConnectMode {
-  // Establish the upstream connection immediately when the downstream connection is accepted.
-  // This is the default behavior and provides the lowest latency.
-  IMMEDIATE = 0;
-
-  // Wait for initial data from the downstream connection before establishing the upstream connection.
-  // This allows preceding filters to inspect the initial data (e.g., extracting SNI from TLS ClientHello)
-  // before the upstream connection is established.
-  //
-  // This mode requires ``max_early_data_bytes`` to be set.
-  //
-  // .. warning::
-  //   This mode is not suitable for server-first protocols (e.g., SMTP, MySQL, POP3) where the
-  //   server sends the initial greeting. For such protocols, use ``IMMEDIATE`` mode.
-  ON_DOWNSTREAM_DATA = 1;
-
-  // Wait for the downstream TLS handshake to complete before establishing the upstream connection.
-  // This allows access to the full TLS connection information, including client certificates
-  // and negotiated parameters, which can be used for routing decisions or passed as metadata
-  // to the upstream.
-  //
-  // .. note::
-  //   This mode is only effective when the downstream connection uses TLS. For non-TLS
-  //   connections, it behaves the same as ``IMMEDIATE``.
-  ON_DOWNSTREAM_TLS_HANDSHAKE = 2;
+  google.protobuf.UInt32Value max_early_data_bytes = 22 [(validate.rules).uint32 = {lte: 1048576}];
 }

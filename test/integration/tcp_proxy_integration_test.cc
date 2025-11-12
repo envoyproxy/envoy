@@ -2628,4 +2628,95 @@ TEST_P(TcpProxyIntegrationTest, MultipleConcurrentConnectionsWithOnDownstreamDat
   tcp_client3->close();
 }
 
+// Test downstream closes before upstream connection is ready.
+TEST_P(TcpProxyIntegrationTest, DownstreamClosedBeforeUpstreamReadyImmediate) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    tcp_proxy.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  // Create connection but close it immediately before upstream is ready.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->close();
+
+  // Wait for the connection to be processed. The race condition is that downstream
+  // may close before upstream pool callback fires. This should be handled gracefully.
+  // The upstream connection may or may not be established depending on timing.
+  test_server_->waitForCounterExists("tcp.tcp_stats.downstream_cx_total");
+}
+
+// Test downstream closes before upstream connection is ready with ON_DOWNSTREAM_DATA.
+TEST_P(TcpProxyIntegrationTest, DownstreamClosedBeforeUpstreamReadyOnDownstreamData) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    tcp_proxy.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(1024);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  // Create connection, send data, then close before upstream is ready.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("trigger", false, false));
+
+  // Close immediately after sending data, creating a race with upstream connection.
+  tcp_client->close();
+
+  // The filter should handle the race condition gracefully. Depending on timing,
+  // the upstream connection may or may not be established.
+  test_server_->waitForCounterExists("tcp.tcp_stats.downstream_cx_total");
+}
+
+// Test downstream closes with buffered data before upstream connection is ready.
+TEST_P(TcpProxyIntegrationTest, DownstreamClosedWithBufferedDataBeforeUpstreamReady) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    tcp_proxy.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  // Create connection, send data that will be buffered, then close.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  std::string large_data(4096, 'x');
+  ASSERT_TRUE(tcp_client->write(large_data, false, false));
+
+  // Close immediately while data is buffered and upstream is connecting.
+  tcp_client->close();
+
+  // The buffered data should be discarded. Depending on timing, the upstream connection
+  // may or may not be established. Either way, no crashes or leaks should occur.
+  test_server_->waitForCounterExists("tcp.tcp_stats.downstream_cx_total");
+}
+
 } // namespace Envoy
