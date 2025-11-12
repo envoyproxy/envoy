@@ -138,6 +138,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: matcher
+  change: |
+    Removed work-in-progress annotations from RBAC filter ``matcher`` and ``shadow_matcher`` fields in both HTTP
+    and network filters to reflect to mark this feature stable.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request
