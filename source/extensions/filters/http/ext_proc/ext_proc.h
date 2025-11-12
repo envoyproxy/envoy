@@ -250,18 +250,15 @@ public:
 
   bool isUpstream() const { return is_upstream_; }
 
-  const Protobuf::RepeatedPtrField<std::string>&
-  untypedForwardingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>& untypedForwardingMetadataNamespaces() const {
     return proto_config_.metadata_options().forwarding_namespaces().untyped();
   }
 
-  const Protobuf::RepeatedPtrField<std::string>&
-  typedForwardingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>& typedForwardingMetadataNamespaces() const {
     return proto_config_.metadata_options().forwarding_namespaces().typed();
   }
 
-  const Protobuf::RepeatedPtrField<std::string>&
-  untypedReceivingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>& untypedReceivingMetadataNamespaces() const {
     return proto_config_.metadata_options().receiving_namespaces().untyped();
   }
 
@@ -310,8 +307,7 @@ private:
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
       Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
       Server::Configuration::CommonFactoryContext& context);
-  const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor
-      proto_config_;
+  const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   const bool failure_mode_allow_;
   const bool observability_mode_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
@@ -378,16 +374,13 @@ public:
     return grpc_initial_metadata_;
   }
 
-  const Protobuf::RepeatedPtrField<std::string>*
-  untypedForwardingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>* untypedForwardingMetadataNamespaces() const {
     return untyped_forwarding_namespaces_;
   }
-  const Protobuf::RepeatedPtrField<std::string>*
-  typedForwardingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>* typedForwardingMetadataNamespaces() const {
     return typed_forwarding_namespaces_;
   }
-  const Protobuf::RepeatedPtrField<std::string>*
-  untypedReceivingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>* untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
   const absl::optional<bool>& failureModeAllow() const { return failure_mode_allow_; }
