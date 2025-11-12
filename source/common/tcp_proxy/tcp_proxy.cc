@@ -992,6 +992,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
       ENVOY_CONN_LOG(debug, "Early data buffer exceeded max size {}, read-disabling downstream",
                      read_callbacks_->connection(), max_buffered_bytes_);
       read_callbacks_->connection().readDisable(true);
+      read_disabled_due_to_buffer_ = true;
     }
 
     config_->stats().early_data_received_count_total_.inc();
@@ -1206,11 +1207,18 @@ void Filter::onUpstreamConnection() {
     getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(early_data_buffer_.length());
     upstream_->encodeData(early_data_buffer_, early_data_end_stream_);
     ASSERT(0 == early_data_buffer_.length());
+  }
 
-    // Re-enable downstream reads now that the early data buffer is handled.
+  // Re-enable downstream reads if we disabled reading.
+  // Reading can be disabled in two cases:
+  // 1. Buffer overflow when receive_before_connect is enabled (tracked by
+  // read_disabled_due_to_buffer_)
+  // 2. In establishUpstreamConnection() when receive_before_connect is disabled
+  if (read_disabled_due_to_buffer_) {
     read_callbacks_->connection().readDisable(false);
+    read_disabled_due_to_buffer_ = false;
   } else if (!receive_before_connect_) {
-    // Re-enable downstream reads now that the upstream connection is established
+    // Re-enable downstream reads that were disabled in establishUpstreamConnection()
     // when early data reception was NOT enabled.
     read_callbacks_->connection().readDisable(false);
   }
