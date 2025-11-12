@@ -121,11 +121,18 @@ private:
     if (attributes) {
       data_point.mutable_attributes()->CopyFrom(*attributes);
       // When attributes are present, set the start time for delta/cumulative metrics.
-      if (temporality != AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED) {
-        data_point.set_start_time_unix_nano(
-            temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
-                ? delta_start_time_ns_
-                : cumulative_start_time_ns_);
+      data_point.mutable_attributes()->CopyFrom(*attributes);
+      // When attributes are present, set the start time for delta/cumulative metrics.
+      switch (temporality) {
+      case AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA:
+        data_point.set_start_time_unix_nano(delta_start_time_ns_);
+        break;
+      case AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE:
+        data_point.set_start_time_unix_nano(cumulative_start_time_ns_);
+        break;
+      default:
+        // Do not set start time for UNSPECIFIED.
+        break;
       }
     }
   }
