@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.sampling_decision.v3;
+
+import "envoy/type/v3/percent.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.sampling_decision.v3";
+option java_outer_classname = "SamplingDecisionProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/sampling_decision/v3;sampling_decisionv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Sampling Decision]
+// Sampling Decision :ref:`configuration overview <config_http_filters_sampling_decision>`.
+// [#extension: envoy.filters.http.sampling_decision]
+
+// The sampling decision filter evaluates whether a request should be sampled based on runtime
+// configuration and stores the decision in dynamic metadata. This allows other components, such as
+// access log filters, to reference the sampling decision without re-evaluating the sampling logic.
+// [#next-free-field: 5]
+message SamplingDecision {
+  // The runtime key to use for sampling. The runtime value will override the configured
+  // ``percent_sampled`` if present.
+  string runtime_key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The default sampling percentage to use if the runtime key is not set.
+  // Defaults to 0% (no sampling) if not specified.
+  type.v3.FractionalPercent percent_sampled = 2;
+
+  // By default, sampling will be based on the request ID to ensure consistent sampling
+  // across different filters for the same request. If this field is set to true, each
+  // evaluation will use an independent random value, which may be useful in some
+  // scenarios, such as when independent sampling decisions that should not be correlated
+  // with other filters are required. Note that this will cause the filter to behave like
+  // an independent random variable when used multiple times in the filter chain.
+  bool use_independent_randomness = 3;
+
+  // The metadata namespace to use for storing the sampling decision.
+  // Defaults to ``envoy.filters.http.sampling_decision`` if not specified.
+  //
+  // The following fields will be set in dynamic metadata under the configured namespace:
+  // ``sampled`` (boolean) indicating whether the request was sampled, ``numerator`` and
+  // ``denominator`` (numbers) indicating the sampling rate, and ``runtime_key`` (string)
+  // indicating the runtime key used for sampling. This metadata can be accessed later by
+  // other filters, access log filters, or formatters using dynamic metadata accessors.
+  string metadata_namespace = 4;
+}

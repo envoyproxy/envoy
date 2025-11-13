@@ -138,6 +138,12 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: http_filter
+  change: |
+    Added :ref:`sampling_decision http filter <config_http_filters_sampling_decision>` which evaluates runtime-based
+    sampling decisions and stores them in dynamic metadata. This allows other filters, such as access log filters,
+    to reference the sampling decision without re-evaluating the sampling logic. The filter supports configurable
+    runtime keys, sampling percentages, deterministic or independent randomness, and custom metadata namespaces.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request

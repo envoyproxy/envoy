@@ -61,6 +61,7 @@ HTTP filters
   rate_limit_quota_filter
   rbac_filter
   router_filter
+  sampling_decision_filter
   set_filter_state
   set_metadata_filter
   stateful_session_filter

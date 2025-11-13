@@ -90,6 +90,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
 # reverse conn cluster extension
 /*/extensions/clusters/reverse_connection @agrawroh @basundhara-c @botengyao @yanavlasov
+# sampling decision http filter extension
+/*/extensions/filters/http/sampling_decision @agrawroh @wbpcode
 /*/extensions/common/redis @msukalski @henryyyang @mattklein123
 /*/extensions/health_checkers/redis @mattklein123 @UNOWNED
 /*/extensions/filters/network/redis_proxy @mattklein123 @UNOWNED
