@@ -94,15 +94,15 @@ build:sanitizer --linkopt -ldl
 test:sanitizer --build_tests_only
 
 # Common flags for Clang (shared between all clang variants)
-build:clang-common --action_env=BAZEL_COMPILER=clang
-build:clang-common --linkopt=-fuse-ld=lld
-build:clang-common --action_env=CC=clang --host_action_env=CC=clang
-build:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
-build:clang-common --incompatible_enable_cc_toolchain_resolution=false
+common:clang-common --action_env=BAZEL_COMPILER=clang
+common:clang-common --linkopt=-fuse-ld=lld
+common:clang-common --action_env=CC=clang --host_action_env=CC=clang
+common:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
+common:clang-common --incompatible_enable_cc_toolchain_resolution=false
 
 # Clang with libc++ (default)
-build:clang --config=clang-common
-build:clang --config=libc++
+common:clang --config=clang-common
+common:clang --config=libc++
 
 build:arm64-clang --config=clang
 
@@ -222,13 +222,13 @@ build:msan --test_env=MSAN_SYMBOLIZER_PATH
 build:msan --copt -O1
 build:msan --copt -fno-optimize-sibling-calls
 
-build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
-build:libc++ --action_env=LDFLAGS=-stdlib=libc++
-build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
-build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
-build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
-build:libc++ --define force_libcpp=enabled
-build:libc++ --@envoy//bazel:libc++=true
+common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+common:libc++ --action_env=LDFLAGS=-stdlib=libc++
+common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
+common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
+common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
+common:libc++ --define force_libcpp=enabled
+common:libc++ --@envoy//bazel:libc++=true
 
 
 
