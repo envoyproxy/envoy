@@ -136,7 +136,7 @@ class BuildGraph:
         return self._mangle_deps_set(
             await query(
                 query_string,
-                query_options=tuple(os.environ.get("BAZEL_GLOBAL_OPTION_LIST", "").split())))
+                query_options=tuple(os.environ.get("BAZEL_QUERY_OPTION_LIST", "").split())))
 
     def _filtered_deps_query(self, targets):
         return f'filter("^@.*//", deps(set({" ".join(targets)})))'

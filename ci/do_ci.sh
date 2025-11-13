@@ -40,12 +40,12 @@ setup_clang_toolchain() {
     CONFIG_PARTS+=("clang")
     # We only support clang with libc++ now
     CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
-    BAZEL_GLOBAL_OPTIONS+=("--config=${CONFIG}")
-    BAZEL_GLOBAL_OPTION_LIST="${BAZEL_GLOBAL_OPTIONS[*]}"
     BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
+    BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTION_LIST[@]}" "--config=${CONFIG}")
+    BAZEL_QUERY_OPTION_LIST="${BAZEL_QUERY_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
-    export BAZEL_GLOBAL_OPTION_LIST
+    export BAZEL_QUERY_OPTION_LIST
     echo "clang toolchain configured: ${CONFIG}"
 }
 
