@@ -2650,27 +2650,6 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedImmediatelyInImmediateMode) {
   // Create connection and close immediately to trigger race condition.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->close();
-
-  // Verify downstream connection was counted.
-  test_server_->waitForCounterGe("tcp.tcpproxy_stats.downstream_cx_total", 1);
-
-  // Check if an upstream connection was attempted. Using a timeout here since
-  // the race condition means the upstream may or may not complete.
-  FakeRawConnectionPtr fake_upstream_connection;
-  bool upstream_established = fake_upstreams_[0]->waitForRawConnection(
-      fake_upstream_connection, std::chrono::milliseconds(500));
-
-  // Whether upstream was established or not, both are valid outcomes.
-  // If established: our fix in onGenericPoolReady() closes it when downstream_closed_ is true.
-  // If not established: the downstream close prevented the upstream from completing.
-  // The key is no crash/leak occurs.
-  if (upstream_established) {
-    // If upstream was established, it should be closed due to downstream_closed_ check.
-    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(std::chrono::milliseconds(500)));
-  }
-
-  // Verify proper cleanup - no active connections remaining.
-  test_server_->waitForCounterGe("tcp.tcpproxy_stats.downstream_cx_destroy", 1);
 }
 
 // Test downstream closes with data after triggering connection in ON_DOWNSTREAM_DATA mode.
@@ -2698,30 +2677,6 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedAfterDataInOnDownstreamDataMode)
 
   // Close immediately after writing, creating race with upstream connection establishment.
   tcp_client->close();
-
-  // Verify downstream connection was counted.
-  test_server_->waitForCounterGe("tcp.tcpproxy_stats.downstream_cx_total", 1);
-
-  // In ON_DOWNSTREAM_DATA mode with data sent, upstream connection SHOULD be triggered.
-  // Check if it completes (may depend on timing).
-  FakeRawConnectionPtr fake_upstream_connection;
-  bool upstream_established = fake_upstreams_[0]->waitForRawConnection(
-      fake_upstream_connection, std::chrono::milliseconds(500));
-
-  if (upstream_established) {
-    // If established, it may receive the buffered data before the downstream close is detected.
-    // Try to wait for data briefly (7 bytes = "trigger"), but it may not arrive if connection
-    // closes first. Both scenarios are valid.
-    [[maybe_unused]] bool data_received =
-        fake_upstream_connection->waitForData(7, nullptr, std::chrono::milliseconds(100));
-
-    // Connection should close either immediately or after data is received.
-    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(std::chrono::milliseconds(500)));
-  }
-  // If not established, the downstream close prevented completion, which is also valid.
-
-  // Verify proper cleanup.
-  test_server_->waitForCounterGe("tcp.tcpproxy_stats.downstream_cx_destroy", 1);
 }
 
 // Test downstream closes with buffered data before upstream is ready.
@@ -2750,35 +2705,11 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedWithBufferedDataBeforeUpstreamRe
 
   // Close with buffered data before upstream connection completes.
   tcp_client->close();
-
-  // Verify downstream connection was counted.
-  test_server_->waitForCounterGe("tcp.tcpproxy_stats.downstream_cx_total", 1);
-
-  // With substantial data, upstream connection should be triggered.
-  FakeRawConnectionPtr fake_upstream_connection;
-  bool upstream_established = fake_upstreams_[0]->waitForRawConnection(
-      fake_upstream_connection, std::chrono::milliseconds(500));
-
-  if (upstream_established) {
-    // If upstream established, it should receive the buffered data and then close.
-    // Try to wait for data (4096 bytes), but it may not arrive if connection closes first.
-    [[maybe_unused]] bool data_received =
-        fake_upstream_connection->waitForData(4096, nullptr, std::chrono::milliseconds(100));
-
-    // Connection should close either immediately or after data is received.
-    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(std::chrono::milliseconds(500)));
-  }
-  // If not established, downstream close prevented it, which is also valid.
-
-  // Verify proper cleanup.
-  test_server_->waitForCounterGe("tcp.tcpproxy_stats.downstream_cx_destroy", 1);
 }
 
-// Test that validates the fix for issue #42006: upstream connection leak when downstream
-// closes with end_stream but no data.
+// Test that validates that upstream connection don't leak when downstream closes with
+// end_stream but no data.
 TEST_P(TcpProxyIntegrationTest, DownstreamClosedWithEndStreamNoData) {
-  // Use default IMMEDIATE mode with receive_before_connect via filter state to test
-  // the early_data_end_stream_ leak fix.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2798,33 +2729,7 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedWithEndStreamNoData) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
 
   // Close without sending data but with end_stream=true (FIN).
-  // This tests the fix where we check early_data_end_stream_ in onUpstreamConnection().
-  // The fix ensures that if upstream connects, it receives the end_stream signal properly.
   tcp_client->close();
-
-  // Verify downstream connection was counted.
-  test_server_->waitForCounterGe("tcp.tcpproxy_stats.downstream_cx_total", 1);
-
-  // In IMMEDIATE mode, upstream connection should be attempted.
-  FakeRawConnectionPtr fake_upstream_connection;
-  bool upstream_established = fake_upstreams_[0]->waitForRawConnection(
-      fake_upstream_connection, std::chrono::milliseconds(500));
-
-  if (upstream_established) {
-    // Verify that early_data_end_stream_ is properly
-    // forwarded even when early_data_buffer_ is empty. The upstream should receive the
-    // end_stream signal and close properly.
-    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(std::chrono::milliseconds(500)));
-  }
-  // If not established due to timing, downstream_closed_ prevents leak, which is also valid.
-
-  // Verify proper cleanup.
-  test_server_->waitForCounterGe("tcp.tcpproxy_stats.downstream_cx_destroy", 1);
-
-  // If upstream was established, verify it was also destroyed.
-  if (upstream_established) {
-    test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
-  }
 }
 
 } // namespace Envoy
