@@ -1266,12 +1266,15 @@ void Filter::onUpstreamConnection() {
   connecting_ = false;
 
   // If we have received any data before upstream connection is established, send it to
-  // the upstream connection.
-  if (early_data_buffer_.length() > 0) {
+  // the upstream connection. Also check if downstream signaled end_stream even with no data
+  // to prevent upstream connection leaks.
+  if (early_data_buffer_.length() > 0 || early_data_end_stream_) {
     // Early data should only happen when receive_before_connect is enabled.
     ASSERT(receive_before_connect_);
 
-    getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(early_data_buffer_.length());
+    if (early_data_buffer_.length() > 0) {
+      getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(early_data_buffer_.length());
+    }
     upstream_->encodeData(early_data_buffer_, early_data_end_stream_);
     ASSERT(0 == early_data_buffer_.length());
   }
