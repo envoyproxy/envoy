@@ -99,7 +99,8 @@ resources:
 
   void
   handleOauth2TokenRequest(absl::string_view client_secret, bool success = true,
-                           bool good_token = true, bool good_json = true, bool empty_body = false, int token_expiry = 20,
+                           bool good_token = true, bool good_json = true, bool empty_body = false,
+                           int token_expiry = 20,
                            absl::optional<absl::string_view> scope_in_request = absl::nullopt) {
     acceptNewStream();
     const std::string request_body = oauth2_request_->body().toString();
@@ -122,7 +123,7 @@ resources:
       oauth2_request_->encodeData(buffer, true);
       return;
     }
-    if(empty_body) {
+    if (empty_body) {
       Buffer::OwnedImpl buffer("");
       oauth2_request_->encodeData(buffer, true);
       return;
@@ -641,43 +642,42 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   getFakeOuth2Connection();
-  
+
   // First request: return a response with a 200 status code and empty body
   // This causes "unexpected EOF" parsing error
   handleOauth2TokenRequest("test_client_secret", true, true, true, true, 20);
-  
+
   // Wait for the failure to be logged
   test_server_->waitForCounterEq(
       "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", 1,
       std::chrono::milliseconds(1000));
-  
+
   // Verify only 1 request so far (before retry)
   EXPECT_EQ(1UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
                 ->value());
-  
+
   // Wait for retry to happen (retry_interval is 1s)
   // The fix should cause a retry for empty body parsing errors (BadTokenTransientFailure)
   // This will block on acceptNewStream() until the retry actually creates a new stream
   // If the bug were still present, this would timeout because no retry would occur
   handleOauth2TokenRequest("test_client_secret", true, true, true, false, 20);
-  
+
   // Verify that retry happened - should have 2 token requests
   EXPECT_EQ(2UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
                 ->value());
-  
+
   // Verify the failure counter records one failure
-  EXPECT_EQ(1UL,
-            test_server_
-                ->counter(
-                    "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token")
-                ->value());
-  
+  EXPECT_EQ(
+      1UL,
+      test_server_
+          ->counter("http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token")
+          ->value());
+
   // Verify that token was eventually fetched successfully
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
                                  std::chrono::milliseconds(1000));
-    
 }
 
 TEST_P(CredentialInjectorIntegrationTest, RetryOnClusterNotFound) {

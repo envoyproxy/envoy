@@ -18,12 +18,7 @@ namespace OAuth2 {
 class FilterCallbacks {
 public:
   virtual ~FilterCallbacks() = default;
-  enum class FailureReason {
-    StreamReset,
-    BadToken,
-    BadResponseCode,
-    BadTokenTransientFailure
-  };
+  enum class FailureReason { StreamReset, BadToken, BadResponseCode, BadTokenTransientFailure };
 
   virtual void onGetAccessTokenSuccess(const std::string& access_token,
                                        std::chrono::seconds expires_in) PURE;
