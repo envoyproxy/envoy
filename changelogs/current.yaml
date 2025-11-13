@@ -214,6 +214,9 @@ new_features:
     Added ``drainConnectionUponCompletion()`` to the Lua filter stream info API. This allows Lua scripts
     to mark connections for draining, which adds a ``Connection: close`` header for HTTP/1.1 or sends a
     ``GOAWAY`` frame for HTTP/2 and HTTP/3.
+- area: lua
+  change: |
+    Added new executions counter to the Lua filter to track script execution count.
 - area: wasm
   change: |
     Added ``sign`` foreign function to create cryptographic signatures.
