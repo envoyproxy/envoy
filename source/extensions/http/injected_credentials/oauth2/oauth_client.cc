@@ -87,6 +87,12 @@ void OAuth2ClientImpl::onSuccess(const Envoy::Http::AsyncClient::Request&,
   END_TRY catch (EnvoyException& e) {
     ENVOY_LOG(error, "Error parsing response body, received exception: {}", e.what());
     ENVOY_LOG(error, "Response body: {}", response_body);
+    //if the response body is empty we consider this a potentially transient failure
+    if (response_body.empty()) {
+      parent_->onGetAccessTokenFailure(FilterCallbacks::FailureReason::BadTokenTransientFailure);
+      ENVOY_LOG(error, "Response body is empty, permitting retry to cope with transient failure");
+      return;
+    }
     parent_->onGetAccessTokenFailure(FilterCallbacks::FailureReason::BadToken);
     return;
   }

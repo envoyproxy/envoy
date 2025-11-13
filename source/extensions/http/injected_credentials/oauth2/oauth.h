@@ -22,6 +22,7 @@ public:
     StreamReset,
     BadToken,
     BadResponseCode,
+    BadTokenTransientFailure
   };
 
   virtual void onGetAccessTokenSuccess(const std::string& access_token,

@@ -118,6 +118,11 @@ void TokenProvider::onGetAccessTokenFailure(FailureReason failure_reason) {
     stats_.token_fetch_failed_on_bad_token_.inc();
     retry = false;
     break;
+  case FailureReason::BadTokenTransientFailure:
+    //we still record this as a bad token failure but we permit retry
+    stats_.token_fetch_failed_on_bad_token_.inc();
+    retry = true;
+    break;
   case FailureReason::BadResponseCode:
     stats_.token_fetch_failed_on_bad_response_code_.inc();
     break;
