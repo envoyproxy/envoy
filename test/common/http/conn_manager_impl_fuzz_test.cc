@@ -649,10 +649,11 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   std::vector<FuzzStreamPtr> streams;
 
   // Limiting the number of actions processed to avoid excessively long executions
-  constexpr int kMaxActions = 1024;
-  const int num_actions = std::min<int>(kMaxActions, input.actions_size());
-  for (int i = 0; i < num_actions; ++i) {
-    const auto& action = input.actions(i);
+  constexpr uint32_t kMaxActions = 4096;
+  const uint32_t num_actions =
+      std::min<uint32_t>(kMaxActions, static_cast<uint32_t>(input.actions_size()));
+  for (uint32_t i = 0; i < num_actions; ++i) {
+    const auto& action = input.actions(static_cast<int>(i));
     ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
     if (!connection_alive) {
       ENVOY_LOG_MISC(trace, "skipping due to dead connection");
