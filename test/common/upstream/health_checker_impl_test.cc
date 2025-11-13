@@ -3226,8 +3226,8 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
   // We expect resolve() to be called twice, once for endpoint socket matching (with no metadata in
   // this test) and once for health check socket matching. In the latter we expect metadata that
   // matches the above object.
-  EXPECT_CALL(*transport_socket_match, resolve(nullptr, nullptr));
-  EXPECT_CALL(*transport_socket_match, resolve(MetadataEq(metadata), nullptr))
+  EXPECT_CALL(*transport_socket_match, resolve(nullptr, nullptr, _));
+  EXPECT_CALL(*transport_socket_match, resolve(MetadataEq(metadata), nullptr, _))
       .WillOnce(Return(TransportSocketMatcher::MatchData(
           *health_check_only_socket_factory, health_transport_socket_stats, "health_check_only")));
   // The health_check_only_socket_factory should be used to create a transport socket for the health
@@ -3273,7 +3273,7 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
       std::make_unique<Upstream::MockTransportSocketMatcher>(std::move(default_socket_factory));
   // We expect resolve() to be called exactly once for endpoint socket matching. We should not
   // attempt to match again for health checks since there is not match criteria in the config.
-  EXPECT_CALL(*transport_socket_match, resolve(nullptr, nullptr));
+  EXPECT_CALL(*transport_socket_match, resolve(nullptr, nullptr, _));
 
   cluster_->info_->transport_socket_matcher_ = std::move(transport_socket_match);
 

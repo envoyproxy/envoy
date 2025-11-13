@@ -680,7 +680,7 @@ public:
 
   void initialize() override {
     // Initialize c-ares library in case first time.
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     if (!ares_library_initialized_) {
       ares_library_initialized_ = true;
       ENVOY_LOG(trace, "c-ares library initialized.");
@@ -689,7 +689,7 @@ public:
   }
   void terminate() override {
     // Cleanup c-ares library if initialized.
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     if (ares_library_initialized_) {
       ares_library_initialized_ = false;
       ENVOY_LOG(trace, "c-ares library cleaned up.");

@@ -176,6 +176,7 @@ MockClusterInfo::MockClusterInfo()
         return makeOptRefFromPtr<const Envoy::Orca::LrsReportMetricNames>(
             lrs_report_metric_names_.get());
       }));
+  ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;

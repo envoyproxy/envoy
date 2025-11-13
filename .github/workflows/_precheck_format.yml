@@ -40,6 +40,8 @@ jobs:
       concurrency-suffix: -${{ matrix.target }}
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       request: ${{ inputs.request }}
+      # format needs aspell, and format-api requires git
+      docker-ci: false
       error-match: |
         ERROR
         error:

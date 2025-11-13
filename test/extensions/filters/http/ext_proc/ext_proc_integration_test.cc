@@ -445,15 +445,16 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersServerHalfClosesFirst) {
         mut1->mutable_header()->set_raw_value("new");
         return true;
       });
-  // ext_proc is configured to only send request headers. In this case, server indicates that it is
-  // not expecting any more messages from ext_proc filter and half-closes the stream.
-  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
-  // ext_proc will immediately close side stream in this case, because by default Envoy gRPC client
-  // will reset the stream if the server half-closes before the client. Note that the ext_proc
-  // filter has not yet half-closed the sidestream, since it is doing it during its destruction.
-  // This is expected behavior for gRPC protocol.
-  EXPECT_TRUE(processor_stream_->waitForReset());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+    // Envoy closes the side stream in this case.
+    EXPECT_TRUE(processor_stream_->waitForReset());
+  }
+
+  // ext_proc server indicates that it is not expecting any more messages
+  // from ext_proc filter and half-closes the stream.
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -501,6 +502,55 @@ TEST_P(ExtProcIntegrationTest, ServerHalfClosesAfterHeaders) {
 
   handleUpstreamRequest();
   EXPECT_EQ(upstream_request_->bodyLength(), 10);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ServerHalfClosesDuringBodyStream) {
+  // Configure ext_proc to send both headers and body
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_failure_mode_allow(true);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [](const HttpHeaders& headers, HeadersResponse&) {
+                                 EXPECT_FALSE(headers.end_of_stream());
+                                 return true;
+                               });
+
+  // Client sends 7 chunks.
+  for (int i = 0; i < 7; ++i) {
+    if (i == 6) {
+      codec_client_->sendData(*request_encoder_, 1, true);
+    } else {
+      codec_client_->sendData(*request_encoder_, 1, false);
+    }
+    if (i < 4) {
+      processRequestBodyMessage(*grpc_upstreams_[0], false,
+                                [](const HttpBody& body, BodyResponse&) {
+                                  EXPECT_FALSE(body.end_of_stream());
+                                  return true;
+                                });
+    }
+  }
+
+  processor_stream_->finishGrpcStream(Grpc::Status::Internal);
+
+  // Even if the gRPC server half-closed, processing of the main request still continues.
+  // Verify that data made it to upstream.
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->bodyLength(), 7);
   verifyDownstreamResponse(*response, 200);
 }
 
