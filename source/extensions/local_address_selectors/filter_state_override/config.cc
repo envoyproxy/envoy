@@ -1,4 +1,4 @@
-#include "source/extensions/local_address_selectors/linux_network_namespace/config.h"
+#include "source/extensions/local_address_selectors/filter_state_override/config.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/upstream.h"
@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace LocalAddressSelectors {
-namespace LinuxNetworkNamespace {
+namespace FilterStateOverride {
 
 namespace {
 class NamespaceLocalAddressSelector : public Upstream::UpstreamLocalAddressSelector,
@@ -65,7 +65,7 @@ NamespaceLocalAddressSelectorFactory::createLocalAddressSelector(
 REGISTER_FACTORY(NamespaceLocalAddressSelectorFactory,
                  Upstream::UpstreamLocalAddressSelectorFactory);
 
-} // namespace LinuxNetworkNamespace
+} // namespace FilterStateOverride
 } // namespace LocalAddressSelectors
 } // namespace Extensions
 } // namespace Envoy

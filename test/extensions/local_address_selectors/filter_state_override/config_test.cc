@@ -1,7 +1,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
-#include "source/extensions/local_address_selectors/linux_network_namespace/config.h"
+#include "source/extensions/local_address_selectors/filter_state_override/config.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace LocalAddressSelectors {
-namespace LinuxNetworkNamespace {
+namespace FilterStateOverride {
 namespace {
 
 TEST(ConfigTest, EmptyUpstreamAddresses) {
@@ -148,7 +148,7 @@ TEST(ConfigTest, NamespaceOverrideEffective) {
 }
 
 } // namespace
-} // namespace LinuxNetworkNamespace
+} // namespace FilterStateOverride
 } // namespace LocalAddressSelectors
 } // namespace Extensions
 } // namespace Envoy
