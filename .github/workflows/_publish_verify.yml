@@ -60,6 +60,19 @@ jobs:
           downloads: |
             oci.arm64: container/build_images
             oci.x64: container/build_images
+          bind-mounts: |
+            - src: /mnt/workspace
+              target: GITHUB_WORKSPACE
+              chown: "runner:runner"
+            - src: /mnt/runner
+              target: RUNNER_TEMP/container/bazel_root
+              chown: "runner:runner"
+            - src: /mnt/docker
+              target: /var/lib/docker
+              rm: true
+              command-pre: sudo systemctl stop docker
+              command-post: sudo systemctl start docker
+
           rbe: false
           source: |
             export NO_BUILD_SETUP=1
