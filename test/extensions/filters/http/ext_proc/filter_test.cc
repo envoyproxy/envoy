@@ -5596,6 +5596,7 @@ TEST_F(HttpFilterTest, CloseStreamOnRequestHeaders) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
   filter_->onDestroy();
 }
+
 TEST_F(HttpFilterTest, ClusterMetadataOptionsOverride) {
   initialize(R"EOF(
   grpc_service:
@@ -5626,33 +5627,21 @@ TEST_F(HttpFilterTest, ClusterMetadataOptionsOverride) {
   FilterConfigPerRoute route_config(override_cfg, builder_, factory_context_);
 
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
-      .WillOnce(testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs {
-        return {&route_config};
-      }));
+      .WillOnce(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
-  EXPECT_EQ(FilterHeadersStatus::StopIteration,
-            filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
 
-  ASSERT_EQ(filter_->encodingState()
-                .untypedClusterMetadataForwardingNamespaces()
-                .size(),
-            1);
-  EXPECT_EQ(
-      filter_->encodingState().untypedClusterMetadataForwardingNamespaces()[0],
-      "untyped_ns_2");
-  ASSERT_EQ(filter_->decodingState()
-                .typedClusterMetadataForwardingNamespaces()
-                .size(),
-            1);
-  EXPECT_EQ(
-      filter_->decodingState().typedClusterMetadataForwardingNamespaces()[0],
-      "typed_ns_2");
-  EXPECT_EQ(FilterTrailersStatus::Continue,
-            filter_->encodeTrailers(response_trailers_));
+  ASSERT_EQ(filter_->encodingState().untypedClusterMetadataForwardingNamespaces().size(), 1);
+  EXPECT_EQ(filter_->encodingState().untypedClusterMetadataForwardingNamespaces()[0],
+            "untyped_ns_2");
+  ASSERT_EQ(filter_->decodingState().typedClusterMetadataForwardingNamespaces().size(), 1);
+  EXPECT_EQ(filter_->decodingState().typedClusterMetadataForwardingNamespaces()[0], "typed_ns_2");
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 
   filter_->onDestroy();
 }
@@ -5695,8 +5684,7 @@ TEST_F(HttpFilterTest, FilterMetadataOverridesClusterMetadata) {
   TestUtility::loadFromYaml(cluster_metadata_yaml, cluster_info->metadata_);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
-  EXPECT_EQ(FilterHeadersStatus::StopIteration,
-            filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
 
   // The filter metadata should override cluster metadata.
   EXPECT_EQ("from_filter", last_request_.metadata_context()
@@ -5707,8 +5695,7 @@ TEST_F(HttpFilterTest, FilterMetadataOverridesClusterMetadata) {
                                .string_value());
 
   processResponseHeaders(false, absl::nullopt);
-  EXPECT_EQ(FilterTrailersStatus::Continue,
-            filter_->encodeTrailers(response_trailers_));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
 }
 

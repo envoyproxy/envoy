@@ -2042,6 +2042,34 @@ void Filter::mergePerRouteConfig() {
     encoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
   }
 
+  if (merged_config->untypedClusterMetadataForwardingNamespaces().has_value()) {
+    untyped_cluster_metadata_forwarding_namespaces_ =
+        merged_config->untypedClusterMetadataForwardingNamespaces().value();
+    ENVOY_STREAM_LOG(trace,
+                     "Setting new untyped cluster metadata forwarding "
+                     "namespaces from per-route "
+                     "configuration",
+                     *decoder_callbacks_);
+    decoding_state_.setUntypedClusterMetadataForwardingNamespaces(
+        untyped_cluster_metadata_forwarding_namespaces_);
+    encoding_state_.setUntypedClusterMetadataForwardingNamespaces(
+        untyped_cluster_metadata_forwarding_namespaces_);
+  }
+
+  if (merged_config->typedClusterMetadataForwardingNamespaces().has_value()) {
+    typed_cluster_metadata_forwarding_namespaces_ =
+        merged_config->typedClusterMetadataForwardingNamespaces().value();
+    ENVOY_STREAM_LOG(trace,
+                     "Setting new typed cluster metadata forwarding namespaces "
+                     "from per-route "
+                     "configuration",
+                     *decoder_callbacks_);
+    decoding_state_.setTypedClusterMetadataForwardingNamespaces(
+        typed_cluster_metadata_forwarding_namespaces_);
+    encoding_state_.setTypedClusterMetadataForwardingNamespaces(
+        typed_cluster_metadata_forwarding_namespaces_);
+  }
+
   if (merged_config->failureModeAllow().has_value()) {
     ENVOY_STREAM_LOG(trace, "Setting new failureModeAllow from per-route configuration",
                      *decoder_callbacks_);
