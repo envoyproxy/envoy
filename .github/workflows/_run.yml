@@ -236,10 +236,10 @@ jobs:
         mkdir ${{ runner.temp }}/container
         if mountpoint -q /mnt; then
             echo "has-mnt=true" >> "$GITHUB_OUTPUT"
-        fi
-        USAGE="$(df --output=pcent /mnt | tail -n 1 | tr -d ' %')"
-        if [[ "$USAGE" -ge 100 ]]; then
-            echo "::warning::Disk usage for /mnt is at 100% ... remounting"
+            USAGE="$(df --output=pcent /mnt | tail -n 1 | tr -d ' %')"
+            if [[ "$USAGE" -ge 100 ]]; then
+                echo "::warning::Disk usage for /mnt is at 100% ... remounting"
+            fi
         fi
       id: disk
     - uses: envoyproxy/toolshed/gh-actions/github/remnt@actions-v0.3.30
