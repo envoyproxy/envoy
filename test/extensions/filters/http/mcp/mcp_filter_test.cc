@@ -38,6 +38,16 @@ public:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
+  void setupWithClearRouteCache(bool clear_route_cache) {
+    envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+    proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+    proto_config.set_clear_route_cache(clear_route_cache);
+    config_ = std::make_shared<McpFilterConfig>(proto_config);
+    filter_ = std::make_unique<McpFilter>(config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
 protected:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -270,6 +280,102 @@ TEST_F(McpFilterTest, PostWithWrongContentType) {
 
   // Wrong content-type, should pass through
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+// Test route cache is NOT cleared by default when metadata is set
+TEST_F(McpFilterTest, RouteCacheNotClearedByDefault) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+  Buffer::OwnedImpl decoding_buffer;
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+
+  // Expect dynamic metadata to be set
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+
+  // Expect route cache NOT to be cleared (default behavior)
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test route cache is NOT cleared when clear_route_cache is false
+TEST_F(McpFilterTest, RouteCacheNotClearedWhenDisabled) {
+  setupWithClearRouteCache(false);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+  Buffer::OwnedImpl decoding_buffer;
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+
+  // Expect dynamic metadata to be set
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+
+  // Expect route cache NOT to be cleared
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test route cache is cleared when explicitly enabled
+TEST_F(McpFilterTest, RouteCacheClearedWhenExplicitlyEnabled) {
+  setupWithClearRouteCache(true);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+  Buffer::OwnedImpl decoding_buffer;
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+
+  // Expect dynamic metadata to be set
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+
+  // Expect route cache to be cleared
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test route cache clearing configuration getter
+TEST_F(McpFilterTest, ClearRouteCacheConfigGetter) {
+  // Default should be false
+  EXPECT_FALSE(config_->clearRouteCache());
+
+  // Explicitly set to false
+  setupWithClearRouteCache(false);
+  EXPECT_FALSE(config_->clearRouteCache());
+
+  // Explicitly set to true
+  setupWithClearRouteCache(true);
+  EXPECT_TRUE(config_->clearRouteCache());
 }
 
 } // namespace
