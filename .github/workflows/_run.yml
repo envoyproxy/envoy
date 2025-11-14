@@ -422,6 +422,6 @@ jobs:
 
     - name: Wipe mounted disk
       uses: envoyproxy/toolshed/gh-actions/github/remnt@actions-v0.3.30
-      if: steps.disk.outputs.has-mnt == 'true'
+      if: steps.disk.outputs.has-mnt == 'true' && always()
       with:
         recreate-swap: false
