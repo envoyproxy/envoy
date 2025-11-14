@@ -165,6 +165,14 @@ void McpFilter::finalizeDynamicMetadata() {
     decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
                                                         *metadata_);
     ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata_->DebugString());
+
+    // Clear route cache to allow route re-selection based on dynamic metadata
+    if (config_->clearRouteCache()) {
+      if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {
+        cb->clearRouteCache();
+        ENVOY_LOG(debug, "MCP filter cleared route cache for metadata-based routing");
+      }
+    }
   }
 }
 
