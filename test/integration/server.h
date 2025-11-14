@@ -184,7 +184,7 @@ public:
   }
   void add(uint64_t amount) override {
     counter_->add(amount);
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     condvar_.Signal();
   }
   void inc() override { add(1); }
@@ -213,7 +213,7 @@ public:
   using Stats::AllocatorImpl::AllocatorImpl;
 
   void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
     while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() != value) {
       condvar_.Wait(&mutex_);
@@ -222,7 +222,7 @@ public:
   }
 
   void waitForCounterFromStringGe(const std::string& name, uint64_t value) {
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
     while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() < value) {
       condvar_.Wait(&mutex_);
@@ -231,7 +231,7 @@ public:
   }
 
   void waitForCounterExists(const std::string& name) {
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to exist", name);
     while (getCounterLockHeld(name) == nullptr) {
       condvar_.Wait(&mutex_);
@@ -246,7 +246,7 @@ protected:
         Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
         condvar_);
     {
-      absl::MutexLock l(&mutex_);
+      absl::MutexLock l(mutex_);
       // Allow getting the counter directly from the allocator, since it's harder to
       // signal when the counter has been added to a given stats store.
       counters_.emplace(counter->name(), counter);

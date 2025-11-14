@@ -78,7 +78,7 @@ jobs:
             --config=docs-ci
           rbe: true
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/gcs/artefact/sync@actions-v0.3.26
+            - uses: envoyproxy/toolshed/gh-actions/gcs/artefact/sync@actions-v0.3.29
               with:
                 bucket: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
                 path: generated/docs

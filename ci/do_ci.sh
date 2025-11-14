@@ -293,14 +293,12 @@ case $CI_TARGET in
 
     asan)
         setup_clang_toolchain
-        BAZEL_BUILD_OPTIONS+=(
-            -c dbg
-            "--config=asan"
-            "--build_tests_only"
-            "--remote_download_minimal")
         echo "bazel ASAN/UBSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
+        bazel_with_collection test \
+            --config=asan \
+            "${BAZEL_BUILD_OPTIONS[@]}" \
+            "${TEST_TARGETS[@]}"
         # TODO(mattklein123): This part of the test is now flaky in CI and it's unclear why, possibly
         # due to sandboxing issue. Debug and enable it again.
         # if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
@@ -416,7 +414,7 @@ case $CI_TARGET in
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
-            --define wasm=wamtime \
+            --define wasm=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
             --define log_fast_debug_assert_in_release=enabled \
@@ -697,18 +695,13 @@ case $CI_TARGET in
 
     msan)
         setup_clang_toolchain
-        # msan must comes as first to win library link order.
-        BAZEL_BUILD_OPTIONS=(
-            "--config=msan"
-            "${BAZEL_BUILD_OPTIONS[@]}"
-            "-c" "dbg"
-            "--build_tests_only"
-            "--remote_download_minimal")
         echo "bazel MSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
+        # msan must comes as first to win library link order.
         bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            -- "${TEST_TARGETS[@]}"
+            test --config=msan \
+                "${BAZEL_BUILD_OPTIONS[@]}" \
+                -- "${TEST_TARGETS[@]}"
         ;;
 
     publish)
@@ -849,11 +842,9 @@ case $CI_TARGET in
         echo "bazel TSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
         bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            test \
              --config=tsan \
-             -c dbg \
-             --build_tests_only \
-             --remote_download_minimal \
+            "${BAZEL_BUILD_OPTIONS[@]}" \
              "${TEST_TARGETS[@]}"
         ;;
 

@@ -86,10 +86,6 @@ jobs:
         export ENVOY_DOCKER_IN_DOCKER=1
         export ENVOY_DOCKER_SAVE_IMAGE=true
         export ENVOY_OCI_DIR=build_images
-
-        # export DOCKER_BUILD_PLATFORM=${{ inputs.arch == 'x64' && 'linux/amd64' || 'linux/arm64' }}
-        # export DOCKER_LOAD_IMAGES=true
-        # export DOCKER_FORCE_OCI_OUTPUT=true
       trusted: ${{ inputs.trusted }}
       upload-name: oci.${{ inputs.arch }}
       upload-path: container/envoy/${{ inputs.arch }}/build_images
@@ -118,6 +114,10 @@ jobs:
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
+      docker-ci: false
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       import-gpg: true
       rbe: false

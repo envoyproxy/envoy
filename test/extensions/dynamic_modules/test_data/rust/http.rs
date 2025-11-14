@@ -205,9 +205,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(new_value.as_slice(), b"value");
     envoy_filter.remove_request_header("to-be-deleted");
 
+    // Test add API.
+    envoy_filter.add_request_header("multi", b"value3");
+    let multi_value = envoy_filter.get_request_header_values("multi");
+    assert_eq!(multi_value.len(), 3);
+    assert_eq!(multi_value[2].as_slice(), b"value3");
+
     // Test all getter API.
     let all_headers = envoy_filter.get_request_headers();
-    assert_eq!(all_headers.len(), 4);
+    assert_eq!(all_headers.len(), 5);
     assert_eq!(all_headers[0].0.as_slice(), b"single");
     assert_eq!(all_headers[0].1.as_slice(), b"value");
     assert_eq!(all_headers[1].0.as_slice(), b"multi");
@@ -216,6 +222,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_headers[2].1.as_slice(), b"value2");
     assert_eq!(all_headers[3].0.as_slice(), b"new");
     assert_eq!(all_headers[3].1.as_slice(), b"value");
+    assert_eq!(all_headers[4].0.as_slice(), b"multi");
+    assert_eq!(all_headers[4].1.as_slice(), b"value3");
+
 
     let downstream_port =
       envoy_filter.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::SourcePort);
@@ -267,9 +276,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(&new_value.as_slice(), b"value");
     envoy_filter.remove_request_trailer("to-be-deleted");
 
+    // Test add API.
+    envoy_filter.add_request_trailer("multi", b"value3");
+    let multi_value = envoy_filter.get_request_trailer_values("multi");
+    assert_eq!(multi_value.len(), 3);
+    assert_eq!(multi_value[2].as_slice(), b"value3");
+
     // Test all getter API.
     let all_trailers = envoy_filter.get_request_trailers();
-    assert_eq!(all_trailers.len(), 4);
+    assert_eq!(all_trailers.len(), 5);
     assert_eq!(all_trailers[0].0.as_slice(), b"single");
     assert_eq!(all_trailers[0].1.as_slice(), b"value");
     assert_eq!(all_trailers[1].0.as_slice(), b"multi");
@@ -278,6 +293,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_trailers[2].1.as_slice(), b"value2");
     assert_eq!(all_trailers[3].0.as_slice(), b"new");
     assert_eq!(all_trailers[3].1.as_slice(), b"value");
+    assert_eq!(all_trailers[4].0.as_slice(), b"multi");
+    assert_eq!(all_trailers[4].1.as_slice(), b"value3");
+
 
     abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
   }
@@ -311,9 +329,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(&new_value.as_slice(), b"value");
     envoy_filter.remove_response_header("to-be-deleted");
 
+    // Test add API.
+    envoy_filter.add_response_header("multi", b"value3");
+    let multi_value = envoy_filter.get_response_header_values("multi");
+    assert_eq!(multi_value.len(), 3);
+    assert_eq!(multi_value[2].as_slice(), b"value3");
+
     // Test all getter API.
     let all_headers = envoy_filter.get_response_headers();
-    assert_eq!(all_headers.len(), 4);
+    assert_eq!(all_headers.len(), 5);
     assert_eq!(all_headers[0].0.as_slice(), b"single");
     assert_eq!(all_headers[0].1.as_slice(), b"value");
     assert_eq!(all_headers[1].0.as_slice(), b"multi");
@@ -322,6 +346,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_headers[2].1.as_slice(), b"value2");
     assert_eq!(all_headers[3].0.as_slice(), b"new");
     assert_eq!(all_headers[3].1.as_slice(), b"value");
+    assert_eq!(all_headers[4].0.as_slice(), b"multi");
+    assert_eq!(all_headers[4].1.as_slice(), b"value3");
 
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
@@ -362,9 +388,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(&new_value.as_slice(), b"value");
     envoy_filter.remove_response_trailer("to-be-deleted");
 
+    // Test add API.
+    envoy_filter.add_response_trailer("multi", b"value3");
+    let multi_value = envoy_filter.get_response_trailer_values("multi");
+    assert_eq!(multi_value.len(), 3);
+    assert_eq!(multi_value[2].as_slice(), b"value3");
+
     // Test all getter API.
     let all_trailers = envoy_filter.get_response_trailers();
-    assert_eq!(all_trailers.len(), 4);
+    assert_eq!(all_trailers.len(), 5);
     assert_eq!(all_trailers[0].0.as_slice(), b"single",);
     assert_eq!(all_trailers[0].1.as_slice(), b"value");
     assert_eq!(all_trailers[1].0.as_slice(), b"multi",);
@@ -373,6 +405,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_trailers[2].1.as_slice(), b"value2");
     assert_eq!(all_trailers[3].0.as_slice(), b"new");
     assert_eq!(all_trailers[3].1.as_slice(), b"value");
+    assert_eq!(all_trailers[4].0.as_slice(), b"multi");
+    assert_eq!(all_trailers[4].1.as_slice(), b"value3");
+
 
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
@@ -695,6 +730,7 @@ struct BodyCallbacksFilter {
   response_body: Vec<u8>,
 }
 
+#[cfg(test)]
 impl BodyCallbacksFilter {
   fn get_final_read_request_body<'a>(&'a self) -> &'a Vec<u8> {
     &self.request_body

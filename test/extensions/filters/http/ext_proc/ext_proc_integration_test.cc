@@ -445,15 +445,16 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersServerHalfClosesFirst) {
         mut1->mutable_header()->set_raw_value("new");
         return true;
       });
-  // ext_proc is configured to only send request headers. In this case, server indicates that it is
-  // not expecting any more messages from ext_proc filter and half-closes the stream.
-  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
-  // ext_proc will immediately close side stream in this case, because by default Envoy gRPC client
-  // will reset the stream if the server half-closes before the client. Note that the ext_proc
-  // filter has not yet half-closed the sidestream, since it is doing it during its destruction.
-  // This is expected behavior for gRPC protocol.
-  EXPECT_TRUE(processor_stream_->waitForReset());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+    // Envoy closes the side stream in this case.
+    EXPECT_TRUE(processor_stream_->waitForReset());
+  }
+
+  // ext_proc server indicates that it is not expecting any more messages
+  // from ext_proc filter and half-closes the stream.
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -501,6 +502,55 @@ TEST_P(ExtProcIntegrationTest, ServerHalfClosesAfterHeaders) {
 
   handleUpstreamRequest();
   EXPECT_EQ(upstream_request_->bodyLength(), 10);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ServerHalfClosesDuringBodyStream) {
+  // Configure ext_proc to send both headers and body
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_failure_mode_allow(true);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [](const HttpHeaders& headers, HeadersResponse&) {
+                                 EXPECT_FALSE(headers.end_of_stream());
+                                 return true;
+                               });
+
+  // Client sends 7 chunks.
+  for (int i = 0; i < 7; ++i) {
+    if (i == 6) {
+      codec_client_->sendData(*request_encoder_, 1, true);
+    } else {
+      codec_client_->sendData(*request_encoder_, 1, false);
+    }
+    if (i < 4) {
+      processRequestBodyMessage(*grpc_upstreams_[0], false,
+                                [](const HttpBody& body, BodyResponse&) {
+                                  EXPECT_FALSE(body.end_of_stream());
+                                  return true;
+                                });
+    }
+  }
+
+  processor_stream_->finishGrpcStream(Grpc::Status::Internal);
+
+  // Even if the gRPC server half-closed, processing of the main request still continues.
+  // Verify that data made it to upstream.
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->bodyLength(), 7);
   verifyDownstreamResponse(*response, 200);
 }
 
@@ -1582,9 +1632,8 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
 class ExtProcIntegrationTestUpstream : public ExtProcIntegrationTest {
 public:
   void initializeConfig() {
-    ConfigOptions config_option = {};
-    config_option.downstream_filter = false;
-    ExtProcIntegrationTest::initializeConfig(config_option);
+    ExtProcIntegrationTest::initializeConfig(
+        ConfigOptions{.filter_setup = ConfigOptions::FilterSetup::kNone});
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
@@ -3727,6 +3776,54 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, RequestAttributesInResponseOnlyProcessing) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_response_attributes()->Add("request.path");
+  proto_config_.mutable_response_attributes()->Add("request.method");
+  proto_config_.mutable_response_attributes()->Add("request.scheme");
+  proto_config_.mutable_response_attributes()->Add("request.size");
+
+  initializeConfig(
+      ConfigOptions{// Causes filter to only be invoked in response path
+                    .filter_setup = ConfigOptions::FilterSetup::kCompositeMatchOnResponseHeaders});
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  // No request headers message expected, since composite filter doesn't match
+  // until response headers are seen.
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"match-header", "match"}},
+      /*end_stream=*/false);
+  upstream_request_->encodeData("body", /*end_stream=*/true);
+
+  // Handle response headers message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Add something to the response so the message isn't seen as spurious
+        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
+        *(resp.mutable_response_headers()) = headers_resp;
+
+        EXPECT_TRUE(req.has_response_headers());
+        EXPECT_EQ(req.attributes().size(), 1);
+        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
+        EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
+        EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
+        EXPECT_EQ(proto_struct.fields().at("request.size").number_value(), 0);
+
+        // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
+        EXPECT_TRUE(req.response_headers().attributes().empty());
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
@@ -4693,10 +4790,10 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
 // Test when ext_proc filter is nested inside a composite filter, the access_log filter
 // uses the composite filter name to retrieve the ext_proc filter state values.
 TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
-  // Adding the composite/ext_proc filter configuration.
-  composite_test_ = true;
   std::string tunnel_access_log_path_;
-  initializeConfig();
+  initializeConfig(
+      ConfigOptions{// Use composite/ext_proc filter configuration.
+                    .filter_setup = ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders});
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {

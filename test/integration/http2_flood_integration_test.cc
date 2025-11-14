@@ -81,6 +81,9 @@ protected:
   void floodClient(const Http2Frame& frame, uint32_t num_frames, const std::string& flood_stat);
 
   void setNetworkConnectionBufferSize();
+
+  // Avoid hiding the other form of beginSession.
+  using Http2RawFrameIntegrationTest::beginSession;
   void beginSession() override;
   void prefillOutboundDownstreamQueue(uint32_t data_frame_count, uint32_t data_frame_size = 10);
   IntegrationStreamDecoderPtr prefillOutboundUpstreamQueue(uint32_t frame_count);

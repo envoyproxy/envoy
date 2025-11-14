@@ -483,8 +483,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (direct_response != nullptr) {
     stats_.rq_direct_response_.inc();
     direct_response->rewritePathHeader(headers, !config_->suppress_envoy_headers_);
+    std::string body;
+    absl::string_view direct_response_body = direct_response->formatBody(
+        (downstream_headers_ == nullptr) ? *Http::StaticEmptyHeaders::get().request_headers
+                                         : *downstream_headers_,
+        *Http::StaticEmptyHeaders::get().response_headers, callbacks_->streamInfo(), body);
+
     callbacks_->sendLocalReply(
-        direct_response->responseCode(), direct_response->responseBody(),
+        direct_response->responseCode(), direct_response_body,
         [this, direct_response](Http::ResponseHeaderMap& response_headers) -> void {
           std::string new_uri;
           ASSERT(downstream_headers_ != nullptr);
@@ -699,7 +705,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // well as handling unsupported asynchronous host selection by treating it
     // as host selection failure and calling sendNoHealthyUpstreamResponse.
     continueDecodeHeaders(cluster, headers, end_stream, std::move(host_selection_response.host),
-                          std::string(host_selection_response.details));
+                          host_selection_response.details);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -740,7 +746,7 @@ void Filter::onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::stri
 bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
                                    Http::RequestHeaderMap& headers, bool end_stream,
                                    Upstream::HostConstSharedPtr&& selected_host,
-                                   absl::optional<std::string> host_selection_details) {
+                                   absl::string_view host_selection_details) {
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_end_ms", callbacks_->dispatcher().timeSource().monotonicTime());
 
@@ -803,7 +809,13 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   // runtime keys. Also the method CONNECT doesn't support shadowing.
   auto method = headers.getMethodValue();
   if (method != Http::Headers::get().MethodValues.Connect) {
-    for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
+    // Use cluster-level shadow policies if they are available (most specific wins).
+    // If no cluster-level policies are configured, fall back to route-level policies.
+    const auto& policies_to_evaluate = !cluster_->shadowPolicies().empty()
+                                           ? cluster_->shadowPolicies()
+                                           : route_entry_->shadowPolicies();
+
+    for (const auto& shadow_policy : policies_to_evaluate) {
       const auto& policy_ref = *shadow_policy;
       if (FilterUtility::shouldShadow(policy_ref, config_->runtime_, callbacks_->streamId())) {
         active_shadow_policies_.push_back(std::cref(policy_ref));
@@ -933,12 +945,12 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalClu
                                         callbacks_->streamInfo().protocol(), this, *message);
 }
 
-void Filter::sendNoHealthyUpstreamResponse(absl::optional<std::string> optional_details) {
+void Filter::sendNoHealthyUpstreamResponse(absl::string_view optional_details) {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, false);
-  absl::string_view details = (optional_details.has_value() && !optional_details->empty())
-                                  ? absl::string_view(*optional_details)
-                                  : StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream;
+  absl::string_view details = optional_details.empty()
+                                  ? StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream
+                                  : optional_details;
   callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", modify_headers_,
                              absl::nullopt, details);
 }
@@ -1995,11 +2007,11 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   // convertRequestHeadersForInternalRedirect logs failure reasons but log
   // details for other failure modes here.
   if (!downstream_end_stream_) {
-    ENVOY_STREAM_LOG(trace, "Internal redirect failed: request incomplete", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "Internal redirect failed: request incomplete", *callbacks_);
   } else if (request_buffer_overflowed_) {
-    ENVOY_STREAM_LOG(trace, "Internal redirect failed: request body overflow", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "Internal redirect failed: request body overflow", *callbacks_);
   } else if (location == nullptr) {
-    ENVOY_STREAM_LOG(trace, "Internal redirect failed: missing location header", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "Internal redirect failed: missing location header", *callbacks_);
   }
 
   cluster_->trafficStats()->upstream_internal_redirect_failed_total_.inc();
@@ -2225,7 +2237,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
                              TimeoutRetry is_timeout_retry, Upstream::HostConstSharedPtr&& host,
                              Upstream::ThreadLocalCluster& cluster,
-                             absl::optional<std::string> host_selection_details) {
+                             absl::string_view host_selection_details) {
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_end_ms", callbacks_->dispatcher().timeSource().monotonicTime());
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(cluster, host);
