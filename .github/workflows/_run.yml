@@ -235,6 +235,7 @@ jobs:
     - run: |
         mkdir ${{ runner.temp }}/container
         if mountpoint -q /mnt; then
+            echo "has-mnt=true" >> "$GITHUB_OUTPUT"
             USAGE="$(df --output=pcent /mnt | tail -n 1 | tr -d ' %')"
             if [[ "$USAGE" -ge 100 ]]; then
                 echo "should-remnt=true" >> "$GITHUB_OUTPUT"
@@ -362,7 +363,7 @@ jobs:
       name: Configure repo Bazel settings
 
     # NOTE: This is where untrusted code can be run!!!
-    #  It MUST be the last step in the workflow
+    #  It MUST be the last step in the workflow other than disk wipe
     - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.30
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
@@ -418,3 +419,9 @@ jobs:
         MOUNT_GPG_HOME: ${{ inputs.import-gpg && 1 || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
         ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}
+
+    - name: Wipe mounted disk
+      uses: envoyproxy/toolshed/gh-actions/github/remnt@actions-v0.3.30
+      if: steps.disk.outputs.has-mnt == 'true'
+      with:
+        recreate-swap: false
