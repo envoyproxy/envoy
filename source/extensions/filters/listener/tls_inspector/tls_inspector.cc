@@ -191,7 +191,7 @@ void Filter::setDownstreamTransportFailureReason() {
       ":TLS_error_end");
   ENVOY_LOG(debug, "tls inspector: parseClientHello failed: {}, {}: {}", ERR_peek_error(),
             ERR_peek_last_error(), transport_failure);
-  cb_->streamInfo().setDownstreamTransportFailureReason(std::move(transport_failure));
+  cb_->streamInfo().setDownstreamTransportFailureReason(transport_failure);
 }
 
 ParseState Filter::getParserState(int handshake_status) {
