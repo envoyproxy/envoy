@@ -34,6 +34,7 @@ public:
     case OverloadProactiveResourceName::GlobalDownstreamMaxConnections:
       return GlobalDownstreamMaxConnections;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 };
 
