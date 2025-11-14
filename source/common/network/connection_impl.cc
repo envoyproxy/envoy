@@ -344,6 +344,10 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   // It is safe to call close() since there is an IO handle check.
   socket_->close();
 
+  // Propagate transport failure reason to StreamInfo before raising close events,
+  // ensuring it's available to all filters and access loggers.
+  stream_info_.setDownstreamTransportFailureReason(transportFailureReason());
+
   // Call the base class directly as close() is called in the destructor.
   ConnectionImpl::raiseEvent(close_type);
 }
