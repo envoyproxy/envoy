@@ -401,6 +401,86 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
   EXPECT_TRUE(handled_network_change);
 }
 
+TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAndroid) {
+  builder_.enableConnectionMigration(true);
+  builder_.addRuntimeGuard("drain_pools_on_network_change", true);
+  builder_.addRuntimeGuard("decouple_explicit_drain_pools_and_dns_refresh", true);
+  builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
+  // Refreshing DNS cache will revert the overridden lyft.com entry with actual
+  // internet accessible address which is not intended.
+  builder_.setDisableDnsRefreshOnNetworkChange(true);
+
+  initialize();
+
+  if (getCodecType() != Http::CodecType::HTTP3 || version_ != Network::Address::IpVersion::v4) {
+    // This test relies on a 2nd loopback address.
+    return;
+  }
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
+                                   std::to_string(request_data.length()));
+
+  EnvoyStreamCallbacks stream_callbacks1 = createDefaultStreamCallbacks();
+  stream_callbacks1.on_data_ = [this](const Buffer::Instance&, uint64_t, bool, envoy_stream_intel) {
+    cc_.on_data_calls_++;
+  };
+
+  stream_ = createNewStream(std::move(stream_callbacks1));
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
+  stream_->sendData(std::make_unique<Buffer::OwnedImpl>(std::move(request_data)));
+  stream_->close(Http::Utility::createRequestTrailerMapPtr());
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls_, 1);
+  ASSERT_EQ(cc_.status_, "200");
+  ASSERT_GE(cc_.on_data_calls_, 1);
+  ASSERT_EQ(cc_.on_complete_calls_, 1);
+  ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
+  ASSERT_EQ(0, last_stream_final_intel_.socket_reused);
+
+  // An h3 upstream connection should have been established.
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_rq_total", 1));
+
+ EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 123)).Times(0u);
+   // A new cellular network appears and becomes the default network. The idle connection should be closed.
+  internalEngine()->onNetworkConnectAndroid(ConnectionType::CONNECTION_4G, 123);
+  internalEngine()->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_4G, 123);
+  ASSERT_TRUE(waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS", 1));
+
+  // A new connection will be created on the new default network to serve new requests.
+  EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 123))
+      .WillOnce(Invoke([&](Network::ConnectionSocket& socket, int64_t) {
+        // Mock binding to the new cellular network with a new address.
+        socket.ioHandle().bind(
+            std::make_shared<const Network::Address::Ipv4Instance>("127.0.0.2", 0, nullptr));
+      }));
+  default_request_headers_.setCopy(
+      Envoy::Http::LowerCaseString(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES), "0");
+  memset(&last_stream_final_intel_, 0, sizeof(envoy_final_stream_intel));
+  ConditionalInitializer terminal_callback;
+  cc_.terminal_callback_ = &terminal_callback;
+  EnvoyStreamCallbacks stream_callbacks2 = createDefaultStreamCallbacks();
+
+  stream_ = createNewStream(std::move(stream_callbacks2));
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+
+  terminal_callback.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls_, 2);
+  ASSERT_EQ(cc_.status_, "200");
+  ASSERT_EQ(cc_.on_complete_calls_, 2);
+  ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
+  ASSERT_EQ(0, last_stream_final_intel_.socket_reused);
+
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_rq_total", 2));
+  // The total h3 connection count should have increased.
+  EXPECT_EQ(2, getCounterValue("cluster.base.upstream_cx_http3_total"));
+}
+
 TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkChangeEventsAndroid) {
   builder_.enableConnectionMigration(true);
   builder_.addRuntimeGuard("drain_pools_on_network_change", true);
