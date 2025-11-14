@@ -28,6 +28,13 @@ public:
       proactive_action_name_to_resource_ = {
           {GlobalDownstreamMaxConnections,
            OverloadProactiveResourceName::GlobalDownstreamMaxConnections}};
+
+  const std::string& resourceToName(OverloadProactiveResourceName resource) const {
+    switch (resource) {
+    case OverloadProactiveResourceName::GlobalDownstreamMaxConnections:
+      return GlobalDownstreamMaxConnections;
+    }
+  }
 };
 
 using OverloadProactiveResources = ConstSingleton<OverloadProactiveResourceNameValues>;
