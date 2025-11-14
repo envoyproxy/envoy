@@ -32,6 +32,14 @@ minor_behavior_changes:
     <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite>` to
     :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` to support substitution
     formatting for path header rewriting.
+- area: tracing
+  change: |
+    The :ref:`request header custom tag <envoy_v3_api_field_type.tracing.v3.CustomTag.request_header>`
+    now only support fetching header values from the HTTP request headers. Any non-HTTP protocols
+    could only set custom tags using the substitution formatter based
+    :ref:`custom tag value <envoy_v3_api_field_type.tracing.v3.CustomTag.value>`.
+    This behavior change could be reverted by setting the runtime guard
+    ``envoy.reloadable_features.get_header_tag_from_header_map`` to false.
 - area: ext_proc
   change: |
     Use one of a hard-coded set of error messages when a :ref:`HeaderMutation
