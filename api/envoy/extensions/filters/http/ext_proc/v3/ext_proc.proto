@@ -219,7 +219,7 @@ message ExternalProcessor {
 
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
   // emitted statistics between configured ``ext_proc`` filters in an HTTP filter chain.
-  string stat_prefix = 8;
+  string stat_prefix = 8 [(validate.rules).string = {max_bytes: 64}];
 
   // Rules that determine what modifications an external processing server may
   // make to message headers. If not set, all headers may be modified except
