@@ -53,6 +53,9 @@ jobs:
         --config=mobile-android-release
         //:android_dist
       container: ${{ needs.load.outputs.build-image && fromJSON(needs.load.outputs.build-image).mobile || '' }}
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       request: ${{ needs.load.outputs.request }}
       timeout-minutes: 90
       target: build
@@ -70,6 +73,9 @@ jobs:
     with:
       command: ./bazelw
       container-command:
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       docker-ipv6: false
       # Return to using:
       #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
@@ -108,6 +114,9 @@ jobs:
       command: ./bazelw
       container-command:
       args: ${{ matrix.args }}
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       request: ${{ needs.load.outputs.request }}
       target: ${{ matrix.target }}
       runs-on: ubuntu-22.04

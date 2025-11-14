@@ -42,6 +42,7 @@ jobs:
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ matrix.target }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
+      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths || '/opt/hostedtoolcache' }}
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
@@ -63,6 +64,9 @@ jobs:
           name: Release (x64)
           target-suffix: x64
           arch: x64
+          diskspace-hack-paths: |
+            /opt/hostedtoolcache
+            /usr/local/.ghcup
           rbe: true
         - target: release.test_only
           name: Release (arm64)
