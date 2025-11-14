@@ -1113,9 +1113,9 @@ void Filter::onConnectMaxAttempts() {
 void Filter::onUpstreamConnection() {
   connecting_ = false;
 
-  // If we have received any data before upstream connection is established, send it to
-  // the upstream connection.
-  if (early_data_buffer_.length() > 0) {
+  // If we have received any data before upstream connection is established, or if the downstream
+  // has indicated end of stream, send the data and/or end_stream to the upstream connection.
+  if (early_data_buffer_.length() > 0 || early_data_end_stream_) {
     // Early data should only happen when receive_before_connect is enabled.
     ASSERT(receive_before_connect_);
 
@@ -1128,7 +1128,7 @@ void Filter::onUpstreamConnection() {
     // Re-enable downstream reads now that the early data buffer is flushed.
     read_callbacks_->connection().readDisable(false);
   } else if (!receive_before_connect_) {
-    // Re-enable downstream reads now that the upstream connection is established
+    // Re-enable downstream reads now that the upstream connection is established.
     read_callbacks_->connection().readDisable(false);
   }
 
