@@ -37,6 +37,7 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bind-mounts: ${{ matrix.bind-mounts }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
