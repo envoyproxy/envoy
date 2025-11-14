@@ -1,3 +1,5 @@
+#include "source/common/common/assert.h"
+
 #include "library/common/network/apple_platform_cert_verifier.h"
 #include "library/common/system/default_system_helper.h"
 
@@ -17,6 +19,10 @@ int64_t DefaultSystemHelper::getDefaultNetworkHandle() { return -1; }
 
 std::vector<std::pair<int64_t, ConnectionType>> DefaultSystemHelper::getAllConnectedNetworks() {
   return {};
+}
+
+void DefaultSystemHelper::bindSocketToNetwork(Network::ConnectionSocket&, int64_t) {
+  PANIC("unreachable");
 }
 
 } // namespace Envoy

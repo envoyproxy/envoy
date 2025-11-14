@@ -1,6 +1,10 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 
+#include "envoy/registry/registry.h"
+
+#include "source/common/config/utility.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/quic/envoy_quic_client_packet_writer_factory.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_client_packet_writer_factory_impl.h"
@@ -23,7 +27,8 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, ui
 
 std::unique_ptr<PersistentQuicInfoImpl>
 createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
-                                   const Upstream::ClusterInfo& cluster) {
+                                   const Upstream::ClusterInfo& cluster,
+                                   Server::Configuration::ServerFactoryContext& server_context) {
   auto quic_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
       dispatcher, cluster.perConnectionBufferLimitBytes());
   const envoy::config::core::v3::QuicProtocolOptions& quic_config =
@@ -39,11 +44,38 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
   }
   quic_info->max_packet_length_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_config, max_packet_length, 0);
+
   uint32_t num_timeouts_to_trigger_port_migration =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_config, num_timeouts_to_trigger_port_migration, 0);
   quic_info->migration_config_.allow_port_migration = (num_timeouts_to_trigger_port_migration > 0);
-  // TODO: make this an extension point.
-  quic_info->writer_factory_ = std::make_unique<QuicClientPacketWriterFactoryImpl>();
+  if (quic_config.has_connection_migration()) {
+    quic_info->migration_config_.migrate_session_on_network_change = true;
+    quic_info->migration_config_.migrate_session_early = true;
+    quic_info->migration_config_.migrate_idle_session =
+        quic_config.connection_migration().migrate_idle_connection();
+    if (quic_config.connection_migration().has_max_idle_time_before_migration()) {
+      // Override the QUICHE default value 30s.
+      quic_info->migration_config_.idle_migration_period =
+          quic::QuicTime::Delta::FromSeconds(DurationUtil::durationToSeconds(
+              quic_config.connection_migration().max_idle_time_before_migration()));
+    }
+    if (quic_config.connection_migration().has_max_time_on_non_default_network()) {
+      // Override the QUICHE default value 128s.
+      quic_info->migration_config_.max_time_on_non_default_network =
+          quic::QuicTime::Delta::FromSeconds(DurationUtil::durationToSeconds(
+              quic_config.connection_migration().max_time_on_non_default_network()));
+    }
+  }
+  if (quic_config.has_client_packet_writer()) {
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<QuicClientPacketWriterConfigFactory>(
+        quic_config.client_packet_writer());
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        quic_config.client_packet_writer(), server_context.messageValidationVisitor(), factory);
+    quic_info->writer_factory_ = factory.createQuicClientPacketWriterFactory(
+        *message, server_context.messageValidationVisitor());
+  } else {
+    quic_info->writer_factory_ = std::make_unique<QuicClientPacketWriterFactoryImpl>();
+  }
   return quic_info;
 }
 
@@ -68,7 +100,10 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   ASSERT(info_impl->writer_factory_ != nullptr);
   QuicClientPacketWriterFactory::CreationResult creation_result =
       info_impl->writer_factory_->createSocketAndQuicPacketWriter(
-          server_addr, quic::kInvalidNetworkHandle, local_addr, options);
+          server_addr,
+          (network_observer_registry ? network_observer_registry->getDefaultNetwork()
+                                     : quic::kInvalidNetworkHandle),
+          local_addr, options);
   const bool use_migration_in_quiche =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_migration_in_quiche");
   quic::QuicForceBlockablePacketWriter* wrapper = nullptr;

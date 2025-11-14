@@ -359,6 +359,7 @@ envoy_cc_library(
     deps = [
         ":quic_network_connectivity_observer_interface",
         "//envoy/event:dispatcher_interface",
+        "@com_github_google_quiche//:quic_core_path_validator_lib",
     ],
 )
 
@@ -404,7 +405,22 @@ envoy_cc_library(
         ":envoy_quic_packet_writer_lib",
         ":envoy_quic_utils_lib",
         ":envoy_quic_client_connection_lib",
+        "//source/common/network:connection_socket_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
+    ]),
+)
+
+envoy_cc_library(
+    name = "envoy_quic_client_packet_writer_factory_interface",
+    hdrs = envoy_select_enable_http3(["envoy_quic_client_packet_writer_factory.h"]),
+    deps = envoy_select_enable_http3([
+        ":envoy_quic_packet_writer_lib",
+        "//envoy/config:typed_config_interface",
+        "//envoy/network:address_interface",
+        "//envoy/network:listen_socket_interface",
+        "//envoy/server:factory_context_interface",
+        "@com_github_google_quiche//:quic_core_path_validator_lib",
+        "@com_github_google_quiche//:quic_core_types_lib",
     ]),
 )
 
@@ -413,9 +429,12 @@ envoy_cc_library(
     srcs = envoy_select_enable_http3(["envoy_quic_client_connection.cc"]),
     hdrs = envoy_select_enable_http3(["envoy_quic_client_connection.h"]),
     deps = envoy_select_enable_http3([
+        ":envoy_quic_client_packet_writer_factory_interface",
         ":envoy_quic_packet_writer_lib",
+        ":envoy_quic_network_observer_registry_factory_lib",
         ":quic_network_connection_lib",
         "//envoy/event:dispatcher_interface",
+        "//envoy/network:listen_socket_interface",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/runtime:runtime_lib",

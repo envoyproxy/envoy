@@ -68,6 +68,11 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final boolean mEnablePlatformCertificatesValidation = true;
   private String mUpstreamTlsSni = "";
   private int mH3ConnectionKeepaliveInitialIntervalMilliseconds = 0;
+  private boolean mUseQuicPlatformPacketWriter = false;
+  private boolean mEnableConnectionMigration = false;
+  private boolean mMigrateIdleConnection = false;
+  private long mMaxIdleTimeBeforeMigrationSeconds = 0;
+  private long mMaxTimeOnNonDefaultNetworkSeconds = 0;
   private boolean mUseNetworkChangeEvent = false;
   private boolean mUseV2NetworkMonitor = false;
 
@@ -227,6 +232,41 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return this;
   }
 
+  public NativeCronvoyEngineBuilderImpl setUseQuicPlatformPacketWriter(boolean use) {
+    mUseQuicPlatformPacketWriter = use;
+    return this;
+  }
+
+  public NativeCronvoyEngineBuilderImpl setEnableConnectionMigration(boolean enable) {
+    mEnableConnectionMigration = enable;
+    return this;
+  }
+
+  public NativeCronvoyEngineBuilderImpl setMigrateIdleConnection(boolean migrate) {
+    mMigrateIdleConnection = migrate;
+    return this;
+  }
+
+  /**
+   * Set the maximum idle time for a QUIC connection before migration.
+   * @param seconds The maximum idle time in seconds. Should be non-zero to take effect.
+   * @return This builder.
+   */
+  public NativeCronvoyEngineBuilderImpl setMaxIdleTimeBeforeMigrationSeconds(long seconds) {
+    mMaxIdleTimeBeforeMigrationSeconds = seconds;
+    return this;
+  }
+
+  /**
+   * Set the maximum time a QUIC connection can remain on a non-default network.
+   * @param seconds The maximum time in seconds. Should be non-zero to take effect.
+   * @return This builder.
+   */
+  public NativeCronvoyEngineBuilderImpl setMaxTimeOnNonDefaultNetworkSeconds(long seconds) {
+    mMaxTimeOnNonDefaultNetworkSeconds = seconds;
+    return this;
+  }
+
   public NativeCronvoyEngineBuilderImpl setConnectTimeoutSeconds(int connectTimeout) {
     mConnectTimeoutSeconds = connectTimeout;
     return this;
@@ -295,6 +335,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
         mAppId, mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
         keyValueStores, mRuntimeGuards, mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
-        mH3ConnectionKeepaliveInitialIntervalMilliseconds);
+        mH3ConnectionKeepaliveInitialIntervalMilliseconds, mUseQuicPlatformPacketWriter,
+        mEnableConnectionMigration, mMigrateIdleConnection, mMaxIdleTimeBeforeMigrationSeconds,
+        mMaxTimeOnNonDefaultNetworkSeconds);
   }
 }

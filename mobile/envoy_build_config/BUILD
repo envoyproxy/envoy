@@ -52,6 +52,7 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:config",
         "@envoy_mobile//library/common/extensions/key_value/platform:config",
         "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
+        "@envoy_mobile//library/common/extensions/quic_packet_writer/platform:config",
         "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
     ] + envoy_select_envoy_mobile_listener(
         [

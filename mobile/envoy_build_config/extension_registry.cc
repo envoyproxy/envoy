@@ -62,6 +62,7 @@
 #include "library/common/extensions/key_value/platform/config.h"
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
+#include "library/common/extensions/quic_packet_writer/platform/config.h"
 
 namespace Envoy {
 
@@ -169,6 +170,8 @@ void ExtensionRegistry::registerFactories() {
 
   // This is required for load balancers of upstream clusters `base` and `base_clear`.
   Envoy::Extensions::LoadBalancingPolicies::ClusterProvided::forceRegisterFactory();
+
+  Quic::forceRegisterQuicPlatformPacketWriterConfigFactory();
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are downstream factories required if Envoy Mobile is compiled with

@@ -65,6 +65,11 @@ open class EngineBuilder() {
   private var enablePlatformCertificatesValidation = false
   private var upstreamTlsSni: String = ""
   private var h3ConnectionKeepaliveInitialIntervalMilliseconds = 0
+  private var useQuicPlatformPacketWriter: Boolean = false
+  private var enableConnectionMigration: Boolean = false
+  private var migrateIdleConnection: Boolean = false
+  private var maxIdleTimeBeforeMigrationSeconds: Long = 0
+  private var maxTimeOnNonDefaultNetworkSeconds: Long = 0
 
   /**
    * Sets a log level to use with Envoy.
@@ -522,6 +527,61 @@ open class EngineBuilder() {
   }
 
   /**
+   * Specify whether to use the platform packet writer for QUIC.
+   *
+   * @param useQuicPlatformPacketWriter whether to use the platform packet writer.
+   * @return This builder.
+   */
+  fun setUseQuicPlatformPacketWriter(useQuicPlatformPacketWriter: Boolean): EngineBuilder {
+    this.useQuicPlatformPacketWriter = useQuicPlatformPacketWriter
+    return this
+  }
+
+  /**
+   * Specify whether to enable QUIC connection migration.
+   *
+   * @param enableConnectionMigration whether to enable connection migration.
+   * @return This builder.
+   */
+  fun setEnableConnectionMigration(enableConnectionMigration: Boolean): EngineBuilder {
+    this.enableConnectionMigration = enableConnectionMigration
+    return this
+  }
+
+  /**
+   * Specify whether to migrate idle QUIC connections.
+   *
+   * @param migrateIdleConnection whether to migrate idle connections.
+   * @return This builder.
+   */
+  fun setMigrateIdleConnection(migrateIdleConnection: Boolean): EngineBuilder {
+    this.migrateIdleConnection = migrateIdleConnection
+    return this
+  }
+
+  /**
+   * Set the maximum idle time for a QUIC connection before migration.
+   *
+   * @param maxIdleTimeBeforeMigrationSeconds the maximum idle time in seconds. Should be non-zero.
+   * @return This builder.
+   */
+  fun setMaxIdleTimeBeforeMigrationSeconds(maxIdleTimeBeforeMigrationSeconds: Long): EngineBuilder {
+    this.maxIdleTimeBeforeMigrationSeconds = maxIdleTimeBeforeMigrationSeconds
+    return this
+  }
+
+  /**
+   * Set the maximum time a QUIC connection can remain on a non-default network.
+   *
+   * @param maxTimeOnNonDefaultNetworkSeconds the maximum time in seconds. Should be non-zero.
+   * @return This builder.
+   */
+  fun setMaxTimeOnNonDefaultNetworkSeconds(maxTimeOnNonDefaultNetworkSeconds: Long): EngineBuilder {
+    this.maxTimeOnNonDefaultNetworkSeconds = maxTimeOnNonDefaultNetworkSeconds
+    return this
+  }
+
+  /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
    * @return A new instance of Envoy.
@@ -569,6 +629,11 @@ open class EngineBuilder() {
         enablePlatformCertificatesValidation,
         upstreamTlsSni,
         h3ConnectionKeepaliveInitialIntervalMilliseconds,
+        useQuicPlatformPacketWriter,
+        enableConnectionMigration,
+        migrateIdleConnection,
+        maxIdleTimeBeforeMigrationSeconds,
+        maxTimeOnNonDefaultNetworkSeconds,
       )
 
     return EngineImpl(engineType(), engineConfiguration, logLevel)

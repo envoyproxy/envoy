@@ -115,6 +115,11 @@ class EnvoyConfigurationTest {
     h3ConnectionKeepaliveInitialIntervalMilliseconds: Int = 0,
     disableDnsRefreshOnFailure: Boolean = false,
     disableDnsRefreshOnNetworkChange: Boolean = false,
+    useQuicPlatformPacketWriter: Boolean = true,
+    enableConnectionMigration: Boolean = false,
+    migrateIdleConnection: Boolean = false,
+    maxIdleTimeBeforeMigrationSeconds: Long = 0,
+    maxTimeOnNonDefaultNetworkSeconds: Long = 0,
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       connectTimeoutSeconds,
@@ -156,6 +161,11 @@ class EnvoyConfigurationTest {
       enablePlatformCertificatesValidation,
       upstreamTlsSni,
       h3ConnectionKeepaliveInitialIntervalMilliseconds,
+      useQuicPlatformPacketWriter,
+      enableConnectionMigration,
+      migrateIdleConnection,
+      maxIdleTimeBeforeMigrationSeconds,
+      maxTimeOnNonDefaultNetworkSeconds,
     )
   }
 
@@ -218,6 +228,12 @@ class EnvoyConfigurationTest {
     // Validate that createProtoString doesn't change filter order.
     val resolvedTemplate2 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
+
+    // Validate the correct quic packet writer extension
+    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy_mobile.extensions.quic_packet_writer.platform.QuicPlatformPacketWriterConfig")
+    // Validate that connection migration is off
+    assertThat(resolvedTemplate).doesNotContain("connection_migration {")
+
     // Validate that createBootstrap also doesn't change filter order.
     // This may leak memory as the bootstrap isn't used.
     envoyConfiguration.createBootstrap()
@@ -298,5 +314,18 @@ class EnvoyConfigurationTest {
 
     assertThat(resolvedTemplate).contains("test_feature_false")
     assertThat(resolvedTemplate).contains("test_feature_true")
+  }
+
+  @Test
+  fun `configuration resolves with quic migration enabled`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      enableConnectionMigration = true,
+      migrateIdleConnection = true
+    )
+
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
+    assertThat(resolvedTemplate).contains("QuicPlatformPacketWriterConfig")
+    assertThat(resolvedTemplate).contains("connection_migration { migrate_idle_connection: true }")
   }
 }

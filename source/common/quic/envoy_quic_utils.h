@@ -180,10 +180,13 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 
 // Create a connection socket instance and apply given socket options to the
 // socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.
-Network::ConnectionSocketPtr
-createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
-                       Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+Network::ConnectionSocketPtr createConnectionSocket(
+    const Network::Address::InstanceConstSharedPtr& peer_addr,
+    Network::Address::InstanceConstSharedPtr& local_addr,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    quic::QuicNetworkHandle network = quic::kInvalidNetworkHandle,
+    std::function<void(Network::ConnectionSocket&, quic::QuicNetworkHandle)> custom_bind_func =
+        nullptr);
 
 // Convert a cert in string form to X509 object.
 // Return nullptr if the bytes passed cannot be passed.

@@ -3,6 +3,8 @@
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/quic/envoy_quic_client_packet_writer_factory.h"
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_network_connection.h"
@@ -16,33 +18,6 @@ namespace Quic {
 
 // Limits the max number of sockets created.
 constexpr uint8_t kMaxNumSocketSwitches = 5;
-
-class QuicClientPacketWriterFactory {
-public:
-  virtual ~QuicClientPacketWriterFactory() = default;
-
-  struct CreationResult {
-    std::unique_ptr<EnvoyQuicPacketWriter> writer_;
-    Network::ConnectionSocketPtr socket_;
-  };
-
-  /**
-   * Creates a socket and a QUIC packet writer associated with it.
-   * @param server_addr The server address to connect to.
-   * @param network The network to bind the socket to.
-   * @param local_addr The local address to bind if not nullptr and if the network is invalid. Will
-   * be set to the actual local address of the created socket.
-   * @param options The socket options to apply.
-   * @return A struct containing the created socket and writer objects.
-   */
-  virtual CreationResult
-  createSocketAndQuicPacketWriter(Network::Address::InstanceConstSharedPtr server_addr,
-                                  quic::QuicNetworkHandle network,
-                                  Network::Address::InstanceConstSharedPtr& local_addr,
-                                  const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
-};
-
-using QuicClientPacketWriterFactoryPtr = std::shared_ptr<QuicClientPacketWriterFactory>;
 
 class PacketsToReadDelegate {
 public:

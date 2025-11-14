@@ -63,6 +63,11 @@ public class EnvoyConfiguration {
   public final boolean enablePlatformCertificatesValidation;
   public final String upstreamTlsSni;
   public final int h3ConnectionKeepaliveInitialIntervalMilliseconds;
+  public final boolean useQuicPlatformPacketWriter;
+  public final boolean enableConnectionMigration;
+  public final boolean migrateIdleConnection;
+  public final long maxIdleTimeBeforeMigrationSeconds;
+  public final long maxTimeOnNonDefaultNetworkSeconds;
 
   /**
    * Create a new instance of the configuration.
@@ -129,6 +134,11 @@ public class EnvoyConfiguration {
    * @param upstreamTlsSni                                the upstream TLS socket SNI override.
    * @param h3ConnectionKeepaliveInitialIntervalMilliseconds the initial keepalive ping timeout for
    * HTTP/3.
+   * @param useQuicPlatformPacketWriter                 whether to use the platform packet writer.
+   * @param enableConnectionMigration                   whether to enable connection migration.
+   * @param migrateIdleConnection                       whether to migrate idle connections.
+   * @param maxIdleTimeBeforeMigrationSeconds           the maximum idle time before migration.
+   * @param maxTimeOnNonDefaultNetworkSeconds           the maximum time on non-default network.
    */
   public EnvoyConfiguration(
       int connectTimeoutSeconds, boolean disableDnsRefreshOnFailure,
@@ -149,7 +159,9 @@ public class EnvoyConfiguration {
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, Map<String, Boolean> runtimeGuards,
       boolean enablePlatformCertificatesValidation, String upstreamTlsSni,
-      int h3ConnectionKeepaliveInitialIntervalMilliseconds) {
+      int h3ConnectionKeepaliveInitialIntervalMilliseconds, boolean useQuicPlatformPacketWriter,
+      boolean enableConnectionMigration, boolean migrateIdleConnection,
+      long maxIdleTimeBeforeMigrationSeconds, long maxTimeOnNonDefaultNetworkSeconds) {
     JniLibrary.load();
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.disableDnsRefreshOnFailure = disableDnsRefreshOnFailure;
@@ -208,6 +220,11 @@ public class EnvoyConfiguration {
     this.upstreamTlsSni = upstreamTlsSni;
     this.h3ConnectionKeepaliveInitialIntervalMilliseconds =
         h3ConnectionKeepaliveInitialIntervalMilliseconds;
+    this.useQuicPlatformPacketWriter = useQuicPlatformPacketWriter;
+    this.enableConnectionMigration = enableConnectionMigration;
+    this.migrateIdleConnection = migrateIdleConnection;
+    this.maxIdleTimeBeforeMigrationSeconds = maxIdleTimeBeforeMigrationSeconds;
+    this.maxTimeOnNonDefaultNetworkSeconds = maxTimeOnNonDefaultNetworkSeconds;
   }
 
   public long createBootstrap() {
@@ -233,6 +250,8 @@ public class EnvoyConfiguration {
         h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
         enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards,
-        h3ConnectionKeepaliveInitialIntervalMilliseconds);
+        h3ConnectionKeepaliveInitialIntervalMilliseconds, useQuicPlatformPacketWriter,
+        enableConnectionMigration, migrateIdleConnection, maxIdleTimeBeforeMigrationSeconds,
+        maxTimeOnNonDefaultNetworkSeconds);
   }
 }

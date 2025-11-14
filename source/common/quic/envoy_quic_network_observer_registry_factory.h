@@ -6,6 +6,8 @@
 
 #include "source/common/quic/quic_network_connectivity_observer.h"
 
+#include "quiche/quic/core/quic_path_validator.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -22,6 +24,12 @@ public:
     quic_observers_.erase(&observer);
   }
 
+  // Get the default network handle.
+  virtual quic::QuicNetworkHandle getDefaultNetwork() PURE;
+
+  // Get an alternative network handle different from the given one.
+  virtual quic::QuicNetworkHandle getAlternativeNetwork(quic::QuicNetworkHandle network) PURE;
+
 protected:
   const absl::flat_hash_set<QuicNetworkConnectivityObserver*>& registeredQuicObservers() const {
     return quic_observers_;
@@ -36,9 +44,7 @@ public:
   virtual ~EnvoyQuicNetworkObserverRegistryFactory() = default;
 
   virtual std::unique_ptr<EnvoyQuicNetworkObserverRegistry>
-  createQuicNetworkObserverRegistry(Event::Dispatcher& /*dispatcher*/) {
-    return std::make_unique<EnvoyQuicNetworkObserverRegistry>();
-  }
+  createQuicNetworkObserverRegistry(Event::Dispatcher& /*dispatcher*/) PURE;
 };
 
 using EnvoyQuicNetworkObserverRegistryPtr = std::unique_ptr<EnvoyQuicNetworkObserverRegistry>;

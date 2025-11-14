@@ -53,8 +53,33 @@ message QuicKeepAliveSettings {
   }];
 }
 
+// Config for QUIC connection migration across network interfaces, i.e. cellular to WIFI, upon
+// network change events from the platform, i.e. the current network gets
+// disconnected, or upon the QUIC detects bad connections. After migration, the
+// connection may be on a different network other than the default network
+// picked by the platform. A connection is such special state is only allowed to
+// serve new requests for a certain period of time before being drained, and
+// meanwhile it will try to migrate to the default network if possible.
+message ConnectionMigrationSettings {
+  // Whether to migrate idle connections which aren't serving any requests.
+  // If absent, idle connections will not be migrated but be closed upon
+  // migration signals.
+  bool migrate_idle_connection = 1;
+  // If idle connections are allowed to be migrated, only migrate the connection
+  // if it hasn't been idle for longer than this idle period. Otherwise, the
+  // connection will be closed instead.
+  // If absent, the default is 30s.
+  google.protobuf.Duration max_idle_time_before_migration = 2 [(validate.rules).duration = {gte {seconds: 1}}];
+  // After migrating to a non-default network interface, the connection will
+  // only be allowed to stay on that network for up to this period of time before
+  // being drained unless it migrates to the default network or that network
+  // gets picked as the default by the device by then.
+  // If absent, the default is 128s.
+  google.protobuf.Duration max_time_on_non_default_network = 3 [(validate.rules).duration = {gte {seconds: 1}}];
+}
+
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 10]
+// [#next-free-field: 12]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
@@ -118,6 +143,21 @@ message QuicProtocolOptions {
   // Maximum packet length for QUIC connections. It refers to the largest size of a QUIC packet that can be transmitted over the connection.
   // If not specified, one of the `default values in QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/quic_constants.h>`_ is used.
   google.protobuf.UInt64Value max_packet_length = 9;
+
+  // A customized UDP socket and QUIC packet writer using it for the client connection.
+  // If not present, the default platform-independent socket and writer will be used.
+  config.core.v3.TypedExtensionConfig client_packet_writer = 10;
+
+  // Enable QUIC `connection migration
+  // <https://datatracker.ietf.org/doc/html/rfc9000#name-connection-migration>`
+  // to a different network interface when the current network is degrading or
+  // has become bad.
+  // In order to use a different network interface other than the platform's  default one,
+  // a customized :ref:`client_packet_writer <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.client_packet_writer>` needs to be configured to
+  // create UDP sockets on non-default networks.
+  // Only takes effect when runtime key ``envoy.reloadable_features.use_migration_in_quiche`` is true.
+  // If absent, the feature will be disabled.
+  ConnectionMigrationSettings connection_migration = 11;
 }
 
 message UpstreamHttpProtocolOptions {

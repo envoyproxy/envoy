@@ -6,6 +6,7 @@
 
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -96,12 +97,14 @@ void EnvoyQuicClientConnection::EnvoyQuicClinetPathContextFactory::CreatePathVal
 }
 
 quic::QuicNetworkHandle EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::FindAlternateNetwork(
-    quic::QuicNetworkHandle /*network*/) {
-  return quic::kInvalidNetworkHandle;
+    quic::QuicNetworkHandle network) {
+  return registry_.has_value() ? registry_.value().get().getAlternativeNetwork(network)
+                               : quic::kInvalidNetworkHandle;
 }
 
 quic::QuicNetworkHandle EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::GetDefaultNetwork() {
-  return quic::kInvalidNetworkHandle;
+  return registry_.has_value() ? registry_.value().get().getDefaultNetwork()
+                               : quic::kInvalidNetworkHandle;
 }
 
 void EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::OnMigrationToPathDone(

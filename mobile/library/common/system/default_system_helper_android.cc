@@ -1,6 +1,16 @@
+#include <android/multinetwork.h>
+#include <errno.h>
+
+#include "envoy/common/exception.h"
+
+#include "source/common/common/assert.h"
+
+#include "library/common/common/utility.h"
 #include "library/common/system/default_system_helper.h"
 #include "library/jni/android_jni_utility.h"
 #include "library/jni/android_network_utility.h"
+
+namespace Envoy {
 
 namespace Envoy {
 
@@ -20,6 +30,21 @@ int64_t DefaultSystemHelper::getDefaultNetworkHandle() { return JNI::getDefaultN
 
 std::vector<std::pair<int64_t, ConnectionType>> DefaultSystemHelper::getAllConnectedNetworks() {
   return JNI::getAllConnectedNetworks();
+}
+
+void DefaultSystemHelper::bindSocketToNetwork(Network::ConnectionSocket& socket,
+                                              int64_t network_handle) {
+  if (!socket.ioHandle().isOpen()) {
+    ENVOY_LOG_MISC(warn, "Socket is not open, not binding to network");
+    return;
+  }
+  auto fd = socket.ioHandle().fdDoNotUse();
+  int rc = android_setsocknetwork(static_cast<int>(fd), static_cast<netid_t>(network_handle));
+  if (rc != 0) {
+    ENVOY_LOG_MISC(warn, "Failed to bind socket to network {}: {}, closing socket", network_handle,
+                   Envoy::errorDetails(errno));
+    socket.close();
+  }
 }
 
 } // namespace Envoy

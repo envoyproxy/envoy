@@ -170,6 +170,15 @@ public:
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& setUpstreamTlsSni(std::string sni);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
+  EngineBuilder& setUseQuicPlatformPacketWriter(bool use_quic_platform_packet_writer);
+  // If called to enable connection migration, no need to call setUseQuicPlatformPacketWriter()
+  // separately.
+  EngineBuilder& enableConnectionMigration(bool connection_migration_on);
+  EngineBuilder& setMigrateIdleConnection(bool migrate_idle_connection);
+  // 0 means using the Envoy default 30s.
+  EngineBuilder& setMaxIdleTimeBeforeMigrationSeconds(int max_idle_time_before_migration);
+  // 0 means using the Envoy default 128s.
+  EngineBuilder& setMaxTimeOnNonDefaultNetworkSeconds(int max_time_on_non_default_network);
 
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   // Set additional socket options on the upstream cluster outbound sockets.
@@ -332,6 +341,13 @@ private:
 
   int keepalive_initial_interval_ms_ = 0;
   int max_concurrent_streams_ = 0;
+  bool use_quic_platform_packet_writer_ = false;
+
+  // QUIC connection migration.
+  bool enable_connection_migration_ = false;
+  bool migrate_idle_connection_ = false;
+  int max_idle_time_before_migration_seconds_ = 0;
+  int max_time_on_non_default_network_seconds_ = 0;
 
   std::string node_id_;
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;

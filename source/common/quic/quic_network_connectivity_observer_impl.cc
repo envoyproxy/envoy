@@ -9,17 +9,19 @@ QuicNetworkConnectivityObserverImpl::QuicNetworkConnectivityObserverImpl(
     EnvoyQuicClientSession& session)
     : session_(session) {}
 
-void QuicNetworkConnectivityObserverImpl::onNetworkMadeDefault(NetworkHandle /*network*/) {
-  // TODO(danzh) propagate `network` to quic session.
-  (void)session_;
+void QuicNetworkConnectivityObserverImpl::onNetworkMadeDefault(NetworkHandle network) {
+  ENVOY_CONN_LOG(trace, "Network {} has become the default.", session_, network);
+  session_.migration_manager().OnNetworkMadeDefault(network);
 }
 
-void QuicNetworkConnectivityObserverImpl::onNetworkConnected(NetworkHandle /*network*/) {
-  (void)session_;
+void QuicNetworkConnectivityObserverImpl::onNetworkConnected(NetworkHandle network) {
+  ENVOY_CONN_LOG(trace, "Network {} gets connected.", session_, network);
+  session_.migration_manager().OnNetworkConnected(network);
 }
 
-void QuicNetworkConnectivityObserverImpl::onNetworkDisconnected(NetworkHandle /*network*/) {
-  (void)session_;
+void QuicNetworkConnectivityObserverImpl::onNetworkDisconnected(NetworkHandle network) {
+  ENVOY_CONN_LOG(trace, "Network {} gets disconnected.", session_, network);
+  session_.migration_manager().OnNetworkDisconnected(network);
 }
 
 } // namespace Quic

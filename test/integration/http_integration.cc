@@ -403,7 +403,7 @@ void HttpIntegrationTest::initialize() {
   // Needs to outlive all QUIC connections.
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   auto quic_connection_persistent_info =
-      Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster);
+      Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster, server_factory_context_);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(

@@ -410,6 +410,12 @@ public:
     }
   }
 
+  quic::QuicNetworkHandle getDefaultNetwork() override { return quic::kInvalidNetworkHandle; }
+
+  quic::QuicNetworkHandle getAlternativeNetwork(quic::QuicNetworkHandle) override {
+    return quic::kInvalidNetworkHandle;
+  }
+
   using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;
 };
 
