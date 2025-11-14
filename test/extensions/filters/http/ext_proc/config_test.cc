@@ -563,6 +563,27 @@ TEST(HttpExtProcConfigTest, StatusOnErrorDefaultConfig) {
   cb(filter_callback);
 }
 
+TEST(HttpExtProcConfigTest, InvalidStatPrefixTooLong) {
+  // Create a stat_prefix that exceeds the 1024 byte limit
+  std::string long_prefix(1025, 'a');
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+      stat_prefix: google
+  stat_prefix: )EOF" + long_prefix + R"EOF(
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW_WITH_REGEX(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value(), EnvoyException,
+      "Proto constraint validation failed.*stat_prefix.*");
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters
