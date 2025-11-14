@@ -88,7 +88,7 @@ public:
     ASSERT(stream_info_ != nullptr);
     return *stream_info_;
   }
-  StreamInfo::StreamInfo* streamInfo() const { return stream_info_.get(); }
+  StreamInfo::StreamInfo* streamInfoPtr() const { return stream_info_.get(); }
   bool connected() const { return connected_; }
   bool isEndFilterIteration() const { return iter_ == accept_filters_.end(); }
 
