@@ -102,7 +102,7 @@ public:
       if (!active_socket->connected()) {
         // If active_socket is about to be destructed, emit logs if a connection is not created.
         if (active_socket->streamInfoPtr() != nullptr) {
-          emitLogs(*config_, *active_socket->streamInfoPtr());
+          emitLogs(*config_, active_socket->streamInfo());
         } else {
           // If the active_socket is not connected, this socket is not promoted to active
           // connection. Thus the stream_info_ is owned by this active socket.
