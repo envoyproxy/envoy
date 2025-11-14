@@ -101,7 +101,10 @@ public:
   std::string newUri(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
-  const std::string& responseBody() const override { return EMPTY_STRING; }
+  absl::string_view formatBody(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                               const StreamInfo::StreamInfo&, std::string&) const override {
+    return EMPTY_STRING;
+  };
 };
 
 class CommonVirtualHostImpl;
@@ -405,6 +408,7 @@ using HeaderMutationsPtr = std::unique_ptr<Http::HeaderMutations>;
 class ShadowPolicyImpl : public ShadowPolicy {
 public:
   using RequestMirrorPolicy = envoy::config::route::v3::RouteAction::RequestMirrorPolicy;
+
   static absl::StatusOr<std::shared_ptr<ShadowPolicyImpl>>
   create(const RequestMirrorPolicy& config,
          Server::Configuration::CommonFactoryContext& factory_context);
@@ -740,10 +744,10 @@ public:
   std::string newUri(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
-  const std::string& responseBody() const override {
-    return direct_response_body_provider_ != nullptr ? direct_response_body_provider_->data()
-                                                     : EMPTY_STRING;
-  }
+  absl::string_view formatBody(const Http::RequestHeaderMap& request_headers,
+                               const Http::ResponseHeaderMap& response_headers,
+                               const StreamInfo::StreamInfo& stream_info,
+                               std::string& body_out) const override;
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -916,6 +920,7 @@ private:
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
   Envoy::Config::DataSource::DataSourceProviderPtr direct_response_body_provider_;
+  Formatter::FormatterPtr direct_response_body_formatter_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;

@@ -35,6 +35,11 @@ message Mcp {
 
   // Configures how the filter handles non-MCP traffic.
   TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // When set to true, the filter will clear the route cache after setting dynamic metadata.
+  // This allows the route to be re-selected based on the MCP metadata (e.g., method, params).
+  // Defaults to false.
+  bool clear_route_cache = 2;
 }
 
 // McpOverride for MCP filter

@@ -703,6 +703,25 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cluster_shadow_policy_integration_test",
+    size = "large",
+    srcs = ["cluster_shadow_policy_integration_test.cc"],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "upstream_http_filter_integration_test",
     size = "large",
     srcs = ["upstream_http_filter_integration_test.cc"],
@@ -1835,7 +1854,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "extension_discovery_integration_test",
     size = "large",
-    srcs = ["extension_discovery_integration_test.cc"],
+    srcs = envoy_select_enable_http3(["extension_discovery_integration_test.cc"]),
     rbe_pool = "6gig",
     deps = [
         ":http_integration_lib",
@@ -1858,7 +1877,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_extension_discovery_integration_test",
     size = "large",
-    srcs = ["listener_extension_discovery_integration_test.cc"],
+    srcs = envoy_select_enable_http3(["listener_extension_discovery_integration_test.cc"]),
     rbe_pool = "2core",
     deps = [
         ":http_integration_lib",
@@ -2264,9 +2283,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_integration_test",
     size = "large",
-    srcs = envoy_select_admin_functionality([
-        "xds_integration_test.cc",
-    ]),
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//bazel:disable_admin_functionality": [],
+        "//conditions:default": ["xds_integration_test.cc"],
+    }),
     data = [
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",

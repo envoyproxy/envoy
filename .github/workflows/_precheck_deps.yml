@@ -40,7 +40,7 @@ jobs:
       bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths || '/opt/hostedtoolcache' }}
+      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths }}
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       request: ${{ inputs.request }}
       error-match: |
@@ -55,9 +55,7 @@ jobs:
         include:
         - target: deps
           rbe: false
-          diskspace-hack-paths: |
-            /opt/hostedtoolcache
-            /usr/local/.ghcup
+          diskspace-hack-paths:
 
   dependency-review:
     runs-on: ubuntu-24.04

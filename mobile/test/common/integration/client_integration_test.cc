@@ -252,7 +252,7 @@ void ClientIntegrationTest::basicTest() {
     ASSERT_EQ(2, last_stream_final_intel_.upstream_protocol);
   } else {
     // This verifies the H3 attempt was made due to the quic hints.
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     std::string stats = engine_->dumpStats();
     EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;
     // Make sure the client reported protocol was also HTTP/3.
@@ -614,7 +614,7 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
   for (uint32_t i = 0; i < num_requests; ++i) {
     Platform::StreamPrototypeSharedPtr stream_prototype;
     {
-      absl::MutexLock l(&engine_lock_);
+      absl::MutexLock l(engine_lock_);
       stream_prototype = engine_->streamClient()->newStreamPrototype();
     }
 
@@ -666,7 +666,7 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
   for (uint32_t i = 0; i < num_requests; ++i) {
     Platform::StreamPrototypeSharedPtr stream_prototype;
     {
-      absl::MutexLock l(&engine_lock_);
+      absl::MutexLock l(engine_lock_);
       stream_prototype = engine_->streamClient()->newStreamPrototype();
     }
 
@@ -705,7 +705,7 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
     }
 
     if (terminate_engine && request_for_engine_termination == i) {
-      absl::MutexLock l(&engine_lock_);
+      absl::MutexLock l(engine_lock_);
       ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
       engine_.reset();
       break;
@@ -962,7 +962,7 @@ TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
   // Reset connectivity state. This should force a resolve but we will not
   // unblock it.
   {
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     engine_->engine()->resetConnectivityState();
   }
 
@@ -1499,7 +1499,7 @@ TEST_P(ClientIntegrationTest, Proxying) {
   }
   initialize();
   {
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     engine_->engine()->setProxySettings(fake_upstreams_[0]->localAddress()->asString().c_str(),
                                         fake_upstreams_[0]->localAddress()->ip()->port());
   }
@@ -1536,7 +1536,7 @@ TEST_P(ClientIntegrationTest, TestStats) {
   initialize();
 
   {
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     std::string stats = engine_->dumpStats();
     EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
   }

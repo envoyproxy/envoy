@@ -22,9 +22,9 @@ abstracts==0.0.12 \
     #   envoy-distribution-repo
     #   envoy-github-abstract
     #   envoy-github-release
-aio-api-bazel==0.0.3 \
-    --hash=sha256:97e014123757c41bd4b466725e46c3aca0176ff310d851c951219c8d8ef93998 \
-    --hash=sha256:a20e8b9b62b829b73ba37bec798211de485f07463bec8d215aeb3d1b87bcf5e5
+aio-api-bazel==0.0.4 \
+    --hash=sha256:33ba61ac41c6ee8a13ed3e831ab808590fe074cc9703de6d2401d2f200f3c10a \
+    --hash=sha256:33ba61ac41c6ee8a13ed3e831ab808590fe074cc9703de6d2401d2f200f3c10a
     # via -r requirements.in
 aio-api-github==0.2.10 \
     --hash=sha256:2563ad2cd219352a7933b78190c17ab460b503b437bec348a738c0f804adf45f \
