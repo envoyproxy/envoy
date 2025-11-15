@@ -123,6 +123,12 @@ bug_fixes:
   change: |
     Fixed a bug where attributes based on request headers (e.g. ``request.host``) were not sent to
     the ext_proc server if ext_proc was configured to only run on the encode path.
+- area: connection
+  change: |
+    Fixed connection handling to properly propagate transport failure reasons to StreamInfo before raising
+    close events. This ensures the ``connection.transport_failure_reason`` CEL attribute and
+    ``DOWNSTREAM_TRANSPORT_FAILURE_REASON`` access log formatter are populated correctly for all connection
+    types and available to all network filters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
