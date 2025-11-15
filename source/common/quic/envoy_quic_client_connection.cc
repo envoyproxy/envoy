@@ -107,6 +107,10 @@ quic::QuicNetworkHandle EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::Get
                                : quic::kInvalidNetworkHandle;
 }
 
+quic::QuicNetworkHandle EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::GetCurrentNetwork() {
+  return initial_network_;
+}
+
 void EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::OnMigrationToPathDone(
     std::unique_ptr<quic::QuicClientPathValidationContext> context, bool success) {
   if (success) {
@@ -425,10 +429,11 @@ void EnvoyQuicClientConnection::OnCanWrite() {
 
 EnvoyQuicClientConnection::EnvoyQuicMigrationHelper&
 EnvoyQuicClientConnection::getOrCreateMigrationHelper(
-    QuicClientPacketWriterFactory& writer_factory,
+    QuicClientPacketWriterFactory& writer_factory, quic::QuicNetworkHandle initial_network,
     OptRef<EnvoyQuicNetworkObserverRegistry> registry) {
   if (migration_helper_ == nullptr) {
-    migration_helper_ = std::make_unique<EnvoyQuicMigrationHelper>(*this, registry, writer_factory);
+    migration_helper_ = std::make_unique<EnvoyQuicMigrationHelper>(*this, registry, writer_factory,
+                                                                   initial_network);
   }
   return *migration_helper_;
 }

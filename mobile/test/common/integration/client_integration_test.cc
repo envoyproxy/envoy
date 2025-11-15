@@ -413,7 +413,7 @@ TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAn
   initialize();
 
   if (getCodecType() != Http::CodecType::HTTP3 || version_ != Network::Address::IpVersion::v4) {
-    // This test relies on a 2nd loopback address.
+    // This test relies on a 2nd v4 loopback address.
     return;
   }
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
@@ -489,7 +489,7 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkChangeEventsAnd
   initialize();
 
   if (getCodecType() != Http::CodecType::HTTP3 || version_ != Network::Address::IpVersion::v4) {
-    // This test relies on a 2nd loopback address.
+    // This test relies on a 2nd v4 loopback address.
     return;
   }
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");

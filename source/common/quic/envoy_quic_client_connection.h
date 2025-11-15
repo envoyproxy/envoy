@@ -58,9 +58,10 @@ public:
   public:
     EnvoyQuicMigrationHelper(EnvoyQuicClientConnection& connection,
                              OptRef<EnvoyQuicNetworkObserverRegistry> registry,
-                             QuicClientPacketWriterFactory& writer_factory)
+                             QuicClientPacketWriterFactory& writer_factory,
+                             quic::QuicNetworkHandle initial_network)
         : quic::QuicMigrationHelper(), connection_(connection), registry_(registry),
-          writer_factory_(writer_factory) {}
+          writer_factory_(writer_factory), initial_network_(initial_network) {}
 
     quic::QuicNetworkHandle FindAlternateNetwork(quic::QuicNetworkHandle network) override;
 
@@ -71,12 +72,13 @@ public:
 
     quic::QuicNetworkHandle GetDefaultNetwork() override;
 
-    quic::QuicNetworkHandle GetCurrentNetwork() override { return quic::kInvalidNetworkHandle; }
+    quic::QuicNetworkHandle GetCurrentNetwork() override;
 
   private:
     EnvoyQuicClientConnection& connection_;
     OptRef<EnvoyQuicNetworkObserverRegistry> registry_;
     QuicClientPacketWriterFactory& writer_factory_;
+    quic::QuicNetworkHandle initial_network_;
   };
 
   using EnvoyQuicMigrationHelperPtr = std::unique_ptr<EnvoyQuicMigrationHelper>;
@@ -142,6 +144,7 @@ public:
   // Called if the associated QUIC session will handle migration.
   EnvoyQuicMigrationHelper&
   getOrCreateMigrationHelper(QuicClientPacketWriterFactory& writer_factory,
+                             quic::QuicNetworkHandle initial_network,
                              OptRef<EnvoyQuicNetworkObserverRegistry> registry);
 
   // Called if this class will handle migration.

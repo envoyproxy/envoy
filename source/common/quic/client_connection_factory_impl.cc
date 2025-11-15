@@ -1,5 +1,7 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 
+#include <exception>
+
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
@@ -98,12 +100,21 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   quic::ParsedQuicVersionVector quic_versions = quic::CurrentSupportedHttp3Versions();
   ASSERT(!quic_versions.empty());
   ASSERT(info_impl->writer_factory_ != nullptr);
+  quic::QuicNetworkHandle current_network = quic::kInvalidNetworkHandle;
+  if (network_observer_registry != nullptr) {
+    current_network = network_observer_registry->getDefaultNetwork();
+    if (current_network == quic::kInvalidNetworkHandle) {
+      // In case the platform default network is invalid, pick another working network.
+      current_network =
+          network_observer_registry->getAlternativeNetwork(quic::kInvalidNetworkHandle);
+    }
+    // If current_network is still invalid at this point, the created socket
+    // will likely not work. Let the connection figure it out and fail by
+    // itself.
+  }
   QuicClientPacketWriterFactory::CreationResult creation_result =
-      info_impl->writer_factory_->createSocketAndQuicPacketWriter(
-          server_addr,
-          (network_observer_registry ? network_observer_registry->getDefaultNetwork()
-                                     : quic::kInvalidNetworkHandle),
-          local_addr, options);
+      info_impl->writer_factory_->createSocketAndQuicPacketWriter(server_addr, current_network,
+                                                                  local_addr, options);
   const bool use_migration_in_quiche =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_migration_in_quiche");
   quic::QuicForceBlockablePacketWriter* wrapper = nullptr;
@@ -129,7 +140,7 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   quic::QuicConnectionMigrationConfig migration_config = info_impl->migration_config_;
   if (use_migration_in_quiche) {
     migration_helper = &connection->getOrCreateMigrationHelper(
-        *info_impl->writer_factory_,
+        *info_impl->writer_factory_, current_network,
         makeOptRefFromPtr<EnvoyQuicNetworkObserverRegistry>(network_observer_registry));
   } else {
     // The connection needs to be aware of the writer factory so it can create migration probing

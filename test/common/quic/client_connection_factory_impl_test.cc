@@ -42,7 +42,8 @@ protected:
     }
     protocol_options->set_connection_options("5RTO,ACKD");
     protocol_options->set_client_connection_options("6RTO,AKD4");
-    quic_info_ = createPersistentQuicInfoForCluster(dispatcher_, *cluster_);
+    quic_info_ =
+        createPersistentQuicInfoForCluster(dispatcher_, *cluster_, context_.server_context_);
     EXPECT_EQ(quic_info_->quic_config_.max_time_before_crypto_handshake(),
               quic::QuicTime::Delta::FromSeconds(10));
     EXPECT_EQ(quic_info_->quic_config_.GetMaxBidirectionalStreamsToSend(),
