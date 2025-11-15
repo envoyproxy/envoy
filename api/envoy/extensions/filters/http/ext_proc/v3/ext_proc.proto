@@ -402,7 +402,8 @@ message MetadataOptions {
 
   // Describes which cluster metadata namespaces to forward to
   // the external processing server.
-  // NOTE: This is the least specific metadata. Should there be any namespace collision,
+  // .. note::
+  // This is the least specific metadata. Should there be any namespace collision,
   // cluster level metadata can be overridden by filter metadata.
   MetadataNamespaces cluster_metadata_forwarding_namespaces = 3;
 }
