@@ -28,6 +28,14 @@ config_setting(
 configure_make(
     name = "liburing",
     configure_in_place = True,
+    env = select({
+        "//bazel:clang_build": {
+            "AR": "$(AR)",
+            "LD": "$(LD)",
+            "RANLIB": "/opt/llvm/bin/llvm-ranlib",
+        },
+        "//conditions:default": {},
+    }),
     lib_source = "@com_github_axboe_liburing//:all",
     tags = [
         "nocompdb",
@@ -107,6 +115,9 @@ configure_make(
     name = "librdkafka_build",
     configure_in_place = True,
     configure_options = ["--disable-ssl --disable-gssapi --disable-zstd --disable-curl && cp Makefile.config src/.. && cp config.h src/.."],
+    env = {
+        "AR": "$(AR)",
+    },
     lib_source = "@confluentinc_librdkafka//:all",
     out_static_libs = [
         "librdkafka.a",

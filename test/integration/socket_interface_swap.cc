@@ -32,7 +32,7 @@ SocketInterfaceSwap::SocketInterfaceSwap(Network::Socket::Type socket_type)
           })) {}
 
 void SocketInterfaceSwap::IoHandleMatcher::setResumeWrites() {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   mutex_.Await(absl::Condition(
       +[](Network::TestIoSocketHandle** matched_iohandle) { return *matched_iohandle != nullptr; },
       &matched_iohandle_));

@@ -269,7 +269,7 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
 
   auto cert_pem = certificate_data_source_provider_->data() == nullptr
                       ? EMPTY_STRING
-                      : std::move(*certificate_data_source_provider_->data());
+                      : *certificate_data_source_provider_->data();
   if (!cert_pem.empty()) {
     status = pemToDerB64(cert_pem, cert_der_b64, false);
     if (!status.ok()) {
@@ -292,7 +292,7 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
   if (certificate_chain_data_source_provider_.has_value()) {
     auto chain_pem = certificate_chain_data_source_provider_.value()->data() == nullptr
                          ? EMPTY_STRING
-                         : std::move(*certificate_chain_data_source_provider_.value()->data());
+                         : *certificate_chain_data_source_provider_.value()->data();
     if (!chain_pem.empty()) {
       // If a certificate chain is provided, it must be valid
       status = pemToDerB64(chain_pem, cert_chain_der_b64, true);

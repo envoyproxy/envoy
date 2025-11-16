@@ -50,7 +50,7 @@ void CredentialsFileCredentialsProvider::refresh() {
   // Use data source if provided, otherwise read from default AWS credential file path
   if (credential_file_data_source_provider_.has_value() &&
       credential_file_data_source_provider_.value()->data() != nullptr) {
-    credential_file_data = std::move(*credential_file_data_source_provider_.value()->data());
+    credential_file_data = *credential_file_data_source_provider_.value()->data();
     credential_file_path = "<config datasource>";
   } else {
     credential_file_path = Utility::getCredentialFilePath();

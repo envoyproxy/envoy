@@ -46,7 +46,7 @@ void WebIdentityCredentialsProvider::refresh() {
 
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}",
             aws_cluster_manager_->getUriFromClusterName(cluster_name_).value());
-  web_identity_data = std::move(*web_identity_data_source_provider_.value()->data());
+  web_identity_data = *web_identity_data_source_provider_.value()->data();
 
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
