@@ -17,7 +17,6 @@ namespace Upstream {
 using ClientSideWeightedRoundRobinLbProto = envoy::extensions::load_balancing_policies::
     client_side_weighted_round_robin::v3::ClientSideWeightedRoundRobin;
 using OrcaLoadReportProto = xds::data::orca::v3::OrcaLoadReport;
-using CommonLbConfig = envoy::config::cluster::v3::Cluster::CommonLbConfig;
 
 /**
  * Load balancer config used to wrap the config proto.
@@ -172,9 +171,6 @@ public:
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override;
 
     bool recreateOnHostChange() const override { return false; }
-
-    Upstream::LoadBalancerPtr createWithCommonLbConfig(const CommonLbConfig& common_lb_config,
-                                                       Upstream::LoadBalancerParams params);
 
     void applyWeightsToAllWorkers();
 
