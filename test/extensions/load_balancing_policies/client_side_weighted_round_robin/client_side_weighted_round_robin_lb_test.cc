@@ -469,8 +469,6 @@ INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew,
                          ::testing::Values(LoadBalancerTestParam{true},
                                            LoadBalancerTestParam{false}));
 
-// Additional minimal tests to exercise less-traveled branches and improve coverage.
-
 // Ensure that when no hosts have client-side data yet, updateWeightsOnHosts traverses the
 // default-weight path (weights list empty, default=1) without altering host weights.
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeights_AllDefault_NoClientData) {
@@ -489,44 +487,6 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeights_AllDefault_No
 
   EXPECT_EQ(hosts[0]->weight(), 1);
   EXPECT_EQ(hosts[1]->weight(), 1);
-}
-
-// Ensure the WorkerLocalLb constructor consumes RoundRobin locality overrides by constructing
-// with a locality config present in the overrides. We don't assert selection here; we just
-// exercise the configuration merge path in getRoundRobinConfig().
-TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, WorkerLocalLb_LocalityOverride_NoCrash) {
-  // Put a locality config into the RR overrides before constructing WorkerLocalLb via init().
-  lb_config_.round_robin_overrides_.mutable_locality_lb_config()
-      ->mutable_locality_weighted_lb_config();
-
-  // Build a simple topology with two hosts so RR is exercised.
-  hostSet().healthy_hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"),
-      makeTestHost(info_, "tcp://127.0.0.1:81"),
-  };
-  hostSet().hosts_ = hostSet().healthy_hosts_;
-
-  // This will construct WorkerLocalLb with the overrides and call through getRoundRobinConfig().
-  init(false);
-  hostSet().runCallbacks({}, {});
-
-  // A couple of picks to ensure the LB is operational with the override present.
-  EXPECT_NE(nullptr, lb_->peekAnotherHost(nullptr));
-  EXPECT_NE(nullptr, lb_->chooseHost(nullptr).host);
-}
-
-TEST(ClientSideWeightedRoundRobinConfigTest, LocalityConfigPropagatesToOverrides) {
-  // Build proto with locality lb config set.
-  envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
-      ClientSideWeightedRoundRobin proto;
-  proto.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
-
-  // Construct typed config and validate that Round Robin overrides carry locality config.
-  NiceMock<Event::MockDispatcher> dispatcher;
-  ThreadLocal::MockInstance tls;
-  ClientSideWeightedRoundRobinLbConfig typed(proto, dispatcher, tls);
-  EXPECT_TRUE(typed.round_robin_overrides_.has_locality_lb_config());
-  EXPECT_TRUE(typed.round_robin_overrides_.locality_lb_config().has_locality_weighted_lb_config());
 }
 
 TEST(ClientSideWeightedRoundRobinConfigTest, SlowStartConfigPropagatesToOverrides) {

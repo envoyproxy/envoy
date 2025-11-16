@@ -35,10 +35,6 @@ RoundRobinConfig getRoundRobinConfig(const CommonLbConfig& common_config,
     *round_robin_config.lb_config_.mutable_slow_start_config() =
         override_config.slow_start_config();
   }
-  if (override_config.has_locality_lb_config()) {
-    *round_robin_config.lb_config_.mutable_locality_lb_config() =
-        override_config.locality_lb_config();
-  }
   return round_robin_config.lb_config_;
 }
 
@@ -62,10 +58,6 @@ ClientSideWeightedRoundRobinLbConfig::ClientSideWeightedRoundRobinLbConfig(
 
   if (lb_proto.has_slow_start_config()) {
     *round_robin_overrides_.mutable_slow_start_config() = lb_proto.slow_start_config();
-  }
-
-  if (lb_proto.has_locality_lb_config()) {
-    *round_robin_overrides_.mutable_locality_lb_config() = lb_proto.locality_lb_config();
   }
 }
 
