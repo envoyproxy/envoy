@@ -1,4 +1,4 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
+load("@envoy_api//bazel:proto_package.bzl", "api_proto_package")
 
 licenses(["notice"])  # Apache 2
 

@@ -1,7 +1,7 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy library targets
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
+load("@envoy_api//bazel:proto_library.bzl", "api_cc_py_proto_library")
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",

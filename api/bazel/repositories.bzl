@@ -63,7 +63,7 @@ def api_dependencies(bzlmod = False):
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
-load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
+load("@envoy_api//bazel:proto_library.bzl", "api_cc_py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
 api_cc_py_proto_library(
@@ -84,7 +84,7 @@ go_proto_library(
 
 ZIPKINAPI_BUILD_CONTENT = """
 
-load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
+load("@envoy_api//bazel:proto_library.bzl", "api_cc_py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
 api_cc_py_proto_library(
