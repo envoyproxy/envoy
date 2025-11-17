@@ -10,6 +10,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_address.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -41,15 +43,15 @@ public:
    * @param version the IP version
    * @param socket_v6only whether to create IPv6-only socket
    * @param options socket creation options
-   * @return IoHandlePtr for the created socket, or nullptr for unsupported types
+   * @return StatusOr<IoHandlePtr> for the created socket, or nullptr for unsupported types
    */
-  Envoy::Network::IoHandlePtr
+  absl::StatusOr<Envoy::Network::IoHandlePtr>
   socket(Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
          Envoy::Network::Address::IpVersion version, bool socket_v6only,
          const Envoy::Network::SocketCreationOptions& options) const override;
 
   // No-op for reverse connections.
-  Envoy::Network::IoHandlePtr
+  absl::StatusOr<Envoy::Network::IoHandlePtr>
   socket(Envoy::Network::Socket::Type socket_type,
          const Envoy::Network::Address::InstanceConstSharedPtr addr,
          const Envoy::Network::SocketCreationOptions& options) const override;
@@ -70,9 +72,9 @@ public:
    * @param addr_type the address type
    * @param version the IP version
    * @param config the reverse connection configuration
-   * @return IoHandlePtr for the reverse connection socket
+   * @return StatusOr<IoHandlePtr> for the reverse connection socket
    */
-  Envoy::Network::IoHandlePtr
+  absl::StatusOr<Envoy::Network::IoHandlePtr>
   createReverseConnectionSocket(Envoy::Network::Socket::Type socket_type,
                                 Envoy::Network::Address::Type addr_type,
                                 Envoy::Network::Address::IpVersion version,

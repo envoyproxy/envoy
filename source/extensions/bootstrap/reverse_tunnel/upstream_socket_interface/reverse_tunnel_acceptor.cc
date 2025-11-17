@@ -21,7 +21,7 @@ ReverseTunnelAcceptor::ReverseTunnelAcceptor(Server::Configuration::ServerFactor
   ENVOY_LOG(debug, "reverse_tunnel: created acceptor");
 }
 
-Envoy::Network::IoHandlePtr
+absl::StatusOr<Envoy::Network::IoHandlePtr>
 ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type, Envoy::Network::Address::Type,
                               Envoy::Network::Address::IpVersion, bool,
                               const Envoy::Network::SocketCreationOptions&) const {
@@ -32,7 +32,7 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type, Envoy::Network::Addr
   return nullptr;
 }
 
-Envoy::Network::IoHandlePtr
+absl::StatusOr<Envoy::Network::IoHandlePtr>
 ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
                               const Envoy::Network::Address::InstanceConstSharedPtr addr,
                               const Envoy::Network::SocketCreationOptions& options) const {

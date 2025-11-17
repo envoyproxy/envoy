@@ -26,6 +26,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/status/statusor.h"
 #include "absl/synchronization/blocking_counter.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
@@ -331,11 +332,12 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
   if (&socket_interface != &default_interface) {
     ENVOY_LOG(debug, "creating socket using custom interface for address: {}",
               address->logicalName());
-    auto io_handle = socket_interface.socket(socket_type, address, creation_options);
-    if (!io_handle) {
+    absl::StatusOr<Network::IoHandlePtr> io_handle =
+        socket_interface.socket(socket_type, address, creation_options);
+    if (!io_handle.ok() || !*io_handle) {
       return absl::InvalidArgumentError("failed to create socket using custom interface");
     }
-    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
+    return std::make_shared<Network::TcpListenSocket>(std::move(*io_handle), address, options);
   }
 
   // Continue with standard socket creation for addresses using the default interface.

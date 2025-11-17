@@ -30,7 +30,10 @@ namespace Statsd {
 
 UdpStatsdSink::WriterImpl::WriterImpl(UdpStatsdSink& parent)
     : parent_(parent), io_handle_(Network::ioHandleForAddr(Network::Socket::Type::Datagram,
-                                                           parent_.server_address_, {})) {}
+                                                           parent_.server_address_, {})
+                                      .value_or(nullptr)) {
+  RELEASE_ASSERT(io_handle_ && io_handle_->isOpen(), "");
+}
 
 void UdpStatsdSink::WriterImpl::write(const std::string& message) {
   // TODO(mattklein123): We can avoid this const_cast pattern by having a constant variant of

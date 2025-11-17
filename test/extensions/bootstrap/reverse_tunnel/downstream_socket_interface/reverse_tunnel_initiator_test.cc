@@ -17,6 +17,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/logging.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -163,60 +164,66 @@ TEST_F(ReverseTunnelInitiatorTest, FactoryName) {
 
 TEST_F(ReverseTunnelInitiatorTest, SocketMethodBasicIPv4) {
   // Test basic socket creation for IPv4.
-  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, Network::Address::Type::Ip,
-                                          Network::Address::IpVersion::v4, false,
-                                          Network::SocketCreationOptions{});
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->socket(
+      Network::Socket::Type::Stream, Network::Address::Type::Ip, Network::Address::IpVersion::v4,
+      false, Network::SocketCreationOptions{});
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 
   // Verify it's NOT a ReverseConnectionIOHandle (should be a regular socket)
-  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket->get());
   EXPECT_EQ(reverse_handle, nullptr);
 }
 
 TEST_F(ReverseTunnelInitiatorTest, SocketMethodBasicIPv6) {
   // Test basic socket creation for IPv6.
-  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, Network::Address::Type::Ip,
-                                          Network::Address::IpVersion::v6, false,
-                                          Network::SocketCreationOptions{});
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->socket(
+      Network::Socket::Type::Stream, Network::Address::Type::Ip, Network::Address::IpVersion::v6,
+      false, Network::SocketCreationOptions{});
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 }
 
 TEST_F(ReverseTunnelInitiatorTest, SocketMethodDatagram) {
   // Test datagram socket creation.
-  auto socket = socket_interface_->socket(
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->socket(
       Network::Socket::Type::Datagram, Network::Address::Type::Ip, Network::Address::IpVersion::v4,
       false, Network::SocketCreationOptions{});
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 }
 
 TEST_F(ReverseTunnelInitiatorTest, SocketMethodUnixDomain) {
   // Test Unix domain socket creation.
-  auto socket = socket_interface_->socket(
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->socket(
       Network::Socket::Type::Stream, Network::Address::Type::Pipe, Network::Address::IpVersion::v4,
       false, Network::SocketCreationOptions{});
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 }
 
 TEST_F(ReverseTunnelInitiatorTest, SocketMethodWithAddressIPv4) {
   // Test socket creation with IPv4 address.
   auto address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
-  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, address,
-                                          Network::SocketCreationOptions{});
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->socket(
+      Network::Socket::Type::Stream, address, Network::SocketCreationOptions{});
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 }
 
 TEST_F(ReverseTunnelInitiatorTest, SocketMethodWithAddressIPv6) {
   // Test socket creation with IPv6 address.
   auto address = std::make_shared<Network::Address::Ipv6Instance>("::1", 8080);
-  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, address,
-                                          Network::SocketCreationOptions{});
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->socket(
+      Network::Socket::Type::Stream, address, Network::SocketCreationOptions{});
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 }
 
 TEST_F(ReverseTunnelInitiatorTest, SocketMethodWithReverseConnectionAddress) {
@@ -230,13 +237,14 @@ TEST_F(ReverseTunnelInitiatorTest, SocketMethodWithReverseConnectionAddress) {
 
   auto reverse_address = std::make_shared<ReverseConnectionAddress>(config);
 
-  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, reverse_address,
-                                          Network::SocketCreationOptions{});
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->socket(
+      Network::Socket::Type::Stream, reverse_address, Network::SocketCreationOptions{});
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 
   // Verify it's a ReverseConnectionIOHandle (not a regular socket)
-  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket->get());
   EXPECT_NE(reverse_handle, nullptr);
 }
 
@@ -250,15 +258,16 @@ TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketStreamIPv4) {
   config.src_tenant_id = "test-tenant";
   config.remote_clusters.push_back(RemoteClusterConnectionConfig("remote-cluster", 2));
 
-  auto socket = socket_interface_->createReverseConnectionSocket(
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->createReverseConnectionSocket(
       Network::Socket::Type::Stream, Network::Address::Type::Ip, Network::Address::IpVersion::v4,
       config);
 
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 
   // Verify it's a ReverseConnectionIOHandle.
-  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket->get());
   EXPECT_NE(reverse_handle, nullptr);
 
   // Verify that the TLS registry scope is being used.
@@ -274,15 +283,16 @@ TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketStreamIPv6) {
   config.src_tenant_id = "test-tenant";
   config.remote_clusters.push_back(RemoteClusterConnectionConfig("remote-cluster", 2));
 
-  auto socket = socket_interface_->createReverseConnectionSocket(
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->createReverseConnectionSocket(
       Network::Socket::Type::Stream, Network::Address::Type::Ip, Network::Address::IpVersion::v6,
       config);
 
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 
   // Verify it's a ReverseConnectionIOHandle.
-  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket->get());
   EXPECT_NE(reverse_handle, nullptr);
 }
 
@@ -294,15 +304,16 @@ TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketDatagram) {
   config.src_tenant_id = "test-tenant";
   config.remote_clusters.push_back(RemoteClusterConnectionConfig("remote-cluster", 2));
 
-  auto socket = socket_interface_->createReverseConnectionSocket(
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->createReverseConnectionSocket(
       Network::Socket::Type::Datagram, Network::Address::Type::Ip, Network::Address::IpVersion::v4,
       config);
 
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 
   // Verify it's NOT a ReverseConnectionIOHandle.
-  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket->get());
   EXPECT_EQ(reverse_handle, nullptr);
 }
 
@@ -314,15 +325,16 @@ TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketNonIP) {
   config.src_tenant_id = "test-tenant";
   config.remote_clusters.push_back(RemoteClusterConnectionConfig("remote-cluster", 2));
 
-  auto socket = socket_interface_->createReverseConnectionSocket(
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->createReverseConnectionSocket(
       Network::Socket::Type::Stream, Network::Address::Type::Pipe, Network::Address::IpVersion::v4,
       config);
 
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 
   // Verify it's NOT a ReverseConnectionIOHandle (should be a regular socket)
-  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket->get());
   EXPECT_EQ(reverse_handle, nullptr);
 }
 
@@ -334,12 +346,13 @@ TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketEmptyRemoteClust
   config.src_tenant_id = "test-tenant";
   // No remote_clusters added - should return early.
 
-  auto socket = socket_interface_->createReverseConnectionSocket(
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->createReverseConnectionSocket(
       Network::Socket::Type::Stream, Network::Address::Type::Ip, Network::Address::IpVersion::v4,
       config);
 
   // Should return nullptr due to empty remote_clusters.
-  EXPECT_EQ(socket, nullptr);
+  ASSERT_TRUE(socket.ok());
+  EXPECT_EQ(*socket, nullptr);
 }
 
 TEST_F(ReverseTunnelInitiatorTest, SocketMethodWithEmptyReverseConnectionAddress) {
@@ -353,10 +366,11 @@ TEST_F(ReverseTunnelInitiatorTest, SocketMethodWithEmptyReverseConnectionAddress
 
   auto reverse_address = std::make_shared<ReverseConnectionAddress>(config);
 
-  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, reverse_address,
-                                          Network::SocketCreationOptions{});
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  absl::StatusOr<Network::IoHandlePtr> socket = socket_interface_->socket(
+      Network::Socket::Type::Stream, reverse_address, Network::SocketCreationOptions{});
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 }
 
 TEST_F(ReverseTunnelInitiatorTest, SocketMethodWithSocketCreationOptions) {
@@ -366,9 +380,11 @@ TEST_F(ReverseTunnelInitiatorTest, SocketMethodWithSocketCreationOptions) {
   options.max_addresses_cache_size_ = 100;
 
   auto address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
-  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, address, options);
-  EXPECT_NE(socket, nullptr);
-  EXPECT_TRUE(socket->isOpen());
+  absl::StatusOr<Network::IoHandlePtr> socket =
+      socket_interface_->socket(Network::Socket::Type::Stream, address, options);
+  ASSERT_TRUE(socket.ok());
+  ASSERT_NE(*socket, nullptr);
+  EXPECT_TRUE((*socket)->isOpen());
 }
 
 } // namespace ReverseConnection
