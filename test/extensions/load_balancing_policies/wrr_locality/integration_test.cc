@@ -22,11 +22,12 @@ namespace {
 void configureClusterLoadBalancingPolicy(envoy::config::cluster::v3::Cluster& cluster) {
   auto* policy = cluster.mutable_load_balancing_policy();
 
-  // Configure WRR-Locality LB policy on the cluster level, with a CSWRR per-locality LB policy
-  // that disables the CSWRR out-of-band endpoint reporting. This is because it is currently
-  // the only per-locality LB policy that works with CSWRR. Note that the field
+  // Configure WRR-Locality LB policy on the cluster level, with a
+  // ClientSideWeightedRoundRobinLoadBalancer per-locality LB policy that disables the
+  // ClientSideWeightedRoundRobinLoadBalancer out-of-band endpoint reporting. This is because it is
+  // currently the only per-locality LB policy that works with WRR-Locality. Note that the field
   // `enable_oob_load_report` isn't being used at the moment in Envoy, making this configuration
-  // the default CSWRR settings.
+  // the default ClientSideWeightedRoundRobinLoadBalancer settings.
   const std::string policy_yaml = R"EOF(
       policies:
       - typed_extension_config:
@@ -107,9 +108,9 @@ TEST_P(WrrLocalityIntegrationTest, LocalityWeightedRoundRobinLoadBalancing) {
          requests_num);
   initializeConfig(localities_weights);
 
-  // Set the repsonse headers of each of the upstreams. Each will add a header
+  // Set the response headers of each of the upstreams. Each will add a header
   // "my_upstream_index" that will indicate which upstream server returned
-  // the reponse.
+  // the response.
   static const Http::LowerCaseString myUpstreamIndexHeaderName("my_upstream_index");
   // Setup the backends response headers.
   for (uint32_t i = 0; i < kLocalitiesNum; ++i) {
@@ -139,7 +140,7 @@ TEST_P(WrrLocalityIntegrationTest, LocalityWeightedRoundRobinLoadBalancing) {
     cleanupUpstreamAndDownstream();
     ENVOY_LOG(trace, "After request {}.", i);
   }
-  // Validate that the expected usage roughly equals to the acutal usage.
+  // Validate that the expected usage roughly equals to the actual usage.
   for (uint32_t i = 0; i < kLocalitiesNum; ++i) {
     // The expectation that the number of requests per upstream will be up to 2
     // off (because of randomization of the chosen locality order).
@@ -178,7 +179,7 @@ public:
               ->set_path(eds_helper_.edsPath());
         });
     use_lds_ = false;
-    // Set 4 autonmous upstreams, 2 for each locality.
+    // Set 4 autonomous upstreams, 2 for each locality.
     setUpstreamCount(4);
     setUpstreamProtocol(Http::CodecType::HTTP2);
 
@@ -234,9 +235,9 @@ public:
 
   void sendRequestsAndTrackUpstreamUsage(uint64_t number_of_requests,
                                          std::vector<uint64_t>& upstream_usage) {
-    // Set the repsonse headers of each of the upstreams. Each will add a header
+    // Set the response headers of each of the upstreams. Each will add a header
     // "my_upstream_index" that will indicate which upstream server returned
-    // the reponse.
+    // the response.
     static const Http::LowerCaseString myUpstreamIndexHeaderName("my_upstream_index");
     // Setup the backends response headers.
     for (uint32_t i = 0; i < fake_upstreams_.size(); ++i) {
