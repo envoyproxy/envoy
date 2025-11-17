@@ -686,7 +686,6 @@ protected:
   void onRetryTimer();
   void enableRetryTimer();
   void disableRetryTimer();
-  void checkUpstreamConnectionTrigger();
 
 public:
   // Public for testing purposes
@@ -744,8 +743,7 @@ protected:
   bool tls_handshake_complete_{false};
   bool initial_data_received_{false};
   bool read_disabled_due_to_buffer_{false}; // Track if we disabled reading due to buffer overflow.
-  bool using_new_api_{false};          // Track if using new API (max_early_data_bytes) vs legacy.
-  uint32_t max_buffered_bytes_{65536}; // Default 64KB.
+  uint32_t max_buffered_bytes_{65536};      // Default 64KB.
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream
