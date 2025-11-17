@@ -99,52 +99,25 @@ Network::FilterStatus Filter::processInitialData(Network::ListenerFilterBuffer& 
   bool is_ssl = PostgresMessageParser::isSslRequest(temp_buffer, 0);
   ENVOY_LOG(trace, "postgres inspector: isSslRequest returned {}", is_ssl);
   if (is_ssl) {
-    ENVOY_LOG(debug, "postgres inspector: SSL request detected.");
+    ENVOY_LOG(debug, "postgres inspector: SSL request detected");
     ssl_requested_ = true;
 
     // Set protocol as Postgres.
     cb_->socket().setDetectedTransportProtocol("postgres");
     config_->stats().postgres_found_.inc();
     config_->stats().ssl_requested_.inc();
-
-    // Reply 'S' to indicate SSL is supported. This enables SNI-based routing for all PostgreSQL
-    // versions by allowing TLS Inspector to extract SNI from the subsequent ClientHello.
-    //
-    // Protocol flow:
-    // 1. Client sends SSLRequest (8 bytes)
-    // 2. We send 'S' (1 byte) to indicate SSL is supported
-    // 3. Client proceeds with TLS ClientHello
-    // 4. TLS Inspector extracts SNI for filter chain matching
-    //
-    // This works for both PostgreSQL 17+ (direct SSL) and < 17 (negotiated SSL).
-    absl::string_view ssl_response(&SSL_RESPONSE_ACCEPT, 1);
-    Buffer::OwnedImpl write_buffer{};
-    write_buffer.add(ssl_response);
-    Api::IoCallUint64Result result = cb_->socket().ioHandle().write(write_buffer);
-
-    if (!result.ok()) {
-      std::string error_msg = fmt::format(
-          "postgres inspector: failed to write SSL response. code: {} error: {}",
-          static_cast<int>(result.err_->getErrorCode()), result.err_->getErrorDetails());
-      ENVOY_LOG(error, "{}", error_msg);
-      config_->stats().ssl_response_failed_.inc();
-      state_ = ParseState::Error;
-      cb_->socket().ioHandle().close();
-      return Network::FilterStatus::StopIteration;
-    }
-
-    // Drain the SSLRequest from buffer.
-    const bool drained = buffer.drain(SSL_REQUEST_MESSAGE_SIZE);
-    ENVOY_LOG(debug, "postgres inspector: sent 'S' response, drained SSLRequest: {}", drained);
     bytes_processed_for_histogram_ = SSL_REQUEST_MESSAGE_SIZE;
 
-    // Note: For PostgreSQL 17+ (direct SSL), the client may send ClientHello immediately
-    // after SSLRequest in the same TCP segment. That's expected behavior, not a MITM attack.
-    // For pre-17 versions, client waits for our 'S' response before sending ClientHello.
-    // In both cases, TLS Inspector will process any remaining data as TLS handshake.
+    // Inspector only detect and mark the protocol. SSL negotiation must be handled by the
+    // downstream filter chain components:
+    // 1. The postgres_proxy network filter, OR
+    // 2. A starttls transport socket configured in the filter chain.
+    //
+    // For PostgreSQL 17+: Client may send ClientHello immediately after SSLRequest.
+    // For PostgreSQL < 17: Client waits for server response before sending ClientHello.
+    // In both cases, proper SSL handling must be configured in the filter chain.
 
-    bytes_read_ = 0; // Reset for next message
-    config_->stats().ssl_response_success_.inc();
+    bytes_read_ = buffer.rawSlice().len_;
     done(true);
     return Network::FilterStatus::Continue;
   }

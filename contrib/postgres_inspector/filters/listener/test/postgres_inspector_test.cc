@@ -104,25 +104,11 @@ protected:
   Event::MockTimer* timeout_timer_;
 };
 
-// Test SSL request detection and 'S' response.
+// Test SSL request detection.
 TEST_F(PostgresInspectorTest, SslRequest) {
   init();
 
   EXPECT_CALL(socket_, setDetectedTransportProtocol("postgres"));
-
-  // Expect the filter to write 'S' response
-  NiceMock<Network::MockIoHandle> io_handle;
-  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
-
-  // Mock successful write of 'S' response
-  EXPECT_CALL(io_handle, write(testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
-        // Verify 'S' response
-        EXPECT_EQ(1, buffer.length());
-        char response = buffer.peekInt<char>(0);
-        EXPECT_EQ('S', response);
-        return Api::IoCallUint64Result{1, Api::IoError::none()};
-      }));
 
   auto data = PostgresTestUtils::createSslRequest();
   auto buffer = createBuffer(std::move(data));
@@ -132,8 +118,6 @@ TEST_F(PostgresInspectorTest, SslRequest) {
   EXPECT_EQ(Network::FilterStatus::Continue, status);
   EXPECT_EQ(1, cfg_->stats().ssl_requested_.value());
   EXPECT_EQ(1, cfg_->stats().postgres_found_.value());
-  EXPECT_EQ(1, cfg_->stats().ssl_response_success_.value());
-  EXPECT_EQ(0, cfg_->stats().ssl_response_failed_.value());
   EXPECT_EQ(0, cfg_->stats().ssl_not_requested_.value());
 
   // Verify bytes_processed histogram (8 bytes for SSLRequest)

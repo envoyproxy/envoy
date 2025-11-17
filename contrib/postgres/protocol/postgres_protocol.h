@@ -36,9 +36,8 @@ constexpr uint32_t CANCEL_REQUEST_CODE = 0x04d2162e;
 // Similar to SSL request but for GSSAPI encryption.
 constexpr uint32_t GSSAPI_ENC_REQUEST_CODE = 0x04d21630;
 
-// Server responses to SSL request (single byte).
+// Server response to SSL request. It is a single byte used by postgres_proxy filter.
 constexpr char SSL_RESPONSE_ACCEPT = 'S'; // Server supports SSL, proceed with handshake.
-constexpr char SSL_RESPONSE_REJECT = 'N'; // Server does not support SSL.
 
 // Message size constants.
 constexpr uint32_t STARTUP_HEADER_SIZE = 8;             // Length(4) + Version/Code(4).

@@ -20,7 +20,6 @@ using Postgres::Protocol::CANCEL_REQUEST_MESSAGE_SIZE;
 using Postgres::Protocol::POSTGRES_PROTOCOL_VERSION_30;
 using Postgres::Protocol::SSL_REQUEST_CODE;
 using Postgres::Protocol::SSL_REQUEST_MESSAGE_SIZE;
-using Postgres::Protocol::SSL_RESPONSE_ACCEPT;
 using Postgres::Protocol::STARTUP_HEADER_SIZE;
 
 // Alias for backward compatibility.

@@ -30,9 +30,6 @@ using ProtoConfig =
   COUNTER(postgres_not_found)                                                                      \
   COUNTER(ssl_requested)                                                                           \
   COUNTER(ssl_not_requested)                                                                       \
-  COUNTER(ssl_response_success)                                                                    \
-  COUNTER(ssl_response_failed)                                                                     \
-  COUNTER(protocol_violation)                                                                      \
   COUNTER(startup_message_too_large)                                                               \
   COUNTER(startup_message_timeout)                                                                 \
   COUNTER(protocol_error)                                                                          \
