@@ -55,8 +55,7 @@ protected:
   }
 
   void setupFilter() {
-    filter_ = std::make_unique<ProtoApiScrubberFilter>(
-        *(ProtoApiScrubberFilterConfig::create(proto_config_, mock_factory_context_).value()));
+    filter_ = std::make_unique<ProtoApiScrubberFilter>(*filter_config_);
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(mock_encoder_callbacks_);
   }
@@ -67,6 +66,36 @@ protected:
         api_->fileSystem()
             .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
             .value();
+    auto config_or_status =
+        ProtoApiScrubberFilterConfig::create(proto_config_, mock_factory_context_);
+    ASSERT_TRUE(config_or_status.ok());
+
+    filter_config_ = config_or_status.value();
+  }
+
+  void reloadFilterWithConfig(absl::string_view config_pb_text) {
+    // 1. Reset the proto config object
+    proto_config_.Clear();
+
+    // 2. Parse the user-provided config string
+    if (!config_pb_text.empty()) {
+      Envoy::Protobuf::TextFormat::ParseFromString(std::string(config_pb_text), &proto_config_);
+    }
+
+    // 3. CRITICAL: Re-inject the descriptor set.
+    // proto_config_.Clear() deleted the previous one.
+    *proto_config_.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
+
+    // 4. Re-create the Filter Config
+    auto config_or_status =
+        ProtoApiScrubberFilterConfig::create(proto_config_, mock_factory_context_);
+    ASSERT_TRUE(config_or_status.ok());
+    filter_config_ = config_or_status.value();
+
+    setupFilter();
   }
 
   void TearDown() override {
@@ -103,6 +132,7 @@ protected:
 
   Api::ApiPtr api_;
   ProtoApiScrubberConfig proto_config_;
+  std::shared_ptr<const ProtoApiScrubberFilterConfig> filter_config_;
   testing::NiceMock<MockStreamDecoderFilterCallbacks> mock_decoder_callbacks_;
   testing::NiceMock<MockStreamEncoderFilterCallbacks> mock_encoder_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context_;
@@ -257,6 +287,99 @@ TEST_F(ProtoApiScrubberPassThroughTest, StreamingMultipleMessageSingleBuffer) {
 
   // No data modification.
   checkSerializedData<CreateApiKeyRequest>(*request_data4, {request4});
+}
+
+TEST_F(ProtoApiScrubberPassThroughTest, ScrubRequestFieldBasedOnConfig) {
+  // 1. Define a configuration that scrubs 'key.display_name'
+  //    for the method '/apikeys.ApiKeys/CreateApiKey'.
+  const std::string config_with_restrictions = R"pb(
+    filtering_mode: OVERRIDE
+    restrictions {
+      method_restrictions: {
+        key: "/apikeys.ApiKeys/CreateApiKey"
+        value: {
+          request_field_restrictions: {
+            key: "key.display_name"
+            value: {
+              matcher: {
+                matcher_list: {
+                  matchers: {
+                    predicate: {
+                      single_predicate: {
+                        input: {
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
+                          }
+                        }
+                        custom_match: {
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                              expr_match: {
+                                cel_expr_parsed: {
+                                  expr: {
+                                    id: 1
+                                    const_expr: {
+                                      bool_value: true
+                                    }
+                                  }
+                                  source_info: {
+                                    syntax_version: "cel1"
+                                    location: "inline_expression"
+                                    positions: {
+                                      key: 1
+                                      value: 0
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    on_match: {
+                      action: {
+                        typed_config: {
+                          [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  )pb";
+
+  // 2. Reload the filter with this specific config
+  reloadFilterWithConfig(config_with_restrictions);
+
+  // 3. Prepare the request
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+
+  // Create a request object that HAS the field we want to scrub
+  // (makeCreateApiKeyRequest defaults "display_name" to "Display Name")
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+
+  // Verify the field is present initially in our test object
+  EXPECT_EQ(request.key().display_name(), "Display Name");
+
+  // 4. Run the Filter
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  CreateApiKeyRequest expected_scrubbed_request = makeCreateApiKeyRequest();
+  expected_scrubbed_request.mutable_key()->set_display_name("");
+
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {expected_scrubbed_request});
 }
 
 } // namespace

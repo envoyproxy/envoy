@@ -5,17 +5,22 @@
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
 #include "envoy/matcher/matcher.h"
 
+#include "source/common/grpc/common.h"
 #include "source/common/matcher/matcher.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "grpc_transcoding/type_helper.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
+
+using google::grpc::transcoding::TypeHelper;
+using Protobuf::MethodDescriptor;
 
 static constexpr absl::string_view kConfigInitializationError =
     "Error encountered during config initialization.";
@@ -79,13 +84,17 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   for (const auto& method_restriction : proto_config.restrictions().method_restrictions()) {
     std::string method_name = method_restriction.first;
     RETURN_IF_ERROR(validateMethodName(method_name));
+    std::string proto_method_name = std::string(method_name.substr(1));
+    std::replace(proto_method_name.begin(), proto_method_name.end(), '/', '.');
     RETURN_IF_ERROR(initializeMethodRestrictions(
-        method_name, request_field_restrictions_,
+        proto_method_name, request_field_restrictions_,
         method_restriction.second.request_field_restrictions(), context));
     RETURN_IF_ERROR(initializeMethodRestrictions(
-        method_name, response_field_restrictions_,
+        proto_method_name, response_field_restrictions_,
         method_restriction.second.response_field_restrictions(), context));
   }
+
+  initializeTypeUtils();
 
   ENVOY_LOG(trace, "Filter config initialized successfully.");
   return absl::OkStatus();
@@ -225,6 +234,30 @@ ProtoApiScrubberFilterConfig::getResponseFieldMatcher(const std::string& method_
   }
 
   return nullptr;
+}
+
+void ProtoApiScrubberFilterConfig::initializeTypeUtils() {
+  type_helper_ =
+      std::make_unique<const TypeHelper>(Envoy::Protobuf::util::NewTypeResolverForDescriptorPool(
+          Envoy::Grpc::Common::typeUrlPrefix(), descriptor_pool_.get()));
+
+  type_finder_ = std::make_unique<const TypeFinder>(
+      [this](absl::string_view type_url) -> const ::Envoy::Protobuf::Type* {
+        return type_helper_->Info()->GetTypeByTypeUrl(type_url);
+      });
+}
+
+const Protobuf::Type*
+ProtoApiScrubberFilterConfig::getRequestType(const std::string& method_name) const {
+  const MethodDescriptor* method = descriptor_pool_->FindMethodByName(method_name);
+  if (method == nullptr) {
+    return nullptr;
+  }
+
+  std::string request_type_url =
+      absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", method->input_type()->full_name());
+  const Protobuf::Type* request_type = (*type_finder_)(request_type_url);
+  return request_type;
 }
 
 REGISTER_FACTORY(RemoveFilterActionFactory,
