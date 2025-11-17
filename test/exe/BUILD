@@ -155,6 +155,12 @@ envoy_cc_test(
         "fips_check.sh",
         "//source/extensions:extensions_metadata.yaml",
     ],
+    env = select({
+        "//bazel:clang_build": {
+            "OBJDUMP": "/opt/llvm/bin/llvm-objdump",
+        },
+        "//conditions:default": {},
+    }),
     rbe_pool = "6gig",
     deps = [
         "//source/common/version:version_lib",

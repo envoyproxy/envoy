@@ -615,7 +615,8 @@ bool envoy_dynamic_module_callback_http_get_response_trailers(
 void envoy_dynamic_module_callback_http_send_response(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
     envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
-    envoy_dynamic_module_type_buffer_module_ptr body_ptr, size_t body_length) {
+    envoy_dynamic_module_type_buffer_module_ptr body_ptr, size_t body_length,
+    envoy_dynamic_module_type_buffer_module_ptr details, size_t details_length) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
 
   std::function<void(ResponseHeaderMap & headers)> modify_headers = nullptr;
@@ -633,8 +634,15 @@ void envoy_dynamic_module_callback_http_send_response(
   const absl::string_view body =
       body_ptr ? absl::string_view(static_cast<const char*>(body_ptr), body_length) : "";
 
+  absl::string_view details_view;
+  if (details != nullptr && details_length != 0) {
+    details_view = absl::string_view(static_cast<const char*>(details), details_length);
+  } else {
+    details_view = "dynamic_module";
+  }
+
   filter->sendLocalReply(static_cast<Http::Code>(status_code), body, modify_headers, 0,
-                         "dynamic_module");
+                         details_view);
 }
 
 void envoy_dynamic_module_callback_http_send_response_headers(
@@ -1520,6 +1528,15 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
                         "Unsupported attribute ID {} as int", static_cast<int64_t>(attribute_id));
   }
   return ok;
+}
+
+bool envoy_dynamic_module_callback_http_add_custom_flag(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr flag_ptr, size_t flag_length) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  absl::string_view flag_name_view(static_cast<const char*>(flag_ptr), flag_length);
+  filter->decoder_callbacks_->streamInfo().addCustomFlag(flag_name_view);
+  return true;
 }
 
 envoy_dynamic_module_type_http_callout_init_result

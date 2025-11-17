@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/common/cancel_wrapper.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
@@ -126,6 +127,7 @@ protected:
   Thread::MutexBasicLockable mu_;
   std::list<std::weak_ptr<CredentialSubscriberCallbacks>>
       credentials_subscribers_ ABSL_GUARDED_BY(mu_);
+  CancelWrapper::CancelFunction cancel_credentials_update_callback_ = []() {};
 };
 
 } // namespace Aws

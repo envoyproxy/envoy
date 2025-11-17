@@ -31,18 +31,21 @@ setup_clang_toolchain() {
         return
     fi
     CONFIG_PARTS=()
-    if [[ -n "${ENVOY_RBE}" ]]; then
-        CONFIG_PARTS+=("remote")
-    fi
     if [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
         CONFIG_PARTS+=("arm64")
     fi
     CONFIG_PARTS+=("clang")
     # We only support clang with libc++ now
     CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
+    BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}" "--config=${CONFIG}")
+    BAZEL_QUERY_OPTION_LIST="${BAZEL_QUERY_OPTIONS[*]}"
+    if [[ -n "${ENVOY_RBE}" ]]; then
+        CONFIG="remote-${CONFIG}"
+    fi
     BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
+    export BAZEL_QUERY_OPTION_LIST
     echo "clang toolchain configured: ${CONFIG}"
 }
 

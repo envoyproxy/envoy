@@ -111,7 +111,7 @@ fn test_send_response_filter() {
 
   envoy_filter
     .expect_send_response()
-    .withf(|status_code, headers, body| {
+    .withf(|status_code, headers, body, details| {
       *status_code == 200
         && *headers
           == vec![
@@ -119,6 +119,7 @@ fn test_send_response_filter() {
             ("header2", "value2".as_bytes()),
           ]
         && *body == Some(b"Hello, World!")
+        && details.is_none()
     })
     .once()
     .return_const(());
