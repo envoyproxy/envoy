@@ -30,5 +30,9 @@ new_features:
     This can avoid unnecessary load shedding or overload actions.
     To enable, set ``envoy.reloadable_features.fixed_heap_use_allocated`` to true.
     The default algorithm (heap_size - pageheap_unmapped - pageheap_free) does not discount for free memory in TCMalloc caches.
+- area: tls_inspector
+  change: |
+    Propagate the transport error from the tls_inspector to the DownstreamTransportFailureReason in StreamInfo
+    for access logging prior to the TLS handshake.
 
 deprecated:
