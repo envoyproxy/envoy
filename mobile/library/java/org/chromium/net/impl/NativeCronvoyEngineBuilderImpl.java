@@ -232,25 +232,39 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return this;
   }
 
+  /**
+   * Set whether to use a platform specific APIs to create UDP socket and the associated QUIC packet
+   * writer. Note that `setUseV2NetworkMonitor()` also needs to be called to take effect. This is a
+   * temporary API which will be deprecated once the platform specific extension is verified to work
+   * and will be used as the default.
+   */
   public NativeCronvoyEngineBuilderImpl setUseQuicPlatformPacketWriter(boolean use) {
     mUseQuicPlatformPacketWriter = use;
     return this;
   }
 
+  /**
+   * Set whether to enable QUIC connection migration across different network interfaces.
+   * Note that `setUseV2NetworkMonitor()` also needs to be called to take effect.
+   * If enabled, the engine will automatically be configured to use platform packet writer. *
+   */
   public NativeCronvoyEngineBuilderImpl setEnableConnectionMigration(boolean enable) {
     mEnableConnectionMigration = enable;
     return this;
   }
 
+  /**
+   * Set whether to migrate idle connections to a different network upon network events.
+   * If not, the connection might be closed or drained or ignore the network event depends on the
+   * event type.
+   */
   public NativeCronvoyEngineBuilderImpl setMigrateIdleConnection(boolean migrate) {
     mMigrateIdleConnection = migrate;
     return this;
   }
 
   /**
-   * Set the maximum idle time for a QUIC connection before migration.
-   * @param seconds The maximum idle time in seconds. Should be non-zero to take effect.
-   * @return This builder.
+   * Set the maximum idle time allowed for a QUIC connection before migration.
    */
   public NativeCronvoyEngineBuilderImpl setMaxIdleTimeBeforeMigrationSeconds(long seconds) {
     mMaxIdleTimeBeforeMigrationSeconds = seconds;
@@ -258,9 +272,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
-   * Set the maximum time a QUIC connection can remain on a non-default network.
-   * @param seconds The maximum time in seconds. Should be non-zero to take effect.
-   * @return This builder.
+   * Set the maximum time a QUIC connection can remain on a non-default network before switching to
+   * the default one.
    */
   public NativeCronvoyEngineBuilderImpl setMaxTimeOnNonDefaultNetworkSeconds(long seconds) {
     mMaxTimeOnNonDefaultNetworkSeconds = seconds;
@@ -335,8 +348,9 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
         mAppId, mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
         keyValueStores, mRuntimeGuards, mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
-        mH3ConnectionKeepaliveInitialIntervalMilliseconds, mUseQuicPlatformPacketWriter,
-        mEnableConnectionMigration, mMigrateIdleConnection, mMaxIdleTimeBeforeMigrationSeconds,
-        mMaxTimeOnNonDefaultNetworkSeconds);
+        mH3ConnectionKeepaliveInitialIntervalMilliseconds,
+        mUseQuicPlatformPacketWriter && mUseV2NetworkMonitor,
+        mEnableConnectionMigration && mUseV2NetworkMonitor, mMigrateIdleConnection,
+        mMaxIdleTimeBeforeMigrationSeconds, mMaxTimeOnNonDefaultNetworkSeconds);
   }
 }

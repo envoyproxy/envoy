@@ -114,6 +114,7 @@ quic::QuicNetworkHandle EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::Get
 void EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::OnMigrationToPathDone(
     std::unique_ptr<quic::QuicClientPathValidationContext> context, bool success) {
   if (success) {
+    ENVOY_CONN_LOG(trace, "Successfully migrate to use path {} to {}", connection_, context->self_address().ToString(), context->peer_address().ToString());
     auto* envoy_context = static_cast<EnvoyQuicClientPathValidationContext*>(context.get());
     // Connection already owns the writer.
     envoy_context->releaseWriter();
@@ -124,6 +125,8 @@ void EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::OnMigrationToPathDone(
     connection_.connectionSocket()->ioHandle().activateFileEvents(Event::FileReadyType::Write);
     // Send something to notify the peer of the address change immediately.
     connection_.SendPing();
+  } else {
+    ENVOY_CONN_LOG(trace, "Failed to migrate to use path {} to {}", connection_, context->self_address().ToString(), context->peer_address().ToString());
   }
 }
 

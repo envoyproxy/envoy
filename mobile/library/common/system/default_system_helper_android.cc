@@ -12,8 +12,6 @@
 
 namespace Envoy {
 
-namespace Envoy {
-
 bool DefaultSystemHelper::isCleartextPermitted(absl::string_view hostname) {
   return JNI::isCleartextPermitted(hostname);
 }

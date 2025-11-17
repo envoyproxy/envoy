@@ -444,11 +444,14 @@ TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAn
   ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
   ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_rq_total", 1));
 
- EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 123)).Times(0u);
-   // A new cellular network appears and becomes the default network. The idle connection should be closed.
+  EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 123)).Times(0u);
+  // A new cellular network appears and becomes the default network. The idle connection should be
+  // closed.
   internalEngine()->onNetworkConnectAndroid(ConnectionType::CONNECTION_4G, 123);
   internalEngine()->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_4G, 123);
-  ASSERT_TRUE(waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS", 1));
+  ASSERT_TRUE(waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_"
+                               "MIGRATION_NO_MIGRATABLE_STREAMS",
+                               1));
 
   // A new connection will be created on the new default network to serve new requests.
   EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 123))

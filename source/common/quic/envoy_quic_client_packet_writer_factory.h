@@ -12,12 +12,16 @@
 namespace Envoy {
 namespace Quic {
 
+// An extension interface to creating customized UDP sockets and creating
+// QUIC packet writers for upstream connections based on such sockets.
 class QuicClientPacketWriterFactory {
 public:
   virtual ~QuicClientPacketWriterFactory() = default;
 
   struct CreationResult {
+    // Not null.
     std::unique_ptr<EnvoyQuicPacketWriter> writer_;
+    // Not null but can be a bad socket if creation goes wrong.
     Network::ConnectionSocketPtr socket_;
   };
 
@@ -41,7 +45,7 @@ using QuicClientPacketWriterFactoryPtr = std::shared_ptr<QuicClientPacketWriterF
 
 class QuicClientPacketWriterConfigFactory : public Config::TypedFactory {
 public:
-  std::string category() const override { return "envoy.quic.packet_writer"; }
+  std::string category() const override { return "envoy.quic.client_packet_writer"; }
 
   /**
    * Returns a packet writer factory based on the given config.

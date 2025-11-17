@@ -146,6 +146,7 @@ message QuicProtocolOptions {
 
   // A customized UDP socket and QUIC packet writer using it for the client connection.
   // If not present, the default platform-independent socket and writer will be used.
+  // [#extension-category: envoy.quic.client_packet_writer]
   config.core.v3.TypedExtensionConfig client_packet_writer = 10;
 
   // Enable QUIC `connection migration
@@ -157,6 +158,7 @@ message QuicProtocolOptions {
   // create UDP sockets on non-default networks.
   // Only takes effect when runtime key ``envoy.reloadable_features.use_migration_in_quiche`` is true.
   // If absent, the feature will be disabled.
+  // [#not-implemented-hide:]
   ConnectionMigrationSettings connection_migration = 11;
 }
 

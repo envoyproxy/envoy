@@ -5,6 +5,8 @@
 namespace Envoy {
 namespace Quic {
 
+// This extension supports creating a UDP socket binding to a platform-specific network handle.
+// On Android M+, the handle is associated with Network.getNetworkHandle().
 class QuicPlatformPacketWriterFactory : public QuicClientPacketWriterFactory {
 public:
   CreationResult createSocketAndQuicPacketWriter(
