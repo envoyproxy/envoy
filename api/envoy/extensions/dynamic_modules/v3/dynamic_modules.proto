@@ -41,4 +41,13 @@ message DynamicModuleConfig {
   // A module is closed when no more references to it exist in the process. For example,
   // no HTTP filters are using the module (e.g. after configuration update).
   bool do_not_close = 3;
+
+  // The dynamic module is loaded with ``RTLD_LOCAL`` flag to avoid symbol conflicts when multiple
+  // modules are loaded by default. Set this to true to load the module with ``RTLD_GLOBAL`` flag.
+  // This is useful for modules that need to share symbols with other modules.
+  //
+  // .. warning::
+  //   Use this option with caution as it may lead to symbol conflicts and undefined behavior
+  //   if multiple modules define the same symbols and are loaded globally.
+  bool load_globally = 4;
 }

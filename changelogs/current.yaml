@@ -146,6 +146,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: dynamic modules
+  change: |
+    Added support for loading dynamic modules globally by setting :ref:`load_globally
+    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.load_globally>` to true.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request
