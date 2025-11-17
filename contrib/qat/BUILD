@@ -33,6 +33,6 @@ configure_make(
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:public"],
     # Use boringssl alias to select fips vs non-fips version.
-    deps = ["//bazel:boringssl"],
+    deps = ["//bazel:boringcrypto"],
     alwayslink = True,
 )

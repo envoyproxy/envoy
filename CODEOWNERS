@@ -17,6 +17,7 @@
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
+/*/extensions/access_loggers/stats @ggreenway @wbpcode @kyessenov
 /*/extensions/access_loggers/stream @mattklein123 @davinci26
 # alternate protocols cache extensions
 /*/extensions/filters/http/alternate_protocols_cache @RyanTheOptimist @abeyad
@@ -369,7 +370,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @yanavlasov
 # Body transform
-/*/extensions/filters/http/transform @wbpcode @UNOWNED
+/*/extensions/filters/http/transform @wbpcode @yanavlasov @adisuissa
 # Health checkers
 /*/extensions/health_checkers/grpc @zuercher @botengyao
 /*/extensions/health_checkers/http @zuercher @botengyao
@@ -424,7 +425,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/path/uri_template_lib/proto @wbpcode @yanjunxiang-google
 
 # mobile
-/mobile/ @RyanTheOptimist @abeyad @fredyw
+/mobile/ @RyanTheOptimist @abeyad @danzh2010
 
 # Contrib
 /contrib/exe/ @mattklein123 @wbpcode

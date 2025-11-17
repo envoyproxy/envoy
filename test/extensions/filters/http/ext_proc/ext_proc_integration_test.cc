@@ -505,6 +505,55 @@ TEST_P(ExtProcIntegrationTest, ServerHalfClosesAfterHeaders) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, ServerHalfClosesDuringBodyStream) {
+  // Configure ext_proc to send both headers and body
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_failure_mode_allow(true);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [](const HttpHeaders& headers, HeadersResponse&) {
+                                 EXPECT_FALSE(headers.end_of_stream());
+                                 return true;
+                               });
+
+  // Client sends 7 chunks.
+  for (int i = 0; i < 7; ++i) {
+    if (i == 6) {
+      codec_client_->sendData(*request_encoder_, 1, true);
+    } else {
+      codec_client_->sendData(*request_encoder_, 1, false);
+    }
+    if (i < 4) {
+      processRequestBodyMessage(*grpc_upstreams_[0], false,
+                                [](const HttpBody& body, BodyResponse&) {
+                                  EXPECT_FALSE(body.end_of_stream());
+                                  return true;
+                                });
+    }
+  }
+
+  processor_stream_->finishGrpcStream(Grpc::Status::Internal);
+
+  // Even if the gRPC server half-closed, processing of the main request still continues.
+  // Verify that data made it to upstream.
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->bodyLength(), 7);
+  verifyDownstreamResponse(*response, 200);
+}
+
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
 // by requesting to modify the request headers.
@@ -3640,6 +3689,60 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
   ASSERT_EQ(1, md_header_result.size());
   EXPECT_EQ("value from ext_proc", md_header_result[0]->value().getStringView());
 
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SendClusterMetadata) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  auto* md_opts = proto_config_.mutable_metadata_options();
+  md_opts->mutable_cluster_metadata_forwarding_namespaces()->add_untyped("cluster_ns_untyped");
+  md_opts->mutable_cluster_metadata_forwarding_namespaces()->add_typed("cluster_ns_typed");
+
+  ConfigOptions config_option = {};
+  config_option.add_metadata = true;
+  initializeConfig(config_option);
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add some metadata to cluster_0
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* metadata = cluster->mutable_metadata();
+    Protobuf::Struct struct_val;
+    (*struct_val.mutable_fields())["some_string"].set_string_value("some_value");
+    (*metadata->mutable_filter_metadata())["cluster_ns_untyped"] = struct_val;
+
+    Protobuf::Any any_val;
+    any_val.PackFrom(struct_val);
+    (*metadata->mutable_typed_filter_metadata())["cluster_ns_typed"] = any_val;
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  EXPECT_TRUE(request_headers_msg.has_metadata_context());
+  const auto& received_metadata = request_headers_msg.metadata_context();
+
+  const auto& filter_metadata = received_metadata.filter_metadata();
+  EXPECT_EQ(filter_metadata.at("cluster_ns_untyped").fields().at("some_string").string_value(),
+            "some_value");
+
+  const auto& typed_filter_metadata = received_metadata.typed_filter_metadata();
+  EXPECT_TRUE(typed_filter_metadata.contains("cluster_ns_typed"));
+
+  processor_stream_->startGrpcStream();
+  ProcessingResponse resp1;
+  resp1.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp1);
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  handleUpstreamRequest();
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
   verifyDownstreamResponse(*response, 200);
 }
 
