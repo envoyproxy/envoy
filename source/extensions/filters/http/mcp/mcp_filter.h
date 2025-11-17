@@ -8,6 +8,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -33,7 +34,11 @@ class McpFilterConfig {
 public:
   explicit McpFilterConfig(const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config)
       : traffic_mode_(proto_config.traffic_mode()),
-        clear_route_cache_(proto_config.clear_route_cache()) {}
+        clear_route_cache_(proto_config.clear_route_cache()),
+        max_request_body_size_(proto_config.has_max_request_body_size()
+                                   ? proto_config.max_request_body_size().value()
+                                   : 8192), // Default: 8KB
+        parser_config_(ParserConfig::fromProto(proto_config.parser_config())) {}
 
   envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode() const {
     return traffic_mode_;
@@ -45,9 +50,14 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
+  uint32_t maxRequestBodySize() const { return max_request_body_size_; }
+  const ParserConfig& parserConfig() const { return parser_config_; }
+
 private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
   const bool clear_route_cache_;
+  const uint32_t max_request_body_size_;
+  ParserConfig parser_config_;
 };
 
 /**
@@ -74,7 +84,7 @@ using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;
  */
 class McpFilter : public Http::PassThroughFilter, public Logger::Loggable<Logger::Id::mcp> {
 public:
-  explicit McpFilter(McpFilterConfigSharedPtr config) : config_(config) {}
+  explicit McpFilter(McpFilterConfigSharedPtr config) : max_request_body_size_(config->maxRequestBodySize()), config_(config) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -98,9 +108,16 @@ private:
   bool isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const;
   bool shouldRejectRequest() const;
 
-  void finalizeDynamicMetadata();
+  void handleParseError(absl::string_view error_msg);
+  Http::FilterDataStatus completeParsing();
+  const ParserConfig& getParserConfig() const;
+
+  const uint32_t max_request_body_size_{0};
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  uint32_t bytes_parsed_{0};
+  bool parsing_complete_{false};
+  std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
   std::unique_ptr<Protobuf::Struct> metadata_;

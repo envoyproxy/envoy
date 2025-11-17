@@ -148,11 +148,6 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
 
   std::string body = R"({"method": "test"})";
   Buffer::OwnedImpl buffer(body);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
