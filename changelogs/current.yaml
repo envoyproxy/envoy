@@ -55,8 +55,8 @@ minor_behavior_changes:
     ``envoy.reloadable_features.ext_proc_stream_close_optimization`` to ``false``.
 - area: ext_authz
   change: |
-    Check that the response header count is less than the configured limits before applying mutations, and do not
-    add new headers if not.
+    Check that the response header count and size is less than the configured limits after applying
+    mutations and send a local reply if not.
 - area: ext_authz
   change: |
     Fixed HTTP ext_authz service to properly propagate headers (such as ``set-cookie``) back to clients. The
