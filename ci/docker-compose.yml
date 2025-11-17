@@ -1,6 +1,6 @@
 x-envoy-build-base: &envoy-build-base
   image: >-
-    ${ENVOY_BUILD_IMAGE:-docker.io/envoyproxy/envoy-build-ubuntu:4ce0cb04f941fb89d475597a640176ae64070bb1@sha256:de54e91a8d27623ffbd3fb9bd1aba8241567e41c0fb82b167128e3629c2ede18}
+    ${ENVOY_BUILD_IMAGE:?ERROR: ENVOY_BUILD_IMAGE is not set! either set it in your environment or use ci/run_envoy_docker.sh to set it}
   cpus: ${ENVOY_DOCKER_CPUS:-0}
   user: root:root
   working_dir: ${ENVOY_DOCKER_SOURCE_DIR:-/source}
