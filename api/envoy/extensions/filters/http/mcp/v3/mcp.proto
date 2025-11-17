@@ -43,32 +43,6 @@ message Mcp {
   bool clear_route_cache = 2;
 
   google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {lte: 10485760}];
-
-    // Parser configuration
-  ParserConfig parser_config = 4;
-}
-
-// Parser configuration (simplified from json_to_metadata style)
-message ParserConfig {
-  // A rule to extract a value from JSON
-  message Rule {
-    // Path to the value in JSON using dot notation for nested fields
-    // Examples:
-    //   "method" - top level field
-    //   "params.tool_name" - nested field
-    //   "params.config.timeout" - deeply nested field
-    string path = 1 [(validate.rules).string = {min_len: 1}];
-    
-    // The key name to use in the metadata
-    // If not set, defaults to the original path
-    string key = 2;
-
-    // Allow the path to be missed.
-    bool allow_missing = 3;
-  }
-
-  // Rules to apply
-  repeated Rule rules = 1;
 }
 
 // McpOverride for MCP filter

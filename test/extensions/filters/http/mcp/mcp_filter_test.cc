@@ -151,7 +151,7 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
-                             "request must be a valid JSON-RPC 2.0 message for MCP", _, _, _));
+                             "reached end of stream and don't get enough data.", _, _, _));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
@@ -185,11 +185,6 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
 
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   // Expect dynamic metadata to be set
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
@@ -198,7 +193,7 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
 }
 
 // Test buffering behavior for streaming data
-TEST_F(McpFilterTest, StreamingDataBuffering) {
+TEST_F(McpFilterTest, PartialNoJsonData) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
@@ -209,7 +204,7 @@ TEST_F(McpFilterTest, StreamingDataBuffering) {
   Buffer::OwnedImpl buffer("partial data");
 
   // Not end_stream, should buffer
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
 }
 
 // Test encoder passthrough
@@ -234,11 +229,6 @@ TEST_F(McpFilterTest, WrongJsonRpcVersion) {
 
   std::string wrong_version = R"({"jsonrpc": "1.0", "method": "test", "id": 1})";
   Buffer::OwnedImpl buffer(wrong_version);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
 
@@ -288,11 +278,6 @@ TEST_F(McpFilterTest, RouteCacheNotClearedByDefault) {
 
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   // Expect dynamic metadata to be set
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
@@ -316,11 +301,6 @@ TEST_F(McpFilterTest, RouteCacheNotClearedWhenDisabled) {
 
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   // Expect dynamic metadata to be set
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
@@ -344,11 +324,6 @@ TEST_F(McpFilterTest, RouteCacheClearedWhenExplicitlyEnabled) {
 
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   // Expect dynamic metadata to be set
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));

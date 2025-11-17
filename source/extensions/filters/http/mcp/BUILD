@@ -49,4 +49,3 @@ envoy_cc_extension(
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
     ],
 )
-

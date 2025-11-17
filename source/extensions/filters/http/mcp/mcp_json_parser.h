@@ -1,17 +1,20 @@
 #pragma once
 
 #include <memory>
+#include <stack>
 #include <string>
-#include <vector>
+#include <string_view>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
-#include "absl/status/status.h"
-#include "absl/strings/string_view.h"
 #include "envoy/extensions/filters/http/mcp/v3/mcp.pb.h"
-#include "google/protobuf/util/converter/json_stream_parser.h"
-#include "google/protobuf/util/converter/object_writer.h"
+
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
+
+#include "google/protobuf/util/converter/json_stream_parser.h"
+#include "google/protobuf/util/converter/object_writer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,91 +22,245 @@ namespace HttpFilters {
 namespace Mcp {
 
 /**
- * Extraction rule
+ * MCP method types enumeration
  */
-struct Rule {
-  std::vector<std::string> path_segments;
-  std::string key;
-  
-  Rule(const std::string& path, const std::string& metadata_key);
+enum class McpMethodType {
+  UNKNOWN,
+
+  // Tools
+  TOOLS_CALL,
+  TOOLS_LIST,
+
+  // Resources
+  RESOURCES_READ,
+  RESOURCES_LIST,
+  RESOURCES_SUBSCRIBE,
+  RESOURCES_UNSUBSCRIBE,
+  RESOURCES_TEMPLATES_LIST,
+
+  // Prompts
+  PROMPTS_GET,
+  PROMPTS_LIST,
+
+  // Completion
+  COMPLETION_COMPLETE,
+
+  // Logging
+  LOGGING_SET_LEVEL,
+
+  // Lifecycle
+  INITIALIZE,
+  INITIALIZED,
+  SHUTDOWN,
+
+  // Sampling
+  SAMPLING_CREATE_MESSAGE,
+
+  // Utility
+  PING,
+
+  // Notifications
+  NOTIFICATION_RESOURCES_LIST_CHANGED,
+  NOTIFICATION_RESOURCES_UPDATED,
+  NOTIFICATION_TOOLS_LIST_CHANGED,
+  NOTIFICATION_PROMPTS_LIST_CHANGED,
+  NOTIFICATION_PROGRESS,
+  NOTIFICATION_MESSAGE,
+  NOTIFICATION_CANCELLED,
+  NOTIFICATION_INITIALIZED,
+  NOTIFICATION_GENERIC
 };
 
 /**
- * Parser configuration
+ * MCP protocol constants
  */
-struct ParserConfig {
-  std::vector<Rule> rules;
-  
-  // Build from protobuf
-  static ParserConfig fromProto(
-      const envoy::extensions::filters::http::mcp::v3::ParserConfig& proto);
-  
-  // Default MCP configuration
-  static ParserConfig defaultMcpConfig();
-};
+namespace McpConstants {
+// JSON-RPC constants
+constexpr std::string_view JSONRPC_VERSION = "2.0";
+constexpr std::string_view JSONRPC_FIELD = "jsonrpc";
+constexpr std::string_view METHOD_FIELD = "method";
+constexpr std::string_view ID_FIELD = "id";
+constexpr std::string_view PARAMS_FIELD = "params";
+constexpr std::string_view RESULT_FIELD = "result";
+constexpr std::string_view ERROR_FIELD = "error";
+
+// Method names
+namespace Methods {
+// Tools
+constexpr std::string_view TOOLS_CALL = "tools/call";
+constexpr std::string_view TOOLS_LIST = "tools/list";
+
+// Resources
+constexpr std::string_view RESOURCES_READ = "resources/read";
+constexpr std::string_view RESOURCES_LIST = "resources/list";
+constexpr std::string_view RESOURCES_SUBSCRIBE = "resources/subscribe";
+constexpr std::string_view RESOURCES_UNSUBSCRIBE = "resources/unsubscribe";
+constexpr std::string_view RESOURCES_TEMPLATES_LIST = "resources/templates/list";
+
+// Prompts
+constexpr std::string_view PROMPTS_GET = "prompts/get";
+constexpr std::string_view PROMPTS_LIST = "prompts/list";
+
+// Completion
+constexpr std::string_view COMPLETION_COMPLETE = "completion/complete";
+
+// Logging
+constexpr std::string_view LOGGING_SET_LEVEL = "logging/setLevel";
+
+// Lifecycle
+constexpr std::string_view INITIALIZE = "initialize";
+constexpr std::string_view INITIALIZED = "initialized";
+constexpr std::string_view SHUTDOWN = "shutdown";
+
+// Sampling
+constexpr std::string_view SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
+
+// Utility
+constexpr std::string_view PING = "ping";
+
+// Notification prefix
+constexpr std::string_view NOTIFICATION_PREFIX = "notifications/";
+
+// Specific notifications
+constexpr std::string_view NOTIFICATION_RESOURCES_LIST_CHANGED =
+    "notifications/resources/list_changed";
+constexpr std::string_view NOTIFICATION_RESOURCES_UPDATED = "notifications/resources/updated";
+constexpr std::string_view NOTIFICATION_TOOLS_LIST_CHANGED = "notifications/tools/list_changed";
+constexpr std::string_view NOTIFICATION_PROMPTS_LIST_CHANGED = "notifications/prompts/list_changed";
+constexpr std::string_view NOTIFICATION_PROGRESS = "notifications/progress";
+constexpr std::string_view NOTIFICATION_MESSAGE = "notifications/message";
+constexpr std::string_view NOTIFICATION_CANCELLED = "notifications/cancelled";
+constexpr std::string_view NOTIFICATION_INITIALIZED = "notifications/initialized";
+} // namespace Methods
+} // namespace McpConstants
 
 /**
- * Custom ObjectWriter for field extraction
+ * Configuration for MCP field extraction
  */
-class FieldExtractorObjectWriter : public google::protobuf::util::converter::ObjectWriter,
-                                   public Logger::Loggable<Logger::Id::mcp> {
+class McpParserConfig {
 public:
-  FieldExtractorObjectWriter(Protobuf::Struct& metadata, const ParserConfig& config);
+  struct FieldPolicy {
+    std::string path; // JSON path (e.g., "params.name")
 
-  // ObjectWriter interface
-  FieldExtractorObjectWriter* StartObject(absl::string_view name) override;
-  FieldExtractorObjectWriter* EndObject() override;
-  FieldExtractorObjectWriter* StartList(absl::string_view name) override;
-  FieldExtractorObjectWriter* EndList() override;
-  FieldExtractorObjectWriter* RenderBool(absl::string_view name, bool value) override;
-  FieldExtractorObjectWriter* RenderInt32(absl::string_view name, int32_t value) override;
-  FieldExtractorObjectWriter* RenderUint32(absl::string_view name, uint32_t value) override;
-  FieldExtractorObjectWriter* RenderInt64(absl::string_view name, int64_t value) override;
-  FieldExtractorObjectWriter* RenderUint64(absl::string_view name, uint64_t value) override;
-  FieldExtractorObjectWriter* RenderDouble(absl::string_view name, double value) override;
-  FieldExtractorObjectWriter* RenderFloat(absl::string_view name, float value) override;
-  FieldExtractorObjectWriter* RenderString(absl::string_view name, absl::string_view value) override;
-  FieldExtractorObjectWriter* RenderBytes(absl::string_view name, absl::string_view value) override;
-  FieldExtractorObjectWriter* RenderNull(absl::string_view name) override;
+    FieldPolicy(const std::string& p) : path(p) {}
+  };
 
-  // Check if we should stop parsing
-  bool shouldStop();
+  // Get extraction policy for a specific method
+  const std::vector<FieldPolicy>& getFieldsForMethod(McpMethodType method) const;
+
+  // Get all global fields to always extract
+  const std::unordered_set<std::string>& getAlwaysExtract() const { return always_extract_; }
+
+  // Create default config (minimal extraction)
+  static McpParserConfig createDefault();
 
 private:
-  // Check if current path matches any rule and extract if it does
-  void checkAndExtract(absl::string_view name, const std::string& value);
-  
-  // Track path
-  void pushPath(absl::string_view name);
-  void popPath();
-  
-  // Check if current path matches a rule
-  bool matchesRule(const Rule& rule) const;
-  
-  Protobuf::Struct& metadata_;
-  const ParserConfig& config_;
-  
-  // Current path in JSON
-  std::vector<std::string> path_;
-  
-  // Track which rules have been matched
-  std::vector<bool> matched_rules_;
-  
-  // Track depth
-  int depth_{0};
-  
-  // Skip arrays
-  int array_depth_{0};
+  void initializeDefaults();
 
-  bool all_rules_matched_{false};
+  // Per-method field policies
+  std::unordered_map<McpMethodType, std::vector<FieldPolicy>> method_fields_;
+
+  // Global fields to always extract
+  std::unordered_set<std::string> always_extract_;
 };
 
 /**
- * JSON parser with path-based extraction
+ * MCP JSON field extractor with early stopping optimization
  */
-class JsonPathParser : public Logger::Loggable<Logger::Id::mcp> {
+class McpFieldExtractor : public google::protobuf::util::converter::ObjectWriter,
+                          public Logger::Loggable<Logger::Id::mcp> {
 public:
-  explicit JsonPathParser(const ParserConfig& config);
+  McpFieldExtractor(Protobuf::Struct& metadata, const McpParserConfig& config);
+
+  // ObjectWriter implementation
+  McpFieldExtractor* StartObject(absl::string_view name) override;
+  McpFieldExtractor* EndObject() override;
+  McpFieldExtractor* StartList(absl::string_view name) override;
+  McpFieldExtractor* EndList() override;
+  McpFieldExtractor* RenderString(absl::string_view name, absl::string_view value) override;
+  McpFieldExtractor* RenderInt32(absl::string_view name, int32_t value) override;
+  McpFieldExtractor* RenderUint32(absl::string_view name, uint32_t value) override;
+  McpFieldExtractor* RenderInt64(absl::string_view name, int64_t value) override;
+  McpFieldExtractor* RenderUint64(absl::string_view name, uint64_t value) override;
+  McpFieldExtractor* RenderDouble(absl::string_view name, double value) override;
+  McpFieldExtractor* RenderFloat(absl::string_view name, float value) override;
+  McpFieldExtractor* RenderBool(absl::string_view name, bool value) override;
+  McpFieldExtractor* RenderNull(absl::string_view name) override;
+  McpFieldExtractor* RenderBytes(absl::string_view name, absl::string_view value) override;
+
+  // Check if we can stop parsing early
+  bool shouldStopParsing() const { return can_stop_parsing_; }
+
+  // Finalize extraction after parsing complete
+  void finalizeExtraction();
+
+  // MCP validation getters
+  McpMethodType getMethodType() const { return method_type_; }
+  bool isValidMcp() const { return is_valid_mcp_; }
+  const std::string& getMethod() const { return method_; }
+  const std::vector<std::string>& getMissingRequiredFields() const {
+    return missing_required_fields_;
+  }
+
+private:
+  // Get current path as string
+  std::string getCurrentPath() const;
+
+  // Check if we have all fields we need for early stop
+  void checkEarlyStop();
+
+  // Store field in temp storage
+  void storeField(const std::string& path, const Protobuf::Value& value);
+
+  // Copy selected fields from temp to final
+  void copySelectedFields();
+  void copyFieldByPath(const std::string& path);
+
+  // Validate required fields
+  void validateRequiredFields();
+
+  Protobuf::Struct temp_storage_;   // Store all fields temporarily
+  Protobuf::Struct& root_metadata_; // Final filtered metadata
+  const McpParserConfig& config_;
+
+  // Stack for building temp storage
+  struct NestedContext {
+    Protobuf::Struct* struct_ptr;
+    std::string field_name;
+  };
+  std::stack<NestedContext> context_stack_;
+
+  // Current path tracking
+  std::vector<std::string> path_stack_;
+
+  // Track collected fields
+  std::unordered_set<std::string> collected_fields_;
+  std::unordered_set<std::string> extracted_fields_;
+
+  // MCP state
+  std::string method_;
+  McpMethodType method_type_{McpMethodType::UNKNOWN};
+  bool is_valid_mcp_{false};
+  bool has_jsonrpc_{false};
+  bool has_method_{false};
+
+  // Early stop optimization
+  bool can_stop_parsing_{false};
+
+  // Validation
+  std::vector<std::string> missing_required_fields_;
+
+  int depth_{0};
+  int array_depth_{0};
+};
+
+/**
+ * MCP JSON parser with selective field extraction
+ */
+class McpJsonParser : public Logger::Loggable<Logger::Id::mcp> {
+public:
+  // Constructor with optional config (defaults to minimal extraction)
+  explicit McpJsonParser(const McpParserConfig& config = McpParserConfig::createDefault());
 
   // Parse a chunk of JSON data
   absl::Status parse(absl::string_view data);
@@ -111,27 +268,46 @@ public:
   // Finish parsing
   absl::Status finishParse();
 
-  bool allRulesMatched() const { return all_rules_matched_; }
+  // Check if this is a valid MCP request
+  bool isValidMcpRequest() const;
 
-  // Get the extracted metadata
+  bool isAllFieldsCollected() const { return all_fields_collected_; }
+
+  // Get the MCP method type
+  McpMethodType getMethodType() const;
+
+  // Get the method string
+  const std::string& getMethod() const;
+
+  // Get missing required fields (if any)
+  const std::vector<std::string>& getMissingRequiredFields() const;
+
+  // Get the extracted metadata (only contains configured fields)
   const Protobuf::Struct& metadata() const { return metadata_; }
   Protobuf::Struct& mutableMetadata() { return metadata_; }
 
-  // Check if this is a valid MCP request (has jsonrpc="2.0" and method)
-  bool isValidMcpRequest() const;
+  // Helper to get nested value from metadata
+  const Protobuf::Value* getNestedValue(const std::string& dotted_path) const;
 
-  // Reset for reuse
+  // Reset parser for reuse
   void reset();
 
+  // Static helper to parse method string to enum
+  static McpMethodType parseMethod(const std::string& method);
+
 private:
-  ParserConfig config_;
+  McpParserConfig config_;
   Protobuf::Struct metadata_;
-  std::unique_ptr<FieldExtractorObjectWriter> object_writer_;
+  std::unique_ptr<McpFieldExtractor> extractor_;
   std::unique_ptr<google::protobuf::util::converter::JsonStreamParser> stream_parser_;
   bool parsing_started_{false};
-  size_t total_bytes_parsed_{0};
-  bool all_rules_matched_{false};
+  bool all_fields_collected_{false};
 };
+
+// Compatibility aliases
+using JsonPathParser = McpJsonParser;
+using FieldExtractorObjectWriter = McpFieldExtractor;
+using ParserConfig = McpParserConfig;
 
 } // namespace Mcp
 } // namespace HttpFilters

@@ -1,302 +1,612 @@
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
+
 #include "source/common/common/assert.h"
-#include "absl/strings/str_split.h"
+
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
-// Rule implementation - updated constructor
-Rule::Rule(const std::string& path, const std::string& metadata_key) {
-  // Parse path into segments
-  path_segments = absl::StrSplit(path, '.', absl::SkipEmpty());
+using namespace McpConstants;
 
-  // Set key - if empty, use the full path as key
-  if (metadata_key.empty()) {
-    key = path;  // Use full path as default, not just last segment
-  } else {
-    key = metadata_key;
+// Static method to parse method string to enum
+McpMethodType McpJsonParser::parseMethod(const std::string& method) {
+  using namespace McpConstants::Methods;
+
+  // Tools
+  if (method == TOOLS_CALL)
+    return McpMethodType::TOOLS_CALL;
+  if (method == TOOLS_LIST)
+    return McpMethodType::TOOLS_LIST;
+
+  // Resources
+  if (method == RESOURCES_READ)
+    return McpMethodType::RESOURCES_READ;
+  if (method == RESOURCES_LIST)
+    return McpMethodType::RESOURCES_LIST;
+  if (method == RESOURCES_SUBSCRIBE)
+    return McpMethodType::RESOURCES_SUBSCRIBE;
+  if (method == RESOURCES_UNSUBSCRIBE)
+    return McpMethodType::RESOURCES_UNSUBSCRIBE;
+  if (method == RESOURCES_TEMPLATES_LIST)
+    return McpMethodType::RESOURCES_TEMPLATES_LIST;
+
+  // Prompts
+  if (method == PROMPTS_GET)
+    return McpMethodType::PROMPTS_GET;
+  if (method == PROMPTS_LIST)
+    return McpMethodType::PROMPTS_LIST;
+
+  // Completion
+  if (method == COMPLETION_COMPLETE)
+    return McpMethodType::COMPLETION_COMPLETE;
+
+  // Logging
+  if (method == LOGGING_SET_LEVEL)
+    return McpMethodType::LOGGING_SET_LEVEL;
+
+  // Lifecycle
+  if (method == INITIALIZE)
+    return McpMethodType::INITIALIZE;
+  if (method == INITIALIZED)
+    return McpMethodType::INITIALIZED;
+  if (method == SHUTDOWN)
+    return McpMethodType::SHUTDOWN;
+
+  // Sampling
+  if (method == SAMPLING_CREATE_MESSAGE)
+    return McpMethodType::SAMPLING_CREATE_MESSAGE;
+
+  // Utility
+  if (method == PING)
+    return McpMethodType::PING;
+
+  // Notifications - check prefix
+  if (method.starts_with(std::string(NOTIFICATION_PREFIX))) {
+    // Specific notification types
+    if (method == NOTIFICATION_RESOURCES_LIST_CHANGED)
+      return McpMethodType::NOTIFICATION_RESOURCES_LIST_CHANGED;
+    if (method == NOTIFICATION_RESOURCES_UPDATED)
+      return McpMethodType::NOTIFICATION_RESOURCES_UPDATED;
+    if (method == NOTIFICATION_TOOLS_LIST_CHANGED)
+      return McpMethodType::NOTIFICATION_TOOLS_LIST_CHANGED;
+    if (method == NOTIFICATION_PROMPTS_LIST_CHANGED)
+      return McpMethodType::NOTIFICATION_PROMPTS_LIST_CHANGED;
+    if (method == NOTIFICATION_PROGRESS)
+      return McpMethodType::NOTIFICATION_PROGRESS;
+    if (method == NOTIFICATION_MESSAGE)
+      return McpMethodType::NOTIFICATION_MESSAGE;
+    if (method == NOTIFICATION_CANCELLED)
+      return McpMethodType::NOTIFICATION_CANCELLED;
+    if (method == NOTIFICATION_INITIALIZED)
+      return McpMethodType::NOTIFICATION_INITIALIZED;
+    return McpMethodType::NOTIFICATION_GENERIC;
   }
+
+  return McpMethodType::UNKNOWN;
 }
 
-// ParserConfig implementation
-ParserConfig ParserConfig::fromProto(
-    const envoy::extensions::filters::http::mcp::v3::ParserConfig& proto) {
-  ParserConfig config;
+// McpParserConfig implementation
+void McpParserConfig::initializeDefaults() {
+  // Always extract core JSON-RPC fields
+  always_extract_.insert("jsonrpc");
+  always_extract_.insert("method");
 
-  for (const auto& rule : proto.rules()) {
-    if (rule.path() == "jsonrpc") {
-      continue;
-    }
-    config.rules.emplace_back(rule.path(), rule.key());
-  }
+  // tools/call - only tool name
+  method_fields_[McpMethodType::TOOLS_CALL] = {
+      FieldPolicy("params.name") // Required
+  };
 
-  // The parser will by default extract the json_rpc;
-  config.rules.emplace_back("jsonrpc", "");
+  // tools/list - cursor for pagination
+  method_fields_[McpMethodType::TOOLS_LIST] = {FieldPolicy("params.cursor")};
 
+  // resources/read - URI is required
+  method_fields_[McpMethodType::RESOURCES_READ] = {FieldPolicy("params.uri")};
+
+  // resources/list - cursor
+  method_fields_[McpMethodType::RESOURCES_LIST] = {FieldPolicy("params.cursor")};
+
+  // resources/subscribe - URI is required
+  method_fields_[McpMethodType::RESOURCES_SUBSCRIBE] = {FieldPolicy("params.uri")};
+
+  // resources/unsubscribe - URI is required
+  method_fields_[McpMethodType::RESOURCES_UNSUBSCRIBE] = {FieldPolicy("params.uri")};
+
+  // resources/templates/list - cursor
+  method_fields_[McpMethodType::RESOURCES_TEMPLATES_LIST] = {FieldPolicy("params.cursor")};
+
+  // prompts/get - name is required
+  method_fields_[McpMethodType::PROMPTS_GET] = {FieldPolicy("params.name")};
+
+  // prompts/list - cursor
+  method_fields_[McpMethodType::PROMPTS_LIST] = {FieldPolicy("params.cursor")};
+
+  // completion/complete - ref fields
+  method_fields_[McpMethodType::COMPLETION_COMPLETE] = {};
+
+  // logging/setLevel - level is required
+  method_fields_[McpMethodType::LOGGING_SET_LEVEL] = {FieldPolicy("params.level")};
+
+  // initialize - protocol version and client info
+  method_fields_[McpMethodType::INITIALIZE] = {FieldPolicy("params.protocolVersion"),
+                                               FieldPolicy("params.clientInfo.name")};
+
+  // Empty configs for simple methods
+  method_fields_[McpMethodType::SAMPLING_CREATE_MESSAGE] = {};
+  method_fields_[McpMethodType::INITIALIZED] = {};
+  method_fields_[McpMethodType::SHUTDOWN] = {};
+  method_fields_[McpMethodType::PING] = {};
+
+  // Notifications
+  method_fields_[McpMethodType::NOTIFICATION_RESOURCES_UPDATED] = {FieldPolicy("params.uri")};
+
+  method_fields_[McpMethodType::NOTIFICATION_PROGRESS] = {FieldPolicy("params.progressToken"),
+                                                          FieldPolicy("params.progress")};
+
+  method_fields_[McpMethodType::NOTIFICATION_CANCELLED] = {FieldPolicy("params.requestId")};
+
+  method_fields_[McpMethodType::NOTIFICATION_MESSAGE] = {FieldPolicy("params.level")};
+
+  // Other notifications - no params
+  method_fields_[McpMethodType::NOTIFICATION_RESOURCES_LIST_CHANGED] = {};
+  method_fields_[McpMethodType::NOTIFICATION_TOOLS_LIST_CHANGED] = {};
+  method_fields_[McpMethodType::NOTIFICATION_PROMPTS_LIST_CHANGED] = {};
+  method_fields_[McpMethodType::NOTIFICATION_INITIALIZED] = {};
+  method_fields_[McpMethodType::NOTIFICATION_GENERIC] = {};
+}
+
+McpParserConfig McpParserConfig::createDefault() {
+  McpParserConfig config;
+  config.initializeDefaults();
+  // TODO(botengyao) add proto configs
   return config;
 }
 
-ParserConfig ParserConfig::defaultMcpConfig() {
-  ParserConfig config;
-  config.rules.emplace_back("jsonrpc", "");
-  config.rules.emplace_back("method", "");
-  return config;
+const std::vector<McpParserConfig::FieldPolicy>&
+McpParserConfig::getFieldsForMethod(McpMethodType method) const {
+  static const std::vector<FieldPolicy> empty;
+  auto it = method_fields_.find(method);
+  return (it != method_fields_.end()) ? it->second : empty;
 }
 
-// FieldExtractorObjectWriter implementation
-FieldExtractorObjectWriter::FieldExtractorObjectWriter(
-    Protobuf::Struct& metadata, const ParserConfig& config)
-    : metadata_(metadata), config_(config), 
-      matched_rules_(config.rules.size(), false) {}
+// McpFieldExtractor implementation
+McpFieldExtractor::McpFieldExtractor(Protobuf::Struct& metadata, const McpParserConfig& config)
+    : root_metadata_(metadata), config_(config) {
+  // Start with temp storage
+  context_stack_.push({&temp_storage_, ""});
+}
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::StartObject(absl::string_view name) {
-  if (shouldStop() || array_depth_ > 0) {
-    return this;
+McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
+  if (can_stop_parsing_) {
+    return this; // Early stop
   }
-  
+
+  if (array_depth_ > 0) {
+    return this; // Skip arrays
+  }
+
   depth_++;
 
-  if (!name.empty() && depth_ > 1) {
-    pushPath(name);
+  if (!name.empty()) {
+    path_stack_.push_back(std::string(name));
   }
-  
+
+  auto* parent = context_stack_.top().struct_ptr;
+  if (parent && !name.empty()) {
+    // Create nested structure in temp storage
+    auto* nested = (*parent->mutable_fields())[std::string(name)].mutable_struct_value();
+    context_stack_.push({nested, std::string(name)});
+  } else if (depth_ == 1) {
+    // Root object
+    context_stack_.push({&temp_storage_, ""});
+  }
+
   return this;
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::EndObject() {
-  if (array_depth_ > 0) {
-    return this;
-  }
-  
+McpFieldExtractor* McpFieldExtractor::EndObject() {
   if (depth_ > 0) {
     depth_--;
-    if (!path_.empty()) {
-      popPath();
+    if (!path_stack_.empty()) {
+      path_stack_.pop_back();
+    }
+    if (context_stack_.size() > 1) {
+      context_stack_.pop();
     }
   }
-  
+
+  // When we finish the root object, do selective extraction
+  if (depth_ == 0 && !can_stop_parsing_) {
+    finalizeExtraction();
+  }
+
   return this;
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::StartList(absl::string_view) {
-  // Skip arrays - we don't support them
+McpFieldExtractor* McpFieldExtractor::StartList(absl::string_view) {
+  // Arrays not supported - skip
   array_depth_++;
   return this;
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::EndList() {
+McpFieldExtractor* McpFieldExtractor::EndList() {
   if (array_depth_ > 0) {
     array_depth_--;
   }
   return this;
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::RenderString(
-    absl::string_view name, absl::string_view value) {
-  if (shouldStop() || array_depth_ > 0) {
+McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
+                                                   absl::string_view value) {
+  if (can_stop_parsing_) {
     return this;
   }
-  
-  checkAndExtract(name, std::string(value));
+
+  if (array_depth_ > 0) {
+    return this;
+  }
+
+  std::string full_path = getCurrentPath();
+  if (!name.empty()) {
+    if (!full_path.empty()) {
+      full_path += ".";
+    }
+    full_path += name;
+  }
+  ENVOY_LOG_MISC(debug, "render string name {} path {}, value {}", name, full_path, value);
+
+  // Check top-level fields for method detection
+  if (depth_ == 1) {
+    if (name == JSONRPC_FIELD && value == JSONRPC_VERSION) {
+      has_jsonrpc_ = true;
+      is_valid_mcp_ = true;
+    } else if (name == METHOD_FIELD) {
+      has_method_ = true;
+      method_ = std::string(value);
+      method_type_ = McpJsonParser::parseMethod(method_);
+    }
+  }
+
+  // Store in temp storage
+  Protobuf::Value proto_value;
+  proto_value.set_string_value(std::string(value));
+  storeField(full_path, proto_value);
+
+  // Check for early stop
+  checkEarlyStop();
   return this;
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::RenderInt32(
-    absl::string_view name, int32_t value) {
+McpFieldExtractor* McpFieldExtractor::RenderBool(absl::string_view name, bool value) {
+  if (can_stop_parsing_ || array_depth_ > 0) {
+    return this;
+  }
+
+  std::string full_path = getCurrentPath();
+  if (!name.empty()) {
+    if (!full_path.empty())
+      full_path += ".";
+    full_path += name;
+  }
+
+  Protobuf::Value proto_value;
+  proto_value.set_bool_value(value);
+  storeField(full_path, proto_value);
+
+  checkEarlyStop();
+  return this;
+}
+
+McpFieldExtractor* McpFieldExtractor::RenderInt32(absl::string_view name, int32_t value) {
   return RenderInt64(name, static_cast<int64_t>(value));
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::RenderUint32(
-    absl::string_view name, uint32_t value) {
+McpFieldExtractor* McpFieldExtractor::RenderUint32(absl::string_view name, uint32_t value) {
   return RenderUint64(name, static_cast<uint64_t>(value));
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::RenderInt64(
-    absl::string_view name, int64_t value) {
-  if (shouldStop() || array_depth_ > 0) {
+McpFieldExtractor* McpFieldExtractor::RenderInt64(absl::string_view name, int64_t value) {
+  if (can_stop_parsing_ || array_depth_ > 0) {
     return this;
   }
-  
-  checkAndExtract(name, std::to_string(value));
+
+  std::string full_path = getCurrentPath();
+  if (!name.empty()) {
+    if (!full_path.empty())
+      full_path += ".";
+    full_path += name;
+  }
+
+  Protobuf::Value proto_value;
+  proto_value.set_number_value(static_cast<double>(value));
+  storeField(full_path, proto_value);
+
+  checkEarlyStop();
   return this;
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::RenderUint64(
-    absl::string_view name, uint64_t value) {
-  if (shouldStop() || array_depth_ > 0) {
+McpFieldExtractor* McpFieldExtractor::RenderUint64(absl::string_view name, uint64_t value) {
+  if (can_stop_parsing_ || array_depth_ > 0) {
     return this;
   }
-  
-  checkAndExtract(name, std::to_string(value));
+
+  std::string full_path = getCurrentPath();
+  if (!name.empty()) {
+    if (!full_path.empty())
+      full_path += ".";
+    full_path += name;
+  }
+
+  Protobuf::Value proto_value;
+  proto_value.set_number_value(static_cast<double>(value));
+  storeField(full_path, proto_value);
+
+  checkEarlyStop();
   return this;
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::RenderDouble(
-    absl::string_view name, double value) {
-  if (shouldStop() || array_depth_ > 0) {
+McpFieldExtractor* McpFieldExtractor::RenderDouble(absl::string_view name, double value) {
+  if (can_stop_parsing_ || array_depth_ > 0) {
     return this;
   }
-  
-  checkAndExtract(name, std::to_string(value));
+
+  std::string full_path = getCurrentPath();
+  if (!name.empty()) {
+    if (!full_path.empty())
+      full_path += ".";
+    full_path += name;
+  }
+
+  Protobuf::Value proto_value;
+  proto_value.set_number_value(value);
+  storeField(full_path, proto_value);
+
+  checkEarlyStop();
   return this;
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::RenderFloat(
-    absl::string_view name, float value) {
+McpFieldExtractor* McpFieldExtractor::RenderFloat(absl::string_view name, float value) {
   return RenderDouble(name, static_cast<double>(value));
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::RenderBool(
-    absl::string_view name, bool value) {
-  if (shouldStop() || array_depth_ > 0) {
+McpFieldExtractor* McpFieldExtractor::RenderNull(absl::string_view name) {
+  if (can_stop_parsing_ || array_depth_ > 0) {
     return this;
   }
 
-  checkAndExtract(name, value ? "true" : "false");
+  std::string full_path = getCurrentPath();
+  if (!name.empty()) {
+    if (!full_path.empty())
+      full_path += ".";
+    full_path += name;
+  }
+
+  Protobuf::Value proto_value;
+  proto_value.set_null_value(Protobuf::NULL_VALUE);
+  storeField(full_path, proto_value);
+
+  checkEarlyStop();
   return this;
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::RenderBytes(
-    absl::string_view name, absl::string_view value) {
+McpFieldExtractor* McpFieldExtractor::RenderBytes(absl::string_view name, absl::string_view value) {
   return RenderString(name, value);
 }
 
-FieldExtractorObjectWriter* FieldExtractorObjectWriter::RenderNull(absl::string_view name) {
-  if (shouldStop() || array_depth_ > 0) {
-    return this;
+std::string McpFieldExtractor::getCurrentPath() const { return absl::StrJoin(path_stack_, "."); }
+
+void McpFieldExtractor::storeField(const std::string& path, const Protobuf::Value& value) {
+  // Store in nested structure in temp storage
+  if (!context_stack_.empty() && context_stack_.top().struct_ptr) {
+    auto* current = context_stack_.top().struct_ptr;
+    size_t last_dot = path.rfind('.');
+    std::string field_name = (last_dot != std::string::npos) ? path.substr(last_dot + 1) : path;
+    if (!field_name.empty()) {
+      (*current->mutable_fields())[field_name] = value;
+    }
   }
 
-  checkAndExtract(name, "");
-  return this;
+  collected_fields_.insert(path);
 }
 
-void FieldExtractorObjectWriter::checkAndExtract(
-    absl::string_view name, const std::string& value) {
-  std::vector<std::string> current_path = path_;
-  if (!name.empty()) {
-    current_path.push_back(std::string(name));
+void McpFieldExtractor::checkEarlyStop() {
+  // Can't stop if we haven't seen jsonrpc and method yet
+  ENVOY_LOG(debug, "boteng checkEarlyStop");
+  if (!has_jsonrpc_ || !has_method_) {
+    return;
   }
 
-  // Check against all rules
-  for (size_t i = 0; i < config_.rules.size(); ++i) {
-    if (matched_rules_[i]) {
-      continue;
+  // Check if we have all global fields we need
+  for (const auto& field : config_.getAlwaysExtract()) {
+    if (collected_fields_.count(field) == 0) {
+      return;
+    }
+  }
+
+  // For requests/notifications, check method-specific fields
+  const auto& required_fields = config_.getFieldsForMethod(method_type_);
+  for (const auto& field : required_fields) {
+    if (collected_fields_.count(field.path) == 0) {
+      return; // Still missing this field
+    }
+  }
+
+  // We have everything we need
+  can_stop_parsing_ = true;
+  ENVOY_LOG(debug, "early stop: Have all fields for method {}", method_);
+}
+
+void McpFieldExtractor::finalizeExtraction() {
+  ENVOY_LOG_MISC(trace, "calling finalizeExtraction");
+  if (!has_jsonrpc_ || !has_method_) {
+    ENVOY_LOG(debug, "not a valid MCP message");
+    is_valid_mcp_ = false;
+    return;
+  }
+
+  // Copy selected fields from temp to final
+  copySelectedFields();
+
+  // Validate required fields
+  validateRequiredFields();
+}
+
+void McpFieldExtractor::copySelectedFields() {
+  for (const auto& field : config_.getAlwaysExtract()) {
+    copyFieldByPath(field);
+  }
+
+  // Copy method-specific fields
+  if (method_type_ != McpMethodType::UNKNOWN) {
+    const auto& fields = config_.getFieldsForMethod(method_type_);
+    for (const auto& field : fields) {
+      copyFieldByPath(field.path);
+    }
+  }
+}
+
+void McpFieldExtractor::copyFieldByPath(const std::string& path) {
+  std::vector<std::string> segments = absl::StrSplit(path, '.');
+
+  // Navigate source to find value
+  const Protobuf::Struct* current_source = &temp_storage_;
+  const Protobuf::Value* value = nullptr;
+
+  for (size_t i = 0; i < segments.size(); ++i) {
+    auto it = current_source->fields().find(segments[i]);
+    if (it == current_source->fields().end()) {
+      return; // Field doesn't exist
     }
 
-    const auto& rule = config_.rules[i];
-    
-    // Check if current path matches rule path
-    if (current_path.size() == rule.path_segments.size()) {
-      bool matches = true;
-      for (size_t j = 0; j < current_path.size(); ++j) {
-        if (current_path[j] != rule.path_segments[j]) {
-          matches = false;
-          break;
-        }
+    if (i == segments.size() - 1) {
+      value = &it->second;
+    } else {
+      if (!it->second.has_struct_value()) {
+        return;
       }
+      current_source = &it->second.struct_value();
+    }
+  }
 
-      if (matches) {
-        auto* value_proto = metadata_.mutable_fields()->operator[](rule.key).mutable_string_value();
-        *value_proto = value;
-        matched_rules_[i] = true;
-        
-        ENVOY_LOG(debug, "Extracted field {} = {} -> metadata[{}]",
-                  absl::StrJoin(current_path, "."), value, rule.key);
-      }
+  if (!value) {
+    return;
+  }
+
+  // Navigate dest and create nested structure
+  Protobuf::Struct* current_dest = &root_metadata_;
+
+  for (size_t i = 0; i < segments.size() - 1; ++i) {
+    auto& fields = *current_dest->mutable_fields();
+    auto it = fields.find(segments[i]);
+
+    if (it == fields.end() || !it->second.has_struct_value()) {
+      current_dest = fields[segments[i]].mutable_struct_value();
+    } else {
+      current_dest = it->second.mutable_struct_value();
+    }
+  }
+
+  // Copy the final value
+  (*current_dest->mutable_fields())[segments.back()] = *value;
+  extracted_fields_.insert(path);
+}
+
+void McpFieldExtractor::validateRequiredFields() {
+  if (method_type_ == McpMethodType::UNKNOWN) {
+    return;
+  }
+
+  const auto& fields = config_.getFieldsForMethod(method_type_);
+  for (const auto& field : fields) {
+    if (extracted_fields_.count(field.path) == 0) {
+      missing_required_fields_.push_back(field.path);
+      ENVOY_LOG(debug, "missing required field for {}: {}", method_, field.path);
     }
   }
 }
 
-void FieldExtractorObjectWriter::pushPath(absl::string_view name) {
-  path_.push_back(std::string(name));
-}
+// McpJsonParser implementation
+McpJsonParser::McpJsonParser(const McpParserConfig& config) : config_(config) { reset(); }
 
-void FieldExtractorObjectWriter::popPath() {
-  if (!path_.empty()) {
-    path_.pop_back();
-  }
-}
-
-bool FieldExtractorObjectWriter::shouldStop() {
-  if (all_rules_matched_) {
-    return true;
-  }
-
-   // Check if all rules have been matched
-  for (bool matched : matched_rules_) {
-    if (!matched) {
-      return false;
-    }
-  }
-  all_rules_matched_ = true;
-  return true;  // All rules matched
-}
-
-// JsonPathParser implementation
-JsonPathParser::JsonPathParser(const ParserConfig& config) 
-    : config_(config) {
-  reset();
-}
-
-absl::Status JsonPathParser::parse(absl::string_view data) {
+absl::Status McpJsonParser::parse(absl::string_view data) {
   if (!parsing_started_) {
-    object_writer_ = std::make_unique<FieldExtractorObjectWriter>(metadata_, config_);
-    stream_parser_ = std::make_unique<google::protobuf::util::converter::JsonStreamParser>(
-        object_writer_.get());
+    extractor_ = std::make_unique<McpFieldExtractor>(metadata_, config_);
+    stream_parser_ =
+        std::make_unique<google::protobuf::util::converter::JsonStreamParser>(extractor_.get());
     parsing_started_ = true;
   }
 
-  // Apply size limit
-  size_t bytes_to_parse = data.size();
-  absl::string_view chunk = data.substr(0, bytes_to_parse);
-  absl::Status status = stream_parser_->Parse(chunk);
-  
-  total_bytes_parsed_ += bytes_to_parse;
-
-  if (object_writer_->shouldStop()) {
-    ENVOY_LOG(debug, "Stopping JSON parsing - all fields extracted");
-    all_rules_matched_ = true;
-    return absl::OkStatus();
+  auto status = stream_parser_->Parse(data);
+  ENVOY_LOG(debug, "parser pasing");
+  if (extractor_->shouldStopParsing()) {
+    ENVOY_LOG(debug, "Parser stopped early - all required fields collected");
+    all_fields_collected_ = true;
+    return finishParse();
   }
-
   return status;
 }
 
-absl::Status JsonPathParser::finishParse() {
+absl::Status McpJsonParser::finishParse() {
   if (!parsing_started_) {
     return absl::InvalidArgumentError("No data has been parsed");
   }
-
-  if (object_writer_->shouldStop()) {
-    return absl::OkStatus();
-  }
-
-  return stream_parser_->FinishParse();
+  ENVOY_LOG(debug, "parser finishParse");
+  auto status = stream_parser_->FinishParse();
+  extractor_->finalizeExtraction();
+  return status;
 }
 
-bool JsonPathParser::isValidMcpRequest() const {
-  const auto& fields = metadata_.fields();
-  
-  // Check jsonrpc = "2.0"
-  auto jsonrpc_it = fields.find("jsonrpc");
-  if (jsonrpc_it != fields.end() && 
-      jsonrpc_it->second.has_string_value() &&
-      jsonrpc_it->second.string_value() == "2.0") {
-    return true;
-  }
+bool McpJsonParser::isValidMcpRequest() const { return extractor_ && extractor_->isValidMcp(); }
 
-  return false;
+McpMethodType McpJsonParser::getMethodType() const {
+  return extractor_ ? extractor_->getMethodType() : McpMethodType::UNKNOWN;
 }
 
-void JsonPathParser::reset() {
+const std::string& McpJsonParser::getMethod() const {
+  static const std::string empty;
+  return extractor_ ? extractor_->getMethod() : empty;
+}
+
+const std::vector<std::string>& McpJsonParser::getMissingRequiredFields() const {
+  static const std::vector<std::string> empty;
+  return extractor_ ? extractor_->getMissingRequiredFields() : empty;
+}
+
+const Protobuf::Value* McpJsonParser::getNestedValue(const std::string& dotted_path) const {
+  if (dotted_path.empty()) {
+    return nullptr;
+  }
+
+  std::vector<std::string> path = absl::StrSplit(dotted_path, '.');
+  const Protobuf::Struct* current = &metadata_;
+
+  for (size_t i = 0; i < path.size(); ++i) {
+    auto it = current->fields().find(path[i]);
+    if (it == current->fields().end()) {
+      return nullptr;
+    }
+
+    if (i == path.size() - 1) {
+      return &it->second;
+    } else {
+      if (!it->second.has_struct_value()) {
+        return nullptr;
+      }
+      current = &it->second.struct_value();
+    }
+  }
+
+  return nullptr;
+}
+
+void McpJsonParser::reset() {
   metadata_.Clear();
-  object_writer_.reset();
+  extractor_.reset();
   stream_parser_.reset();
   parsing_started_ = false;
-  total_bytes_parsed_ = 0;
 }
 
 } // namespace Mcp
