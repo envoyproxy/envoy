@@ -29,7 +29,7 @@ public:
                                                             std::string tag = "METADATA") {
     const std::string yaml = fmt::format(R"EOF(
   text_format_source:
-    inline_string: "%{}({}:metadata.test:test_key)%"
+    inline_string: "%{}({}:metadata.test:test_key):999%"
 )EOF",
                                          tag, type);
     TestUtility::loadFromYaml(yaml, config_);

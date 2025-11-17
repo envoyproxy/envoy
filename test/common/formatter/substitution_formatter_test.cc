@@ -3804,7 +3804,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   const std::string expected_json_map = R"EOF({
-    "test_key": "test_value",
+    "test_key": "test_val",
     "test_obj": {
       "inner_key": "inner_value"
     },
@@ -3813,7 +3813,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
 
   Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
-    test_key: '%DYNAMIC_METADATA(com.test:test_key)%'
+    test_key: '%DYNAMIC_METADATA(com.test:test_key):8%'
     test_obj: '%DYNAMIC_METADATA(com.test:test_obj)%'
     test_obj.inner_key: '%DYNAMIC_METADATA(com.test:test_obj:inner_key)%'
   )EOF",
