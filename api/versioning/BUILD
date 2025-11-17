@@ -81,6 +81,7 @@ proto_library(
         "//envoy/extensions/bootstrap/internal_listener/v3:pkg",
         "//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg",
         "//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg",
+        "//envoy/extensions/certificate_selectors/on_demand_secret/v3:pkg",
         "//envoy/extensions/clusters/aggregate/v3:pkg",
         "//envoy/extensions/clusters/common/dns/v3:pkg",
         "//envoy/extensions/clusters/dns/v3:pkg",
