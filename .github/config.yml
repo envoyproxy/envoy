@@ -2,10 +2,11 @@ agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
   repo: docker.io/envoyproxy/envoy-build-ubuntu
+  repo-gcr: gcr.io/envoy-ci/envoy-build
   sha: de54e91a8d27623ffbd3fb9bd1aba8241567e41c0fb82b167128e3629c2ede18
+  sha-mobile: c0e11c4adaf7c7eec1e3bdc5f598e09ce5e5d5c355f161df8d75f0a10504f6ff
+  # TODO: remove this dupe (currently used by ci request handler)
   mobile-sha: c0e11c4adaf7c7eec1e3bdc5f598e09ce5e5d5c355f161df8d75f0a10504f6ff
-  # this is authoritative, but is not currently used in github ci
-  gcr-sha: de54e91a8d27623ffbd3fb9bd1aba8241567e41c0fb82b167128e3629c2ede18
   tag: 4ce0cb04f941fb89d475597a640176ae64070bb1
 
 config:
