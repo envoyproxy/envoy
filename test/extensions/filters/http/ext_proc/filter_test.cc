@@ -4395,8 +4395,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedBeforeBody) {
 
   auto& grpc_calls = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
   checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-  checkGrpcCallBody(*grpc_calls.body_stats_, 6, Grpc::Status::Ok,
-                    std::chrono::microseconds(160),
+  checkGrpcCallBody(*grpc_calls.body_stats_, 6, Grpc::Status::Ok, std::chrono::microseconds(160),
                     std::chrono::microseconds(50), std::chrono::microseconds(10));
   filter_->onDestroy();
 }
@@ -4495,8 +4494,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
 
   auto& grpc_calls = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
   checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-  checkGrpcCallBody(*grpc_calls.body_stats_, 11, Grpc::Status::Ok,
-                    std::chrono::microseconds(420),
+  checkGrpcCallBody(*grpc_calls.body_stats_, 11, Grpc::Status::Ok, std::chrono::microseconds(420),
                     std::chrono::microseconds(80), std::chrono::microseconds(10));
   filter_->onDestroy();
 }
