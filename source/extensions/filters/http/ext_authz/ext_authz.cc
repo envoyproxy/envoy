@@ -496,7 +496,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       headers.addCopy(key, value);
       if (config_->enforceResponseHeaderLimits() && !headersWithinLimits(headers)) {
         responseHeaderLimitsReached();
-        return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+        return Http::FilterHeadersStatus::StopIteration;
       }
     }
   }
@@ -509,7 +509,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       headers.setCopy(key, value);
       if (config_->enforceResponseHeaderLimits() && !headersWithinLimits(headers)) {
         responseHeaderLimitsReached();
-        return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+        return Http::FilterHeadersStatus::StopIteration;
       }
     }
   }
@@ -523,7 +523,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
         headers.addCopy(key, value);
         if (config_->enforceResponseHeaderLimits() && !headersWithinLimits(headers)) {
           responseHeaderLimitsReached();
-          return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+          return Http::FilterHeadersStatus::StopIteration;
         }
       }
     }
@@ -538,7 +538,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
         headers.setCopy(key, value);
         if (config_->enforceResponseHeaderLimits() && !headersWithinLimits(headers)) {
           responseHeaderLimitsReached();
-          return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+          return Http::FilterHeadersStatus::StopIteration;
         }
       }
     }

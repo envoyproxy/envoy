@@ -5379,7 +5379,7 @@ public:
                 sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
     EXPECT_CALL(encoder_filter_callbacks_, continueEncoding()).Times(0);
 
-    EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->encodeHeaders(response_headers, false));
 
     EXPECT_EQ(1U, config_->stats().response_header_limits_reached_.value());
