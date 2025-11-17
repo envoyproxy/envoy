@@ -110,7 +110,7 @@ CpuTimes LinuxContainerCpuStatsReader::getCpuTimes() {
                      cgroupv2_cpu_effective_file_);
       return {false, true, 0, 0, 0};
     }
-    // Format is a single range like "0-3" or "0-16" (no commas, no extra tokens)
+    // Format can be a single CPU like "0" or a range like "0-3" or "0-16"
     int N = 0;
     std::string range_token;
     v2_effective_file >> range_token;
@@ -120,20 +120,27 @@ CpuTimes LinuxContainerCpuStatsReader::getCpuTimes() {
       return {false, true, 0, 0, 0};
     }
     size_t dash_pos = range_token.find('-');
-    if (dash_pos == std::string::npos) {
-      ENVOY_LOG_MISC(error, "Invalid CPU range in {}: {}", cgroupv2_cpu_effective_file_,
-                     range_token);
-      return {false, true, 0, 0, 0};
-    }
     TRY_ASSERT_MAIN_THREAD {
-      int range_start = std::stoi(range_token.substr(0, dash_pos));
-      int range_end = std::stoi(range_token.substr(dash_pos + 1));
-      if (range_start < 0 || range_end < range_start) {
-        ENVOY_LOG_MISC(error, "Invalid CPU range in {}: {}", cgroupv2_cpu_effective_file_,
-                       range_token);
-        return {false, true, 0, 0, 0};
+      if (dash_pos == std::string::npos) {
+        // Single CPU (e.g., "0" means 1 core)
+        int single_cpu = std::stoi(range_token);
+        if (single_cpu < 0) {
+          ENVOY_LOG_MISC(error, "Invalid CPU value in {}: {}", cgroupv2_cpu_effective_file_,
+                         range_token);
+          return {false, true, 0, 0, 0};
+        }
+        N = 1;
+      } else {
+        // CPU range (e.g., "0-3" means 4 cores)
+        int range_start = std::stoi(range_token.substr(0, dash_pos));
+        int range_end = std::stoi(range_token.substr(dash_pos + 1));
+        if (range_start < 0 || range_end < range_start) {
+          ENVOY_LOG_MISC(error, "Invalid CPU range in {}: {}", cgroupv2_cpu_effective_file_,
+                         range_token);
+          return {false, true, 0, 0, 0};
+        }
+        N = (range_end - range_start + 1);
       }
-      N = (range_end - range_start + 1);
     }
     END_TRY
     catch (const std::exception&) {
