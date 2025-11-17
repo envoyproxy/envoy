@@ -1,3 +1,9 @@
+#include <chrono>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -25,6 +31,8 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
@@ -140,11 +148,16 @@ public:
       // Owns the inner writer.
       wrapper->set_writer(writer_);
     }
+
+    absl::StatusOr<Network::ConnectionSocketPtr> socket_or =
+        createConnectionSocket(peer_addr_, self_addr_, nullptr);
+    ASSERT_TRUE(socket_or.ok()) << socket_or.status();
+    ASSERT_NE(*socket_or, nullptr);
+
     quic_connection_ = new TestEnvoyQuicClientConnection(
         quic::test::TestConnectionId(), connection_helper_, alarm_factory_,
         (quiche_handles_migration_ ? wrapper : static_cast<quic::QuicPacketWriter*>(writer_)),
-        quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
-        connection_id_generator_);
+        quic_version_, *dispatcher_, std::move(*socket_or), connection_id_generator_);
     EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* migration_helper = nullptr;
     if (!quiche_handles_migration_) {
       quic_connection_->setWriterFactory(writer_factory_);

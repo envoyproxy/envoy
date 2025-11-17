@@ -1033,16 +1033,6 @@ void ServerConnectionImpl::onTransportSocketConnectTimeout() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
-    Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
-    const Network::Address::InstanceConstSharedPtr& source_address,
-    Network::TransportSocketPtr&& transport_socket,
-    const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsConstSharedPtr& transport_options)
-    : ClientConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
-                           source_address, std::move(transport_socket), options,
-                           transport_options) {}
-
-ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
     const Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,

@@ -28,11 +28,14 @@ TEST(IoSocketHandleImplIntegration, LastRoundTripIntegrationTest) {
   server.sin_port = htons(80);
 
   Address::InstanceConstSharedPtr addr(new Address::Ipv4Instance(&server));
-  auto socket_ = std::make_shared<Envoy::Network::ClientSocketImpl>(addr, nullptr);
-  socket_->setBlockingForTest(true);
-  EXPECT_TRUE(socket_->connect(addr).return_value_ == 0);
+  absl::StatusOr<std::unique_ptr<ClientSocketImpl>> socket_or =
+      ClientSocketImpl::create(addr, nullptr);
+  ASSERT_TRUE(socket_or.ok()) << socket_or.status();
+  std::unique_ptr<ClientSocketImpl> socket = std::move(*socket_or);
+  socket->setBlockingForTest(true);
+  EXPECT_TRUE(socket->connect(addr).return_value_ == 0);
 
-  EXPECT_TRUE(socket_->ioHandle().lastRoundTripTime() != absl::nullopt);
+  EXPECT_TRUE(socket->ioHandle().lastRoundTripTime() != absl::nullopt);
 }
 #endif
 

@@ -17,6 +17,8 @@
 #include "source/common/network/io_uring_socket_handle_impl.h"
 #endif
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -63,9 +65,10 @@ IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
                                     io_uring_worker_factory_.lock().get());
 }
 
-IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
-                                        Address::IpVersion version, bool socket_v6only,
-                                        const SocketCreationOptions& options) const {
+absl::StatusOr<IoHandlePtr>
+SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
+                            Address::IpVersion version, bool socket_v6only,
+                            const SocketCreationOptions& options) const {
   int protocol = 0;
 #if defined(__APPLE__) || defined(WIN32)
   ASSERT(!options.mptcp_enabled_, "MPTCP is only supported on Linux");
@@ -101,20 +104,26 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
       ASSERT(version == Address::IpVersion::v4);
       domain = AF_INET;
     }
+
+    if (!ipFamilySupported(domain)) {
+      const absl::string_view family_name = (domain == AF_INET) ? "IPv4" : "IPv6";
+      return absl::FailedPreconditionError(
+          fmt::format("{} not supported on this host", family_name));
+    }
   } else if (addr_type == Address::Type::Pipe) {
     domain = AF_UNIX;
   } else {
     ASSERT(addr_type == Address::Type::EnvoyInternal);
     PANIC("not implemented");
     // TODO(lambdai): Add InternalIoSocketHandleImpl to support internal address.
-    return nullptr;
+    return absl::UnimplementedError("EnvoyInternal address type not yet supported");
   }
 
   const Api::SysCallSocketResult result =
       Api::OsSysCallsSingleton::get().socket(domain, flags, protocol);
   if (!SOCKET_VALID(result.return_value_)) {
     IS_ENVOY_BUG(fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-    return nullptr;
+    return absl::InternalError(fmt::format("socket(2) failed: {}", errorDetails(result.errno_)));
   }
   IoHandlePtr io_handle =
       makeSocket(result.return_value_, socket_v6only, socket_type, domain, options);
@@ -124,25 +133,28 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   const int rc = io_handle->setBlocking(false).return_value_;
   if (SOCKET_FAILURE(result.return_value_)) {
     IS_ENVOY_BUG(fmt::format("Unable to set socket non-blocking: got error: {}", rc));
-    return nullptr;
+    return absl::InternalError(
+        fmt::format("Unable to set socket non-blocking: {}", errorDetails(rc)));
   }
 #endif
 
   return io_handle;
 }
 
-IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
-                                        const Address::InstanceConstSharedPtr addr,
-                                        const SocketCreationOptions& options) const {
+absl::StatusOr<IoHandlePtr>
+SocketInterfaceImpl::socket(Socket::Type socket_type, const Address::InstanceConstSharedPtr addr,
+                            const SocketCreationOptions& options) const {
   Address::IpVersion ip_version = addr->ip() ? addr->ip()->version() : Address::IpVersion::v4;
   int v6only = 0;
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
     v6only = addr->ip()->ipv6()->v6only();
   }
 
-  IoHandlePtr io_handle =
+  absl::StatusOr<IoHandlePtr> io_handle_or =
       SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only, options);
-  if (io_handle && addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6 &&
+  RETURN_IF_NOT_OK(io_handle_or.status());
+  IoHandlePtr io_handle = std::move(*io_handle_or);
+  if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6 &&
       !Address::forceV6()) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
     const Api::SysCallIntResult result = io_handle->setOption(
@@ -154,12 +166,17 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
 }
 
 bool SocketInterfaceImpl::ipFamilySupported(int domain) {
+  return static_cast<const SocketInterfaceImpl*>(this)->ipFamilySupported(domain);
+}
+
+bool SocketInterfaceImpl::ipFamilySupported(int domain) const {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSocketResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
   if (SOCKET_VALID(result.return_value_)) {
+    const Api::SysCallIntResult close_result = os_sys_calls.close(result.return_value_);
     RELEASE_ASSERT(
-        os_sys_calls.close(result.return_value_).return_value_ == 0,
-        fmt::format("Fail to close fd: response code {}", errorDetails(result.return_value_)));
+        close_result.return_value_ == 0,
+        fmt::format("Fail to close fd: response code {}", errorDetails(close_result.errno_)));
   }
   return SOCKET_VALID(result.return_value_);
 }

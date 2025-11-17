@@ -30,9 +30,13 @@ std::string createHeader(const std::string& format, uint32_t version) {
 DaemonBrokerImpl::DaemonBrokerImpl(const std::string& daemon_endpoint)
     : address_(
           Network::Utility::parseInternetAddressAndPortNoThrow(daemon_endpoint, false /*v6only*/)),
-      io_handle_(Network::ioHandleForAddr(Network::Socket::Type::Datagram, address_, {})) {
+      io_handle_(Network::ioHandleForAddr(Network::Socket::Type::Datagram, address_, {})
+                     .value_or(nullptr)) {
   if (address_ == nullptr) {
     throw EnvoyException(absl::StrCat("malformed IP address: ", daemon_endpoint));
+  }
+  if (io_handle_ == nullptr || !io_handle_->isOpen()) {
+    throw EnvoyException(absl::StrCat("failed to create socket: ", daemon_endpoint));
   }
 }
 

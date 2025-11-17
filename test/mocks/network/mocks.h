@@ -32,6 +32,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -759,10 +760,10 @@ class MockSocketInterface : public SocketInterfaceImpl {
 public:
   explicit MockSocketInterface(const std::vector<Address::IpVersion>& versions)
       : versions_(versions.begin(), versions.end()) {}
-  MOCK_METHOD(IoHandlePtr, socket,
+  MOCK_METHOD(absl::StatusOr<IoHandlePtr>, socket,
               (Socket::Type, Address::Type, Address::IpVersion, bool, const SocketCreationOptions&),
               (const));
-  MOCK_METHOD(IoHandlePtr, socket,
+  MOCK_METHOD(absl::StatusOr<IoHandlePtr>, socket,
               (Socket::Type, const Address::InstanceConstSharedPtr, const SocketCreationOptions&),
               (const));
   bool ipFamilySupported(int domain) override {

@@ -1788,15 +1788,23 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAsyncConnect) {
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  // ipFamilySupported() check
+  EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{2, 0}));
+  EXPECT_CALL(os_sys_calls, close(2)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+
+  // Actual connection
   EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
+
 #if defined(__APPLE__) || defined(WIN32)
   EXPECT_CALL(os_sys_calls, setsocketblocking(1, false))
-      .WillOnce(Return(Api::SysCallIntResult{1, 0}));
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
 #endif
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _))
       .Times(testing::AtLeast(0u))
       .WillRepeatedly(Return(0));
-  EXPECT_CALL(os_sys_calls, connect(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
+  EXPECT_CALL(os_sys_calls, connect(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
         sockaddr_in* addr_in = reinterpret_cast<sockaddr_in*>(addr);

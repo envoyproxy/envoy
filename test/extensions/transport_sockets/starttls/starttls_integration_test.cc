@@ -1,9 +1,13 @@
+#include <memory>
+#include <utility>
+
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/common/network/connection_impl.h"
+#include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
@@ -15,6 +19,7 @@
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/registry.h"
 
+#include "absl/status/statusor.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -132,11 +137,11 @@ private:
 class ClientTestConnection : public Network::ClientConnectionImpl {
 public:
   ClientTestConnection(Event::Dispatcher& dispatcher,
-                       const Network::Address::InstanceConstSharedPtr& remote_address,
+                       std::unique_ptr<Network::ConnectionSocket> socket,
                        const Network::Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options)
-      : ClientConnectionImpl(dispatcher, remote_address, source_address,
+      : ClientConnectionImpl(dispatcher, std::move(socket), source_address,
                              std::move(transport_socket), options, nullptr) {}
 
   void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
@@ -217,8 +222,13 @@ void StartTlsIntegrationTest::initialize() {
 
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
+
+  absl::StatusOr<std::unique_ptr<Network::ClientSocketImpl>> client_socket_or =
+      Network::ClientSocketImpl::create(address, nullptr);
+  ASSERT_TRUE(client_socket_or.ok()) << client_socket_or.status();
+
   conn_ = std::make_unique<ClientTestConnection>(
-      *dispatcher_, address, Network::Address::InstanceConstSharedPtr(),
+      *dispatcher_, std::move(*client_socket_or), Network::Address::InstanceConstSharedPtr(),
       cleartext_context_->createTransportSocket(
           std::make_shared<Network::TransportSocketOptionsImpl>(
               absl::string_view(""), std::vector<std::string>(), std::vector<std::string>()),

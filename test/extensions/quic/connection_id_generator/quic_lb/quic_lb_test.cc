@@ -1,9 +1,17 @@
+#include <functional>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
 #include "source/common/network/socket_option_factory.h"
 #include "source/extensions/quic/connection_id_generator/quic_lb/quic_lb.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_test.h"
@@ -71,8 +79,11 @@ public:
 
     // Create the rest of the sockets on the same address as the first.
     for (uint32_t i = 0; i < concurrency - 1; i++) {
-      Network::SocketPtr sock = std::make_unique<Network::SocketImpl>(
+      absl::StatusOr<Network::SocketPtr> socket_or = Network::SocketImpl::create(
           Network::Socket::Type::Datagram, address_, nullptr, Network::SocketCreationOptions{});
+      ASSERT(socket_or.ok(), absl::StrCat("failed to create socket: ", socket_or.status()));
+
+      Network::SocketPtr sock = std::move(*socket_or);
       sock->addOptions(Network::SocketOptionFactory::buildReusePortOptions());
       Network::Socket::applyOptions(sock->options(), *sock,
                                     envoy::config::core::v3::SocketOption::STATE_PREBIND);

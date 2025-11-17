@@ -9,6 +9,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -849,11 +850,13 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, EcdsBasicSuccess) {
   // Change to a new port, and connection should fail.
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
+  absl::StatusOr<Network::ConnectionSocketPtr> socket_or = Quic::createConnectionSocket(
+      codec_client_->rawConnection().connectionInfoProvider().remoteAddress(), local_addr, nullptr);
+  ASSERT_TRUE(socket_or.ok()) << socket_or.status();
   dynamic_cast<Quic::EnvoyQuicClientConnection*>(
       dynamic_cast<Quic::EnvoyQuicClientSession&>(codec_client_->rawConnection()).connection())
-      ->switchConnectionSocket(Quic::createConnectionSocket(
-          codec_client_->rawConnection().connectionInfoProvider().remoteAddress(), local_addr,
-          nullptr));
+      ->switchConnectionSocket(std::move(*socket_or));
+
   Envoy::IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -872,11 +875,13 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, EcdsBasicSuccess) {
   EXPECT_THAT(log, testing::HasSubstr("200 \"def\""));
   // Change to a new port, and connection shouldn't fail.
   local_addr = Network::Test::getCanonicalLoopbackAddress(version_);
+  socket_or = Quic::createConnectionSocket(
+      codec_client_->rawConnection().connectionInfoProvider().remoteAddress(), local_addr, nullptr);
+  ASSERT_TRUE(socket_or.ok()) << socket_or.status();
   dynamic_cast<Quic::EnvoyQuicClientConnection*>(
       dynamic_cast<Quic::EnvoyQuicClientSession&>(codec_client_->rawConnection()).connection())
-      ->switchConnectionSocket(Quic::createConnectionSocket(
-          codec_client_->rawConnection().connectionInfoProvider().remoteAddress(), local_addr,
-          nullptr));
+      ->switchConnectionSocket(std::move(*socket_or));
+
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);

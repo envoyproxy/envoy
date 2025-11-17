@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <memory>
+#include <utility>
 
 #include "envoy/config/listener/v3/quic_config.pb.validate.h"
 #include "envoy/network/exception.h"
@@ -33,6 +34,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -267,9 +269,12 @@ protected:
     } else {
       client_address = Network::Test::getCanonicalLoopbackAddress(version_);
     }
-    client_sockets_.push_back(
-        std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, client_address,
-                                              nullptr, Network::SocketCreationOptions{}));
+
+    absl::StatusOr<std::unique_ptr<Network::SocketImpl>> socket_or = Network::SocketImpl::create(
+        Network::Socket::Type::Datagram, client_address, nullptr, Network::SocketCreationOptions{});
+    ASSERT_TRUE(socket_or.ok()) << socket_or.status();
+    client_sockets_.push_back(std::move(*socket_or));
+
     // Set outgoing ECN marks on client packets.
     int level = IPPROTO_IP;
     int optname = IP_TOS;

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+#include <utility>
+
 #include "source/common/network/connection_impl.h"
 #include "source/server/config_validation/dispatcher.h"
 
@@ -14,12 +17,12 @@ namespace Network {
 class ConfigValidateConnection : public Network::ClientConnectionImpl {
 public:
   ConfigValidateConnection(Event::ValidationDispatcher& dispatcher,
-                           Network::Address::InstanceConstSharedPtr remote_address,
+                           std::unique_ptr<ConnectionSocket> socket,
                            Network::Address::InstanceConstSharedPtr source_address,
                            Network::TransportSocketPtr&& transport_socket,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsConstSharedPtr& transport_options)
-      : Network::ClientConnectionImpl(dispatcher, remote_address, source_address,
+      : Network::ClientConnectionImpl(dispatcher, std::move(socket), source_address,
                                       std::move(transport_socket), options, transport_options) {}
 
   // Unit tests may instantiate it without proper event machine and leave opened sockets.

@@ -7,6 +7,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -125,9 +127,10 @@ private:
 
 class SocketImpl : public virtual Socket {
 public:
-  SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr& address_for_io_handle,
-             const Address::InstanceConstSharedPtr& remote_address,
-             const SocketCreationOptions& options);
+  static absl::StatusOr<std::unique_ptr<SocketImpl>>
+  create(Socket::Type socket_type, const Address::InstanceConstSharedPtr& address_for_io_handle,
+         const Address::InstanceConstSharedPtr& remote_address,
+         const SocketCreationOptions& options);
 
   // Network::Socket
   ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }
@@ -184,6 +187,9 @@ public:
   absl::optional<Address::IpVersion> ipVersion() const override;
 
 protected:
+  SocketImpl(IoHandlePtr&& io_handle, Socket::Type sock_type, Address::Type addr_type,
+             const Address::InstanceConstSharedPtr& remote_address);
+
   SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
              const Address::InstanceConstSharedPtr& remote_address);
 

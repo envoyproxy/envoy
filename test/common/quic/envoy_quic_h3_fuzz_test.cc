@@ -3,6 +3,7 @@
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include "test/common/quic/envoy_quic_h3_fuzz.pb.h"
 #include "test/common/quic/envoy_quic_h3_fuzz_helper.h"
@@ -12,6 +13,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 
+#include "absl/status/statusor.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
 #include "quiche/quic/core/tls_server_handshaker.h"
@@ -130,7 +132,12 @@ struct Harness {
   }
 
   void fuzz(const test::common::quic::QuicH3FuzzCase& input) {
-    auto connection_socket = Quic::createConnectionSocket(peer_addr_, self_addr_, nullptr);
+    absl::StatusOr<Network::ConnectionSocketPtr> connection_socket_or =
+        Quic::createConnectionSocket(peer_addr_, self_addr_, nullptr);
+    if (!connection_socket_or.ok()) {
+      return;
+    }
+    Network::ConnectionSocketPtr connection_socket = std::move(*connection_socket_or);
     auto connection = std::make_unique<EnvoyQuicServerConnection>(
         quic::test::TestConnectionId(), srv_addr_, cli_addr_, *connection_helper_, *alarm_factory_,
         &writer_, quic::ParsedQuicVersionVector{quic_version_}, std::move(connection_socket),

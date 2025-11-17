@@ -35,6 +35,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -908,10 +909,11 @@ private:
   ActiveSession* createSessionWithOptionalHost(Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                                const Upstream::HostConstSharedPtr& host);
 
-  virtual Network::SocketPtr createUdpSocket(const Upstream::HostConstSharedPtr& host) {
+  virtual absl::StatusOr<Network::SocketPtr>
+  createUdpSocket(const Upstream::HostConstSharedPtr& host) {
     // Virtual so this can be overridden in unit tests.
-    return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address(),
-                                                 nullptr, Network::SocketCreationOptions{});
+    return Network::SocketImpl::create(Network::Socket::Type::Datagram, host->address(), nullptr,
+                                       Network::SocketCreationOptions{});
   }
 
   void fillProxyStreamInfo();
