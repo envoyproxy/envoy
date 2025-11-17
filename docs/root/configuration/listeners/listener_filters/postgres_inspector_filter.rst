@@ -24,17 +24,17 @@ name from the startup message.
 .. note::
 
   For SNI-based routing of PostgreSQL connections:
-  
+
   - **PostgreSQL 17+**: SNI-based filter chain selection works natively. PostgreSQL 17+ sends
     the SSLRequest and TLS ClientHello together in the initial stream, allowing the TLS Inspector
     to extract SNI before filter chain selection occurs.
-  
+
   - **PostgreSQL < 17**: SNI-based filter chain selection is **not supported**. These versions
     use a two-phase SSL negotiation (SSLRequest → 'S' response → TLS handshake), which means
     the TLS handshake (and thus SNI extraction) occurs after filter chain selection. For these
     versions, use :ref:`Dynamic Forward Proxy <arch_overview_http_dynamic_forward_proxy>`
     to read SNI from connection metadata for routing decisions.
-  
+
   The postgres_inspector should be placed **before** the :ref:`tls_inspector
   <config_listener_filters_tls_inspector>` filter in the listener filter chain for both cases.
 
@@ -157,17 +157,17 @@ Proxy uses the SNI from connection metadata for routing:
 .. note::
 
   **SNI-based filter chain selection for PostgreSQL < 17:**
-  
+
   SNI-based filter chain selection is **not supported** for PostgreSQL versions prior to 17 because:
-  
+
   1. The postgres_inspector detects the PostgreSQL protocol and triggers filter chain selection
   2. The postgres_proxy sends the 'S' response to the client's SSLRequest
   3. The client then initiates the TLS handshake (which contains SNI)
   4. By this time, the filter chain has already been selected
-  
+
   For SNI-based routing with PostgreSQL < 17, use the Dynamic Forward Proxy approach shown above,
   which reads SNI from connection metadata **after** the TLS handshake completes.
-  
+
   **PostgreSQL 17+ natively supports SNI-based filter chain selection** as shown in the first example,
   because the SSLRequest and TLS ClientHello are sent together.
 
