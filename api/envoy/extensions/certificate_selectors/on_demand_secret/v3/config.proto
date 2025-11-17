@@ -5,6 +5,7 @@ package envoy.extensions.certificate_selectors.on_demand_secret.v3;
 import "envoy/config/core/v3/config_source.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.certificate_selectors.on_demand_secret.v3";
 option java_outer_classname = "ConfigProto";
@@ -27,7 +28,6 @@ message Config {
 
     config.core.v3.ConfigSource sds_config = 2;
   }
-  repeated SdsSecretConfig sds_secret_config = 1
-        [(validate.rules).message = {required: true}];
+  repeated SdsSecretConfig sds_secret_config = 1 [(validate.rules).message = {required: true}];
 }
 

@@ -2106,3 +2106,11 @@ envoy.filters.http.dynamic_modules:
   status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+envoy.certificate_selectors.on_demand_secret:
+  categories:
+  - envoy.tls.certificate_selectors
+  security_posture: unknown
+  status: alpha
+  status_upstream: alpha
+  type_urls:
+  - envoy.extensions.certificate_selectors.on_demand_secret.v3.Config
