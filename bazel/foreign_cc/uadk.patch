@@ -1,5 +1,5 @@
 diff --git a/conf.sh b/conf.sh
-index c361fbc..da24702 100755
+index c361fbc..6a0d15d 100755
 --- a/conf.sh
 +++ b/conf.sh
 @@ -4,6 +4,14 @@
@@ -17,10 +17,11 @@ index c361fbc..da24702 100755
  
  # These two parameters could be in arbitary sequence
  if [[ $1 && $1 = "--static" ]] || [[ $2 && $2 = "--static" ]]; then
-@@ -17,4 +25,5 @@ ac_cv_func_malloc_0_nonnull=yes ac_cv_func_realloc_0_nonnull=yes ./configure \
+@@ -16,5 +24,5 @@ ac_cv_func_malloc_0_nonnull=yes ac_cv_func_realloc_0_nonnull=yes ./configure \
+ 	--enable-perf=yes \
  	--host aarch64-linux-gnu \
  	--target aarch64-linux-gnu \
- 	--includedir=/usr/local/include/ \
+-	--includedir=/usr/local/include/ \
 -	$COMPILE_TYPE
 +	$COMPILE_TYPE \
 +	"${EXTRA_ARGS[@]}"
