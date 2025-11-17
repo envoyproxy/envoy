@@ -64,6 +64,7 @@ public class MainActivity extends Activity {
                    return null;
                  })
                  .enablePlatformCertificatesValidation(true)
+                 .setUseV2NetworkMonitor(true)
                  .build();
 
     recyclerView = (RecyclerView)findViewById(R.id.recycler_view);
