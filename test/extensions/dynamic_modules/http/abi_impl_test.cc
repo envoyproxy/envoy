@@ -466,7 +466,8 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_F(DynamicModuleHttpFilterTest, SendResponseNullptr) {
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
                                                  testing::Eq(0), testing::Eq("dynamic_module")));
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 3, nullptr, 0);
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 3, nullptr, 0,
+                                                   nullptr, 0);
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SendResponseEmptyResponse) {
@@ -479,7 +480,8 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseEmptyResponse) {
                                                  testing::Eq(0), testing::Eq("dynamic_module")));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
 
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 3, nullptr, 0);
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 3, nullptr, 0,
+                                                   nullptr, 0);
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SendResponse) {
@@ -506,7 +508,7 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponse) {
   }));
 
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array.get(),
-                                                   header_count, nullptr, 0);
+                                                   header_count, nullptr, 0, nullptr, 0);
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
@@ -536,7 +538,27 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
     EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[1]->value().getStringView(), "value2");
   }));
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array.get(), 3, body,
-                                                   body_length);
+                                                   body_length, nullptr, 0);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SendResponseWithCustomResponseCodeDetails) {
+  const std::string body_str = "body";
+  envoy_dynamic_module_type_buffer_module_ptr body = const_cast<char*>(body_str.data());
+  size_t body_length = body_str.size();
+  absl::string_view test_details = "test_details";
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
+                                                 testing::Eq(0), testing::Eq("test_details")));
+  envoy_dynamic_module_callback_http_send_response(
+      filter_.get(), 200, nullptr, 0, body, body_length, const_cast<char*>(test_details.data()),
+      test_details.size());
+}
+
+TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {
+  // Test with empty response.
+  EXPECT_CALL(decoder_callbacks_.stream_info_, addCustomFlag(testing::Eq("XXX")));
+  absl::string_view flag = "XXX";
+  envoy_dynamic_module_callback_http_add_custom_flag(filter_.get(), const_cast<char*>(flag.data()),
+                                                     flag.size());
 }
 
 TEST(ABIImpl, metadata) {

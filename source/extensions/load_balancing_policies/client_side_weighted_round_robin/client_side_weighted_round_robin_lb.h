@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.pb.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/upstream.h"
@@ -18,6 +19,7 @@ using ClientSideWeightedRoundRobinLbProto = envoy::extensions::load_balancing_po
     client_side_weighted_round_robin::v3::ClientSideWeightedRoundRobin;
 using OrcaLoadReportProto = xds::data::orca::v3::OrcaLoadReport;
 using CommonLbConfig = envoy::config::cluster::v3::Cluster::CommonLbConfig;
+using RoundRobinConfig = envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin;
 
 /**
  * Load balancer config used to wrap the config proto.
@@ -35,6 +37,9 @@ public:
   std::chrono::milliseconds blackout_period;
   std::chrono::milliseconds weight_expiration_period;
   std::chrono::milliseconds weight_update_period;
+
+  // Round robin proto overrides that we want to propagate to the worker RR LB (e.g., slow start).
+  RoundRobinConfig round_robin_overrides_;
 
   Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::SlotAllocator& tls_slot_allocator_;
@@ -148,7 +153,7 @@ public:
   public:
     WorkerLocalLb(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                   ClusterLbStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
-                  const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+                  const CommonLbConfig& common_config, const RoundRobinConfig& round_robin_config,
                   TimeSource& time_source, OptRef<ThreadLocalShim> tls_shim);
 
   private:
@@ -162,9 +167,10 @@ public:
     WorkerLocalLbFactory(const Upstream::ClusterInfo& cluster_info,
                          const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
                          Envoy::Random::RandomGenerator& random, TimeSource& time_source,
-                         ThreadLocal::SlotAllocator& tls)
+                         ThreadLocal::SlotAllocator& tls,
+                         const RoundRobinConfig& round_robin_config)
         : cluster_info_(cluster_info), priority_set_(priority_set), runtime_(runtime),
-          random_(random), time_source_(time_source) {
+          random_(random), time_source_(time_source), round_robin_config_(round_robin_config) {
       tls_ = ThreadLocal::TypedSlot<ThreadLocalShim>::makeUnique(tls);
       tls_->set([](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalShim>(); });
     }
@@ -185,6 +191,7 @@ public:
     Runtime::Loader& runtime_;
     Envoy::Random::RandomGenerator& random_;
     TimeSource& time_source_;
+    const RoundRobinConfig round_robin_config_;
   };
 
 public:
