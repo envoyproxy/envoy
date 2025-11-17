@@ -131,8 +131,11 @@ TEST_F(LinuxContainerCpuStatsReaderTest, ReadsCgroupContainerStats) {
   setCpuAllocated("2000\n");
   setCpuTimes("1000\n");
 
+  // Pass non-existent paths for cgroup v2 files to test cgroup v1 behavior
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
   LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
-                                                      cpuTimesPath());
+                                                      cpuTimesPath(), nonexistent_path,
+                                                      nonexistent_path, nonexistent_path);
   CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
 
   const uint64_t current_monotonic_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -149,8 +152,11 @@ TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuAllocated) {
   const std::string temp_path_cpu_allocated =
       TestEnvironment::temporaryPath("container_cpu_times_not_exists");
 
+  // Pass non-existent paths for cgroup v2 files to test cgroup v1 behavior
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
   LinuxContainerCpuStatsReader container_stats_reader(test_time_source, temp_path_cpu_allocated,
-                                                      cpuTimesPath());
+                                                      cpuTimesPath(), nonexistent_path,
+                                                      nonexistent_path, nonexistent_path);
   CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
   EXPECT_EQ(envoy_container_stats.work_time, 0);
@@ -162,8 +168,11 @@ TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuTimes) {
   const std::string temp_path_cpu_times =
       TestEnvironment::temporaryPath("container_cpu_times_not_exists");
 
+  // Pass non-existent paths for cgroup v2 files to test cgroup v1 behavior
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
   LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
-                                                      temp_path_cpu_times);
+                                                      temp_path_cpu_times, nonexistent_path,
+                                                      nonexistent_path, nonexistent_path);
   CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
   EXPECT_EQ(envoy_container_stats.work_time, 0);
@@ -174,8 +183,11 @@ TEST_F(LinuxContainerCpuStatsReaderTest, UnexpectedFormatCpuAllocatedLine) {
   TimeSource& test_time_source = timeSource();
   setCpuAllocated("notanumb3r\n");
 
+  // Pass non-existent paths for cgroup v2 files to test cgroup v1 behavior
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
   LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
-                                                      cpuTimesPath());
+                                                      cpuTimesPath(), nonexistent_path,
+                                                      nonexistent_path, nonexistent_path);
   CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
   EXPECT_EQ(envoy_container_stats.work_time, 0);
@@ -186,8 +198,11 @@ TEST_F(LinuxContainerCpuStatsReaderTest, UnexpectedFormatCpuTimesLine) {
   TimeSource& test_time_source = timeSource();
   setCpuTimes("notanumb3r\n");
 
+  // Pass non-existent paths for cgroup v2 files to test cgroup v1 behavior
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
   LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
-                                                      cpuTimesPath());
+                                                      cpuTimesPath(), nonexistent_path,
+                                                      nonexistent_path, nonexistent_path);
   CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
   EXPECT_EQ(envoy_container_stats.work_time, 0);
