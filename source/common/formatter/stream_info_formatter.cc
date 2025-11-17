@@ -1870,7 +1870,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   true);
             }}},
           {"DYNAMIC_METADATA",
-           {CommandSyntaxChecker::PARAMS_REQUIRED,
+           {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
             [](absl::string_view format, absl::optional<size_t> max_length) {
               absl::string_view filter_namespace;
               std::vector<absl::string_view> path;
