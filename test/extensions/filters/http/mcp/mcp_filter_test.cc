@@ -150,7 +150,7 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
   Buffer::OwnedImpl buffer(body);
   Buffer::OwnedImpl decoding_buffer;
 
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
       .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
@@ -192,7 +192,7 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
   Buffer::OwnedImpl buffer(json);
   Buffer::OwnedImpl decoding_buffer;
 
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
       .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
@@ -241,7 +241,7 @@ TEST_F(McpFilterTest, WrongJsonRpcVersion) {
   Buffer::OwnedImpl buffer(wrong_version);
   Buffer::OwnedImpl decoding_buffer;
 
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
       .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
@@ -352,7 +352,8 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejected) {
   filter_->decodeHeaders(headers, false);
 
   // Create a JSON body that exceeds 100 bytes
-  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "longkey": "this is a very long string to exceed the limit"}, "id": 1})";
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "longkey": "this is a very long string to exceed the limit"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
   Buffer::OwnedImpl decoding_buffer;
 
@@ -362,8 +363,8 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejected) {
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::PayloadTooLarge,
-                            testing::HasSubstr("Request body size exceeds maximum allowed size"),
-                            _, _, "mcp_filter_body_too_large"));
+                             testing::HasSubstr("Request body size exceeds maximum allowed size"),
+                             _, _, "mcp_filter_body_too_large"));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
@@ -387,7 +388,8 @@ TEST_F(McpFilterTest, RequestBodyWithDisabledLimitAllowsLargeBodies) {
 
   // Create a large JSON-RPC body
   std::string large_data(50000, 'x'); // 50KB of data
-  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"data": ")" + large_data + R"("}, "id": 1})";
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"data": ")" + large_data +
+                     R"("}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
   Buffer::OwnedImpl decoding_buffer;
 
@@ -417,7 +419,9 @@ TEST_F(McpFilterTest, RequestBodyExactlyAtLimitSucceeds) {
   filter_->decodeHeaders(headers, false);
 
   // Create a JSON body that's exactly 100 bytes
-  std::string json = R"({"jsonrpc": "2.0", "method": "testMethod", "params": {"key": "val"}, "id": 1})"; // 81 bytes
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "testMethod", "params": {"key": "val"}, "id": 1})"; // 81
+                                                                                          // bytes
   // Pad to exactly 100 bytes
   while (json.size() < 100) {
     json.insert(json.size() - 1, " ");
@@ -432,8 +436,7 @@ TEST_F(McpFilterTest, RequestBodyExactlyAtLimitSucceeds) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   // Should NOT be rejected
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::PayloadTooLarge, _, _, _, _))
-      .Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::PayloadTooLarge, _, _, _, _)).Times(0);
 
   // Note: This might fail JSON parsing due to padding, but should not trigger size limit
   filter_->decodeData(buffer, true);
@@ -491,7 +494,8 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   filter_->decodeHeaders(headers, false);
 
   // Large body should be rejected even in PASS_THROUGH mode
-  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value with lots of data"}, "id": 1})";
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value with lots of data"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
   Buffer::OwnedImpl decoding_buffer;
 
