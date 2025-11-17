@@ -113,6 +113,7 @@ private:
   uint32_t maxConfigReadBytes() const { return config_->maxClientHelloSize(); }
   ParseState getParserState(int handshake_status);
   void setDynamicMetadata(absl::string_view failure_reason);
+  void setDownstreamTransportFailureReason();
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};

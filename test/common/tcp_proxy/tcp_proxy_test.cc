@@ -798,6 +798,43 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectEarlyDataWithEndStream) {
   upstream_callbacks_->onUpstreamData(response, false);
 }
 
+// Test that when downstream closes without sending any data before upstream connection is
+// established, the end_stream signal is properly propagated to upstream.
+// This prevents upstream connection leaks.
+TEST_P(TcpProxyTest, ReceiveBeforeConnectDownstreamClosesWithoutData) {
+  setup(/*connections=*/1, /*set_redirect_records=*/false, /*receive_before_connect=*/true);
+
+  // Downstream closes without sending any data.
+  Buffer::OwnedImpl empty_buffer;
+  EXPECT_CALL(*upstream_connections_.at(0), write(_, _)).Times(0);
+  filter_->onData(empty_buffer, /*end_stream=*/true);
+
+  // When upstream connection is established, the end_stream signal should be sent even though
+  // the buffer is empty. This ensures the upstream connection is properly closed.
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(""), /*end_stream*/ true));
+  raiseEventUpstreamConnected(/*conn_index=*/0);
+}
+
+// Test that when downstream sends empty buffer with end_stream before upstream is connected,
+// the end_stream is properly handled.
+TEST_P(TcpProxyTest, ReceiveBeforeConnectEmptyBufferWithEndStream) {
+  setup(/*connections=*/1, /*set_redirect_records=*/false, /*receive_before_connect=*/true);
+
+  // Downstream sends empty data with end_stream set.
+  Buffer::OwnedImpl empty_buffer;
+  EXPECT_CALL(*upstream_connections_.at(0), write(_, _)).Times(0);
+  filter_->onData(empty_buffer, /*end_stream=*/true);
+
+  // When upstream connection is established, end_stream should be propagated.
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(""), /*end_stream*/ true));
+  raiseEventUpstreamConnected(/*conn_index=*/0);
+
+  // Upstream can still send data back.
+  Buffer::OwnedImpl response("response data");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_callbacks_->onUpstreamData(response, false);
+}
+
 TEST_P(TcpProxyTest, ReceiveBeforeConnectNoEarlyData) {
   setup(1, /*set_redirect_records=*/false, /*receive_before_connect=*/true);
   raiseEventUpstreamConnected(/*conn_index=*/0, /*expect_read_enable=*/false);

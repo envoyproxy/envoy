@@ -53,16 +53,16 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.29
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.30
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.29
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.30
       with:
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/gh-actions/bson@actions-v0.3.29
+    - uses: envoyproxy/toolshed/gh-actions/bson@actions-v0.3.30
       id: update
       name: Update dependency (${{ inputs.dependency }})
       with:
@@ -97,13 +97,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.3.29
+    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.3.30
       name: Upload diff
       with:
         name: ${{ inputs.dependency }}-${{ steps.update.outputs.output }}
     - name: Create a PR
       if: ${{ inputs.pr }}
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.29
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.30
       with:
         base: main
         body: |
@@ -134,11 +134,11 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.29
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.30
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.29
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.30
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -156,8 +156,7 @@ jobs:
         shas=(
             tag
             sha
-            mobile-sha
-            gcr-sha)
+            mobile-sha)
         for sha in "${shas[@]}"; do
             current_sha=$(bazel run --config=ci //tools/dependency:build-image-sha "$sha")
             echo "${sha}=${current_sha}" >> "$GITHUB_OUTPUT"
@@ -180,19 +179,17 @@ jobs:
 
     - name: Check Docker SHAs
       id: build-images
-      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.3.29
+      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.3.30
       with:
         images: |
            sha: docker.io/envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
            mobile-sha: docker.io/envoyproxy/envoy-build-ubuntu:mobile-${{ steps.build-tools.outputs.tag }}
-           gcr-sha: gcr.io/envoy-ci/envoy-build:${{ steps.build-tools.outputs.tag }}
 
     - run: |
         SHA_REPLACE=(
             "$CURRENT_ENVOY_TAG:$ENVOY_TAG"
             "$CURRENT_ENVOY_SHA:${{ fromJSON(steps.build-images.outputs.shas).sha }}"
-            "$CURRENT_ENVOY_MOBILE_SHA:${{ fromJSON(steps.build-images.outputs.shas).mobile-sha }}"
-            "$CURRENT_ENVOY_GCR_SHA:${{ fromJSON(steps.build-images.outputs.shas).gcr-sha }}")
+            "$CURRENT_ENVOY_MOBILE_SHA:${{ fromJSON(steps.build-images.outputs.shas).mobile-sha }}")
         echo "replace=${SHA_REPLACE[*]}" >> "$GITHUB_OUTPUT"
       name: Find SHAs to replace
       id: shas
@@ -201,7 +198,6 @@ jobs:
         CURRENT_ENVOY_TAG: ${{ steps.current.outputs.tag }}
         CURRENT_ENVOY_SHA: ${{ steps.current.outputs.sha }}
         CURRENT_ENVOY_MOBILE_SHA: ${{ steps.current.outputs.mobile-sha }}
-        CURRENT_ENVOY_GCR_SHA: ${{ steps.current.outputs.gcr-sha }}
     - run: |
         echo "${SHA_REPLACE}" | xargs bazel run --config=ci @envoy_toolshed//sha:replace "${PWD}"
       env:
@@ -209,7 +205,7 @@ jobs:
       name: Update SHAs
       working-directory: envoy
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.29
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.30
       with:
         base: main
         body: Created by Envoy dependency bot

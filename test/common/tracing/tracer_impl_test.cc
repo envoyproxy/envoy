@@ -12,6 +12,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -246,6 +247,88 @@ TEST_F(FinalizerImplTest, TestAll) {
     });
 
     TracerUtility::finalizeSpan(span, stream_info, config, false);
+  }
+}
+
+TEST_F(FinalizerImplTest, TestAllWithLegacyRequestHeader) {
+  TestEnvironment::setEnvVar("E_CC", "c", 1);
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.get_header_tag_from_header_map", "false"}});
+
+  request_headers_.clear();
+  trace_context.context_map_ = {{"x-request-id", "id"}, {"x-bb", "b"}};
+  trace_context.context_host_ = "test.com";
+  trace_context.context_method_ = "method";
+  trace_context.context_path_ = "TestService";
+  trace_context.context_protocol_ = "test";
+
+  // Set upstream cluster.
+  cluster_info_->name_ = "my_upstream_cluster_from_cluster_info";
+  cluster_info_->observability_name_ = "my_upstream_cluster_observable_from_cluster_info";
+
+  // Enable verbose logs.
+  EXPECT_CALL(config, verbose).WillOnce(Return(true));
+
+  // Downstream address.
+  const std::string downstream_ip = "10.0.0.100";
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(downstream_ip, 0, nullptr)};
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
+
+  // Timestamps of stream.
+  const auto start_timestamp =
+      SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
+  EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_timestamp));
+  const absl::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
+  const MonotonicTime time = MonotonicTime(nanoseconds.value());
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime())
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(MonotonicTime(std::chrono::nanoseconds(10))));
+  auto& timing = stream_info.upstream_info_->upstreamTiming();
+  timing.first_upstream_tx_byte_sent_ = time;
+  timing.last_upstream_tx_byte_sent_ = time;
+  timing.first_upstream_rx_byte_received_ = time;
+  timing.last_upstream_rx_byte_received_ = time;
+  stream_info.downstream_timing_.onFirstDownstreamTxByteSent(time_system);
+  stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
+
+  {
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster),
+                             Eq("my_upstream_cluster_from_cluster_info")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName),
+                             Eq("my_upstream_cluster_observable_from_cluster_info")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress),
+                             Eq("10.0.0.1:443"))); // Upstream address as 'peer.address'
+
+    const auto log_timestamp =
+        start_timestamp + std::chrono::duration_cast<SystemTime::duration>(*nanoseconds);
+    EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LastDownstreamRxByteReceived));
+    EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().FirstUpstreamTxByteSent));
+    EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LastUpstreamTxByteSent));
+    EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().FirstUpstreamRxByteReceived));
+    EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LastUpstreamRxByteReceived));
+    EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().FirstDownstreamTxByteSent));
+    EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LastDownstreamTxByteSent));
+
+    expectSetCustomTags({
+        {"{ tag: aa, literal: { value: a } }", true, "a"},
+        {"{ tag: bb-1, request_header: { name: X-Bb, default_value: _b } }", true, "b"},
+        {"{ tag: bb-2, request_header: { name: X-Bb-Not-Found, default_value: b2 } }", true, "b2"},
+        {"{ tag: bb-3, request_header: { name: X-Bb-Not-Found } }", false, ""},
+        {"{ tag: cc-1, environment: { name: E_CC } }", true, "c"},
+        {"{ tag: cc-1-a, environment: { name: E_CC, default_value: _c } }", true, "c"},
+        {"{ tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }", true, "c2"},
+        {"{ tag: cc-3, environment: { name: E_CC_NOT_FOUND} }", false, ""},
+    });
+
+    TracerUtility::finalizeSpan(span, stream_info, config, true);
   }
 }
 
