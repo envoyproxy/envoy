@@ -4933,5 +4933,146 @@ TEST_F(HttpConnectionManagerImplTest, ShouldDrainConnectionUponCompletionHttp11)
   response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 }
 
+// Test graceful shutdown behavior with sendGoAwayAndClose(true)
+TEST_F(HttpConnectionManagerImplTest, SendGoAwayAndCloseGraceful) {
+  setup();
+  // Mock codec to return HTTP/2 protocol for graceful shutdown support.
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http2));
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        // Trigger graceful shutdown during request processing
+        filter->callbacks_->sendGoAwayAndClose(true);
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+  // Expect graceful shutdown to start drain timer and send shutdown notice
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  EXPECT_CALL(*codec_, shutdownNotice());
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // Complete the existing stream
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+}
+
+// Test that transport failure reasons are properly propagated to connection-level StreamInfo.
+TEST_F(HttpConnectionManagerImplTest, TransportFailureReasonPropagation) {
+  setup();
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // Simulate a transport failure (e.g., TLS handshake error) by setting the failure reason in
+  // StreamInfo before raising the event, which is what ConnectionImpl::closeSocket() does.
+  const std::string test_failure_reason =
+      "TLS_error:|268435612:SSL routines:OPENSSL_internal:HTTP_REQUEST:TLS_error_end";
+
+  // Verify the connection-level StreamInfo is empty before we set it.
+  EXPECT_TRUE(
+      filter_callbacks_.connection_.stream_info_.downstreamTransportFailureReason().empty());
+
+  // Set the transport failure reason as closeSocket() would do before raising the event.
+  filter_callbacks_.connection_.stream_info_.setDownstreamTransportFailureReason(
+      test_failure_reason);
+
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_)).Times(2);
+  EXPECT_CALL(*filter, onStreamComplete());
+  EXPECT_CALL(*filter, onDestroy());
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+
+  // Trigger the remote close event. The failure reason is already set in StreamInfo.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  // Verify the transport failure reason is still present in the connection-level StreamInfo.
+  EXPECT_EQ(test_failure_reason,
+            filter_callbacks_.connection_.stream_info_.downstreamTransportFailureReason());
+}
+
+// Test transport failure reason propagation on local close.
+TEST_F(HttpConnectionManagerImplTest, TransportFailureReasonPropagationLocalClose) {
+  setup();
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // Simulate a transport failure reason by setting it in StreamInfo before raising the event,
+  // which is what ConnectionImpl::closeSocket() does.
+  const std::string test_failure_reason = "TLS_error:|266:certificate_verify_failed:TLS_error_end";
+
+  // Set the transport failure reason as closeSocket() would do before raising the event.
+  filter_callbacks_.connection_.stream_info_.setDownstreamTransportFailureReason(
+      test_failure_reason);
+
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_)).Times(2);
+  EXPECT_CALL(*filter, onStreamComplete());
+  EXPECT_CALL(*filter, onDestroy());
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+
+  // Trigger the local close event. The failure reason is already set in StreamInfo.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+
+  // Verify the transport failure reason is still present in StreamInfo.
+  EXPECT_EQ(test_failure_reason,
+            filter_callbacks_.connection_.stream_info_.downstreamTransportFailureReason());
+}
+
 } // namespace Http
 } // namespace Envoy

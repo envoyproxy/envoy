@@ -10,6 +10,7 @@
 # Startup options cannot be selected via config.
 # TODO: Adding just to test android
 startup --host_jvm_args=-Xmx3g
+startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 
 common --noenable_bzlmod
 
@@ -42,12 +43,6 @@ build --http_timeout_scaling=6.0
 build --action_env=CC --host_action_env=CC
 build --action_env=CXX --host_action_env=CXX
 build --action_env=LLVM_CONFIG --host_action_env=LLVM_CONFIG
-# Do not pass through PATH however.
-# It tends to have machine-specific values, such as dynamically created temp folders.
-# This would make it impossible to share remote action cache hits among machines.
-# build --action_env=PATH --host_action_env=PATH
-# To make our own CI green, we do need that flag on Windows though.
-build:windows --action_env=PATH --host_action_env=PATH
 
 # Allow stamped caches to bust when local filesystem changes.
 # Requires setting `BAZEL_VOLATILE_DIRTY` in the env.
@@ -63,8 +58,6 @@ build --incompatible_enforce_config_setting_visibility
 
 test --test_verbose_timeout_warnings
 test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
-
-test --test_tag_filters=-runtime-cpu
 
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
@@ -92,17 +85,19 @@ build --@com_googlesource_googleurl//build_config:system_icu=0
 # Common flags for sanitizers
 build:sanitizer --define tcmalloc=disabled
 build:sanitizer --linkopt -ldl
+test:sanitizer --build_tests_only
 
 # Common flags for Clang (shared between all clang variants)
-build:clang-common --action_env=BAZEL_COMPILER=clang
-build:clang-common --linkopt=-fuse-ld=lld
-build:clang-common --action_env=CC=clang --host_action_env=CC=clang
-build:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
-build:clang-common --incompatible_enable_cc_toolchain_resolution=false
+common:clang-common --action_env=BAZEL_COMPILER=clang
+common:clang-common --linkopt=-fuse-ld=lld
+common:clang-common --action_env=CC=clang --host_action_env=CC=clang
+common:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
+common:clang-common --incompatible_enable_cc_toolchain_resolution=false
 
 # Clang with libc++ (default)
-build:clang --config=clang-common
-build:clang --config=libc++
+common:clang --config=clang-common
+common:clang --config=libc++
+common:clang --action_env=LDFLAGS="-fuse-ld=lld"
 
 build:arm64-clang --config=clang
 
@@ -148,7 +143,7 @@ build:asan-common --config=sanitizer
 build:asan-common --define signal_trace=disabled
 build:asan-common --define ENVOY_CONFIG_ASAN=1
 build:asan-common --build_tag_filters=-no_san
-build:asan-common --test_tag_filters=-no_san,-runtime-cpu
+build:asan-common --test_tag_filters=-no_san
 build:asan-common --copt -fsanitize=address,undefined
 build:asan-common --linkopt -fsanitize=address,undefined
 # vptr and function sanitizer are enabled in asan if it is set up via bazel/setup_clang.sh.
@@ -199,7 +194,7 @@ build:tsan --copt -fsanitize=thread
 build:tsan --linkopt -fsanitize=thread
 build:tsan --copt -DTHREAD_SANITIZER=1
 build:tsan --build_tag_filters=-no_san,-no_tsan
-build:tsan --test_tag_filters=-no_san,-no_tsan,-runtime-cpu
+build:tsan --test_tag_filters=-no_san,-no_tsan
 # Needed due to https://github.com/libevent/libevent/issues/777
 build:tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 # https://github.com/abseil/abseil-cpp/issues/760
@@ -211,7 +206,7 @@ build:tsan --test_timeout=120,600,1500,4800
 build:msan --action_env=ENVOY_MSAN=1
 build:msan --config=sanitizer
 build:msan --build_tag_filters=-no_san
-build:msan --test_tag_filters=-no_san,-runtime-cpu
+build:msan --test_tag_filters=-no_san
 build:msan --define ENVOY_CONFIG_MSAN=1
 build:msan --copt -fsanitize=memory
 build:msan --linkopt -fsanitize=memory
@@ -222,16 +217,13 @@ build:msan --test_env=MSAN_SYMBOLIZER_PATH
 build:msan --copt -O1
 build:msan --copt -fno-optimize-sibling-calls
 
-build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
-build:libc++ --action_env=LDFLAGS=-stdlib=libc++
-build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
-build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
-build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
-build:libc++ --define force_libcpp=enabled
-build:libc++ --@envoy//bazel:libc++=true
-
-
-
+common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
+common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
+common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
+common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
+common:libc++ --define force_libcpp=enabled
+common:libc++ --@envoy//bazel:libc++=true
 
 # Optimize build for binary size reduction.
 build:sizeopt -c opt --copt -Os
@@ -272,10 +264,10 @@ build:coverage --coverage_report_generator=@envoy//tools/coverage:report_generat
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
-build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target,-runtime-cpu
+build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
-build:fuzz-coverage --test_tag_filters=-nocoverage,-runtime-cpu
+build:fuzz-coverage --test_tag_filters=-nocoverage
 # Existing fuzz tests don't need a full WASM runtime and in generally we don't really want to
 # fuzz dependencies anyways. On the other hand, disabling WASM reduces the build time and
 # resources required to build and run the tests.
@@ -321,47 +313,15 @@ build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 
-# Windows bazel does not allow sandboxed as a spawn strategy
-build:remote-windows --spawn_strategy=remote,local
-build:remote-windows --strategy=Javac=remote,local
-build:remote-windows --strategy=Closure=remote,local
-build:remote-windows --strategy=Genrule=remote,local
-build:remote-windows --strategy=CppLink=local
-build:remote-windows --remote_timeout=7200
-build:remote-windows --google_default_credentials=true
-build:remote-windows --remote_download_toplevel
-
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
-
 
 build:remote-arm64-clang --config=remote
 build:remote-arm64-clang --config=rbe-toolchain-arm64-clang
 
-
 build:remote-gcc --config=remote
 build:remote-gcc --config=gcc
 build:remote-gcc --config=rbe-toolchain-gcc
-
-build:remote-asan --config=remote
-build:remote-asan --config=rbe-toolchain-clang
-build:remote-asan --config=asan
-
-build:remote-msan --config=remote
-build:remote-msan --config=rbe-toolchain-clang
-build:remote-msan --config=msan
-
-build:remote-tsan --config=remote
-build:remote-tsan --config=rbe-toolchain-clang
-build:remote-tsan --config=tsan
-
-build:remote-msvc-cl --config=remote-windows
-build:remote-msvc-cl --config=msvc-cl
-build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
-
-build:remote-clang-cl --config=remote-windows
-build:remote-clang-cl --config=clang-cl
-build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 ## Compile-time-options testing
 # Right now, none of the available compile-time options conflict with each other. If this
@@ -385,7 +345,6 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=docker.io/envoyproxy/envoy-build-ubuntu:f4a881a1205e8e6db1a57162faf3df7aed88eae8@sha256:b10346fe2eee41733dbab0e02322c47a538bf3938d093a5daebad9699860b814
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -396,7 +355,6 @@ build:docker-sandbox --experimental_enable_docker_sandbox
 
 build:docker-clang --config=docker-sandbox
 build:docker-clang --config=rbe-toolchain-clang
-
 
 build:docker-gcc --config=docker-sandbox
 build:docker-gcc --config=gcc
@@ -465,55 +423,6 @@ build:oss-fuzz --linkopt=-pthread
 # Compile database generation config
 build:compdb --build_tag_filters=-nocompdb
 
-# Windows build quirks
-build:windows --action_env=TMPDIR
-build:windows --define signal_trace=disabled
-build:windows --define hot_restart=disabled
-build:windows --define tcmalloc=disabled
-build:windows --define wasm=disabled
-build:windows --define manual_stamp=manual_stamp
-build:windows --cxxopt="/std:c++20"
-build:windows --output_groups=+pdb_file
-
-# TODO(wrowe,sunjayBhatia): Resolve bugs upstream in curl and rules_foreign_cc
-# See issue https://github.com/bazelbuild/rules_foreign_cc/issues/301
-build:windows --copt="-DCARES_STATICLIB"
-build:windows --copt="-DNGHTTP2_STATICLIB"
-build:windows --copt="-DCURL_STATICLIB"
-
-# Override any clang preference if building msvc-cl
-# Drop the determinism feature (-DDATE etc are a no-op in msvc-cl)
-build:msvc-cl --action_env=USE_CLANG_CL=""
-build:msvc-cl --define clang_cl=0
-build:msvc-cl --features=-determinism
-
-# Windows build behaviors when using clang-cl
-build:clang-cl --action_env=USE_CLANG_CL=1
-build:clang-cl --define clang_cl=1
-
-# Required to work around Windows clang-cl build defects
-# Ignore conflicting definitions of _WIN32_WINNT
-# Override determinism flags (DATE etc) is valid on clang-cl compiler
-build:clang-cl --copt="-Wno-macro-redefined"
-build:clang-cl --copt="-Wno-builtin-macro-redefined"
-# Workaround problematic missing override declarations of mocks
-# TODO: resolve this class of problematic mocks, e.g.
-# ./test/mocks/http/stream.h(16,21): error: 'addCallbacks'
-#     overrides a member function but is not marked 'override'
-#   MOCK_METHOD(void, addCallbacks, (StreamCallbacks & callbacks));
-build:clang-cl --copt="-Wno-inconsistent-missing-override"
-
-# Defaults to 'auto' - Off for windows, so override to linux behavior
-build:windows --enable_runfiles=yes
-
-# This should become adopted by bazel as the default
-build:windows --features=compiler_param_file
-
-# These options attempt to force a monolithic binary including the CRT
-build:windows --features=fully_static_link
-build:windows --features=static_link_msvcrt
-build:windows --dynamic_mode=off
-
 # RBE (Google)
 build:cache-google --google_default_credentials=true
 build:cache-google --remote_cache=grpcs://remotebuildexecution.googleapis.com
@@ -556,7 +465,6 @@ common:bes-envoy-engflow --bes_timeout=3600s
 common:bes-envoy-engflow --bes_upload_mode=fully_async
 common:bes-envoy-engflow --nolegacy_important_outputs
 common:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
-common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:95d7afdea0f0f8881e88fa5e581db4f50907d0745ac8d90e00357ac1a316abe5
 common:rbe-envoy-engflow --jobs=200
 common:rbe-envoy-engflow --define=engflow_rbe=true
 

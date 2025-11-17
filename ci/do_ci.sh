@@ -31,18 +31,21 @@ setup_clang_toolchain() {
         return
     fi
     CONFIG_PARTS=()
-    if [[ -n "${ENVOY_RBE}" ]]; then
-        CONFIG_PARTS+=("remote")
-    fi
     if [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
         CONFIG_PARTS+=("arm64")
     fi
     CONFIG_PARTS+=("clang")
     # We only support clang with libc++ now
     CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
+    BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}" "--config=${CONFIG}")
+    BAZEL_QUERY_OPTION_LIST="${BAZEL_QUERY_OPTIONS[*]}"
+    if [[ -n "${ENVOY_RBE}" ]]; then
+        CONFIG="remote-${CONFIG}"
+    fi
     BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
+    export BAZEL_QUERY_OPTION_LIST
     echo "clang toolchain configured: ${CONFIG}"
 }
 
@@ -68,10 +71,12 @@ function bazel_with_collection() {
     then
         pushd bazel-testlogs
         failed_logs=$(grep "  /build.*test.log" "${BAZEL_OUTPUT}" | sed -e 's/  \/build.*\/testlogs\/\(.*\)/\1/')
-        while read -r f; do
-        cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
-        done <<< "$failed_logs"
-        popd
+        if [[ -n "${failed_logs}" ]]; then
+            while read -r f; do
+                cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
+            done <<< "$failed_logs"
+            popd
+        fi
     fi
     exit "${BAZEL_STATUS}"
   fi
@@ -192,7 +197,7 @@ function bazel_envoy_api_build() {
         --//tools/api_proto_plugin:extra_args=api_version:3.7 \
         //tools/protoprint:protoprint_test
     echo "Validating API structure..."
-    "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/api:validate_structure "${PWD}/api/envoy"
     echo "Testing API..."
     bazel_with_collection \
         test "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -291,14 +296,12 @@ case $CI_TARGET in
 
     asan)
         setup_clang_toolchain
-        BAZEL_BUILD_OPTIONS+=(
-            -c dbg
-            "--config=asan"
-            "--build_tests_only"
-            "--remote_download_minimal")
         echo "bazel ASAN/UBSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
-        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
+        bazel_with_collection test \
+            --config=asan \
+            "${BAZEL_BUILD_OPTIONS[@]}" \
+            "${TEST_TARGETS[@]}"
         # TODO(mattklein123): This part of the test is now flaky in CI and it's unclear why, possibly
         # due to sandboxing issue. Debug and enable it again.
         # if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
@@ -389,7 +392,7 @@ case $CI_TARGET in
             --define wasm=wamr \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips,-runtime-cpu \
+            --test_tag_filters=-nofips \
             --build_tests_only
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
@@ -399,7 +402,7 @@ case $CI_TARGET in
             --define admin_functionality=disabled \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips,-runtime-cpu \
+            --test_tag_filters=-nofips \
             --build_tests_only
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
@@ -414,7 +417,7 @@ case $CI_TARGET in
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
-            --define wasm=wamtime \
+            --define wasm=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
             --define log_fast_debug_assert_in_release=enabled \
@@ -451,7 +454,6 @@ case $CI_TARGET in
         fi
         setup_clang_toolchain
         bazel test \
-              --test_tag_filters=runtime-cpu \
               "${BAZEL_BUILD_OPTIONS[@]}" \
               //test/server:cgroup_cpu_simple_integration_test
         ;;
@@ -696,18 +698,13 @@ case $CI_TARGET in
 
     msan)
         setup_clang_toolchain
-        # msan must comes as first to win library link order.
-        BAZEL_BUILD_OPTIONS=(
-            "--config=msan"
-            "${BAZEL_BUILD_OPTIONS[@]}"
-            "-c" "dbg"
-            "--build_tests_only"
-            "--remote_download_minimal")
         echo "bazel MSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
+        # msan must comes as first to win library link order.
         bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            -- "${TEST_TARGETS[@]}"
+            test --config=msan \
+                "${BAZEL_BUILD_OPTIONS[@]}" \
+                -- "${TEST_TARGETS[@]}"
         ;;
 
     publish)
@@ -848,11 +845,9 @@ case $CI_TARGET in
         echo "bazel TSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
         bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            test \
              --config=tsan \
-             -c dbg \
-             --build_tests_only \
-             --remote_download_minimal \
+            "${BAZEL_BUILD_OPTIONS[@]}" \
              "${TEST_TARGETS[@]}"
         ;;
 

@@ -6,6 +6,7 @@ import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
+import "envoy/config/core/v3/substitution_format_string.proto";
 import "envoy/type/matcher/v3/filter_state.proto";
 import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/regex.proto";
@@ -1942,6 +1943,12 @@ message DirectResponseAction {
   //   :ref:`envoy_v3_api_msg_config.route.v3.Route`, :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` or
   //   :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost`.
   core.v3.DataSource body = 2;
+
+  // Specifies a format string for the response body. If present, the contents of
+  // ``body_format`` will be formatted and used as the response body, where the
+  // contents of ``body`` (may be empty) will be passed as the variable ``%LOCAL_REPLY_BODY%``.
+  // If neither are provided, no body is included in the generated response.
+  core.v3.SubstitutionFormatString body_format = 3;
 }
 
 // [#not-implemented-hide:]

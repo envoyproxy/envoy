@@ -34,5 +34,6 @@ envoy_cc_library(
         "//source/extensions/load_balancing_policies/round_robin:round_robin_lb_lib",
         "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
     ],
 )

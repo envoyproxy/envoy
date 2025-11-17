@@ -45,6 +45,11 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
     receiving_namespaces:
       untyped:
       - ns2
+    cluster_metadata_forwarding_namespaces:
+      typed:
+      - cluster_ns1
+      untyped:
+      - cluster_ns2
   )EOF";
 
   ExternalProcessingFilterConfig factory;

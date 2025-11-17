@@ -684,12 +684,48 @@ size_t OwnedImpl::addFragments(absl::Span<const absl::string_view> fragments) {
     back.commit<false>(reservation);
     length_ += total_size_to_copy;
   } else {
-    // Downgrade to using `addImpl` if not enough memory in the back slice.
-    // TODO(wbpcode): Fill the remaining memory space in the back slice then
-    // allocate enough contiguous memory for the remaining unwritten fragments
-    // and copy them directly. This may result in better performance.
-    for (const auto& fragment : fragments) {
-      addImpl(fragment.data(), fragment.size());
+    // Fill the remaining space in the back slice first, then allocate one contiguous
+    // slice for all remaining fragments. This reduces the number of slices created and
+    // improves memory locality.
+    size_t fragment_index = 0;
+    uint64_t bytes_written_to_reservation = 0;
+
+    // Fill as many complete fragments as possible into the existing reservation.
+    while (fragment_index < fragments.size() &&
+           bytes_written_to_reservation + fragments[fragment_index].size() <= reservation.len_) {
+      const auto& fragment = fragments[fragment_index];
+      memcpy(mem, fragment.data(), fragment.size()); // NOLINT(safe-memcpy)
+      mem += fragment.size();
+      bytes_written_to_reservation += fragment.size();
+      fragment_index++;
+    }
+
+    // Commit what we've written to the existing reservation.
+    if (bytes_written_to_reservation > 0) {
+      back.commit<false>({reservation.mem_, bytes_written_to_reservation});
+      length_ += bytes_written_to_reservation;
+    }
+
+    // If there are remaining fragments, allocate one contiguous slice for all of them.
+    if (fragment_index < fragments.size()) {
+      size_t remaining_size = 0;
+      for (size_t i = fragment_index; i < fragments.size(); i++) {
+        remaining_size += fragments[i].size();
+      }
+
+      slices_.emplace_back(Slice(remaining_size, account_));
+      Slice& new_slice = slices_.back();
+      Slice::Reservation new_reservation = new_slice.reserve(remaining_size);
+      ASSERT(new_reservation.len_ == remaining_size);
+      uint8_t* new_mem = static_cast<uint8_t*>(new_reservation.mem_);
+
+      for (size_t i = fragment_index; i < fragments.size(); i++) {
+        memcpy(new_mem, fragments[i].data(), fragments[i].size()); // NOLINT(safe-memcpy)
+        new_mem += fragments[i].size();
+      }
+
+      new_slice.commit<false>(new_reservation);
+      length_ += remaining_size;
     }
   }
 

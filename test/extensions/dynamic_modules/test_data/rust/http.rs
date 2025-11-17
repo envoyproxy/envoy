@@ -205,9 +205,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(new_value.as_slice(), b"value");
     envoy_filter.remove_request_header("to-be-deleted");
 
+    // Test add API.
+    envoy_filter.add_request_header("multi", b"value3");
+    let multi_value = envoy_filter.get_request_header_values("multi");
+    assert_eq!(multi_value.len(), 3);
+    assert_eq!(multi_value[2].as_slice(), b"value3");
+
     // Test all getter API.
     let all_headers = envoy_filter.get_request_headers();
-    assert_eq!(all_headers.len(), 4);
+    assert_eq!(all_headers.len(), 5);
     assert_eq!(all_headers[0].0.as_slice(), b"single");
     assert_eq!(all_headers[0].1.as_slice(), b"value");
     assert_eq!(all_headers[1].0.as_slice(), b"multi");
@@ -216,6 +222,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_headers[2].1.as_slice(), b"value2");
     assert_eq!(all_headers[3].0.as_slice(), b"new");
     assert_eq!(all_headers[3].1.as_slice(), b"value");
+    assert_eq!(all_headers[4].0.as_slice(), b"multi");
+    assert_eq!(all_headers[4].1.as_slice(), b"value3");
+
 
     let downstream_port =
       envoy_filter.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::SourcePort);
@@ -267,9 +276,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(&new_value.as_slice(), b"value");
     envoy_filter.remove_request_trailer("to-be-deleted");
 
+    // Test add API.
+    envoy_filter.add_request_trailer("multi", b"value3");
+    let multi_value = envoy_filter.get_request_trailer_values("multi");
+    assert_eq!(multi_value.len(), 3);
+    assert_eq!(multi_value[2].as_slice(), b"value3");
+
     // Test all getter API.
     let all_trailers = envoy_filter.get_request_trailers();
-    assert_eq!(all_trailers.len(), 4);
+    assert_eq!(all_trailers.len(), 5);
     assert_eq!(all_trailers[0].0.as_slice(), b"single");
     assert_eq!(all_trailers[0].1.as_slice(), b"value");
     assert_eq!(all_trailers[1].0.as_slice(), b"multi");
@@ -278,6 +293,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_trailers[2].1.as_slice(), b"value2");
     assert_eq!(all_trailers[3].0.as_slice(), b"new");
     assert_eq!(all_trailers[3].1.as_slice(), b"value");
+    assert_eq!(all_trailers[4].0.as_slice(), b"multi");
+    assert_eq!(all_trailers[4].1.as_slice(), b"value3");
+
 
     abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
   }
@@ -311,9 +329,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(&new_value.as_slice(), b"value");
     envoy_filter.remove_response_header("to-be-deleted");
 
+    // Test add API.
+    envoy_filter.add_response_header("multi", b"value3");
+    let multi_value = envoy_filter.get_response_header_values("multi");
+    assert_eq!(multi_value.len(), 3);
+    assert_eq!(multi_value[2].as_slice(), b"value3");
+
     // Test all getter API.
     let all_headers = envoy_filter.get_response_headers();
-    assert_eq!(all_headers.len(), 4);
+    assert_eq!(all_headers.len(), 5);
     assert_eq!(all_headers[0].0.as_slice(), b"single");
     assert_eq!(all_headers[0].1.as_slice(), b"value");
     assert_eq!(all_headers[1].0.as_slice(), b"multi");
@@ -322,6 +346,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_headers[2].1.as_slice(), b"value2");
     assert_eq!(all_headers[3].0.as_slice(), b"new");
     assert_eq!(all_headers[3].1.as_slice(), b"value");
+    assert_eq!(all_headers[4].0.as_slice(), b"multi");
+    assert_eq!(all_headers[4].1.as_slice(), b"value3");
 
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
@@ -362,9 +388,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(&new_value.as_slice(), b"value");
     envoy_filter.remove_response_trailer("to-be-deleted");
 
+    // Test add API.
+    envoy_filter.add_response_trailer("multi", b"value3");
+    let multi_value = envoy_filter.get_response_trailer_values("multi");
+    assert_eq!(multi_value.len(), 3);
+    assert_eq!(multi_value[2].as_slice(), b"value3");
+
     // Test all getter API.
     let all_trailers = envoy_filter.get_response_trailers();
-    assert_eq!(all_trailers.len(), 4);
+    assert_eq!(all_trailers.len(), 5);
     assert_eq!(all_trailers[0].0.as_slice(), b"single",);
     assert_eq!(all_trailers[0].1.as_slice(), b"value");
     assert_eq!(all_trailers[1].0.as_slice(), b"multi",);
@@ -373,6 +405,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_trailers[2].1.as_slice(), b"value2");
     assert_eq!(all_trailers[3].0.as_slice(), b"new");
     assert_eq!(all_trailers[3].1.as_slice(), b"value");
+    assert_eq!(all_trailers[4].0.as_slice(), b"multi");
+    assert_eq!(all_trailers[4].1.as_slice(), b"value3");
+
 
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
@@ -406,6 +441,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
         ("header2", "value2".as_bytes()),
       ],
       Some(b"Hello, World!"),
+      None,
     );
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
@@ -695,16 +731,13 @@ struct BodyCallbacksFilter {
   response_body: Vec<u8>,
 }
 
-impl Drop for BodyCallbacksFilter {
-  fn drop(&mut self) {
-    assert_eq!(
-      std::str::from_utf8(&self.request_body).unwrap(),
-      "nicenicenice"
-    );
-    assert_eq!(
-      std::str::from_utf8(&self.response_body).unwrap(),
-      "coolcoolcool"
-    );
+#[cfg(test)]
+impl BodyCallbacksFilter {
+  fn get_final_read_request_body<'a>(&'a self) -> &'a Vec<u8> {
+    &self.request_body
+  }
+  fn get_final_read_response_body<'a>(&'a self) -> &'a Vec<u8> {
+    &self.response_body
   }
 }
 
@@ -764,34 +797,60 @@ impl std::io::Read for BodyReader<'_> {
 struct BodyWriter<'a, EHF: EnvoyHttpFilter> {
   envoy_filter: &'a mut EHF,
   request: bool,
+  received: bool, // true: new received body, false: old buffered body
 }
 
 impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
-  fn new(envoy_filter: &'a mut EHF, request: bool) -> Self {
+  fn new(envoy_filter: &'a mut EHF, request: bool, received: bool) -> Self {
     // Before starting to write, drain the existing buffer content.
-    let current_vec = if request {
-      envoy_filter
-        .get_request_body()
-        .expect("request body is None")
-    } else {
-      envoy_filter
-        .get_response_body()
-        .expect("response body is None")
-    };
+    if received {
+      let optional_vec = if request {
+        envoy_filter.get_received_request_body()
+      } else {
+        envoy_filter.get_received_response_body()
+      };
 
-    let buffer_bytes = current_vec
-      .iter()
-      .map(|buf| buf.as_slice().len())
-      .sum::<usize>();
+      if optional_vec.is_some() {
+        let received_vec = optional_vec.unwrap();
 
-    if request {
-      assert!(envoy_filter.drain_request_body(buffer_bytes));
+        let buffer_bytes = received_vec
+          .iter()
+          .map(|buf| buf.as_slice().len())
+          .sum::<usize>();
+
+        if request {
+          assert!(envoy_filter.drain_received_request_body(buffer_bytes));
+        } else {
+          assert!(envoy_filter.drain_received_response_body(buffer_bytes));
+        }
+      }
     } else {
-      assert!(envoy_filter.drain_response_body(buffer_bytes));
+      let optional_vec = if request {
+        envoy_filter.get_buffered_request_body()
+      } else {
+        envoy_filter.get_buffered_response_body()
+      };
+
+      if optional_vec.is_some() {
+        let buffered_vec = optional_vec.unwrap();
+
+        let buffer_bytes = buffered_vec
+          .iter()
+          .map(|buf| buf.as_slice().len())
+          .sum::<usize>();
+
+        if request {
+          assert!(envoy_filter.drain_buffered_request_body(buffer_bytes));
+        } else {
+          assert!(envoy_filter.drain_buffered_response_body(buffer_bytes));
+        }
+      }
     }
+
     Self {
       envoy_filter,
       request,
+      received,
     }
   }
 }
@@ -799,18 +858,36 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
 impl<'a, EHF: EnvoyHttpFilter> std::io::Write for BodyWriter<'a, EHF> {
   fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
     if self.request {
-      if !self.envoy_filter.append_request_body(buf) {
-        return Err(std::io::Error::new(
-          std::io::ErrorKind::Other,
-          "Buffer is not available",
-        ));
+      if self.received {
+        if !self.envoy_filter.append_received_request_body(buf) {
+          return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Buffer is not available",
+          ));
+        }
+      } else {
+        if !self.envoy_filter.append_buffered_request_body(buf) {
+          return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Buffer is not available",
+          ));
+        }
       }
     } else {
-      if !self.envoy_filter.append_response_body(buf) {
-        return Err(std::io::Error::new(
-          std::io::ErrorKind::Other,
-          "Buffer is not available",
-        ));
+      if self.received {
+        if !self.envoy_filter.append_received_response_body(buf) {
+          return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Buffer is not available",
+          ));
+        }
+      } else {
+        if !self.envoy_filter.append_buffered_response_body(buf) {
+          return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Buffer is not available",
+          ));
+        }
       }
     }
 
@@ -828,23 +905,45 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     envoy_filter: &mut EHF,
     end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
-    // Test reading request body.
-    let body = envoy_filter
-      .get_request_body()
-      .expect("request body is None");
-    let mut reader = BodyReader::new(body);
-    let mut buf = vec![0; 1024];
-    let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-    self.request_body.extend_from_slice(&buf[.. n]);
-    // Drop the reader and try writing to the writer.
-    drop(reader);
+    {
+      // Test reading new received request body.
+      let body = envoy_filter.get_received_request_body();
+      if body.is_some() {
+        let mut reader = BodyReader::new(body.unwrap());
+        let mut buf = vec![0; 1024];
+        let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
+        self.request_body.extend_from_slice(&buf[.. n]);
+        // Drop the reader and try writing to the writer.
+        drop(reader);
 
-    // Test writing to request body.
-    let mut writer = BodyWriter::new(envoy_filter, true);
-    std::io::Write::write(&mut writer, b"foo").unwrap();
-    if end_of_stream {
-      std::io::Write::write(&mut writer, b"end").unwrap();
+        // Test writing to request body.
+        let mut writer = BodyWriter::new(envoy_filter, true, true);
+        std::io::Write::write(&mut writer, b"foo").unwrap();
+        if end_of_stream {
+          std::io::Write::write(&mut writer, b"end").unwrap();
+        }
+      }
     }
+    {
+      // Test reading old buffered request body.
+      let body = envoy_filter.get_buffered_request_body();
+      if body.is_some() {
+        let mut reader = BodyReader::new(body.unwrap());
+        let mut buf = vec![0; 1024];
+        let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
+        self.request_body.extend_from_slice(&buf[.. n]);
+        // Drop the reader and try writing to the writer.
+        drop(reader);
+
+        // Test writing to request body.
+        let mut writer = BodyWriter::new(envoy_filter, true, false);
+        std::io::Write::write(&mut writer, b"foo").unwrap();
+        if end_of_stream {
+          std::io::Write::write(&mut writer, b"end").unwrap();
+        }
+      }
+    }
+
     abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
   }
 
@@ -853,23 +952,45 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     envoy_filter: &mut EHF,
     end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
-    // Test reading response body.
-    let body = envoy_filter
-      .get_response_body()
-      .expect("response body is None");
-    let mut reader = BodyReader::new(body);
-    let mut buffer = Vec::new();
-    std::io::Read::read_to_end(&mut reader, &mut buffer).unwrap();
-    self.response_body.extend_from_slice(&buffer);
-    // Drop the reader and try writing to the writer.
-    drop(reader);
+    {
+      // Test reading new received response body.
+      let body = envoy_filter.get_received_response_body();
+      if body.is_some() {
+        let mut reader = BodyReader::new(body.unwrap());
+        let mut buffer = Vec::new();
+        std::io::Read::read_to_end(&mut reader, &mut buffer).unwrap();
+        self.response_body.extend_from_slice(&buffer);
+        // Drop the reader and try writing to the writer.
+        drop(reader);
 
-    // Test writing to response body.
-    let mut writer = BodyWriter::new(envoy_filter, false);
-    std::io::Write::write(&mut writer, b"bar").unwrap();
-    if end_of_stream {
-      std::io::Write::write(&mut writer, b"end").unwrap();
+        // Test writing to response body.
+        let mut writer = BodyWriter::new(envoy_filter, false, true);
+        std::io::Write::write(&mut writer, b"bar").unwrap();
+        if end_of_stream {
+          std::io::Write::write(&mut writer, b"end").unwrap();
+        }
+      }
     }
+    {
+      // Test reading old buffered response body.
+      let body = envoy_filter.get_buffered_response_body();
+      if body.is_some() {
+        let mut reader = BodyReader::new(body.unwrap());
+        let mut buffer = Vec::new();
+        std::io::Read::read_to_end(&mut reader, &mut buffer).unwrap();
+        self.response_body.extend_from_slice(&buffer);
+        // Drop the reader and try writing to the writer.
+        drop(reader);
+
+        // Test writing to response body.
+        let mut writer = BodyWriter::new(envoy_filter, false, false);
+        std::io::Write::write(&mut writer, b"bar").unwrap();
+        if end_of_stream {
+          std::io::Write::write(&mut writer, b"end").unwrap();
+        }
+      }
+    }
+
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }
 }

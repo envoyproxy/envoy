@@ -130,6 +130,8 @@ envoy_cc_library(
         "//envoy/router:router_interface",
         "//envoy/tracing:custom_tag_interface",
         "//source/common/config:metadata_lib",
+        "//source/common/formatter:substitution_formatter_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
     ],
 )

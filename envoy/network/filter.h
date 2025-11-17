@@ -399,6 +399,11 @@ public:
    * @param use_original_dst whether to use original destination address or not.
    */
   virtual void useOriginalDst(bool use_original_dst) PURE;
+
+  /**
+   * Return the connection level stream info interface.
+   */
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 };
 
 /**

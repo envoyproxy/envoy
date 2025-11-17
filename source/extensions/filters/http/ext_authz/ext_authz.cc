@@ -67,6 +67,11 @@ const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& defaultChe
   CONSTRUCT_ON_FIRST_USE(envoy::extensions::filters::http::ext_authz::v3::CheckSettings);
 }
 
+bool headersWithinLimits(const Http::HeaderMap& headers) {
+  return headers.size() <= headers.maxHeadersCount() &&
+         headers.byteSize() <= headers.maxHeadersKb() * 1024;
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
@@ -100,6 +105,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
                                                     : absl::nullopt),
       emit_filter_state_stats_(config.emit_filter_state_stats()),
+      enforce_response_header_limits_(config.enforce_response_header_limits()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -482,17 +488,16 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
                    "set to the encoded response:",
                    *encoder_callbacks_, response_headers_to_add_.size(),
                    response_headers_to_set_.size());
-  bool omitted_response_headers = false;
   if (!response_headers_to_add_.empty()) {
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter added header(s) to the encoded response:", *encoder_callbacks_);
     for (const auto& [key, value] : response_headers_to_add_) {
-      if (headers.size() >= headers.maxHeadersCount()) {
-        omitted_response_headers = true;
-        break;
-      }
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, key.get(), value);
       headers.addCopy(key, value);
+      if (config_->enforceResponseHeaderLimits() && !headersWithinLimits(headers)) {
+        responseHeaderLimitsReached();
+        return Http::FilterHeadersStatus::StopIteration;
+      }
     }
   }
 
@@ -500,14 +505,12 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter set header(s) to the encoded response:", *encoder_callbacks_);
     for (const auto& [key, value] : response_headers_to_set_) {
-      if (headers.get(key).empty() && headers.size() >= headers.maxHeadersCount()) {
-        omitted_response_headers = true;
-        // Continue because there could be other existing headers that can be set without increasing
-        // the number of headers.
-        continue;
-      }
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, key.get(), value);
       headers.setCopy(key, value);
+      if (config_->enforceResponseHeaderLimits() && !headersWithinLimits(headers)) {
+        responseHeaderLimitsReached();
+        return Http::FilterHeadersStatus::StopIteration;
+      }
     }
   }
 
@@ -515,13 +518,13 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     for (const auto& [key, value] : response_headers_to_add_if_absent_) {
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, key.get(), value);
       if (auto header_entry = headers.get(key); header_entry.empty()) {
-        if (headers.size() >= headers.maxHeadersCount()) {
-          omitted_response_headers = true;
-          break;
-        }
         ENVOY_STREAM_LOG(trace, "ext_authz filter added header(s) to the encoded response:",
                          *encoder_callbacks_);
         headers.addCopy(key, value);
+        if (config_->enforceResponseHeaderLimits() && !headersWithinLimits(headers)) {
+          responseHeaderLimitsReached();
+          return Http::FilterHeadersStatus::StopIteration;
+        }
       }
     }
   }
@@ -533,14 +536,12 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
         ENVOY_STREAM_LOG(
             trace, "ext_authz filter set header(s) to the encoded response:", *encoder_callbacks_);
         headers.setCopy(key, value);
+        if (config_->enforceResponseHeaderLimits() && !headersWithinLimits(headers)) {
+          responseHeaderLimitsReached();
+          return Http::FilterHeadersStatus::StopIteration;
+        }
       }
     }
-  }
-
-  if (omitted_response_headers) {
-    ENVOY_LOG_EVERY_POW_2(
-        warn, "Some ext_authz response headers weren't added because the header map was full.");
-    stats_.omitted_response_headers_.inc();
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -686,6 +687,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
         request_headers_->setCopy(Http::LowerCaseString(key), value);
+        if (!headersWithinLimits(*request_headers_)) {
+          stats_.request_header_limits_reached_.inc();
+          rejectResponse();
+          return;
+        }
         break;
       case CheckResult::IGNORE:
         ENVOY_STREAM_LOG(trace, "Ignoring invalid header to set '{}':'{}'.", *decoder_callbacks_,
@@ -705,6 +711,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
         request_headers_->addCopy(Http::LowerCaseString(key), value);
+        if (!headersWithinLimits(*request_headers_)) {
+          stats_.request_header_limits_reached_.inc();
+          rejectResponse();
+          return;
+        }
         break;
       case CheckResult::IGNORE:
         ENVOY_STREAM_LOG(trace, "Ignoring invalid header to add '{}':'{}'.", *decoder_callbacks_,
@@ -740,6 +751,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           // into one entry. The value of that combined entry is separated by ",".
           // TODO(dio): Consider to use addCopy instead.
           request_headers_->appendCopy(lowercase_key, value);
+          if (!headersWithinLimits(*request_headers_)) {
+            stats_.request_header_limits_reached_.inc();
+            rejectResponse();
+            return;
+          }
         }
         break;
       }
@@ -779,6 +795,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
         request_headers_->remove(lowercase_key);
+        if (!headersWithinLimits(*request_headers_)) {
+          stats_.request_header_limits_reached_.inc();
+          rejectResponse();
+          return;
+        }
         break;
       case CheckResult::IGNORE:
         ENVOY_STREAM_LOG(trace, "Ignoring disallowed header removal '{}'.", *decoder_callbacks_,
@@ -901,12 +922,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           trace, "ext_authz filter modified query parameter(s), using new path for request: {}",
           *decoder_callbacks_, new_path);
       request_headers_->setPath(new_path);
-    }
-
-    if (request_headers_->size() > request_headers_->maxHeadersCount() ||
-        request_headers_->byteSize() > request_headers_->maxHeadersKb() * 1024) {
-      rejectResponse();
-      return;
+      if (!headersWithinLimits(*request_headers_)) {
+        stats_.request_header_limits_reached_.inc();
+        rejectResponse();
+        return;
+      }
     }
 
     if (cluster_) {
@@ -978,7 +998,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           // Then set all of the requested headers, allowing the same header to be set multiple
           // times, e.g. `Set-Cookie`.
           for (const auto& [key, value] : headers) {
-            if (response_headers.size() >= response_headers.maxHeadersCount()) {
+            if (config_->enforceResponseHeaderLimits() &&
+                response_headers.size() >= response_headers.maxHeadersCount()) {
               stats_.omitted_response_headers_.inc();
               ENVOY_LOG_EVERY_POW_2(
                   warn,
@@ -1023,6 +1044,20 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     break;
   }
   }
+}
+
+void Filter::responseHeaderLimitsReached() {
+  const Http::Code status = Http::Code::InternalServerError;
+  ENVOY_LOG_EVERY_POW_2(warn,
+                        "ext_authz filter couldn't add all response header mutations. "
+                        "Sending local reply with response status code: {}",
+                        enumToInt(status));
+  stats_.response_header_limits_reached_.inc();
+  encoder_callbacks_->streamInfo().setResponseFlag(
+      StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
+  encoder_callbacks_->sendLocalReply(
+      status, EMPTY_STRING, nullptr, absl::nullopt,
+      Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzInvalid);
 }
 
 void Filter::rejectResponse() {

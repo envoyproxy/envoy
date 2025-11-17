@@ -117,7 +117,7 @@ public:
             lb_config_, cluster_info_, priority_set_, runtime_, random_, simTime()),
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
             priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-            simTime(), /*tls_shim=*/absl::nullopt));
+            lb_config_.round_robin_overrides_, simTime(), /*tls_shim=*/absl::nullopt));
 
     // Initialize the thread aware load balancer from config.
     ASSERT_EQ(lb_->initialize(), absl::OkStatus());
@@ -384,10 +384,127 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_Updat
   EXPECT_EQ(client_side_data->weight_.load(), 42);
 }
 
+TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
+  // Configure slow start via overrides.
+  auto* slow = lb_config_.round_robin_overrides_.mutable_slow_start_config();
+  slow->mutable_slow_start_window()->set_seconds(60);
+  slow->mutable_min_weight_percent()->set_value(0.35);
+  // aggression left default (1.0).
+
+  // Create first host, initialize LB, then later add second host to trigger slow start.
+  auto h1 = makeTestHost(info_, "tcp://127.0.0.1:80", 1 /*weight*/);
+  hostSet().healthy_hosts_ = {h1};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  init(false);
+  hostSet().runCallbacks({}, {});
+
+  // Advance time to simulate existing steady-state.
+  simTime().advanceTimeWait(std::chrono::seconds(12));
+
+  // Add second host now; it should be in slow start window initially.
+  auto h2 = makeTestHost(info_, "tcp://127.0.0.1:81", 1 /*weight*/);
+  hostSet().healthy_hosts_.push_back(h2);
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {});
+
+  // Expect bias towards h1 initially because h2 is dampened by min_weight_percent=0.35.
+  // Perform 7 picks and expect about 5:2 in favor of h1 (tolerance via exact sequence in RR tests
+  // is brittle; instead check counts with small tolerance).
+  size_t picks1 = 70; // scale up to reduce flakiness
+  size_t h1_count = 0, h2_count = 0;
+  for (size_t i = 0; i < picks1; ++i) {
+    auto chosen = lb_->chooseHost(nullptr).host;
+    if (chosen == h1)
+      ++h1_count;
+    else if (chosen == h2)
+      ++h2_count;
+    else
+      FAIL();
+  }
+  // Expect h1 to be chosen noticeably more often (ratio ~ (1):(0.35)).
+  EXPECT_GT(h1_count, h2_count);
+
+  // Advance time so that time factor ~0.5 (30/60) dominates over min 0.35.
+  simTime().advanceTimeWait(std::chrono::seconds(18));
+  hostSet().runCallbacks({}, {});
+
+  h1_count = 0;
+  h2_count = 0;
+  for (size_t i = 0; i < picks1; ++i) {
+    auto chosen = lb_->chooseHost(nullptr).host;
+    if (chosen == h1)
+      ++h1_count;
+    else if (chosen == h2)
+      ++h2_count;
+    else
+      FAIL();
+  }
+  // Now expect closer to 2:1 ratio in favor of h1; i.e., still h1 > h2.
+  EXPECT_GT(h1_count, h2_count);
+
+  // Advance time beyond slow start window so both hosts equal (1:1).
+  simTime().advanceTimeWait(std::chrono::seconds(45));
+  hostSet().runCallbacks({}, {});
+
+  h1_count = 0;
+  h2_count = 0;
+  for (size_t i = 0; i < picks1; ++i) {
+    auto chosen = lb_->chooseHost(nullptr).host;
+    if (chosen == h1)
+      ++h1_count;
+    else if (chosen == h2)
+      ++h2_count;
+    else
+      FAIL();
+  }
+  // Expect approximately equal selection; allow 30% tolerance.
+  double final_ratio =
+      static_cast<double>(h1_count) / static_cast<double>(h2_count == 0 ? 1 : h2_count);
+  EXPECT_GT(final_ratio, 0.7);
+  EXPECT_LT(final_ratio, 1.3);
+}
+
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew,
                          ClientSideWeightedRoundRobinLoadBalancerTest,
                          ::testing::Values(LoadBalancerTestParam{true},
                                            LoadBalancerTestParam{false}));
+
+// Ensure that when no hosts have client-side data yet, updateWeightsOnHosts traverses the
+// default-weight path (weights list empty, default=1) without altering host weights.
+TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeights_AllDefault_NoClientData) {
+  init(false);
+  HostVector hosts = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"),
+      makeTestHost(info_, "tcp://127.0.0.1:81"),
+  };
+  // Baseline weights are 1.
+  EXPECT_EQ(hosts[0]->weight(), 1);
+  EXPECT_EQ(hosts[1]->weight(), 1);
+
+  // Call the helper to update weights on hosts without any client-side LB policy data.
+  // This should take the codepath computing default_weight=1 and leave weights unchanged.
+  lb_->updateWeightsOnHosts(hosts);
+
+  EXPECT_EQ(hosts[0]->weight(), 1);
+  EXPECT_EQ(hosts[1]->weight(), 1);
+}
+
+TEST(ClientSideWeightedRoundRobinConfigTest, SlowStartConfigPropagatesToOverrides) {
+  // Build proto with slow start config set.
+  envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
+      ClientSideWeightedRoundRobin proto;
+  proto.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(15);
+  proto.mutable_slow_start_config()->mutable_min_weight_percent()->set_value(0.25);
+
+  // Construct typed config and validate that Round Robin overrides carry slow start config.
+  NiceMock<Event::MockDispatcher> dispatcher;
+  ThreadLocal::MockInstance tls;
+  ClientSideWeightedRoundRobinLbConfig typed(proto, dispatcher, tls);
+  EXPECT_TRUE(typed.round_robin_overrides_.has_slow_start_config());
+  EXPECT_EQ(typed.round_robin_overrides_.slow_start_config().slow_start_window().seconds(), 15);
+  EXPECT_DOUBLE_EQ(typed.round_robin_overrides_.slow_start_config().min_weight_percent().value(),
+                   0.25);
+}
 
 // Unit tests for ClientSideWeightedRoundRobinLoadBalancer implementation.
 

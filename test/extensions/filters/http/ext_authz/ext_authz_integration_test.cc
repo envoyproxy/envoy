@@ -43,9 +43,10 @@ struct GrpcInitializeConfigOpts {
   uint32_t max_denied_response_body_bytes = 0;
   // In some tests a request is never sent. If a request is never sent, stats are not set. In those
   // tests, we need to be able to override this to false.
-  absl::optional<bool> expect_stats_override;
+  absl::optional<bool> expect_stats_override = absl::nullopt;
   // In timeout tests we expect zero response bytes.
   bool stats_expect_response_bytes = true;
+  bool enforce_response_header_limits = false;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -141,6 +142,10 @@ public:
         proto_config_.set_emit_filter_state_stats(true);
         *(*proto_config_.mutable_filter_metadata()->mutable_fields())["foo"]
              .mutable_string_value() = "bar";
+      }
+
+      if (opts.enforce_response_header_limits) {
+        proto_config_.set_enforce_response_header_limits(true);
       }
 
       // Add labels and verify they are passed.
@@ -2100,7 +2105,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAddExceedsLimit) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
       });
 
-  initializeConfig();
+  initializeConfig({.enforce_response_header_limits = true});
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
 
@@ -2126,12 +2131,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAddExceedsLimit) {
 
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
-  EXPECT_EQ("200", response_->headers().getStatusValue());
-  // NB: Something else adds headers to the response between the ext_authz filter and the downstream
-  // client so the header count is greater than you might expect (100), but we can at least be sure
-  // that all the ext_authz response headers didn't get added.
-  EXPECT_LT(response_->headers().size(), 120);
-  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("new-header-99")).empty());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
   cleanup();
 }
 
@@ -2144,7 +2144,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToSetExceedsLimit) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
       });
 
-  initializeConfig();
+  initializeConfig({.enforce_response_header_limits = true});
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
 
@@ -2175,16 +2175,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToSetExceedsLimit) {
   ASSERT_TRUE(response_->waitForEndStream());
 
   EXPECT_TRUE(response_->complete());
-  EXPECT_EQ("200", response_->headers().getStatusValue());
-
-  EXPECT_LT(response_->headers().size(), 120);
-  // The last new headers shouldn't get added to the header map, but the
-  // existing upstream header will be overridden.
-  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("new-header-99")).empty());
-  EXPECT_EQ("new-value", response_->headers()
-                             .get(Http::LowerCaseString("upstream-header"))[0]
-                             ->value()
-                             .getStringView());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
   cleanup();
 }
 
@@ -2195,7 +2186,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAppendIfAbsentExceedsLimit) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(100);
       });
 
-  initializeConfig();
+  initializeConfig({.enforce_response_header_limits = true});
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
 
@@ -2226,10 +2217,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAppendIfAbsentExceedsLimit) {
   ASSERT_TRUE(response_->waitForEndStream());
 
   EXPECT_TRUE(response_->complete());
-  EXPECT_EQ("200", response_->headers().getStatusValue());
-
-  EXPECT_LT(response_->headers().size(), 120);
-  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("new-header-99")).empty());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
   cleanup();
 }
 

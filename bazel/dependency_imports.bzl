@@ -90,6 +90,8 @@ def envoy_dependency_imports(
 
     setup_sanitizer_libs()
 
+    protoc_gen_jsonschema_go_dependencies()
+
     # These dependencies, like most of the Go in this repository, exist only for the API.
     # These repos also have transient dependencies - `build_external` allows them to use them.
     # TODO(phlax): remove `build_external` and pin all transients
@@ -97,96 +99,80 @@ def envoy_dependency_imports(
         name = "org_golang_google_grpc",
         build_file_proto_mode = "disable",
         importpath = "google.golang.org/grpc",
-        sum = "h1:raiipEjMOIC/TO2AvyTxP25XFdLxNIBwzDh3FM3XztI=",
-        version = "v1.34.0",
+        sum = "h1:aHQeeJbo8zAkAa3pRzrVjZlbz6uSfeOXlJNQM0RAbz0=",
+        version = "v1.68.0",
         build_external = "external",
-        # project_url = "https://pkg.go.dev/google.golang.org/grpc",
-        # last_update = "2020-12-02"
-        # use_category = ["api"],
-        # cpe = "cpe:2.3:a:grpc:grpc:*",
     )
     go_repository(
         name = "org_golang_x_net",
         importpath = "golang.org/x/net",
-        sum = "h1:0mm1VjtFUOIlE1SbDlwjYaDxZVDP2S5ou6y0gSgXHu8=",
-        version = "v0.0.0-20200226121028-0de0cce0169b",
+        sum = "h1:Mb7Mrk043xzHgnRM88suvJFwzVrRfHEHJEl5/71CKw0=",
+        version = "v0.34.0",
         build_external = "external",
-        # project_url = "https://pkg.go.dev/golang.org/x/net",
-        # last_update = "2020-02-26"
-        # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L129-L134"
     )
     go_repository(
         name = "org_golang_x_text",
         importpath = "golang.org/x/text",
-        sum = "h1:cokOdA+Jmi5PJGXLlLllQSgYigAEfHXJAERHVMaCc2k=",
-        version = "v0.3.3",
+        sum = "h1:zyQAAkrwaneQ066sspRyJaG9VNi/YJ1NfzcGB3hZ/qo=",
+        version = "v0.21.0",
         build_external = "external",
-        # project_url = "https://pkg.go.dev/golang.org/x/text",
-        # last_update = "2021-06-16"
-        # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L148-L153"
     )
     go_repository(
         name = "org_golang_google_genproto_googleapis_api",
         importpath = "google.golang.org/genproto/googleapis/api",
-        sum = "h1:DoPTO70H+bcDXcd39vOqb2viZxgqeBeSGtZ55yZU4/Q=",
-        version = "v0.0.0-20230822172742-b8732ec3820d",
+        sum = "h1:+2XxjfsAu6vqFxwGBRcHiMaDCuZiqXGDUDVWVtrFAnE=",
+        version = "v0.0.0-20251029180050-ab9386a59fda",
         build_external = "external",
     )
     go_repository(
         name = "org_golang_google_genproto_googleapis_rpc",
         importpath = "google.golang.org/genproto/googleapis/rpc",
-        sum = "h1:uvYuEyMHKNt+lT4K3bN6fGswmK8qSvcreM3BwjDh+y4=",
-        version = "v0.0.0-20230822172742-b8732ec3820d",
+        sum = "h1:i/Q+bfisr7gq6feoJnS/DlpdwEL4ihp41fvRiM3Ork0=",
+        version = "v0.0.0-20251029180050-ab9386a59fda",
         build_external = "external",
     )
     go_repository(
         name = "org_golang_google_protobuf",
+        build_file_proto_mode = "disable",
         importpath = "google.golang.org/protobuf",
-        sum = "h1:d0NfwRgPtno5B1Wa6L2DAG+KivqkdutMf1UhdNx175w=",
-        version = "v1.28.1",
+        sum = "h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=",
+        version = "v1.36.10",
         build_external = "external",
     )
     go_repository(
         name = "com_github_cncf_xds_go",
         importpath = "github.com/cncf/xds/go",
-        sum = "h1:B/lvg4tQ5hfFZd4V2hcSfFVfUvAK6GSFKxIIzwnkv8g=",
-        version = "v0.0.0-20220520190051-1e77728a1eaa",
+        sum = "h1:gt7U1Igw0xbJdyaCM5H2CnlAlPSkzrhsebQB6WQWjLA=",
+        version = "v0.0.0-20251110193048-8bfbf64dc13e",
+        build_external = "external",
+    )
+    go_repository(
+        name = "dev_cel_expr",
+        importpath = "cel.dev/expr",
+        sum = "h1:56OvJKSH3hDGL0ml5uSxZmz3/3Pq4tJ+fb1unVLAFcY=",
+        version = "v0.24.0",
         build_external = "external",
     )
     go_repository(
         name = "com_github_spf13_afero",
         importpath = "github.com/spf13/afero",
-        sum = "h1:8q6vk3hthlpb2SouZcnBVKboxWQWMDNF38bwholZrJc=",
-        version = "v1.3.4",
+        sum = "h1:EaGW2JJh15aKOejeuJ+wpFSHnbd7GE6Wvp3TsNhb6LY=",
+        version = "v1.10.0",
         build_external = "external",
-        # project_url = "https://pkg.go.dev/github.com/spf13/afero",
-        # last_update = "2021-03-20"
-        # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L60-L65"
     )
     go_repository(
         name = "com_github_lyft_protoc_gen_star_v2",
         importpath = "github.com/lyft/protoc-gen-star/v2",
-        sum = "h1:keaAo8hRuAT0O3DfJ/wM3rufbAjGeJ1lAtWZHDjKGB0=",
-        version = "v2.0.1",
+        sum = "h1:sIXJOMrYnQZJu7OB7ANSF4MYri2fTEGIsRLz6LwI4xE=",
+        version = "v2.0.4-0.20230330145011-496ad1ac90a4",
         build_external = "external",
-        # project_url = "https://pkg.go.dev/github.com/lyft/protoc-gen-star",
-        # last_update = "2023-01-06"
-        # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.10.1/dependencies.bzl#L35-L40"
     )
     go_repository(
         name = "com_github_iancoleman_strcase",
         importpath = "github.com/iancoleman/strcase",
-        sum = "h1:ux/56T2xqZO/3cP1I2F86qpeoYPCOzk+KF/UH/Ar+lk=",
-        version = "v0.0.0-20180726023541-3605ed457bf7",
+        sum = "h1:nTXanmYxhfFAMjZL34Ov6gkzEsSJZ5DbhxWjvSASxEI=",
+        version = "v0.3.0",
         build_external = "external",
-        # project_url = "https://pkg.go.dev/github.com/iancoleman/strcase",
-        # last_update = "2020-11-22"
-        # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L23-L28"
     )
     go_repository(
         name = "com_github_planetscale_vtprotobuf",
@@ -196,7 +182,6 @@ def envoy_dependency_imports(
         build_external = "external",
     )
 
-    protoc_gen_jsonschema_go_dependencies()
     rules_proto_grpc_toolchains()
 
 def envoy_download_go_sdks(go_version):

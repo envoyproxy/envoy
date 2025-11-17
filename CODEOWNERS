@@ -17,6 +17,7 @@
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
+/*/extensions/access_loggers/stats @ggreenway @wbpcode @kyessenov
 /*/extensions/access_loggers/stream @mattklein123 @davinci26
 # alternate protocols cache extensions
 /*/extensions/filters/http/alternate_protocols_cache @RyanTheOptimist @abeyad
@@ -274,6 +275,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/compression/zstd @rainingmaster @mattklein123
 # cel
 /*/extensions/access_loggers/filters/cel @kyessenov @douglas-reid @adisuissa
+# process rate limit
+/*/extensions/access_loggers/filters/process_ratelimit @taoxuy @kyessenov
 # health check
 /*/extensions/filters/http/health_check @mattklein123 @adisuissa
 # lua
@@ -366,6 +369,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/string_matcher/ @ggreenway @cpakulski
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @yanavlasov
+# Body transform
+/*/extensions/filters/http/transform @wbpcode @yanavlasov @adisuissa
 # Health checkers
 /*/extensions/health_checkers/grpc @zuercher @botengyao
 /*/extensions/health_checkers/http @zuercher @botengyao
@@ -411,6 +416,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/source/extensions/api_listeners/default_api_listener @UNOWNED @UNOWNED
 /*/source/extensions/listener_managers/listener_manager @yanavlasov @ggreenway
 /*/source/extensions/listener_managers/validation_listener_manager @adisuissa @ggreenway
+/*/source/extensions/matching/common_inputs/transport_socket @agrawroh @kyessenov
 /*/source/extensions/config_subscription/ @adisuissa @UNOWNED
 /*/source/extensions/config_subscription/grpc @adisuissa @UNOWNED
 
@@ -419,7 +425,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/path/uri_template_lib/proto @wbpcode @yanjunxiang-google
 
 # mobile
-/mobile/ @RyanTheOptimist @abeyad @fredyw
+/mobile/ @RyanTheOptimist @abeyad @danzh2010
 
 # Contrib
 /contrib/exe/ @mattklein123 @wbpcode
