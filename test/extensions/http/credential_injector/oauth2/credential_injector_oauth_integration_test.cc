@@ -11,6 +11,18 @@ namespace HttpFilters {
 namespace CredentialInjector {
 namespace {
 
+MATCHER_P(HasClientSecret, m, "") {
+  const auto query_parameters = Http::Utility::QueryParamsMulti::parseParameters(arg, 0, true);
+  auto secret = query_parameters.getFirstValue("client_secret");
+  return testing::ExplainMatchResult(testing::Optional(m), secret, result_listener);
+}
+
+MATCHER_P(HasScope, m, "") {
+  const auto query_parameters = Http::Utility::QueryParamsMulti::parseParameters(arg, 0, true);
+  auto actual_scope = query_parameters.getFirstValue("scope");
+  return testing::ExplainMatchResult(testing::Optional(m), actual_scope, result_listener);
+}
+
 class CredentialInjectorIntegrationTest : public HttpIntegrationTest,
                                           public Grpc::GrpcClientIntegrationParamTest {
 public:
@@ -55,27 +67,7 @@ resources:
 
   void TearDown() override { test_server_.reset(); }
 
-  virtual void checkClientSecretInRequest(absl::string_view request_body,
-                                          absl::string_view client_secret) {
-    const auto query_parameters =
-        Http::Utility::QueryParamsMulti::parseParameters(request_body, 0, true);
-    auto secret = query_parameters.getFirstValue("client_secret");
-
-    ASSERT_TRUE(secret.has_value());
-    EXPECT_EQ(secret.value(), client_secret);
-  }
-
-  virtual void checkScopeInRequest(absl::string_view request_body,
-                                   absl::string_view desired_scope) {
-    const auto query_parameters =
-        Http::Utility::QueryParamsMulti::parseParameters(request_body, 0, true);
-    auto actual_scope = query_parameters.getFirstValue("scope");
-
-    ASSERT_TRUE(actual_scope.has_value());
-    EXPECT_EQ(actual_scope.value(), desired_scope);
-  }
-
-  void getFakeOuth2Connection() {
+  void getFakeOauth2Connection() {
     AssertionResult result =
         fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_oauth2_connection_);
     RELEASE_ASSERT(result, result.message());
@@ -88,61 +80,45 @@ resources:
     result = oauth2_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
     ASSERT_TRUE(oauth2_request_->waitForHeadersComplete());
+    request_body_ = oauth2_request_->body().toString();
   }
 
-  void waitForTokenRequestAndDontRespondWithToken() {
-    getFakeOuth2Connection();
-    acceptNewStream();
-    checkClientSecretInRequest(oauth2_request_->body().toString(), "test_client_secret");
-    oauth2_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
-  }
-
-  void
-  handleOauth2TokenRequest(absl::string_view client_secret, bool success = true,
-                           bool good_token = true, bool good_json = true, int token_expiry = 20,
-                           absl::optional<absl::string_view> scope_in_request = absl::nullopt) {
-    acceptNewStream();
-    const std::string request_body = oauth2_request_->body().toString();
-    checkClientSecretInRequest(request_body, client_secret);
-    if (scope_in_request.has_value()) {
-      checkScopeInRequest(request_body, scope_in_request.value());
-    }
-
-    if (success) {
-      oauth2_request_->encodeHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
-          false);
-    } else {
-      oauth2_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
-    }
-
+  void encodeGoodJsonResponseBody(int token_expiry = 20) {
     envoy::extensions::http::injected_credentials::oauth2::OAuthResponse oauth_response;
-    if (!good_json) {
-      Buffer::OwnedImpl buffer("bad json");
-      oauth2_request_->encodeData(buffer, true);
-      return;
-    }
     oauth_response.mutable_access_token()->set_value("test-access-token");
-    if (good_token) {
-      oauth_response.mutable_expires_in()->set_value(token_expiry);
-    }
-    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
+    oauth_response.mutable_expires_in()->set_value(token_expiry);
+    Buffer::OwnedImpl data(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
+    oauth2_request_->encodeData(data, true);
+  }
 
-    oauth2_request_->encodeData(buffer, true);
+  void encodeBadJsonResponseBody() {
+    Buffer::OwnedImpl data("bad json");
+    oauth2_request_->encodeData(data, true);
+  }
+
+  void encodeBadTokenResponseBody() {
+    envoy::extensions::http::injected_credentials::oauth2::OAuthResponse oauth_response;
+    oauth_response.mutable_access_token()->set_value("test-access-token");
+    Buffer::OwnedImpl data(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
+    oauth2_request_->encodeData(data, true);
+  }
+
+  Http::TestResponseHeaderMapImpl jsonResponseHeaders() {
+    return Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                           {"content-type", "application/json"}};
   }
 
   void waitForOAuth2Response(absl::string_view client_secret) {
-    getFakeOuth2Connection();
-    handleOauth2TokenRequest(client_secret);
-  }
-
-  void waitForBadOAuth2Response(absl::string_view client_secret) {
-    getFakeOuth2Connection();
-    handleOauth2TokenRequest(client_secret, false);
+    getFakeOauth2Connection();
+    acceptNewStream();
+    EXPECT_THAT(request_body_, HasClientSecret(client_secret));
+    oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
+    encodeGoodJsonResponseBody();
   }
 
   FakeHttpConnectionPtr fake_oauth2_connection_{};
   FakeStreamPtr oauth2_request_{};
+  std::string request_body_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, CredentialInjectorIntegrationTest,
@@ -449,10 +425,18 @@ typed_config:
   initializeFilter(filter_config);
 
   // wait for first token request and respond with bad response
-  waitForBadOAuth2Response("test_client_secret");
+  getFakeOauth2Connection();
+  acceptNewStream();
+  EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
+  oauth2_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+  encodeGoodJsonResponseBody();
 
   // wait for retried token request and respond with good response
-  handleOauth2TokenRequest("test_client_secret", true, true, true, 20, "scope1");
+  acceptNewStream();
+  EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
+  EXPECT_THAT(request_body_, HasScope("scope1"));
+  oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
+  encodeGoodJsonResponseBody();
 
   EXPECT_EQ(
       1UL,
@@ -510,8 +494,11 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
 
-  getFakeOuth2Connection();
-  handleOauth2TokenRequest("test_client_secret", true, true, true, 2);
+  getFakeOauth2Connection();
+  acceptNewStream();
+  EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
+  oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
+  encodeGoodJsonResponseBody(2);
 
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
                                  std::chrono::milliseconds(500));
@@ -537,7 +524,10 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   // wait for second token refresh request and respond with new token
-  handleOauth2TokenRequest("test_client_secret");
+  acceptNewStream();
+  EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
+  oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
+  encodeGoodJsonResponseBody();
 
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 2,
                                  std::chrono::milliseconds(1200));
@@ -568,8 +558,11 @@ typed_config:
               path: "{{ test_tmpdir }}/client_secret.yaml"
 )EOF";
   initializeFilter(filter_config);
-  getFakeOuth2Connection();
-  handleOauth2TokenRequest("test_client_secret", true, false);
+  getFakeOauth2Connection();
+  acceptNewStream();
+  EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
+  oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
+  encodeBadTokenResponseBody();
   test_server_->waitForCounterEq(
       "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", 1,
       std::chrono::milliseconds(1000));
@@ -600,8 +593,12 @@ typed_config:
               path: "{{ test_tmpdir }}/client_secret.yaml"
 )EOF";
   initializeFilter(filter_config);
-  getFakeOuth2Connection();
-  handleOauth2TokenRequest("test_client_secret", true, true, false);
+  getFakeOauth2Connection();
+  acceptNewStream();
+  EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
+  oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
+  encodeBadJsonResponseBody();
+
   test_server_->waitForCounterEq(
       "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", 1,
       std::chrono::milliseconds(1000));
@@ -665,7 +662,12 @@ typed_config:
               path: "{{ test_tmpdir }}/client_secret.yaml"
 )EOF";
   initializeFilter(filter_config);
-  waitForTokenRequestAndDontRespondWithToken();
+  // Wait for token request, and don't respond with token.
+  getFakeOauth2Connection();
+  acceptNewStream();
+  EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
+  oauth2_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+
   test_server_->waitForCounterEq(
       "http.config_test.credential_injector.oauth2.token_fetch_failed_on_stream_reset", 1,
       std::chrono::milliseconds(1000));
@@ -675,7 +677,10 @@ typed_config:
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_requested", 2,
                                  std::chrono::milliseconds(1200));
   // wait for retried token request and respond with good response
-  handleOauth2TokenRequest("test_client_secret");
+  acceptNewStream();
+  EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
+  oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
+  encodeGoodJsonResponseBody(20);
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
                                  std::chrono::milliseconds(1200));
 
