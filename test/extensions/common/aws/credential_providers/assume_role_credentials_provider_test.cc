@@ -969,6 +969,32 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithExternalId) {
   EXPECT_EQ("test-access-key", credentials.accessKeyId().value());
 }
 
+// Tests ASAN failure when cancel wrapper is not used
+TEST_F(AssumeRoleCredentialsProviderTest, CancelWrapperPreventsUseAfterFree) {
+  std::function<void()> captured_callback;
+
+  EXPECT_CALL(context_.thread_local_, runOnAllThreads(testing::_, testing::_))
+      .WillOnce(testing::Invoke([&captured_callback](const std::function<void()>&,
+                                                     const std::function<void()>& complete_cb) {
+        captured_callback = complete_cb;
+      }));
+
+  setupProvider();
+
+  {
+    auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+    provider_friend.setCredentialsToAllThreads(std::make_unique<Credentials>());
+
+    ASSERT_TRUE(captured_callback != nullptr);
+
+    provider_friend.provider_.reset();
+    provider_.reset();
+  }
+
+  captured_callback();
+  delete raw_metadata_fetcher_;
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

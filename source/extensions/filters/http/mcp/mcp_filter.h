@@ -32,7 +32,8 @@ constexpr absl::string_view JsonRpcVersion = "2.0";
 class McpFilterConfig {
 public:
   explicit McpFilterConfig(const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config)
-      : traffic_mode_(proto_config.traffic_mode()) {}
+      : traffic_mode_(proto_config.traffic_mode()),
+        clear_route_cache_(proto_config.clear_route_cache()) {}
 
   envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode() const {
     return traffic_mode_;
@@ -42,8 +43,11 @@ public:
     return traffic_mode_ == envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP;
   }
 
+  bool clearRouteCache() const { return clear_route_cache_; }
+
 private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
+  const bool clear_route_cache_;
 };
 
 /**

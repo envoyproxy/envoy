@@ -391,7 +391,7 @@ TEST_P(IdleTimeoutIntegrationTest, ResponseTimeout) {
   initialize();
 
   // Lock up fake upstream so that it won't accept connections.
-  absl::MutexLock l(&fake_upstreams_[0]->lock());
+  absl::MutexLock l(fake_upstreams_[0]->lock());
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);

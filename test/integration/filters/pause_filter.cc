@@ -24,7 +24,7 @@ public:
 
   Http::FilterDataStatus decodeData(Buffer::Instance& buf, bool end_stream) override {
     if (end_stream) {
-      absl::WriterMutexLock m(&encode_lock_);
+      absl::WriterMutexLock m(encode_lock_);
       number_of_decode_calls_ref_++;
       // If this is the second stream to decode headers and we're at high watermark. force low
       // watermark state
@@ -37,7 +37,7 @@ public:
 
   Http::FilterDataStatus encodeData(Buffer::Instance& buf, bool end_stream) override {
     if (end_stream) {
-      absl::WriterMutexLock m(&encode_lock_);
+      absl::WriterMutexLock m(encode_lock_);
       number_of_encode_calls_ref_++;
       // If this is the first stream to encode headers and we're not at high watermark, force high
       // watermark state.
@@ -71,7 +71,7 @@ public:
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       // ABSL_GUARDED_BY insists the lock be held when the guarded variables are passed by
       // reference.
-      absl::WriterMutexLock m(&encode_lock_);
+      absl::WriterMutexLock m(encode_lock_);
       callbacks.addStreamFilter(std::make_shared<::Envoy::TestPauseFilter>(
           encode_lock_, number_of_encode_calls_, number_of_decode_calls_));
     };
