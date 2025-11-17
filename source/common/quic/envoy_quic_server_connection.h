@@ -80,6 +80,7 @@ public:
     return stream_info_.dynamicMetadata();
   };
   StreamInfo::FilterState& filterState() override { return *stream_info_.filterState().get(); }
+  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
 
   // Network::QuicListenerFilterManager
   void addFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
