@@ -576,6 +576,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
         200,
         vec![("some_header", b"some_value")],
         Some(b"local_response_body_from_on_request_headers"),
+        Some("test_details"),
       );
       envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
     } else {
@@ -593,6 +594,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
         200,
         vec![("some_header", b"some_value")],
         Some(b"local_response_body_from_on_request_body"),
+        None,
       );
       envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer
     } else {
@@ -610,6 +612,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
         500,
         vec![("some_header", b"some_value")],
         Some(b"local_response_body_from_on_response_headers"),
+        None,
       );
       return envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration;
     }
@@ -651,7 +654,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       1000,
     );
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, vec![("foo", b"bar")], None);
+      envoy_filter.send_response(500, vec![("foo", b"bar")], None, None);
     } else {
       // Try sending the same callout id, which should fail.
       assert_eq!(
@@ -712,6 +715,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       200,
       vec![("some_header", b"some_value")],
       Some(b"local_response_body"),
+      Some("callout_success"),
     );
   }
 }
@@ -848,7 +852,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
       // Event from the on_scheduled when the cache key was found.
       1 => {
         let result = self.rx.take().unwrap().recv().unwrap();
-        envoy_filter.send_response(200, vec![("cached", b"yes")], Some(result.as_bytes()));
+        envoy_filter.send_response(200, vec![("cached", b"yes")], Some(result.as_bytes()), None);
       },
       // Event from the on_response_headers.
       2 => {
