@@ -437,9 +437,10 @@ message Listener {
   // Whether the listener bypasses configured overload manager actions.
   bool bypass_overload_manager = 35;
 
-  // If set, then TCP keepalive settings are configured for the listener address
-  // and additional addresses. See :ref:`tcp_keepalive_override <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive_override>`
-  // to override TCP keepalive settings for additional addresses.
+  // If set, TCP keepalive settings are configured for the listener address and inherited by
+  // additional addresses. If not set, TCP keepalive settings are not configured for the
+  // listener address and additional addresses by default. See :ref:`tcp_keepalive_override <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive_override>`
+  // to override TCP keepalive settings for individual additional addresses.
   core.v3.TcpKeepalive tcp_keepalive = 37;
 }
 
