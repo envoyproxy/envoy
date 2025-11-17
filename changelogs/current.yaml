@@ -8,6 +8,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tcp_proxy
+  change: |
+    Fixed a connection leak in the TCP proxy when the ``receive_before_connect`` feature is enabled and the
+    downstream connection closes before the upstream connection is established.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

@@ -890,9 +890,25 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
 void Filter::onUpstreamConnection() {
   connecting_ = false;
-  // Re-enable downstream reads now that the upstream connection is established
-  // so we have a place to send downstream data to.
-  read_callbacks_->connection().readDisable(false);
+
+  // If we have received any data before upstream connection is established, or if the downstream
+  // has indicated end of stream, send the data and/or end_stream to the upstream connection.
+  if (early_data_buffer_.length() > 0 || early_data_end_stream_) {
+    // Early data should only happen when receive_before_connect is enabled.
+    ASSERT(receive_before_connect_);
+
+    ENVOY_CONN_LOG(trace, "TCP:onUpstreamEvent() Flushing early data buffer to upstream",
+                   read_callbacks_->connection());
+    getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(early_data_buffer_.length());
+    upstream_->encodeData(early_data_buffer_, early_data_end_stream_);
+    ASSERT(0 == early_data_buffer_.length());
+
+    // Re-enable downstream reads now that the early data buffer is flushed.
+    read_callbacks_->connection().readDisable(false);
+  } else if (!receive_before_connect_) {
+    // Re-enable downstream reads now that the upstream connection is established.
+    read_callbacks_->connection().readDisable(false);
+  }
 
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
       Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
