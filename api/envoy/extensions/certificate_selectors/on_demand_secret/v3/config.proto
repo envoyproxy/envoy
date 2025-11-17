@@ -28,6 +28,6 @@ message Config {
 
     config.core.v3.ConfigSource sds_config = 2;
   }
-  repeated SdsSecretConfig sds_secret_config = 1 [(validate.rules).message = {required: true}];
+  SdsSecretConfig sds_secret_config = 1 [(validate.rules).message = {required: true}];
 }
 
