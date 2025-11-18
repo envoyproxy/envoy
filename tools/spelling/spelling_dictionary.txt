@@ -1608,6 +1608,8 @@ EWMA
 hotplug
 cgroupv1
 cgroupv2
+cgroupsv1
+cgroupsv2
 usage_usec
 usec
 nsec
