@@ -262,12 +262,13 @@ public:
     return proto_config_.metadata_options().receiving_namespaces().untyped();
   }
 
-  const Protobuf::RepeatedPtrField<std::string>& untypedClusterMetadataForwardingNamespaces() const {
-        return proto_config_.metadata_options().cluster_metadata_forwarding_namespaces().untyped();
+  const Protobuf::RepeatedPtrField<std::string>&
+  untypedClusterMetadataForwardingNamespaces() const {
+    return proto_config_.metadata_options().cluster_metadata_forwarding_namespaces().untyped();
   }
 
   const Protobuf::RepeatedPtrField<std::string>& typedClusterMetadataForwardingNamespaces() const {
-        return proto_config_.metadata_options().cluster_metadata_forwarding_namespaces().typed();
+    return proto_config_.metadata_options().cluster_metadata_forwarding_namespaces().typed();
   }
 
   const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
@@ -391,12 +392,11 @@ public:
   const Protobuf::RepeatedPtrField<std::string>* untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
-const Protobuf::RepeatedPtrField<std::string>*
+  const Protobuf::RepeatedPtrField<std::string>*
   untypedClusterMetadataForwardingNamespaces() const {
     return untyped_cluster_metadata_forwarding_namespaces_;
   }
-const Protobuf::RepeatedPtrField<std::string>*
-  typedClusterMetadataForwardingNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>* typedClusterMetadataForwardingNamespaces() const {
     return typed_cluster_metadata_forwarding_namespaces_;
   }
   const absl::optional<bool>& failureModeAllow() const { return failure_mode_allow_; }
@@ -422,10 +422,8 @@ private:
   const Protobuf::RepeatedPtrField<std::string>* untyped_forwarding_namespaces_;
   const Protobuf::RepeatedPtrField<std::string>* typed_forwarding_namespaces_;
   const Protobuf::RepeatedPtrField<std::string>* untyped_receiving_namespaces_;
-    const Protobuf::RepeatedPtrField<std::string>* 
-      untyped_cluster_metadata_forwarding_namespaces_;
-  const Protobuf::RepeatedPtrField<std::string>* 
-      typed_cluster_metadata_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>* untyped_cluster_metadata_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>* typed_cluster_metadata_forwarding_namespaces_;
 
   const absl::optional<bool> failure_mode_allow_;
 

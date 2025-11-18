@@ -508,12 +508,14 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       untyped_receiving_namespaces_(more_specific.untypedReceivingMetadataNamespaces() != nullptr
                                         ? more_specific.untypedReceivingMetadataNamespaces()
                                         : less_specific.untypedReceivingMetadataNamespaces()),
-      untyped_cluster_metadata_forwarding_namespaces_(more_specific.untypedClusterMetadataForwardingNamespaces() != nullptr
-                                        ? more_specific.untypedClusterMetadataForwardingNamespaces()
-                                        : less_specific.untypedClusterMetadataForwardingNamespaces()),
-      typed_cluster_metadata_forwarding_namespaces_(more_specific.typedClusterMetadataForwardingNamespaces() != nullptr
-                                        ? more_specific.typedClusterMetadataForwardingNamespaces()
-                                        : less_specific.typedClusterMetadataForwardingNamespaces()),
+      untyped_cluster_metadata_forwarding_namespaces_(
+          more_specific.untypedClusterMetadataForwardingNamespaces() != nullptr
+              ? more_specific.untypedClusterMetadataForwardingNamespaces()
+              : less_specific.untypedClusterMetadataForwardingNamespaces()),
+      typed_cluster_metadata_forwarding_namespaces_(
+          more_specific.typedClusterMetadataForwardingNamespaces() != nullptr
+              ? more_specific.typedClusterMetadataForwardingNamespaces()
+              : less_specific.typedClusterMetadataForwardingNamespaces()),
       failure_mode_allow_(more_specific.failureModeAllow().has_value()
                               ? more_specific.failureModeAllow()
                               : less_specific.failureModeAllow()),
