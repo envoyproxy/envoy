@@ -209,6 +209,94 @@ TEST_F(LinuxContainerCpuStatsReaderTest, UnexpectedFormatCpuTimesLine) {
   EXPECT_EQ(envoy_container_stats.total_time, 0);
 }
 
+// Test: Cgroup v1 with different cpu_allocated values
+TEST_F(LinuxContainerCpuStatsReaderTest, DifferentCpuAllocatedValues) {
+  TimeSource& test_time_source = timeSource();
+  setCpuAllocated("1024\n"); // Standard value
+  setCpuTimes("5000\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
+                                                      cpuTimesPath(), nonexistent_path,
+                                                      nonexistent_path, nonexistent_path);
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  // work_time = (5000 * 1000) / 1024 = 4882.8125
+  EXPECT_NEAR(envoy_container_stats.work_time, 4882.8125, 0.01);
+  EXPECT_GT(envoy_container_stats.total_time, 0);
+}
+
+// Test: Cgroup v1 with large cpu_times value
+TEST_F(LinuxContainerCpuStatsReaderTest, LargeCpuTimesValue) {
+  TimeSource& test_time_source = timeSource();
+  setCpuAllocated("2048\n");
+  setCpuTimes("999999999\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
+                                                      cpuTimesPath(), nonexistent_path,
+                                                      nonexistent_path, nonexistent_path);
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_GT(envoy_container_stats.work_time, 0);
+}
+
+// Test: Cgroup v1 with zero cpu_times
+TEST_F(LinuxContainerCpuStatsReaderTest, ZeroCpuTimes) {
+  TimeSource& test_time_source = timeSource();
+  setCpuAllocated("2000\n");
+  setCpuTimes("0\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
+                                                      cpuTimesPath(), nonexistent_path,
+                                                      nonexistent_path, nonexistent_path);
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+}
+
+// Test: Cgroup v1 with small cpu_allocated value
+TEST_F(LinuxContainerCpuStatsReaderTest, SmallCpuAllocatedValue) {
+  TimeSource& test_time_source = timeSource();
+  setCpuAllocated("512\n");
+  setCpuTimes("2000\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
+                                                      cpuTimesPath(), nonexistent_path,
+                                                      nonexistent_path, nonexistent_path);
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  // work_time = (2000 * 1000) / 512 = 3906.25
+  EXPECT_NEAR(envoy_container_stats.work_time, 3906.25, 0.01);
+}
+
+// Test: Cgroup v1 with very large cpu_allocated value
+TEST_F(LinuxContainerCpuStatsReaderTest, VeryLargeCpuAllocatedValue) {
+  TimeSource& test_time_source = timeSource();
+  setCpuAllocated("102400\n"); // 100x the default
+  setCpuTimes("10000\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
+                                                      cpuTimesPath(), nonexistent_path,
+                                                      nonexistent_path, nonexistent_path);
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_GT(envoy_container_stats.work_time, 0);
+}
+
 // Test fixture for cgroup v2 tests
 class LinuxContainerCpuStatsReaderV2Test : public testing::Test {
 public:
@@ -569,6 +657,92 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, QuotaExceedsAvailableCores) {
   EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
   EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores,
                    4.0); // min(4, 8) = 4, limited by available cores
+}
+
+// Test: Very large usage value
+TEST_F(LinuxContainerCpuStatsReaderV2Test, VeryLargeUsageValue) {
+  TimeSource& test_time_source = timeSource();
+  setV2CpuStat("usage_usec 999999999999\n"); // Very large usage
+  setV2CpuMax("400000 100000\n");
+  setV2CpuEffective("0-7\n");
+
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, v1CpuAllocatedPath(),
+                                                      v1CpuTimesPath(), v2CpuStatPath(),
+                                                      v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 999999999999ULL);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 4.0);
+}
+
+// Test: Zero usage value
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ZeroUsageValue) {
+  TimeSource& test_time_source = timeSource();
+  setV2CpuStat("usage_usec 0\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, v1CpuAllocatedPath(),
+                                                      v1CpuTimesPath(), v2CpuStatPath(),
+                                                      v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+}
+
+// Test: Fractional CPU quota (less than 1 core)
+TEST_F(LinuxContainerCpuStatsReaderV2Test, FractionalCpuQuota) {
+  TimeSource& test_time_source = timeSource();
+  setV2CpuStat("usage_usec 100000\n");
+  setV2CpuMax("25000 100000\n"); // quota=25000, period=100000 => 0.25 cores
+  setV2CpuEffective("0-3\n");
+
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, v1CpuAllocatedPath(),
+                                                      v1CpuTimesPath(), v2CpuStatPath(),
+                                                      v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 0.25);
+}
+
+// Test: Different period value
+TEST_F(LinuxContainerCpuStatsReaderV2Test, DifferentPeriodValue) {
+  TimeSource& test_time_source = timeSource();
+  setV2CpuStat("usage_usec 300000\n");
+  setV2CpuMax("50000 50000\n"); // quota=50000, period=50000 => 1.0 core
+  setV2CpuEffective("0-7\n");
+
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, v1CpuAllocatedPath(),
+                                                      v1CpuTimesPath(), v2CpuStatPath(),
+                                                      v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 1.0);
+}
+
+// Test: cpu.stat with additional fields
+TEST_F(LinuxContainerCpuStatsReaderV2Test, CpuStatWithAdditionalFields) {
+  TimeSource& test_time_source = timeSource();
+  setV2CpuStat("usage_usec 450000\nuser_usec 250000\nsystem_usec 200000\nother_field 12345\n");
+  setV2CpuMax("300000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, v1CpuAllocatedPath(),
+                                                      v1CpuTimesPath(), v2CpuStatPath(),
+                                                      v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 450000);
 }
 
 } // namespace
