@@ -400,19 +400,27 @@ void InternalEngine::onDefaultNetworkChanged(int network) {
 
 void InternalEngine::onDefaultNetworkChangedAndroid(ConnectionType connection_type,
                                                     int64_t net_id) {
-  connectivity_manager_->onDefaultNetworkChangedAndroid(connection_type, net_id);
+  if (engine_running_.HasBeenNotified()) {
+    connectivity_manager_->onDefaultNetworkChangedAndroid(connection_type, net_id);
+  }
 }
 
 void InternalEngine::onNetworkDisconnectAndroid(int64_t net_id) {
-  connectivity_manager_->onNetworkDisconnectAndroid(net_id);
+  if (engine_running_.HasBeenNotified()) {
+    connectivity_manager_->onNetworkDisconnectAndroid(net_id);
+  }
 }
 
 void InternalEngine::onNetworkConnectAndroid(ConnectionType connection_type, int64_t net_id) {
-  connectivity_manager_->onNetworkConnectAndroid(connection_type, net_id);
+  if (engine_running_.HasBeenNotified()) {
+    connectivity_manager_->onNetworkConnectAndroid(connection_type, net_id);
+  }
 }
 
 void InternalEngine::purgeActiveNetworkListAndroid(const std::vector<int64_t>& active_network_ids) {
-  connectivity_manager_->purgeActiveNetworkListAndroid(active_network_ids);
+  if (engine_running_.HasBeenNotified()) {
+    connectivity_manager_->purgeActiveNetworkListAndroid(active_network_ids);
+  }
 }
 
 void InternalEngine::onDefaultNetworkUnavailable() {
