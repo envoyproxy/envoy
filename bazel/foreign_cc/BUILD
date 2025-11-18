@@ -56,38 +56,20 @@ envoy_cc_library(
     }),
 )
 
-# autotools packages are unusable on Windows as-is
-# TODO: Consider our own gperftools.BUILD file as we do with many other packages
-configure_make(
-    name = "gperftools_build",
-    configure_options = [
-        "--enable-shared=no",
-        "--enable-frame-pointers",
-        "--disable-libunwind",
-    ] + select({
-        "//bazel:apple": ["AR=/usr/bin/ar"],
-        "//conditions:default": [],
-    }),
-    lib_source = "@com_github_gperftools_gperftools//:all",
-    linkopts = ["-lpthread"],
-    out_static_libs = select({
-        "//bazel:debug_tcmalloc": ["libtcmalloc_debug.a"],
-        "//conditions:default": ["libtcmalloc_and_profiler.a"],
-    }),
-    tags = ["skip_on_windows"],
-    targets = [
-        "install-libLTLIBRARIES install-perftoolsincludeHEADERS",
-    ],
-    alwayslink = True,
-)
-
-# Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/227
 cc_library(
     name = "gperftools",
     tags = ["skip_on_windows"],
-    deps = [
-        "gperftools_build",
-    ],
+    deps = select({
+        "//bazel:debug_tcmalloc": [
+            "@gperftools//:stacktrace",
+            "@gperftools//:tcmalloc_debug",
+        ],
+        "//conditions:default": [
+            "@gperftools//:cpu_profiler",
+            "@gperftools//:stacktrace",
+            "@gperftools//:tcmalloc",
+        ],
+    }),
 )
 
 make(
