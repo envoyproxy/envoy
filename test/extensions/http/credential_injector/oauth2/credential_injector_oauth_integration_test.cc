@@ -1,3 +1,4 @@
+#include "source/common/http/headers.h"
 #include "source/extensions/http/injected_credentials/oauth2/oauth_response.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
@@ -67,7 +68,33 @@ resources:
 
   void TearDown() override { test_server_.reset(); }
 
-  void getFakeOauth2Connection() {
+  virtual void checkClientSecretInRequest(absl::string_view request_body,
+                                          absl::string_view client_secret) {
+    const auto query_parameters =
+        Http::Utility::QueryParamsMulti::parseParameters(request_body, 0, true);
+    auto secret = query_parameters.getFirstValue("client_secret");
+
+    ASSERT_TRUE(secret.has_value());
+    EXPECT_EQ(secret.value(), client_secret);
+  }
+
+  virtual void checkScopeInRequest(absl::string_view request_body,
+                                   absl::string_view desired_scope) {
+    const auto query_parameters =
+        Http::Utility::QueryParamsMulti::parseParameters(request_body, 0, true);
+    auto actual_scope = query_parameters.getFirstValue("scope");
+
+    ASSERT_TRUE(actual_scope.has_value());
+    EXPECT_EQ(actual_scope.value(), desired_scope);
+  }
+
+  virtual void checkUserAgentInRequest(const Http::RequestHeaderMap& headers) {
+    const auto user_agent = headers.getUserAgentValue();
+    ASSERT_FALSE(user_agent.empty());
+    EXPECT_EQ(Http::Headers::get().UserAgentValues.GoBrowser, user_agent);
+  }
+
+  void getFakeOuth2Connection() {
     AssertionResult result =
         fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_oauth2_connection_);
     RELEASE_ASSERT(result, result.message());
@@ -81,6 +108,7 @@ resources:
     RELEASE_ASSERT(result, result.message());
     ASSERT_TRUE(oauth2_request_->waitForHeadersComplete());
     request_body_ = oauth2_request_->body().toString();
+    checkUserAgentInRequest(oauth2_request_->headers());
   }
 
   void encodeGoodJsonResponseBody(int token_expiry = 20) {
@@ -686,6 +714,91 @@ typed_config:
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
+                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->value()
+                                            .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test endpoint_params are properly sent to OAuth2 server
+TEST_P(CredentialInjectorIntegrationTest, InjectCredentialWithEndpointParams) {
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: envoy.http.injected_credentials.oauth2
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
+      token_fetch_retry_interval: 1s
+      token_endpoint:
+        cluster: oauth
+        timeout: 0.5s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: test_client_id
+        client_secret:
+          name: client-secret
+          sds_config:
+            path_config_source:
+              path: "{{ test_tmpdir }}/client_secret.yaml"
+      scopes:
+        - "api://default/scope"
+      endpoint_params:
+        - name: test-param
+          value: test-value
+        - name: another-param
+          value: another-value
+)EOF";
+  initializeFilter(filter_config);
+
+  getFakeOuth2Connection();
+  acceptNewStream();
+
+  const std::string request_body = oauth2_request_->body().toString();
+
+  // Verify standard OAuth2 parameters
+  checkClientSecretInRequest(request_body, "test_client_secret");
+  checkScopeInRequest(request_body, "api://default/scope");
+
+  // Verify custom endpoint parameters are present
+  const auto query_parameters =
+      Http::Utility::QueryParamsMulti::parseParameters(request_body, 0, true);
+
+  auto test_param = query_parameters.getFirstValue("test-param");
+  ASSERT_TRUE(test_param.has_value());
+  EXPECT_EQ(test_param.value(), "test-value");
+
+  auto another_param = query_parameters.getFirstValue("another-param");
+  ASSERT_TRUE(another_param.has_value());
+  EXPECT_EQ(another_param.value(), "another-value");
+
+  // Respond with access token
+  oauth2_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+
+  envoy::extensions::http::injected_credentials::oauth2::OAuthResponse oauth_response;
+  oauth_response.mutable_access_token()->set_value("test-access-token");
+  oauth_response.mutable_expires_in()->set_value(20);
+  Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
+  oauth2_request_->encodeData(buffer, true);
+
+  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
+                                 std::chrono::milliseconds(2500));
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();

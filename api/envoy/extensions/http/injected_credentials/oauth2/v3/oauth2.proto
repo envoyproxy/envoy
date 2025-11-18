@@ -73,4 +73,18 @@ message OAuth2 {
   // The interval must be at least 1 second.
   google.protobuf.Duration token_fetch_retry_interval = 4
       [(validate.rules).duration = {gte {seconds: 1}}];
+
+  // Optional additional parameters to include in the token endpoint request body.
+  // These parameters will be URL-encoded and added to the request body along with the standard OAuth2 parameters.
+  // Refer to your authorization server's documentation for supported parameters.
+  message EndpointParam {
+    // Parameter name.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Parameter value.
+    string value = 2;
+  }
+
+  // Optional list of additional parameters to send to the token endpoint.
+  repeated EndpointParam endpoint_params = 5;
 }
