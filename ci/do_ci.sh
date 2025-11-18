@@ -542,12 +542,12 @@ case $CI_TARGET in
         fi
 
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-              //tools/zstd \
+              @zstd//:zstd_cli \
               -- --stdout \
                  -d "$ENVOY_RELEASE_TARBALL" \
             | tar xfO - envoy > distribution/custom/envoy
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-              //tools/zstd \
+              @zstd//:zstd_cli \
               -- --stdout \
                  -d "$ENVOY_RELEASE_TARBALL" \
             | tar xfO - envoy-contrib > distribution/custom/envoy-contrib
