@@ -80,6 +80,7 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
     return SubstitutionFormatUtils::unspecifiedValue();
   }
 
+  SubstitutionFormatUtils::truncate(val, max_length_);
   return val;
 }
 
