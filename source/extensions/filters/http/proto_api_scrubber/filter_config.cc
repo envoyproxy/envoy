@@ -265,6 +265,25 @@ ProtoApiScrubberFilterConfig::getRequestType(const std::string& method_name) con
   return request_type;
 }
 
+absl::StatusOr<const Protobuf::Type*>
+ProtoApiScrubberFilterConfig::getResponseType(const std::string& method_name) const {
+  // Covert grpc method name from `/package.service/method` format to `package.service.method` as
+  // the method `FindMethodByName` expects the method name to be in the latter format.
+  std::string dot_separated_method_name =
+      absl::StrReplaceAll(absl::StripPrefix(method_name, "/"), {{"/", "."}});
+  const MethodDescriptor* method = descriptor_pool_->FindMethodByName(dot_separated_method_name);
+  if (method == nullptr) {
+    return absl::InvalidArgumentError(absl::StrFormat(
+        "Unable to find method `%s` in the descriptor pool configured for this filter.",
+        method_name));
+  }
+
+  std::string response_type_url =
+      absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", method->output_type()->full_name());
+  const Protobuf::Type* response_type = (*type_finder_)(response_type_url);
+  return response_type;
+}
+
 REGISTER_FACTORY(RemoveFilterActionFactory,
                  Matcher::ActionFactory<ProtoApiScrubberRemoveFieldAction>);
 
