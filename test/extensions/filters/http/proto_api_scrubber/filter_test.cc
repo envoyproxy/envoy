@@ -165,7 +165,6 @@ protected:
       auto content_or = api_->fileSystem().fileReadToEnd(
           Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath));
 
-      // Manual error check instead of ASSIGN_OR_RETURN
       if (!content_or.ok()) {
         return content_or.status();
       }
