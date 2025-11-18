@@ -90,8 +90,6 @@ const char* codecStrError(int) { return "unknown_error"; }
 #endif
 
 int reasonToReset(StreamResetReason reason) {
-  std::cout << "boteng reasonToReset " << static_cast<int>(reason) << std::endl;
-  ENVOY_LOG_MISC(debug, "boteng: reasonToReset {}", static_cast<int>(reason));
   switch (reason) {
   case StreamResetReason::LocalRefusedStreamReset:
     return OGHTTP2_REFUSED_STREAM;
