@@ -191,15 +191,6 @@ Envoy will not use a must-staple certificate for new connections after its OCSP 
 OCSP responses are never stapled to TLS requests that do not indicate support for OCSP stapling
 via the ``status_request`` extension.
 
-The following runtime flags are provided to adjust the requirements of OCSP responses and override
-the OCSP policy. These flags default to ``true``.
-
-* ``envoy.reloadable_features.require_ocsp_response_for_must_staple_certs``: Disabling this allows
-  the operator to omit an OCSP response for must-staple certs in the config.
-* ``envoy.reloadable_features.check_ocsp_policy``: Disabling this will disable OCSP policy
-  checking. OCSP responses are stapled when available if the client supports it, even if the
-  response is expired. Stapling is skipped if no response is present.
-
 OCSP responses are ignored for :ref:`UpstreamTlsContexts
 <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.
 

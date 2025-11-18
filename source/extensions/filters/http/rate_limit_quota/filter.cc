@@ -98,9 +98,9 @@ addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
 Http::FilterHeadersStatus sendDenyResponse(Http::StreamDecoderFilterCallbacks* cb,
                                            const DenyResponseSettings& settings,
                                            StreamInfo::CoreResponseFlag flag) {
-  cb->sendLocalReply(
-      getDenyResponseCode(settings), MessageUtil::bytesToString(getResponseBodyText(settings)),
-      addDenyResponseHeadersCb(settings), getGrpcStatus(settings), "rate_limited_by_quota");
+  cb->sendLocalReply(getDenyResponseCode(settings), getResponseBodyText(settings),
+                     addDenyResponseHeadersCb(settings), getGrpcStatus(settings),
+                     "rate_limited_by_quota");
   cb->streamInfo().setResponseFlag(flag);
   return Envoy::Http::FilterHeadersStatus::StopIteration;
 }

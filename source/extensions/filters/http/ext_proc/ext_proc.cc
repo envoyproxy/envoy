@@ -460,20 +460,33 @@ FilterConfigPerRoute::FilterConfigPerRoute(
       grpc_initial_metadata_(config.overrides().grpc_initial_metadata().begin(),
                              config.overrides().grpc_initial_metadata().end()),
       untyped_forwarding_namespaces_(
-          (!config.has_overrides() || !config.overrides().has_metadata_options() ||
-           !config.overrides().metadata_options().has_forwarding_namespaces())
+
+          !config.overrides().metadata_options().has_forwarding_namespaces()
               ? nullptr
               : &config.overrides().metadata_options().forwarding_namespaces().untyped()),
       typed_forwarding_namespaces_(
-          (!config.has_overrides() || !config.overrides().has_metadata_options() ||
-           !config.overrides().metadata_options().has_forwarding_namespaces())
+          !config.overrides().metadata_options().has_forwarding_namespaces()
               ? nullptr
               : &config.overrides().metadata_options().forwarding_namespaces().typed()),
       untyped_receiving_namespaces_(
-          (!config.has_overrides() || !config.overrides().has_metadata_options() ||
-           !config.overrides().metadata_options().has_receiving_namespaces())
+
+          !config.overrides().metadata_options().has_receiving_namespaces()
               ? nullptr
               : &config.overrides().metadata_options().receiving_namespaces().untyped()),
+      untyped_cluster_metadata_forwarding_namespaces_(
+          !config.overrides().metadata_options().has_cluster_metadata_forwarding_namespaces()
+              ? nullptr
+              : &config.overrides()
+                     .metadata_options()
+                     .cluster_metadata_forwarding_namespaces()
+                     .untyped()),
+      typed_cluster_metadata_forwarding_namespaces_(
+          !config.overrides().metadata_options().has_cluster_metadata_forwarding_namespaces()
+              ? nullptr
+              : &config.overrides()
+                     .metadata_options()
+                     .cluster_metadata_forwarding_namespaces()
+                     .typed()),
       failure_mode_allow_(
           config.overrides().has_failure_mode_allow()
               ? absl::optional<bool>(config.overrides().failure_mode_allow().value())
@@ -1366,6 +1379,28 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
   auto* cb = state.callbacks();
   envoy::config::core::v3::Metadata forwarding_metadata;
 
+  // Forward cluster metadata if so configured.
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+      cb->streamInfo().upstreamClusterInfo();
+  if (cluster_info.has_value() && cluster_info.value() != nullptr) {
+    const auto& cluster_metadata = cluster_info.value()->metadata().filter_metadata();
+    for (const auto& context_key : state.untypedClusterMetadataForwardingNamespaces()) {
+      if (const auto metadata_it = cluster_metadata.find(context_key);
+          metadata_it != cluster_metadata.end()) {
+        (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+      }
+    }
+
+    const auto& cluster_typed_metadata = cluster_info.value()->metadata().typed_filter_metadata();
+    for (const auto& context_key : state.typedClusterMetadataForwardingNamespaces()) {
+      if (const auto metadata_it = cluster_typed_metadata.find(context_key);
+          metadata_it != cluster_typed_metadata.end()) {
+        (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
+            metadata_it->second;
+      }
+    }
+  }
+
   // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_proc
   // service. If metadata key is set in both the connection and request metadata then the value
   // will be the request metadata value. The metadata will only be searched for the callbacks
@@ -1960,6 +1995,30 @@ void Filter::mergePerRouteConfig() {
         *merged_config->untypedReceivingMetadataNamespaces());
     encoding_state_.setUntypedReceivingMetadataNamespaces(
         *merged_config->untypedReceivingMetadataNamespaces());
+  }
+
+  if (merged_config->untypedClusterMetadataForwardingNamespaces() != nullptr) {
+    ENVOY_STREAM_LOG(trace,
+                     "Setting new untyped cluster metadata forwarding "
+                     "namespaces from per-route "
+                     "configuration",
+                     *decoder_callbacks_);
+    decoding_state_.setUntypedClusterMetadataForwardingNamespaces(
+        *merged_config->untypedClusterMetadataForwardingNamespaces());
+    encoding_state_.setUntypedClusterMetadataForwardingNamespaces(
+        *merged_config->untypedClusterMetadataForwardingNamespaces());
+  }
+
+  if (merged_config->typedClusterMetadataForwardingNamespaces() != nullptr) {
+    ENVOY_STREAM_LOG(trace,
+                     "Setting new typed cluster metadata forwarding namespaces "
+                     "from per-route "
+                     "configuration",
+                     *decoder_callbacks_);
+    decoding_state_.setTypedClusterMetadataForwardingNamespaces(
+        *merged_config->typedClusterMetadataForwardingNamespaces());
+    encoding_state_.setTypedClusterMetadataForwardingNamespaces(
+        *merged_config->typedClusterMetadataForwardingNamespaces());
   }
 
   if (merged_config->failureModeAllow().has_value()) {
