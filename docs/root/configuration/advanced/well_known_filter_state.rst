@@ -81,6 +81,10 @@ The following lists the filter state object keys used by the Envoy extensions:
   <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>` override on a per-route basis.
   Accepts a number string as a constructor.
 
+``envoy.tls.on_demand_secret``
+  Overrides the secret name when using :ref:`On-demand secret certificate selector
+  <envoy_v3_api_msg_extensions.certificate_selectors.on_demand_secret.v3.Config>`.
+
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
 

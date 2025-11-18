@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.certificate_selectors.on_demand_secret.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/config_source.proto";
 
 import "udpa/annotations/status.proto";
@@ -22,6 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Config {
   message SdsSecretConfig {
     // Secret name. If specified, the secret is pre-fetched during configuration and applied to all connections.
+    // This can be overridden on a per-connection basis using the filter state key ``envoy.tls.on_demand_secret``.
     string name = 1;
 
     // If specified, the secret is fetched and reloaded via SDS. When absent, the secret is loaded from the
@@ -32,7 +34,9 @@ message Config {
   // Defines the source of the secrets (static resources or dynamic SDS).
   SdsSecretConfig sds_secret_config = 1 [(validate.rules).message = {required: true}];
 
-  // If specified and there is a filter state with the given key, then the object string value determines the secret name.
-  string filter_state_key = 2;
+  // Optional extension to specify a mapping to the secret name. Requires that
+  // the ``name`` field in the ``sds_secret_config`` is empty.
+  // [#extension-category: envoy.tls.certificate_selector_mapping]
+  config.core.v3.TypedExtensionConfig secret_name = 2;
 }
 
