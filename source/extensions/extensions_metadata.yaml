@@ -2111,6 +2111,5 @@ envoy.certificate_selectors.on_demand_secret:
   - envoy.tls.certificate_selectors
   security_posture: unknown
   status: alpha
-  status_upstream: alpha
   type_urls:
   - envoy.extensions.certificate_selectors.on_demand_secret.v3.Config

@@ -28,6 +28,8 @@ message Config {
 
     config.core.v3.ConfigSource sds_config = 2;
   }
+
+  // Start pre-fetching the secret on the configuration load but allow connections to accept.
   SdsSecretConfig sds_secret_config = 1 [(validate.rules).message = {required: true}];
 }
 

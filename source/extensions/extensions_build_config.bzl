@@ -585,7 +585,7 @@ EXTENSIONS = {
     "envoy.geoip_providers.maxmind":                         "//source/extensions/geoip_providers/maxmind:config",
 
     #
-    # cluster specifier plugin
+    # Cluster specifier plugin
     #
     "envoy.router.cluster_specifier_plugin.lua":     "//source/extensions/router/cluster_specifiers/lua:config",
     "envoy.router.cluster_specifier_plugin.matcher": "//source/extensions/router/cluster_specifiers/matcher:config",
@@ -597,8 +597,11 @@ EXTENSIONS = {
     "envoy.generic_proxy.codecs.dubbo":                         "//source/extensions/filters/network/generic_proxy/codecs/dubbo:config",
     "envoy.generic_proxy.codecs.http1":                         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
 
-    # Dynamic mocules
+    # Dynamic modules
     "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
+
+    # Certificate selectors
+    "envoy.certificates_selectors.on_demand":                  "//source/extensions/certificate_selectors/on_demand:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
