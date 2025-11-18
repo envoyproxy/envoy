@@ -55,8 +55,8 @@ minor_behavior_changes:
     ``envoy.reloadable_features.ext_proc_stream_close_optimization`` to ``false``.
 - area: ext_authz
   change: |
-    Check that the response header count is less than the configured limits before applying mutations, and do not
-    add new headers if not.
+    Check that the response header count and size is less than the configured limits after applying
+    mutations and send a local reply if not.
 - area: ext_authz
   change: |
     Fixed HTTP ext_authz service to properly propagate headers (such as ``set-cookie``) back to clients. The
@@ -123,6 +123,10 @@ bug_fixes:
   change: |
     Fixed a bug where attributes based on request headers (e.g. ``request.host``) were not sent to
     the ext_proc server if ext_proc was configured to only run on the encode path.
+- area: tcp_proxy
+  change: |
+    Fixed a connection leak in the TCP proxy when the ``receive_before_connect`` feature is enabled and the
+    downstream connection closes before the upstream connection is established.
 - area: connection
   change: |
     Fixed connection handling to properly propagate transport failure reasons to StreamInfo before raising
@@ -172,6 +176,9 @@ new_features:
   change: |
     Added a new :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>` which emits
     configurable metrics.
+- area: otlp_stat_sink
+  change: |
+    Fix ``start_time_unix_nano`` for the metrics exported.
 - area: otlp_stat_sink
   change: |
     Added support for dropping stats via
@@ -303,5 +310,12 @@ new_features:
     Added support for substitution formatting in direct response bodies via the new
     :ref:`body_format <envoy_v3_api_field_config.route.v3.DirectResponseAction.body_format>` field
     in :ref:`DirectResponseAction <envoy_v3_api_msg_config.route.v3.DirectResponseAction>`.
+- area: tls_inspector
+  change: |
+    Propagate the transport error from the tls_inspector to the DownstreamTransportFailureReason in StreamInfo
+    for access logging prior to the TLS handshake.
+- area: ext_proc
+  change: |
+    Add support for forwarding cluster metadata to ext_proc server.
 
 deprecated:
