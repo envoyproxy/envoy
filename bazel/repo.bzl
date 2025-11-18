@@ -14,8 +14,8 @@ def image_mobile():
         REPO, PREFIX_MOBILE, TAG, SHA_MOBILE)
 
 def image_worker():
-    return "%s:%s@sha256:%s" % (
-        REPO_GCR, TAG, SHA)
+    return "%s@sha256:%s" % (
+        REPO_GCR, SHA)
 
 """
 
