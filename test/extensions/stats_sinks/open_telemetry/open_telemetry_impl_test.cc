@@ -283,6 +283,7 @@ public:
     EXPECT_EQ(1, metric.gauge().data_points().size());
     EXPECT_EQ(value, metric.gauge().data_points()[0].as_int());
     EXPECT_EQ(expected_time_ns_, metric.gauge().data_points()[0].time_unix_nano());
+    EXPECT_EQ(0, metric.gauge().data_points()[0].start_time_unix_nano());
   }
 
   void expectSum(const opentelemetry::proto::metrics::v1::Metric& metric, std::string name,
@@ -294,9 +295,11 @@ public:
     if (is_delta) {
       EXPECT_EQ(AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
                 metric.sum().aggregation_temporality());
+      EXPECT_EQ(delta_start_time_ns_, metric.sum().data_points()[0].start_time_unix_nano());
     } else {
       EXPECT_EQ(AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
                 metric.sum().aggregation_temporality());
+      EXPECT_EQ(cumulative_start_time_ns_, metric.sum().data_points()[0].start_time_unix_nano());
     }
 
     EXPECT_EQ(1, metric.sum().data_points().size());
@@ -322,12 +325,12 @@ public:
     if (is_delta) {
       EXPECT_EQ(AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
                 metric.histogram().aggregation_temporality());
-
+      EXPECT_EQ(delta_start_time_ns_, data_point.start_time_unix_nano());
       EXPECT_GE(data_point.sum(), 3559994.2);
     } else {
       EXPECT_EQ(AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
                 metric.histogram().aggregation_temporality());
-
+      EXPECT_EQ(cumulative_start_time_ns_, data_point.start_time_unix_nano());
       EXPECT_GE(data_point.sum(), 5724992.7);
     }
 
@@ -347,6 +350,9 @@ public:
     EXPECT_EQ(key, attributes[0].key());
     EXPECT_EQ(value, attributes[0].value().string_value());
   }
+
+  int64_t delta_start_time_ns_ = 123;
+  int64_t cumulative_start_time_ns_ = 456;
 };
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
@@ -358,7 +364,8 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
   addHostGaugeToSnapshot("test_host_gauge", 4);
   addHistogramToSnapshot("test_histogram");
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 5);
 
   {
@@ -397,7 +404,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
   }
 
   gauge_storage_.back()->used_ = false;
-  metrics = flusher.flush(snapshot_, 0);
+  metrics = flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 4);
 }
 
@@ -410,7 +417,8 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithStatsPrefix) {
   addGaugeToSnapshot("test_host_gauge", 1);
   addHistogramToSnapshot("test_histogram");
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 5);
 
   {
@@ -447,7 +455,8 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithNoTaggedName) {
   addGaugeToSnapshot("test_gauge", 1);
   addHistogramToSnapshot("test_histogram");
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 3);
 
   {
@@ -473,8 +482,8 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithNoAttributes) {
   addCounterToSnapshot("test_counter", 1, 1);
   addGaugeToSnapshot("test_gauge", 1);
   addHistogramToSnapshot("test_histogram");
-
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 3);
   {
     const auto* metric = findGauge(metrics, getTagExtractedName("test_gauge"));
@@ -506,7 +515,8 @@ TEST_F(OtlpMetricsFlusherTests, GaugeMetric) {
   addHostGaugeToSnapshot("test_host_gauge1", 3);
   addHostGaugeToSnapshot("test_host_gauge2", 4);
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 4);
   expectGauge(*findGauge(metrics, getTagExtractedName("test_gauge1")),
               getTagExtractedName("test_gauge1"), 1);
@@ -526,7 +536,8 @@ TEST_F(OtlpMetricsFlusherTests, CumulativeCounterMetric) {
   addHostCounterToSnapshot("test_host_counter1", 2, 4);
   addHostCounterToSnapshot("test_host_counter2", 5, 10);
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 4);
   expectSum(*findSum(metrics, getTagExtractedName("test_counter1")),
             getTagExtractedName("test_counter1"), 1, false);
@@ -546,7 +557,8 @@ TEST_F(OtlpMetricsFlusherTests, DeltaCounterMetric) {
   addHostCounterToSnapshot("test_host_counter1", 2, 4);
   addHostCounterToSnapshot("test_host_counter2", 5, 10);
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
 
   expectMetricsCount(metrics, 4);
   expectSum(*findSum(metrics, getTagExtractedName("test_counter1")),
@@ -565,7 +577,8 @@ TEST_F(OtlpMetricsFlusherTests, CumulativeHistogramMetric) {
   addHistogramToSnapshot("test_histogram1");
   addHistogramToSnapshot("test_histogram2");
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 2);
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram1")),
                   getTagExtractedName("test_histogram1"), false);
@@ -579,7 +592,8 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
   addHistogramToSnapshot("test_histogram1", true);
   addHistogramToSnapshot("test_histogram2", true);
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 2);
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram1")),
                   getTagExtractedName("test_histogram1"), true);
@@ -651,7 +665,8 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationCounter) 
   addCounterToSnapshot("unmapped_counter", 0, 1, true, {{"keyX", "valX"}});
   addCounterToSnapshot("unmapped_counter", 0, 5, true, {{"keyY", "valY"}});
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 123);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   const int expected_metrics_count = 2;
   expectMetricsCount(metrics, expected_metrics_count);
 
@@ -747,7 +762,8 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationGauge) {
   addGaugeToSnapshot("unmapped_gauge", 4, true, {{"keyX", "valX"}});
   addGaugeToSnapshot("unmapped_gauge", 10, true, {{"keyY", "valY"}});
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 123);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   const int expected_metrics_count = 2;
   expectMetricsCount(metrics, expected_metrics_count);
 
@@ -842,7 +858,8 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationHistogram
   addHistogramToSnapshot("unmapped_histogram", false, true, {{"keyX", "valX"}});
   addHistogramToSnapshot("unmapped_histogram", false, true, {{"keyY", "valY"}});
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 123);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   const int expected_metrics_count = 2;
   expectMetricsCount(metrics, expected_metrics_count);
 
@@ -995,7 +1012,8 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
   addGaugeToSnapshot("test_gauge", 1, true, {{"key", "valA"}});
   addHistogramToSnapshot("test_histogram", false, true, {{"key", "hist1"}});
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 3);
 
   auto& exported_metrics =
@@ -1098,7 +1116,8 @@ TEST_F(OtlpMetricsFlusherTests, DropMetrics) {
   addHistogramToSnapshot("test_histogram");
   addHistogramToSnapshot("drop_histogram");
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 5);
 
   EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_counter")));
@@ -1161,7 +1180,8 @@ TEST_F(OtlpMetricsFlusherTests, OnNoMatchDrop) {
   addCounterToSnapshot("keep_counter", 1, 1);
   addCounterToSnapshot("drop_via_on_no_match_counter", 1, 1);
 
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 1);
 
   EXPECT_NE(nullptr, findMetric(metrics, "new_kept_metric"));
@@ -1172,7 +1192,8 @@ TEST_F(OtlpMetricsFlusherTests, SetResourceAttributes) {
   OtlpMetricsFlusherImpl flusher(
       otlpOptions(true, false, true, true, "", {{"key_foo", "val_foo"}}));
   addCounterToSnapshot("test_counter1", 1, 1);
-  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 0);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
   expectMetricsCount(metrics, 1);
   expectSum(metricAt(0, metrics), getTagExtractedName("test_counter1"), 1, true);
   EXPECT_EQ(1, metrics->resource_metrics().size());
@@ -1191,7 +1212,8 @@ public:
 
 class MockOtlpMetricsFlusher : public OtlpMetricsFlusher {
 public:
-  MOCK_METHOD(MetricsExportRequestPtr, flush, (Stats::MetricSnapshot&, int64_t), (const, override));
+  MOCK_METHOD(MetricsExportRequestPtr, flush, (Stats::MetricSnapshot&, int64_t, int64_t),
+              (const, override));
 };
 
 class OpenTelemetryGrpcSinkTests : public OpenTelemetryStatsSinkTests {
@@ -1206,18 +1228,22 @@ public:
 
 TEST_F(OpenTelemetryGrpcSinkTests, BasicFlow) {
   // Initialize the sink with a created_at time of 1000.
-  OpenTelemetryGrpcSink sink(flusher_, exporter_, 1000);
+  OpenTelemetryGrpcSink sink(flusher_, exporter_, /*create_time_ns=*/1000);
 
   // First flush: last_flush_time_ns should be the created_at value (1000).
   MetricsExportRequestPtr request1 = std::make_unique<MetricsExportRequest>();
-  EXPECT_CALL(*flusher_, flush(_, 1000)).WillOnce(Return(ByMove(std::move(request1))));
+  EXPECT_CALL(*flusher_, flush(_, /*delta_start_time_ns=*/1000,
+                               /*cumulative_start_time_ns=*/1000))
+      .WillOnce(Return(ByMove(std::move(request1))));
   EXPECT_CALL(*exporter_, send(_));
   sink.flush(snapshot_);
 
   // Second flush: last_flush_time_ns should be the snapshotTime() of the
   // snapshot used in the first flush, which is expected_time_ns_.
   MetricsExportRequestPtr request2 = std::make_unique<MetricsExportRequest>();
-  EXPECT_CALL(*flusher_, flush(_, expected_time_ns_)).WillOnce(Return(ByMove(std::move(request2))));
+  EXPECT_CALL(*flusher_, flush(_, /*delta_start_time_ns=*/expected_time_ns_,
+                               /*cumulative_start_time_ns=*/1000))
+      .WillOnce(Return(ByMove(std::move(request2))));
   EXPECT_CALL(*exporter_, send(_));
   sink.flush(snapshot_);
 }

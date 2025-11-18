@@ -1380,6 +1380,8 @@ bool envoy_dynamic_module_callback_http_set_response_trailer(
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length);
 
+// ---------------------- HTTP local response callbacks ------------------------
+
 /**
  * envoy_dynamic_module_callback_http_send_response is called by the module to send the response
  * to the downstream.
@@ -1392,11 +1394,17 @@ bool envoy_dynamic_module_callback_http_set_response_trailer(
  * @param headers_vector_size is the size of the headers_vector.
  * @param body is the pointer to the buffer of the body of the response.
  * @param body_length is the length of the body.
+ * @param details is the pointer to the buffer of the response code details of the response.
+ * The response code details is an optional short string that provides additional information about
+ * why this response code was sent like "rate_limited". It is typically used for logging purposes.
+ * This is optional and can be null.
+ * @param details_length is the length of the details.
  */
 void envoy_dynamic_module_callback_http_send_response(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
     envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
-    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_length);
+    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_length,
+    envoy_dynamic_module_type_buffer_module_ptr details, size_t details_length);
 
 /**
  * envoy_dynamic_module_callback_http_send_response_headers is called by the module to send the
@@ -1831,6 +1839,25 @@ bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
+
+// ---------------------- Other HTTP filter callbacks ----------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_add_custom_flag is called by the module to add a custom flag
+ * to indicate a noteworthy event of this stream. Multiple flags could be added and will be
+ * concatenated with comma. It should not contain any empty or space characters (' ', '\t', '\f',
+ * '\v', '\n', '\r'). to the HTTP stream. The flag can later be used in logging or metrics.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param flag_ptr is the pointer to the buffer of the flag to be added. Ideally, it should be a
+ * very short string that represents a single event, like the the Envoy response flag.
+ * @param flag_length is the length of the flag.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_add_custom_flag(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr flag_ptr, size_t flag_length);
 
 // ---------------------- HTTP filter scheduler callbacks ------------------------
 
