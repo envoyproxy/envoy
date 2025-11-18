@@ -1606,6 +1606,7 @@ DNAT
 RSP
 EWMA
 hotplug
+cgroup
 cgroupv1
 cgroupv2
 cgroupsv1

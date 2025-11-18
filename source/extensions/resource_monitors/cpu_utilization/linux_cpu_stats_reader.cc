@@ -209,7 +209,7 @@ CpuTimes LinuxContainerCpuStatsReader::getCpuTimes() {
   ENVOY_LOG_MISC(trace, "cgroupsv1 cgroup v2 not found");
   ENVOY_LOG_MISC(trace, "cgroupsv1 failing back to cgroup v1 ");
 
-  // cgroupv1 fallback
+  // fallback to cgroup v1 if cgroup v2 is not found
   std::ifstream cpu_allocated_file, cpu_times_file;
   double cpu_allocated_value, cpu_times_value;
 
