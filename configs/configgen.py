@@ -8,7 +8,7 @@ OUT_DIR = sys.argv[1]
 
 #
 # About this script: Envoy configurations needed for a complete infrastructure are complicated.
-# This script demonstrates how to programatically build Envoy configurations using jinja templates.
+# This script demonstrates how to programmatically build Envoy configurations using jinja templates.
 # This is roughly how we build our configurations at Lyft. The three configurations demonstrated
 # here (front proxy, double proxy, and service to service) are also very close approximations to
 # what we use at Lyft in production. They give a demonstration of how to configure most Envoy
