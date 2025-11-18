@@ -581,7 +581,7 @@ TEST(HttpExtProcConfigTest, InvalidStatPrefixTooLong) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).value(), EnvoyException,
-      "Proto constraint validation failed.*stat_prefix.*");
+      "Proto constraint validation failed.*StatPrefix.*");
 }
 
 } // namespace
