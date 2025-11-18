@@ -153,6 +153,10 @@ The HTTP filter outputs statistics in the ``cluster.<route target cluster>.ext_a
   invalid, Counter, Total responses rejected due to invalid header or query parameter mutations.
   omitted_response_headers, Counter, "Total responses for which ext_authz rejected any number of
   headers due to the header map constraints."
+  request_header_limits_reached, Counter, "Total requests for which ext_authz sent a local reply
+  because it couldn't apply all header mutations"
+  response_header_limits_reached, Counter, "Total responses for which ext_authz sent a local reply
+  because it couldn't apply all header mutations"
 
 Dynamic Metadata
 ----------------

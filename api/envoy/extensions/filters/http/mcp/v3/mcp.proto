@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.mcp.v3;
 
+import "google/protobuf/wrappers.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -40,6 +42,15 @@ message Mcp {
   // This allows the route to be re-selected based on the MCP metadata (e.g., method, params).
   // Defaults to false.
   bool clear_route_cache = 2;
+
+  // Maximum size of the request body to buffer for JSON-RPC validation.
+  // If the request body exceeds this size, the request is rejected with ``413 Payload Too Large``.
+  // This limit applies to both ``REJECT_NO_MCP`` and ``PASS_THROUGH`` modes to prevent unbounded buffering.
+  //
+  // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
+  //
+  // Setting it to 0 would disable the limit. It is not recommended to do so in production.
+  google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {lte: 10485760}];
 }
 
 // McpOverride for MCP filter
