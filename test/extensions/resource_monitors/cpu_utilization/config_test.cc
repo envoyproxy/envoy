@@ -129,7 +129,7 @@ TEST(CpuUtilizationMonitorFactoryTest, FactoryRegistered) {
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
   EXPECT_NE(factory, nullptr);
-  
+
   auto* typed_factory = dynamic_cast<CpuUtilizationMonitorFactory*>(factory);
   EXPECT_NE(typed_factory, nullptr);
   EXPECT_EQ(typed_factory->name(), "envoy.resource_monitors.cpu_utilization");
