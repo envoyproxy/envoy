@@ -21,15 +21,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // by setting FIPS compliance policy on the loaded secret material.
 message Config {
   message SdsSecretConfig {
-    // Name by which the secret can be uniquely referred to. When both name and config are specified,
-    // then secret can be fetched and/or reloaded via SDS. When only name is specified, then secret
-    // will be loaded from static resources.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    // Secret name. If specified, the secret is pre-fetched during configuration and applied to all connections.
+    string name = 1;
 
+    // If specified, the secret is fetched and reloaded via SDS. When absent, the secret is loaded from the
+    // static resources.
     config.core.v3.ConfigSource sds_config = 2;
   }
 
-  // Start pre-fetching the secret on the configuration load but allow connections to accept.
+  // Defines the source of the secrets (static resources or dynamic SDS).
   SdsSecretConfig sds_secret_config = 1 [(validate.rules).message = {required: true}];
+
+  // If specified and there is a filter state with the given key, then the object string value determines the secret name.
+  string filter_state_key = 2;
 }
 
