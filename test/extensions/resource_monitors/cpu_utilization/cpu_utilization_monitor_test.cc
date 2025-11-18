@@ -715,6 +715,117 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2DynamicCoreChange) {
   EXPECT_DOUBLE_EQ(resource.pressure(), 0.04875); // 0.5 * 0.05 + 0.025 * 0.95
 }
 
+// Cgroup v2 Error Handling Tests
+TEST(HostCpuUtilizationMonitorTest, CgroupV2ReportsError) {
+  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
+  auto stats_reader = std::make_unique<MockCpuStatsReader>();
+  EXPECT_CALL(*stats_reader, getCpuTimes())
+      .WillOnce(Return(CpuTimes{false, true, 0, 0, 0}))      // Constructor call
+      .WillOnce(Return(CpuTimes{false, true, 0, 0, 0}))      // Invalid cgroup v2
+      .WillOnce(Return(CpuTimes{false, true, 0, 200, 2.0})); // Invalid cgroup v2
+  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasError());
+  ASSERT_FALSE(resource.hasPressure());
+
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasError());
+  ASSERT_FALSE(resource.hasPressure());
+}
+
+TEST(HostCpuUtilizationMonitorTest, CgroupV2ErroneousStatsDenominator) {
+  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
+  auto stats_reader = std::make_unique<MockCpuStatsReader>();
+  EXPECT_CALL(*stats_reader, getCpuTimes())
+      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0})) // Initial valid
+      .WillOnce(Return(CpuTimes{true, true, 100000.0, 99999999, 2.0})); // total_time goes backward
+  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasError());
+  ASSERT_FALSE(resource.hasPressure());
+}
+
+TEST(HostCpuUtilizationMonitorTest, CgroupV2ErroneousStatsNumerator) {
+  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
+  auto stats_reader = std::make_unique<MockCpuStatsReader>();
+  EXPECT_CALL(*stats_reader, getCpuTimes())
+      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0})) // Initial valid
+      .WillOnce(Return(CpuTimes{true, true, 99999.0, 200000000, 2.0})); // work_time goes backward
+  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasError());
+  ASSERT_FALSE(resource.hasPressure());
+}
+
+TEST(HostCpuUtilizationMonitorTest, CgroupV2ZeroTotalTimeDelta) {
+  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
+  auto stats_reader = std::make_unique<MockCpuStatsReader>();
+  EXPECT_CALL(*stats_reader, getCpuTimes())
+      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0}))  // Initial valid
+      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0})); // No time delta (zero)
+  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasError());
+  ASSERT_FALSE(resource.hasPressure());
+}
+
+TEST(ContainerCpuUsageMonitorTest, CgroupV2ReportsError) {
+  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
+  config.set_mode(
+      envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
+  auto stats_reader = std::make_unique<MockCpuStatsReader>();
+  EXPECT_CALL(*stats_reader, getCpuTimes())
+      .WillOnce(Return(CpuTimes{false, true, 0, 0, 2.0}))    // Constructor call
+      .WillOnce(Return(CpuTimes{false, true, 0, 0, 2.0}))    // Invalid cgroup v2
+      .WillOnce(Return(CpuTimes{false, true, 0, 200, 2.0})); // Invalid cgroup v2
+  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasError());
+
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasError());
+}
+
+TEST(ContainerCpuUsageMonitorTest, CgroupV2ErroneousStatsDenominator) {
+  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
+  config.set_mode(
+      envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
+  auto stats_reader = std::make_unique<MockCpuStatsReader>();
+  EXPECT_CALL(*stats_reader, getCpuTimes())
+      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0})) // Initial valid
+      .WillOnce(Return(CpuTimes{true, true, 100000.0, 99999999, 2.0})); // total_time goes backward
+  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasError());
+}
+
+TEST(ContainerCpuUsageMonitorTest, CgroupV2ErroneousStatsNumerator) {
+  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
+  config.set_mode(
+      envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
+  auto stats_reader = std::make_unique<MockCpuStatsReader>();
+  EXPECT_CALL(*stats_reader, getCpuTimes())
+      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0})) // Initial valid
+      .WillOnce(Return(CpuTimes{true, true, 99999.0, 200000000, 2.0})); // work_time goes backward
+  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasError());
+}
+
 } // namespace
 } // namespace CpuUtilizationMonitor
 } // namespace ResourceMonitors
