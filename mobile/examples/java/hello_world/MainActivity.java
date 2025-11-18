@@ -54,6 +54,7 @@ public class MainActivity extends Activity {
     setContentView(R.layout.activity_main);
 
     engine = new AndroidEngineBuilder(getApplication())
+                 .setUseV2NetworkMonitor(true)
                  .setLogLevel(LogLevel.DEBUG)
                  .setLogger((level, message) -> {
                    Log.d(TAG, message);
@@ -64,7 +65,6 @@ public class MainActivity extends Activity {
                    return null;
                  })
                  .enablePlatformCertificatesValidation(true)
-                 .setUseV2NetworkMonitor(true)
                  .build();
 
     recyclerView = (RecyclerView)findViewById(R.id.recycler_view);
