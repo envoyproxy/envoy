@@ -180,16 +180,14 @@ public:
       const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
   struct CookieSettings {
     CookieSettings(const envoy::extensions::filters::http::oauth2::v3::CookieConfig& config)
-        : same_site_(config.same_site()), path_(config.path().empty() ? "/" : config.path()) {}
+        : same_site_(config.same_site()) {}
 
-    // Default constructor
+    // Default constructor.
     CookieSettings()
         : same_site_(envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                         CookieConfig_SameSite_DISABLED),
-          path_("/") {}
+                         CookieConfig_SameSite_DISABLED) {}
 
     const envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite same_site_;
-    const std::string path_;
   };
 
   const CookieSettings& bearerTokenCookieSettings() const { return bearer_token_cookie_settings_; }
@@ -203,6 +201,7 @@ public:
   const CookieSettings& codeVerifierCookieSettings() const {
     return code_verifier_cookie_settings_;
   }
+  const std::string& cookiesPath() const { return cookies_path_; }
   bool disableTokenEncryption() const { return disable_token_encryption_; }
 
 private:
@@ -247,6 +246,7 @@ private:
   const CookieSettings refresh_token_cookie_settings_;
   const CookieSettings nonce_cookie_settings_;
   const CookieSettings code_verifier_cookie_settings_;
+  const std::string cookies_path_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

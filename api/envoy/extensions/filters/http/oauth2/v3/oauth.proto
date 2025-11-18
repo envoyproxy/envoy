@@ -37,16 +37,9 @@ message CookieConfig {
 
   // The value used for the SameSite cookie attribute.
   SameSite same_site = 1 [(validate.rules).enum = {defined_only: true}];
-
-  // The path attribute for the cookie.
-  // This controls the scope of the cookie and is useful for path-based routing scenarios
-  // where different logical boundaries or applications may operate with different OAuth2 clients.
-  //
-  // If not specified, defaults to ``/``.
-  string path = 2;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message CookieConfigs {
   // Configuration for the bearer token cookie.
   CookieConfig bearer_token_cookie_config = 1;
@@ -68,6 +61,17 @@ message CookieConfigs {
 
   // Configuration for the code verifier cookie.
   CookieConfig code_verifier_cookie_config = 7;
+
+  // The path attribute for all OAuth2 cookies from this filter instance.
+  // All OAuth cookies (bearer token, HMAC, ID token, refresh token, nonce, code verifier, and expires)
+  // will use this same path value. This ensures that all cookies work together as a cohesive authentication session.
+  //
+  // This setting is useful for path-based routing scenarios where multiple OAuth2 filter instances
+  // operate on different path prefixes with different OAuth2 clients. Each filter instance should
+  // configure a distinct path to prevent cookie collisions.
+  //
+  // If not specified, defaults to ``/``.
+  string path = 8;
 }
 
 // [#next-free-field: 6]

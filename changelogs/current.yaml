@@ -159,8 +159,9 @@ new_features:
 - area: oauth2
   change: |
     Added support for configuring cookie path in OAuth2 filter. The :ref:`path
-    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.CookieConfig.path>` field can now be set
-    for each cookie type to control the scope of OAuth2 cookies.
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.CookieConfigs.path>` field can now be set
+    to control the scope of all OAuth2 cookies from a filter instance. This allows multiple OAuth2 filter
+    instances operating on different path prefixes to use distinct cookie paths and avoid collisions.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request
