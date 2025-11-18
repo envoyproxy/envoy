@@ -59,6 +59,27 @@ message DeniedHttpResponse {
   string body = 3;
 }
 
+// HTTP attributes for an error response.
+message ErrorHttpResponse {
+  // This field allows the authorization service to send an HTTP response status code to the
+  // downstream client when an error occurs. If not set, Envoy sends the status code configured
+  // via :ref:`status_on_error <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.status_on_error>`,
+  // which defaults to ``403 Forbidden``.
+  type.v3.HttpStatus status = 1;
+
+  // This field allows the authorization service to send HTTP response headers
+  // to the downstream client.
+  //
+  // .. note::
+  //     The :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` defaults to
+  //     ``false`` when used in this message.
+  repeated config.core.v3.HeaderValueOption headers = 2;
+
+  // This field allows the authorization service to send a response body data
+  // to the downstream client.
+  string body = 3;
+}
+
 // HTTP attributes for an OK response.
 // [#next-free-field: 9]
 message OkHttpResponse {
@@ -114,6 +135,7 @@ message OkHttpResponse {
 }
 
 // Intended for gRPC and Network Authorization servers ``only``.
+// [#next-free-field: 6]
 message CheckResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.CheckResponse";
@@ -132,6 +154,14 @@ message CheckResponse {
 
     // Supplies http attributes for an ok response.
     OkHttpResponse ok_response = 3;
+
+    // Supplies http attributes for an error response. This is used when the authorization
+    // service encounters an internal error and wants to return custom headers and body to the
+    // downstream client. When ``error_response`` is set, the ext_authz filter increments the
+    // ``ext_authz_error`` stat and respects the :ref:`failure_mode_allow
+    // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>`
+    // configuration.
+    ErrorHttpResponse error_response = 5;
   }
 
   // Optional response metadata that will be emitted as dynamic metadata to be consumed by the next

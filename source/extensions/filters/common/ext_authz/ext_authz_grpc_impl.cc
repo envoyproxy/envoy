@@ -117,6 +117,21 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
       const auto& ok_response = response->ok_response();
       copyOkResponseMutations(authz_response, ok_response);
     }
+  } else if (response->has_error_response()) {
+    // If error_response is present, treat it as an error and not denial.
+    span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceError);
+    authz_response->status = CheckStatus::Error;
+
+    // For error responses, don't set a default status_code.
+    // Let the filter use status_on_error configuration.
+    const auto& error_response = response->error_response();
+    copyHeaderFieldIntoResponse(authz_response, error_response.headers());
+
+    const uint32_t status_code = error_response.status().code();
+    if (status_code > 0) {
+      authz_response->status_code = static_cast<Http::Code>(status_code);
+    }
+    authz_response->body = error_response.body();
   } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;

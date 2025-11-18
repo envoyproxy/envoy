@@ -156,6 +156,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: ext_authz
+  change: |
+    Added support for :ref:`ErrorHttpResponse <envoy_v3_api_msg_service.auth.v3.ErrorHttpResponse>` in the external
+    authorization API. This new response type allows authorization services to return custom HTTP status codes, headers,
+    and response bodies when encountering internal errors.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request

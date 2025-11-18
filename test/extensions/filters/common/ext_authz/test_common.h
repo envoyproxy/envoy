@@ -43,6 +43,11 @@ public:
                                             const HeaderValueOptionVector& headers,
                                             const HeaderValueOptionVector& downstream_headers);
 
+  static CheckResponsePtr makeErrorCheckResponse(Grpc::Status::GrpcStatus response_status,
+                                                 envoy::type::v3::StatusCode http_status_code,
+                                                 const std::string& body,
+                                                 const HeaderValueOptionVector& headers);
+
   static Response
   makeAuthzResponse(CheckStatus status, Http::Code status_code = Http::Code::OK,
                     const std::string& body = std::string{},
@@ -62,15 +67,30 @@ public:
 };
 
 MATCHER_P(AuthzErrorResponse, response, "") {
-  // These fields should be always empty when the status is an error.
-  if (!arg->headers_to_add.empty() || !arg->headers_to_append.empty() || !arg->body.empty()) {
+  // For gRPC transport errors (onFailure), these fields should be empty.
+  // For error_response, headers_to_set and body can be populated.
+  if (!arg->headers_to_append.empty()) {
     return false;
   }
-  // HTTP status code should be always set to Forbidden.
-  if (arg->status_code != Http::Code::Forbidden) {
-    return false;
-  }
+  // Status code can be custom for error_response or Forbidden for transport errors.
   return arg->status == response.status;
+}
+
+MATCHER_P(AuthzErrorResponseWithAttributes, response, "") {
+  if (arg->status != response.status) {
+    return false;
+  }
+  if (arg->grpc_status != response.grpc_status) {
+    return false;
+  }
+  if (arg->status_code != response.status_code) {
+    return false;
+  }
+  if (arg->body.compare(response.body)) {
+    return false;
+  }
+  // Compare headers_to_set.
+  return TestCommon::compareHeaderVector(response.headers_to_set, arg->headers_to_set);
 }
 
 MATCHER_P(AuthzResponseNoAttributes, response, "") {
