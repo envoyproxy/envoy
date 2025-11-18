@@ -98,6 +98,7 @@ common:clang-common --incompatible_enable_cc_toolchain_resolution=false
 common:clang --config=clang-common
 common:clang --config=libc++
 common:clang --action_env=LDFLAGS="-fuse-ld=lld"
+common:clang --define=LLVM_DIRECTORY=/opt/llvm
 
 build:arm64-clang --config=clang
 
