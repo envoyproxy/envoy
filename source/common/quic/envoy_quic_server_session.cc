@@ -12,6 +12,7 @@
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 
+#include "absl/log/absl_check.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -62,11 +63,15 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
   }
   quic_connection_->set_context_listener(
       std::make_unique<EnvoyQuicConnectionContextListener>(this, dispatcher));
+  quic_stat_names.chargeQuicConnectionNumStats(listener_scope, /*is_upstream=*/false,
+                                               /*in_use=*/false, /*increment=*/true);
 }
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
   QuicFilterManagerConnectionImpl::network_connection_ = nullptr;
+  quic_stat_names_.chargeQuicConnectionNumStats(stats_scope_, /*is_upstream=*/false,
+                                                /*in_use=*/false, /*increment=*/false);
 }
 
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
@@ -97,6 +102,11 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   }
   auto stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL, codec_stats_.value(),
                                           http3_options_.value(), headers_with_underscores_action_);
+  bool streams_was_empty = !HasActiveRequestStreams();
+  if (streams_was_empty && !stream->is_static()) {
+    quic_stat_names_.chargeQuicConnectionNumStats(stats_scope_, /*is_upstream=*/false,
+                                                  /*in_use=*/true, /*increment=*/true);
+  }
   ActivateStream(absl::WrapUnique(stream));
   if (aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
@@ -139,6 +149,7 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
       position_->connection_map_.erase(&position_->filter_chain_);
     }
     position_.reset();
+    on_connection_closed_called_ = true;
   }
 }
 
@@ -271,6 +282,21 @@ EnvoyQuicServerSession::SelectAlpn(const std::vector<absl::string_view>& alpns) 
     }
   }
   return alpns.end();
+}
+
+void EnvoyQuicServerSession::OnStreamClosed(quic::QuicStreamId stream_id) {
+  bool streams_was_empty = !HasActiveRequestStreams();
+
+  QuicServerSessionBase::OnStreamClosed(stream_id);
+  if (on_connection_closed_called_) {
+    return;
+  }
+
+  if (!streams_was_empty && !HasActiveRequestStreams()) {
+    quic_stat_names_.chargeQuicConnectionNumStats(stats_scope_, /*is_upstream=*/false,
+                                                  /*in_use=*/true, /*increment=*/false);
+    ABSL_DCHECK(!on_connection_closed_called_);
+  }
 }
 
 } // namespace Quic

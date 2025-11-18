@@ -24,14 +24,24 @@ public:
   void chargeQuicResetStreamErrorStats(Stats::Scope& scope, quic::QuicResetStreamError error_code,
                                        bool from_self, bool is_upstream);
 
+  void chargeQuicConnectionNumStats(Stats::Scope& scope, bool is_upstream, bool in_use,
+                                    bool increment);
+
 private:
   // Find the actual counter in |scope| and increment it.
   // An example counter name: "http3.downstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR".
   void incCounter(Stats::Scope& scope, const Stats::StatNameVec& names);
 
+  // Find the actual gauge in |scope| and increment it.
+  void incGauge(Stats::Scope& scope, const Stats::StatNameVec& names);
+  // Find the actual gauge in |scope| and decrement it.
+  void decGauge(Stats::Scope& scope, const Stats::StatNameVec& names);
+
   Stats::StatName connectionCloseStatName(quic::QuicErrorCode error_code);
 
   Stats::StatName resetStreamErrorStatName(quic::QuicRstStreamErrorCode error_code);
+
+  Stats::StatName connectionNumStatName(bool in_use);
 
   Stats::StatNamePool stat_name_pool_;
   Stats::SymbolTable& symbol_table_;
@@ -46,6 +56,8 @@ private:
   Thread::AtomicPtrArray<const uint8_t, quic::QUIC_STREAM_LAST_ERROR + 1,
                          Thread::AtomicPtrAllocMode::DoNotDelete>
       reset_stream_error_stat_names_;
+  Thread::AtomicPtrArray<const uint8_t, 2, Thread::AtomicPtrAllocMode::DoNotDelete>
+      connection_num_stat_names_;
 };
 
 #else

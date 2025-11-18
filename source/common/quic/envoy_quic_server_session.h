@@ -102,6 +102,9 @@ public:
   std::vector<absl::string_view>::const_iterator
   SelectAlpn(const std::vector<absl::string_view>& alpns) const override;
 
+  // Override for detecting idle sessions.
+  void OnStreamClosed(quic::QuicStreamId stream_id) override;
+
   void setHeadersWithUnderscoreAction(
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action) {
@@ -160,6 +163,7 @@ private:
   Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_ = nullptr;
   Server::LoadShedPoint* should_send_go_away_on_dispatch_ = nullptr;
   bool h3_go_away_sent_ = false;
+  bool on_connection_closed_called_ = false;
 };
 
 } // namespace Quic

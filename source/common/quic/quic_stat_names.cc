@@ -28,6 +28,22 @@ void QuicStatNames::incCounter(Stats::Scope& scope, const Stats::StatNameVec& na
   scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
+void QuicStatNames::incGauge(Stats::Scope& scope, const Stats::StatNameVec& names) {
+  Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+  scope
+      .gaugeFromStatName(Stats::StatName(stat_name_storage.get()),
+                         Stats::Gauge::ImportMode::NeverImport)
+      .inc();
+}
+
+void QuicStatNames::decGauge(Stats::Scope& scope, const Stats::StatNameVec& names) {
+  Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+  scope
+      .gaugeFromStatName(Stats::StatName(stat_name_storage.get()),
+                         Stats::Gauge::ImportMode::NeverImport)
+      .dec();
+}
+
 void QuicStatNames::chargeQuicConnectionCloseStats(Stats::Scope& scope,
                                                    quic::QuicErrorCode error_code,
                                                    quic::ConnectionCloseSource source,
@@ -59,6 +75,18 @@ void QuicStatNames::chargeQuicResetStreamErrorStats(Stats::Scope& scope,
                      (from_self ? from_self_ : from_peer_), stream_error});
 }
 
+void QuicStatNames::chargeQuicConnectionNumStats(Stats::Scope& scope, bool is_upstream, bool in_use,
+                                                 bool increment) {
+  ASSERT(&symbol_table_ == &scope.symbolTable());
+  if (increment) {
+    incGauge(scope, {http3_prefix_, (is_upstream ? upstream_ : downstream_),
+                     connectionNumStatName(in_use)});
+  } else {
+    decGauge(scope, {http3_prefix_, (is_upstream ? upstream_ : downstream_),
+                     connectionNumStatName(in_use)});
+  }
+}
+
 Stats::StatName QuicStatNames::connectionCloseStatName(quic::QuicErrorCode error_code) {
   ASSERT(error_code <= quic::QUIC_LAST_ERROR);
 
@@ -77,6 +105,13 @@ Stats::StatName QuicStatNames::resetStreamErrorStatName(quic::QuicRstStreamError
         return stat_name_pool_.addReturningStorage(absl::StrCat(
             "quic_reset_stream_error_code_", QuicRstStreamErrorCodeToString(error_code)));
       }));
+}
+
+Stats::StatName QuicStatNames::connectionNumStatName(bool in_use) {
+  return Stats::StatName(connection_num_stat_names_.get(in_use, [this, in_use]() -> const uint8_t* {
+    return stat_name_pool_.addReturningStorage(
+        absl::StrCat("real_client_connections", (in_use ? "_in_use" : "_total")));
+  }));
 }
 
 #else
