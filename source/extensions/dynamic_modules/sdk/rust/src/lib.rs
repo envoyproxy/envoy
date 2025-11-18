@@ -746,6 +746,7 @@ pub trait EnvoyHttpFilter {
     status_code: u32,
     headers: Vec<(&'a str, &'a [u8])>,
     body: Option<&'a [u8]>,
+    details: Option<&'a str>,
   );
 
   /// Send response headers to the downstream, optionally indicating end of stream.
@@ -761,6 +762,13 @@ pub trait EnvoyHttpFilter {
   ///
   /// The trailers are passed as a list of key-value pairs.
   fn send_response_trailers<'a>(&mut self, trailers: Vec<(&'a str, &'a [u8])>);
+
+  /// add a custom flag to indicate a noteworthy event of this stream. Mutliple flags could be added
+  /// and will be concatenated with comma. It should not contain any empty or space characters (' ',
+  /// '\t', '\f', '\v', '\n', '\r'). to the HTTP stream. The flag can later be used in logging or
+  /// metrics. Ideally, it should be a very short string that represents a single event, like the
+  /// the Envoy response flag.
+  fn add_custom_flag(&mut self, flag: &str);
 
   /// Get the number-typed metadata value with the given key.
   /// Use the `source` parameter to specify which metadata to use.
@@ -1410,9 +1418,17 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn send_response(&mut self, status_code: u32, headers: Vec<(&str, &[u8])>, body: Option<&[u8]>) {
+  fn send_response(
+    &mut self,
+    status_code: u32,
+    headers: Vec<(&str, &[u8])>,
+    body: Option<&[u8]>,
+    details: Option<&str>,
+  ) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
+    let details_ptr = details.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let details_length = details.map(|s| s.len()).unwrap_or(0);
 
     // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
     // not because of any formal layout guarantees but because:
@@ -1431,6 +1447,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         headers.len(),
         body_ptr as *mut _,
         body_length,
+        details_ptr as *const _ as *mut _,
+        details_length,
       )
     }
   }
@@ -1485,6 +1503,18 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         trailers_ptr,
         trailers.len(),
       )
+    }
+  }
+
+  fn add_custom_flag(&mut self, flag: &str) {
+    let flag_ptr = flag.as_ptr();
+    let flag_size = flag.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_custom_flag(
+        self.raw_ptr,
+        flag_ptr as *const _ as *mut _,
+        flag_size,
+      );
     }
   }
 
