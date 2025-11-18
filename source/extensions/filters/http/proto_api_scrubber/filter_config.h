@@ -81,6 +81,9 @@ public:
   // Returns the request type of the method.
   absl::StatusOr<const Protobuf::Type*> getRequestType(const std::string& method_name) const;
 
+  // Returns the response type of the method.
+  absl::StatusOr<const Protobuf::Type*> getResponseType(const std::string& method_name) const;
+
   FilteringMode filteringMode() const { return filtering_mode_; }
 
 private:
