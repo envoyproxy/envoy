@@ -19,14 +19,16 @@ class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersio
                         public HttpIntegrationTest {
 public:
   IntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
-    useAccessLog("%METADATA(VIRTUAL_HOST:metadata.test:test_key)%,%METADATA(VIRTUAL_HOST:metadata.test:test_trunc):10%,");
+    useAccessLog("%METADATA(VIRTUAL_HOST:metadata.test:test_key)%,"
+                 "%METADATA(VIRTUAL_HOST:metadata.test:test_trunc):10%,");
 
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
           Protobuf::Struct struct_value;
           (*struct_value.mutable_fields())["test_key"] = ValueUtil::stringValue("test_value");
-          (*struct_value.mutable_fields())["test_trunc"] = ValueUtil::stringValue("test_truncated_value");
+          (*struct_value.mutable_fields())["test_trunc"] =
+              ValueUtil::stringValue("test_truncated_value");
 
           (*hcm.mutable_route_config()
                 ->mutable_virtual_hosts(0)
