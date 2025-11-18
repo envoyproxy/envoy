@@ -642,7 +642,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   // trigger the onTimeout event manually, since the timer is fake.
   generic_active_listener_->sockets().front()->onTimeout();
   EXPECT_EQ(server_name,
-            tcp_socket->streamInfo()->downstreamAddressProvider().requestedServerName());
+            tcp_socket->streamInfoPtr()->downstreamAddressProvider().requestedServerName());
 }
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.

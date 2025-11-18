@@ -43,12 +43,6 @@ build --http_timeout_scaling=6.0
 build --action_env=CC --host_action_env=CC
 build --action_env=CXX --host_action_env=CXX
 build --action_env=LLVM_CONFIG --host_action_env=LLVM_CONFIG
-# Do not pass through PATH however.
-# It tends to have machine-specific values, such as dynamically created temp folders.
-# This would make it impossible to share remote action cache hits among machines.
-# build --action_env=PATH --host_action_env=PATH
-# To make our own CI green, we do need that flag on Windows though.
-build:windows --action_env=PATH --host_action_env=PATH
 
 # Allow stamped caches to bust when local filesystem changes.
 # Requires setting `BAZEL_VOLATILE_DIRTY` in the env.
@@ -319,47 +313,15 @@ build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 
-# Windows bazel does not allow sandboxed as a spawn strategy
-build:remote-windows --spawn_strategy=remote,local
-build:remote-windows --strategy=Javac=remote,local
-build:remote-windows --strategy=Closure=remote,local
-build:remote-windows --strategy=Genrule=remote,local
-build:remote-windows --strategy=CppLink=local
-build:remote-windows --remote_timeout=7200
-build:remote-windows --google_default_credentials=true
-build:remote-windows --remote_download_toplevel
-
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
-
 
 build:remote-arm64-clang --config=remote
 build:remote-arm64-clang --config=rbe-toolchain-arm64-clang
 
-
 build:remote-gcc --config=remote
 build:remote-gcc --config=gcc
 build:remote-gcc --config=rbe-toolchain-gcc
-
-build:remote-asan --config=remote
-build:remote-asan --config=rbe-toolchain-clang
-build:remote-asan --config=asan
-
-build:remote-msan --config=remote
-build:remote-msan --config=rbe-toolchain-clang
-build:remote-msan --config=msan
-
-build:remote-tsan --config=remote
-build:remote-tsan --config=rbe-toolchain-clang
-build:remote-tsan --config=tsan
-
-build:remote-msvc-cl --config=remote-windows
-build:remote-msvc-cl --config=msvc-cl
-build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
-
-build:remote-clang-cl --config=remote-windows
-build:remote-clang-cl --config=clang-cl
-build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 ## Compile-time-options testing
 # Right now, none of the available compile-time options conflict with each other. If this
@@ -383,7 +345,6 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=docker.io/envoyproxy/envoy-build-ubuntu:4ce0cb04f941fb89d475597a640176ae64070bb1@sha256:de54e91a8d27623ffbd3fb9bd1aba8241567e41c0fb82b167128e3629c2ede18
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -394,7 +355,6 @@ build:docker-sandbox --experimental_enable_docker_sandbox
 
 build:docker-clang --config=docker-sandbox
 build:docker-clang --config=rbe-toolchain-clang
-
 
 build:docker-gcc --config=docker-sandbox
 build:docker-gcc --config=gcc
@@ -463,55 +423,6 @@ build:oss-fuzz --linkopt=-pthread
 # Compile database generation config
 build:compdb --build_tag_filters=-nocompdb
 
-# Windows build quirks
-build:windows --action_env=TMPDIR
-build:windows --define signal_trace=disabled
-build:windows --define hot_restart=disabled
-build:windows --define tcmalloc=disabled
-build:windows --define wasm=disabled
-build:windows --define manual_stamp=manual_stamp
-build:windows --cxxopt="/std:c++20"
-build:windows --output_groups=+pdb_file
-
-# TODO(wrowe,sunjayBhatia): Resolve bugs upstream in curl and rules_foreign_cc
-# See issue https://github.com/bazelbuild/rules_foreign_cc/issues/301
-build:windows --copt="-DCARES_STATICLIB"
-build:windows --copt="-DNGHTTP2_STATICLIB"
-build:windows --copt="-DCURL_STATICLIB"
-
-# Override any clang preference if building msvc-cl
-# Drop the determinism feature (-DDATE etc are a no-op in msvc-cl)
-build:msvc-cl --action_env=USE_CLANG_CL=""
-build:msvc-cl --define clang_cl=0
-build:msvc-cl --features=-determinism
-
-# Windows build behaviors when using clang-cl
-build:clang-cl --action_env=USE_CLANG_CL=1
-build:clang-cl --define clang_cl=1
-
-# Required to work around Windows clang-cl build defects
-# Ignore conflicting definitions of _WIN32_WINNT
-# Override determinism flags (DATE etc) is valid on clang-cl compiler
-build:clang-cl --copt="-Wno-macro-redefined"
-build:clang-cl --copt="-Wno-builtin-macro-redefined"
-# Workaround problematic missing override declarations of mocks
-# TODO: resolve this class of problematic mocks, e.g.
-# ./test/mocks/http/stream.h(16,21): error: 'addCallbacks'
-#     overrides a member function but is not marked 'override'
-#   MOCK_METHOD(void, addCallbacks, (StreamCallbacks & callbacks));
-build:clang-cl --copt="-Wno-inconsistent-missing-override"
-
-# Defaults to 'auto' - Off for windows, so override to linux behavior
-build:windows --enable_runfiles=yes
-
-# This should become adopted by bazel as the default
-build:windows --features=compiler_param_file
-
-# These options attempt to force a monolithic binary including the CRT
-build:windows --features=fully_static_link
-build:windows --features=static_link_msvcrt
-build:windows --dynamic_mode=off
-
 # RBE (Google)
 build:cache-google --google_default_credentials=true
 build:cache-google --remote_cache=grpcs://remotebuildexecution.googleapis.com
@@ -554,7 +465,6 @@ common:bes-envoy-engflow --bes_timeout=3600s
 common:bes-envoy-engflow --bes_upload_mode=fully_async
 common:bes-envoy-engflow --nolegacy_important_outputs
 common:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
-common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:de54e91a8d27623ffbd3fb9bd1aba8241567e41c0fb82b167128e3629c2ede18
 common:rbe-envoy-engflow --jobs=200
 common:rbe-envoy-engflow --define=engflow_rbe=true
 
