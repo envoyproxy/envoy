@@ -10,6 +10,7 @@
 #############################
 # Dotfiles: ignore by default
 #############################
+.bazelrc
 \.*
 !.azure-pipelines
 !.bazelci

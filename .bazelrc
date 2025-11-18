@@ -89,10 +89,10 @@ build:sanitizer --linkopt -ldl
 test:sanitizer --build_tests_only
 
 # Common flags for Clang (shared between all clang variants)
-common:clang-common --action_env=BAZEL_COMPILER=clang
+common:clang-common --action_env=BAZEL_COMPILER=clang-19
 common:clang-common --linkopt=-fuse-ld=lld
-common:clang-common --action_env=CC=clang --host_action_env=CC=clang
-common:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
+common:clang-common --action_env=CC=clang --host_action_env=CC=clang-19
+common:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++-19
 common:clang-common --incompatible_enable_cc_toolchain_resolution=false
 
 # Clang with libc++ (default)
