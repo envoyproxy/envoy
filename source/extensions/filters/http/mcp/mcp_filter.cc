@@ -97,7 +97,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       // Need to buffer the body to check for JSON-RPC 2.0
       is_mcp_request_ = true;
 
-      // Set the buffer limit - Envoy will automatically send 413 if exceeded
+      // Set the buffer limit.
       const uint32_t max_size = config_->maxRequestBodySize();
       if (max_size > 0) {
         decoder_callbacks_->setDecoderBufferLimit(max_size);
@@ -129,7 +129,6 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     parser_ = std::make_unique<JsonPathParser>();
   }
 
-  ENVOY_LOG(debug, "decodeData start");
   if (parsing_complete_) {
     return Http::FilterDataStatus::Continue;
   }
@@ -152,27 +151,20 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   parse_buffer.reserve(to_parse);
   parse_buffer.resize(to_parse);
   data.copyOut(bytes_parsed_, to_parse, parse_buffer.data());
-  ENVOY_LOG(debug, "boteng parse_buffer: {}", parse_buffer);
+  ENVOY_LOG(debug, "parse_buffer: {}", parse_buffer);
 
-  auto status = parser_->parse(parse_buffer);
-  ENVOY_LOG(debug, "boteng parse_buffer after: {}", parse_buffer);
   // The partial parser will return a bad status.
-  if (!status.ok() && end_stream) {
-    ENVOY_LOG(debug, "mcp filter parse error: {}", status.ToString());
-    parsing_complete_ = true;
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "request body is not a valid JSON.",
-                                       nullptr, absl::nullopt, "mcp_filter_invalid_json");
-    return Http::FilterDataStatus::StopIterationNoBuffer;
-  }
-
+  auto status = parser_->parse(parse_buffer);
+  ENVOY_LOG(debug, "parse_buffer after: {}", parse_buffer);
+  ENVOY_LOG(debug, "mcp filter parse error: {}", status.ToString());
   bytes_parsed_ += to_parse;
 
   if (parser_->isAllFieldsCollected()) {
     ENVOY_LOG(debug, "mcp early parse termination: found all fields");
     return completeParsing();
   } else {
-    if (end_stream) {
-      handleParseError("reached end of stream and don't get enough data.");
+    if (end_stream || (max_request_body_size_ > 0 && bytes_parsed_ >= max_request_body_size_)) {
+      handleParseError("reached end_stream or configured body size, don't get enough data.");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }

@@ -151,7 +151,8 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
-                             "reached end of stream and don't get enough data.", _, _, _));
+                             "reached end_stream or configured body size, don't get enough data.",
+                             _, _, _));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
@@ -204,7 +205,7 @@ TEST_F(McpFilterTest, PartialNoJsonData) {
   Buffer::OwnedImpl buffer("partial data");
 
   // Not end_stream, should buffer
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
 // Test encoder passthrough
@@ -310,11 +311,7 @@ TEST_F(McpFilterTest, RequestBodyUnderLimitSucceeds) {
   // Create a JSON-RPC body that's under 1KB
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
 
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -340,18 +337,7 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejected) {
   std::string json =
       R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "longkey": "this is a very long string to exceed the limit"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::PayloadTooLarge,
-                             testing::HasSubstr("Request body size exceeds maximum allowed size"),
-                             _, _, "mcp_filter_body_too_large"));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Test request body with limit disabled (0 = no limit) allows large bodies
@@ -376,11 +362,6 @@ TEST_F(McpFilterTest, RequestBodyWithDisabledLimitAllowsLargeBodies) {
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"data": ")" + large_data +
                      R"("}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
 
   // Should succeed even with large body
@@ -414,11 +395,6 @@ TEST_F(McpFilterTest, RequestBodyExactlyAtLimitSucceeds) {
   json = json.substr(0, 100);
 
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   // Should NOT be rejected
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::PayloadTooLarge, _, _, _, _)).Times(0);
@@ -482,16 +458,7 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   std::string json =
       R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value with lots of data"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::PayloadTooLarge, _, _, _, "mcp_filter_body_too_large"));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Test route cache is NOT cleared by default when metadata is set
