@@ -6,9 +6,43 @@ import io.envoyproxy.envoymobile.engine.AndroidEngineImpl
 /** The engine builder to use to create Envoy engine on Android. */
 class AndroidEngineBuilder(context: Context) : EngineBuilder() {
   private var useV2NetworkMonitor = false
+  private var useQuicPlatformPacketWriter = false
+  private var enableConnectionMigration = false
+  private var migrateIdleConnection = false
+  private var maxIdleTimeBeforeMigrationSeconds: Long = 0
+  private var maxTimeOnNonDefaultNetworkSeconds: Long = 0
 
   fun setUseV2NetworkMonitor(useV2NetworkMonitor: Boolean): AndroidEngineBuilder {
     this.useV2NetworkMonitor = useV2NetworkMonitor
+    return this
+  }
+
+  fun setUseQuicPlatformPacketWriter(useQuicPlatformPacketWriter: Boolean): AndroidEngineBuilder {
+    this.useQuicPlatformPacketWriter = useQuicPlatformPacketWriter
+    return this
+  }
+
+  fun setEnableConnectionMigration(enableConnectionMigration: Boolean): AndroidEngineBuilder {
+    this.enableConnectionMigration = enableConnectionMigration
+    return this
+  }
+
+  fun setMigrateIdleConnection(migrateIdleConnection: Boolean): AndroidEngineBuilder {
+    this.migrateIdleConnection = migrateIdleConnection
+    return this
+  }
+
+  fun setMaxIdleTimeBeforeMigrationSeconds(
+    maxIdleTimeBeforeMigrationSeconds: Long
+  ): AndroidEngineBuilder {
+    this.maxIdleTimeBeforeMigrationSeconds = maxIdleTimeBeforeMigrationSeconds
+    return this
+  }
+
+  fun setMaxTimeOnNonDefaultNetworkSeconds(
+    maxTimeOnNonDefaultNetworkSeconds: Long
+  ): AndroidEngineBuilder {
+    this.maxTimeOnNonDefaultNetworkSeconds = maxTimeOnNonDefaultNetworkSeconds
     return this
   }
 
@@ -22,7 +56,12 @@ class AndroidEngineBuilder(context: Context) : EngineBuilder() {
         enableProxying,
         /*useNetworkChangeEvent*/ false,
         /*disableDnsRefreshOnNetworkChange*/ false,
-        useV2NetworkMonitor
+        useV2NetworkMonitor,
+        useQuicPlatformPacketWriter,
+        enableConnectionMigration,
+        migrateIdleConnection,
+        maxIdleTimeBeforeMigrationSeconds,
+        maxTimeOnNonDefaultNetworkSeconds
       )
     }
   }
