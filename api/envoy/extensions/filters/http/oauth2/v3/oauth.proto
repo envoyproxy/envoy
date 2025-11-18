@@ -62,13 +62,11 @@ message CookieConfigs {
   // Configuration for the code verifier cookie.
   CookieConfig code_verifier_cookie_config = 7;
 
-  // The path attribute for all OAuth2 cookies from this filter instance.
-  // All OAuth cookies (bearer token, HMAC, ID token, refresh token, nonce, code verifier, and expires)
-  // will use this same path value. This ensures that all cookies work together as a cohesive authentication session.
+  // The path attribute for all OAuth2 cookies. All cookies will use this path value to ensure
+  // they work together as a cohesive authentication session.
   //
-  // This setting is useful for path-based routing scenarios where multiple OAuth2 filter instances
-  // operate on different path prefixes with different OAuth2 clients. Each filter instance should
-  // configure a distinct path to prevent cookie collisions.
+  // This is useful for path-based routing scenarios where multiple OAuth2 filter instances
+  // operate on different path prefixes with different OAuth2 clients to prevent cookie collisions.
   //
   // If not specified, defaults to ``/``.
   string path = 8;
