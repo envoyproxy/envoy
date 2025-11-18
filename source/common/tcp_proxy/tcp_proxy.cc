@@ -997,8 +997,19 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     early_data_buffer_.move(data);
     ASSERT(early_data_buffer_.length() > 0 || data.length() == 0);
 
-    // If no data was received, return Continue to allow filter chain to continue.
+    // Track end_stream even if buffer is empty so we can propagate it to upstream later.
+    if (!early_data_end_stream_) {
+      early_data_end_stream_ = end_stream;
+    }
+
+    // If no data was received, handle legacy mode and return early.
     if (early_data_buffer_.length() == 0) {
+      // For legacy mode (max_buffered_bytes_ == 0), read-disable immediately even if buffer is
+      // empty. This maintains backward compatibility with the old behavior.
+      if (max_buffered_bytes_ == 0) {
+        read_callbacks_->connection().readDisable(true);
+        read_disabled_due_to_buffer_ = true;
+      }
       return Network::FilterStatus::Continue;
     }
 
@@ -1032,9 +1043,6 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     }
 
     config_->stats().early_data_received_count_total_.inc();
-    if (!early_data_end_stream_) {
-      early_data_end_stream_ = end_stream;
-    }
   }
   // The upstream should consume all of the data.
   // Before there is an upstream the connection should be readDisabled. If the upstream is
