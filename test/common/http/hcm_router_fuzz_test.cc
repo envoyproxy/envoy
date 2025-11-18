@@ -538,6 +538,10 @@ public:
       }
       case ActionCase::kRequestHeader: {
         auto& a = action.request_header();
+        if (a.has_headers() || a.headers().headers_size() == 0) {
+          // Needs at least one header to be valid.
+          break;
+        }
         FuzzCluster& cluster = cluster_manager.selectOneCluster(a.cluster());
         FuzzDownstreamPtr stream = std::make_unique<FuzzDownstream>(*hcm_);
         streams_.push_back(std::move(stream));
