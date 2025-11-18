@@ -798,7 +798,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "MIT",
         license_url = "https://github.com/google/brotli/blob/v{version}/LICENSE",
     ),
-    com_github_facebook_zstd = dict(
+    zstd = dict(
         project_name = "zstd",
         project_desc = "zstd compression library",
         project_url = "https://facebook.github.io/zstd",

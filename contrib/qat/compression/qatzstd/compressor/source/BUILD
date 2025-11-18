@@ -15,10 +15,12 @@ make(
     build_data = ["@com_github_qat_zstd//:all"],
     env = select({
         "//bazel:clang_build": {
-            "CFLAGS": "-Wno-error=unused-parameter -Wno-error=unused-command-line-argument -I$$EXT_BUILD_DEPS/qatlib/include -I$$EXT_BUILD_DEPS/zstd/include",
+            "CFLAGS": "-Wno-error=unused-parameter -Wno-error=unused-command-line-argument -I$$EXT_BUILD_DEPS/qatlib/include",
+            "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd/lib",
         },
         "//conditions:default": {
-            "CFLAGS": "-I$$EXT_BUILD_DEPS/qatlib/include -I$$EXT_BUILD_DEPS/zstd/include",
+            "CFLAGS": "-I$$EXT_BUILD_DEPS/qatlib/include",
+            "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd/lib",
         },
     }),
     includes = [],
@@ -34,8 +36,8 @@ make(
         "install",
     ],
     deps = [
-        "//bazel/foreign_cc:zstd",
         "//contrib/qat:qatlib",
+        "@zstd",
     ],
 )
 
