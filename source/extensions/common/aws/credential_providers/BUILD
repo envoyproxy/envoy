@@ -126,6 +126,7 @@ envoy_cc_library(
     deps = [
         "//envoy/api:api_interface",
         "//source/common/common:base64_lib",
+        "//source/common/common:cancel_wrapper_lib",
         "//source/common/config:datasource_lib",
         "//source/extensions/common/aws:aws_cluster_manager_lib",
         "//source/extensions/common/aws:credentials_provider_base_lib",

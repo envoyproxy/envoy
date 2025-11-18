@@ -34,6 +34,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
 };
 
 MetadataCredentialsProviderBase::~MetadataCredentialsProviderBase() {
+  cancel_credentials_update_callback_();
   if (metadata_fetcher_) {
     metadata_fetcher_->cancel();
   }
@@ -144,20 +145,22 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
                                       OptRef<ThreadLocalCredentialsCache>
                                           obj) { obj->credentials_ = shared_credentials; },
         /* Notify waiting signers on completion of credential setting above */
-        [this]() {
-          credentials_pending_.store(false);
-          std::list<std::weak_ptr<CredentialSubscriberCallbacks>> subscribers_copy;
-          {
-            Thread::LockGuard guard(mu_);
-            subscribers_copy = credentials_subscribers_;
-          }
-          for (auto& weak_cb : subscribers_copy) {
-            if (auto cb = weak_cb.lock()) {
-              ENVOY_LOG(debug, "Notifying subscriber of credential update");
-              cb->onCredentialUpdate();
-            }
-          }
-        });
+        CancelWrapper::cancelWrapped(
+            [this]() {
+              credentials_pending_.store(false);
+              std::list<std::weak_ptr<CredentialSubscriberCallbacks>> subscribers_copy;
+              {
+                Thread::LockGuard guard(mu_);
+                subscribers_copy = credentials_subscribers_;
+              }
+              for (auto& weak_cb : subscribers_copy) {
+                if (auto cb = weak_cb.lock()) {
+                  ENVOY_LOG(debug, "Notifying subscriber of credential update");
+                  cb->onCredentialUpdate();
+                }
+              }
+            },
+            &cancel_credentials_update_callback_));
   }
 }
 
