@@ -88,7 +88,7 @@ TEST(DynamicModuleTestLanguages, LoadLibGlobally) {
   absl::StatusOr<DynamicModulePtr> child_module = newDynamicModule(child_path, false, false);
   EXPECT_TRUE(child_module.ok());
 
-  using GetSomeVariableFuncType = int (*)(void);
+  using GetSomeVariableFuncType = int (*)();
   const auto getSomeVariable =
       child_module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
   EXPECT_TRUE(getSomeVariable.ok());
