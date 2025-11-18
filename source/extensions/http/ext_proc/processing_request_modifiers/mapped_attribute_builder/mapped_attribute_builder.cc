@@ -54,11 +54,11 @@ bool MappedAttributeBuilder::modifyRequest(
       dynamic_cast<const Http::ResponseHeaderMap*>(params.response_headers),
       dynamic_cast<const Http::ResponseTrailerMap*>(params.response_trailers));
 
-  const auto evaled_attributes = is_inbound ?
-    expression_manager_.evaluateRequestAttributes(*activation_ptr) :
-    expression_manager_.evaluateResponseAttributes(*activation_ptr);
-  const auto& attributes_map = is_inbound ? config_.mapped_request_attributes() :
-    config_.mapped_response_attributes();
+  const auto evaled_attributes =
+      is_inbound ? expression_manager_.evaluateRequestAttributes(*activation_ptr)
+                 : expression_manager_.evaluateResponseAttributes(*activation_ptr);
+  const auto& attributes_map =
+      is_inbound ? config_.mapped_request_attributes() : config_.mapped_response_attributes();
 
   Protobuf::Struct& remapped_attributes =
       (*request.mutable_attributes())[Extensions::HttpFilters::HttpFilterNames::get()

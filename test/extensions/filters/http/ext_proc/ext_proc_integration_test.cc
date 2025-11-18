@@ -3777,12 +3777,15 @@ TEST_P(ExtProcIntegrationTest, RequestAttributesInResponseOnlyProcessing) {
 
 TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
 
   envoy::extensions::http::ext_proc::processing_request_modifiers::mapped_attribute_builder::v3::
       MappedAttributeBuilder builder;
-  auto* mapped_attributes = builder.mutable_mapped_request_attributes();
-  (*mapped_attributes)["remapped.method"] = "request.method";
+  auto* mapped_request_attributes = builder.mutable_mapped_request_attributes();
+  (*mapped_request_attributes)["remapped.method"] = "request.method";
+  auto* mapped_response_attributes = builder.mutable_mapped_response_attributes();
+  (*mapped_response_attributes)["remapped.code"] = "response.code";
   auto* modifier_config = proto_config_.mutable_processing_request_modifier();
   modifier_config->set_name("envoy.extensions.http.ext_proc.mapped_attribute_builder");
   modifier_config->mutable_typed_config()->PackFrom(builder);
@@ -3819,7 +3822,34 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
                           return true;
                         });
 
-  handleUpstreamRequest();
+  handleUpstreamRequestWithTrailer();
+
+  // Handle response headers message.
+  processGenericMessage(*grpc_upstreams_[0], false,
+                        [](const ProcessingRequest& req, ProcessingResponse& resp) {
+                          // Add something to the response so the message isn't seen as spurious
+                          resp.mutable_response_headers();
+
+                          EXPECT_TRUE(req.has_response_headers());
+                          EXPECT_EQ(req.attributes().size(), 1);
+                          auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+                          EXPECT_EQ(proto_struct.fields().at("remapped.code").number_value(), 200);
+                          // Make sure we did not include anything else, such as request attributes
+                          EXPECT_EQ(proto_struct.fields().size(), 1);
+                          return true;
+                        });
+
+  // Handle response trailers message, making sure we did not send response attributes again.
+  processGenericMessage(*grpc_upstreams_[0], false,
+                        [](const ProcessingRequest& req, ProcessingResponse& resp) {
+                          // Add something to the response so the message isn't seen as spurious
+                          resp.mutable_response_trailers();
+
+                          EXPECT_TRUE(req.has_response_trailers());
+                          EXPECT_TRUE(req.attributes().empty());
+                          return true;
+                        });
+
   verifyDownstreamResponse(*response, 200);
 }
 
