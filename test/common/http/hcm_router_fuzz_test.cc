@@ -12,7 +12,7 @@
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
 
 #include "test/common/http/conn_manager_impl_test_base.h"
-#include "test/common/http/hcm_router_fuzz.pb.h"
+#include "test/common/http/hcm_router_fuzz.pb.validate.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
@@ -538,7 +538,7 @@ public:
       }
       case ActionCase::kRequestHeader: {
         auto& a = action.request_header();
-        if (a.has_headers() || a.headers().headers_size() == 0) {
+        if (a.headers().headers_size() == 0) {
           // Needs at least one header to be valid.
           break;
         }
@@ -609,6 +609,12 @@ private:
 #ifdef _DISABLE_STATIC_HARNESS
 
 DEFINE_PROTO_FUZZER(FuzzCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
+  }
   auto harness = std::make_unique<Harness>();
   harness->fuzz(input);
 }
@@ -618,6 +624,12 @@ DEFINE_PROTO_FUZZER(FuzzCase& input) {
 static std::unique_ptr<Harness> harness = nullptr;
 static void cleanup() { harness = nullptr; }
 DEFINE_PROTO_FUZZER(FuzzCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
+  }
   if (harness == nullptr) {
     harness = std::make_unique<Harness>();
     atexit(cleanup);
