@@ -61,7 +61,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //             http2_protocol_options:
 //               max_concurrent_streams: 100
 //        .... [further cluster config]
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
   // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
@@ -195,4 +195,14 @@ message HttpProtocolOptions {
   //   Mirroring will not be triggered if the :ref:`primary cluster
   //   <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` does not exist.
   repeated config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 9;
+
+  // Specifies the retry policy for requests routed to this cluster. When configured,
+  // cluster-level retry policy overrides route-level retry policy. When not configured,
+  // route-level retry policy (if any) will be used.
+  //
+  // .. note::
+  //
+  //   Cluster-level retry policy will override route-level retry policy entirely. Policies are
+  //   not merged.
+  config.route.v3.RetryPolicy retry_policy = 10;
 }

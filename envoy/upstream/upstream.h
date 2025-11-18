@@ -40,6 +40,7 @@ class FilterChainManager;
 namespace Router {
 class ShadowPolicy;
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
+class RetryPolicy;
 } // namespace Router
 
 namespace Upstream {
@@ -1242,6 +1243,12 @@ public:
    * cluster.
    */
   virtual const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const PURE;
+
+  /**
+   * @return const Router::RetryPolicy* the retry policy configured for this cluster. Returns
+   * nullptr if no cluster-level retry policy is configured.
+   */
+  virtual const Router::RetryPolicy* retryPolicy() const PURE;
 
 protected:
   /**

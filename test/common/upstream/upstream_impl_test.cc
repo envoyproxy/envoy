@@ -6477,6 +6477,229 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyDisableShadowHostSuff
   EXPECT_EQ("shadow_cluster", policy->cluster());
 }
 
+// Test cluster-level retry policy with basic retry_on configuration.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyBasic) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        retry_policy:
+          retry_on: "5xx,reset,connect-failure"
+          num_retries: 3
+          per_try_timeout: 2s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(3, retry_policy->numRetries());
+  EXPECT_EQ(std::chrono::milliseconds(2000), retry_policy->perTryTimeout());
+}
+
+// Test cluster-level retry policy with retry back-off configuration.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithBackoff) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        retry_policy:
+          retry_on: "gateway-error,connect-failure,refused-stream"
+          num_retries: 5
+          retry_back_off:
+            base_interval: 0.1s
+            max_interval: 1s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(5, retry_policy->numRetries());
+}
+
+// Test cluster-level retry policy with retriable status codes.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithRetriableStatusCodes) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        retry_policy:
+          retry_on: "retriable-status-codes"
+          num_retries: 2
+          retriable_status_codes: [503, 429]
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(2, retry_policy->numRetries());
+}
+
+// Test cluster-level retry policy with per try idle timeout.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithPerTryIdleTimeout) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        retry_policy:
+          retry_on: "5xx"
+          num_retries: 3
+          per_try_timeout: 5s
+          per_try_idle_timeout: 1s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(3, retry_policy->numRetries());
+  EXPECT_EQ(std::chrono::milliseconds(5000), retry_policy->perTryTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(1000), retry_policy->perTryIdleTimeout());
+}
+
+// Test cluster with no retry policy.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterNoRetryPolicy) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  EXPECT_EQ(nullptr, retry_policy);
+}
+
+// Test cluster-level retry policy with rate limited retry back-off.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithRateLimitedBackoff) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        retry_policy:
+          retry_on: "retriable-status-codes"
+          num_retries: 3
+          retriable_status_codes: [429]
+          rate_limited_retry_back_off:
+            reset_headers:
+              - name: "Retry-After"
+                format: SECONDS
+            max_interval: 300s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(3, retry_policy->numRetries());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

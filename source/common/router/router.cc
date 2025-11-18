@@ -801,9 +801,16 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ = createRetryState(
-      *route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_context_,
-      config_->factory_context_, callbacks_->dispatcher(), route_entry_->priority());
+  // Use cluster-level retry policy if available. The most specific policy wins.
+  // If no cluster-level policy is configured, fall back to route-level policy.
+  const Router::RetryPolicy* retry_policy = cluster_->retryPolicy();
+  if (retry_policy == nullptr) {
+    retry_policy = route_entry_->retryPolicy().get();
+  }
+
+  retry_state_ = createRetryState(*retry_policy, headers, *cluster_, request_vcluster_,
+                                  route_stats_context_, config_->factory_context_,
+                                  callbacks_->dispatcher(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys. Also the method CONNECT doesn't support shadowing.
@@ -2171,7 +2178,14 @@ bool Filter::convertRequestHeadersForInternalRedirect(
 }
 
 void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
-  for (const auto& options_predicate : route_entry_->retryPolicy()->retryOptionsPredicates()) {
+  // Use cluster-level retry policy if available. The most specific policy wins.
+  // If no cluster-level policy is configured, fall back to route-level policy.
+  const Router::RetryPolicy* retry_policy = cluster_->retryPolicy();
+  if (retry_policy == nullptr) {
+    retry_policy = route_entry_->retryPolicy().get();
+  }
+
+  for (const auto& options_predicate : retry_policy->retryOptionsPredicates()) {
     const Upstream::RetryOptionsPredicate::UpdateOptionsParameters parameters{
         retriable_request.streamInfo(), upstreamSocketOptions()};
     auto ret = options_predicate->updateOptions(parameters);

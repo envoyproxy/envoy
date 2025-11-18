@@ -16,6 +16,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/router/retry_policy_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -200,6 +201,18 @@ ProtocolOptionsConfigImpl::buildShadowPolicies(
   return policies;
 }
 
+absl::StatusOr<std::shared_ptr<const Envoy::Router::RetryPolicy>>
+ProtocolOptionsConfigImpl::buildRetryPolicy(
+    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+    ProtobufMessage::ValidationVisitor& validation_visitor,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  if (!options.has_retry_policy()) {
+    return nullptr;
+  }
+  return Envoy::Router::RetryPolicyImpl::create(options.retry_policy(), validation_visitor,
+                                                server_context);
+}
+
 absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>>
 ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
@@ -212,9 +225,13 @@ ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
   RETURN_IF_NOT_OK_REF(validator_factory_or_error.status());
   auto shadow_policies_or_error = buildShadowPolicies(options, server_context);
   RETURN_IF_NOT_OK_REF(shadow_policies_or_error.status());
+  auto retry_policy_or_error =
+      buildRetryPolicy(options, server_context.messageValidationVisitor(), server_context);
+  RETURN_IF_NOT_OK_REF(retry_policy_or_error.status());
   return std::shared_ptr<ProtocolOptionsConfigImpl>(new ProtocolOptionsConfigImpl(
       options, options_or_error.value(), std::move(validator_factory_or_error.value()),
-      cache_options_or_error.value(), std::move(shadow_policies_or_error.value()), server_context));
+      cache_options_or_error.value(), std::move(shadow_policies_or_error.value()),
+      std::move(retry_policy_or_error.value()), server_context));
 }
 
 absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>>
@@ -239,6 +256,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     Envoy::Http::HeaderValidatorFactoryPtr&& header_validator_factory,
     absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
     std::vector<Envoy::Router::ShadowPolicyPtr>&& shadow_policies,
+    std::shared_ptr<const Envoy::Router::RetryPolicy>&& retry_policy,
     Server::Configuration::ServerFactoryContext& server_context)
     : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(
           getHttpOptions(options), server_context, server_context.messageValidationVisitor())),
@@ -254,7 +272,8 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       header_validator_factory_(std::move(header_validator_factory)),
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
-      use_alpn_(options.has_auto_config()), shadow_policies_(std::move(shadow_policies)) {
+      use_alpn_(options.has_auto_config()), shadow_policies_(std::move(shadow_policies)),
+      retry_policy_(std::move(retry_policy)) {
   ASSERT(Http2::Utility::initializeAndValidateOptions(http2_options_).status().ok());
   // Build outlier detection config.
 
