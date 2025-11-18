@@ -11,6 +11,17 @@ namespace LocalAddressSelectors {
 namespace FilterStateOverride {
 
 namespace {
+
+absl::optional<std::string> getObjectAsString(const StreamInfo::FilterState::Objects& objects,
+                                              absl::string_view name) {
+  for (const auto& obj : objects) {
+    if (obj.name_ == name) {
+      return obj.data_->serializeAsString();
+    }
+  }
+  return {};
+}
+
 class NamespaceLocalAddressSelector : public Upstream::UpstreamLocalAddressSelector,
                                       public Logger::Loggable<Logger::Id::upstream> {
 public:
@@ -24,18 +35,16 @@ public:
     const auto upstream_address =
         inner_->getUpstreamLocalAddress(endpoint_address, socket_options, transport_socket_options);
     if (transport_socket_options && upstream_address.address_) {
-      for (const auto& obj : transport_socket_options->downstreamSharedFilterStateObjects()) {
-        if (obj.name_ == "envoy.network.upstream_network_namespace") {
-          if (const auto data = obj.data_->serializeAsString(); data.has_value()) {
-            const auto new_address = upstream_address.address_->withNetworkNamespace(*data);
-            if (new_address) {
-              return {.address_ = new_address, .socket_options_ = upstream_address.socket_options_};
-            }
-          } else {
-            ENVOY_LOG(trace, "Failed to serialize filter state as string");
-          }
-          break;
+      const auto data =
+          getObjectAsString(transport_socket_options->downstreamSharedFilterStateObjects(),
+                            "envoy.network.upstream_bind_override.network_namespace");
+      if (data.has_value()) {
+        const auto new_address = upstream_address.address_->withNetworkNamespace(*data);
+        if (new_address) {
+          return {.address_ = new_address, .socket_options_ = upstream_address.socket_options_};
         }
+      } else {
+        ENVOY_LOG(trace, "Failed to serialize filter state as string");
       }
     }
     return upstream_address;

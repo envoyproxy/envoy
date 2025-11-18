@@ -48,7 +48,8 @@ private:
   const std::string value_;
 };
 
-constexpr absl::string_view FilterStateKey = "envoy.network.upstream_network_namespace";
+constexpr absl::string_view FilterStateKey =
+    "envoy.network.upstream_bind_override.network_namespace";
 
 Network::TransportSocketOptionsConstSharedPtr optionsWithOverride(absl::string_view netns) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);

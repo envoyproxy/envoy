@@ -76,7 +76,7 @@ The following lists the filter state object keys used by the Envoy extensions to
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
 
-``envoy.network.upstream_network_namespace``
+``envoy.network.upstream_bind_override.network_namespace``
   Allows overriding the network namespace on the upstream connections using the :ref:`Linux network
   namespace local address selector
   <envoy_v3_api_msg_extensions.local_address_selectors.filter_state_override.v3.Config>`
