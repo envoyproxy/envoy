@@ -47,6 +47,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/credential_injector:config",
         "//source/extensions/http/injected_credentials/oauth2:config",
         "//source/extensions/http/injected_credentials/oauth2:oauth_response_cc_proto",
+        "//source/common/http:headers_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:utility_lib",
     ],
