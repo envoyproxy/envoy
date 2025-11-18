@@ -113,11 +113,11 @@ bug_fixes:
     Fixed per-route configuration for composite filter to support matching on response headers and trailers.
     Previously, per-route matchers would silently fail when attempting to match on ``HttpResponseHeaderMatchInput``
     or ``HttpResponseTrailerMatchInput``, causing the delegated filter to be skipped without error.
-- area: admin
+- area: network
   change: |
-    Fixed admin ``/listeners`` endpoint to include network namespace filepath in socket addresses.
-    Previously, listeners in non-default network namespaces would return addresses without the namespace
-    information.
+    Fixed socket address proto translations to preserve network namespace filepath information.
+    Previously, listeners in non-default namespaces would lose this information when passed through
+    proto translation, causing admin ``/listeners`` endpoint (and other consumers) to fail to display the namespace.
 - area: router
   change: |
     Fixed a regression where router-set headers (e.g., ``x-envoy-expected-rq-timeout-ms``, ``x-envoy-attempt-count``)
