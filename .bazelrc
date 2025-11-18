@@ -32,6 +32,7 @@ build --copt=-DABSL_MIN_LOG_LEVEL=4
 build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 build --copt=-Wno-deprecated-declarations
 build --define envoy_mobile_listener=enabled
+build --define=LLVM_DIRECTORY=/opt/llvm
 build --experimental_repository_downloader_retries=2
 build --enable_platform_specific_config
 build --incompatible_merge_fixed_and_default_shell_env
