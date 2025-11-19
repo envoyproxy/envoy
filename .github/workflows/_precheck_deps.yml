@@ -47,14 +47,13 @@ jobs:
         ERROR
         error:
         Error:
-      rbe: ${{ matrix.rbe }}
+      rbe: true
       target: ${{ matrix.target }}
       trusted: ${{ inputs.trusted }}
     strategy:
       matrix:
         include:
         - target: deps
-          rbe: false
           diskspace-hack-paths:
 
   dependency-review:

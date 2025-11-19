@@ -324,8 +324,7 @@ message ExtAuthz {
   uint32 max_denied_response_body_bytes = 30;
 
   // When set to ``true``, the filter will enforce the response header map's count and size limits
-  // by dropping headers added by the external auth service. Enabling this may break applications
-  // relying on those headers!
+  // by sending a local reply when those limits are violated.
   //
   // When set to ``false``, the filter will ignore the response header map's limits and add / set
   // all response headers as specified by the external auth service.

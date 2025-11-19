@@ -10,6 +10,7 @@ load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@emsdk//:toolchains.bzl", "register_emscripten_toolchains")
 load("@envoy_toolshed//compile:sanitizer_libs.bzl", "setup_sanitizer_libs")
 load("@envoy_toolshed//coverage/grcov:grcov_repository.bzl", "grcov_repository")
+load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
@@ -39,6 +40,16 @@ def envoy_dependency_imports(
         yq_version = YQ_VERSION,
         buf_sha = BUF_SHA,
         buf_version = BUF_VERSION):
+    native.register_toolchains("@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain")
+    native.register_toolchains("@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain-arm64")
+    native.register_toolchains("@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain")
+    arch_alias(
+        name = "clang_platform",
+        aliases = {
+            "amd64": "@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform",
+            "aarch64": "@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_platform",
+        },
+    )
     compatibility_proxy_repo()
     rules_foreign_cc_dependencies()
     go_rules_dependencies()

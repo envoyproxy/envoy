@@ -22,14 +22,19 @@ done
 find_file() {
     # kinda wierd to use PYTHON_RUNFILES but that is what is available in the
     # bazel generator customization
-    find "${PYTHON_RUNFILES}" -type f -o -type l -name "${1}" -path "*/tools/coverage/**/*" | head -1
+    find "${PYTHON_RUNFILES}" \( -type f -o -type l \) -name "${1}" -path "*/tools/coverage/**/*" | head -1
+}
+
+find_external_file() {
+    # Find files in external repositories (not under tools/coverage)
+    find "${PYTHON_RUNFILES}" \( -type f -o -type l \) -name "${1}" | head -1
 }
 
 GRCOV="$(find_file grcov_bin)"
 GRCOV_CONFIG="$(find_file grcov_config.json)"
 COVERAGE_CONFIG="$(find_file "*coverage_config.json")"
 JQ_BIN="$(find_file jq)"
-ZSTD_BIN="$(find_file zstd)"
+ZSTD_BIN="$(find_external_file zstd_cli)"
 TEMPLATES_DIR="$(dirname "$(find_file base.html)")"
 JQ_FILTER="$(find_file "filter.jq")"
 INFO_FILES=()
