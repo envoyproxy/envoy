@@ -220,6 +220,10 @@ public:
     vhost_ = mock_route_->virtual_host_;
 
     ON_CALL(*tlc_.cluster_.info_, maintenanceMode()).WillByDefault(Return(maintenance_));
+    mock_host_ = std::make_shared<NiceMock<Envoy::Upstream::MockHost>>();
+    ON_CALL(tlc_, chooseHost(_)).WillByDefault(Invoke([this](Upstream::LoadBalancerContext*) {
+      return Upstream::HostSelectionResponse{mock_host_, "foo"};
+    }));
   }
 
   void newUpstream(Router::GenericConnectionPoolCallbacks* request,
@@ -324,6 +328,7 @@ public:
   std::unique_ptr<Router::MockDirectResponseEntry> direct_response_entry_;
 
   std::string direct_response_body_;
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHost>> mock_host_;
 };
 
 // This class holds the upstream `FuzzCluster` instances. This has nothing
@@ -538,10 +543,6 @@ public:
       }
       case ActionCase::kRequestHeader: {
         auto& a = action.request_header();
-        if (a.headers().headers_size() == 0) {
-          // Needs at least one header to be valid.
-          break;
-        }
         FuzzCluster& cluster = cluster_manager.selectOneCluster(a.cluster());
         FuzzDownstreamPtr stream = std::make_unique<FuzzDownstream>(*hcm_);
         streams_.push_back(std::move(stream));
