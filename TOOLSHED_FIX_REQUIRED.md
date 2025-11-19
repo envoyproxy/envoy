@@ -6,37 +6,62 @@ The Envoy project's multi-arch container images (v1.35.1+) are missing the `medi
 
 ## Root Cause
 
-The `envoyproxy/toolshed/gh-actions/oci/collector` action uses buildah to create and push multi-arch manifests. Buildah has a known bug where it omits the `mediaType` field when pushing OCI format manifests.
+The `envoyproxy/toolshed/gh-actions/oci/collector` action uses buildah to create and push multi-arch manifests. The workflow runs on **ubuntu-22.04** which has **buildah 1.23.1** (from 2022). This version has a known bug where it omits the `mediaType` field when pushing OCI format manifests.
+
+**The bugs were fixed in buildah 1.31-1.32 (2023), but ubuntu-22.04 still ships with the old 1.23.1 version.**
 
 ## Required Fix in Toolshed Repository
 
 **Repository**: `envoyproxy/toolshed`
-**File**: `gh-actions/oci/collector/action.yml` (or wherever buildah manifest push is called)
+**File**: `gh-actions/oci/collector/action.yml` (or wherever buildah is used)
 
-**Change Required**:
+### Option 1: Upgrade Buildah (Recommended)
 
-Add the `--format=v2s2` flag to the `buildah manifest push` command:
+Install buildah 1.32+ before using it:
+
+```yaml
+- name: Install buildah 1.32+
+  run: |
+    # Method 1: From kubic repository
+    echo 'deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/ /' | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
+    curl -fsSL https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable/xUbuntu_22.04/Release.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/devel_kubic_libcontainers_stable.gpg > /dev/null
+    sudo apt-get update
+    sudo apt-get install -y buildah
+    buildah --version  # Should show 1.32+
+```
+
+Or switch to ubuntu-24.04 runners (has buildah 1.33).
+
+### Option 2: Use Docker Format (Workaround)
+
+If upgrading is not immediately possible, use the Docker format flag:
 
 ```bash
-# Before (broken):
+# Before (broken with buildah 1.23.1):
 buildah manifest push --all <manifest-name> docker://<registry>/<repo>:<tag>
 
-# After (fixed):
+# After (workaround for buildah 1.23.1):
 buildah manifest push --all --format=v2s2 <manifest-name> docker://<registry>/<repo>:<tag>
 ```
 
 ## Why This Works
 
+### Option 1: Upgrade Buildah
+- Buildah 1.32+ has the bug fix that properly sets the `mediaType` field
+- Results in proper OCI format manifests with `application/vnd.oci.image.index.v1+json`
+- This is the proper long-term solution
+
+### Option 2: Docker Format Workaround
 - The `--format=v2s2` flag tells buildah to use Docker manifest list format
-- Docker format always includes the `mediaType` field
+- Docker format always includes the `mediaType` field even in buildah 1.23.1
 - The resulting manifest is still multi-arch and compatible with all tools
-- The mediaType will be `application/vnd.docker.distribution.manifest.list.v2+json` (Docker format) instead of missing entirely
+- The mediaType will be `application/vnd.docker.distribution.manifest.list.v2+json` (Docker format)
 
 ## Alternative Approaches (Not Recommended)
 
-1. **Wait for buildah fix**: Issues #4395 and #5051 are open but no timeline for resolution
+1. **Wait for ubuntu-24.04 to become default**: Has buildah 1.33 but may not be stable
 2. **Post-process manifests**: Complex and fragile
-3. **Switch to different tooling**: Unnecessary when a simple flag fixes it
+3. **Switch to different tooling**: Unnecessary when buildah upgrade or flag fixes it
 
 ## Testing the Fix
 
@@ -62,7 +87,10 @@ oci.pull(
 
 - **Severity**: High - Blocks Bazel users from using Envoy images
 - **Scope**: All Envoy container images from v1.35.1 onwards
-- **Fix Complexity**: Trivial (one flag addition)
+- **Root Cause**: Outdated buildah 1.23.1 on ubuntu-22.04 runners
+- **Fix Complexity**: 
+  - Upgrade buildah: Moderate (add installation step)
+  - Workaround flag: Trivial (one flag addition)
 - **Fix Location**: Toolshed repository, not Envoy repository
 
 ## References

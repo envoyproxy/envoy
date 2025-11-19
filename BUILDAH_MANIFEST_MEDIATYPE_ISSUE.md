@@ -64,33 +64,69 @@ According to the [OCI Image Index Specification](https://github.com/opencontaine
 - When present, it MUST be set to `"application/vnd.oci.image.index.v1+json"`
 - The field aids in forward/backward compatibility and helps tools identify the manifest type
 
-## Buildah Known Issues
+## Buildah Known Issues and Version Problem
 
-This is a **known bug in buildah**:
+This is a **known bug in older versions of buildah**:
 
 ### Issue #4395: MediaType not set when pushing OCI Image Index
 - **Link**: https://github.com/containers/buildah/issues/4395
-- **Status**: Open
+- **Status**: Closed/Fixed in buildah 1.32+ (July 2023)
 - **Description**: When buildah pushes an OCI Image Index manifest using the OCI format, it omits the `mediaType` field at the top level
 - **Impact**: Tools like rules_oci, Google Jib, and others that strictly validate manifests will fail
 
 ### Issue #5051: Image index media type and annotation
 - **Link**: https://github.com/containers/buildah/issues/5051
-- **Status**: Open
-- **Description**: Related issues with mediaType handling in manifest lists
+- **Status**: Closed/Fixed in buildah 1.31+ via PR #5301
+- **Description**: Buildah couldn't create OCI format image indexes with proper mediaType and annotations
 - **Impact**: Compatibility issues between Docker and OCI formats
+
+### The Real Problem: Outdated Buildah Version
+
+The Envoy workflow uses **ubuntu-22.04** GitHub Actions runners, which come with **buildah 1.23.1** (from 2022). This version predates both fixes:
+- Buildah 1.23.1 is from 2022
+- Issue #5051 was fixed in buildah 1.31 (2023)
+- Issue #4395 was fixed in buildah 1.32 (2023)
+
+**Therefore, the root cause is using an outdated version of buildah that has this bug.**
 
 ## Who's at Fault?
 
-1. **Buildah**: Has a bug where it doesn't set the mediaType field when using OCI format
-2. **OCI Spec**: Says "SHOULD" instead of "MUST", making it technically optional
-3. **rules_oci**: Could be more lenient and handle missing mediaType, but it's reasonable to expect compliance with "SHOULD" directives
+1. **GitHub Actions ubuntu-22.04 runners**: Ship with outdated buildah 1.23.1 (from 2022)
+2. **Buildah 1.23.1**: Has the bug where it doesn't set the mediaType field when using OCI format
+3. **OCI Spec**: Says "SHOULD" instead of "MUST", making it technically optional
+4. **rules_oci**: Could be more lenient and handle missing mediaType, but it's reasonable to expect compliance with "SHOULD" directives
 
-The consensus is that **buildah should be fixed** to include the mediaType field for better compatibility.
+The consensus is that **buildah should be upgraded** to 1.32+ for better compatibility.
 
 ## Recommended Solutions
 
-### Option 1: Use Docker Manifest Format (Immediate Fix)
+### Option 1: Upgrade Buildah (Best Long-term Solution)
+
+Upgrade the buildah version used in the GitHub Actions workflow to 1.32 or later, which has the fix.
+
+In the `envoyproxy/toolshed/gh-actions/oci/collector` action, add a step to install a newer buildah:
+
+```yaml
+- name: Install newer buildah
+  run: |
+    # Install buildah 1.32+ from kubic repository or build from source
+    sudo add-apt-repository -y ppa:projectatomic/ppa
+    sudo apt-get update
+    sudo apt-get install -y buildah
+```
+
+Or switch to ubuntu-24.04 runners which have buildah 1.33.
+
+**Pros**:
+- Proper fix that addresses the root cause
+- Uses true OCI format with mediaType
+- Future-proof solution
+
+**Cons**:
+- Requires modifying the runner setup
+- Needs testing to ensure compatibility
+
+### Option 2: Use Docker Manifest Format (Immediate Workaround)
 
 In the `envoyproxy/toolshed/gh-actions/oci/collector` action, modify the `buildah manifest push` command to use Docker format:
 
@@ -99,7 +135,7 @@ buildah manifest push --all --format=v2s2 <manifest-list> docker://<registry>/<i
 ```
 
 **Pros**:
-- Immediate fix that works now
+- Immediate fix that works with buildah 1.23.1
 - Docker manifest format always includes the mediaType field
 - Still multi-arch compatible
 - Widely supported by all tools
@@ -107,20 +143,21 @@ buildah manifest push --all --format=v2s2 <manifest-list> docker://<registry>/<i
 **Cons**:
 - Uses Docker format instead of OCI format
 - mediaType will be `application/vnd.docker.distribution.manifest.list.v2+json` instead of `application/vnd.oci.image.index.v1+json`
+- Doesn't address the root cause (old buildah)
 
-### Option 2: Wait for Buildah Fix (Long-term)
+### Option 3: Wait for Ubuntu 24.04 Runners
 
-Monitor buildah issues #4395 and #5051 for fixes and upgrade when available.
+GitHub Actions ubuntu-24.04 runners come with buildah 1.33, which has the fix.
 
 **Pros**:
-- Uses true OCI format
-- Proper long-term solution
+- Uses OCI format with proper mediaType
+- No custom buildah installation needed
 
 **Cons**:
-- No timeline for fix
-- Envoy users blocked in the meantime
+- ubuntu-24.04 runners may not be stable yet
+- Requires workflow changes
 
-### Option 3: Post-Process Manifests
+### Option 4: Post-Process Manifests
 
 After pushing, fetch and modify the manifest to add the mediaType field, then re-push.
 
@@ -136,20 +173,37 @@ After pushing, fetch and modify the manifest to add the mediaType field, then re
 
 **For Envoy maintainers:**
 
-The fix needs to be made in the **toolshed repository** in the `gh-actions/oci/collector/action.yml` file. The specific change would be to add `--format=v2s2` flag to the buildah manifest push command.
+The fix needs to be made in the **toolshed repository** in the `gh-actions/oci/collector/action.yml` file. You have three options:
 
-**File to fix**: `envoyproxy/toolshed/gh-actions/oci/collector/action.yml`
+**Best solution (long-term)**: Upgrade to buildah 1.32+ by either:
+- Installing a newer buildah version in the action
+- Switching to ubuntu-24.04 runners (buildah 1.33)
 
-**Command change**:
+**Quick workaround (immediate)**: Add `--format=v2s2` flag to the buildah manifest push command.
+
+**Specific changes needed**:
+
+For the workaround:
 ```bash
-# Current (broken):
+# Current (broken with buildah 1.23.1):
 buildah manifest push --all <manifest> docker://...
 
-# Fixed (working):
+# Fixed (working with buildah 1.23.1):
 buildah manifest push --all --format=v2s2 <manifest> docker://...
 ```
 
-This is a **one-line fix** that will restore compatibility with rules_oci and other tools.
+For the proper fix:
+```yaml
+# Add before using buildah:
+- name: Install buildah 1.32+
+  run: |
+    # Install from kubic or other repository with newer buildah
+    sudo apt-get install -y buildah>=1.32
+```
+
+**Version Requirements**:
+- Current: buildah 1.23.1 (ubuntu-22.04) - **HAS THE BUG**
+- Fixed: buildah 1.32+ - **BUG IS FIXED**
 
 ## Verification
 
