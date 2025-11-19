@@ -22,30 +22,30 @@ const std::string kCreateApiKeyMethod = "/apikeys.ApiKeys/CreateApiKey";
 
 // CEL Matcher Config: Evaluates to TRUE (Trigger Action)
 const std::string kCelAlwaysTrue = R"EOF(
-                              cel_expr_parsed:
-                                expr:
-                                  id: 1
-                                  const_expr:
-                                    bool_value: true
-                                source_info:
-                                  syntax_version: "cel1"
-                                  location: "inline_expression"
-                                  positions:
-                                    1: 0
+                                    cel_expr_parsed:
+                                      expr:
+                                        id: 1
+                                        const_expr:
+                                          bool_value: true
+                                      source_info:
+                                        syntax_version: "cel1"
+                                        location: "inline_expression"
+                                        positions:
+                                          1: 0
 )EOF";
 
 // CEL Matcher Config: Evaluates to FALSE (Skip Action)
 const std::string kCelAlwaysFalse = R"EOF(
-                              cel_expr_parsed:
-                                expr:
-                                  id: 1
-                                  const_expr:
-                                    bool_value: false
-                                source_info:
-                                  syntax_version: "cel1"
-                                  location: "inline_expression"
-                                  positions:
-                                    1: 0
+                                    cel_expr_parsed:
+                                      expr:
+                                        id: 1
+                                        const_expr:
+                                          bool_value: false
+                                      source_info:
+                                        syntax_version: "cel1"
+                                        location: "inline_expression"
+                                        positions:
+                                          1: 0
 )EOF";
 
 class ProtoApiScrubberIntegrationTest : public HttpProtocolIntegrationTest {
@@ -67,46 +67,46 @@ public:
     if (!method_name.empty() && !field_to_scrub.empty()) {
       restrictions_yaml = fmt::format(
           R"EOF(
-        restrictions:
-          method_restrictions:
-            "{0}":
-              request_field_restrictions:
-                "{1}":
-                  matcher:
-                    matcher_list:
-                      matchers:
-                        - predicate:
-                            single_predicate:
-                              input:
-                                name: "envoy.matching.inputs.cel_data_input"
-                                typed_config:
-                                  "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
-                              custom_match:
-                                name: "envoy.matching.matchers.cel_matcher"
-                                typed_config:
-                                  "@type": type.googleapis.com/xds.type.matcher.v3.CelMatcher
-                                  expr_match:
-                                    {2}
-                          on_match:
-                            action:
-                              name: remove_field
-                              typed_config:
-                                "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
+  restrictions:
+    method_restrictions:
+      "{0}":
+        request_field_restrictions:
+          "{1}":
+            matcher:
+              matcher_list:
+                matchers:
+                  - predicate:
+                      single_predicate:
+                        input:
+                          name: "envoy.matching.inputs.cel_data_input"
+                          typed_config:
+                            "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
+                        custom_match:
+                          name: "envoy.matching.matchers.cel_matcher"
+                          typed_config:
+                            "@type": type.googleapis.com/xds.type.matcher.v3.CelMatcher
+                            expr_match:
+                              {2}
+                    on_match:
+                      action:
+                        name: remove_field
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
         )EOF",
           method_name, field_to_scrub, cel_matcher_config);
     }
 
     return fmt::format(
         R"EOF(
-      name: envoy.filters.http.proto_api_scrubber
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig
-        filtering_mode: OVERRIDE
-        descriptor_set:
-          data_source:
-            filename: {0}
-      {1}
-      )EOF",
+name: envoy.filters.http.proto_api_scrubber
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig
+  filtering_mode: OVERRIDE
+  descriptor_set:
+    data_source:
+      filename: {0}
+{1}
+)EOF",
         descriptor_path, restrictions_yaml);
   }
 
