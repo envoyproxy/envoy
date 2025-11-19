@@ -204,11 +204,11 @@ public class AndroidNetworkMonitorV2 {
     mInstance = null;
   }
 
-  /** @returns The singleton mInstance of {@link AndroidNetworkMonitorV2}. */
-  public static AndroidNetworkMonitorV2 getInstance() {
-    assert mInstance != null;
-    return mInstance;
-  }
+  /**
+   * @returns The singleton mInstance of {@link AndroidNetworkMonitorV2} if load() is called.
+   * Otherwise return null.
+   */
+  public static AndroidNetworkMonitorV2 getInstance() { return mInstance; }
 
   /**
    * Returns true if there is an internet connectivity.
