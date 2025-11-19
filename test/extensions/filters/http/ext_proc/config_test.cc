@@ -571,7 +571,8 @@ TEST(HttpExtProcConfigTest, InvalidStatPrefixTooLong) {
     google_grpc:
       target_uri: ext_proc_server
       stat_prefix: google
-  stat_prefix: )EOF" + long_prefix + R"EOF(
+  stat_prefix: )EOF" +
+                     long_prefix + R"EOF(
   )EOF";
 
   ExternalProcessingFilterConfig factory;
