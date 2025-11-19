@@ -27,11 +27,14 @@ class ReverseConnectionClusterIntegrationTest
       public HttpIntegrationTest {
 public:
   ReverseConnectionClusterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam(), ConfigHelper::httpProxyConfig()) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), ConfigHelper::httpProxyConfig()) {}
 
   void initialize() override {
     // Set up one fake upstream for the final destination service.
     setUpstreamCount(1);
+
+    // Configure HTTP/2 for upstream to support concurrent requests on a single connection.
+    setUpstreamProtocol(Http::CodecType::HTTP2);
 
     // Add bootstrap extensions required for reverse tunnel functionality.
     config_helper_.addBootstrapExtension(R"EOF(
@@ -77,7 +80,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelWithCluster
   // Configure the full reverse tunnel flow with cluster.
   config_helper_.addConfigModifier([tunnel_listener_port, loopback_addr](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    // Clear existing listeners, but keep cluster_0 which will be auto-populated with fake_upstreams_[0].
+    // Clear existing listeners, but keep cluster_0 which will be auto-populated with
+    // fake_upstreams_[0].
     bootstrap.mutable_static_resources()->clear_listeners();
 
     // Ensure admin interface is configured.
@@ -122,16 +126,15 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelWithCluster
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
         egress_hcm;
     egress_hcm.set_stat_prefix("egress_http");
-    egress_hcm.set_codec_type(
-        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-            AUTO);
-    
+    egress_hcm.set_codec_type(envoy::extensions::filters::network::http_connection_manager::v3::
+                                  HttpConnectionManager::AUTO);
+
     auto* egress_route_config = egress_hcm.mutable_route_config();
     egress_route_config->set_name("local_route");
     auto* egress_virtual_host = egress_route_config->add_virtual_hosts();
     egress_virtual_host->set_name("backend");
     egress_virtual_host->add_domains("*");
-    
+
     auto* egress_route = egress_virtual_host->add_routes();
     egress_route->mutable_match()->set_prefix("/");
     egress_route->mutable_route()->set_cluster("reverse_connection_cluster");
@@ -181,7 +184,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelWithCluster
     // Configure the cluster as a reverse connection cluster type.
     auto* cluster_type = rc_cluster->mutable_cluster_type();
     cluster_type->set_name("envoy.clusters.reverse_connection");
-    
+
     envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig rc_config;
     // The host_id_format specifies how to extract the host identifier from the request.
     // This should match the node_id used in the reverse tunnel handshake.
@@ -201,7 +204,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelWithCluster
     auto* init_listener = bootstrap.mutable_static_resources()->add_listeners();
     init_listener->set_name("reverse_conn_listener");
     init_listener->mutable_listener_filters_timeout()->set_seconds(0);
-    
+
     // Use rc:// address format to encode reverse connection metadata.
     // Format: rc://node_id:cluster_id:tenant_id@upstream_cluster_name:connection_count
     auto* init_address = init_listener->mutable_address()->mutable_socket_address();
@@ -218,9 +221,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelWithCluster
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
         init_hcm;
     init_hcm.set_stat_prefix("reverse_conn_initiator");
-    init_hcm.set_codec_type(
-        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-            AUTO);
+    init_hcm.set_codec_type(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::AUTO);
 
     auto* init_route_config = init_hcm.mutable_route_config();
     init_route_config->set_name("local_route");
@@ -266,7 +268,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelWithCluster
   registerTestServerPorts({"tunnel_listener", "egress_listener"});
 
   ENVOY_LOG_MISC(info, "Waiting for reverse tunnel connections to be established.");
-  
+
   // Wait for reverse tunnel to establish.
   test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1,
                                  std::chrono::milliseconds(5000));
@@ -275,6 +277,24 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelWithCluster
   test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.test-node-id", 1);
   test_server_->waitForGaugeGe("reverse_tunnel_acceptor.clusters.test-cluster-id", 1);
 
+  // Verify no handshake errors occurred.
+  EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.parse_error")->value(), 0);
+  EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.rejected")->value(), 0);
+  EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.validation_failed")->value(), 0);
+
+  // Verify downstream initiator stats (with detailed stats enabled).
+  ENVOY_LOG_MISC(info, "Verifying downstream reverse tunnel initiator stats.");
+  const std::string tunnel_address = fmt::format("{}:{}", loopback_addr, tunnel_listener_port);
+
+  // Wait for initiator connection stats - the stat name includes the actual address:port
+  // Format: reverse_tunnel_initiator.host.<address>:<port>.connected
+  const std::string initiator_host_stat =
+      fmt::format("reverse_tunnel_initiator.host.{}.connected", tunnel_address);
+  test_server_->waitForGaugeGe(initiator_host_stat, 1, std::chrono::milliseconds(2000));
+
+  // Verify cluster-level initiator stats.
+  test_server_->waitForGaugeGe("reverse_tunnel_initiator.cluster.tunnel_cluster.connected", 1);
+
   ENVOY_LOG_MISC(info, "Reverse tunnel established. Sending HTTP request through tunnel.");
 
   // Now send an HTTP request through the egress listener which routes to the reverse
@@ -282,7 +302,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelWithCluster
   codec_client_ = makeHttpConnection(lookupPort("egress_listener"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  
+
   // Wait for the request to arrive at the fake upstream through the reverse tunnel.
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -302,6 +322,118 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelWithCluster
 
   ENVOY_LOG_MISC(info, "End-to-end request/response through reverse tunnel successful.");
 
+  // Verify cluster stats for the reverse connection cluster.
+  ENVOY_LOG_MISC(info, "Verifying reverse connection cluster stats.");
+  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_total", 1);
+  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_completed", 1);
+  EXPECT_EQ(
+      test_server_->counter("cluster.reverse_connection_cluster.upstream_cx_connect_fail")->value(),
+      0);
+
+  // Test concurrent requests with different headers using the established tunnel.
+  ENVOY_LOG_MISC(info, "Testing concurrent requests with different headers.");
+
+  // Create multiple concurrent requests using various tunnel identifiers.
+  std::vector<Http::RequestEncoder*> encoders;
+  std::vector<IntegrationStreamDecoderPtr> responses;
+  std::vector<Http::TestRequestHeaderMapImpl> test_headers;
+
+  // Request 1: Use default node-id (test-node-id via Lua script default).
+  test_headers.push_back(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/test/path1"}, {":scheme", "http"}, {":authority", "host"}});
+
+  // Request 2: Explicitly specify x-node-id header with test-node-id.
+  test_headers.push_back(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                        {":path", "/test/path2"},
+                                                        {":scheme", "http"},
+                                                        {":authority", "host"},
+                                                        {"x-node-id", "test-node-id"}});
+
+  // Request 3: Use x-cluster-id header with test-cluster-id.
+  test_headers.push_back(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                        {":path", "/test/path3"},
+                                                        {":scheme", "http"},
+                                                        {":authority", "host"},
+                                                        {"x-cluster-id", "test-cluster-id"}});
+
+  // Request 4: Both x-node-id and x-cluster-id (x-node-id takes precedence per Lua).
+  test_headers.push_back(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                        {":path", "/test/path4"},
+                                                        {":scheme", "http"},
+                                                        {":authority", "host"},
+                                                        {"x-node-id", "test-node-id"},
+                                                        {"x-cluster-id", "test-cluster-id"}});
+
+  // Request 5: Another request with default routing to verify tunnel reuse.
+  test_headers.push_back(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/test/path5"}, {":scheme", "http"}, {":authority", "host"}});
+
+  // Send all requests concurrently.
+  ENVOY_LOG_MISC(info, "Sending {} concurrent requests.", test_headers.size());
+  for (size_t i = 0; i < test_headers.size(); i++) {
+    auto encoder_decoder = codec_client_->startRequest(test_headers[i]);
+    encoders.push_back(&encoder_decoder.first);
+    responses.push_back(std::move(encoder_decoder.second));
+    codec_client_->sendData(*encoders[i], 0, true);
+  }
+
+  // Collect all upstream streams.
+  ENVOY_LOG_MISC(info, "Collecting {} upstream streams.", test_headers.size());
+  std::vector<FakeStreamPtr> upstream_streams;
+  for (size_t i = 0; i < test_headers.size(); i++) {
+    FakeStreamPtr stream;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, stream));
+    ASSERT_TRUE(stream->waitForEndStream(*dispatcher_));
+    upstream_streams.push_back(std::move(stream));
+  }
+
+  // Verify all upstream streams received expected paths and respond to all.
+  ENVOY_LOG_MISC(info, "Responding to {} upstream streams.", upstream_streams.size());
+  for (size_t i = 0; i < upstream_streams.size(); i++) {
+    const auto actual_path = upstream_streams[i]->headers().getPathValue();
+    ENVOY_LOG_MISC(info, "Upstream stream {} received request with path: {}", i, actual_path);
+
+    // Verify it's one of our expected test paths.
+    bool path_matched = false;
+    for (size_t j = 1; j <= 5; j++) {
+      if (actual_path == fmt::format("/test/path{}", j)) {
+        path_matched = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(path_matched) << "Unexpected path: " << actual_path;
+
+    // Send response.
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    upstream_streams[i]->encodeHeaders(response_headers, true);
+  }
+
+  // Wait for all responses to complete.
+  ENVOY_LOG_MISC(info, "Waiting for all {} responses to complete.", responses.size());
+  for (size_t i = 0; i < responses.size(); i++) {
+    ASSERT_TRUE(responses[i]->waitForEndStream());
+    EXPECT_TRUE(responses[i]->complete());
+    EXPECT_EQ("200", responses[i]->headers().getStatusValue());
+  }
+
+  ENVOY_LOG_MISC(info, "All {} concurrent requests successfully completed.", responses.size());
+
+  // Verify updated cluster stats after concurrent requests.
+  ENVOY_LOG_MISC(info, "Verifying updated stats after concurrent requests.");
+  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_total",
+                                 6); // 1 initial + 5 concurrent
+  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_completed", 6);
+
+  // Verify that all requests routed through the existing reverse tunnel.
+  // Since all requests use test-node-id or test-cluster-id (which both map to the same tunnel),
+  // they all successfully use the established connection.
+  test_server_->waitForCounterEq("reverse_tunnel.handshake.accepted", 1);
+  ENVOY_LOG_MISC(info,
+                 "All concurrent requests successfully routed through single established tunnel.");
+
+  ENVOY_LOG_MISC(info, "All tests completed successfully.");
+
   // Cleanup.
   cleanupUpstreamAndDownstream();
 }
@@ -311,4 +443,3 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelWithCluster
 } // namespace Clusters
 } // namespace Extensions
 } // namespace Envoy
-
