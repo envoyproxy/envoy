@@ -690,6 +690,15 @@ TEST(ResolvedUdpSocketConfig, Warning) {
 
 #ifndef WIN32
 TEST(PacketLoss, LossTest) {
+  class ZeroTimeSource : public TimeSource {
+  public:
+    ZeroTimeSource() = default;
+    ~ZeroTimeSource() override = default;
+
+    SystemTime systemTime() override { return SystemTime(std::chrono::seconds(0)); }
+    MonotonicTime monotonicTime() override { return MonotonicTime(std::chrono::seconds(0)); }
+  };
+
   // Create and bind a UDP socket.
   auto version = TestEnvironment::getIpVersionsForTest()[0];
   auto kernel_version = version == Network::Address::IpVersion::v4 ? AF_INET : AF_INET6;
@@ -725,16 +734,16 @@ TEST(PacketLoss, LossTest) {
   NiceMock<MockUdpPacketProcessor> processor;
   IoHandle::UdpSaveCmsgConfig udp_save_cmsg_config;
   ON_CALL(processor, saveCmsgConfig()).WillByDefault(ReturnRef(udp_save_cmsg_config));
-  MonotonicTime time(std::chrono::seconds(0));
   uint32_t packets_dropped = 0;
   UdpRecvMsgMethod recv_msg_method = UdpRecvMsgMethod::RecvMsg;
   if (Api::OsSysCallsSingleton::get().supportsMmsg()) {
     recv_msg_method = UdpRecvMsgMethod::RecvMmsg;
   }
 
+  ZeroTimeSource time_source;
   uint32_t packets_read = 0;
-  Utility::readFromSocket(handle, *address, processor, time, recv_msg_method, &packets_dropped,
-                          &packets_read);
+  Utility::readFromSocket(handle, *address, processor, time_source, recv_msg_method,
+                          &packets_dropped, &packets_read);
   EXPECT_EQ(1, packets_dropped);
   EXPECT_EQ(0, packets_read);
 
@@ -743,8 +752,8 @@ TEST(PacketLoss, LossTest) {
                                         reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
 
   // Make sure the drop count is now 2.
-  Utility::readFromSocket(handle, *address, processor, time, recv_msg_method, &packets_dropped,
-                          &packets_read);
+  Utility::readFromSocket(handle, *address, processor, time_source, recv_msg_method,
+                          &packets_dropped, &packets_read);
   EXPECT_EQ(2, packets_dropped);
   EXPECT_EQ(0, packets_read);
 }
