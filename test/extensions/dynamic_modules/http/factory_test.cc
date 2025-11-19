@@ -27,6 +27,7 @@ TEST(DynamicModuleConfigFactory, LoadOK) {
 dynamic_module_config:
     name: no_op
     do_not_close: true
+    load_globally: false
 filter_name: foo
 filter_config:
     "@type": "type.googleapis.com/google.protobuf.StringValue"
@@ -59,6 +60,7 @@ TEST(DynamicModuleConfigFactory, LoadEmpty) {
 dynamic_module_config:
     name: no_op
     do_not_close: true
+    load_globally: true
 filter_name: foo
 )EOF";
 
@@ -88,6 +90,7 @@ TEST(DynamicModuleConfigFactory, LoadBytes) {
 dynamic_module_config:
     name: no_op
     do_not_close: true
+    load_globally: true
 filter_name: foo
 filter_config:
     "@type": "type.googleapis.com/google.protobuf.BytesValue"
