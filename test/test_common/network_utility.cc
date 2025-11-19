@@ -228,6 +228,16 @@ struct SyncPacketProcessor : public Network::UdpPacketProcessor {
   std::list<Network::UdpRecvData>& data_;
   const uint64_t max_rx_datagram_size_;
 };
+
+class ZeroTimeSource : public TimeSource {
+public:
+  ZeroTimeSource() = default;
+  ~ZeroTimeSource() override = default;
+
+  SystemTime systemTime() override { return SystemTime(std::chrono::seconds(0)); }
+  MonotonicTime monotonicTime() override { return MonotonicTime(std::chrono::seconds(0)); }
+};
+
 } // namespace
 
 Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
@@ -238,9 +248,9 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
   if (Api::OsSysCallsSingleton::get().supportsMmsg()) {
     recv_msg_method = UdpRecvMsgMethod::RecvMmsg;
   }
-  return Network::Utility::readFromSocket(handle, local_address, processor,
-                                          MonotonicTime(std::chrono::seconds(0)), recv_msg_method,
-                                          nullptr, nullptr);
+  static ZeroTimeSource time_source;
+  return Network::Utility::readFromSocket(handle, local_address, processor, time_source,
+                                          recv_msg_method, nullptr, nullptr);
 }
 
 UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_rx_datagram_size)
