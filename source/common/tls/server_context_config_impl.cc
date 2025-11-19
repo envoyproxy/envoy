@@ -172,9 +172,11 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     Ssl::TlsCertificateSelectorConfigFactory* provider_factory =
         &Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorConfigFactory>(
             provider_config);
-    tls_certificate_selector_factory_ = provider_factory->createTlsCertificateSelectorFactory(
-        provider_config.typed_config(), factory_context.serverFactoryContext(),
-        factory_context.messageValidationVisitor(), creation_status, for_quic);
+    auto selector_factory = provider_factory->createTlsCertificateSelectorFactory(
+        provider_config.typed_config(), factory_context,
+        *this, for_quic);
+    SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
+    tls_certificate_selector_factory_ = *std::move(selector_factory);
     return;
   }
 
@@ -193,9 +195,11 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   auto factory =
       TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
   const Protobuf::Any any;
-  tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
-      any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor(),
-      creation_status, for_quic);
+  auto selector_factory = factory->createTlsCertificateSelectorFactory(
+      any, factory_context, *this,
+      for_quic);
+  SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
+  tls_certificate_selector_factory_ = *std::move(selector_factory);
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {

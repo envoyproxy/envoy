@@ -73,12 +73,12 @@ private:
       const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
           policy);
 
-  Ssl::TlsCertificateSelectorFactory tls_certificate_selector_factory_;
   absl::optional<std::chrono::seconds> session_timeout_;
   const bool disable_stateless_session_resumption_;
   const bool disable_stateful_session_resumption_;
   bool full_scan_certs_on_sni_mismatch_;
   const bool prefer_client_ciphers_;
+  Ssl::TlsCertificateSelectorFactory tls_certificate_selector_factory_; // Contains a reference to this context.
 };
 
 } // namespace Tls

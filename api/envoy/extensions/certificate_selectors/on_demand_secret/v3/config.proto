@@ -21,22 +21,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // without warming. The certificate secret is validated against the outer common TLS context, e.g.
 // by setting FIPS compliance policy on the loaded secret material.
 message Config {
-  message SdsSecretConfig {
-    // Secret name. If specified, the secret is pre-fetched during configuration and applied to all connections.
-    // This can be overridden on a per-connection basis using the filter state key ``envoy.tls.on_demand_secret``.
-    string name = 1;
+  // Defines the source of the secrets.
+  config.core.v3.ConfigSource config_source= 1 [(validate.rules).message = {required: true}];
 
-    // If specified, the secret is fetched and reloaded via SDS. When absent, the secret is loaded from the
-    // static resources.
-    config.core.v3.ConfigSource sds_config = 2;
-  }
-
-  // Defines the source of the secrets (static resources or dynamic SDS).
-  SdsSecretConfig sds_secret_config = 1 [(validate.rules).message = {required: true}];
-
-  // Optional extension to specify a mapping to the secret name. Requires that
-  // the ``name`` field in the ``sds_secret_config`` is empty.
-  // [#extension-category: envoy.tls.certificate_selector_mapping]
-  config.core.v3.TypedExtensionConfig secret_name = 2;
+  // Secret name. If specified, the secret is pre-fetched during configuration and applied to all connections.
+  // This can be overridden on a per-connection basis using the filter state key ``envoy.tls.on_demand_secret``,
+  // in which case the secret is fetched on-demand.
+  string name = 2;
 }
 

@@ -16,7 +16,7 @@ namespace Envoy {
 
 namespace Server {
 namespace Configuration {
-class CommonFactoryContext;
+class GenericFactoryContext;
 } // namespace Configuration
 } // namespace Server
 
@@ -25,6 +25,7 @@ namespace Ssl {
 // Opaque type defined and used by the ``ServerContext``.
 struct TlsContext;
 
+class ContextConfig;
 class ServerContextConfig;
 
 using CurveNID = int;
@@ -259,17 +260,21 @@ using TlsCertificateSelectorFactory = std::function<TlsCertificateSelectorPtr(
 class TlsCertificateSelectorConfigFactory : public Config::TypedFactory {
 public:
   /**
+   * Create a certificate selector for a TLS context.
+   * @param config proto configuration.
+   * @param factory_context generic factory context.
+   * @param tls_context is the parent TLS context which is guaranteed to outlive the selector.
    * @param for_quic true when in quic context, which does not support selecting certificate
    * asynchronously.
    * @returns a factory to create a TlsCertificateSelector. Accepts the |config| and
    * |validation_visitor| for early validation. This virtual base doesn't
    * perform MessageUtil::downcastAndValidate, but an implementation should.
    */
-  virtual TlsCertificateSelectorFactory
+  virtual absl::StatusOr<TlsCertificateSelectorFactory>
   createTlsCertificateSelectorFactory(const Protobuf::Message& config,
-                                      Server::Configuration::CommonFactoryContext& factory_context,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                      absl::Status& creation_status, bool for_quic) PURE;
+                                      Server::Configuration::GenericFactoryContext& factory_context,
+                                      const ContextConfig& tls_context,
+                                      bool for_quic) PURE;
 
   std::string category() const override { return "envoy.tls.certificate_selectors"; }
 };
