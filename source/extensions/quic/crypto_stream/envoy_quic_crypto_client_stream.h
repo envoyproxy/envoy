@@ -11,8 +11,7 @@ public:
   createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
                                     std::unique_ptr<quic::ProofVerifyContext> verify_context,
                                     quic::QuicCryptoClientConfig* crypto_config,
-                                    quic::QuicCryptoClientStream::ProofHandler* proof_handler,
-                                    bool has_application_state) override;
+                                    quic::QuicCryptoClientStream::ProofHandler* proof_handler) override;
 };
 
 } // namespace Quic
