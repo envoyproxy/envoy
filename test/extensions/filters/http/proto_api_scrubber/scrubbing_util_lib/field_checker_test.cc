@@ -9,6 +9,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
@@ -35,6 +36,8 @@ public:
 namespace {
 
 inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
+inline constexpr char kRemoveFieldActionType[] =
+    "type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction";
 
 // Mock class for Matcher::Action to simulate actions other than RemoveFieldAction.
 class MockAction : public Matcher::Action {
@@ -52,11 +55,9 @@ public:
 
 class FieldCheckerTest : public ::testing::Test {
 protected:
-  FieldCheckerTest() : api_(Api::createApiForTest()) {
-    setupMocks();
-    initDefaultProtoConfig();
-    initFilterConfigFromDefaultProtoConfig();
-  }
+  FieldCheckerTest() : api_(Api::createApiForTest()) { setupMocks(); }
+
+  enum class FieldType { Request, Response };
 
   void setupMocks() {
     // factory_context.serverFactoryContext().api() is used to read descriptor file during filter
@@ -67,429 +68,58 @@ protected:
         .WillByDefault(testing::ReturnRef(server_factory_context_));
   }
 
-  void initDefaultProtoConfig() {
-    Protobuf::TextFormat::ParseFromString(getDefaultProtoConfig(), &proto_config_);
-    *proto_config_.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+  // Helper to load descriptors (shared by all configs)
+  void loadDescriptors(ProtoApiScrubberConfig& config) {
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
             .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
             .value();
   }
 
-  void initFilterConfigFromDefaultProtoConfig() {
+  // Helper to initialize the filter config from a specific Proto config
+  void initializeFilterConfig(ProtoApiScrubberConfig& config) {
+    loadDescriptors(config);
     absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config =
-        ProtoApiScrubberFilterConfig::create(proto_config_, factory_context_);
+        ProtoApiScrubberFilterConfig::create(config, factory_context_);
     ASSERT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     ASSERT_NE(filter_config.value(), nullptr);
     filter_config_ = std::move(filter_config.value());
   }
 
-  std::string getDefaultProtoConfig() {
-    return R"pb(
-      descriptor_set: { }
-      restrictions: {
-        method_restrictions: {
-          key: "/library.BookService/GetBook"
-          value: {
-            request_field_restrictions: {
-              key: "shelf"
-              value: {
-                matcher: {
-                  matcher_list: {
-                    matchers: {
-                      predicate: {
-                        single_predicate: {
-                          input: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
-                            }
-                          }
-                          custom_match: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                                expr_match: {
-                                  cel_expr_parsed: {
-                                    expr: {
-                                      id: 1
-                                      const_expr: {
-                                        bool_value: false
-                                      }
-                                    }
-                                    source_info: {
-                                      syntax_version: "cel1"
-                                      location: "inline_expression"
-                                      positions: {
-                                        key: 1
-                                        value: 0
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                      on_match: {
-                        action: {
-                          typed_config: {
-                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
-                          }
-                        }
-                      }
-                    }
-                  }
+  /**
+   * Utility to add a field restriction to a specific ProtoApiScrubberConfig object.
+   */
+  void addRestriction(ProtoApiScrubberConfig& config, const std::string& method_name,
+                      const std::string& field_path, FieldType field_type, bool match_result) {
+
+    // CEL Matcher Template
+    constexpr absl::string_view matcher_template = R"pb(
+      matcher_list: {
+        matchers: {
+          predicate: {
+            single_predicate: {
+              input: {
+                typed_config: {
+                  [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
                 }
               }
-            }
-            request_field_restrictions: {
-              key: "filter_criteria.publication_details.original_release_info.year"
-              value: {
-                matcher: {
-                  matcher_list: {
-                    matchers: {
-                      predicate: {
-                        single_predicate: {
-                          input: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
-                            }
-                          }
-                          custom_match: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                                expr_match: {
-                                  cel_expr_parsed: {
-                                    expr: {
-                                      id: 1
-                                      const_expr: {
-                                        bool_value: false
-                                      }
-                                    }
-                                    source_info: {
-                                      syntax_version: "cel1"
-                                      location: "inline_expression"
-                                      positions: {
-                                        key: 1
-                                        value: 0
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
+              custom_match: {
+                typed_config: {
+                  [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                    expr_match: {
+                      cel_expr_parsed: {
+                        expr: {
+                          id: 1
+                          const_expr: {
+                            bool_value: $0
                           }
                         }
-                      }
-                      on_match: {
-                        action: {
-                          typed_config: {
-                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            request_field_restrictions: {
-              key: "id"
-              value: {
-                matcher: {
-                  matcher_list: {
-                    matchers: {
-                      predicate: {
-                        single_predicate: {
-                          input: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
-                            }
-                          }
-                          custom_match: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                                expr_match: {
-                                  cel_expr_parsed: {
-                                    expr: {
-                                      id: 1
-                                      const_expr: {
-                                        bool_value: true
-                                      }
-                                    }
-                                    source_info: {
-                                      syntax_version: "cel1"
-                                      location: "inline_expression"
-                                      positions: {
-                                        key: 1
-                                        value: 0
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                      on_match: {
-                        action: {
-                          typed_config: {
-                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            request_field_restrictions: {
-              key: "filter_criteria.publication_details.original_release_info.region_code"
-              value: {
-                matcher: {
-                  matcher_list: {
-                    matchers: {
-                      predicate: {
-                        single_predicate: {
-                          input: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
-                            }
-                          }
-                          custom_match: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                                expr_match: {
-                                  cel_expr_parsed: {
-                                    expr: {
-                                      id: 1
-                                      const_expr: {
-                                        bool_value: true
-                                      }
-                                    }
-                                    source_info: {
-                                      syntax_version: "cel1"
-                                      location: "inline_expression"
-                                      positions: {
-                                        key: 1
-                                        value: 0
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                      on_match: {
-                        action: {
-                          typed_config: {
-                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            response_field_restrictions: {
-              key: "publisher"
-              value: {
-                matcher: {
-                  matcher_list: {
-                    matchers: {
-                      predicate: {
-                        single_predicate: {
-                          input: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
-                            }
-                          }
-                          custom_match: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                                expr_match: {
-                                  cel_expr_parsed: {
-                                    expr: {
-                                      id: 1
-                                      const_expr: {
-                                        bool_value: false
-                                      }
-                                    }
-                                    source_info: {
-                                      syntax_version: "cel1"
-                                      location: "inline_expression"
-                                      positions: {
-                                        key: 1
-                                        value: 0
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                      on_match: {
-                        action: {
-                          typed_config: {
-                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            response_field_restrictions: {
-              key: "fulfillment.primary_location.exact_coordinates.aisle"
-              value: {
-                matcher: {
-                  matcher_list: {
-                    matchers: {
-                      predicate: {
-                        single_predicate: {
-                          input: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
-                            }
-                          }
-                          custom_match: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                                expr_match: {
-                                  cel_expr_parsed: {
-                                    expr: {
-                                      id: 1
-                                      const_expr: {
-                                        bool_value: false
-                                      }
-                                    }
-                                    source_info: {
-                                      syntax_version: "cel1"
-                                      location: "inline_expression"
-                                      positions: {
-                                        key: 1
-                                        value: 0
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                      on_match: {
-                        action: {
-                          typed_config: {
-                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            response_field_restrictions: {
-              key: "name"
-              value: {
-                matcher: {
-                  matcher_list: {
-                    matchers: {
-                      predicate: {
-                        single_predicate: {
-                          input: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
-                            }
-                          }
-                          custom_match: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                                expr_match: {
-                                  cel_expr_parsed: {
-                                    expr: {
-                                      id: 1
-                                      const_expr: {
-                                        bool_value: true
-                                      }
-                                    }
-                                    source_info: {
-                                      syntax_version: "cel1"
-                                      location: "inline_expression"
-                                      positions: {
-                                        key: 1
-                                        value: 0
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                      on_match: {
-                        action: {
-                          typed_config: {
-                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            response_field_restrictions: {
-              key: "fulfillment.primary_location.exact_coordinates.bin_number"
-              value: {
-                matcher: {
-                  matcher_list: {
-                    matchers: {
-                      predicate: {
-                        single_predicate: {
-                          input: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
-                            }
-                          }
-                          custom_match: {
-                            typed_config: {
-                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                                expr_match: {
-                                  cel_expr_parsed: {
-                                    expr: {
-                                      id: 1
-                                      const_expr: {
-                                        bool_value: true
-                                      }
-                                    }
-                                    source_info: {
-                                      syntax_version: "cel1"
-                                      location: "inline_expression"
-                                      positions: {
-                                        key: 1
-                                        value: 0
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                      on_match: {
-                        action: {
-                          typed_config: {
-                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
+                        source_info: {
+                          syntax_version: "cel1"
+                          location: "inline_expression"
+                          positions: {
+                            key: 1
+                            value: 0
                           }
                         }
                       }
@@ -499,13 +129,36 @@ protected:
               }
             }
           }
+          on_match: {
+            action: {
+              typed_config: {
+                [$1] { }
+              }
+            }
+          }
         }
       }
     )pb";
+
+    std::string matcher_str =
+        absl::Substitute(matcher_template, match_result ? "true" : "false", kRemoveFieldActionType);
+
+    xds::type::matcher::v3::Matcher matcher;
+    if (!Envoy::Protobuf::TextFormat::ParseFromString(matcher_str, &matcher)) {
+      FAIL() << "Failed to parse generated matcher config.";
+    }
+
+    auto& method_restrictions = *config.mutable_restrictions()->mutable_method_restrictions();
+    auto& method_config = method_restrictions[method_name];
+
+    auto* field_map = (field_type == FieldType::Request)
+                          ? method_config.mutable_request_field_restrictions()
+                          : method_config.mutable_response_field_restrictions();
+
+    *(*field_map)[field_path].mutable_matcher() = matcher;
   }
 
   Api::ApiPtr api_;
-  ProtoApiScrubberConfig proto_config_;
   std::shared_ptr<const ProtoApiScrubberFilterConfig> filter_config_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
@@ -621,10 +274,22 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
 
 // This tests CheckField() method for request fields.
 TEST_F(FieldCheckerTest, RequestFieldChecker) {
-  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  ProtoApiScrubberConfig config;
+  std::string method = "/library.BookService/GetBook";
 
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+  addRestriction(config, method, "shelf", FieldType::Request, false);
+  addRestriction(config, method, "filter_criteria.publication_details.original_release_info.year",
+                 FieldType::Request, false);
+  addRestriction(config, method, "id", FieldType::Request, true);
+  addRestriction(config, method,
+                 "filter_criteria.publication_details.original_release_info.region_code",
+                 FieldType::Request, true);
+
+  initializeFilterConfig(config);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method,
+                             filter_config_.get());
 
   {
     // The field `urn` doesn't have any match tree configured.
@@ -638,7 +303,7 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
     // The field `filter_criteria.publication_details.original_release_info.language` doesn't have
     // any match tree configured.
     Protobuf::Field field;
-    field.set_name("filter_criteria.publication_details.original_release_info.language");
+    field.set_name("language");
     field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
     EXPECT_EQ(field_checker.CheckField(
                   {"filter_criteria", "publication_details", "original_release_info", "language"},
@@ -660,7 +325,7 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
     // configured which always evaluates to false. Hence, no match is found and CheckField returns
     // kInclude.
     Protobuf::Field field;
-    field.set_name("filter_criteria.publication_details.original_release_info.year");
+    field.set_name("year");
     field.set_kind(Protobuf::Field_Kind_TYPE_INT64);
     EXPECT_EQ(
         field_checker.CheckField(
@@ -685,9 +350,13 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
     // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`
     // and hence, CheckField returns kInclude.
     Protobuf::Field field;
-    field.set_name("filter_criteria.publication_details.original_release_info.region_code");
+    field.set_name("region_code");
     field.set_kind(Protobuf::Field_Kind_TYPE_INT64);
-    EXPECT_EQ(field_checker.CheckField({"id"}, &field), FieldCheckResults::kExclude);
+
+    EXPECT_EQ(field_checker.CheckField({"filter_criteria", "publication_details",
+                                        "original_release_info", "region_code"},
+                                       &field),
+              FieldCheckResults::kExclude);
   }
 
   {
@@ -713,10 +382,21 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
 
 // This tests CheckField() method for response fields.
 TEST_F(FieldCheckerTest, ResponseFieldChecker) {
-  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  ProtoApiScrubberConfig config;
+  std::string method = "/library.BookService/GetBook";
 
-  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+  addRestriction(config, method, "publisher", FieldType::Response, false);
+  addRestriction(config, method, "fulfillment.primary_location.exact_coordinates.aisle",
+                 FieldType::Response, false);
+  addRestriction(config, method, "name", FieldType::Response, true);
+  addRestriction(config, method, "fulfillment.primary_location.exact_coordinates.bin_number",
+                 FieldType::Response, true);
+
+  initializeFilterConfig(config);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, method,
+                             filter_config_.get());
 
   {
     // The field `author` doesn't have any match tree configured.
@@ -803,6 +483,9 @@ TEST_F(FieldCheckerTest, ResponseFieldChecker) {
 }
 
 TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
+  ProtoApiScrubberConfig config;
+  initializeFilterConfig(config);
+
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Protobuf::Field field;
   field.set_name("user");
@@ -811,19 +494,17 @@ TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
   FieldChecker field_checker(ScrubberContext::kTestScrubbing, &mock_stream_info,
                              "/library.BookService/GetBook", filter_config_.get());
 
-  EXPECT_LOG_CONTAINS(
-      "warn",
-      "Error encountered while matching the field `user`. This field would be preserved. Internal "
-      "error details: Unsupported scrubber context enum value: `0`. Supported values are: {1, 2}.",
-      {
-        FieldCheckResults result = field_checker.CheckField({"user"}, &field);
-        EXPECT_EQ(result, FieldCheckResults::kInclude);
-      });
+  EXPECT_LOG_CONTAINS("warn", "Unsupported scrubber context enum value", {
+    FieldCheckResults result = field_checker.CheckField({"user"}, &field);
+    EXPECT_EQ(result, FieldCheckResults::kInclude);
+  });
 }
 
 TEST_F(FieldCheckerTest, IncludesType) {
-  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  ProtoApiScrubberConfig config;
+  initializeFilterConfig(config);
 
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
                              "/library.BookService/GetBook", filter_config_.get());
 
@@ -833,8 +514,10 @@ TEST_F(FieldCheckerTest, IncludesType) {
 }
 
 TEST_F(FieldCheckerTest, SupportAny) {
-  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  ProtoApiScrubberConfig config;
+  initializeFilterConfig(config);
 
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
                              "/library.BookService/GetBook", filter_config_.get());
 
@@ -842,8 +525,10 @@ TEST_F(FieldCheckerTest, SupportAny) {
 }
 
 TEST_F(FieldCheckerTest, FilterName) {
-  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  ProtoApiScrubberConfig config;
+  initializeFilterConfig(config);
 
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
                              "/library.BookService/GetBook", filter_config_.get());
 

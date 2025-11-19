@@ -2220,7 +2220,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAppendIfAbsentExceedsLimit) {
   EXPECT_EQ("500", response_->headers().getStatusValue());
   cleanup();
 }
-
 // Regression test for https://github.com/envoyproxy/envoy/issues/17344
 TEST(ExtConfigValidateTest, Validate) {
   Server::TestComponentFactory component_factory;
