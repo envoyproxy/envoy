@@ -377,20 +377,18 @@ TEST_F(ProtoApiScrubberPassThroughTest, StreamingMultipleMessageSingleBuffer) {
 using ProtoApiScrubberPathValidationTest = ProtoApiScrubberFilterTest;
 
 TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
-  const std::string expected_rc_detail = "proto_api_scrubber_INVALID_ARGUMENT{Error in `:path` header validation.}";
+  const std::string expected_rc_detail =
+      "proto_api_scrubber_INVALID_ARGUMENT{Error in `:path` header validation.}";
 
   // Case 1: Empty Path
   {
-    TestRequestHeaderMapImpl req_headers =
-        TestRequestHeaderMapImpl{{":method", "POST"},
-                                 {":path", ""},
-                                 {"content-type", "application/grpc"}};
+    TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+        {":method", "POST"}, {":path", ""}, {"content-type", "application/grpc"}};
 
     EXPECT_CALL(mock_decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::BadRequest,
                                testing::HasSubstr("Method name is empty"), _,
-                               Eq(Envoy::Grpc::Status::InvalidArgument),
-                               Eq(expected_rc_detail)));
+                               Eq(Envoy::Grpc::Status::InvalidArgument), Eq(expected_rc_detail)));
 
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(req_headers, true));
@@ -406,8 +404,7 @@ TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
     EXPECT_CALL(mock_decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::BadRequest,
                                testing::HasSubstr("contains '*' which is not supported"), _,
-                               Eq(Envoy::Grpc::Status::InvalidArgument),
-                               Eq(expected_rc_detail)));
+                               Eq(Envoy::Grpc::Status::InvalidArgument), Eq(expected_rc_detail)));
 
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(req_headers, true));
@@ -423,8 +420,7 @@ TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
     EXPECT_CALL(mock_decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::BadRequest,
                                testing::HasSubstr("should follow the gRPC format"), _,
-                               Eq(Envoy::Grpc::Status::InvalidArgument),
-                               Eq(expected_rc_detail)));
+                               Eq(Envoy::Grpc::Status::InvalidArgument), Eq(expected_rc_detail)));
 
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(req_headers, true));
@@ -432,16 +428,13 @@ TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
 
   // Case 4: Missing Service Part (Double Slash)
   {
-    TestRequestHeaderMapImpl req_headers =
-        TestRequestHeaderMapImpl{{":method", "POST"},
-                                 {":path", "//MethodName"},
-                                 {"content-type", "application/grpc"}};
+    TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+        {":method", "POST"}, {":path", "//MethodName"}, {"content-type", "application/grpc"}};
 
     EXPECT_CALL(mock_decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::BadRequest,
                                testing::HasSubstr("should follow the gRPC format"), _,
-                               Eq(Envoy::Grpc::Status::InvalidArgument),
-                               Eq(expected_rc_detail)));
+                               Eq(Envoy::Grpc::Status::InvalidArgument), Eq(expected_rc_detail)));
 
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(req_headers, true));
@@ -449,16 +442,13 @@ TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
 
   // Case 5: Missing Method Part (Trailing Slash)
   {
-    TestRequestHeaderMapImpl req_headers =
-        TestRequestHeaderMapImpl{{":method", "POST"},
-                                 {":path", "/package.Service/"},
-                                 {"content-type", "application/grpc"}};
+    TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+        {":method", "POST"}, {":path", "/package.Service/"}, {"content-type", "application/grpc"}};
 
     EXPECT_CALL(mock_decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::BadRequest,
                                testing::HasSubstr("should follow the gRPC format"), _,
-                               Eq(Envoy::Grpc::Status::InvalidArgument),
-                               Eq(expected_rc_detail)));
+                               Eq(Envoy::Grpc::Status::InvalidArgument), Eq(expected_rc_detail)));
 
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(req_headers, true));
@@ -474,8 +464,7 @@ TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
     EXPECT_CALL(mock_decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::BadRequest,
                                testing::HasSubstr("should follow the gRPC format"), _,
-                               Eq(Envoy::Grpc::Status::InvalidArgument),
-                               Eq(expected_rc_detail)));
+                               Eq(Envoy::Grpc::Status::InvalidArgument), Eq(expected_rc_detail)));
 
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(req_headers, true));
@@ -491,8 +480,7 @@ TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
     EXPECT_CALL(mock_decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::BadRequest,
                                testing::HasSubstr("should follow the gRPC format"), _,
-                               Eq(Envoy::Grpc::Status::InvalidArgument),
-                               Eq(expected_rc_detail)));
+                               Eq(Envoy::Grpc::Status::InvalidArgument), Eq(expected_rc_detail)));
 
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(req_headers, true));
