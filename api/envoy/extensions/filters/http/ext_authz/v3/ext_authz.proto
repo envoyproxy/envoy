@@ -80,7 +80,7 @@ message ExtAuthz {
   BufferSettings with_request_body = 5;
 
   // Clears the route cache in order to allow the external authorization service to correctly affect
-  // routing decisions. The filter clears all cached routes when:
+  // routing decisions. The filter clears all cached routes when all of the following holds:
   //
   // * This field is set to ``true``.
   // * The status returned from the authorization service is an HTTP 200 or gRPC 0.
@@ -488,13 +488,12 @@ message AuthorizationResponse {
 
   // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
   // response headers that have a correspondent match will be added to the client's response.
+  // When a header is included in this list, ``Path``, ``Status``, ``Content-Length``, ``WWW-Authenticate`` and
+  // ``Location`` are automatically added.
   //
   // .. note::
   //   When this list is *not* set, all the authorization response headers, except
   //   ``Authority (Host)``, will be in the response to the client.
-  //
-  // When a header is included in this list, ``Path``, ``Status``, ``Content-Length``, ``WWW-Authenticate`` and
-  // ``Location`` are automatically added.
   type.matcher.v3.ListStringMatcher allowed_client_headers = 2;
 
   // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
