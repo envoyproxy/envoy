@@ -67,7 +67,7 @@ jobs:
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/init@4e94bd11f71e507f7f87df81788dff88d1dacbfb  # codeql-bundle-v4.31.0
+      uses: github/codeql-action/init@e12f0178983d466f2f6028f5cc7a6d786fd97f4b  # codeql-bundle-v4.31.4
       with:
         languages: cpp
         trap-caching: false
@@ -92,7 +92,7 @@ jobs:
     - name: Build
       if: ${{ env.BUILD_TARGETS != '' }}
       run: |
-       bazel/setup_clang.sh bin/clang18.1.8
+       bazel/setup_clang.sh "$(realpath bin/clang18.1.8)"
        bazel shutdown
        bazel build \
            -c fastbuild \
@@ -112,6 +112,6 @@ jobs:
 
     - name: Perform CodeQL Analysis
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/analyze@4e94bd11f71e507f7f87df81788dff88d1dacbfb  # codeql-bundle-v4.31.0
+      uses: github/codeql-action/analyze@e12f0178983d466f2f6028f5cc7a6d786fd97f4b  # codeql-bundle-v4.31.4
       with:
         trap-caching: false

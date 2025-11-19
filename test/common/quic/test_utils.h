@@ -164,9 +164,9 @@ public:
   TestQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
                              std::unique_ptr<quic::ProofVerifyContext> verify_context,
                              quic::QuicCryptoClientConfig* crypto_config,
-                             ProofHandler* proof_handler, bool has_application_state)
+                             ProofHandler* proof_handler)
       : quic::QuicCryptoClientStream(server_id, session, std::move(verify_context), crypto_config,
-                                     proof_handler, has_application_state) {}
+                                     proof_handler, /*has_application_state=*/true) {}
 
   bool encryption_established() const override { return true; }
   quic::HandshakeState GetHandshakeState() const override { return quic::HANDSHAKE_CONFIRMED; }
@@ -174,16 +174,14 @@ public:
 
 class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
 public:
-  std::unique_ptr<quic::QuicCryptoClientStreamBase>
-  createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
-                                    std::unique_ptr<quic::ProofVerifyContext> verify_context,
-                                    quic::QuicCryptoClientConfig* crypto_config,
-                                    quic::QuicCryptoClientStream::ProofHandler* proof_handler,
-                                    bool has_application_state) override {
+  std::unique_ptr<quic::QuicCryptoClientStreamBase> createEnvoyQuicCryptoClientStream(
+      const quic::QuicServerId& server_id, quic::QuicSession* session,
+      std::unique_ptr<quic::ProofVerifyContext> verify_context,
+      quic::QuicCryptoClientConfig* crypto_config,
+      quic::QuicCryptoClientStream::ProofHandler* proof_handler) override {
     last_verify_context_ = *verify_context;
-    return std::make_unique<TestQuicCryptoClientStream>(server_id, session,
-                                                        std::move(verify_context), crypto_config,
-                                                        proof_handler, has_application_state);
+    return std::make_unique<TestQuicCryptoClientStream>(
+        server_id, session, std::move(verify_context), crypto_config, proof_handler);
   }
 
   OptRef<quic::ProofVerifyContext> lastVerifyContext() const { return last_verify_context_; }

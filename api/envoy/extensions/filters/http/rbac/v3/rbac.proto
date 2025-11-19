@@ -4,7 +4,6 @@ package envoy.extensions.filters.http.rbac.v3;
 
 import "envoy/config/rbac/v3/rbac.proto";
 
-import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/migrate.proto";
@@ -64,10 +63,8 @@ message RBAC {
   // If absent, no shadow matcher will be applied.
   // Match tree for testing RBAC rules through stats and logs without enforcing them.
   // If absent, no shadow matching occurs.
-  xds.type.matcher.v3.Matcher shadow_matcher = 5 [
-    (udpa.annotations.field_migrate).oneof_promotion = "shadow_rules_specifier",
-    (xds.annotations.v3.field_status).work_in_progress = true
-  ];
+  xds.type.matcher.v3.Matcher shadow_matcher = 5
+      [(udpa.annotations.field_migrate).oneof_promotion = "shadow_rules_specifier"];
 
   // If specified, shadow rules will emit stats with the given prefix.
   // This is useful for distinguishing metrics when multiple RBAC filters use shadow rules.
