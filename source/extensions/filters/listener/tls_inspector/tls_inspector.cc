@@ -184,6 +184,16 @@ void Filter::setDynamicMetadata(absl::string_view failure_reason) {
   cb_->setDynamicMetadata(dynamicMetadataKey(), metadata);
 }
 
+void Filter::setDownstreamTransportFailureReason() {
+  const std::string transport_failure = absl::StrCat(
+      "TLS_error|",
+      Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"),
+      ":TLS_error_end");
+  ENVOY_LOG(debug, "tls inspector: parseClientHello failed: {}, {}: {}", ERR_peek_error(),
+            ERR_peek_last_error(), transport_failure);
+  cb_->streamInfo().setDownstreamTransportFailureReason(transport_failure);
+}
+
 ParseState Filter::getParserState(int handshake_status) {
   switch (SSL_get_error(ssl_.get(), handshake_status)) {
   case SSL_ERROR_WANT_READ:
@@ -231,10 +241,7 @@ ParseState Filter::getParserState(int handshake_status) {
       }
       config_->stats().tls_not_found_.inc();
       setDynamicMetadata(failureReasonClientHelloNotDetected());
-      ENVOY_LOG(
-          debug, "tls inspector: parseClientHello failed: {}, {}: {}", ERR_peek_error(),
-          ERR_peek_last_error(),
-          Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"));
+      setDownstreamTransportFailureReason();
     }
     return ParseState::Done;
   default:

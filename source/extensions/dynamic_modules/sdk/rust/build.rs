@@ -52,7 +52,7 @@ impl bindgen::callbacks::ParseCallbacks for TrimEnumNameFromVariantName {
   ) -> Option<String> {
     let variant_name = match enum_name {
       Some(enum_name) => original_variant_name
-        .trim_start_matches(enum_name)
+        .trim_start_matches(enum_name.trim_start_matches("enum "))
         .trim_start_matches('_'),
       None => original_variant_name,
     };

@@ -142,7 +142,6 @@ cc_binary(
         "-lm",
         # See libpthread below.
         "-L$(GENDIR)/{}".format(package_name()),
-        "-latomic",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],

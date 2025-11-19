@@ -165,14 +165,16 @@ build:mobile-remote-ci-common --experimental_ui_max_stdouterr_bytes=10485760
 build:mobile-remote-ci-linux --define=EXECUTOR=remote
 build:mobile-remote-ci-linux --disk_cache=
 build:mobile-remote-ci-linux --incompatible_strict_action_env=true
-# GCC toolchain options
 build:mobile-remote-ci-linux --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+
+# Clang toolchain options
 build:mobile-remote-ci-linux --crosstool_top=//third_party/rbe_configs/cc:toolchain
 build:mobile-remote-ci-linux --extra_execution_platforms=//third_party/rbe_configs/config:platform
 build:mobile-remote-ci-linux --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
 build:mobile-remote-ci-linux --host_platform=//third_party/rbe_configs/config:platform
 build:mobile-remote-ci-linux --platforms=//third_party/rbe_configs/config:platform
 build:mobile-remote-ci-linux --config=mobile-remote-ci-common
+build:mobile-remote-ci-linux --config=libc++
 
 #############################################################################
 # mobile-remote-ci-linux-clang: These options are linux-only using Clang by default
