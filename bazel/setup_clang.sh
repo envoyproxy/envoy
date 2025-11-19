@@ -27,7 +27,6 @@ build:clang --action_env=LLVM_CONFIG=${LLVM_CONFIG} --host_action_env=LLVM_CONFI
 build:clang --repo_env=LLVM_CONFIG=${LLVM_CONFIG}
 build:clang --linkopt=-L${LLVM_LIBDIR}
 build:clang --linkopt=-Wl,-rpath,${LLVM_LIBDIR}
-build:clang --define=LLVM_DIRECTORY=${LLVM_PREFIX}
 
 build:asan --linkopt=-L${RT_LIBRARY_PATH}
 EOF
