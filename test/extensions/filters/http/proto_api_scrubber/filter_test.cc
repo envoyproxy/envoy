@@ -374,7 +374,130 @@ TEST_F(ProtoApiScrubberPassThroughTest, StreamingMultipleMessageSingleBuffer) {
   checkSerializedData<CreateApiKeyRequest>(*request_data4, {request4});
 }
 
-using ProtoApiScrubberScrubbingTest = ProtoApiScrubberFilterTest;
+using ProtoApiScrubberPathValidationTest = ProtoApiScrubberFilterTest;
+
+TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
+  const std::string expected_rc_detail = "proto_api_scrubber_INVALID_ARGUMENT{Error in `:path` header validation.}";
+
+  // Case 1: Empty Path
+  {
+    TestRequestHeaderMapImpl req_headers =
+        TestRequestHeaderMapImpl{{":method", "POST"},
+                                 {":path", ""},
+                                 {"content-type", "application/grpc"}};
+
+    EXPECT_CALL(mock_decoder_callbacks_,
+                sendLocalReply(Envoy::Http::Code::BadRequest,
+                               testing::HasSubstr("Method name is empty"), _,
+                               Eq(Envoy::Grpc::Status::InvalidArgument),
+                               Eq(expected_rc_detail)));
+
+    EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(req_headers, true));
+  }
+
+  // Case 2: Wildcard in Path
+  {
+    TestRequestHeaderMapImpl req_headers =
+        TestRequestHeaderMapImpl{{":method", "POST"},
+                                 {":path", "/package.Service/Method*"},
+                                 {"content-type", "application/grpc"}};
+
+    EXPECT_CALL(mock_decoder_callbacks_,
+                sendLocalReply(Envoy::Http::Code::BadRequest,
+                               testing::HasSubstr("contains '*' which is not supported"), _,
+                               Eq(Envoy::Grpc::Status::InvalidArgument),
+                               Eq(expected_rc_detail)));
+
+    EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(req_headers, true));
+  }
+
+  // Case 3: Missing Leading Slash
+  {
+    TestRequestHeaderMapImpl req_headers =
+        TestRequestHeaderMapImpl{{":method", "POST"},
+                                 {":path", "package.Service/Method"},
+                                 {"content-type", "application/grpc"}};
+
+    EXPECT_CALL(mock_decoder_callbacks_,
+                sendLocalReply(Envoy::Http::Code::BadRequest,
+                               testing::HasSubstr("should follow the gRPC format"), _,
+                               Eq(Envoy::Grpc::Status::InvalidArgument),
+                               Eq(expected_rc_detail)));
+
+    EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(req_headers, true));
+  }
+
+  // Case 4: Missing Service Part (Double Slash)
+  {
+    TestRequestHeaderMapImpl req_headers =
+        TestRequestHeaderMapImpl{{":method", "POST"},
+                                 {":path", "//MethodName"},
+                                 {"content-type", "application/grpc"}};
+
+    EXPECT_CALL(mock_decoder_callbacks_,
+                sendLocalReply(Envoy::Http::Code::BadRequest,
+                               testing::HasSubstr("should follow the gRPC format"), _,
+                               Eq(Envoy::Grpc::Status::InvalidArgument),
+                               Eq(expected_rc_detail)));
+
+    EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(req_headers, true));
+  }
+
+  // Case 5: Missing Method Part (Trailing Slash)
+  {
+    TestRequestHeaderMapImpl req_headers =
+        TestRequestHeaderMapImpl{{":method", "POST"},
+                                 {":path", "/package.Service/"},
+                                 {"content-type", "application/grpc"}};
+
+    EXPECT_CALL(mock_decoder_callbacks_,
+                sendLocalReply(Envoy::Http::Code::BadRequest,
+                               testing::HasSubstr("should follow the gRPC format"), _,
+                               Eq(Envoy::Grpc::Status::InvalidArgument),
+                               Eq(expected_rc_detail)));
+
+    EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(req_headers, true));
+  }
+
+  // Case 6: Service Name Without Dot
+  {
+    TestRequestHeaderMapImpl req_headers =
+        TestRequestHeaderMapImpl{{":method", "POST"},
+                                 {":path", "/SimpleService/Method"},
+                                 {"content-type", "application/grpc"}};
+
+    EXPECT_CALL(mock_decoder_callbacks_,
+                sendLocalReply(Envoy::Http::Code::BadRequest,
+                               testing::HasSubstr("should follow the gRPC format"), _,
+                               Eq(Envoy::Grpc::Status::InvalidArgument),
+                               Eq(expected_rc_detail)));
+
+    EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(req_headers, true));
+  }
+
+  // Case 7: Service Name with Empty Sub-parts (Double Dot)
+  {
+    TestRequestHeaderMapImpl req_headers =
+        TestRequestHeaderMapImpl{{":method", "POST"},
+                                 {":path", "/package..Service/Method"},
+                                 {"content-type", "application/grpc"}};
+
+    EXPECT_CALL(mock_decoder_callbacks_,
+                sendLocalReply(Envoy::Http::Code::BadRequest,
+                               testing::HasSubstr("should follow the gRPC format"), _,
+                               Eq(Envoy::Grpc::Status::InvalidArgument),
+                               Eq(expected_rc_detail)));
+
+    EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(req_headers, true));
+  }
+}
 
 TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod) {
   ProtoApiScrubberConfig config;
@@ -404,6 +527,8 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod) {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->decodeData(*request_data, true));
 }
+
+using ProtoApiScrubberScrubbingTest = ProtoApiScrubberFilterTest;
 
 // Tests that a simple non-nested field with restrictions configured which evaluates to `true` is
 // scrubbed out from the request.

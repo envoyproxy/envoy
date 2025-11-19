@@ -33,7 +33,6 @@ using proto_processing_lib::proto_scrubber::ScrubberContext;
 const char kRcDetailFilterProtoApiScrubber[] = "proto_api_scrubber";
 const char kRcDetailErrorRequestBufferConversion[] = "REQUEST_BUFFER_CONVERSION_FAIL";
 const char kRcDetailErrorTypeBadRequest[] = "BAD_REQUEST";
-// TODO: Rename and change the value.
 const char kPathValidationError[] = "Error in `:path` header validation.";
 
 std::string formatError(absl::string_view filter_name, absl::string_view error_type,
