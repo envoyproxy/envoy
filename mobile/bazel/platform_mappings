@@ -1,1 +1,32 @@
-../../bazel/platform_mappings
+flags:
+  --cpu=arm64-v8a
+    @envoy//bazel:android_aarch64
+
+  --cpu=armeabi-v7a
+    @envoy//bazel:android_armeabi
+
+  --cpu=x86
+    @envoy//bazel:android_x86
+
+  --cpu=x86_64
+    @envoy//bazel:android_x86_64
+
+  --cpu=darwin_x86_64
+  --apple_platform_type=macos
+    @envoy//bazel:macos_x86_64
+
+  --cpu=darwin_arm64
+  --apple_platform_type=macos
+    @envoy//bazel:macos_arm64
+
+  --cpu=ios_x86_64
+  --apple_platform_type=ios
+    @envoy//bazel:ios_x86_64_platform
+
+  --cpu=ios_sim_arm64
+  --apple_platform_type=ios
+    @envoy//bazel:ios_sim_arm64_platform
+
+  --cpu=ios_arm64
+  --apple_platform_type=ios
+    @envoy//bazel:ios_arm64_platform
