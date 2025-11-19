@@ -75,8 +75,9 @@ public:
   virtual MatchTreeHttpMatchingDataSharedPtr
   getResponseFieldMatcher(const std::string& method_name, const std::string& field_mask) const;
 
-  // Returns the type finder which resolves type URL string to the corresponding `Protobuf::Type*`.
-  TypeFinder getTypeFinder() const { return *type_finder_; };
+  // Returns a constant reference to the type finder which resolves type URL string to the
+  // corresponding `Protobuf::Type*`.
+  const TypeFinder& getTypeFinder() const { return *type_finder_; };
 
   // Returns the request type of the method.
   absl::StatusOr<const Protobuf::Type*> getRequestType(const std::string& method_name) const;

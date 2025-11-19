@@ -256,7 +256,7 @@ ProtoApiScrubberFilterConfig::getRequestType(const std::string& method_name) con
   if (method == nullptr) {
     return absl::InvalidArgumentError(absl::StrFormat(
         "Unable to find method `%s` in the descriptor pool configured for this filter.",
-        method_name));
+        dot_separated_method_name));
   }
 
   std::string request_type_url =

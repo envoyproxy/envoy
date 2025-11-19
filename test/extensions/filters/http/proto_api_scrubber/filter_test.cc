@@ -164,10 +164,7 @@ protected:
     if (!config.has_descriptor_set()) {
       auto content_or = api_->fileSystem().fileReadToEnd(
           Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath));
-
-      if (!content_or.ok()) {
-        return content_or.status();
-      }
+      RETURN_IF_NOT_OK(content_or.status());
 
       *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
           std::move(content_or.value());
@@ -175,9 +172,7 @@ protected:
 
     // Create new Config Object
     auto config_or_status = ProtoApiScrubberFilterConfig::create(config, mock_factory_context_);
-    if (!config_or_status.ok()) {
-      return config_or_status.status();
-    }
+    RETURN_IF_NOT_OK(config_or_status.status());
 
     // Reset the filter config instance
     filter_config_ = config_or_status.value();
@@ -398,7 +393,7 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 
   std::string expected_error_msg =
-      "Unable to find method `/some.nonexistent.Service/UnknownMethod` in the "
+      "Unable to find method `some.nonexistent.Service.UnknownMethod` in the "
       "descriptor pool configured for this filter.";
 
   EXPECT_CALL(mock_decoder_callbacks_,
@@ -410,74 +405,74 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod) {
             filter_->decodeData(*request_data, true));
 }
 
-TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestFieldBasedOnConfig) {
-  {
-    ProtoApiScrubberConfig proto_config;
-    proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+// Tests that a simple non-nested field with restrictions configured which evaluates to `true` is
+// scrubbed out from the request.
+TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestSimpleField) {
+  ProtoApiScrubberConfig proto_config;
+  proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
 
-    std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
-    std::string field_path = "key.display_name";
+  std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
+  std::string field_path = "parent";
 
-    addRestriction(proto_config, method_name, field_path, FieldType::Request, true,
-                   kRemoveFieldActionType);
+  addRestriction(proto_config, method_name, field_path, FieldType::Request, true,
+                 kRemoveFieldActionType);
 
-    // Reload the filter with the above config.
-    ASSERT_TRUE(reloadFilter(proto_config).ok());
+  // Reload the filter with the above config.
+  ASSERT_TRUE(reloadFilter(proto_config).ok());
 
-    // Prepare the request.
-    TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
-        {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
-    CreateApiKeyRequest request = makeCreateApiKeyRequest();
-    Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  // Prepare the request.
+  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
 
-    // Pre-check that the field exists in the incoming request.
-    EXPECT_EQ(request.key().display_name(), "Display Name");
+  // Pre-check that the field exists in the incoming request.
+  EXPECT_EQ(request.parent(), "project-id");
 
-    // Run the filter.
-    EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
-              filter_->decodeHeaders(req_headers, true));
-    EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+  // Run the filter.
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
-    // Post-check: Verify scrubbing happened
-    CreateApiKeyRequest expected_scrubbed_request = makeCreateApiKeyRequest();
-    expected_scrubbed_request.mutable_key()->clear_display_name();
+  // Post-check: Verify scrubbing happened
+  CreateApiKeyRequest expected_scrubbed_request = makeCreateApiKeyRequest();
+  expected_scrubbed_request.clear_parent();
 
-    checkSerializedData<CreateApiKeyRequest>(*request_data, {expected_scrubbed_request});
-  }
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {expected_scrubbed_request});
+}
 
-  {
-    ProtoApiScrubberConfig proto_config;
-    proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+// Tests that a nested field with restrictions configured which evaluates to `true` is scrubbed out
+// from the request.
+TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestNestedField) {
+  ProtoApiScrubberConfig proto_config;
+  proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
 
-    std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
-    std::string field_path = "key.update_time.seconds";
+  std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
+  std::string field_path = "key.update_time.seconds";
 
-    addRestriction(proto_config, method_name, field_path, FieldType::Request, true,
-                   kRemoveFieldActionType);
+  addRestriction(proto_config, method_name, field_path, FieldType::Request, true,
+                 kRemoveFieldActionType);
 
-    // Reload the filter with the above config.
-    ASSERT_TRUE(reloadFilter(proto_config).ok());
+  // Reload the filter with the above config.
+  ASSERT_TRUE(reloadFilter(proto_config).ok());
 
-    // Prepare the request.
-    TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
-        {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
-    CreateApiKeyRequest request = makeCreateApiKeyRequest();
-    Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  // Prepare the request.
+  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
 
-    // Pre-check that the field exists in the incoming request.
-    EXPECT_EQ(request.key().update_time().seconds(), 1684306560);
+  // Pre-check that the field exists in the incoming request.
+  EXPECT_EQ(request.key().update_time().seconds(), 1684306560);
 
-    // Run the filter.
-    EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
-              filter_->decodeHeaders(req_headers, true));
-    EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+  // Run the filter.
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
-    // Post-check: Verify scrubbing happened
-    CreateApiKeyRequest expected_scrubbed_request = makeCreateApiKeyRequest();
-    expected_scrubbed_request.mutable_key()->mutable_update_time()->clear_seconds();
+  // Post-check: Verify scrubbing happened
+  CreateApiKeyRequest expected_scrubbed_request = makeCreateApiKeyRequest();
+  expected_scrubbed_request.mutable_key()->mutable_update_time()->clear_seconds();
 
-    checkSerializedData<CreateApiKeyRequest>(*request_data, {expected_scrubbed_request});
-  }
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {expected_scrubbed_request});
 }
 
 } // namespace

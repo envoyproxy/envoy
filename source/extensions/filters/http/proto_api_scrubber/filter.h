@@ -49,12 +49,20 @@ private:
   GrpcFieldExtraction::MessageConverterPtr request_msg_converter_{nullptr};
 
   // Creates and returns an instance of `ProtoScrubber` which can be used for request scrubbing.
-  absl::StatusOr<std::unique_ptr<ProtoScrubber>> createAndReturnRequestProtoScrubber();
+  absl::StatusOr<std::unique_ptr<ProtoScrubber>> createRequestProtoScrubber();
 
   const ProtoApiScrubberFilterConfig& filter_config_;
 
   // Stores the full gRPC method name e.g., `/package.service/method`.
+  // It is populated while decoding the headers (i.e., in the `decodeHeaders()` method) and is used
+  // during decoding and encoding of the data (i.e., decodeData(), encodeData(), respectively).
   std::string method_name_;
+
+  // The scrubber instance for the request path.
+  // It is lazily initialized in decodeData() to ensure it is instantiated exactly
+  // once per request, preserving state across multiple data frames (e.g., for
+  // gRPC streaming or large payloads).
+  std::unique_ptr<ProtoScrubber> request_scrubber_;
 
   // The field checker which uses match tree configured in the filter config to determine whether a
   // field should be preserved or removed from the request protobuf payloads.

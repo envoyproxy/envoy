@@ -776,7 +776,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetRequestType) {
     EXPECT_THAT(
         type_or_status.status().message(),
         testing::HasSubstr(
-            "Unable to find method `/apikeys.ApiKeys/NonExistentMethod` in the descriptor pool"));
+            "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the descriptor pool"));
   }
 }
 
