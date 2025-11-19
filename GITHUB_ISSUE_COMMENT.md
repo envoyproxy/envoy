@@ -16,7 +16,7 @@ After thorough research, I can provide a definitive answer:
 
 ### The Buildah Bug History
 
-1. **Buildah Issues #4395 and #5051**: Documented the mediaType omission bug
+1. **Buildah issues [4395](https://github.com/containers/buildah/issues/4395) and [5051](https://github.com/containers/buildah/issues/5051)**: Documented the mediaType omission bug
 2. **Fixed in buildah 1.31-1.32** (2023): The bugs were fixed about a year after buildah 1.23.1
 3. **Current ubuntu-22.04**: Still ships with the old buggy version (1.23.1)
 

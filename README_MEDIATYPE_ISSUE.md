@@ -16,7 +16,7 @@
 
 ### Technical Details
 - **Root cause**: GitHub Actions ubuntu-22.04 runners use buildah 1.23.1 (from 2022)
-- **Buildah bug**: Issues #4395 and #5051 - fixed in buildah 1.31-1.32 (2023)
+- **Buildah bug**: Issues [4395](https://github.com/containers/buildah/issues/4395) and [5051](https://github.com/containers/buildah/issues/5051) - fixed in buildah 1.31-1.32 (2023)
 - **Current version**: 1.23.1 predates the fix by about a year
 - **OCI spec**: Recommends (SHOULD) the mediaType field but doesn't require (MUST) it
 - **Impact**: Tools like rules_oci in Bazel fail with "key 'mediaType' not found" error

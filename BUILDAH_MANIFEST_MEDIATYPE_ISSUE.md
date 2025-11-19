@@ -68,15 +68,15 @@ According to the [OCI Image Index Specification](https://github.com/opencontaine
 
 This is a **known bug in older versions of buildah**:
 
-### Issue #4395: MediaType not set when pushing OCI Image Index
+### Buildah Issue 4395: MediaType not set when pushing OCI Image Index
 - **Link**: https://github.com/containers/buildah/issues/4395
 - **Status**: Closed/Fixed in buildah 1.32+ (July 2023)
 - **Description**: When buildah pushes an OCI Image Index manifest using the OCI format, it omits the `mediaType` field at the top level
 - **Impact**: Tools like rules_oci, Google Jib, and others that strictly validate manifests will fail
 
-### Issue #5051: Image index media type and annotation
+### Buildah Issue 5051: Image index media type and annotation
 - **Link**: https://github.com/containers/buildah/issues/5051
-- **Status**: Closed/Fixed in buildah 1.31+ via PR #5301
+- **Status**: Closed/Fixed in buildah 1.31+ via PR 5301
 - **Description**: Buildah couldn't create OCI format image indexes with proper mediaType and annotations
 - **Impact**: Compatibility issues between Docker and OCI formats
 
@@ -84,8 +84,8 @@ This is a **known bug in older versions of buildah**:
 
 The Envoy workflow uses **ubuntu-22.04** GitHub Actions runners, which come with **buildah 1.23.1** (from 2022). This version predates both fixes:
 - Buildah 1.23.1 is from 2022
-- Issue #5051 was fixed in buildah 1.31 (2023)
-- Issue #4395 was fixed in buildah 1.32 (2023)
+- [Buildah issue 5051](https://github.com/containers/buildah/issues/5051) was fixed in buildah 1.31 (2023)
+- [Buildah issue 4395](https://github.com/containers/buildah/issues/4395) was fixed in buildah 1.32 (2023)
 
 **Therefore, the root cause is using an outdated version of buildah that has this bug.**
 
@@ -230,6 +230,6 @@ After the fix is implemented, verify by:
 
 - Envoy Issue: https://github.com/envoyproxy/envoy/issues/41864
 - OCI Image Index Spec: https://github.com/opencontainers/image-spec/blob/main/image-index.md
-- Buildah Issue #4395: https://github.com/containers/buildah/issues/4395
-- Buildah Issue #5051: https://github.com/containers/buildah/issues/5051
+- Buildah Issue 4395: https://github.com/containers/buildah/issues/4395
+- Buildah Issue 5051: https://github.com/containers/buildah/issues/5051
 - Commit that introduced the issue: 01cfa864651a6d4ce0de0b03bd6ab202599eb6dd
