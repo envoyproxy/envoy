@@ -165,6 +165,10 @@ new_features:
     Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request
     and response bodies in any position of HTTP filter chain.
     This also make it possible to refresh routes based on the attributes in the request body.
+- area: matcher
+  change: |
+    Removed work-in-progress annotations from RBAC filter ``matcher`` and ``shadow_matcher`` fields in both HTTP
+    and network filters to reflect to mark this feature stable.
 - area: access_log
   change: |
     Support process-level rate limiting on access log emission by
