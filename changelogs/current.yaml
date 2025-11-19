@@ -62,6 +62,11 @@ minor_behavior_changes:
     Fixed HTTP ext_authz service to properly propagate headers (such as ``set-cookie``) back to clients. The
     filter now correctly uses ``allowed_client_headers`` for denied responses and ``allowed_client_headers_on_success``
     for successful authorization responses.
+- area: ext_authz
+  change: |
+    Fixed a bug where ``filter_enabled_metadata`` was not honored when the filter was marked with ``disabled: true``.
+    The filter is now instantiated when ``filter_enabled_metadata`` is configured, allowing it to check dynamic metadata
+    at runtime and enable itself conditionally.
 - area: quic
   change: |
     Switch to use QUICHE provided migration logic to handle port migration upon path degrading and migration to Server
