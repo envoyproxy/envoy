@@ -237,7 +237,9 @@ new_features:
     See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
 - area: redis
   change: |
-    Added cluster-scoped command support with a flexible response handling framework.
+    optimsed info command to provide limited metrics with consolidated view
+    of cluster and added a new command INFO.SHARD for getting shard specific
+    metrics.
 - area: overload management
   change: |
     The fixed heap resource monitor can now calculate memory pressure as currently allocated memory divided by maximum heap size,
