@@ -3,9 +3,13 @@ module(
     version = "1.37.0-dev",
 )
 
+bazel_dep(name = "aspect_bazel_lib", version = "2.21.2")
 bazel_dep(name = "envoy_api", version = "1.37.0-dev")
 bazel_dep(name = "envoy_build_config", version = "1.37.0-dev")
 bazel_dep(name = "envoy_mobile", version = "1.37.0-dev")
+bazel_dep(name = "rules_python", version = "1.6.3")
+bazel_dep(name = "rules_shell", version = "0.6.1")
+bazel_dep(name = "zstd", version = "1.5.7")
 
 local_path_override(
     module_name = "envoy_api",
