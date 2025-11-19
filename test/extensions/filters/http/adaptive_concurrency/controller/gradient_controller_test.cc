@@ -956,6 +956,47 @@ min_rtt_calc_params:
   EXPECT_FALSE(controller->inMinRTTSamplingWindow());
 }
 
+TEST_F(GradientControllerTest, ForwardingDecisionCasMultithreaded) {
+  // Use a constant concurrency limit of exactly 2.
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  max_concurrency_limit: 2
+  concurrency_update_interval: 0.1s
+min_rtt_calc_params:
+  fixed_value: 0.05s
+  min_concurrency: 2
+)EOF";
+
+  auto controller = makeController(yaml);
+  auto& synchronizer = controller->synchronizer();
+  synchronizer.enable();
+
+  // Increase the request count by 1, leaving just 1 available request slot until the concurrency
+  // limit is hit.
+  tryForward(controller, true);
+
+  // Spin off a thread and make it wait before it updates the request count.
+  synchronizer.waitOn("forwarding_decision_pre_cas");
+  std::thread t1([this, &controller]() {
+    // A block decision is expected, since the request count will have reached the limit of 2 before
+    // this thread is resumed.
+    tryForward(controller, false);
+  });
+
+  // Wait until the thread is reaches the sync point.
+  synchronizer.barrierOn("forwarding_decision_pre_cas");
+
+  // While the thread is paused, increase the request count to 2, filling the remaining request
+  // slot.
+  tryForward(controller, true);
+
+  // Signal the thread to proceed.
+  synchronizer.signal("forwarding_decision_pre_cas");
+  t1.join();
+}
+
 } // namespace
 } // namespace Controller
 } // namespace AdaptiveConcurrency
