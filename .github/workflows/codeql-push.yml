@@ -92,7 +92,7 @@ jobs:
     - name: Build
       if: ${{ env.BUILD_TARGETS != '' }}
       run: |
-       bazel/setup_clang.sh bin/clang18.1.8
+       bazel/setup_clang.sh "$(realpath bin/clang18.1.8)"
        bazel shutdown
        bazel build \
            -c fastbuild \
