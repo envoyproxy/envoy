@@ -206,9 +206,8 @@ absl::Status ProtoApiScrubberFilterConfig::validateMethodName(absl::string_view 
 
   const std::vector<absl::string_view> method_name_parts = absl::StrSplit(method_name, '/');
   if (method_name_parts.size() != 3 || !method_name_parts[0].empty() ||
-      method_name_parts[1].empty() ||
-      !absl::StrContains(method_name_parts[1], '.') || // Enforce dot in service part
-      !isApiNameValid(method_name_parts[1]) || method_name_parts[2].empty()) {
+      method_name_parts[1].empty() || !isApiNameValid(method_name_parts[1]) ||
+      method_name_parts[2].empty()) {
     return absl::InvalidArgumentError(
         fmt::format("{} Invalid method name: '{}'. Method name should follow the gRPC format "
                     "('/package.ServiceName/MethodName').",
