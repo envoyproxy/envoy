@@ -126,7 +126,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   }
 
   if (!parser_) {
-    parser_ = std::make_unique<JsonPathParser>();
+    parser_ = std::make_unique<JsonPathParser>(config_->parserConfig());
   }
 
   if (parsing_complete_) {

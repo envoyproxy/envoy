@@ -50,7 +50,31 @@ message Mcp {
   //
   // Setting it to 0 would disable the limit. It is not recommended to do so in production.
   google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {lte: 10485760}];
+
+  // Parser configuration, this provide the attribute extraction override.
+  ParserConfig parser_config = 4;
 }
+
+// Parser configuration with method-specific rules
+message ParserConfig {
+  // A single field extraction rule
+  message FieldRule {
+    // JSON path to extract (e.g., "params.name", "params.uri")
+    string path = 1 [(validate.rules).string = {min_len: 1}];
+  }
+  
+  // Configuration for a specific MCP method
+  message MethodConfig {
+    // Method name (e.g., "tools/call", "resources/read", "initialize")
+    string method = 1 [(validate.rules).string = {min_len: 1}];
+    
+    // Fields to extract for this method
+    repeated FieldRule fields = 2;
+  }
+  
+  // Method-specific configurations
+  repeated MethodConfig methods = 1;
+ }
 
 // McpOverride for MCP filter
 message McpOverride {

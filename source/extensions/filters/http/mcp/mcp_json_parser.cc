@@ -13,7 +13,7 @@ namespace Mcp {
 using namespace McpConstants;
 
 // Static method to parse method string to enum
-McpMethodType McpJsonParser::parseMethod(const std::string& method) {
+McpMethodType McpParserConfig::parseMethod(const std::string& method) {
   using namespace McpConstants::Methods;
 
   // Tools
@@ -89,6 +89,10 @@ McpMethodType McpJsonParser::parseMethod(const std::string& method) {
   return McpMethodType::UNKNOWN;
 }
 
+void McpParserConfig::addMethodConfig(const McpMethodType& method, std::vector<FieldRule> fields) {
+  method_fields_[method] = std::move(fields);
+}
+
 // McpParserConfig implementation
 void McpParserConfig::initializeDefaults() {
   // Always extract core JSON-RPC fields
@@ -97,42 +101,42 @@ void McpParserConfig::initializeDefaults() {
 
   // tools/call - only tool name
   method_fields_[McpMethodType::TOOLS_CALL] = {
-      FieldPolicy("params.name") // Required
+      FieldRule("params.name") // Required
   };
 
   // tools/list - cursor for pagination
-  method_fields_[McpMethodType::TOOLS_LIST] = {FieldPolicy("params.cursor")};
+  method_fields_[McpMethodType::TOOLS_LIST] = {FieldRule("params.cursor")};
 
   // resources/read - URI is required
-  method_fields_[McpMethodType::RESOURCES_READ] = {FieldPolicy("params.uri")};
+  method_fields_[McpMethodType::RESOURCES_READ] = {FieldRule("params.uri")};
 
   // resources/list - cursor
-  method_fields_[McpMethodType::RESOURCES_LIST] = {FieldPolicy("params.cursor")};
+  method_fields_[McpMethodType::RESOURCES_LIST] = {FieldRule("params.cursor")};
 
   // resources/subscribe - URI is required
-  method_fields_[McpMethodType::RESOURCES_SUBSCRIBE] = {FieldPolicy("params.uri")};
+  method_fields_[McpMethodType::RESOURCES_SUBSCRIBE] = {FieldRule("params.uri")};
 
   // resources/unsubscribe - URI is required
-  method_fields_[McpMethodType::RESOURCES_UNSUBSCRIBE] = {FieldPolicy("params.uri")};
+  method_fields_[McpMethodType::RESOURCES_UNSUBSCRIBE] = {FieldRule("params.uri")};
 
   // resources/templates/list - cursor
-  method_fields_[McpMethodType::RESOURCES_TEMPLATES_LIST] = {FieldPolicy("params.cursor")};
+  method_fields_[McpMethodType::RESOURCES_TEMPLATES_LIST] = {FieldRule("params.cursor")};
 
   // prompts/get - name is required
-  method_fields_[McpMethodType::PROMPTS_GET] = {FieldPolicy("params.name")};
+  method_fields_[McpMethodType::PROMPTS_GET] = {FieldRule("params.name")};
 
   // prompts/list - cursor
-  method_fields_[McpMethodType::PROMPTS_LIST] = {FieldPolicy("params.cursor")};
+  method_fields_[McpMethodType::PROMPTS_LIST] = {FieldRule("params.cursor")};
 
   // completion/complete - ref fields
   method_fields_[McpMethodType::COMPLETION_COMPLETE] = {};
 
   // logging/setLevel - level is required
-  method_fields_[McpMethodType::LOGGING_SET_LEVEL] = {FieldPolicy("params.level")};
+  method_fields_[McpMethodType::LOGGING_SET_LEVEL] = {FieldRule("params.level")};
 
   // initialize - protocol version and client info
-  method_fields_[McpMethodType::INITIALIZE] = {FieldPolicy("params.protocolVersion"),
-                                               FieldPolicy("params.clientInfo.name")};
+  method_fields_[McpMethodType::INITIALIZE] = {FieldRule("params.protocolVersion"),
+                                               FieldRule("params.clientInfo.name")};
 
   // Empty configs for simple methods
   method_fields_[McpMethodType::SAMPLING_CREATE_MESSAGE] = {};
@@ -141,14 +145,14 @@ void McpParserConfig::initializeDefaults() {
   method_fields_[McpMethodType::PING] = {};
 
   // Notifications
-  method_fields_[McpMethodType::NOTIFICATION_RESOURCES_UPDATED] = {FieldPolicy("params.uri")};
+  method_fields_[McpMethodType::NOTIFICATION_RESOURCES_UPDATED] = {FieldRule("params.uri")};
 
-  method_fields_[McpMethodType::NOTIFICATION_PROGRESS] = {FieldPolicy("params.progressToken"),
-                                                          FieldPolicy("params.progress")};
+  method_fields_[McpMethodType::NOTIFICATION_PROGRESS] = {FieldRule("params.progressToken"),
+                                                          FieldRule("params.progress")};
 
-  method_fields_[McpMethodType::NOTIFICATION_CANCELLED] = {FieldPolicy("params.requestId")};
+  method_fields_[McpMethodType::NOTIFICATION_CANCELLED] = {FieldRule("params.requestId")};
 
-  method_fields_[McpMethodType::NOTIFICATION_MESSAGE] = {FieldPolicy("params.level")};
+  method_fields_[McpMethodType::NOTIFICATION_MESSAGE] = {FieldRule("params.level")};
 
   // Other notifications - no params
   method_fields_[McpMethodType::NOTIFICATION_RESOURCES_LIST_CHANGED] = {};
@@ -158,16 +162,39 @@ void McpParserConfig::initializeDefaults() {
   method_fields_[McpMethodType::NOTIFICATION_GENERIC] = {};
 }
 
-McpParserConfig McpParserConfig::createDefault() {
+McpParserConfig McpParserConfig::fromProto(
+    const envoy::extensions::filters::http::mcp::v3::ParserConfig& proto) {
   McpParserConfig config;
+
+  // Set core fields to always extract
+  config.always_extract_.insert("jsonrpc");
+  config.always_extract_.insert("method");
+
   config.initializeDefaults();
-  // TODO(botengyao) add proto configs
+
+  // Process method-specific overrides
+  for (const auto& method_proto : proto.methods()) {
+    std::vector<FieldRule> fields;
+
+    for (const auto& field_proto : method_proto.fields()) {
+      fields.emplace_back(field_proto.path());
+    }
+
+    config.addMethodConfig(McpParserConfig::parseMethod(method_proto.method()), std::move(fields));
+  }
+
   return config;
 }
 
-const std::vector<McpParserConfig::FieldPolicy>&
+McpParserConfig McpParserConfig::createDefault() {
+  McpParserConfig config;
+  config.initializeDefaults();
+  return config;
+}
+
+const std::vector<McpParserConfig::FieldRule>&
 McpParserConfig::getFieldsForMethod(McpMethodType method) const {
-  static const std::vector<FieldPolicy> empty;
+  static const std::vector<FieldRule> empty;
   auto it = method_fields_.find(method);
   return (it != method_fields_.end()) ? it->second : empty;
 }
@@ -266,7 +293,7 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
     } else if (name == METHOD_FIELD) {
       has_method_ = true;
       method_ = std::string(value);
-      method_type_ = McpJsonParser::parseMethod(method_);
+      method_type_ = McpParserConfig::parseMethod(method_);
     }
   }
 

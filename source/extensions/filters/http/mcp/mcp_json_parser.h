@@ -139,14 +139,23 @@ constexpr std::string_view NOTIFICATION_INITIALIZED = "notifications/initialized
  */
 class McpParserConfig {
 public:
-  struct FieldPolicy {
+  struct FieldRule {
     std::string path; // JSON path (e.g., "params.name")
 
-    FieldPolicy(const std::string& p) : path(p) {}
+    FieldRule(const std::string& p) : path(p) {}
   };
 
+  // Create from proto configuration
+  static McpParserConfig fromProto(const envoy::extensions::filters::http::mcp::v3::ParserConfig& proto);
+
+  // Static helper to parse method string to enum
+  static McpMethodType parseMethod(const std::string& method);
+
   // Get extraction policy for a specific method
-  const std::vector<FieldPolicy>& getFieldsForMethod(McpMethodType method) const;
+  const std::vector<FieldRule>& getFieldsForMethod(McpMethodType method) const;
+
+  // Add method configuration
+  void addMethodConfig(const McpMethodType& method, std::vector<FieldRule> fields);
 
   // Get all global fields to always extract
   const std::unordered_set<std::string>& getAlwaysExtract() const { return always_extract_; }
@@ -158,7 +167,7 @@ private:
   void initializeDefaults();
 
   // Per-method field policies
-  std::unordered_map<McpMethodType, std::vector<FieldPolicy>> method_fields_;
+  std::unordered_map<McpMethodType, std::vector<FieldRule>> method_fields_;
 
   // Global fields to always extract
   std::unordered_set<std::string> always_extract_;
@@ -291,9 +300,6 @@ public:
 
   // Reset parser for reuse
   void reset();
-
-  // Static helper to parse method string to enum
-  static McpMethodType parseMethod(const std::string& method);
 
 private:
   McpParserConfig config_;
