@@ -1413,9 +1413,9 @@ six==1.16.0 \
     # via
     #   python-dateutil
     #   sphinxcontrib-httpdomain
-slack-sdk==3.37.0 \
-    --hash=sha256:242d6cffbd9e843af807487ff04853189b812081aeaa22f90a8f159f20220ed9 \
-    --hash=sha256:e108a0836eafda74d8a95e76c12c2bcb010e645d504d8497451e4c7ebb229c87
+slack-sdk==3.38.0 \
+    --hash=sha256:6c5e908abd68e97373a88437ef2fa3ff7a4c356807bbc41fcd7d6cbbfa2034d6 \
+    --hash=sha256:73f43ef535929c6034982434aba4d5fd04db3b40f4e0cd14c3abfd56419d181d
     # via -r requirements.in
 smmap==5.0.1 \
     --hash=sha256:dceeb6c0028fdb6734471eb07c0cd2aae706ccaecab45965ee83f11c8d3b1f62 \
