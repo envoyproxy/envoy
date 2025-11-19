@@ -419,5 +419,14 @@ public:
   using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;
 };
 
+class TestEnvoyQuicNetworkObserverRegistryFactory
+    : public Quic::EnvoyQuicNetworkObserverRegistryFactory {
+public:
+  std::unique_ptr<Quic::EnvoyQuicNetworkObserverRegistry>
+  createQuicNetworkObserverRegistry(Event::Dispatcher&) override {
+    return std::make_unique<TestNetworkObserverRegistry>();
+  }
+};
+
 } // namespace Quic
 } // namespace Envoy
