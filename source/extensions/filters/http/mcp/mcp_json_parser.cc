@@ -12,175 +12,66 @@ namespace Mcp {
 
 using namespace McpConstants;
 
-// Static method to parse method string to enum
-McpMethodType McpParserConfig::parseMethod(const std::string& method) {
-  using namespace McpConstants::Methods;
-
-  // Tools
-  if (method == TOOLS_CALL)
-    return McpMethodType::TOOLS_CALL;
-  if (method == TOOLS_LIST)
-    return McpMethodType::TOOLS_LIST;
-
-  // Resources
-  if (method == RESOURCES_READ)
-    return McpMethodType::RESOURCES_READ;
-  if (method == RESOURCES_LIST)
-    return McpMethodType::RESOURCES_LIST;
-  if (method == RESOURCES_SUBSCRIBE)
-    return McpMethodType::RESOURCES_SUBSCRIBE;
-  if (method == RESOURCES_UNSUBSCRIBE)
-    return McpMethodType::RESOURCES_UNSUBSCRIBE;
-  if (method == RESOURCES_TEMPLATES_LIST)
-    return McpMethodType::RESOURCES_TEMPLATES_LIST;
-
-  // Prompts
-  if (method == PROMPTS_GET)
-    return McpMethodType::PROMPTS_GET;
-  if (method == PROMPTS_LIST)
-    return McpMethodType::PROMPTS_LIST;
-
-  // Completion
-  if (method == COMPLETION_COMPLETE)
-    return McpMethodType::COMPLETION_COMPLETE;
-
-  // Logging
-  if (method == LOGGING_SET_LEVEL)
-    return McpMethodType::LOGGING_SET_LEVEL;
-
-  // Lifecycle
-  if (method == INITIALIZE)
-    return McpMethodType::INITIALIZE;
-  if (method == INITIALIZED)
-    return McpMethodType::INITIALIZED;
-  if (method == SHUTDOWN)
-    return McpMethodType::SHUTDOWN;
-
-  // Sampling
-  if (method == SAMPLING_CREATE_MESSAGE)
-    return McpMethodType::SAMPLING_CREATE_MESSAGE;
-
-  // Utility
-  if (method == PING)
-    return McpMethodType::PING;
-
-  // Notifications - check prefix
-  if (method.starts_with(std::string(NOTIFICATION_PREFIX))) {
-    // Specific notification types
-    if (method == NOTIFICATION_RESOURCES_LIST_CHANGED)
-      return McpMethodType::NOTIFICATION_RESOURCES_LIST_CHANGED;
-    if (method == NOTIFICATION_RESOURCES_UPDATED)
-      return McpMethodType::NOTIFICATION_RESOURCES_UPDATED;
-    if (method == NOTIFICATION_TOOLS_LIST_CHANGED)
-      return McpMethodType::NOTIFICATION_TOOLS_LIST_CHANGED;
-    if (method == NOTIFICATION_PROMPTS_LIST_CHANGED)
-      return McpMethodType::NOTIFICATION_PROMPTS_LIST_CHANGED;
-    if (method == NOTIFICATION_PROGRESS)
-      return McpMethodType::NOTIFICATION_PROGRESS;
-    if (method == NOTIFICATION_MESSAGE)
-      return McpMethodType::NOTIFICATION_MESSAGE;
-    if (method == NOTIFICATION_CANCELLED)
-      return McpMethodType::NOTIFICATION_CANCELLED;
-    if (method == NOTIFICATION_INITIALIZED)
-      return McpMethodType::NOTIFICATION_INITIALIZED;
-    return McpMethodType::NOTIFICATION_GENERIC;
-  }
-
-  return McpMethodType::UNKNOWN;
+void McpParserConfig::addMethodConfig(absl::string_view method, std::vector<FieldRule> fields) {
+  method_fields_[std::string(method)] = std::move(fields);
 }
-
-void McpParserConfig::addMethodConfig(const McpMethodType& method, std::vector<FieldRule> fields) {
-  method_fields_[method] = std::move(fields);
-}
-
 // McpParserConfig implementation
 void McpParserConfig::initializeDefaults() {
   // Always extract core JSON-RPC fields
   always_extract_.insert("jsonrpc");
   always_extract_.insert("method");
 
-  // tools/call - only tool name
-  method_fields_[McpMethodType::TOOLS_CALL] = {
-      FieldRule("params.name") // Required
-  };
+  // Tools
+  addMethodConfig(Methods::TOOLS_CALL, {FieldRule("params.name")});
 
-  // tools/list - cursor for pagination
-  method_fields_[McpMethodType::TOOLS_LIST] = {FieldRule("params.cursor")};
+  // Resources
+  addMethodConfig(Methods::RESOURCES_READ, {FieldRule("params.uri")});
+  addMethodConfig(Methods::RESOURCES_LIST, {FieldRule("params.cursor")});
+  addMethodConfig(Methods::RESOURCES_SUBSCRIBE, {FieldRule("params.uri")});
+  addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE, {FieldRule("params.uri")});
+  addMethodConfig(Methods::RESOURCES_TEMPLATES_LIST, {FieldRule("params.cursor")});
 
-  // resources/read - URI is required
-  method_fields_[McpMethodType::RESOURCES_READ] = {FieldRule("params.uri")};
+  // Prompts
+  addMethodConfig(Methods::PROMPTS_GET, {FieldRule("params.name")});
+  addMethodConfig(Methods::PROMPTS_LIST, {FieldRule("params.cursor")});
 
-  // resources/list - cursor
-  method_fields_[McpMethodType::RESOURCES_LIST] = {FieldRule("params.cursor")};
+  // Completion
+  addMethodConfig(Methods::COMPLETION_COMPLETE, {});
 
-  // resources/subscribe - URI is required
-  method_fields_[McpMethodType::RESOURCES_SUBSCRIBE] = {FieldRule("params.uri")};
+  // Logging
+  addMethodConfig(Methods::LOGGING_SET_LEVEL, {FieldRule("params.level")});
 
-  // resources/unsubscribe - URI is required
-  method_fields_[McpMethodType::RESOURCES_UNSUBSCRIBE] = {FieldRule("params.uri")};
-
-  // resources/templates/list - cursor
-  method_fields_[McpMethodType::RESOURCES_TEMPLATES_LIST] = {FieldRule("params.cursor")};
-
-  // prompts/get - name is required
-  method_fields_[McpMethodType::PROMPTS_GET] = {FieldRule("params.name")};
-
-  // prompts/list - cursor
-  method_fields_[McpMethodType::PROMPTS_LIST] = {FieldRule("params.cursor")};
-
-  // completion/complete - ref fields
-  method_fields_[McpMethodType::COMPLETION_COMPLETE] = {};
-
-  // logging/setLevel - level is required
-  method_fields_[McpMethodType::LOGGING_SET_LEVEL] = {FieldRule("params.level")};
-
-  // initialize - protocol version and client info
-  method_fields_[McpMethodType::INITIALIZE] = {FieldRule("params.protocolVersion"),
-                                               FieldRule("params.clientInfo.name")};
-
-  // Empty configs for simple methods
-  method_fields_[McpMethodType::SAMPLING_CREATE_MESSAGE] = {};
-  method_fields_[McpMethodType::INITIALIZED] = {};
-  method_fields_[McpMethodType::SHUTDOWN] = {};
-  method_fields_[McpMethodType::PING] = {};
+  // Lifecycle
+  addMethodConfig(Methods::INITIALIZE,
+                  {FieldRule("params.protocolVersion"), FieldRule("params.clientInfo.name")});
 
   // Notifications
-  method_fields_[McpMethodType::NOTIFICATION_RESOURCES_UPDATED] = {FieldRule("params.uri")};
+  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED, {FieldRule("params.uri")});
 
-  method_fields_[McpMethodType::NOTIFICATION_PROGRESS] = {FieldRule("params.progressToken"),
-                                                          FieldRule("params.progress")};
+  addMethodConfig(Methods::NOTIFICATION_PROGRESS,
+                  {FieldRule("params.progressToken"), FieldRule("params.progress")});
 
-  method_fields_[McpMethodType::NOTIFICATION_CANCELLED] = {FieldRule("params.requestId")};
+  addMethodConfig(Methods::NOTIFICATION_CANCELLED, {FieldRule("params.requestId")});
 
-  method_fields_[McpMethodType::NOTIFICATION_MESSAGE] = {FieldRule("params.level")};
-
-  // Other notifications - no params
-  method_fields_[McpMethodType::NOTIFICATION_RESOURCES_LIST_CHANGED] = {};
-  method_fields_[McpMethodType::NOTIFICATION_TOOLS_LIST_CHANGED] = {};
-  method_fields_[McpMethodType::NOTIFICATION_PROMPTS_LIST_CHANGED] = {};
-  method_fields_[McpMethodType::NOTIFICATION_INITIALIZED] = {};
-  method_fields_[McpMethodType::NOTIFICATION_GENERIC] = {};
+  addMethodConfig(Methods::NOTIFICATION_MESSAGE, {FieldRule("params.level")});
 }
 
-McpParserConfig McpParserConfig::fromProto(
-    const envoy::extensions::filters::http::mcp::v3::ParserConfig& proto) {
+McpParserConfig
+McpParserConfig::fromProto(const envoy::extensions::filters::http::mcp::v3::ParserConfig& proto) {
   McpParserConfig config;
 
   // Set core fields to always extract
   config.always_extract_.insert("jsonrpc");
   config.always_extract_.insert("method");
-
   config.initializeDefaults();
 
   // Process method-specific overrides
   for (const auto& method_proto : proto.methods()) {
     std::vector<FieldRule> fields;
-
     for (const auto& field_proto : method_proto.fields()) {
       fields.emplace_back(field_proto.path());
     }
-
-    config.addMethodConfig(McpParserConfig::parseMethod(method_proto.method()), std::move(fields));
+    config.addMethodConfig(method_proto.method(), std::move(fields));
   }
 
   return config;
@@ -193,7 +84,7 @@ McpParserConfig McpParserConfig::createDefault() {
 }
 
 const std::vector<McpParserConfig::FieldRule>&
-McpParserConfig::getFieldsForMethod(McpMethodType method) const {
+McpParserConfig::getFieldsForMethod(const std::string& method) const {
   static const std::vector<FieldRule> empty;
   auto it = method_fields_.find(method);
   return (it != method_fields_.end()) ? it->second : empty;
@@ -289,11 +180,15 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
   if (depth_ == 1) {
     if (name == JSONRPC_FIELD && value == JSONRPC_VERSION) {
       has_jsonrpc_ = true;
-      is_valid_mcp_ = true;
+      if (has_method_) {
+        is_valid_mcp_ = true;
+      }
     } else if (name == METHOD_FIELD) {
       has_method_ = true;
+      if (has_jsonrpc_) {
+        is_valid_mcp_ = true;
+      }
       method_ = std::string(value);
-      method_type_ = McpParserConfig::parseMethod(method_);
     }
   }
 
@@ -441,7 +336,6 @@ void McpFieldExtractor::storeField(const std::string& path, const Protobuf::Valu
 
 void McpFieldExtractor::checkEarlyStop() {
   // Can't stop if we haven't seen jsonrpc and method yet
-  ENVOY_LOG(debug, "boteng checkEarlyStop");
   if (!has_jsonrpc_ || !has_method_) {
     return;
   }
@@ -454,20 +348,18 @@ void McpFieldExtractor::checkEarlyStop() {
   }
 
   // For requests/notifications, check method-specific fields
-  const auto& required_fields = config_.getFieldsForMethod(method_type_);
+  const auto& required_fields = config_.getFieldsForMethod(method_);
   for (const auto& field : required_fields) {
     if (collected_fields_.count(field.path) == 0) {
       return; // Still missing this field
     }
   }
 
-  // We have everything we need
   can_stop_parsing_ = true;
   ENVOY_LOG(debug, "early stop: Have all fields for method {}", method_);
 }
 
 void McpFieldExtractor::finalizeExtraction() {
-  ENVOY_LOG_MISC(trace, "calling finalizeExtraction");
   if (!has_jsonrpc_ || !has_method_) {
     ENVOY_LOG(debug, "not a valid MCP message");
     is_valid_mcp_ = false;
@@ -487,11 +379,9 @@ void McpFieldExtractor::copySelectedFields() {
   }
 
   // Copy method-specific fields
-  if (method_type_ != McpMethodType::UNKNOWN) {
-    const auto& fields = config_.getFieldsForMethod(method_type_);
-    for (const auto& field : fields) {
-      copyFieldByPath(field.path);
-    }
+  const auto& fields = config_.getFieldsForMethod(method_);
+  for (const auto& field : fields) {
+    copyFieldByPath(field.path);
   }
 }
 
@@ -542,11 +432,7 @@ void McpFieldExtractor::copyFieldByPath(const std::string& path) {
 }
 
 void McpFieldExtractor::validateRequiredFields() {
-  if (method_type_ == McpMethodType::UNKNOWN) {
-    return;
-  }
-
-  const auto& fields = config_.getFieldsForMethod(method_type_);
+  const auto& fields = config_.getFieldsForMethod(method_);
   for (const auto& field : fields) {
     if (extracted_fields_.count(field.path) == 0) {
       missing_required_fields_.push_back(field.path);
@@ -568,6 +454,7 @@ absl::Status McpJsonParser::parse(absl::string_view data) {
 
   auto status = stream_parser_->Parse(data);
   ENVOY_LOG(debug, "parser pasing");
+  ENVOY_LOG(debug, "status ok: {}, {}", status.ok(), status.message());
   if (extractor_->shouldStopParsing()) {
     ENVOY_LOG(debug, "Parser stopped early - all required fields collected");
     all_fields_collected_ = true;
@@ -587,10 +474,6 @@ absl::Status McpJsonParser::finishParse() {
 }
 
 bool McpJsonParser::isValidMcpRequest() const { return extractor_ && extractor_->isValidMcp(); }
-
-McpMethodType McpJsonParser::getMethodType() const {
-  return extractor_ ? extractor_->getMethodType() : McpMethodType::UNKNOWN;
-}
 
 const std::string& McpJsonParser::getMethod() const {
   static const std::string empty;

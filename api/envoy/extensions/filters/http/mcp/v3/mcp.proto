@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.mcp.v3;
 
 import "google/protobuf/wrappers.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -62,19 +63,19 @@ message ParserConfig {
     // JSON path to extract (e.g., "params.name", "params.uri")
     string path = 1 [(validate.rules).string = {min_len: 1}];
   }
-  
+
   // Configuration for a specific MCP method
   message MethodConfig {
     // Method name (e.g., "tools/call", "resources/read", "initialize")
     string method = 1 [(validate.rules).string = {min_len: 1}];
-    
+
     // Fields to extract for this method
     repeated FieldRule fields = 2;
   }
-  
+
   // Method-specific configurations
   repeated MethodConfig methods = 1;
- }
+}
 
 // McpOverride for MCP filter
 message McpOverride {

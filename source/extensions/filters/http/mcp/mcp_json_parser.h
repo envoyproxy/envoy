@@ -22,56 +22,6 @@ namespace HttpFilters {
 namespace Mcp {
 
 /**
- * MCP method types enumeration
- */
-enum class McpMethodType {
-  UNKNOWN,
-
-  // Tools
-  TOOLS_CALL,
-  TOOLS_LIST,
-
-  // Resources
-  RESOURCES_READ,
-  RESOURCES_LIST,
-  RESOURCES_SUBSCRIBE,
-  RESOURCES_UNSUBSCRIBE,
-  RESOURCES_TEMPLATES_LIST,
-
-  // Prompts
-  PROMPTS_GET,
-  PROMPTS_LIST,
-
-  // Completion
-  COMPLETION_COMPLETE,
-
-  // Logging
-  LOGGING_SET_LEVEL,
-
-  // Lifecycle
-  INITIALIZE,
-  INITIALIZED,
-  SHUTDOWN,
-
-  // Sampling
-  SAMPLING_CREATE_MESSAGE,
-
-  // Utility
-  PING,
-
-  // Notifications
-  NOTIFICATION_RESOURCES_LIST_CHANGED,
-  NOTIFICATION_RESOURCES_UPDATED,
-  NOTIFICATION_TOOLS_LIST_CHANGED,
-  NOTIFICATION_PROMPTS_LIST_CHANGED,
-  NOTIFICATION_PROGRESS,
-  NOTIFICATION_MESSAGE,
-  NOTIFICATION_CANCELLED,
-  NOTIFICATION_INITIALIZED,
-  NOTIFICATION_GENERIC
-};
-
-/**
  * MCP protocol constants
  */
 namespace McpConstants {
@@ -80,9 +30,6 @@ constexpr std::string_view JSONRPC_VERSION = "2.0";
 constexpr std::string_view JSONRPC_FIELD = "jsonrpc";
 constexpr std::string_view METHOD_FIELD = "method";
 constexpr std::string_view ID_FIELD = "id";
-constexpr std::string_view PARAMS_FIELD = "params";
-constexpr std::string_view RESULT_FIELD = "result";
-constexpr std::string_view ERROR_FIELD = "error";
 
 // Method names
 namespace Methods {
@@ -146,16 +93,14 @@ public:
   };
 
   // Create from proto configuration
-  static McpParserConfig fromProto(const envoy::extensions::filters::http::mcp::v3::ParserConfig& proto);
-
-  // Static helper to parse method string to enum
-  static McpMethodType parseMethod(const std::string& method);
+  static McpParserConfig
+  fromProto(const envoy::extensions::filters::http::mcp::v3::ParserConfig& proto);
 
   // Get extraction policy for a specific method
-  const std::vector<FieldRule>& getFieldsForMethod(McpMethodType method) const;
+  const std::vector<FieldRule>& getFieldsForMethod(const std::string& method) const;
 
   // Add method configuration
-  void addMethodConfig(const McpMethodType& method, std::vector<FieldRule> fields);
+  void addMethodConfig(absl::string_view method, std::vector<FieldRule> fields);
 
   // Get all global fields to always extract
   const std::unordered_set<std::string>& getAlwaysExtract() const { return always_extract_; }
@@ -167,7 +112,7 @@ private:
   void initializeDefaults();
 
   // Per-method field policies
-  std::unordered_map<McpMethodType, std::vector<FieldRule>> method_fields_;
+  std::unordered_map<std::string, std::vector<FieldRule>> method_fields_;
 
   // Global fields to always extract
   std::unordered_set<std::string> always_extract_;
@@ -204,7 +149,6 @@ public:
   void finalizeExtraction();
 
   // MCP validation getters
-  McpMethodType getMethodType() const { return method_type_; }
   bool isValidMcp() const { return is_valid_mcp_; }
   const std::string& getMethod() const { return method_; }
   const std::vector<std::string>& getMissingRequiredFields() const {
@@ -248,7 +192,6 @@ private:
 
   // MCP state
   std::string method_;
-  McpMethodType method_type_{McpMethodType::UNKNOWN};
   bool is_valid_mcp_{false};
   bool has_jsonrpc_{false};
   bool has_method_{false};
@@ -281,9 +224,6 @@ public:
   bool isValidMcpRequest() const;
 
   bool isAllFieldsCollected() const { return all_fields_collected_; }
-
-  // Get the MCP method type
-  McpMethodType getMethodType() const;
 
   // Get the method string
   const std::string& getMethod() const;

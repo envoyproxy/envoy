@@ -151,24 +151,29 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   parse_buffer.reserve(to_parse);
   parse_buffer.resize(to_parse);
   data.copyOut(bytes_parsed_, to_parse, parse_buffer.data());
-  ENVOY_LOG(debug, "parse_buffer: {}", parse_buffer);
 
-  // The partial parser will return a bad status.
+  // The partial parser will return an ok status if the requirements are not satified.
+  // It will potentally be a bad status if all the requirements are extracted.
   auto status = parser_->parse(parse_buffer);
-  ENVOY_LOG(debug, "parse_buffer after: {}", parse_buffer);
-  ENVOY_LOG(debug, "mcp filter parse error: {}", status.ToString());
   bytes_parsed_ += to_parse;
 
   if (parser_->isAllFieldsCollected()) {
     ENVOY_LOG(debug, "mcp early parse termination: found all fields");
     return completeParsing();
-  } else {
-    if (end_stream || (max_request_body_size_ > 0 && bytes_parsed_ >= max_request_body_size_)) {
-      handleParseError("reached end_stream or configured body size, don't get enough data.");
-      return Http::FilterDataStatus::StopIterationNoBuffer;
-    }
   }
-  ENVOY_LOG(debug, "mcp early parse not found all fields, waiting more data");
+
+  // If we are here, we haven't collected all fields yet.
+  bool size_limit_hit = (max_request_body_size_ > 0 && bytes_parsed_ >= max_request_body_size_);
+  if (end_stream || size_limit_hit) {
+    handleParseError("reached end_stream or configured body size, don't get enough data.");
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  if (!status.ok()) {
+    handleParseError(status.message());
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
@@ -196,7 +201,6 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   // Set dynamic metadata
   const auto& metadata = parser_->metadata();
-  ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
   if (!metadata.fields().empty()) {
     decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
                                                         metadata);

@@ -19,6 +19,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "mcp_json_parser_test",
+    srcs = ["mcp_json_parser_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/mcp:mcp_json_parser_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:status_utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "mcp_filter_integration_test",
     srcs = ["mcp_filter_integration_test.cc"],
     deps = [

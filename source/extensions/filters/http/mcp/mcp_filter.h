@@ -22,11 +22,6 @@ namespace MetadataKeys {
 constexpr absl::string_view FilterName = "mcp_proxy";
 } // namespace MetadataKeys
 
-// MCP protocol constants
-namespace McpConstants {
-constexpr absl::string_view JsonRpcVersion = "2.0";
-} // namespace McpConstants
-
 /**
  * Configuration for the MCP filter.
  */
@@ -38,7 +33,7 @@ public:
         max_request_body_size_(proto_config.has_max_request_body_size()
                                    ? proto_config.max_request_body_size().value()
                                    : 8192), // Default: 8KB
-  parser_config_(ParserConfig::fromProto(proto_config.parser_config())) {}
+        parser_config_(ParserConfig::fromProto(proto_config.parser_config())) {}
 
   envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode() const {
     return traffic_mode_;
