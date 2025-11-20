@@ -130,6 +130,7 @@ public:
 
   const HttpClientStats& stats() const;
   Event::ScopeTracker& scopeTracker() const { return dispatcher_; }
+  size_t highWatermark() const { return high_watermark_; }
 
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
 
