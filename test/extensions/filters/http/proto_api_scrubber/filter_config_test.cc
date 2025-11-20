@@ -976,7 +976,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetTypeFinder) {
     EXPECT_EQ(type, nullptr);
   }
 }
-  
+
 TEST_F(ProtoApiScrubberFilterConfigTest, ParseMessageRestrictions) {
   ProtoApiScrubberConfig proto_config = getConfigWithMessageRestrictions();
   auto filter_config_or_status =

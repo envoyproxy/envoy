@@ -88,7 +88,7 @@ public:
    */
   virtual MatchTreeHttpMatchingDataSharedPtr
   getResponseFieldMatcher(const std::string& method_name, const std::string& field_mask) const;
-  
+
   /**
    * Returns the match tree associated with an entire method.
    * @param method_name The full gRPC method name (e.g., "/package.service.Method").
@@ -179,7 +179,7 @@ private:
 
   // A map from {method_name, field_mask} to the respective match tree for response fields.
   StringPairToMatchTreeMap response_field_restrictions_;
-  
+
   // A map from method_name to the respective match tree for method-level restrictions.
   absl::flat_hash_map<std::string, MatchTreeHttpMatchingDataSharedPtr> method_level_restrictions_;
 
