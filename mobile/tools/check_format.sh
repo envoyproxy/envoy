@@ -8,13 +8,31 @@ if [ -z "$ENVOY_FORMAT_ACTION" ]; then
   ENVOY_FORMAT_ACTION="check"
 fi
 
+if [[ -n "$BAZEL_BUILD_EXTRA_OPTIONS" ]]; then
+    read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS}"
+else
+    if [[ -n "$ENVOY_RBE" ]]; then
+        BAZEL_BUILD_EXTRA_OPTIONS=(--config=mobile-remote-clang)
+    else
+        BAZEL_BUILD_EXTRA_OPTIONS=(--config=mobile-clang)
+    fi
+fi
+
+echo "${BAZEL_BUILD_EXTRA_OPTIONS[*]}"
+
+_bazel () {
+    local cmd="${1}"
+    shift
+    ./bazelw "${cmd}" "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" "${@}"
+}
+
 if [[ $(uname) == "Darwin" ]]; then
   if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
-    ./bazelw run @SwiftLint//:swiftlint -- --fix --quiet 2>/dev/null
-    ./bazelw run @DrString//:drstring format 2>/dev/null
+    _bazel run @SwiftLint//:swiftlint -- --fix --quiet 2>/dev/null
+    _bazel run @DrString//:drstring format 2>/dev/null
   else
-    ./bazelw run @SwiftLint//:swiftlint -- --strict --quiet 2>/dev/null
-    ./bazelw run @DrString//:drstring check 2>/dev/null
+    _bazel run @SwiftLint//:swiftlint -- --strict --quiet 2>/dev/null
+    _bazel run @DrString//:drstring check 2>/dev/null
   fi
 fi
 
@@ -43,7 +61,7 @@ FORMAT_ARGS+=(
     --build_fixer_check_excluded_paths
     ./envoy ./BUILD ./dist)
 
-export ENVOY_BAZEL_PREFIX="@envoy" && ./bazelw run @envoy//tools/code_format:check_format -- "${ENVOY_FORMAT_ACTION}" --path "$PWD" "${FORMAT_ARGS[@]}"
+export ENVOY_BAZEL_PREFIX="@envoy" && _bazel run @envoy//tools/code_format:check_format -- "${ENVOY_FORMAT_ACTION}" --path "$PWD" "${FORMAT_ARGS[@]}"
 
 KTFMT="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"/ktfmt.sh
 KOTLIN_DIRS=(

@@ -64,7 +64,7 @@ jobs:
         - name: Current size
           args: >-
             build
-            --config=mobile-remote-release-clang
+            --config=mobile-remote-release
             //test/performance:test_binary_size
           # Ensure files don't leak back into the main binary
           source: |-
@@ -74,7 +74,7 @@ jobs:
         - name: Main size
           args: >-
             build
-            --config=mobile-remote-release-clang
+            --config=mobile-remote-release
             //test/performance:test_binary_size
           ref: main
           target: size-main

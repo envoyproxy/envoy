@@ -49,7 +49,8 @@ jobs:
     with:
       args: >-
         test
-        --config=mobile-remote-ci-linux-asan
+        --config=remote-ci
+        --config=mobile-asan
         //test/common/...
       bind-mount: false
       request: ${{ needs.load.outputs.request }}
