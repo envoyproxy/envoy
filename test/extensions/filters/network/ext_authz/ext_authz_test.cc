@@ -601,9 +601,9 @@ TEST_F(ExtAuthzFilterTest, MetadataContext) {
       .WillByDefault(ReturnRef(metadata));
 
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-    addr_);
+      addr_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
-    addr_);
+      addr_);
 
   envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))

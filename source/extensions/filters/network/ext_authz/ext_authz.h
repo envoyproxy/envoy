@@ -63,9 +63,9 @@ public:
                       Matchers::MetadataMatcher(config.filter_enabled_metadata(), context))
                 : absl::nullopt),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
-                                    config.metadata_context_namespaces().end()),
+                                     config.metadata_context_namespaces().end()),
         typed_metadata_context_namespaces_(config.typed_metadata_context_namespaces().begin(),
-                                          config.typed_metadata_context_namespaces().end()) {
+                                           config.typed_metadata_context_namespaces().end()) {
     auto labels_key_it =
         context.bootstrap().node().metadata().fields().find(config.bootstrap_metadata_labels_key());
     if (labels_key_it != context.bootstrap().node().metadata().fields().end()) {
