@@ -61,7 +61,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //             http2_protocol_options:
 //               max_concurrent_streams: 100
 //        .... [further cluster config]
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
   // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
@@ -219,5 +219,5 @@ message HttpProtocolOptions {
   //
   //   Cluster-level retry policy will override route-level retry policy entirely. Policies are
   //   not merged.
-  config.route.v3.RetryPolicy retry_policy = 10;
+  config.route.v3.RetryPolicy retry_policy = 11;
 }
