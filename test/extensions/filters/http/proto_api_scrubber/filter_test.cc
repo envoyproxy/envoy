@@ -308,17 +308,6 @@ TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, PathNotExist) {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue,
             filter_->decodeData(
                 *Envoy::Grpc::Common::serializeToGrpcFrame(makeCreateApiKeyRequest()), true));
-
-  TestResponseHeaderMapImpl resp_headers =
-      TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/grpc"}};
-
-  // Pass through response headers directly.
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(resp_headers, true));
-
-  // Pass through response data directly.
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue,
-            filter_->encodeData(
-                *Envoy::Grpc::Common::serializeToGrpcFrame(makeCreateApiKeyResponse()), true));
 }
 
 // Following tests validate that the filter rejects the request for various failure scenarios.
@@ -378,20 +367,21 @@ TEST_F(ProtoApiScrubberEmptyMessageTest, HandlesEmptyRequestStreamMessage) {
   std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+
   filter_->decodeHeaders(req_headers, false);
 
   // Create a data buffer with 0 bytes (empty), but end_stream = true.
   // The MessageConverter should produce an empty StreamMessage to signal EOS.
   Envoy::Buffer::OwnedImpl empty_data;
 
-  // This should trigger the `if (stream_message->message() == nullptr)` block
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(empty_data, true));
 }
 
 TEST_F(ProtoApiScrubberEmptyMessageTest, HandlesEmptyResponseStreamMessage) {
   std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+
   filter_->decodeHeaders(req_headers, true);
 
   TestResponseHeaderMapImpl resp_headers =
@@ -402,7 +392,6 @@ TEST_F(ProtoApiScrubberEmptyMessageTest, HandlesEmptyResponseStreamMessage) {
   // The MessageConverter should produce an empty StreamMessage to signal EOS.
   Envoy::Buffer::OwnedImpl empty_data;
 
-  // This should trigger the `if (stream_message->message() == nullptr)` block
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
 }
 
@@ -614,7 +603,7 @@ TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
   }
 }
 
-TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod) {
+TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod_RequestFlow) {
   ProtoApiScrubberConfig config;
   ASSERT_TRUE(reloadFilter(config).ok());
 
@@ -641,6 +630,51 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod) {
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->decodeData(*request_data, true));
+}
+
+// Tests the case where an unknown method name is passed in the request headers due to which
+// creation of response scrubber fails.
+// We simulate this by using a method name that satisfies the gRPC regex check
+// (so decodeHeaders passes) but does NOT exist in the descriptor pool.
+// We then skip decodeData (as if the request had no body) and go straight to encodeData, otherwise,
+// it would have called `sendLocalReply` in decodeData itself.
+TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod_ResponseFlow) {
+  // Use a non-existent method name
+  std::string method_name = "/apikeys.ApiKeys/NonExistentMethod";
+  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+
+  // decodeHeaders passes because it only checks the format (regex), not the descriptor
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  // Skip decodeData (simulate no request body)
+  // If we ran decodeData, it would fail here. By skipping it, we force the failure
+  // to happen in encodeData instead.
+
+  TestResponseHeaderMapImpl resp_headers =
+      TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  // Send Response Data
+  // The filter will now try to create the Response Scrubber.
+  // It will attempt to look up "apikeys.ApiKeys.NonExistentMethod" in the descriptor pool.
+  // This will fail.
+  ApiKey response = makeCreateApiKeyResponse();
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  // Verify Rejection
+  // Expect the error log and Local Reply
+  EXPECT_CALL(mock_encoder_callbacks_,
+              sendLocalReply(
+                  Http::Code::BadRequest,
+                  "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the descriptor pool configured for this filter.",
+                  Eq(nullptr),
+                  Eq(Envoy::Grpc::Status::InvalidArgument),
+                  "proto_api_scrubber_BAD_REQUEST{INVALID_ARGUMENT}"));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_->encodeData(*response_data, true));
 }
 
 using ProtoApiScrubberScrubbingTest = ProtoApiScrubberFilterTest;
