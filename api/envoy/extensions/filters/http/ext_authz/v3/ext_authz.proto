@@ -55,15 +55,17 @@ message ExtAuthz {
 
   // Changes the filter's behavior on errors:
   //
-  // #. When set to ``true``, the filter will ``accept`` the client request even if communication with
-  //    the authorization service has failed, or if the authorization service has returned an HTTP 5xx
-  //    error.
+  // * When set to ``true``, the filter will ``accept`` the client request even if communication with
+  //   the authorization service has failed, or if the authorization service has returned an HTTP 5xx
+  //   error.
   //
-  // #. When set to ``false``, the filter will ``reject`` client requests and return ``Forbidden``
-  //    if communication with the authorization service has failed, or if the authorization service
-  //    has returned an HTTP 5xx error.
+  // * When set to ``false``, the filter will ``reject`` client requests and return ``Forbidden``
+  //   if communication with the authorization service has failed, or if the authorization service
+  //   has returned an HTTP 5xx error.
   //
   // Errors can always be tracked in the :ref:`stats <config_http_filters_ext_authz_stats>`.
+  //
+  // Defaults to ``false``.
   bool failure_mode_allow = 2;
 
   // When ``failure_mode_allow`` and ``failure_mode_allow_header_add`` are both set to ``true``,
@@ -78,25 +80,26 @@ message ExtAuthz {
   BufferSettings with_request_body = 5;
 
   // Clears the route cache in order to allow the external authorization service to correctly affect
-  // routing decisions. The filter clears all cached routes when:
+  // routing decisions. The filter clears all cached routes when all of the following holds:
   //
-  // #. The field is set to ``true``.
+  // * This field is set to ``true``.
+  // * The status returned from the authorization service is an HTTP 200 or gRPC 0.
+  // * At least one ``authorization response header`` is added to the client request, or is used to
+  //   alter another client request header.
   //
-  // #. The status returned from the authorization service is an HTTP 200 or gRPC 0.
-  //
-  // #. At least one ``authorization response header`` is added to the client request, or is used to
-  //    alter another client request header.
-  //
+  // Defaults to ``false``.
   bool clear_route_cache = 6;
 
   // Sets the HTTP status that is returned to the client when the authorization server returns an error
-  // or cannot be reached. The default status is HTTP 403 Forbidden.
+  // or cannot be reached.
+  //
+  // The default status is ``HTTP 403 Forbidden``.
   type.v3.HttpStatus status_on_error = 7;
 
-  // When this is set to ``true``, the filter will check the :ref:`ext_authz response
+  // When set to ``true``, the filter will check the :ref:`ext_authz response
   // <envoy_v3_api_msg_service.auth.v3.CheckResponse>` for invalid header and
-  // query parameter mutations. If the side stream response is invalid, it will send a local reply
-  // to the downstream request with status HTTP 500 Internal Server Error.
+  // query parameter mutations. If the response is invalid, the filter will send a local reply
+  // to the downstream request with status ``HTTP 500 Internal Server Error``.
   //
   // .. note::
   //   Both ``headers_to_remove`` and ``query_parameters_to_remove`` are validated, but invalid elements in
@@ -106,6 +109,8 @@ message ExtAuthz {
   // unexpected behavior.
   //
   // If you are using ext_authz with an untrusted ext_authz server, you should set this to ``true``.
+  //
+  // Defaults to ``false``.
   bool validate_mutations = 24;
 
   // Specifies a list of metadata namespaces whose values, if present, will be passed to the
@@ -266,19 +271,19 @@ message ExtAuthz {
   bool encode_raw_headers = 23;
 
   // Rules for what modifications an ext_authz server may make to the request headers before
-  // continuing decoding / forwarding upstream.
+  // continuing decoding or forwarding upstream.
   //
-  // If set to anything, enables header mutation checking against configured rules. Note that
+  // If set, enables header mutation checking against the configured rules. Note that
   // :ref:`HeaderMutationRules <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutationRules>`
-  // has defaults that change ext_authz behavior. Also note that if this field is set to anything,
-  // ext_authz can no longer append to :-prefixed headers.
+  // has defaults that change ext_authz behavior. Also note that if this field is set,
+  // ext_authz can no longer append to ``:``-prefixed headers.
   //
-  // If empty, header mutation rule checking is completely disabled.
+  // If unset, header mutation rule checking is completely disabled.
   //
-  // Regardless of what is configured here, ext_authz cannot remove :-prefixed headers.
+  // Regardless of what is configured here, ext_authz cannot remove ``:``-prefixed headers.
   //
   // This field and ``validate_mutations`` have different use cases. ``validate_mutations`` enables
-  // correctness checks for all header / query parameter mutations (e.g. for invalid characters).
+  // correctness checks for all header and query parameter mutations (for example, invalid characters).
   // This field allows the filter to reject mutations to specific headers.
   config.common.mutation_rules.v3.HeaderMutationRules decoder_header_mutation_rules = 26;
 
@@ -302,8 +307,10 @@ message ExtAuthz {
   // key will be the same as the filter name.
   //
   // If using Envoy gRPC, emits latency, bytes sent / received, upstream info, and upstream cluster
-  // info. If not using Envoy gRPC, emits only latency. Note that stats are ONLY added to filter
-  // state if a check request is actually made to an ext_authz service.
+  // info. If not using Envoy gRPC, emits only latency.
+  //
+  // .. note::
+  //   Stats are ONLY added to filter state if a check request is actually made to an ext_authz service.
   //
   // If this is ``false`` the filter will not emit stats, but filter_metadata will still be respected if
   // it has a value.
@@ -327,12 +334,12 @@ message ExtAuthz {
   // by sending a local reply when those limits are violated.
   //
   // When set to ``false``, the filter will ignore the response header map's limits and add / set
-  // all response headers as specified by the external auth service.
+  // all response headers as specified by the external authorization service.
   //
   // Recommendation: enable if the external authorization service is not trusted. Otherwise, leave
-  // false.
+  // it ``false``.
   //
-  // Defaults to false.
+  // Defaults to ``false``.
   bool enforce_response_header_limits = 31;
 }
 
@@ -343,13 +350,18 @@ message BufferSettings {
 
   // Sets the maximum size of a message body that the filter will hold in memory. Envoy will return
   // ``HTTP 413`` and will *not* initiate the authorization process when the buffer reaches the size
-  // set in this field. Note that this setting will have precedence over :ref:`failure_mode_allow
-  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>`.
+  // set in this field.
+  //
+  // .. note::
+  //   This setting will have precedence over :ref:`failure_mode_allow
+  //   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>`.
   uint32 max_request_bytes = 1 [(validate.rules).uint32 = {gt: 0}];
 
   // When this field is ``true``, Envoy will buffer the message until ``max_request_bytes`` is reached.
   // The authorization request will be dispatched and no 413 HTTP error will be returned by the
   // filter.
+  //
+  // Defaults to ``false``.
   bool allow_partial_message = 2;
 
   // If ``true``, the body sent to the external authorization service is set as raw bytes and populates
@@ -362,14 +374,18 @@ message BufferSettings {
   // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`. In configurations that use
   // an :ref:`http_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.http_service>`, this
   // has no effect.
+  //
+  // Defaults to ``false``.
   bool pack_as_bytes = 3;
 }
 
 // HttpService is used for raw HTTP communication between the filter and the authorization service.
 // When configured, the filter will parse the client request and use these attributes to call the
 // authorization server. Depending on the response, the filter may reject or accept the client
-// request. Note that in any of these events, metadata can be added, removed or overridden by the
-// filter:
+// request.
+//
+// .. note::
+//   In any of these events, metadata can be added, removed or overridden by the filter:
 //
 // On authorization request, a list of allowed request headers may be supplied. See
 // :ref:`allowed_headers
@@ -444,8 +460,10 @@ message AuthorizationRequest {
   type.matcher.v3.ListStringMatcher allowed_headers = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // Sets a list of headers that will be included in the request to the authorization service. Note that
-  // client request headers with the same key will be overridden.
+  // Sets a list of headers that will be included in the request to the authorization service.
+  //
+  // .. note::
+  //   Client request headers with the same key will be overridden.
   repeated config.core.v3.HeaderValue headers_to_add = 2;
 }
 
@@ -456,19 +474,26 @@ message AuthorizationResponse {
 
   // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
   // response headers that have a correspondent match will be added to the original client request.
-  // Note that coexistent headers will be overridden.
+  //
+  // .. note::
+  //   Existing headers will be overridden.
   type.matcher.v3.ListStringMatcher allowed_upstream_headers = 1;
 
   // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
   // response headers that have a correspondent match will be added to the original client request.
-  // Note that coexistent headers will be appended.
+  //
+  // .. note::
+  //   Existing headers will be appended.
   type.matcher.v3.ListStringMatcher allowed_upstream_headers_to_append = 3;
 
   // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
-  // response headers that have a correspondent match will be added to the client's response. Note
-  // that when this list is *not* set, all the authorization response headers, except ``Authority
-  // (Host)`` will be in the response to the client. When a header is included in this list, ``Path``,
-  // ``Status``, ``Content-Length``, ``WWWAuthenticate`` and ``Location`` are automatically added.
+  // response headers that have a correspondent match will be added to the client's response.
+  // When a header is included in this list, ``Path``, ``Status``, ``Content-Length``, ``WWW-Authenticate`` and
+  // ``Location`` are automatically added.
+  //
+  // .. note::
+  //   When this list is *not* set, all the authorization response headers, except
+  //   ``Authority (Host)``, will be in the response to the client.
   type.matcher.v3.ListStringMatcher allowed_client_headers = 2;
 
   // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization

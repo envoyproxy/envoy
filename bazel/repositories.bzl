@@ -164,7 +164,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_libprotobuf_mutator()
     _com_github_google_libsxg()
     _com_github_google_tcmalloc()
-    _com_github_gperftools_gperftools()
+    _gperftools()
     _com_github_grpc_grpc()
     _rules_proto_grpc()
     _com_github_unicode_org_icu()
@@ -938,10 +938,9 @@ def _com_github_google_tcmalloc():
         patch_args = ["-p1"],
     )
 
-def _com_github_gperftools_gperftools():
+def _gperftools():
     external_http_archive(
-        name = "com_github_gperftools_gperftools",
-        build_file_content = BUILD_ALL_CONTENT,
+        name = "gperftools",
     )
 
 def _com_github_wamr():

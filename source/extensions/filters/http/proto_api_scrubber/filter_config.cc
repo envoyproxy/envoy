@@ -9,20 +9,26 @@
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
 #include "envoy/matcher/matcher.h"
 
+#include "source/common/grpc/common.h"
 #include "source/common/matcher/matcher.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "fmt/core.h"
+#include "grpc_transcoding/type_helper.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
+
+using google::grpc::transcoding::TypeHelper;
+using Protobuf::MethodDescriptor;
 
 static constexpr absl::string_view kConfigInitializationError =
     "Error encountered during config initialization.";
@@ -100,6 +106,8 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
     RETURN_IF_ERROR(
         initializeMessageRestrictions(proto_config.restrictions().message_restrictions(), context));
   }
+
+  initializeTypeUtils();
 
   ENVOY_LOG(trace, "Filter config initialized successfully.");
   return absl::OkStatus();
@@ -300,6 +308,36 @@ ProtoApiScrubberFilterConfig::getMessageMatcher(const std::string& message_name)
     return it->second;
   }
   return nullptr;
+}
+
+void ProtoApiScrubberFilterConfig::initializeTypeUtils() {
+  type_helper_ =
+      std::make_unique<const TypeHelper>(Envoy::Protobuf::util::NewTypeResolverForDescriptorPool(
+          Envoy::Grpc::Common::typeUrlPrefix(), descriptor_pool_.get()));
+
+  type_finder_ = std::make_unique<const TypeFinder>(
+      [this](absl::string_view type_url) -> const ::Envoy::Protobuf::Type* {
+        return type_helper_->Info()->GetTypeByTypeUrl(type_url);
+      });
+}
+
+absl::StatusOr<const Protobuf::Type*>
+ProtoApiScrubberFilterConfig::getRequestType(const std::string& method_name) const {
+  // Covert grpc method name from `/package.service/method` format to `package.service.method` as
+  // the method `FindMethodByName` expects the method name to be in the latter format.
+  std::string dot_separated_method_name =
+      absl::StrReplaceAll(absl::StripPrefix(method_name, "/"), {{"/", "."}});
+  const MethodDescriptor* method = descriptor_pool_->FindMethodByName(dot_separated_method_name);
+  if (method == nullptr) {
+    return absl::InvalidArgumentError(absl::StrFormat(
+        "Unable to find method `%s` in the descriptor pool configured for this filter.",
+        dot_separated_method_name));
+  }
+
+  std::string request_type_url =
+      absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", method->input_type()->full_name());
+  const Protobuf::Type* request_type = (*type_finder_)(request_type_url);
+  return request_type;
 }
 
 REGISTER_FACTORY(RemoveFilterActionFactory,

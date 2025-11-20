@@ -19,6 +19,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "grpc_transcoding/type_helper.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
 
 namespace Envoy {
@@ -30,6 +31,7 @@ using envoy::extensions::filters::http::proto_api_scrubber::v3::MessageRestricti
 using envoy::extensions::filters::http::proto_api_scrubber::v3::MethodRestrictions;
 using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionConfig;
+using google::grpc::transcoding::TypeHelper;
 using Http::HttpMatchingData;
 using Protobuf::Map;
 using xds::type::matcher::v3::HttpAttributesCelMatchInput;
@@ -39,6 +41,7 @@ using FilteringMode = ProtoApiScrubberConfig::FilteringMode;
 using MatchTreeHttpMatchingDataSharedPtr = Matcher::MatchTreeSharedPtr<HttpMatchingData>;
 using StringPairToMatchTreeMap =
     absl::flat_hash_map<std::pair<std::string, std::string>, MatchTreeHttpMatchingDataSharedPtr>;
+using TypeFinder = std::function<const Envoy::Protobuf::Type*(const std::string&)>;
 } // namespace
 
 // The config for Proto API Scrubber filter. As a thread-safe class, it should be constructed only
@@ -85,7 +88,7 @@ public:
    */
   virtual MatchTreeHttpMatchingDataSharedPtr
   getResponseFieldMatcher(const std::string& method_name, const std::string& field_mask) const;
-
+  
   /**
    * Returns the match tree associated with an entire method.
    * @param method_name The full gRPC method name (e.g., "/package.service.Method").
@@ -102,6 +105,13 @@ public:
    */
   virtual MatchTreeHttpMatchingDataSharedPtr
   getMessageMatcher(const std::string& message_name) const;
+
+  // Returns a constant reference to the type finder which resolves type URL string to the
+  // corresponding `Protobuf::Type*`.
+  const TypeFinder& getTypeFinder() const { return *type_finder_; };
+
+  // Returns the request type of the method.
+  absl::StatusOr<const Protobuf::Type*> getRequestType(const std::string& method_name) const;
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
@@ -138,6 +148,9 @@ private:
   absl::Status initializeDescriptorPool(Api::Api& api,
                                         const ::envoy::config::core::v3::DataSource& data_source);
 
+  // Initializes the type utilities (e.g., type helper, type finder, etc.).
+  void initializeTypeUtils();
+
   // Initializes the method's request and response restrictions using the restrictions configured
   // in the proto config.
   absl::Status
@@ -166,12 +179,19 @@ private:
 
   // A map from {method_name, field_mask} to the respective match tree for response fields.
   StringPairToMatchTreeMap response_field_restrictions_;
-
+  
   // A map from method_name to the respective match tree for method-level restrictions.
   absl::flat_hash_map<std::string, MatchTreeHttpMatchingDataSharedPtr> method_level_restrictions_;
 
   // A map from message_name to the respective match tree for message-level restrictions.
   absl::flat_hash_map<std::string, MatchTreeHttpMatchingDataSharedPtr> message_level_restrictions_;
+
+  // An instance of `google::grpc::transcoding::TypeHelper` which can be used for type resolution.
+  std::unique_ptr<const TypeHelper> type_helper_;
+
+  // A lambda function which resolves type URL string to the corresponding `Protobuf::Type*`.
+  // Internally, it uses `type_helper_` for type resolution.
+  std::unique_ptr<const TypeFinder> type_finder_;
 };
 
 // A class to validate the input type specified for the unified matcher in the config.

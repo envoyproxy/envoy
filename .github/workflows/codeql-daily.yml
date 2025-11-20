@@ -34,7 +34,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@4e94bd11f71e507f7f87df81788dff88d1dacbfb  # codeql-bundle-v4.31.0
+      uses: github/codeql-action/init@e12f0178983d466f2f6028f5cc7a6d786fd97f4b  # codeql-bundle-v4.31.4
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -58,7 +58,7 @@ jobs:
 
     - name: Build
       run: |
-       bazel/setup_clang.sh bin/clang18.1.8
+       bazel/setup_clang.sh "$(realpath bin/clang18.1.8)"
        bazelisk shutdown
        bazel build \
            -c fastbuild \
@@ -75,6 +75,6 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@4e94bd11f71e507f7f87df81788dff88d1dacbfb  # codeql-bundle-v4.31.0
+      uses: github/codeql-action/analyze@e12f0178983d466f2f6028f5cc7a6d786fd97f4b  # codeql-bundle-v4.31.4
       with:
         trap-caching: false
