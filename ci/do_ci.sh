@@ -27,26 +27,22 @@ else
 fi
 
 setup_clang_toolchain() {
+    local config
     if [[ -n "${CLANG_TOOLCHAIN_SETUP}" ]]; then
         return
     fi
-    CONFIG_PARTS=()
-    if [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
-        CONFIG_PARTS+=("arm64")
-    fi
-    CONFIG_PARTS+=("clang")
+    config="clang"
     # We only support clang with libc++ now
-    CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
-    BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}" "--config=${CONFIG}")
+    BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}" "--config=${config}")
     BAZEL_QUERY_OPTION_LIST="${BAZEL_QUERY_OPTIONS[*]}"
     if [[ -n "${ENVOY_RBE}" ]]; then
-        CONFIG="remote-${CONFIG}"
+        config="remote-${config}"
     fi
-    BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
+    BAZEL_BUILD_OPTIONS+=("--config=${config}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
     export BAZEL_QUERY_OPTION_LIST
-    echo "clang toolchain configured: ${CONFIG}"
+    echo "clang toolchain configured: ${config}"
 }
 
 function collect_build_profile() {

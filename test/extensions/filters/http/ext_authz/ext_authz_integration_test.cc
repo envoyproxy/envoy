@@ -1321,6 +1321,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, Retry) {
                        Headers{});
   waitForSuccessfulUpstreamResponse("200");
 
+  // Verify retry stats are incremented correctly.
+  test_server_->waitForCounterGe("cluster.ext_authz_cluster.upstream_rq_retry", 1);
+  test_server_->waitForCounterGe("cluster.ext_authz_cluster.upstream_rq_total", 2);
+
   cleanup();
 }
 
@@ -2220,7 +2224,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAppendIfAbsentExceedsLimit) {
   EXPECT_EQ("500", response_->headers().getStatusValue());
   cleanup();
 }
-
 // Regression test for https://github.com/envoyproxy/envoy/issues/17344
 TEST(ExtConfigValidateTest, Validate) {
   Server::TestComponentFactory component_factory;

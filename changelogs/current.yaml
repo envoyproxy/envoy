@@ -62,6 +62,11 @@ minor_behavior_changes:
     Fixed HTTP ext_authz service to properly propagate headers (such as ``set-cookie``) back to clients. The
     filter now correctly uses ``allowed_client_headers`` for denied responses and ``allowed_client_headers_on_success``
     for successful authorization responses.
+- area: ext_authz
+  change: |
+    Fixed a bug where ``filter_enabled_metadata`` was not honored when the filter was marked with ``disabled: true``.
+    The filter is now instantiated when ``filter_enabled_metadata`` is configured, allowing it to check dynamic metadata
+    at runtime and enable itself conditionally.
 - area: quic
   change: |
     Switch to use QUICHE provided migration logic to handle port migration upon path degrading and migration to Server
@@ -133,6 +138,10 @@ bug_fixes:
     close events. This ensures the ``connection.transport_failure_reason`` CEL attribute and
     ``DOWNSTREAM_TRANSPORT_FAILURE_REASON`` access log formatter are populated correctly for all connection
     types and available to all network filters.
+- area: aws
+  change: |
+    Changes web identity token file watching behavior in the aws signing common components. This ensures that if the token file is rotated,
+    the new token will be picked up.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -156,11 +165,19 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: dynamic modules
+  change: |
+    Added support for loading dynamic modules globally by setting :ref:`load_globally
+    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.load_globally>` to true.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request
     and response bodies in any position of HTTP filter chain.
     This also make it possible to refresh routes based on the attributes in the request body.
+- area: matcher
+  change: |
+    Removed work-in-progress annotations from RBAC filter ``matcher`` and ``shadow_matcher`` fields in both HTTP
+    and network filters to reflect to mark this feature stable.
 - area: access_log
   change: |
     Support process-level rate limiting on access log emission by
@@ -172,6 +189,11 @@ new_features:
 - area: udp_sink
   change: |
     Enhanced the UDP sink to support tapped messages larger than 64 KB.
+- area: listener
+  change: |
+    Marked the :ref:`filter_chain_matcher <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
+    field as stable by removing the work-in-progress annotation. The xDS matcher API for filter chain selection
+    has been thoroughly tested and should be ready for production use now.
 - area: access_log
   change: |
     Added a new :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>` which emits
@@ -317,5 +339,9 @@ new_features:
 - area: ext_proc
   change: |
     Add support for forwarding cluster metadata to ext_proc server.
+- area: aws
+  change: |
+    Added new feature ``match_included_headers`` to the request signing extension, that allows for a positive header match and
+    excludes all other non-SigV4-required headers.
 
 deprecated:

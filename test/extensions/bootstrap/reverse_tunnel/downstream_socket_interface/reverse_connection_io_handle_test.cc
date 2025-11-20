@@ -9,6 +9,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/tls/ssl_handshaker.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
@@ -21,6 +22,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 
 using testing::_;
 using testing::Invoke;
@@ -32,6 +34,22 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
+
+// Mock SslHandshakerImpl for testing SSL quiet shutdown functionality.
+// This extends the real SslHandshakerImpl so dynamic_cast will succeed.
+class MockSslHandshakerImpl : public Extensions::TransportSockets::Tls::SslHandshakerImpl {
+public:
+  // Constructor that takes an SSL object to pass to the base class.
+  explicit MockSslHandshakerImpl(SSL* ssl)
+      : Extensions::TransportSockets::Tls::SslHandshakerImpl(bssl::UniquePtr<SSL>(ssl), 0, nullptr),
+        mock_ssl_(ssl) {}
+
+  // Override ssl() to return our mock SSL pointer.
+  SSL* ssl() const override { return mock_ssl_; }
+
+private:
+  SSL* mock_ssl_{nullptr};
+};
 
 // ReverseConnectionIOHandle Test Class.
 
@@ -2880,6 +2898,160 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSocketAndFdFailures) {
     auto result = io_handle_->accept(nullptr, nullptr);
     EXPECT_EQ(result, nullptr);
   }
+}
+
+// Tests the case where dynamic_cast succeeds and SSL_set_quiet_shutdown is called.
+TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionQuietShutdownSuccess) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  createTriggerPipe();
+  EXPECT_TRUE(isTriggerPipeReady());
+
+  // Set up mock thread local cluster.
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
+      .WillRepeatedly(ReturnRef(*mock_priority_set));
+
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Create a mock connection with TLS.
+  auto mock_connection = setupMockConnection();
+
+  // Create a mock SSL object to verify SSL_set_quiet_shutdown is called.
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ctx.get(), nullptr);
+  SSL* mock_ssl = SSL_new(ctx.get());
+  ASSERT_NE(mock_ssl, nullptr);
+
+  // Create MockSslHandshakerImpl that extends the real SslHandshakerImpl.
+  // This will make the dynamic_cast succeed.
+  // Pass the SSL object to the constructor so it doesn't crash.
+  auto mock_ssl_handshaker = std::make_shared<MockSslHandshakerImpl>(mock_ssl);
+
+  // Mock ssl() to return MockSslHandshakerImpl.
+  EXPECT_CALL(*mock_connection, ssl()).WillRepeatedly(Return(mock_ssl_handshaker));
+
+  Upstream::MockHost::MockCreateConnectionData success_conn_data;
+  success_conn_data.connection_ = mock_connection.get();
+  success_conn_data.host_description_ = mock_host;
+
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_)).WillOnce(Return(success_conn_data));
+
+  mock_connection.release();
+
+  // Initiate connection to create wrapper.
+  bool result = initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host);
+  EXPECT_TRUE(result);
+
+  const auto& connection_wrappers = getConnectionWrappers();
+  EXPECT_EQ(connection_wrappers.size(), 1);
+
+  RCConnectionWrapper* wrapper_ptr = connection_wrappers[0].get();
+
+  // Before calling onConnectionDone, verify quiet_shutdown is not set (default is 0).
+  EXPECT_EQ(SSL_get_quiet_shutdown(mock_ssl), 0);
+
+  // Call onConnectionDone with success - this should trigger the SSL quiet shutdown code path.
+  // The dynamic_cast will succeed, and SSL_set_quiet_shutdown(ssl, 1) will be called.
+  io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
+
+  // Verify SSL_set_quiet_shutdown was called by checking the SSL object's quiet_shutdown flag.
+  EXPECT_EQ(SSL_get_quiet_shutdown(mock_ssl), 1);
+
+  // Verify wrapper was cleaned up.
+  EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
+  EXPECT_EQ(getConnectionWrappers().size(), 0);
+
+  // Verify connection was queued.
+  EXPECT_EQ(getEstablishedConnectionsSize(), 1);
+
+  // Verify stats show connected state.
+  auto stat_map = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.connected"], 1);
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connected"], 1);
+}
+
+// Test onConnectionDone with TLS connection where dynamic_cast fails (mock doesn't derive from
+// SslHandshakerImpl).
+TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionDynamicCastFails) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  createTriggerPipe();
+  EXPECT_TRUE(isTriggerPipeReady());
+
+  // Set up mock thread local cluster.
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
+      .WillRepeatedly(ReturnRef(*mock_priority_set));
+
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Create a mock connection WITH SSL (TLS connection).
+  auto mock_connection = setupMockConnection();
+
+  // Create a mock SSL connection info that does not derive from SslHandshakerImpl.
+  // This will cause the dynamic_cast to fail.
+  auto mock_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+
+  // Mock ssl() to return non-null, indicating TLS connection.
+  EXPECT_CALL(*mock_connection, ssl()).WillRepeatedly(Return(mock_ssl_info));
+
+  Upstream::MockHost::MockCreateConnectionData success_conn_data;
+  success_conn_data.connection_ = mock_connection.get();
+  success_conn_data.host_description_ = mock_host;
+
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_)).WillOnce(Return(success_conn_data));
+
+  mock_connection.release();
+
+  // Initiate connection to create wrapper.
+  bool result = initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host);
+  EXPECT_TRUE(result);
+
+  const auto& connection_wrappers = getConnectionWrappers();
+  EXPECT_EQ(connection_wrappers.size(), 1);
+
+  RCConnectionWrapper* wrapper_ptr = connection_wrappers[0].get();
+
+  // Call onConnectionDone with success, this should trigger the SSL quiet shutdown code path.
+  // Since we're using a mock SSL connection info that doesn't derive from SslHandshakerImpl,
+  // the dynamic_cast will fail.
+  io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
+
+  // Verify wrapper was cleaned up.
+  EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
+  EXPECT_EQ(getConnectionWrappers().size(), 0);
+
+  EXPECT_EQ(getEstablishedConnectionsSize(), 1);
+  auto stat_map = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.connected"], 1);
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connected"], 1);
 }
 
 } // namespace ReverseConnection

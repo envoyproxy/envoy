@@ -8,10 +8,17 @@
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
+#include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
+#include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
+
+using proto_processing_lib::proto_scrubber::FieldCheckerInterface;
+using proto_processing_lib::proto_scrubber::ProtoScrubber;
+using proto_processing_lib::proto_scrubber::ScrubberContext;
 
 inline constexpr const char kFilterName[] = "envoy.filters.http.proto_api_scrubber";
 
@@ -22,7 +29,8 @@ inline constexpr const char kFilterName[] = "envoy.filters.http.proto_api_scrubb
 class ProtoApiScrubberFilter : public Http::PassThroughFilter,
                                Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit ProtoApiScrubberFilter(const ProtoApiScrubberFilterConfig&) {};
+  explicit ProtoApiScrubberFilter(const ProtoApiScrubberFilterConfig& filter_config)
+      : filter_config_(filter_config) {}
 
   Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -39,6 +47,28 @@ private:
   // Request message converter which converts Envoy Buffer data to StreamMessage (for scrubbing) and
   // vice-versa.
   GrpcFieldExtraction::MessageConverterPtr request_msg_converter_{nullptr};
+
+  // Creates and returns an instance of `ProtoScrubber` which can be used for request scrubbing.
+  absl::StatusOr<std::unique_ptr<ProtoScrubber>> createRequestProtoScrubber();
+
+  const ProtoApiScrubberFilterConfig& filter_config_;
+
+  // Stores the full gRPC method name e.g., `/package.service/method`.
+  // It is populated while decoding the headers (i.e., in the `decodeHeaders()` method) and is used
+  // during decoding and encoding of the data (i.e., decodeData(), encodeData(), respectively).
+  std::string method_name_;
+
+  // The field checker which uses match tree configured in the filter config to determine whether a
+  // field should be preserved or removed from the request protobuf payloads.
+  // NOTE: This must outlive `request_scrubber_`, which holds a non-owning reference to this
+  // instance.
+  std::unique_ptr<FieldCheckerInterface> request_match_tree_field_checker_;
+
+  // The scrubber instance for the request path.
+  // It is lazily initialized in decodeData() to ensure it is instantiated exactly
+  // once per request, preserving state across multiple data frames (e.g., for
+  // gRPC streaming or large payloads).
+  std::unique_ptr<ProtoScrubber> request_scrubber_;
 };
 
 class FilterFactory : public Common::FactoryBase<ProtoApiScrubberConfig> {

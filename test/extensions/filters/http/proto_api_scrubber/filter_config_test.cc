@@ -6,6 +6,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -739,6 +740,68 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatcherInputTypeValidations) {
         factory_context);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     EXPECT_EQ(filter_config.status().message(), "");
+  }
+}
+
+TEST_F(ProtoApiScrubberFilterConfigTest, GetRequestType) {
+  // 1. Initialize the config
+  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> config_or_status =
+      ProtoApiScrubberFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_EQ(config_or_status.status().code(), absl::StatusCode::kOk);
+  filter_config_ = std::move(config_or_status.value());
+
+  {
+    // Case 1: Valid Method Name
+    // The method name passed from headers usually has the format /Package.Service/Method
+    std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
+
+    absl::StatusOr<const Protobuf::Type*> type_or_status =
+        filter_config_->getRequestType(method_name);
+
+    ASSERT_EQ(type_or_status.status().code(), absl::StatusCode::kOk);
+    ASSERT_NE(type_or_status.value(), nullptr);
+
+    // Verify the resolved input type is correct
+    EXPECT_EQ(type_or_status.value()->name(), "apikeys.CreateApiKeyRequest");
+  }
+
+  {
+    // Case 2: Invalid Method Name (Not in descriptor)
+    std::string method_name = "/apikeys.ApiKeys/NonExistentMethod";
+
+    absl::StatusOr<const Protobuf::Type*> type_or_status =
+        filter_config_->getRequestType(method_name);
+
+    EXPECT_EQ(type_or_status.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(
+        type_or_status.status().message(),
+        testing::HasSubstr(
+            "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the descriptor pool"));
+  }
+}
+
+TEST_F(ProtoApiScrubberFilterConfigTest, GetTypeFinder) {
+  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> config_or_status =
+      ProtoApiScrubberFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_EQ(config_or_status.status().code(), absl::StatusCode::kOk);
+  filter_config_ = std::move(config_or_status.value());
+  const auto& type_finder = filter_config_->getTypeFinder();
+
+  {
+    // Case 1: Resolve a known Type URL
+    std::string valid_type_url = "type.googleapis.com/apikeys.CreateApiKeyRequest";
+    const Protobuf::Type* type = type_finder(valid_type_url);
+
+    ASSERT_NE(type, nullptr);
+    EXPECT_EQ(type->name(), "apikeys.CreateApiKeyRequest");
+  }
+
+  {
+    // Case 2: Resolve an unknown Type URL
+    std::string invalid_type_url = "type.googleapis.com/apikeys.UnknownMessage";
+    const Protobuf::Type* type = type_finder(invalid_type_url);
+
+    EXPECT_EQ(type, nullptr);
   }
 }
 
