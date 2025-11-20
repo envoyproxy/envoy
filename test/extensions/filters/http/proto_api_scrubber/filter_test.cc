@@ -670,7 +670,7 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod_ResponseFlow) {
                              "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the "
                              "descriptor pool configured for this filter.",
                              Eq(nullptr), Eq(Envoy::Grpc::Status::InvalidArgument),
-                             "proto_api_scrubber_BAD_REQUEST{INVALID_ARGUMENT}"));
+                             "proto_api_scrubber_INVALID_ARGUMENT{BAD_REQUEST}"));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->encodeData(*response_data, true));
