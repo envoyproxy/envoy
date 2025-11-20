@@ -3560,32 +3560,36 @@ TEST_F(ClusterScopeInfoTest, InfoBytesToHumanAllSizes) {
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 10));
-  
+
   // Verify the response contains correctly formatted human-readable values
-  EXPECT_CALL(callbacks_, onResponse_(_))
-      .WillOnce([](Common::Redis::RespValuePtr& response) {
-        ASSERT_NE(nullptr, response);
-        ASSERT_EQ(Common::Redis::RespType::BulkString, response->type());
-        std::string content = response->asString();
-        
-        // Verify _human metrics (only 3 metrics have PostProcess _human variants)
-        EXPECT_THAT(content, testing::HasSubstr("used_memory_human:768B"));       // Bytes: 512+256
-        EXPECT_THAT(content, testing::HasSubstr("used_memory_rss_human:3.00K"));  // KB: 2048+1024
-        EXPECT_THAT(content, testing::HasSubstr("used_memory_peak_human:5.00M")); // MB: max(5242880,2621440)
-        
-        // Verify Sum aggregation worked for numeric values (these don't get _human suffix)
-        EXPECT_THAT(content, testing::HasSubstr("used_memory:768"));                    // 512+256
-        EXPECT_THAT(content, testing::HasSubstr("used_memory_rss:3072"));               // 2048+1024
-        EXPECT_THAT(content, testing::HasSubstr("used_memory_peak:5242880"));           // max value
-        EXPECT_THAT(content, testing::HasSubstr("used_memory_overhead:4294967296"));    // 3221225472+1073741824
-        EXPECT_THAT(content, testing::HasSubstr("used_memory_dataset:8246337208320"));  // sum of TB values
-        EXPECT_THAT(content, testing::HasSubstr("used_memory_startup:10133099161583616")); // sum of PB values
-        
-        // maxmemory is Sum type, so it adds: 10485760 + 10485760 = 20971520
-        EXPECT_THAT(content, testing::HasSubstr("maxmemory:20971520"));
-        EXPECT_THAT(content, testing::HasSubstr("maxmemory_human:20.00M"));  // PostProcess for maxmemory
-      });
-  
+  EXPECT_CALL(callbacks_, onResponse_(_)).WillOnce([](Common::Redis::RespValuePtr& response) {
+    ASSERT_NE(nullptr, response);
+    ASSERT_EQ(Common::Redis::RespType::BulkString, response->type());
+    std::string content = response->asString();
+
+    // Verify _human metrics (only 3 metrics have PostProcess _human variants)
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_human:768B"));      // Bytes: 512+256
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_rss_human:3.00K")); // KB: 2048+1024
+    EXPECT_THAT(content,
+                testing::HasSubstr("used_memory_peak_human:5.00M")); // MB: max(5242880,2621440)
+
+    // Verify Sum aggregation worked for numeric values (these don't get _human suffix)
+    EXPECT_THAT(content, testing::HasSubstr("used_memory:768"));          // 512+256
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_rss:3072"));     // 2048+1024
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_peak:5242880")); // max value
+    EXPECT_THAT(content,
+                testing::HasSubstr("used_memory_overhead:4294967296")); // 3221225472+1073741824
+    EXPECT_THAT(content,
+                testing::HasSubstr("used_memory_dataset:8246337208320")); // sum of TB values
+    EXPECT_THAT(content,
+                testing::HasSubstr("used_memory_startup:10133099161583616")); // sum of PB values
+
+    // max memory is Sum type, so it adds: 10485760 + 10485760 = 20971520
+    EXPECT_THAT(content, testing::HasSubstr("maxmemory:20971520"));
+    EXPECT_THAT(content,
+                testing::HasSubstr("maxmemory_human:20.00M")); // PostProcess for max memory
+  });
+
   pool_callbacks_[1]->onResponse(infoResponse(shard2_response));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.total").value());
