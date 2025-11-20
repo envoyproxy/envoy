@@ -748,7 +748,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license_url = "https://github.com/adrian-thurston/ragel/blob/{version}/COPYING",
     ),
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/13261.
-    net_zlib = dict(
+    zlib = dict(
         project_name = "zlib",
         project_desc = "zlib compression library",
         project_url = "https://zlib.net",
