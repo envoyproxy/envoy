@@ -207,7 +207,6 @@ protected:
     return request;
   }
 
-  // Helper to create the response, which is now directly an ApiKey message.
   apikeys::ApiKey makeCreateApiKeyResponse(absl::string_view pb = R"pb(
       name: "projects/p1/keys/k1"
       display_name: "Response Key Name"
@@ -288,8 +287,11 @@ TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, RequestNotGrpc) {
 
   TestResponseHeaderMapImpl resp_headers =
       TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "not-grpc"}};
+
+  // Pass through response headers directly.
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(resp_headers, true));
 
+  // Pass through response data directly.
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue,
             filter_->encodeData(
                 *Envoy::Grpc::Common::serializeToGrpcFrame(makeCreateApiKeyResponse()), true));
@@ -309,8 +311,11 @@ TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, PathNotExist) {
 
   TestResponseHeaderMapImpl resp_headers =
       TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/grpc"}};
+
+  // Pass through response headers directly.
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(resp_headers, true));
 
+  // Pass through response data directly.
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue,
             filter_->encodeData(
                 *Envoy::Grpc::Common::serializeToGrpcFrame(makeCreateApiKeyResponse()), true));
@@ -740,39 +745,6 @@ TEST_F(ProtoApiScrubberScrubbingTest, RequestScrubbingFailsOnTruncatedNestedMess
   EXPECT_EQ(createTruncatedPayload(0x12), frames[0].data_->toString());
 }
 
-// Tests that the response passes through without modification even if the scrubbing fails due to
-// malformed grpc message.
-TEST_F(ProtoApiScrubberScrubbingTest, ResponseScrubbingFailsOnTruncatedNestedMessage) {
-  ProtoApiScrubberConfig proto_config;
-  proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
-  std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
-
-  // Target 'create_time' (Field 4) in the Response
-  addRestriction(proto_config, method_name, "create_time.seconds", FieldType::Response, true,
-                 kRemoveFieldActionType);
-  ASSERT_TRUE(reloadFilter(proto_config).ok());
-
-  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
-      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
-  filter_->decodeHeaders(req_headers, true);
-  TestResponseHeaderMapImpl resp_headers =
-      TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/grpc"}};
-  filter_->encodeHeaders(resp_headers, false);
-
-  // Construct payload using Tag 0x22 (Field 4: create_time)
-  Envoy::Buffer::OwnedImpl bad_data = createTruncatedNestedMessageFrame(0x22);
-
-  // Execute the action
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(bad_data, true));
-
-  // Verify that data matches expected payload (unmodified)
-  Envoy::Grpc::Decoder decoder;
-  std::vector<Envoy::Grpc::Frame> frames;
-  ASSERT_TRUE(decoder.decode(bad_data, frames).ok());
-
-  EXPECT_EQ(createTruncatedPayload(0x22), frames[0].data_->toString());
-}
-
 using ProtoApiScrubberResponsePassThroughTest = ProtoApiScrubberFilterTest;
 
 TEST_F(ProtoApiScrubberResponsePassThroughTest, UnaryResponseSingleBuffer) {
@@ -895,6 +867,39 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ScrubResponseNestedField) {
   expected_scrubbed_response.mutable_create_time()->clear_seconds();
 
   checkSerializedData<ApiKey>(*response_data, {expected_scrubbed_response});
+}
+
+// Tests that the response passes through without modification even if the scrubbing fails due to
+// malformed grpc message.
+TEST_F(ProtoApiScrubberResponseScrubbingTest, ResponseScrubbingFailsOnTruncatedNestedMessage) {
+  ProtoApiScrubberConfig proto_config;
+  proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+  std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
+
+  // Target 'create_time' (Field 4) in the Response
+  addRestriction(proto_config, method_name, "create_time.seconds", FieldType::Response, true,
+                 kRemoveFieldActionType);
+  ASSERT_TRUE(reloadFilter(proto_config).ok());
+
+  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+  filter_->decodeHeaders(req_headers, true);
+  TestResponseHeaderMapImpl resp_headers =
+      TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/grpc"}};
+  filter_->encodeHeaders(resp_headers, false);
+
+  // Construct payload using Tag 0x22 (Field 4: create_time)
+  Envoy::Buffer::OwnedImpl bad_data = createTruncatedNestedMessageFrame(0x22);
+
+  // Execute the action
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(bad_data, true));
+
+  // Verify that data matches expected payload (unmodified)
+  Envoy::Grpc::Decoder decoder;
+  std::vector<Envoy::Grpc::Frame> frames;
+  ASSERT_TRUE(decoder.decode(bad_data, frames).ok());
+
+  EXPECT_EQ(createTruncatedPayload(0x22), frames[0].data_->toString());
 }
 
 } // namespace
