@@ -601,7 +601,10 @@ EXTENSIONS = {
     "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
 
     # Certificate selectors
-    "envoy.certificates_selectors.on_demand":                  "//source/extensions/certificate_selectors/on_demand:config",
+    "envoy.tls.certificate_selectors.on_demand_secret":                  "//source/extensions/certificate_selectors/on_demand:config",
+
+    # Certificate mappers
+    "envoy.tls.certificate_mappers.static_name":                  "//source/extensions/certificate_selectors/on_demand:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

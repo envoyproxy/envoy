@@ -22,10 +22,9 @@ class GenericFactoryContext;
 
 namespace Ssl {
 
-// Opaque type defined and used by the ``ServerContext``.
+// Opaque type defined and used by the low-level TLS certificate context.
 struct TlsContext;
 
-class ContextConfig;
 class ServerContextConfig;
 
 using CurveNID = int;
@@ -192,9 +191,9 @@ struct SelectionResult {
   };
   SelectionStatus status; // Status of the certificate selection.
   // Selected TLS context which it only be non-null when status is Success.
-  const Ssl::TlsContext* selected_ctx;
+  const Ssl::TlsContext* selected_ctx{nullptr};
   // True if OCSP stapling should be enabled.
-  bool staple;
+  bool staple{false};
 };
 
 /**
@@ -228,6 +227,8 @@ public:
    *
    * @return selected_ctx should only not be null when status is SelectionStatus::Success, and it
    * will have the same lifetime as ``ServerContextImpl``.
+   *
+   * @param ssl_client_hello low-level SSL object, only valid during the callback.
    */
   virtual SelectionResult selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
                                            CertificateSelectionCallbackPtr cb) PURE;
@@ -249,13 +250,13 @@ public:
   virtual ~TlsCertificateSelectorContext() = default;
 
   /**
-   * @return reference to the initialized Tls Contexts.
+   * @return reference to the available TLS contexts.
    */
   virtual const std::vector<TlsContext>& getTlsContexts() const PURE;
 };
 
-using TlsCertificateSelectorFactory = std::function<TlsCertificateSelectorPtr(
-    const ServerContextConfig&, TlsCertificateSelectorContext&)>;
+using TlsCertificateSelectorFactory =
+    std::function<TlsCertificateSelectorPtr(TlsCertificateSelectorContext&)>;
 
 class TlsCertificateSelectorConfigFactory : public Config::TypedFactory {
 public:
@@ -273,10 +274,26 @@ public:
   virtual absl::StatusOr<TlsCertificateSelectorFactory>
   createTlsCertificateSelectorFactory(const Protobuf::Message& config,
                                       Server::Configuration::GenericFactoryContext& factory_context,
-                                      const ContextConfig& tls_context,
-                                      bool for_quic) PURE;
+                                      const ServerContextConfig& tls_context, bool for_quic) PURE;
 
   std::string category() const override { return "envoy.tls.certificate_selectors"; }
+};
+
+using TlsCertificateMapper = std::function<std::string(const SSL_CLIENT_HELLO&)>;
+using TlsCertificateMapperFactory = std::function<TlsCertificateMapper()>;
+
+class TlsCertificateMapperConfigFactory : public Config::TypedFactory {
+public:
+  /**
+   * Create a certificate selector secret name mapper.
+   * @param config proto configuration.
+   * @param factory_context generic factory context.
+   */
+  virtual absl::StatusOr<TlsCertificateMapperFactory> createTlsCertificateMapperFactory(
+      const Protobuf::Message& config,
+      Server::Configuration::GenericFactoryContext& factory_context) PURE;
+
+  std::string category() const override { return "envoy.tls.certificate_mappers"; }
 };
 
 } // namespace Ssl

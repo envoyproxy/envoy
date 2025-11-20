@@ -169,12 +169,14 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   if (config.common_tls_context().has_custom_tls_certificate_selector()) {
     // If a custom tls context provider is configured, derive the factory from the config.
     const auto& provider_config = config.common_tls_context().custom_tls_certificate_selector();
-    Ssl::TlsCertificateSelectorConfigFactory* provider_factory =
-        &Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorConfigFactory>(
+    Ssl::TlsCertificateSelectorConfigFactory& provider_factory =
+        Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorConfigFactory>(
             provider_config);
-    auto selector_factory = provider_factory->createTlsCertificateSelectorFactory(
-        provider_config.typed_config(), factory_context,
-        *this, for_quic);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        provider_config.typed_config(), factory_context.messageValidationVisitor(),
+        provider_factory);
+    auto selector_factory = provider_factory.createTlsCertificateSelectorFactory(
+        *message, factory_context, *this, for_quic);
     SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
     tls_certificate_selector_factory_ = *std::move(selector_factory);
     return;
@@ -195,9 +197,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   auto factory =
       TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
   const Protobuf::Any any;
-  auto selector_factory = factory->createTlsCertificateSelectorFactory(
-      any, factory_context, *this,
-      for_quic);
+  auto selector_factory =
+      factory->createTlsCertificateSelectorFactory(any, factory_context, *this, for_quic);
   SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
   tls_certificate_selector_factory_ = *std::move(selector_factory);
 }

@@ -32,6 +32,8 @@ public:
     return nullptr;
   }
 
+  void start() override {}
+
 private:
   Secret::TlsCertificatePtr tls_certificate_;
 };
@@ -60,6 +62,8 @@ public:
     return nullptr;
   }
 
+  void start() override {}
+
 private:
   Secret::CertificateValidationContextPtr certificate_validation_context_;
 };
@@ -86,6 +90,8 @@ public:
     return nullptr;
   }
 
+  void start() override {}
+
 private:
   Secret::TlsSessionTicketKeysPtr tls_session_ticket_keys_;
 };
@@ -109,6 +115,8 @@ public:
   addUpdateCallback(std::function<absl::Status()>) override {
     return nullptr;
   }
+
+  void start() override {}
 
 private:
   Secret::GenericSecretPtr generic_secret_;

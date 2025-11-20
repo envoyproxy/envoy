@@ -14,10 +14,13 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         "//envoy/registry",
-        "//envoy/ssl:handshaker_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/ssl:handshaker_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//source/common/config:utility_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
         "//source/common/tls:context_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/certificate_selectors/on_demand_secret/v3:pkg_cc_proto",
     ],
 )

@@ -78,7 +78,8 @@ private:
   const bool disable_stateful_session_resumption_;
   bool full_scan_certs_on_sni_mismatch_;
   const bool prefer_client_ciphers_;
-  Ssl::TlsCertificateSelectorFactory tls_certificate_selector_factory_; // Contains a reference to this context.
+  Ssl::TlsCertificateSelectorFactory
+      tls_certificate_selector_factory_; // Contains a reference to this context.
 };
 
 } // namespace Tls

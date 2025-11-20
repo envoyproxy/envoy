@@ -100,14 +100,15 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      Server::Configuration::CommonFactoryContext& factory_context,
                                      Ssl::ContextAdditionalInitFunc additional_init,
                                      absl::Status& creation_status)
-    : ContextImpl(scope, config, factory_context, additional_init, creation_status),
+    : ContextImpl(scope, config, config.tlsCertificates(), factory_context, additional_init,
+                  creation_status),
       session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()) {
   if (!creation_status.ok()) {
     return;
   }
   // If creation failed, do not create the selector.
-  tls_certificate_selector_ = config.tlsCertificateSelectorFactory()(config, *this);
+  tls_certificate_selector_ = config.tlsCertificateSelectorFactory()(*this);
 
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     creation_status =

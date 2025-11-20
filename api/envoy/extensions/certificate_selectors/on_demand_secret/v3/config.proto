@@ -22,11 +22,17 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // by setting FIPS compliance policy on the loaded secret material.
 message Config {
   // Defines the source of the secrets.
-  config.core.v3.ConfigSource config_source= 1 [(validate.rules).message = {required: true}];
+  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
-  // Secret name. If specified, the secret is pre-fetched during configuration and applied to all connections.
-  // This can be overridden on a per-connection basis using the filter state key ``envoy.tls.on_demand_secret``,
-  // in which case the secret is fetched on-demand.
-  string name = 2;
+  // Extension to specify a mapping to the secret name.
+  // [#extension-category: envoy.tls.certificate_mappers]
+  config.core.v3.TypedExtensionConfig secret_name = 2 [(validate.rules).message = {required: true}];
+
+  // A list of secret resource names to start fetching on configuration load.
+  repeated string prefetch_names = 3;
 }
 
+// A mapping to a fixed certificate name.
+message StaticName {
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+}

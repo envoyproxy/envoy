@@ -121,9 +121,11 @@ public:
 protected:
   friend class ContextImplPeer;
 
-  ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
-              Server::Configuration::CommonFactoryContext& factory_context,
-              Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
+  ContextImpl(
+      Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+      const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
+      Server::Configuration::CommonFactoryContext& factory_context,
+      Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
 
   /**
    * The global SSL-library index used for storing a pointer to the context

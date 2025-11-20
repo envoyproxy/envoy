@@ -49,6 +49,11 @@ public:
    * nullptr if the provider isn't dynamic.
    */
   virtual const Init::Target* initTarget() { return nullptr; }
+
+  /**
+   * Start initializating the provider.
+   */
+  virtual void start() PURE;
 };
 
 using TlsCertificatePtr =
