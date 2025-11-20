@@ -754,7 +754,7 @@ std::string InfoCmdAggregateResponseHandler::bytesToHuman(uint64_t bytes) {
 }
 
 bool InfoCmdAggregateResponseHandler::shouldIncludeSection(absl::string_view section) const {
-  if (info_section_.empty() || info_section_ == "") {
+  if (info_section_.empty()) {
     return true;
   }
   return absl::EqualsIgnoreCase(section, info_section_);
