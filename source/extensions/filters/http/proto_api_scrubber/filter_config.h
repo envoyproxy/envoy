@@ -20,6 +20,7 @@ using envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionConfi
 using google::grpc::transcoding::TypeHelper;
 using Http::HttpMatchingData;
 using Protobuf::Map;
+using Protobuf::MethodDescriptor;
 using xds::type::matcher::v3::HttpAttributesCelMatchInput;
 using ProtoApiScrubberRemoveFieldAction =
     envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction;
@@ -126,6 +127,10 @@ private:
                                             StringPairToMatchTreeMap& field_restrictions,
                                             const Map<std::string, RestrictionConfig>& restrictions,
                                             Server::Configuration::FactoryContext& context);
+
+  // Returns method descriptor by looking up the `descriptor_pool_`.
+  // If the method doesn't exist in the `descriptor_pool`, it returns absl::InvalidArgument error.
+  absl::StatusOr<const MethodDescriptor*> getMethodDescriptor(const std::string& method_name) const;
 
   FilteringMode filtering_mode_;
 

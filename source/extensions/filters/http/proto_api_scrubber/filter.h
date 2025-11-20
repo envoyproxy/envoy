@@ -47,6 +47,10 @@ private:
   void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
                      absl::string_view rc_detail);
 
+  // Rejects response and sends local reply back to the client.
+  void rejectResponse(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
+                      absl::string_view rc_detail);
+
   bool is_valid_grpc_request_ = false;
 
   // Request message converter which converts Envoy Buffer data to StreamMessage (for scrubbing) and
@@ -61,7 +65,7 @@ private:
   absl::StatusOr<std::unique_ptr<ProtoScrubber>> createRequestProtoScrubber();
 
   // Creates and returns an instance of `ProtoScrubber` which can be used for response scrubbing.
-  absl::StatusOr<std::unique_ptr<ProtoScrubber>> createAndReturnResponseProtoScrubber();
+  absl::StatusOr<std::unique_ptr<ProtoScrubber>> createResponseProtoScrubber();
 
   const ProtoApiScrubberFilterConfig& filter_config_;
 
@@ -84,6 +88,8 @@ private:
 
   // The field checker which uses match tree configured in the filter config to determine whether a
   // field should be preserved or removed from the response protobuf payloads.
+  // NOTE: This must outlive `response_scrubber_`, which holds a non-owning reference to this
+  // instance.
   std::unique_ptr<FieldCheckerInterface> response_match_tree_field_checker_;
 
   // The scrubber instance for the response path.
