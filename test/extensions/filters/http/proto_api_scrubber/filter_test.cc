@@ -1,7 +1,11 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/codes.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
@@ -9,6 +13,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/proto/apikeys.pb.h"
+#include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -27,18 +32,24 @@ namespace {
 
 using ::apikeys::ApiKey;
 using ::apikeys::CreateApiKeyRequest;
+using ::bookstore::CreateShelfRequest;
 using ::envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::checkSerializedData;
+using ::Envoy::Grpc::Status;
 using ::Envoy::Http::MockStreamDecoderFilterCallbacks;
 using ::Envoy::Http::MockStreamEncoderFilterCallbacks;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Protobuf::Struct;
+using ::testing::_;
 using ::testing::Eq;
+using ::testing::Return;
+using ::testing::ReturnRef;
 
 inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
 inline constexpr char kRemoveFieldActionType[] =
     "type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction";
+inline constexpr const char kBookstoreDescriptorRelativePath[] = "test/proto/bookstore.descriptor";
 
 class ProtoApiScrubberFilterTest : public ::testing::Test {
 protected:
@@ -47,9 +58,10 @@ protected:
   // Helper Enum for clarity
   enum class FieldType { Request, Response };
 
-  void setup() {
+  virtual void setup() {
     setupMocks();
-    setupFilterConfig();
+    // Default config is empty, tests will override
+    setupFilterConfig("", kApiKeysDescriptorRelativePath);
     setupFilter();
   }
 
@@ -59,6 +71,9 @@ protected:
 
     ON_CALL(mock_encoder_callbacks_, encoderBufferLimit())
         .WillByDefault(testing::Return(UINT32_MAX));
+    ON_CALL(mock_factory_context_, serverFactoryContext())
+        .WillByDefault(ReturnRef(server_factory_context_));
+    ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
   void setupFilter() {
@@ -67,11 +82,12 @@ protected:
     filter_->setEncoderFilterCallbacks(mock_encoder_callbacks_);
   }
 
-  void setupFilterConfig() {
-    Protobuf::TextFormat::ParseFromString("", &proto_config_);
+  void setupFilterConfig(absl::string_view config_yaml,
+                         const char* descriptor_path = kApiKeysDescriptorRelativePath) {
+    Protobuf::TextFormat::ParseFromString(config_yaml, &proto_config_);
     *proto_config_.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
-            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(descriptor_path))
             .value();
     auto config_or_status =
         ProtoApiScrubberFilterConfig::create(proto_config_, mock_factory_context_);
@@ -184,10 +200,23 @@ protected:
     return absl::OkStatus();
   }
 
+  void reSetupFilter(const char* descriptor_path = kApiKeysDescriptorRelativePath) {
+    // Re-parse to be safe, though proto_config_ should be updated.
+    setupFilterConfig(proto_config_.DebugString(), descriptor_path);
+    setupFilter();
+  }
+
   void TearDown() override {
     // Test onDestroy doesn't crash.
     filter_->PassThroughDecoderFilter::onDestroy();
     filter_->PassThroughEncoderFilter::onDestroy();
+  }
+
+  bookstore::CreateShelfRequest makeCreateShelfRequest() {
+    bookstore::CreateShelfRequest request;
+    request.mutable_shelf()->set_id(1);
+    request.mutable_shelf()->set_theme("Test Theme");
+    return request;
   }
 
   apikeys::CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb(
@@ -265,6 +294,7 @@ protected:
   testing::NiceMock<MockStreamDecoderFilterCallbacks> mock_decoder_callbacks_;
   testing::NiceMock<MockStreamEncoderFilterCallbacks> mock_encoder_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   std::unique_ptr<ProtoApiScrubberFilter> filter_;
 };
 
@@ -429,11 +459,11 @@ TEST_F(ProtoApiScrubberPassThroughTest, UnaryMultipeBuffers) {
   splitBuffer(request_data, req_data_size[0], req_data_size[1], request_data_parts[0],
               request_data_parts[1], request_data_parts[2]);
 
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationAndBuffer,
             filter_->decodeData(request_data_parts[0], false));
   EXPECT_EQ(request_data_parts[0].length(), 0);
 
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationAndBuffer,
             filter_->decodeData(request_data_parts[1], false));
   EXPECT_EQ(request_data_parts[1].length(), 0);
 
@@ -940,8 +970,160 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ResponseScrubbingFailsOnTruncatedN
   EXPECT_EQ(createTruncatedPayload(0x22), frames[0].data_->toString());
 }
 
-} // namespace
+// Tests for Method Level Restrictions
+class MethodLevelRestrictionTest : public ProtoApiScrubberFilterTest {
+protected:
+  // Override setup to load bookstore descriptor
+  void setup() override {
+    setupMocks();
+    // Config will be set by each test
+  }
+};
 
+TEST_F(MethodLevelRestrictionTest, MethodBlockedByMatcher) {
+  setupFilterConfig(R"pb(
+    restrictions: {
+      method_restrictions: {
+        key: "/bookstore.Bookstore/CreateShelf"
+        value: {
+          method_restriction: {
+            matcher: {
+              matcher_list: {
+                matchers: {
+                  predicate: {
+                    single_predicate: {
+                      input: {
+                        name: "request"
+                        typed_config: {
+                          [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {}
+                        }
+                      }
+                      custom_match: {
+                        name: "cel"
+                        typed_config: {
+                          [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                            expr_match: { parsed_expr: { expr: { const_expr: { bool_value: true } } } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                  on_match: {
+                    action: {
+                      name: "block"
+                      typed_config: {
+                        [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] {}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  )pb",
+                    kBookstoreDescriptorRelativePath);
+  reSetupFilter(kBookstoreDescriptorRelativePath);
+
+  auto req_headers = TestRequestHeaderMapImpl{{":method", "POST"},
+                                              {":path", "/bookstore.Bookstore/CreateShelf"},
+                                              {"content-type", "application/grpc"}};
+
+  EXPECT_CALL(mock_decoder_callbacks_,
+              sendLocalReply(Http::Code::Forbidden, "Method not allowed", Eq(nullptr),
+                             Eq(Status::PermissionDenied),
+                             "proto_api_scrubber_Forbidden{METHOD_BLOCKED}")); // Corrected Case
+
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, false));
+}
+
+TEST_F(MethodLevelRestrictionTest, MethodAllowedByMatcher) {
+  setupFilterConfig(R"pb(
+    restrictions: {
+      method_restrictions: {
+        key: "/bookstore.Bookstore/CreateShelf"
+        value: {
+          method_restriction: {
+            matcher: {
+              matcher_list: {
+                matchers: {
+                  predicate: {
+                    single_predicate: {
+                      input: {
+                        name: "request"
+                        typed_config: {
+                          [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {}
+                        }
+                      }
+                      custom_match: {
+                        name: "cel"
+                        typed_config: {
+                          [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                            expr_match: { parsed_expr: { expr: { const_expr: { bool_value: false } } } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                  on_match: {
+                    action: {
+                      name: "block"
+                      typed_config: {
+                        [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] {}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  )pb",
+                    kBookstoreDescriptorRelativePath);
+  reSetupFilter(kBookstoreDescriptorRelativePath);
+
+  auto req_headers = TestRequestHeaderMapImpl{{":method", "POST"},
+                                              {":path", "/bookstore.Bookstore/CreateShelf"},
+                                              {"content-type", "application/grpc"}};
+
+  EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, false));
+
+  // Verify data path is also fine
+  CreateShelfRequest request = makeCreateShelfRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+}
+
+TEST_F(MethodLevelRestrictionTest, MethodAllowedNoRule) {
+  setupFilterConfig(R"pb(
+    restrictions: {
+      method_restrictions: {
+        key: "/bookstore.Bookstore/ListShelves"
+        value: {
+          # No method_restriction field
+        }
+      }
+    }
+  )pb",
+                    kBookstoreDescriptorRelativePath);
+  reSetupFilter(kBookstoreDescriptorRelativePath);
+
+  auto req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/bookstore.Bookstore/CreateShelf"}, // Different method
+                               {"content-type", "application/grpc"}};
+
+  EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, false));
+}
+
+} // namespace
 } // namespace ProtoApiScrubber
 } // namespace HttpFilters
 } // namespace Extensions
