@@ -152,8 +152,9 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   parse_buffer.resize(to_parse);
   data.copyOut(bytes_parsed_, to_parse, parse_buffer.data());
 
-  // The partial parser will return an ok status if the requirements are not satified.
-  // It will potentally be a bad status if all the requirements are extracted.
+  // The partial parser will return an OK status if the requirements are not satisfied.
+  // It will potentially be a bad status due to the partial parse if all the requirements
+  // are extracted.
   auto status = parser_->parse(parse_buffer);
   bytes_parsed_ += to_parse;
 
