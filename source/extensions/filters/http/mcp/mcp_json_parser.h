@@ -13,9 +13,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
 
-#include "google/protobuf/util/converter/json_stream_parser.h"
-#include "google/protobuf/util/converter/object_writer.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -26,58 +23,58 @@ namespace Mcp {
  */
 namespace McpConstants {
 // JSON-RPC constants
-constexpr std::string_view JSONRPC_VERSION = "2.0";
-constexpr std::string_view JSONRPC_FIELD = "jsonrpc";
-constexpr std::string_view METHOD_FIELD = "method";
-constexpr std::string_view ID_FIELD = "id";
+constexpr absl::string_view JSONRPC_VERSION = "2.0";
+constexpr absl::string_view JSONRPC_FIELD = "jsonrpc";
+constexpr absl::string_view METHOD_FIELD = "method";
+constexpr absl::string_view ID_FIELD = "id";
 
 // Method names
 namespace Methods {
 // Tools
-constexpr std::string_view TOOLS_CALL = "tools/call";
-constexpr std::string_view TOOLS_LIST = "tools/list";
+constexpr absl::string_view TOOLS_CALL = "tools/call";
+constexpr absl::string_view TOOLS_LIST = "tools/list";
 
 // Resources
-constexpr std::string_view RESOURCES_READ = "resources/read";
-constexpr std::string_view RESOURCES_LIST = "resources/list";
-constexpr std::string_view RESOURCES_SUBSCRIBE = "resources/subscribe";
-constexpr std::string_view RESOURCES_UNSUBSCRIBE = "resources/unsubscribe";
-constexpr std::string_view RESOURCES_TEMPLATES_LIST = "resources/templates/list";
+constexpr absl::string_view RESOURCES_READ = "resources/read";
+constexpr absl::string_view RESOURCES_LIST = "resources/list";
+constexpr absl::string_view RESOURCES_SUBSCRIBE = "resources/subscribe";
+constexpr absl::string_view RESOURCES_UNSUBSCRIBE = "resources/unsubscribe";
+constexpr absl::string_view RESOURCES_TEMPLATES_LIST = "resources/templates/list";
 
 // Prompts
-constexpr std::string_view PROMPTS_GET = "prompts/get";
-constexpr std::string_view PROMPTS_LIST = "prompts/list";
+constexpr absl::string_view PROMPTS_GET = "prompts/get";
+constexpr absl::string_view PROMPTS_LIST = "prompts/list";
 
 // Completion
-constexpr std::string_view COMPLETION_COMPLETE = "completion/complete";
+constexpr absl::string_view COMPLETION_COMPLETE = "completion/complete";
 
 // Logging
-constexpr std::string_view LOGGING_SET_LEVEL = "logging/setLevel";
+constexpr absl::string_view LOGGING_SET_LEVEL = "logging/setLevel";
 
 // Lifecycle
-constexpr std::string_view INITIALIZE = "initialize";
-constexpr std::string_view INITIALIZED = "initialized";
-constexpr std::string_view SHUTDOWN = "shutdown";
+constexpr absl::string_view INITIALIZE = "initialize";
+constexpr absl::string_view INITIALIZED = "initialized";
+constexpr absl::string_view SHUTDOWN = "shutdown";
 
 // Sampling
-constexpr std::string_view SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
+constexpr absl::string_view SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
 
 // Utility
-constexpr std::string_view PING = "ping";
+constexpr absl::string_view PING = "ping";
 
 // Notification prefix
-constexpr std::string_view NOTIFICATION_PREFIX = "notifications/";
+constexpr absl::string_view NOTIFICATION_PREFIX = "notifications/";
 
 // Specific notifications
-constexpr std::string_view NOTIFICATION_RESOURCES_LIST_CHANGED =
+constexpr absl::string_view NOTIFICATION_RESOURCES_LIST_CHANGED =
     "notifications/resources/list_changed";
-constexpr std::string_view NOTIFICATION_RESOURCES_UPDATED = "notifications/resources/updated";
-constexpr std::string_view NOTIFICATION_TOOLS_LIST_CHANGED = "notifications/tools/list_changed";
-constexpr std::string_view NOTIFICATION_PROMPTS_LIST_CHANGED = "notifications/prompts/list_changed";
-constexpr std::string_view NOTIFICATION_PROGRESS = "notifications/progress";
-constexpr std::string_view NOTIFICATION_MESSAGE = "notifications/message";
-constexpr std::string_view NOTIFICATION_CANCELLED = "notifications/cancelled";
-constexpr std::string_view NOTIFICATION_INITIALIZED = "notifications/initialized";
+constexpr absl::string_view NOTIFICATION_RESOURCES_UPDATED = "notifications/resources/updated";
+constexpr absl::string_view NOTIFICATION_TOOLS_LIST_CHANGED = "notifications/tools/list_changed";
+constexpr absl::string_view NOTIFICATION_PROMPTS_LIST_CHANGED = "notifications/prompts/list_changed";
+constexpr absl::string_view NOTIFICATION_PROGRESS = "notifications/progress";
+constexpr absl::string_view NOTIFICATION_MESSAGE = "notifications/message";
+constexpr absl::string_view NOTIFICATION_CANCELLED = "notifications/cancelled";
+constexpr absl::string_view NOTIFICATION_INITIALIZED = "notifications/initialized";
 } // namespace Methods
 } // namespace McpConstants
 
@@ -103,7 +100,7 @@ public:
   void addMethodConfig(absl::string_view method, std::vector<FieldRule> fields);
 
   // Get all global fields to always extract
-  const std::unordered_set<std::string>& getAlwaysExtract() const { return always_extract_; }
+  const absl::flat_hash_set<std::string>& getAlwaysExtract() const { return always_extract_; }
 
   // Create default config (minimal extraction)
   static McpParserConfig createDefault();
@@ -112,16 +109,16 @@ private:
   void initializeDefaults();
 
   // Per-method field policies
-  std::unordered_map<std::string, std::vector<FieldRule>> method_fields_;
+  absl::flat_hash_map<std::string, std::vector<FieldRule>> method_fields_;
 
   // Global fields to always extract
-  std::unordered_set<std::string> always_extract_;
+  absl::flat_hash_set<std::string> always_extract_;
 };
 
 /**
  * MCP JSON field extractor with early stopping optimization
  */
-class McpFieldExtractor : public google::protobuf::util::converter::ObjectWriter,
+class McpFieldExtractor : public Protobuf::util::ObjectWriter,
                           public Logger::Loggable<Logger::Id::mcp> {
 public:
   McpFieldExtractor(Protobuf::Struct& metadata, const McpParserConfig& config);
@@ -187,8 +184,8 @@ private:
   std::vector<std::string> path_stack_;
 
   // Track collected fields
-  std::unordered_set<std::string> collected_fields_;
-  std::unordered_set<std::string> extracted_fields_;
+  absl::flat_hash_set<std::string> collected_fields_;
+  absl::flat_hash_set<std::string> extracted_fields_;
 
   // MCP state
   std::string method_;
@@ -245,7 +242,7 @@ private:
   McpParserConfig config_;
   Protobuf::Struct metadata_;
   std::unique_ptr<McpFieldExtractor> extractor_;
-  std::unique_ptr<google::protobuf::util::converter::JsonStreamParser> stream_parser_;
+  std::unique_ptr<Protobuf::util::JsonStreamParser> stream_parser_;
   bool parsing_started_{false};
   bool all_fields_collected_{false};
 };

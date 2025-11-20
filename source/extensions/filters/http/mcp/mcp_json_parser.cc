@@ -448,15 +448,14 @@ absl::Status McpJsonParser::parse(absl::string_view data) {
   if (!parsing_started_) {
     extractor_ = std::make_unique<McpFieldExtractor>(metadata_, config_);
     stream_parser_ =
-        std::make_unique<google::protobuf::util::converter::JsonStreamParser>(extractor_.get());
+        std::make_unique<Protobuf::util::JsonStreamParser>(extractor_.get());
     parsing_started_ = true;
   }
 
   auto status = stream_parser_->Parse(data);
-  ENVOY_LOG(debug, "parser pasing");
-  ENVOY_LOG(debug, "status ok: {}, {}", status.ok(), status.message());
+  ENVOY_LOG(trace, "status ok: {}, {}", status.ok(), status.message());
   if (extractor_->shouldStopParsing()) {
-    ENVOY_LOG(debug, "Parser stopped early - all required fields collected");
+    ENVOY_LOG(trace, "Parser stopped early - all required fields collected");
     all_fields_collected_ = true;
     return finishParse();
   }
