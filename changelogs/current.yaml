@@ -34,5 +34,9 @@ new_features:
   change: |
     Propagate the transport error from the tls_inspector to the DownstreamTransportFailureReason in StreamInfo
     for access logging prior to the TLS handshake.
+- area: dynamic modules
+  change: |
+    Added support for loading dynamic modules globally by setting :ref:`load_globally
+    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.load_globally>` to true.
 
 deprecated:
