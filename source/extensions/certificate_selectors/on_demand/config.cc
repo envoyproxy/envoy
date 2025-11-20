@@ -141,11 +141,13 @@ Ssl::SelectionResult AsyncSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl
   const std::string name = mapper_(ssl_client_hello);
   auto current_context = secret_manager_->getContext(name);
   if (current_context) {
+    ENVOY_LOG(trace, "Using an existing certificate '{}'", name);
     const Ssl::TlsContext* tls_context = &current_context.value()->tlsContext();
     fetch_handle_ = std::make_shared<FetchHandle>(*std::move(current_context));
     return Ssl::SelectionResult{Ssl::SelectionResult::SelectionStatus::Success, tls_context, false,
                                 /* TODO(kuat): OCSP stapling */};
   }
+  ENVOY_LOG(trace, "Requesting a certificate '{}'", name);
   ASSERT(fetch_handle_ == nullptr);
   fetch_handle_ = secret_manager_->fetchCertificate(name, std::move(cb));
   return Ssl::SelectionResult{

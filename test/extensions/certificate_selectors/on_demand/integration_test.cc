@@ -3,6 +3,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/extensions/certificate_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
@@ -74,10 +75,8 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4,
                             ConfigHelper::httpProxyConfig(false)) {}
 
-  Network::Address::IpVersion ipVersion() const override{
-      return Network::Address::IpVersion::v4} Grpc::ClientType clientType() const override {
-    return GetParam().sds_grpc_type;
-  }
+  Network::Address::IpVersion ipVersion() const override { return Network::Address::IpVersion::v4; }
+  Grpc::ClientType clientType() const override { return GetParam().sds_grpc_type; }
   virtual std::unique_ptr<FakeUpstream>& sdsUpstream() { return fake_upstreams_[0]; }
   // Index in fake_upstreams_ vector of the data plane upstream.
   int dataPlaneUpstreamIndex() { return 1; }
@@ -90,11 +89,6 @@ public:
               envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
             configToUseSds(common_tls_context);
           });
-      // The SNI of the certificates loaded in this test.
-      default_request_headers_.setHost("www.lyft.com");
-    });
-
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add a static SDS cluster as the first cluster in the list.
       // The SDS cluster needs to appear before the cluster that uses it for secrets, so that it
       // gets initialized first.
@@ -106,8 +100,11 @@ public:
       ConfigHelper::setHttp2(*sds_cluster);
     });
 
+    // The SNI of the certificates loaded in this test.
+    default_request_headers_.setHost("www.home.com");
     HttpIntegrationTest::initialize();
     client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
+    creator_ = [&]() -> Network::ClientConnectionPtr { return makeSslClientConnection(); };
   }
 
   void configToUseSds(
@@ -119,9 +116,21 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
 
-    // Modify the listener ssl cert to use SDS from sds_cluster
-    auto* secret_config_rsa = common_tls_context.add_tls_certificate_sds_secret_configs();
-    setUpSdsConfig(secret_config_rsa, server_cert_rsa_);
+    // Parse on-demand TLS cert selector config.
+    envoy::extensions::certificate_selectors::on_demand_secret::v3::Config on_demand_config;
+    TestUtility::loadFromYaml(on_demand_config_, on_demand_config);
+
+    // Configure config source
+    auto* config_source = on_demand_config.mutable_config_source();
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = config_source->mutable_api_config_source();
+    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "sds_cluster", sdsUpstream()->localAddress());
+    common_tls_context.mutable_custom_tls_certificate_selector()->set_name("on-demand-config");
+    common_tls_context.mutable_custom_tls_certificate_selector()->mutable_typed_config()->PackFrom(
+        on_demand_config);
   }
 
   void createUpstreams() override {
@@ -153,19 +162,6 @@ protected:
     xds_stream_->startGrpcStream();
   }
 
-  void setUpSdsConfig(envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig* secret_config,
-                      const std::string& secret_name,
-                      const std::string& sds_cluster = "sds_cluster") {
-    secret_config->set_name(secret_name);
-    auto* config_source = secret_config->mutable_sds_config();
-    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    auto* api_config_source = config_source->mutable_api_config_source();
-    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-    auto* grpc_service = api_config_source->add_grpc_services();
-    setGrpcService(*grpc_service, sds_cluster, sdsUpstream()->localAddress());
-  }
-
   envoy::extensions::transport_sockets::tls::v3::Secret getServerSecretRsa() {
     envoy::extensions::transport_sockets::tls::v3::Secret secret;
     secret.set_name(server_cert_rsa_);
@@ -186,37 +182,63 @@ protected:
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 
-  void printServerCounters() {
-    std::cerr << "all counters" << std::endl;
-    for (const auto& c : test_server_->counters()) {
-      std::cerr << "counter: " << c->name() << ", value: " << c->value() << std::endl;
-    }
-  }
-
   const std::string server_cert_rsa_{"server_cert_rsa"};
   const std::string server2_cert_rsa_{"server2_cert_rsa"};
   const std::string server_cert_ecdsa_{"server_cert_ecdsa"};
   const std::string validation_secret_{"validation_secret"};
   const std::string client_cert_{"client_cert"};
   Network::UpstreamTransportSocketFactoryPtr client_ssl_ctx_;
+  std::string on_demand_config_;
+  ConnectionCreationFunction creator_;
 };
 
-TEST_P(OnDemandIntegrationTest, BasicSuccess) {
+TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
   on_server_init_function_ = [this]() {
     createSdsStream(*sdsUpstream());
     sendSdsResponse(getServerSecretRsa());
   };
+  on_demand_config_ = R"EOF(
+  secret_name:
+    name: static-name
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      name: server_cert_rsa
+  prefetch_names:
+  - server_cert_rsa
+  )EOF";
   initialize();
-
-  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-    return makeSslClientConnection();
-  };
-  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
-  printServerCounters();
-
-  // Success
+  testRouterHeaderOnlyRequestAndResponse(&creator_, dataPlaneUpstreamIndex());
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+  EXPECT_EQ(
+      1, test_server_->counter("listener.127.0.0.1_0.on_demand_secret.certificate_added")->value());
+}
+
+TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
+  on_demand_config_ = R"EOF(
+  secret_name:
+    name: static-name
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      name: server_cert_rsa
+  )EOF";
+  initialize();
+
+  std::thread thread([&] {
+    // Artifically delay the SDS response using the upstream dispatcher.
+    // Note: this would be cleaner if we had a reliable trigger that a certificiate is pending.
+    createSdsStream(*sdsUpstream());
+    absl::SleepFor(absl::Seconds(1));
+    sendSdsResponse(getServerSecretRsa());
+  });
+
+  testRouterHeaderOnlyRequestAndResponse(&creator_, dataPlaneUpstreamIndex());
+  thread.join();
+
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+  EXPECT_EQ(
+      1, test_server_->counter("listener.127.0.0.1_0.on_demand_secret.certificate_added")->value());
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandIntegrationTest,

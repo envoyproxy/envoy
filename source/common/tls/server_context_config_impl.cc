@@ -151,7 +151,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
 
   if (!capabilities().provides_certificates) {
     if ((config.common_tls_context().tls_certificates().size() +
-         config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
+         config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0 &&
+        !config.common_tls_context().has_custom_tls_certificate_selector()) {
       creation_status = absl::InvalidArgumentError("No TLS certificates found for server context");
     } else if (!config.common_tls_context().tls_certificates().empty() &&
                !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {

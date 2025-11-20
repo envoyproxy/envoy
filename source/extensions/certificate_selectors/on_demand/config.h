@@ -126,6 +126,7 @@ public:
   AsyncSelector(Ssl::TlsCertificateMapper&& mapper, std::shared_ptr<SecretManager> secret_manager)
       : mapper_(std::move(mapper)), secret_manager_(secret_manager) {}
 
+  bool providesCertificates() const override { return true; }
   Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO&,
                                         Ssl::CertificateSelectionCallbackPtr cb) override;
 

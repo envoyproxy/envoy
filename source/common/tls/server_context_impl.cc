@@ -110,18 +110,12 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   // If creation failed, do not create the selector.
   tls_certificate_selector_ = config.tlsCertificateSelectorFactory()(*this);
 
-  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
+  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates &&
+      !tls_certificate_selector_->providesCertificates()) {
     creation_status =
         absl::InvalidArgumentError("Server TlsCertificates must have a certificate specified");
     return;
   }
-
-  // Compute the session context ID hash. We use all the certificate identities,
-  // since we should have a common ID for session resumption no matter what cert
-  // is used. We do this early because it can fail.
-  absl::StatusOr<SessionContextID> id_or_error = generateHashForSessionContextId(server_names);
-  SET_AND_RETURN_IF_NOT_OK(id_or_error.status(), creation_status);
-  const SessionContextID& session_id = *id_or_error;
 
   // First, configure the base context for ClientHello interception.
   // TODO(htuch): replace with SSL_IDENTITY when we have this as a means to do multi-cert in
@@ -136,7 +130,18 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
         });
   }
 
+  // The rest of the code assumes non-empty TLS certificates.
   const auto tls_certificates = config.tlsCertificates();
+  if (tls_certificates.empty()) {
+    return;
+  }
+
+  // Compute the session context ID hash. We use all the certificate identities,
+  // since we should have a common ID for session resumption no matter what cert
+  // is used. We do this early because it can fail.
+  absl::StatusOr<SessionContextID> id_or_error = generateHashForSessionContextId(server_names);
+  SET_AND_RETURN_IF_NOT_OK(id_or_error.status(), creation_status);
+  const SessionContextID& session_id = *id_or_error;
 
   for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
     auto& ctx = tls_contexts_[i];

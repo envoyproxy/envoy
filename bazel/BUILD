@@ -1056,7 +1056,7 @@ config_setting(
         "@platforms//os:linux",
     ],
     flag_values = {
-        ":enable_liburing": "False",
+        ":enable_liburing": "True",
     },
 )
 

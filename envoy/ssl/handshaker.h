@@ -223,6 +223,11 @@ public:
   virtual ~TlsCertificateSelector() = default;
 
   /**
+   * @return true if the selector provides its own SSL contexts.
+   */
+  virtual bool providesCertificates() const { return false; }
+
+  /**
    * Select TLS context based on the client hello in non-QUIC TLS handshake.
    *
    * @return selected_ctx should only not be null when status is SelectionStatus::Success, and it
