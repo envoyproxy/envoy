@@ -733,7 +733,7 @@ std::string InfoCmdAggregateResponseHandler::bytesToHuman(uint64_t bytes) {
   char buffer[64];
 
   if (bytes < 1024) {
-    snprintf(buffer, sizeof(buffer), "%lluB", bytes);
+    snprintf(buffer, sizeof(buffer), "%" PRIu64 "B", bytes);
   } else if (bytes < (1024ULL * 1024)) {
     double d = static_cast<double>(bytes) / 1024.0;
     snprintf(buffer, sizeof(buffer), "%.2fK", d);
@@ -750,7 +750,7 @@ std::string InfoCmdAggregateResponseHandler::bytesToHuman(uint64_t bytes) {
     double d = static_cast<double>(bytes) / (1024.0 * 1024 * 1024 * 1024 * 1024);
     snprintf(buffer, sizeof(buffer), "%.2fP", d);
   } else {
-    snprintf(buffer, sizeof(buffer), "%lluB", bytes);
+    snprintf(buffer, sizeof(buffer), "%" PRIu64 "B", bytes);
   }
 
   return std::string(buffer);
