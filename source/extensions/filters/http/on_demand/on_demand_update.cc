@@ -161,7 +161,9 @@ OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
   return makeOptRefFromPtr(callbacks_->route().get());
 }
 
-Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&, bool) {
+Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&,
+                                                             bool end_stream) {
+  downstream_end_stream_ = end_stream;
   auto config = getConfig();
 
   config->decodeHeadersBehavior().decodeHeaders(*this);
@@ -207,13 +209,15 @@ const OnDemandFilterConfig* OnDemandRouteUpdate::getConfig() {
   return config_.get();
 }
 
-Http::FilterDataStatus OnDemandRouteUpdate::decodeData(Buffer::Instance&, bool) {
+Http::FilterDataStatus OnDemandRouteUpdate::decodeData(Buffer::Instance&, bool end_stream) {
+  downstream_end_stream_ = end_stream;
   return filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration
              ? Http::FilterDataStatus::StopIterationAndWatermark
              : Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus OnDemandRouteUpdate::decodeTrailers(Http::RequestTrailerMap&) {
+  downstream_end_stream_ = true;
   return Http::FilterTrailersStatus::Continue;
 }
 
@@ -241,9 +245,9 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     return;
   }
 
-  if (route_exists &&                  // route can be resolved after an on-demand
-                                       // VHDS update
-      !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
+  if (route_exists &&           // route can be resolved after an on-demand
+                                // VHDS update
+      downstream_end_stream_ && // Redirects require fully read body.
       callbacks_->recreateStream(/*headers=*/nullptr)) {
     return;
   }
@@ -258,7 +262,7 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
   cluster_discovery_handle_.reset();
   if (cluster_status == Upstream::ClusterDiscoveryStatus::Available &&
-      !callbacks_->decodingBuffer()) { // Redirects with body not yet supported.
+      downstream_end_stream_) { // Redirects require fully read body.
     const Http::ResponseHeaderMap* headers = nullptr;
     if (callbacks_->recreateStream(headers)) {
       callbacks_->downstreamCallbacks()->clearRouteCache();
