@@ -335,7 +335,7 @@ void McpFieldExtractor::storeField(const std::string& path, const Protobuf::Valu
 }
 
 void McpFieldExtractor::checkEarlyStop() {
-  // Can't stop if we haven't seen jsonrpc and method yet
+  // Can't stop if we haven't seen the method yet
   if (!has_jsonrpc_ || !has_method_) {
     return;
   }

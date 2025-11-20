@@ -302,7 +302,8 @@ TEST_F(McpJsonParserTest, PartialParsingEscapeSequence) {
   std::string json1 = R"({"jsonrpc": "2.0", "method": "test", "params": {"text": "line1\)";
 
   auto status1 = parser_->parse(json1);
-  // Ealy termination.
+
+  // Early termination.
   EXPECT_FALSE(status1.ok());
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
