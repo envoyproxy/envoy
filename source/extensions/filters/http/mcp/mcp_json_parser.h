@@ -70,7 +70,8 @@ constexpr absl::string_view NOTIFICATION_RESOURCES_LIST_CHANGED =
     "notifications/resources/list_changed";
 constexpr absl::string_view NOTIFICATION_RESOURCES_UPDATED = "notifications/resources/updated";
 constexpr absl::string_view NOTIFICATION_TOOLS_LIST_CHANGED = "notifications/tools/list_changed";
-constexpr absl::string_view NOTIFICATION_PROMPTS_LIST_CHANGED = "notifications/prompts/list_changed";
+constexpr absl::string_view NOTIFICATION_PROMPTS_LIST_CHANGED =
+    "notifications/prompts/list_changed";
 constexpr absl::string_view NOTIFICATION_PROGRESS = "notifications/progress";
 constexpr absl::string_view NOTIFICATION_MESSAGE = "notifications/message";
 constexpr absl::string_view NOTIFICATION_CANCELLED = "notifications/cancelled";
@@ -118,7 +119,7 @@ private:
 /**
  * MCP JSON field extractor with early stopping optimization
  */
-class McpFieldExtractor : public Protobuf::util::ObjectWriter,
+class McpFieldExtractor : public ProtobufUtil::converter::ObjectWriter,
                           public Logger::Loggable<Logger::Id::mcp> {
 public:
   McpFieldExtractor(Protobuf::Struct& metadata, const McpParserConfig& config);
@@ -242,7 +243,7 @@ private:
   McpParserConfig config_;
   Protobuf::Struct metadata_;
   std::unique_ptr<McpFieldExtractor> extractor_;
-  std::unique_ptr<Protobuf::util::JsonStreamParser> stream_parser_;
+  std::unique_ptr<ProtobufUtil::converter::JsonStreamParser> stream_parser_;
   bool parsing_started_{false};
   bool all_fields_collected_{false};
 };

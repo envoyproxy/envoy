@@ -447,8 +447,7 @@ McpJsonParser::McpJsonParser(const McpParserConfig& config) : config_(config) { 
 absl::Status McpJsonParser::parse(absl::string_view data) {
   if (!parsing_started_) {
     extractor_ = std::make_unique<McpFieldExtractor>(metadata_, config_);
-    stream_parser_ =
-        std::make_unique<Protobuf::util::JsonStreamParser>(extractor_.get());
+    stream_parser_ = std::make_unique<ProtobufUtil::converter::JsonStreamParser>(extractor_.get());
     parsing_started_ = true;
   }
 
