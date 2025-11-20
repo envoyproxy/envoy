@@ -666,12 +666,11 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod_ResponseFlow) {
   // Verify Rejection
   // Expect the error log and Local Reply
   EXPECT_CALL(mock_encoder_callbacks_,
-              sendLocalReply(
-                  Http::Code::BadRequest,
-                  "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the descriptor pool configured for this filter.",
-                  Eq(nullptr),
-                  Eq(Envoy::Grpc::Status::InvalidArgument),
-                  "proto_api_scrubber_BAD_REQUEST{INVALID_ARGUMENT}"));
+              sendLocalReply(Http::Code::BadRequest,
+                             "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the "
+                             "descriptor pool configured for this filter.",
+                             Eq(nullptr), Eq(Envoy::Grpc::Status::InvalidArgument),
+                             "proto_api_scrubber_BAD_REQUEST{INVALID_ARGUMENT}"));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->encodeData(*response_data, true));
