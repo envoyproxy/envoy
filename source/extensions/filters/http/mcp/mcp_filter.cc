@@ -165,9 +165,8 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
 
   // A non-JSON data is received
   if (!status.ok()) {
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                    "not a valid JSON",
-                                    nullptr, absl::nullopt, "mcp_filter_not_jsonrpc");
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
+                                       absl::nullopt, "mcp_filter_not_jsonrpc");
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 

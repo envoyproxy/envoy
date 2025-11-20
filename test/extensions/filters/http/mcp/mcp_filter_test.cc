@@ -151,8 +151,7 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
-                             "request must be a valid JSON-RPC 2.0 message for MCP",
-                             _, _, _));
+                             "request must be a valid JSON-RPC 2.0 message for MCP", _, _, _));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
