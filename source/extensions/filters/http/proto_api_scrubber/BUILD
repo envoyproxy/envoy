@@ -13,12 +13,15 @@ envoy_cc_extension(
     name = "filter_config",
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
+    external_deps = ["grpc_transcoding"],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/matcher:matcher_lib",
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
+        "@com_google_absl//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
     ],
 )
@@ -34,6 +37,8 @@ envoy_cc_library(
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_lib",
+        "//source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib",
+        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
     ],
 )

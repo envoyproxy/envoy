@@ -44,3 +44,7 @@ test_program(name = "no_http_filter_response_headers")
 test_program(name = "no_http_filter_response_body")
 
 test_program(name = "no_http_filter_response_trailers")
+
+test_program(name = "program_global")
+
+test_program(name = "program_child")

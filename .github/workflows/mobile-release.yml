@@ -68,7 +68,8 @@ jobs:
         - target: android-release
           args: >-
             build
-            --config=mobile-remote-release-clang-android-publish
+            --config=mobile-remote-release
+            --config=mobile-release-android-publish
             --define=pom_version=$VERSION
             //:android_dist
           output: envoy
