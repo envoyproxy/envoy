@@ -78,18 +78,6 @@ jobs:
       arch: ${{ inputs.arch }}
       target: docker
       target-suffix: ${{ inputs.arch }}
-      bind-mounts: |
-        - src: /mnt/workspace
-          target: GITHUB_WORKSPACE
-          chown: "runner:runner"
-        - src: /mnt/runner
-          target: RUNNER_TEMP/container/bazel_root
-          chown: "runner:runner"
-        - src: /mnt/docker
-          target: /var/lib/docker
-          rm: true
-          command-pre: sudo systemctl stop docker
-          command-post: sudo systemctl start docker
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
