@@ -1,6 +1,3 @@
-#include <uadk/v1/wd.h>
-#include <uadk/v1/wd_rsa.h>
-
 #include <cstddef>
 #include <cstdlib>
 #include <memory>

@@ -1,8 +1,6 @@
 #pragma once
 
 #include <openssl/ssl.h>
-#include <uadk/v1/wd.h>
-#include <uadk/v1/wd_rsa.h>
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/ssl/private_key/private_key.h"
