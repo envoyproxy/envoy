@@ -35,7 +35,8 @@
 namespace Envoy {
 namespace Http {
 class FilterChainManager;
-}
+class HashPolicy;
+} // namespace Http
 
 namespace Router {
 class ShadowPolicy;
@@ -1249,6 +1250,12 @@ public:
    * nullptr if no cluster-level retry policy is configured.
    */
   virtual const Router::RetryPolicy* retryPolicy() const PURE;
+
+  /**
+   * @return const Http::HashPolicy* the hash policy configured for this cluster. Returns nullptr
+   * if no cluster-level hash policy is configured.
+   */
+  virtual const Http::HashPolicy* hashPolicy() const PURE;
 
 protected:
   /**

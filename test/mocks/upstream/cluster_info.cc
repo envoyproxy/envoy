@@ -178,6 +178,7 @@ MockClusterInfo::MockClusterInfo()
       }));
   ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
   ON_CALL(*this, retryPolicy()).WillByDefault(Return(nullptr));
+  ON_CALL(*this, hashPolicy()).WillByDefault(Return(nullptr));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;

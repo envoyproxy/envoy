@@ -1897,8 +1897,7 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_sub_zone("world");
   std::unique_ptr<HostImpl> host = *HostImpl::create(
       cluster.info_, "lyft.com", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
-      std::make_shared<const envoy::config::core::v3::Locality>(locality),
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN);
   EXPECT_EQ(cluster.info_.get(), &host->cluster());
@@ -1924,8 +1923,7 @@ TEST_F(HostImplTest, CreateConnection) {
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
   auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
-      std::make_shared<const envoy::config::core::v3::Locality>(locality),
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN));
 
@@ -1963,8 +1961,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   };
   auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
-      std::make_shared<const envoy::config::core::v3::Locality>(locality),
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, address_list));
 
@@ -2011,8 +2008,7 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   };
   auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
-      std::make_shared<const envoy::config::core::v3::Locality>(locality),
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, address_list));
 
@@ -2068,8 +2064,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   };
   auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
-      std::make_shared<const envoy::config::core::v3::Locality>(locality),
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, address_list));
 
@@ -2120,8 +2115,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   };
   auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
-      std::make_shared<const envoy::config::core::v3::Locality>(locality),
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, address_list));
 
@@ -2267,7 +2261,7 @@ TEST_F(HostImplTest, HealthPipeAddress) {
   config.set_port_value(8000);
   EXPECT_EQ(HostDescriptionImpl::create(
                 info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr, nullptr,
-                std::make_shared<const envoy::config::core::v3::Locality>(), config, 1)
+                envoy::config::core::v3::Locality().default_instance(), config, 1)
                 .status()
                 .message(),
             "Invalid host configuration: non-zero port for non-IP address");
@@ -2282,8 +2276,7 @@ TEST_F(HostImplTest, NetnsInvalid) {
       Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:9999", true, "/netns/filepath");
   EXPECT_EQ(
       HostDescriptionImpl::create(info, "", dest_addr, nullptr, nullptr,
-                                  std::make_shared<const envoy::config::core::v3::Locality>(),
-                                  config, 1)
+                                  envoy::config::core::v3::Locality().default_instance(), config, 1)
           .status()
           .message(),
       "Invalid host configuration: hosts cannot specify network namespaces with their address");
@@ -2303,7 +2296,7 @@ TEST_F(HostImplTest, HealthcheckHostname) {
   config.set_hostname("foo");
   std::unique_ptr<HostDescriptionImpl> descr = *HostDescriptionImpl::create(
       info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr, nullptr,
-      std::make_shared<const envoy::config::core::v3::Locality>(), config, 1);
+      envoy::config::core::v3::Locality().default_instance(), config, 1);
   EXPECT_EQ("foo", descr->hostnameForHealthChecks());
 }
 
@@ -2757,7 +2750,7 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
             cluster->info()->loadBalancerFactory().name());
   auto slow_start_config =
       dynamic_cast<
-          const Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig*>(
+          const Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig*>(
           cluster->info()->loadBalancerConfig().ptr())
           ->lb_config_.slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
@@ -3516,7 +3509,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(remote_address, nullptr, {})
+                               ->getUpstreamLocalAddress(remote_address, nullptr)
                                .address_->asString());
   }
 
@@ -3537,13 +3530,13 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(remote_address, nullptr, {})
+                               ->getUpstreamLocalAddress(remote_address, nullptr)
                                .address_->asString());
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("[2001::1]:0", cluster->info()
                                  ->getUpstreamLocalAddressSelector()
-                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
+                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                  .address_->asString());
   }
 
@@ -3561,7 +3554,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                .address_->asString());
   }
 
@@ -3649,7 +3642,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         *Network::Address::PipeInstance::create("/test");
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                .address_->asString());
   }
 
@@ -3665,7 +3658,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(remote_address, nullptr, {})
+                                   ->getUpstreamLocalAddress(remote_address, nullptr)
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3727,7 +3720,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(remote_address, nullptr, {})
+                                   ->getUpstreamLocalAddress(remote_address, nullptr)
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3746,7 +3739,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
+                                   ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3795,13 +3788,13 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(remote_address, nullptr, {})
+                               ->getUpstreamLocalAddress(remote_address, nullptr)
                                .address_->asString());
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("[2001::1]:0", cluster->info()
                                  ->getUpstreamLocalAddressSelector()
-                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
+                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                  .address_->asString());
   }
 
@@ -3818,7 +3811,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                .address_->asString());
   }
 
@@ -3880,7 +3873,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         *Network::Address::PipeInstance::create("/test");
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                .address_->asString());
   }
 
@@ -3917,7 +3910,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(remote_address, nullptr, {})
+                                   ->getUpstreamLocalAddress(remote_address, nullptr)
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3978,17 +3971,17 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
       std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
   EXPECT_EQ("[2001::1]:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                .address_->asString());
   Network::Address::InstanceConstSharedPtr remote_address =
       std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
   EXPECT_EQ("1.2.3.6:0", cluster->info()
                              ->getUpstreamLocalAddressSelector()
-                             ->getUpstreamLocalAddress(remote_address, nullptr, {})
+                             ->getUpstreamLocalAddress(remote_address, nullptr)
                              .address_->asString());
   EXPECT_EQ("1.2.3.5:0", cluster->info()
                              ->getUpstreamLocalAddressSelector()
-                             ->getUpstreamLocalAddress(remote_address, nullptr, {})
+                             ->getUpstreamLocalAddress(remote_address, nullptr)
                              .address_->asString());
 }
 
@@ -6216,265 +6209,6 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
   EXPECT_EQ(2UL, hosts_per_locality.get()[1].size());
   EXPECT_EQ(zone_b, hosts_per_locality.get()[1][0]->locality());
   EXPECT_EQ(zone_b, hosts_per_locality.get()[1][1]->locality());
-}
-
-// Test cluster-level mirroring policy configuration.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithCluster) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-        request_mirror_policies:
-          - cluster: shadow_cluster
-            runtime_fraction:
-              default_value:
-                numerator: 60
-                denominator: HUNDRED
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(1, shadow_policies.size());
-
-  const auto& policy = shadow_policies[0];
-  EXPECT_EQ("shadow_cluster", policy->cluster());
-  EXPECT_EQ("", policy->clusterHeader().get());
-  EXPECT_FALSE(policy->traceSampled().has_value());
-}
-
-// Test cluster-level mirroring policy with cluster_header.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithClusterHeader) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-        request_mirror_policies:
-          - cluster_header: x-shadow-cluster
-            trace_sampled: true
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(1, shadow_policies.size());
-
-  const auto& policy = shadow_policies[0];
-  EXPECT_EQ("", policy->cluster());
-  EXPECT_EQ("x-shadow-cluster", policy->clusterHeader().get());
-  EXPECT_TRUE(policy->traceSampled().has_value());
-  EXPECT_TRUE(policy->traceSampled().value());
-}
-
-// Test cluster-level mirroring policy with multiple policies.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterMultipleShadowPolicies) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-        request_mirror_policies:
-          - cluster: shadow_cluster_1
-            runtime_fraction:
-              default_value:
-                numerator: 11
-                denominator: HUNDRED
-          - cluster: shadow_cluster_2
-            trace_sampled: false
-          - cluster_header: x-shadow-header
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(3, shadow_policies.size());
-
-  EXPECT_EQ("shadow_cluster_1", shadow_policies[0]->cluster());
-  EXPECT_EQ("shadow_cluster_2", shadow_policies[1]->cluster());
-  EXPECT_EQ("", shadow_policies[2]->cluster());
-  EXPECT_EQ("x-shadow-header", shadow_policies[2]->clusterHeader().get());
-}
-
-// Test cluster-level mirroring policy with header mutations.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithHeaderMutations) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-        request_mirror_policies:
-          - cluster: shadow_cluster
-            request_headers_mutations:
-              - append:
-                  header:
-                    key: x-shadow-header
-                    value: shadow-value
-                  append_action: OVERWRITE_IF_EXISTS_OR_ADD
-              - remove: x-remove-me
-            host_rewrite_literal: shadow-host.example.com
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(1, shadow_policies.size());
-
-  const auto& policy = shadow_policies[0];
-  EXPECT_EQ("shadow_cluster", policy->cluster());
-
-  // Create headers, formatter context, and stream info for header evaluation.
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"}, {":path", "/test"}, {"x-remove-me", "should-be-removed"}};
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  const Envoy::Formatter::Context formatter_context{&headers};
-
-  // Apply header mutations.
-  policy->headerEvaluator().evaluateHeaders(headers, formatter_context, stream_info);
-
-  // Verify the shadow policy header mutations were applied correctly.
-  EXPECT_TRUE(headers.has("x-shadow-header"));
-  EXPECT_EQ("shadow-value", headers.get_("x-shadow-header"));
-
-  // Verify the header removal works correctly.
-  EXPECT_FALSE(headers.has("x-remove-me"));
-
-  // Verify the host rewrite literal is configured correctly.
-  EXPECT_EQ("shadow-host.example.com", policy->hostRewriteLiteral());
-}
-
-// Test cluster with no mirroring policies.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterNoShadowPolicies) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(0, shadow_policies.size());
-}
-
-// Test cluster-level mirroring policy with disable_shadow_host_suffix_append.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyDisableShadowHostSuffix) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-        request_mirror_policies:
-          - cluster: shadow_cluster
-            disable_shadow_host_suffix_append: true
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(1, shadow_policies.size());
-
-  const auto& policy = shadow_policies[0];
-  EXPECT_EQ("shadow_cluster", policy->cluster());
 }
 
 // Test cluster-level retry policy with basic retry_on configuration.

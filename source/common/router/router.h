@@ -348,7 +348,13 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override {
     if (route_entry_ && downstream_headers_) {
-      auto hash_policy = route_entry_->hashPolicy();
+      // Use cluster-level hash policy if available (most specific wins).
+      // If no cluster-level policy is configured, fall back to route-level policy.
+      const Http::HashPolicy* hash_policy = cluster_ != nullptr ? cluster_->hashPolicy() : nullptr;
+      if (hash_policy == nullptr) {
+        hash_policy = route_entry_->hashPolicy();
+      }
+
       if (hash_policy) {
         return hash_policy->generateHash(
             *downstream_headers_, callbacks_->streamInfo(),

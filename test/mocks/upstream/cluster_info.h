@@ -180,6 +180,7 @@ public:
   MOCK_METHOD(OptRef<const std::vector<std::string>>, lrsReportMetricNames, (), (const));
   MOCK_METHOD(const std::vector<Router::ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(const Router::RetryPolicy*, retryPolicy, (), (const));
+  MOCK_METHOD(const Http::HashPolicy*, hashPolicy, (), (const));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;

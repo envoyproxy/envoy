@@ -196,6 +196,21 @@ message HttpProtocolOptions {
   //   <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` does not exist.
   repeated config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 9;
 
+  // Specifies a list of hash policies for consistent hashing load balancing (e.g., Ring Hash or
+  // Maglev) for requests routed to this cluster. When configured, cluster-level policies override
+  // route-level policies. When not configured, route-level policies (if any) will be used.
+  //
+  // This enables consistent routing to the same upstream host for all requests to a cluster,
+  // which is particularly useful for stateful services like caching, session management, or
+  // sticky routing requirements.
+  //
+  // .. note::
+  //
+  //   Hash policies are only effective when the cluster is configured with a hash-based load
+  //   balancing policy (e.g., :ref:`RING_HASH <envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.RING_HASH>`
+  //   or :ref:`MAGLEV <envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.MAGLEV>`).
+  repeated config.route.v3.RouteAction.HashPolicy hash_policy = 10;
+
   // Specifies the retry policy for requests routed to this cluster. When configured,
   // cluster-level retry policy overrides route-level retry policy. When not configured,
   // route-level retry policy (if any) will be used.
