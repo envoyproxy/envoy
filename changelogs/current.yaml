@@ -335,5 +335,9 @@ new_features:
 - area: ext_proc
   change: |
     Add support for forwarding cluster metadata to ext_proc server.
+- area: aws
+  change: |
+    Added new feature ``match_included_headers`` to the request signing extension, that allows for a positive header match and
+    excludes all other non-SigV4-required headers.
 
 deprecated:
