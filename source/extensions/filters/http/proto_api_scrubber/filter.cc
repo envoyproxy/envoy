@@ -254,7 +254,7 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
   ENVOY_STREAM_LOG(trace, "Accumulated {} messages. Starting scrubbing on each of them one by one.",
                    *encoder_callbacks_, messages->size());
 
-  // Only create the request scrubber if it's not already created.
+  // Only create the response scrubber if it's not already created.
   if (!response_scrubber_) {
     absl::StatusOr<std::unique_ptr<ProtoScrubber>> response_scrubber_or_status =
         createResponseProtoScrubber();
