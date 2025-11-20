@@ -689,7 +689,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
   EXPECT_CALL(listener_callbacks_, onData(_))
       .Times(4u)
       .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, client_data.size(), /*expect_receive_time_now=*/true);
+        validateRecvCallbackParams(data, client_data.size());
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
@@ -838,7 +838,7 @@ TEST_P(UdpListenerImplTest, UdpGroReadLimit) {
   EXPECT_CALL(listener_callbacks_, onData(_))
       .Times(64u)
       .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, client_data.size(), /*expect_receive_time_now=*/true);
+        validateRecvCallbackParams(data, client_data.size());
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);

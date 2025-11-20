@@ -563,6 +563,8 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
   const uint64_t gso_size = output.msg_[0].gso_size_;
   ENVOY_LOG_MISC(trace, "gro recvmsg bytes {} with gso_size as {}", result.return_value_, gso_size);
 
+  const MonotonicTime receive_time = time_source.monotonicTime();
+
   // Skip gso segmentation and proceed as a single payload.
   if (gso_size == 0u) {
     if (num_packets_read != nullptr) {
@@ -570,7 +572,7 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
     }
     passPayloadToProcessor(
         result.return_value_, std::move(buffer), std::move(output.msg_[0].peer_address_),
-        std::move(output.msg_[0].local_address_), udp_packet_processor, time_source.monotonicTime(),
+        std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time,
         output.msg_[0].tos_, std::move(output.msg_[0].saved_cmsg_));
     return result;
   }
@@ -586,9 +588,8 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
       *num_packets_read += 1;
     }
     passPayloadToProcessor(bytes_to_copy, std::move(sub_buffer), output.msg_[0].peer_address_,
-                           output.msg_[0].local_address_, udp_packet_processor,
-                           time_source.monotonicTime(), output.msg_[0].tos_,
-                           std::move(output.msg_[0].saved_cmsg_));
+                           output.msg_[0].local_address_, udp_packet_processor, receive_time,
+                           output.msg_[0].tos_, std::move(output.msg_[0].saved_cmsg_));
   }
 
   return result;

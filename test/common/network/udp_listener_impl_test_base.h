@@ -93,8 +93,7 @@ protected:
   }
 
   // Validates receive data, source/destination address and received time.
-  void validateRecvCallbackParams(const UdpRecvData& data, size_t num_packet_per_recv,
-                                  bool expect_receive_time_now = false) {
+  void validateRecvCallbackParams(const UdpRecvData& data, size_t num_packet_per_recv) {
     ASSERT_NE(data.addresses_.local_, nullptr);
 
     ASSERT_NE(data.addresses_.peer_, nullptr);
@@ -107,15 +106,12 @@ protected:
 
     EXPECT_EQ(*data.addresses_.local_, *send_to_addr_);
 
-    EXPECT_EQ(time_system_.monotonicTime() - data.receive_time_,
-              std::chrono::milliseconds(
-                  expect_receive_time_now
-                      ? 0
-                      : (num_packets_received_by_listener_ % num_packet_per_recv) * 100));
-
+    EXPECT_EQ(time_system_.monotonicTime(),
+              data.receive_time_ +
+                  std::chrono::milliseconds(
+                      (num_packets_received_by_listener_ % num_packet_per_recv) * 100));
     // Advance time so that next onData() should have different received time.
     time_system_.advanceTimeWait(std::chrono::milliseconds(100));
-
     ++num_packets_received_by_listener_;
   }
 
