@@ -17,10 +17,13 @@
 #include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/tls/ssl_handshaker.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_address.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
+
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -289,7 +292,6 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         // Close the original connection.
         connection->close(Network::ConnectionCloseType::NoFlush);
 
-        ENVOY_LOG(debug, "reverse_tunnel: returning io_handle.");
         return io_handle;
       }
     } else if (bytes_read == 0) {
@@ -1150,6 +1152,25 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
       host_it->second.connection_keys.insert(connection_key);
       ENVOY_LOG(debug, "reverse_tunnel: Added connection key {} for host {}", connection_key,
                 host_address);
+    }
+
+    // Set quiet shutdown since we are duplicating the socket and closing the original socket. When
+    // the original socket is closed, a TLS close_notify alert is otherwise sent.
+    if (connection->ssl()) {
+      ENVOY_LOG(
+          trace,
+          "reverse_tunnel: Setting quiet shutdown on SSL connection to prevent close_notify alert");
+      const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_handshaker =
+          dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+              connection->ssl().get());
+      if (ssl_handshaker && ssl_handshaker->ssl()) {
+        SSL_set_quiet_shutdown(ssl_handshaker->ssl(), 1);
+        ENVOY_LOG(trace, "reverse_tunnel: Quiet shutdown enabled for connection {}",
+                  connection_key);
+      } else {
+        ENVOY_LOG(warn,
+                  "reverse_tunnel: Failed to cast to SslHandshakerImpl or ssl() returned null");
+      }
     }
 
     Network::ClientConnectionPtr released_conn = wrapper->releaseConnection();

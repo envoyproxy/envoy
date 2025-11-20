@@ -1,6 +1,10 @@
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
 #include <algorithm>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
 #include "envoy/matcher/matcher.h"
@@ -11,7 +15,10 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
+#include "absl/strings/str_split.h"
+#include "fmt/core.h"
 #include "grpc_transcoding/type_helper.h"
 
 namespace Envoy {
@@ -82,20 +89,55 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
       context.serverFactoryContext().api(), proto_config.descriptor_set().data_source());
   RETURN_IF_ERROR(descriptor_pool_init_status);
 
-  for (const auto& method_restriction : proto_config.restrictions().method_restrictions()) {
-    std::string method_name = method_restriction.first;
-    RETURN_IF_ERROR(validateMethodName(method_name));
-    RETURN_IF_ERROR(initializeMethodRestrictions(
-        method_name, request_field_restrictions_,
-        method_restriction.second.request_field_restrictions(), context));
-    RETURN_IF_ERROR(initializeMethodRestrictions(
-        method_name, response_field_restrictions_,
-        method_restriction.second.response_field_restrictions(), context));
+  if (proto_config.has_restrictions()) {
+    for (const auto& method_restriction_pair : proto_config.restrictions().method_restrictions()) {
+      const std::string& method_name = method_restriction_pair.first;
+      const auto& method_config = method_restriction_pair.second;
+      RETURN_IF_ERROR(validateMethodName(method_name));
+      RETURN_IF_ERROR(initializeMethodFieldRestrictions(method_name, request_field_restrictions_,
+                                                        method_config.request_field_restrictions(),
+                                                        context));
+      RETURN_IF_ERROR(initializeMethodFieldRestrictions(method_name, response_field_restrictions_,
+                                                        method_config.response_field_restrictions(),
+                                                        context));
+      RETURN_IF_ERROR(initializeMethodLevelRestrictions(method_name, method_config, context));
+    }
+
+    RETURN_IF_ERROR(
+        initializeMessageRestrictions(proto_config.restrictions().message_restrictions(), context));
   }
 
   initializeTypeUtils();
 
   ENVOY_LOG(trace, "Filter config initialized successfully.");
+  return absl::OkStatus();
+}
+
+absl::Status ProtoApiScrubberFilterConfig::initializeMethodLevelRestrictions(
+    absl::string_view method_name, const MethodRestrictions& method_config,
+    Envoy::Server::Configuration::FactoryContext& context) {
+  if (method_config.has_method_restriction()) {
+    method_level_restrictions_[method_name] =
+        getCelMatcher(context.serverFactoryContext(), method_config.method_restriction().matcher());
+  }
+  return absl::OkStatus();
+}
+
+absl::Status ProtoApiScrubberFilterConfig::initializeMessageRestrictions(
+    const Map<std::string, MessageRestrictions>& message_configs,
+    Envoy::Server::Configuration::FactoryContext& context) {
+  for (const auto& pair : message_configs) {
+    const std::string& message_name = pair.first;
+    const auto& message_config = pair.second;
+    absl::Status name_status = validateMessageName(message_name);
+    if (!name_status.ok()) {
+      return name_status;
+    }
+    if (message_config.has_config()) {
+      message_level_restrictions_[message_name] =
+          getCelMatcher(context.serverFactoryContext(), message_config.config().matcher());
+    }
+  }
   return absl::OkStatus();
 }
 
@@ -183,6 +225,21 @@ absl::Status ProtoApiScrubberFilterConfig::validateMethodName(absl::string_view 
   return absl::OkStatus();
 }
 
+absl::Status ProtoApiScrubberFilterConfig::validateMessageName(absl::string_view message_name) {
+  if (message_name.empty()) {
+    return absl::InvalidArgumentError(
+        fmt::format("{} Invalid message name: '{}'. Message name is empty.",
+                    kConfigInitializationError, message_name));
+  }
+  if (!isApiNameValid(message_name)) {
+    return absl::InvalidArgumentError(
+        fmt::format("{} Invalid message name: '{}'. Message name should be fully qualified (e.g., "
+                    "package.Message).",
+                    kConfigInitializationError, message_name));
+  }
+  return absl::OkStatus();
+}
+
 absl::Status ProtoApiScrubberFilterConfig::validateFieldMask(absl::string_view field_mask) {
   if (field_mask.empty()) {
     return absl::InvalidArgumentError(
@@ -199,7 +256,7 @@ absl::Status ProtoApiScrubberFilterConfig::validateFieldMask(absl::string_view f
   return absl::OkStatus();
 }
 
-absl::Status ProtoApiScrubberFilterConfig::initializeMethodRestrictions(
+absl::Status ProtoApiScrubberFilterConfig::initializeMethodFieldRestrictions(
     absl::string_view method_name, StringPairToMatchTreeMap& field_restrictions,
     const Map<std::string, RestrictionConfig>& restrictions,
     Envoy::Server::Configuration::FactoryContext& context) {
@@ -232,6 +289,24 @@ ProtoApiScrubberFilterConfig::getResponseFieldMatcher(const std::string& method_
     return it->second;
   }
 
+  return nullptr;
+}
+
+MatchTreeHttpMatchingDataSharedPtr
+ProtoApiScrubberFilterConfig::getMethodMatcher(const std::string& method_name) const {
+  if (auto it = method_level_restrictions_.find(method_name);
+      it != method_level_restrictions_.end()) {
+    return it->second;
+  }
+  return nullptr;
+}
+
+MatchTreeHttpMatchingDataSharedPtr
+ProtoApiScrubberFilterConfig::getMessageMatcher(const std::string& message_name) const {
+  if (auto it = message_level_restrictions_.find(message_name);
+      it != message_level_restrictions_.end()) {
+    return it->second;
+  }
   return nullptr;
 }
 
