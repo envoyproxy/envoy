@@ -163,16 +163,23 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     return completeParsing();
   }
 
-  // If we are here, we haven't collected all fields yet.
-  bool size_limit_hit = (max_request_body_size_ > 0 && bytes_parsed_ >= max_request_body_size_);
-  if (end_stream || size_limit_hit) {
-    handleParseError("reached end_stream or configured body size, don't get enough data.");
+  // A non-JSON data is received
+  if (!status.ok()) {
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                    "not a valid JSON",
+                                    nullptr, absl::nullopt, "mcp_filter_not_jsonrpc");
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  if (!status.ok()) {
-    handleParseError(status.message());
-    return Http::FilterDataStatus::StopIterationNoBuffer;
+  // If we are here, we haven't collected all fields yet.
+  bool size_limit_hit = (max_request_body_size_ > 0 && bytes_parsed_ >= max_request_body_size_);
+  if (end_stream || size_limit_hit) {
+    auto final_status = parser_->finishParse();
+    if (!final_status.ok()) {
+      handleParseError("reached end_stream or configured body size, don't get enough data.");
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+    return completeParsing();
   }
 
   return Http::FilterDataStatus::StopIterationAndBuffer;
