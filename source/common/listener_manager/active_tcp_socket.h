@@ -84,7 +84,11 @@ public:
     return stream_info_->dynamicMetadata();
   };
   StreamInfo::FilterState& filterState() override { return *stream_info_->filterState().get(); }
-  StreamInfo::StreamInfo* streamInfo() const { return stream_info_.get(); }
+  StreamInfo::StreamInfo& streamInfo() override {
+    ASSERT(stream_info_ != nullptr);
+    return *stream_info_;
+  }
+  StreamInfo::StreamInfo* streamInfoPtr() const { return stream_info_.get(); }
   bool connected() const { return connected_; }
   bool isEndFilterIteration() const { return iter_ == accept_filters_.end(); }
 

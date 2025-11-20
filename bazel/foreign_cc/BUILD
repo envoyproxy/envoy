@@ -32,7 +32,7 @@ configure_make(
         "//bazel:clang_build": {
             "AR": "$(AR)",
             "LD": "$(LD)",
-            "RANLIB": "/opt/llvm/bin/llvm-ranlib",
+            "RANLIB": "$(AR) -s",
         },
         "//conditions:default": {},
     }),
@@ -54,40 +54,6 @@ envoy_cc_library(
         "//bazel:linux": [":liburing"],
         "//conditions:default": [],
     }),
-)
-
-# autotools packages are unusable on Windows as-is
-# TODO: Consider our own gperftools.BUILD file as we do with many other packages
-configure_make(
-    name = "gperftools_build",
-    configure_options = [
-        "--enable-shared=no",
-        "--enable-frame-pointers",
-        "--disable-libunwind",
-    ] + select({
-        "//bazel:apple": ["AR=/usr/bin/ar"],
-        "//conditions:default": [],
-    }),
-    lib_source = "@com_github_gperftools_gperftools//:all",
-    linkopts = ["-lpthread"],
-    out_static_libs = select({
-        "//bazel:debug_tcmalloc": ["libtcmalloc_debug.a"],
-        "//conditions:default": ["libtcmalloc_and_profiler.a"],
-    }),
-    tags = ["skip_on_windows"],
-    targets = [
-        "install-libLTLIBRARIES install-perftoolsincludeHEADERS",
-    ],
-    alwayslink = True,
-)
-
-# Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/227
-cc_library(
-    name = "gperftools",
-    tags = ["skip_on_windows"],
-    deps = [
-        "gperftools_build",
-    ],
 )
 
 make(
@@ -549,42 +515,6 @@ envoy_cmake(
         """,
         "//conditions:default": "",
     }),
-)
-
-envoy_cmake(
-    name = "zstd",
-    build_args = select({
-        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
-        "//conditions:default": ["-j1"],
-    }),
-    build_data = ["@com_github_facebook_zstd//:all"],
-    cache_entries = {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_LIBDIR": "lib",
-        "ZSTD_BUILD_SHARED": "off",
-        "ZSTD_BUILD_STATIC": "on",
-    },
-    exec_properties = select({
-        "//bazel:engflow_rbe_x86_64": {
-            "Pool": "linux_x64_large",
-        },
-        "//bazel:engflow_rbe_aarch64": {
-            "Pool": "linux_arm64_small",
-        },
-        "//conditions:default": {},
-    }),
-    generate_args = [
-        "-G",
-        "Ninja",
-    ],
-    lib_source = "@com_github_facebook_zstd//:all",
-    out_static_libs = select({
-        "//bazel:windows_x86_64": ["zstd_static.lib"],
-        "//conditions:default": ["libzstd.a"],
-    }),
-    working_directory = "build/cmake",
 )
 
 envoy_cmake(

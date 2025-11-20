@@ -3672,6 +3672,45 @@ TEST_F(OverrideTest, GrpcMetadataOverride) {
               ProtoEq(cfg2.overrides().grpc_initial_metadata()[1]));
 }
 
+// When merging two ExtProcPerRoute configurations, metadata_options in more_specific overrides
+// the one in less_specific for the cluster metadata namespaces.
+TEST_F(OverrideTest, ClusterMetadataNamespacesOverride) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_typed()
+      ->Add("less_specific_typed_ns_1");
+  cfg1.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_untyped()
+      ->Add("less_specific_untyped_ns_1");
+
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_typed()
+      ->Add("more_specific_typed_ns_2");
+  cfg2.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_untyped()
+      ->Add("more_specific_untyped_ns_2");
+
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
+  FilterConfigPerRoute merged_route(route1, route2);
+
+  ASSERT_TRUE(merged_route.typedClusterMetadataForwardingNamespaces().has_value());
+  EXPECT_THAT(*merged_route.typedClusterMetadataForwardingNamespaces(),
+              testing::ElementsAre("more_specific_typed_ns_2"));
+  ASSERT_TRUE(merged_route.untypedClusterMetadataForwardingNamespaces().has_value());
+  EXPECT_THAT(*merged_route.untypedClusterMetadataForwardingNamespaces(),
+              testing::ElementsAre("more_specific_untyped_ns_2"));
+}
+
 // Verify that attempts to change headers that are not allowed to be changed
 // are ignored and a counter is incremented.
 TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {

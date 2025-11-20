@@ -48,7 +48,7 @@ concurrency:
 jobs:
   push-manifests:
     name: Create manifests (${{ inputs.trustred && 'dry run' || 'push' }})
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: read

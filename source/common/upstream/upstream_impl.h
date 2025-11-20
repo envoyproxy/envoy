@@ -1010,6 +1010,10 @@ public:
     return shadow_policies_;
   }
 
+  const Http::HashPolicy* hashPolicy() const override {
+    return http_protocol_options_ != nullptr ? http_protocol_options_->hash_policy_.get() : nullptr;
+  }
+
 protected:
   ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
                   const envoy::config::cluster::v3::Cluster& config,
