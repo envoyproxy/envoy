@@ -1719,6 +1719,8 @@ TEST_F(InfoShardHandlerTest, InfoShardWrongNumberOfArgs) {
   EXPECT_EQ(nullptr,
             splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
 }
+// When the mandatory shard_id parameter is missing, command splitter rejects the request before
+// reaching our handler
 TEST_F(InfoShardHandlerTest, InfoShardMissingShardId) {
   InSequence s;
 
@@ -1727,7 +1729,6 @@ TEST_F(InfoShardHandlerTest, InfoShardMissingShardId) {
 
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
-  // When command has no arguments, command splitter rejects it before reaching our handler
   response.asString() = "invalid request";
 
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
