@@ -9,6 +9,7 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
@@ -24,8 +25,12 @@ using ::envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionCon
 using Http::HttpMatchingData;
 using xds::type::matcher::v3::HttpAttributesCelMatchInput;
 using MatchTreeHttpMatchingDataSharedPtr = Matcher::MatchTreeSharedPtr<HttpMatchingData>;
-using ::Envoy::Matcher::HasActionWithType;
-using ::Envoy::Matcher::HasNoMatch;
+using Matcher::HasActionWithType;
+using Matcher::HasNoMatch;
+using StatusHelpers::HasStatus;
+using StatusHelpers::IsOk;
+using testing::AllOf;
+using testing::HasSubstr;
 using testing::NiceMock;
 
 inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
@@ -278,6 +283,173 @@ protected:
       }
     )pb",
                                                      input_type);
+    ProtoApiScrubberConfig proto_config;
+    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
+    return proto_config;
+  }
+
+  ProtoApiScrubberConfig getConfigWithMessageRestrictions() {
+    std::string filter_conf_string = R"pb(
+      descriptor_set: {}
+      restrictions: {
+        message_restrictions: {
+          key: "package.MyMessage"
+          value: {
+            config: {
+              matcher: {
+                matcher_list: {
+                  matchers: {
+                    predicate: {
+                      single_predicate: {
+                        input: {
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3
+                                 .HttpAttributesCelMatchInput] {}
+                          }
+                        }
+                        custom_match: {
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                              expr_match: {
+                                parsed_expr: { expr: { const_expr: { bool_value: true } } }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    on_match: {
+                      action: {
+                        typed_config: {
+                          [type.googleapis.com/envoy.extensions.filters.http
+                               .proto_api_scrubber.v3.RemoveFieldAction] {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        message_restrictions: {
+          key: "another.package.OtherMessage"
+          value: {
+            config: {
+              matcher: {
+                matcher_list: {
+                  matchers: {
+                    predicate: {
+                      single_predicate: {
+                        input: {
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3
+                                 .HttpAttributesCelMatchInput] {}
+                          }
+                        }
+                        custom_match: {
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                              expr_match: {
+                                parsed_expr: { expr: { const_expr: { bool_value: false } } }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    on_match: {
+                      action: {
+                        typed_config: {
+                          [type.googleapis.com/envoy.extensions.filters.http
+                               .proto_api_scrubber.v3.RemoveFieldAction] {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    )pb";
+    ProtoApiScrubberConfig proto_config;
+    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
+    return proto_config;
+  }
+
+  ProtoApiScrubberConfig getConfigWithMethodLevelRestriction() {
+    std::string filter_conf_string = R"pb(
+      descriptor_set : {}
+      restrictions: {
+        method_restrictions: {
+          key: "/library.BookService/GetBook"
+          value: {
+            method_restriction: {
+              matcher: {
+                matcher_list: {
+                  matchers: {
+                    predicate: {
+                      single_predicate: {
+                        input: {
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {}
+                          }
+                        }
+                        custom_match: {
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                              expr_match: { parsed_expr: { expr: { const_expr: { bool_value: true } } } }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    on_match: {
+                      action: {
+                        typed_config: {
+                          [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    )pb";
+    ProtoApiScrubberConfig proto_config;
+    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
+    return proto_config;
+  }
+
+  ProtoApiScrubberConfig getConfigWithMessageName(absl::string_view message_name) {
+    std::string filter_conf_string = absl::StrFormat(
+        R"pb(
+          descriptor_set : {}
+          restrictions: {
+            message_restrictions: {
+              key: "%s"
+              value: {}
+            }
+          }
+        )pb",
+        message_name);
     ProtoApiScrubberConfig proto_config;
     Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
@@ -803,6 +975,92 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetTypeFinder) {
 
     EXPECT_EQ(type, nullptr);
   }
+}
+
+TEST_F(ProtoApiScrubberFilterConfigTest, ParseMessageRestrictions) {
+  ProtoApiScrubberConfig proto_config = getConfigWithMessageRestrictions();
+  auto filter_config_or_status =
+      ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
+  ASSERT_THAT(filter_config_or_status, IsOk());
+  filter_config_ = filter_config_or_status.value();
+  ASSERT_NE(filter_config_, nullptr);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  Http::Matching::HttpMatchingDataImpl http_matching_data_impl(mock_stream_info);
+
+  auto matcher1 = filter_config_->getMessageMatcher("package.MyMessage");
+  ASSERT_NE(matcher1, nullptr);
+  EXPECT_THAT(
+      matcher1->match(http_matching_data_impl),
+      HasActionWithType("envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction"));
+
+  auto matcher2 = filter_config_->getMessageMatcher("another.package.OtherMessage");
+  ASSERT_NE(matcher2, nullptr);
+  EXPECT_THAT(matcher2->match(http_matching_data_impl), HasNoMatch());
+
+  auto matcher3 = filter_config_->getMessageMatcher("non.existent.Message");
+  EXPECT_EQ(matcher3, nullptr);
+}
+
+TEST_F(ProtoApiScrubberFilterConfigTest, ParseMethodLevelRestriction) {
+  ProtoApiScrubberConfig proto_config = getConfigWithMethodLevelRestriction();
+  auto filter_config_or_status =
+      ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
+  ASSERT_THAT(filter_config_or_status, IsOk());
+  filter_config_ = filter_config_or_status.value();
+  ASSERT_NE(filter_config_, nullptr);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  Http::Matching::HttpMatchingDataImpl http_matching_data_impl(mock_stream_info);
+
+  auto matcher1 = filter_config_->getMethodMatcher("/library.BookService/GetBook");
+  ASSERT_NE(matcher1, nullptr);
+  EXPECT_THAT(
+      matcher1->match(http_matching_data_impl),
+      HasActionWithType("envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction"));
+
+  auto matcher2 = filter_config_->getMethodMatcher("/non.existent.Service/Method");
+  EXPECT_EQ(matcher2, nullptr);
+}
+
+TEST_F(ProtoApiScrubberFilterConfigTest, MessageNameValidations) {
+  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config;
+
+  EXPECT_THAT(ProtoApiScrubberFilterConfig::create(getConfigWithMessageName(""), factory_context_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("Invalid message name: ''. Message name is empty.")));
+
+  EXPECT_THAT(
+      ProtoApiScrubberFilterConfig::create(getConfigWithMessageName("NoPackageMessage"),
+                                           factory_context_),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          HasSubstr(
+              "Invalid message name: 'NoPackageMessage'. Message name should be fully qualified")));
+  EXPECT_THAT(
+      ProtoApiScrubberFilterConfig::create(getConfigWithMessageName(".package.Message"),
+                                           factory_context_),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          HasSubstr(
+              "Invalid message name: '.package.Message'. Message name should be fully qualified")));
+  EXPECT_THAT(
+      ProtoApiScrubberFilterConfig::create(getConfigWithMessageName("package.Message."),
+                                           factory_context_),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          HasSubstr(
+              "Invalid message name: 'package.Message.'. Message name should be fully qualified")));
+  EXPECT_THAT(
+      ProtoApiScrubberFilterConfig::create(getConfigWithMessageName("package..Message"),
+                                           factory_context_),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          HasSubstr(
+              "Invalid message name: 'package..Message'. Message name should be fully qualified")));
+  EXPECT_THAT(ProtoApiScrubberFilterConfig::create(getConfigWithMessageName("package.Message"),
+                                                   factory_context_),
+              IsOk());
 }
 
 } // namespace

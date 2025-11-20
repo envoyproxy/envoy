@@ -75,7 +75,8 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     addRequiredHeaders(headers, long_date, credentials.sessionToken(), override_region);
   }
 
-  const auto canonical_headers = Utility::canonicalizeHeaders(headers, excluded_header_matchers_);
+  const auto canonical_headers =
+      Utility::canonicalizeHeaders(headers, excluded_header_matchers_, included_header_matchers_);
 
   // Phase 1: Create a canonical request
   const auto credential_scope = createCredentialScope(short_date, override_region);

@@ -10,6 +10,7 @@ platform(
         docker_privileged = True,
     ),
     parents = ["//bazel/rbe/toolchains/configs/linux/clang/config:platform"],
+    visibility = ["//visibility:public"],
 )
 
 platform(
@@ -20,6 +21,7 @@ platform(
         docker_privileged = True,
     ),
     parents = ["//bazel/rbe/toolchains/configs/linux/clang/config:platform-arm64"],
+    visibility = ["//visibility:public"],
 )
 
 platform(

@@ -97,6 +97,14 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
     } else {
       // Need to buffer the body to check for JSON-RPC 2.0
       is_mcp_request_ = true;
+
+      // Set the buffer limit - Envoy will automatically send 413 if exceeded
+      const uint32_t max_size = config_->maxRequestBodySize();
+      if (max_size > 0) {
+        decoder_callbacks_->setDecoderBufferLimit(max_size);
+        ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
+      }
+
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
@@ -118,7 +126,24 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   }
 
   if (end_stream) {
-    decoder_callbacks_->addDecodedData(data, true);
+    // Check if the complete request body exceeds the limit
+    const uint32_t max_size = config_->maxRequestBodySize();
+    if (max_size > 0) {
+      decoder_callbacks_->addDecodedData(data, false);
+      const uint64_t total_size = decoder_callbacks_->decodingBuffer()->length();
+
+      if (total_size > max_size) {
+        ENVOY_LOG(debug, "request body size {} exceeds maximum {}", total_size, max_size);
+        decoder_callbacks_->sendLocalReply(
+            Http::Code::PayloadTooLarge,
+            absl::StrCat("Request body size exceeds maximum allowed size of ", max_size, " bytes"),
+            nullptr, absl::nullopt, "mcp_filter_body_too_large");
+        return Http::FilterDataStatus::StopIterationNoBuffer;
+      }
+    } else {
+      decoder_callbacks_->addDecodedData(data, false);
+    }
+
     std::string json = decoder_callbacks_->decodingBuffer()->toString();
     if (metadata_ == nullptr) {
       metadata_ = std::make_unique<Protobuf::Struct>();

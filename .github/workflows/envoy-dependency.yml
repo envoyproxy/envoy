@@ -156,8 +156,7 @@ jobs:
         shas=(
             tag
             sha
-            mobile-sha
-            gcr-sha)
+            mobile-sha)
         for sha in "${shas[@]}"; do
             current_sha=$(bazel run --config=ci //tools/dependency:build-image-sha "$sha")
             echo "${sha}=${current_sha}" >> "$GITHUB_OUTPUT"
@@ -185,14 +184,12 @@ jobs:
         images: |
            sha: docker.io/envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
            mobile-sha: docker.io/envoyproxy/envoy-build-ubuntu:mobile-${{ steps.build-tools.outputs.tag }}
-           gcr-sha: gcr.io/envoy-ci/envoy-build:${{ steps.build-tools.outputs.tag }}
 
     - run: |
         SHA_REPLACE=(
             "$CURRENT_ENVOY_TAG:$ENVOY_TAG"
             "$CURRENT_ENVOY_SHA:${{ fromJSON(steps.build-images.outputs.shas).sha }}"
-            "$CURRENT_ENVOY_MOBILE_SHA:${{ fromJSON(steps.build-images.outputs.shas).mobile-sha }}"
-            "$CURRENT_ENVOY_GCR_SHA:${{ fromJSON(steps.build-images.outputs.shas).gcr-sha }}")
+            "$CURRENT_ENVOY_MOBILE_SHA:${{ fromJSON(steps.build-images.outputs.shas).mobile-sha }}")
         echo "replace=${SHA_REPLACE[*]}" >> "$GITHUB_OUTPUT"
       name: Find SHAs to replace
       id: shas
@@ -201,7 +198,6 @@ jobs:
         CURRENT_ENVOY_TAG: ${{ steps.current.outputs.tag }}
         CURRENT_ENVOY_SHA: ${{ steps.current.outputs.sha }}
         CURRENT_ENVOY_MOBILE_SHA: ${{ steps.current.outputs.mobile-sha }}
-        CURRENT_ENVOY_GCR_SHA: ${{ steps.current.outputs.gcr-sha }}
     - run: |
         echo "${SHA_REPLACE}" | xargs bazel run --config=ci @envoy_toolshed//sha:replace "${PWD}"
       env:

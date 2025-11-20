@@ -58,15 +58,17 @@ private:
   // during decoding and encoding of the data (i.e., decodeData(), encodeData(), respectively).
   std::string method_name_;
 
+  // The field checker which uses match tree configured in the filter config to determine whether a
+  // field should be preserved or removed from the request protobuf payloads.
+  // NOTE: This must outlive `request_scrubber_`, which holds a non-owning reference to this
+  // instance.
+  std::unique_ptr<FieldCheckerInterface> request_match_tree_field_checker_;
+
   // The scrubber instance for the request path.
   // It is lazily initialized in decodeData() to ensure it is instantiated exactly
   // once per request, preserving state across multiple data frames (e.g., for
   // gRPC streaming or large payloads).
   std::unique_ptr<ProtoScrubber> request_scrubber_;
-
-  // The field checker which uses match tree configured in the filter config to determine whether a
-  // field should be preserved or removed from the request protobuf payloads.
-  std::unique_ptr<FieldCheckerInterface> request_match_tree_field_checker_;
 };
 
 class FilterFactory : public Common::FactoryBase<ProtoApiScrubberConfig> {
