@@ -956,6 +956,12 @@ public:
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;
 
   /**
+   * @return how long an upstream connection is allowed to remain above the buffer high watermark
+   * before being closed. A zero duration disables the timeout.
+   */
+  virtual std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const PURE;
+
+  /**
    * @return uint64_t features supported by the cluster. @see Features.
    */
   virtual uint64_t features() const PURE;

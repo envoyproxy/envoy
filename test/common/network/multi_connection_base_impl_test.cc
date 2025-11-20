@@ -368,6 +368,29 @@ TEST_F(MultiConnectionBaseImplTest, SetDelayedCloseTimeout) {
   impl_->setDelayedCloseTimeout(std::chrono::milliseconds(10));
 }
 
+TEST_F(MultiConnectionBaseImplTest, SetBufferHighWatermarkTimeout) {
+  setupMultiConnectionImpl(3);
+
+  startConnect();
+
+  const std::chrono::milliseconds initial_timeout(5);
+  EXPECT_CALL(*createdConnections()[0], setBufferHighWatermarkTimeout(initial_timeout));
+  impl_->setBufferHighWatermarkTimeout(initial_timeout);
+
+  EXPECT_CALL(*nextConnection(), setBufferHighWatermarkTimeout(initial_timeout));
+  timeOutAndStartNextAttempt();
+
+  const std::chrono::milliseconds updated_timeout(10);
+  EXPECT_CALL(*createdConnections()[0], setBufferHighWatermarkTimeout(updated_timeout));
+  EXPECT_CALL(*createdConnections()[1], setBufferHighWatermarkTimeout(updated_timeout));
+  impl_->setBufferHighWatermarkTimeout(updated_timeout);
+
+  EXPECT_CALL(*nextConnection(), setBufferHighWatermarkTimeout(updated_timeout));
+  expectConnectionCreation(2);
+  EXPECT_CALL(*nextConnection(), connect());
+  failover_timer_->invokeCallback();
+}
+
 TEST_F(MultiConnectionBaseImplTest, CloseDuringAttempt) {
   setupMultiConnectionImpl(3);
 

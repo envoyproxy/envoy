@@ -53,7 +53,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -206,6 +206,11 @@ message Listener {
   // If unspecified, an implementation defined default is applied (1MiB).
   google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
+
+  // Optional timeout that controls how long a connection is allowed to stay above the configured
+  // buffer high watermark before it is closed. If this timeout is not specified, connections will
+  // not be closed due to buffer high watermark usage.
+  google.protobuf.Duration per_connection_buffer_high_watermark_timeout = 37;
 
   // Listener metadata.
   core.v3.Metadata metadata = 6;

@@ -46,7 +46,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 60]
+// [#next-free-field: 61]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -883,6 +883,11 @@ message Cluster {
   // unspecified, an implementation defined default is applied (1MiB).
   google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5
       [(udpa.annotations.security).configure_for_untrusted_upstream = true];
+
+  // Optional timeout that controls how long an upstream connection is allowed to stay above the
+  // configured buffer high watermark before it is closed. If this timeout is not specified,
+  // connections will not be closed due to buffer high watermark usage.
+  google.protobuf.Duration per_connection_buffer_high_watermark_timeout = 60;
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.

@@ -166,6 +166,9 @@ protected:
       bool connecting() const override { return false; }
       void write(Buffer::Instance&, bool) override { IS_ENVOY_BUG("Unexpected function call"); }
       void setBufferLimits(uint32_t) override { IS_ENVOY_BUG("Unexpected function call"); }
+      void setBufferHighWatermarkTimeout(std::chrono::milliseconds) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
       uint32_t bufferLimit() const override { return 65000; }
       bool aboveHighWatermark() const override { return false; }
       const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override {

@@ -333,6 +333,14 @@ public:
   virtual void setBufferLimits(uint32_t limit) PURE;
 
   /**
+   * Set the timeout when connection will be closed due to buffer high watermark usage. This is used
+   * to prevent the connection from staying above the buffer high watermark indefinitely due to slow
+   * processing. By default, the timeout is not set.
+   * @param timeout The timeout value in milliseconds
+   */
+  virtual void setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) PURE;
+
+  /**
    * Get the value set with setBufferLimits.
    */
   virtual uint32_t bufferLimit() const PURE;
