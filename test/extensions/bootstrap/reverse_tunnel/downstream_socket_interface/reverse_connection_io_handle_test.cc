@@ -2931,9 +2931,9 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionQuietShutdown
   auto mock_connection = setupMockConnection();
 
   // Create a mock SSL object to verify SSL_set_quiet_shutdown is called.
-  SSL_CTX* ctx = SSL_CTX_new(TLS_method());
-  ASSERT_NE(ctx, nullptr);
-  SSL* mock_ssl = SSL_new(ctx);
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ctx.get(), nullptr);
+  SSL* mock_ssl = SSL_new(ctx.get());
   ASSERT_NE(mock_ssl, nullptr);
 
   // Create MockSslHandshakerImpl that extends the real SslHandshakerImpl.
@@ -2982,10 +2982,6 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionQuietShutdown
   auto stat_map = extension_->getCrossWorkerStatMap();
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.connected"], 1);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connected"], 1);
-
-  // Clean up SSL context (SSL object is owned by MockSslHandshakerImpl and will be freed
-  // automatically).
-  SSL_CTX_free(ctx);
 }
 
 // Test onConnectionDone with TLS connection where dynamic_cast fails (mock doesn't derive from
