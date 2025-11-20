@@ -123,7 +123,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     response_data_ = std::make_unique<Buffer::WatermarkBuffer>(
         [this]() -> void { onBufferedDataDrained(); }, [this]() -> void { onHasBufferedData(); },
         []() -> void {});
-    response_data_->setWatermarks(high_watermark_);
+    response_data_->setWatermarks(http_client_.highWatermark());
   }
 
   // Send data if in default flow control mode, or if resumeData has been called in explicit
