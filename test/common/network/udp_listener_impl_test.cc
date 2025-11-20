@@ -3,11 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/os_sys_calls.h"
-#include "envoy/config/core/v3/base.pb.h"
-
 #include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/network/address_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/udp_listener_impl.h"
@@ -17,13 +13,11 @@
 #include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mock_parent_drained_callback_registrar.h"
-#include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
-#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -695,7 +689,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
   EXPECT_CALL(listener_callbacks_, onData(_))
       .Times(4u)
       .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, client_data.size());
+        validateRecvCallbackParams(data, client_data.size(), /*expect_receive_time_now=*/true);
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
@@ -844,7 +838,7 @@ TEST_P(UdpListenerImplTest, UdpGroReadLimit) {
   EXPECT_CALL(listener_callbacks_, onData(_))
       .Times(64u)
       .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, client_data.size());
+        validateRecvCallbackParams(data, client_data.size(), /*expect_receive_time_now=*/true);
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
