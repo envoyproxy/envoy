@@ -403,7 +403,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/google/tcmalloc/blob/{version}/LICENSE",
     ),
-    com_github_gperftools_gperftools = dict(
+    gperftools = dict(
         project_name = "gperftools",
         project_desc = "tcmalloc and profiling libraries",
         project_url = "https://github.com/gperftools/gperftools",
