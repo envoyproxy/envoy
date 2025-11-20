@@ -18,10 +18,12 @@ configure_make(
     autogen = True,
     configure_command = "conf.sh",
     configure_in_place = True,
+    configure_options = [
+        "--enable-static",
+    ],
     lib_source = "@com_github_huawei_uadk//:all",
-    out_shared_libs = [
-        "libwd.so",
-        "libwd_crypto.so",
+    out_static_libs = [
+        "libwd.a",
     ],
     target_compatible_with = envoy_contrib_linux_aarch64_constraints(),
     visibility = ["//visibility:public"],
