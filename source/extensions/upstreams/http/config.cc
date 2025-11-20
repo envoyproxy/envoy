@@ -238,16 +238,13 @@ ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
   auto retry_policy_or_error =
       buildRetryPolicy(options, server_context.messageValidationVisitor(), server_context);
   RETURN_IF_NOT_OK_REF(retry_policy_or_error.status());
-  return std::shared_ptr<ProtocolOptionsConfigImpl>(new ProtocolOptionsConfigImpl(
-      options, options_or_error.value(), std::move(validator_factory_or_error.value()),
-      cache_options_or_error.value(), std::move(shadow_policies_or_error.value()),
-      std::move(retry_policy_or_error.value()), server_context));
   auto hash_policy_or_error = buildHashPolicy(options, server_context);
   RETURN_IF_NOT_OK_REF(hash_policy_or_error.status());
   return std::shared_ptr<ProtocolOptionsConfigImpl>(new ProtocolOptionsConfigImpl(
       options, options_or_error.value(), std::move(validator_factory_or_error.value()),
       cache_options_or_error.value(), std::move(shadow_policies_or_error.value()),
-      std::move(hash_policy_or_error.value()), server_context));
+      std::move(retry_policy_or_error.value()), std::move(hash_policy_or_error.value()),
+      server_context));
 }
 
 absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>>
