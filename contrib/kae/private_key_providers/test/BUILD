@@ -22,6 +22,7 @@ envoy_cc_test_library(
         "fake_factory.h",
     ],
     external_deps = ["ssl"],
+    linkopts = ["-lnuma"],
     # This makes the test targets dependent on this target only run on the desired platform.
     # The actual feature is dependent on hardware but this mock library can run on other platforms.
     target_compatible_with = envoy_contrib_linux_aarch64_constraints(),

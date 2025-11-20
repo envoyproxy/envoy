@@ -1,8 +1,5 @@
 #include "fake_factory.h"
 
-#include <uadk/v1/wd.h>
-#include <uadk/v1/wd_rsa.h>
-
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
@@ -52,12 +49,12 @@ FakeLibUadkCryptoImpl::~FakeLibUadkCryptoImpl() {
   }
 
   if (prikey_) {
-    delete prikey_->p.data;
-    delete prikey_->q.data;
-    delete prikey_->dp.data;
-    delete prikey_->dq.data;
-    delete prikey_->qinv.data;
-    delete prikey_;
+    delete[] prikey_->p.data;
+    delete[] prikey_->q.data;
+    delete[] prikey_->dp.data;
+    delete[] prikey_->dq.data;
+    delete[] prikey_->qinv.data;
+    delete[] prikey_;
   }
 }
 
