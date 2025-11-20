@@ -32,7 +32,7 @@ configure_make(
         "//bazel:clang_build": {
             "AR": "$(AR)",
             "LD": "$(LD)",
-            "RANLIB": "$(LLVM_DIRECTORY)/bin/llvm-ranlib",
+            "RANLIB": "$(AR) -s",
         },
         "//conditions:default": {},
     }),
