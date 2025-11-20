@@ -320,6 +320,11 @@ new_features:
     Added :ref:`request_mirror_policies <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
     to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
     cluster-level request mirroring. Cluster-level policies override route-level policies when both are configured.
+- area: router
+  change: |
+    Added :ref:`hash_policy <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.hash_policy>`
+    to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
+    cluster-level hash policies.
 - area: network
   change: |
     Add logging info for network ext_proc to filter state.
