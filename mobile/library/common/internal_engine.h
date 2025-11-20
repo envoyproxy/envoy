@@ -210,8 +210,7 @@ private:
 
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
-                 absl::optional<int> thread_priority, 
-                 absl::optional<size_t> high_watermark,
+                 absl::optional<int> thread_priority, absl::optional<size_t> high_watermark,
                  bool disable_dns_refresh_on_network_change,
                  Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger = true);
 
