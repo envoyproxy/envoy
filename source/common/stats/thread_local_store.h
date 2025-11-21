@@ -3,14 +3,11 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
-#include <limits>
 #include <list>
 #include <memory>
 #include <string>
 
-// #include <type_traits>
-
-// #include "third_party/envoy/src/envoy/stats/tag.h"
+#include "envoy/stats/tag.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/hash.h"
