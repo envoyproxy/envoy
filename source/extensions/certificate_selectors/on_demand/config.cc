@@ -110,9 +110,18 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
 HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
                                                 Ssl::CertificateSelectionCallbackPtr&& cb) {
   HandleSharedPtr handle = std::make_shared<Handle>(std::move(cb));
+  // The manager might need to be destroyed after posting from a worker because
+  // the filter chain is being removed. Therefore, use a weak_ptr and ignore
+  // the request to fetch a secret. Handle can also be destroyed because the
+  // underlying connection is reset, and handshake is cancelled.
   factory_context_.mainThreadDispatcher().post(
-      [that = shared_from_this(), name = std::string(secret_name), handle]() mutable {
-        that->addCertificateConfig(name, handle, {});
+      [weak_this = std::weak_ptr<SecretManager>(shared_from_this()),
+       name = std::string(secret_name), weak_handle = std::weak_ptr<Handle>(handle)]() mutable {
+        auto that = weak_this.lock();
+        auto handle = weak_handle.lock();
+        if (that && handle) {
+          that->addCertificateConfig(name, handle, {});
+        }
       });
   return handle;
 }
@@ -179,6 +188,10 @@ OnDemandTlsCertificateSelectorFactory::createTlsCertificateSelectorFactory(
   auto secret_manager = std::make_shared<SecretManager>(config, factory_context, tls_config);
   return [mapper = mapper_factory.value(),
           secret_manager](Ssl::TlsCertificateSelectorContext&) mutable {
+    // Envoy ensures that per-worker TLS sockets are destroyed before the
+    // filter chain holding the TLS socket factory using a completion. This
+    // means the TLS context config will outlive each AsyncSelector, and it is
+    // safe to refer to it by reference.
     return std::make_unique<AsyncSelector>(mapper(), secret_manager);
   };
 }

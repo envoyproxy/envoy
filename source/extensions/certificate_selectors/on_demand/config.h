@@ -100,9 +100,6 @@ private:
   CertSelectionStats stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const envoy::config::core::v3::ConfigSource config_source_;
-
-  // TODO(kuat): Not clear if it outlives after CDS unload while handshakes are in progress.
-  // since events are posted from worker->main.
   const Ssl::ServerContextConfig& tls_config_;
 
   // Main-thread accessible context config subscriptions and callbacks.
