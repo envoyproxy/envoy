@@ -407,7 +407,24 @@ ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatNam
     : scope_id_(parent.next_scope_id_++), parent_(parent), evictable_(evictable),
       max_counters_(max_counter_num), max_gauges_(max_gauge_num),
       max_histograms_(max_histogram_num), prefix_(prefix, parent.alloc_.symbolTable()),
-      central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {}
+      central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {
+  Thread::LockGuard lock(parent_.lock_);
+  if (max_counters_.has_value() && parent_.counters_overflow_ == nullptr) {
+    StatNamePool pool(parent_.symbolTable());
+    StatName name = pool.add("stats.overflow.counters");
+    parent_.counters_overflow_ = parent_.alloc_.makeCounter(name, name, {});
+  }
+  if (max_gauges_.has_value() && parent_.gauges_overflow_ == nullptr) {
+    StatNamePool pool(parent_.symbolTable());
+    StatName name = pool.add("stats.overflow.gauges");
+    parent_.gauges_overflow_ = parent_.alloc_.makeCounter(name, name, {});
+  }
+  if (max_histograms_.has_value() && parent_.histograms_overflow_ == nullptr) {
+    StatNamePool pool(parent_.symbolTable());
+    StatName name = pool.add("stats.overflow.histograms");
+    parent_.histograms_overflow_ = parent_.alloc_.makeCounter(name, name, {});
+  }
+}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   // Helps reproduce a previous race condition by pausing here in tests while we
@@ -489,16 +506,6 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
   return false;
 }
 
-void ThreadLocalStoreImpl::incOverflowCounter(CounterSharedPtr& overflow_counter,
-                                              absl::string_view name) {
-  if (overflow_counter == nullptr) {
-    StatNamePool pool(symbolTable());
-    StatName stat_name = pool.add(name);
-    overflow_counter = alloc_.makeCounter(stat_name, stat_name, {});
-  }
-  overflow_counter->inc();
-}
-
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatName full_stat_name, StatName name_no_tags,
@@ -535,12 +542,12 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     // Stat creation here. Check limits.
     if constexpr (std::is_same_v<StatType, Counter>) {
       if (max_counters_.has_value() && central_cache_map.size() >= max_counters_.value()) {
-        parent_.incOverflowCounter(parent_.counters_overflow_, "stats.overflow.counters");
+        parent_.counters_overflow_->inc();
         return parent_.null_counter_;
       }
     } else if constexpr (std::is_same_v<StatType, Gauge>) {
       if (max_gauges_.has_value() && central_cache_map.size() >= max_gauges_.value()) {
-        parent_.incOverflowCounter(parent_.gauges_overflow_, "stats.overflow.gauges");
+        parent_.gauges_overflow_->inc();
         return parent_.null_gauge_;
       }
     }
@@ -718,7 +725,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
       } else {
         if (max_histograms_.has_value() &&
             central_cache->histograms_.size() >= max_histograms_.value()) {
-          parent_.incOverflowCounter(parent_.histograms_overflow_, "stats.overflow.histograms");
+          parent_.histograms_overflow_->inc();
           return parent_.null_histogram_;
         }
         stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
