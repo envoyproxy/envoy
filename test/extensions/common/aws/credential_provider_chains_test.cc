@@ -12,6 +12,7 @@ using testing::_;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::ReturnRef;
 using testing::WithArg;
 
 namespace Envoy {
@@ -23,6 +24,7 @@ class DefaultCredentialsProviderChainTest : public testing::Test {
 public:
   DefaultCredentialsProviderChainTest() : api_(Api::createApiForTest(time_system_)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+    ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
     cluster_manager_.initializeThreadLocalClusters({"credentials_provider_cluster"});
     mock_provider_ = std::make_shared<MockCredentialsProvider>();
     EXPECT_CALL(factories_, createEnvironmentCredentialsProvider())
@@ -452,6 +454,110 @@ TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithoutSessionName) {
   // Verify that a session name was auto-generated based on the timestamp.
   EXPECT_FALSE(role_session_name.empty());
   EXPECT_EQ(role_session_name, "1234567890000000");
+}
+
+TEST_F(DefaultCredentialsProviderChainTest, WebIdentityCreatesWatchedDirectoryFromEnv) {
+  EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _))
+      .WillRepeatedly(Return(mock_provider_));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _))
+      .WillRepeatedly(Return(mock_provider_));
+
+  std::string watched_dir;
+  std::string filename;
+
+  EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _))
+      .WillOnce(Invoke(WithArg<3>(
+          [&watched_dir, &filename](
+              const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+                  provider) -> CredentialsProviderSharedPtr {
+            filename = provider.web_identity_token_data_source().filename();
+            if (provider.web_identity_token_data_source().has_watched_directory()) {
+              watched_dir = provider.web_identity_token_data_source().watched_directory().path();
+            }
+            return std::make_shared<MockCredentialsProvider>();
+          })));
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()
+      ->mutable_web_identity_token_data_source()
+      ->set_filename("/test/path/token");
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()->set_role_arn(
+      "aws:iam::123456789012:role/arn");
+
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(filename, "/test/path/token");
+  EXPECT_EQ(watched_dir, "/test/path");
+}
+
+TEST_F(DefaultCredentialsProviderChainTest, WebIdentityAddsWatchedDirectoryWhenMissing) {
+  EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _))
+      .WillRepeatedly(Return(mock_provider_));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _))
+      .WillRepeatedly(Return(mock_provider_));
+
+  std::string watched_dir;
+  std::string filename;
+
+  EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _))
+      .WillOnce(Invoke(WithArg<3>(
+          [&watched_dir, &filename](
+              const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+                  provider) -> CredentialsProviderSharedPtr {
+            filename = provider.web_identity_token_data_source().filename();
+            if (provider.web_identity_token_data_source().has_watched_directory()) {
+              watched_dir = provider.web_identity_token_data_source().watched_directory().path();
+            }
+            return std::make_shared<MockCredentialsProvider>();
+          })));
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()
+      ->mutable_web_identity_token_data_source()
+      ->set_filename("/test/path/token");
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()->set_role_arn(
+      "aws:iam::123456789012:role/arn");
+
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(filename, "/test/path/token");
+  EXPECT_EQ(watched_dir, "/test/path");
+}
+
+TEST_F(DefaultCredentialsProviderChainTest, WebIdentityPreservesExistingWatchedDirectory) {
+  EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _))
+      .WillRepeatedly(Return(mock_provider_));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _))
+      .WillRepeatedly(Return(mock_provider_));
+
+  std::string watched_dir;
+  std::string filename;
+
+  EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _))
+      .WillOnce(Invoke(WithArg<3>(
+          [&watched_dir, &filename](
+              const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+                  provider) -> CredentialsProviderSharedPtr {
+            filename = provider.web_identity_token_data_source().filename();
+            watched_dir = provider.web_identity_token_data_source().watched_directory().path();
+            return std::make_shared<MockCredentialsProvider>();
+          })));
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()
+      ->mutable_web_identity_token_data_source()
+      ->set_filename("/test/path/token");
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()
+      ->mutable_web_identity_token_data_source()
+      ->mutable_watched_directory()
+      ->set_path("/custom/watch/dir");
+  credential_provider_config.mutable_assume_role_with_web_identity_provider()->set_role_arn(
+      "aws:iam::123456789012:role/arn");
+
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(filename, "/test/path/token");
+  EXPECT_EQ(watched_dir, "/custom/watch/dir");
 }
 
 } // namespace Aws

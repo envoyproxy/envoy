@@ -250,7 +250,7 @@ std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::Create
           dispatcher_, /*is_server=*/false, transport_socket_options_, *quic_ssl_info_,
           std::make_unique<CertValidationContext>(
               *this, network_connection_->connectionSocket()->ioHandle())),
-      crypto_config(), this, /*has_application_state = */ version().UsesHttp3());
+      crypto_config(), this);
 }
 
 void EnvoyQuicClientSession::setHttp3Options(

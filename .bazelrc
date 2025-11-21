@@ -25,14 +25,12 @@ build --java_runtime_version=remotejdk_11
 build --tool_java_runtime_version=remotejdk_11
 build --java_language_version=11
 build --tool_java_language_version=11
-build --platform_mappings=bazel/platform_mappings
 # silence absl logspam.
 build --copt=-DABSL_MIN_LOG_LEVEL=4
 # Global C++ standard and common warning suppressions
 build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 build --copt=-Wno-deprecated-declarations
 build --define envoy_mobile_listener=enabled
-build --define=LLVM_DIRECTORY=/opt/llvm
 build --experimental_repository_downloader_retries=2
 build --enable_platform_specific_config
 build --incompatible_merge_fixed_and_default_shell_env
@@ -51,8 +49,6 @@ build --action_env=BAZEL_VOLATILE_DIRTY --host_action_env=BAZEL_VOLATILE_DIRTY
 
 build --test_summary=terse
 
-build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
-
 # TODO(keith): Remove once these 2 are the default
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
@@ -66,6 +62,12 @@ common --experimental_allow_tags_propagation
 # Python
 common --@rules_python//python/config_settings:bootstrap_impl=script
 
+# We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
+build --define absl=1
+
+# Disable ICU linking for googleurl.
+build --@com_googlesource_googleurl//build_config:system_icu=0
+
 build:linux --copt=-fdebug-types-section
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
@@ -77,16 +79,18 @@ build:linux --features=per_object_debug_info
 build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:linux --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
-# We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
-build --define absl=1
+# libc++ default for clang
+common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
+common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
+common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
+common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
+common:libc++ --define force_libcpp=enabled
+common:libc++ --@envoy//bazel:libc++=true
 
-# Disable ICU linking for googleurl.
-build --@com_googlesource_googleurl//build_config:system_icu=0
-
-# Common flags for sanitizers
-build:sanitizer --define tcmalloc=disabled
-build:sanitizer --linkopt -ldl
-test:sanitizer --build_tests_only
+# libstdc++ - currently only used for gcc
+build:libstdc++ --@envoy//bazel:libc++=false
+build:libstdc++ --@envoy//bazel:libstdc++=true
 
 # Common flags for Clang (shared between all clang variants)
 common:clang-common --action_env=BAZEL_COMPILER=clang
@@ -99,16 +103,6 @@ common:clang-common --incompatible_enable_cc_toolchain_resolution=false
 common:clang --config=clang-common
 common:clang --config=libc++
 common:clang --action_env=LDFLAGS="-fuse-ld=lld"
-
-build:arm64-clang --config=clang
-
-# Flags for Clang + PCH
-build:clang-pch --spawn_strategy=local
-build:clang-pch --define=ENVOY_CLANG_PCH=1
-
-# libstdc++ - currently only used for gcc
-build:libstdc++ --@envoy//bazel:libc++=false
-build:libstdc++ --@envoy//bazel:libstdc++=true
 
 # Use gold linker for gcc compiler.
 build:gcc --config=libstdc++
@@ -129,6 +123,17 @@ build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --incompatible_enable_cc_toolchain_resolution=false
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
+
+# Common flags for sanitizers
+build:sanitizer --define tcmalloc=disabled
+build:sanitizer --linkopt -ldl
+test:sanitizer --build_tests_only
+
+# Flags for Clang + PCH
+build:clang-pch --spawn_strategy=local
+build:clang-pch --define=ENVOY_CLANG_PCH=1
+
+build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
 
 # Clang-tidy
 # TODO(phlax): enable this, its throwing some errors as well as finding more issues
@@ -218,14 +223,6 @@ build:msan --test_env=MSAN_SYMBOLIZER_PATH
 build:msan --copt -O1
 build:msan --copt -fno-optimize-sibling-calls
 
-common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
-common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
-common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
-common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
-common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
-common:libc++ --define force_libcpp=enabled
-common:libc++ --@envoy//bazel:libc++=true
-
 # Optimize build for binary size reduction.
 build:sizeopt -c opt --copt -Os
 
@@ -284,45 +281,26 @@ build:rbe-toolchain --incompatible_enable_cc_toolchain_resolution=false
 
 build:rbe-toolchain-clang --config=rbe-toolchain
 build:rbe-toolchain-clang --config=clang
-build:rbe-toolchain-clang --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
-build:rbe-toolchain-clang --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
+build:rbe-toolchain-clang --platforms=@clang_platform
+build:rbe-toolchain-clang --host_platform=@clang_platform
 build:rbe-toolchain-clang --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang/cc:toolchain
-build:rbe-toolchain-clang --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain
-build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++
-
-
-build:rbe-toolchain-arm64-clang --config=rbe-toolchain
-build:rbe-toolchain-arm64-clang --config=clang
-build:rbe-toolchain-arm64-clang --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_platform
-build:rbe-toolchain-arm64-clang --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_platform
-build:rbe-toolchain-arm64-clang --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang/cc:toolchain
-build:rbe-toolchain-arm64-clang --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain-arm64
-build:rbe-toolchain-arm64-clang --action_env=CC=clang --action_env=CXX=clang++
-
-
-# Sanitizer configs - CI uses the *-common configs directly
-# Note: clang config comes from rbe-toolchain-clang to avoid duplication
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
+build:rbe-toolchain-gcc --config=gcc
 build:rbe-toolchain-gcc --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
 build:rbe-toolchain-gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
 build:rbe-toolchain-gcc --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/gcc/cc:toolchain
-build:rbe-toolchain-gcc --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain
+
+build:remote-clang --config=remote
+build:remote-clang --config=rbe-toolchain-clang
+
+build:remote-gcc --config=remote
+build:remote-gcc --config=rbe-toolchain-gcc
 
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
-
-build:remote-clang --config=remote
-build:remote-clang --config=rbe-toolchain-clang
-
-build:remote-arm64-clang --config=remote
-build:remote-arm64-clang --config=rbe-toolchain-arm64-clang
-
-build:remote-gcc --config=remote
-build:remote-gcc --config=gcc
-build:remote-gcc --config=rbe-toolchain-gcc
 
 ## Compile-time-options testing
 # Right now, none of the available compile-time options conflict with each other. If this
