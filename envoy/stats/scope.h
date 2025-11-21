@@ -73,8 +73,15 @@ public:
    * @param name supplies the scope's namespace prefix.
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
    * that the metrics are not stored by reference.
+   * @param max_counter_num max number of counters allowed in this scope.
+   * @param max_gauge_num max number of gauges allowed in this scope.
+   * @param max_histogram_num max number of histograms allowed in this scope.
    */
-  virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false) PURE;
+  virtual ScopeSharedPtr
+  createScope(const std::string& name, bool evictable = false,
+              absl::optional<uint64_t> max_counter_num = absl::nullopt,
+              absl::optional<uint64_t> max_gauge_num = absl::nullopt,
+              absl::optional<uint64_t> max_histogram_num = absl::nullopt) PURE;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -84,8 +91,15 @@ public:
    * @param name supplies the scope's namespace prefix.
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
    * that the metrics are not stored by reference.
+   * @param max_counter_num max number of counters allowed in this scope.
+   * @param max_gauge_num max number of gauges allowed in this scope.
+   * @param max_histogram_num max number of histograms allowed in this scope.
    */
-  virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false) PURE;
+  virtual ScopeSharedPtr
+  scopeFromStatName(StatName name, bool evictable = false,
+                    absl::optional<uint64_t> max_counter_num = absl::nullopt,
+                    absl::optional<uint64_t> max_gauge_num = absl::nullopt,
+                    absl::optional<uint64_t> max_histogram_num = absl::nullopt) PURE;
 
   /**
    * Creates a Counter from the stat name. Tag extraction will be performed on the name.

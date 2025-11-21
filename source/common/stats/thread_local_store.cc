@@ -154,15 +154,20 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name,
-                                                            bool evictable) {
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(
+    const std::string& name, bool evictable, absl::optional<uint64_t> max_counter_num,
+    absl::optional<uint64_t> max_gauge_num, absl::optional<uint64_t> max_histogram_num) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(stat_name_storage.statName(), evictable);
+  return scopeFromStatName(stat_name_storage.statName(), evictable, max_counter_num, max_gauge_num,
+                           max_histogram_num);
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name, bool evictable) {
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(
+    StatName name, bool evictable, absl::optional<uint64_t> max_counter_num,
+    absl::optional<uint64_t> max_gauge_num, absl::optional<uint64_t> max_histogram_num) {
   SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
-  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()), evictable);
+  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()), evictable,
+                                               max_counter_num, max_gauge_num, max_histogram_num);
   parent_.addScope(new_scope);
   return new_scope;
 }
@@ -396,9 +401,12 @@ void ThreadLocalStoreImpl::clearHistogramsFromCaches() {
 }
 
 ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix,
-                                           bool evictable)
+                                           bool evictable, absl::optional<uint64_t> max_counter_num,
+                                           absl::optional<uint64_t> max_gauge_num,
+                                           absl::optional<uint64_t> max_histogram_num)
     : scope_id_(parent.next_scope_id_++), parent_(parent), evictable_(evictable),
-      prefix_(prefix, parent.alloc_.symbolTable()),
+      max_counters_(max_counter_num), max_gauges_(max_gauge_num),
+      max_histograms_(max_histogram_num), prefix_(prefix, parent.alloc_.symbolTable()),
       central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
@@ -481,6 +489,16 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
   return false;
 }
 
+void ThreadLocalStoreImpl::incOverflowCounter(CounterSharedPtr& overflow_counter,
+                                              absl::string_view name) {
+  if (overflow_counter == nullptr) {
+    StatNamePool pool(symbolTable());
+    StatName stat_name = pool.add(name);
+    overflow_counter = alloc_.makeCounter(stat_name, stat_name, {});
+  }
+  overflow_counter->inc();
+}
+
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatName full_stat_name, StatName name_no_tags,
@@ -514,6 +532,18 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
                                                central_rejected_stats, tls_rejected_stats)) {
     return null_stat;
   } else {
+    // Stat creation here. Check limits.
+    if constexpr (std::is_same_v<StatType, Counter>) {
+      if (max_counters_.has_value() && central_cache_map.size() >= max_counters_.value()) {
+        parent_.incOverflowCounter(parent_.counters_overflow_, "stats.overflow.counters");
+        return parent_.null_counter_;
+      }
+    } else if constexpr (std::is_same_v<StatType, Gauge>) {
+      if (max_gauges_.has_value() && central_cache_map.size() >= max_gauges_.value()) {
+        parent_.incOverflowCounter(parent_.gauges_overflow_, "stats.overflow.gauges");
+        return parent_.null_gauge_;
+      }
+    }
     StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);
 
     RefcountPtr<StatType> stat = make_stat(
@@ -686,6 +716,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
       if (iter != parent_.histogram_set_.end()) {
         stat = RefcountPtr<ParentHistogramImpl>(*iter);
       } else {
+        if (max_histograms_.has_value() &&
+            central_cache->histograms_.size() >= max_histograms_.value()) {
+          parent_.incOverflowCounter(parent_.histograms_overflow_, "stats.overflow.histograms");
+          return parent_.null_histogram_;
+        }
         stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
                                        tag_helper.tagExtractedName(), tag_helper.statNameTags(),
                                        *buckets, bins, parent_.next_histogram_id_++);
