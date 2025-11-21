@@ -271,6 +271,16 @@ message HttpConnectionManager {
     bool uri = 5;
   }
 
+  // [#next-free-field: 3]
+  // The configuration for forwarding client cert details.
+  message ForwardClientCertConfig {
+      // How to handle the XFCC header.
+      ForwardClientCertDetails forward_client_cert_details = 1;
+
+      // How to set the current client cert details.
+      SetCurrentClientCertDetails set_current_client_cert_details = 2;
+  }
+
   // The configuration for HTTP upgrades.
   // For each upgrade type desired, an UpgradeConfig must be added.
   //
@@ -792,11 +802,8 @@ message HttpConnectionManager {
   // value.
   SetCurrentClientCertDetails set_current_client_cert_details = 17;
 
-  // This field is valid only when :ref:`forward_client_cert_details
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
-  // is SANITIZE_SET_OR_APPEND_FORWARD and the client connection is mTLS. If the client certificate matches the matcher,
-  // the client certificate information will be appended to the request’s XFCC header. Otherwise, the XFCC header will be sanitized.
-  xds.type.matcher.v3.Matcher append_forward_matcher = 60;
+  // The matcher for forwarding client cert details.
+  xds.type.matcher.v3.Matcher forward_client_cert_matcher = 60;
 
   // If proxy_100_continue is true, Envoy will proxy incoming "Expect:
   // 100-continue" headers upstream, and forward "100 Continue" responses
