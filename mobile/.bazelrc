@@ -9,7 +9,6 @@ try-import ../.bazelrc
 #############################################################################
 
 # Common flags for all builds
-build --platform_mappings=bazel/platform_mappings
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled
 build --define=admin_html=disabled
@@ -80,12 +79,25 @@ build:android --java_language_version=8
 build:android --tool_java_language_version=8
 
 # Default flags for Android
-build:mobile-android --android_crosstool_top=@androidndk//:toolchain
-build:mobile-android --noincompatible_enable_android_toolchain_resolution
+build:mobile-android --incompatible_enable_android_toolchain_resolution
 build:mobile-android --java_language_version=8
 build:mobile-android --tool_java_language_version=8
 test:mobile-android --build_tests_only
 test:mobile-android --define=static_extension_registration=disabled
+
+# Flags for release builds targeting Android or the JVM
+# Release does not use the option --define=logger=android
+build:mobile-android-release --config=mobile-android
+build:mobile-android-release --config=mobile-release-common
+build:mobile-android-release --compilation_mode=opt
+build:mobile-android-release --linkopt=-fuse-ld=lld
+build:mobile-android-release --android_platforms=@envoy//bazel/platforms/android:x86_64
+build:mobile-android-release --fat_apk_cpu=x86_64
+
+build:mobile-android-release-publish --config=mobile-android-release
+build:mobile-android-release-publish --config=mobile-remote-release
+build:mobile-android-release-publish --android_platforms=@envoy//bazel/platforms/android:x86,@envoy//bazel/platforms/android:x86_64,@envoy//bazel/platforms/android:armeabi-v7a,@envoy//bazel/platforms/android::arm64-v8a
+build:mobile-android-release-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
 
 
 #############################################################################
@@ -124,17 +136,6 @@ build:mobile-remote-release --config=mobile-release-common
 build:mobile-remote-release --remote_download_toplevel
 build:mobile-remote-release --config=ci
 build:mobile-remote-release --config=remote
-
-build:mobile-release-android --android_platforms=//:android_x86_64
-build:mobile-release-android --linkopt=-fuse-ld=lld
-build:mobile-release-android --config=mobile-android
-build:mobile-release-android --fat_apk_cpu=x86_64
-
-build:mobile-release-android-publish --config=mobile-remote-release
-build:mobile-release-android-publish --config=mobile-release-android
-build:mobile-release-android-publish --android_platforms=//:android_x86_32,//:android_x86_64,//:android_armv7,//:android_arm64
-build:mobile-release-android-publish --linkopt=-fuse-ld=lld
-build:mobile-release-android-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
 
 
 #############################################################################
@@ -187,9 +188,9 @@ build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
 build:rules_xcodeproj --features=-swift.use_global_index_store
 
 build:mobile-macos --config=mobile-remote
-build:mobile-macos --host_platform=//ci/platform:macos
-build:mobile-macos --platforms=//ci/platform:macos
-build:mobile-macos --extra_execution_platforms=//ci/platform:macos
+build:mobile-macos --host_platform=@envoy//bazel/platforms/rbe:macos
+build:mobile-macos --platforms=@envoy//bazel/platforms/rbe:macos
+build:mobile-macos --extra_execution_platforms=@envoy//bazel/platforms/rbe:macos
 build:mobile-macos --xcode_version_config=//ci:xcode_config
 build:mobile-macos --remote_download_toplevel
 build:mobile-macos --config=ci
@@ -226,12 +227,6 @@ build:mobile-release-ios --config=ios
 build:mobile-release-ios --config=mobile-release-common
 build:mobile-release-ios --compilation_mode=opt
 
-# Flags for release builds targeting Android or the JVM
-# Release does not use the option --define=logger=android
-build:mobile-release-android --config=mobile-release-common
-build:mobile-release-android --compilation_mode=opt
-build:mobile-release-android --config=mobile-android
-
 
 #############################################################################
 # toolchains: dbg
@@ -248,3 +243,12 @@ build:mobile-dbg-android --config=android
 # Default flags for iOS debug builds
 build:mobile-dbg-ios --config=mobile-dbg-common
 build:mobile-dbg-ios --config=ios
+
+
+#############################################################################
+# compat: Remove as soon as this PR lands
+#############################################################################
+
+build:mobile-release-android --config=mobile-android-release
+
+build:mobile-release-android-publish --config=mobile-android-release-publish
