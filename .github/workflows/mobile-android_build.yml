@@ -50,7 +50,7 @@ jobs:
       args: >-
         build
         --config=mobile-remote-release
-        --config=mobile-release-android
+        --config=mobile-android-release
         //:android_dist
       container: ${{ needs.load.outputs.build-image && fromJSON(needs.load.outputs.build-image).mobile || '' }}
       request: ${{ needs.load.outputs.request }}
@@ -77,7 +77,7 @@ jobs:
       args: >-
         build
         --config=mobile-remote-release
-        --config=mobile-release-android
+        --config=mobile-android-release
         //examples/kotlin/hello_world:hello_envoy_kt
       request: ${{ needs.load.outputs.request }}
       target: kotlin-hello-world
@@ -132,7 +132,7 @@ jobs:
           args: >-
             build
             --config=mobile-remote-release
-            --config=mobile-release-android
+            --config=mobile-android-release
             //examples/java/hello_world:hello_envoy
         - name: kotlin-baseline-app
           # Return to using:
@@ -141,7 +141,7 @@ jobs:
           args: >-
             build
             --config=mobile-remote-release
-            --config=mobile-release-android
+            --config=mobile-android-release
             //test/kotlin/apps/baseline:hello_envoy_kt
           steps-post: |
             - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.30
@@ -157,7 +157,7 @@ jobs:
           args: >-
             build
             --config=mobile-remote-release
-            --config=mobile-release-android
+            --config=mobile-android-release
             //test/kotlin/apps/experimental:hello_envoy_kt
           steps-post: |
             - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.30
