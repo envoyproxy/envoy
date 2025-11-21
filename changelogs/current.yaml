@@ -124,6 +124,10 @@ bug_fixes:
     were not accessible in ``request_headers_to_add`` configuration on the initial request. Headers configured via
     ``request_headers_to_add`` can now reference router-set headers using formatters like
     ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
+- area: router
+  change: |
+    Fixed an upstream HTTP filter issue if route retries on 5xx and the filter returns
+    FilterHeadersStatus::StopIteration in its encodeHeaders() method.
 - area: ext_proc
   change: |
     Fixed a bug where attributes based on request headers (e.g. ``request.host``) were not sent to

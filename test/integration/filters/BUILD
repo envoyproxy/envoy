@@ -751,6 +751,17 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "encode_headers_return_stop_iteration_filter_config_lib",
+    srcs = [
+        "encode_headers_return_stop_iteration_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "metadata_control_filter_lib",
     srcs = ["metadata_control_filter.cc"],
     deps = [
