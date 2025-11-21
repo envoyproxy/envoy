@@ -127,15 +127,10 @@ public:
       quic::QuicCryptoServerStreamBase::Helper* helper,
       OptRef<const Network::DownstreamTransportSocketFactory> /*transport_socket_factory*/,
       Event::Dispatcher& /*dispatcher*/) override {
-    switch (session->connection()->version().transport_version) {
-    case quic::QUIC_VERSION_46:
-      return std::make_unique<TestQuicCryptoServerStream>(crypto_config, compressed_certs_cache,
-                                                          session, helper);
-    case quic::QUIC_VERSION_UNSUPPORTED:
-      ASSERT(false, "Unknown handshake protocol");
-    default:
+    if (session->connection()->version().transport_version > quic::QUIC_VERSION_46) {
       return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config);
     }
+    ASSERT(false, "Unknown QUIC version");
     return nullptr;
   }
 };
