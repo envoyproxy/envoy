@@ -66,7 +66,7 @@ common --@rules_python//python/config_settings:bootstrap_impl=script
 build --define absl=1
 
 # Disable ICU linking for googleurl.
-build --@com_googlesource_googleurl//build_config:system_icu=0
+build --@com_github_google_gurl//build_config:system_icu=0
 
 build:linux --copt=-fdebug-types-section
 # Enable position independent code (this is the default on macOS and Windows)
