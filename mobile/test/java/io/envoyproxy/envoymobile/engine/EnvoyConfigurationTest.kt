@@ -326,6 +326,6 @@ class EnvoyConfigurationTest {
 
     val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate).contains("QuicPlatformPacketWriterConfig")
-    assertThat(resolvedTemplate).contains("connection_migration { migrate_idle_connection: true }")
+    assertThat(resolvedTemplate).contains("connection_migration { migrate_idle_connections: true }")
   }
 }

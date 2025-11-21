@@ -903,7 +903,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     }
     if (enable_connection_migration_) {
       auto* migration_setting = quic_protocol_options->mutable_connection_migration();
-      migration_setting->set_migrate_idle_connection(migrate_idle_connection_);
+      migration_setting->set_migrate_idle_connections(migrate_idle_connection_);
       if (max_idle_time_before_migration_seconds_ > 0) {
         migration_setting->mutable_max_idle_time_before_migration()->set_seconds(
             max_idle_time_before_migration_seconds_);

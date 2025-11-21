@@ -54,7 +54,7 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
     quic_info->migration_config_.migrate_session_on_network_change = true;
     quic_info->migration_config_.migrate_session_early = true;
     quic_info->migration_config_.migrate_idle_session =
-        quic_config.connection_migration().migrate_idle_connection();
+        quic_config.connection_migration().migrate_idle_connections();
     if (quic_config.connection_migration().has_max_idle_time_before_migration()) {
       // Override the QUICHE default value 30s.
       quic_info->migration_config_.idle_migration_period =
