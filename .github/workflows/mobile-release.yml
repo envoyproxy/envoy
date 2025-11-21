@@ -69,7 +69,7 @@ jobs:
           args: >-
             build
             --config=mobile-remote-release
-            --config=mobile-release-android-publish
+            --config=mobile-android-release-publish
             --define=pom_version=$VERSION
             //:android_dist
           output: envoy
