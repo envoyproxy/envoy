@@ -3,19 +3,21 @@
 #include "envoy/common/optref.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
+
+#ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
-#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
-#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/config/dummy_config.pb.h"
-#include "test/test_common/environment.h"
-#include "test/test_common/utility.h"
 
 #include "quiche/quic/core/http/quic_spdy_session.h"
 #include "quiche/quic/core/qpack/qpack_encoder.h"
@@ -376,6 +378,13 @@ DECLARE_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory);
 REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory,
                  Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface);
 
+#else
+
+namespace Envoy {
+namespace Quic {
+
+#endif
+
 class TestNetworkObserverRegistry : public Quic::EnvoyQuicNetworkObserverRegistry {
 public:
   void onNetworkMadeDefault(NetworkHandle network) {
@@ -408,10 +417,10 @@ public:
     }
   }
 
-  quic::QuicNetworkHandle getDefaultNetwork() override { return quic::kInvalidNetworkHandle; }
+  NetworkHandle getDefaultNetwork() override { return -1; }
 
-  quic::QuicNetworkHandle getAlternativeNetwork(quic::QuicNetworkHandle) override {
-    return quic::kInvalidNetworkHandle;
+  NetworkHandle getAlternativeNetwork(NetworkHandle) override {
+    return -1;
   }
 
   using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;

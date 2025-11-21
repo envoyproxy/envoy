@@ -34,8 +34,8 @@ void DefaultSystemHelper::bindSocketToNetwork(Network::ConnectionSocket& socket,
     ENVOY_LOG_MISC(warn, "Socket is not open, not binding to network");
     return;
   }
-  auto fd = socket.ioHandle().fdDoNotUse();
-  int rc = android_setsocknetwork(static_cast<int>(fd), static_cast<netid_t>(network_handle));
+  int fd = socket.ioHandle().fdDoNotUse();
+  int rc = android_setsocknetwork(static_cast<net_handle_t>(network_handle), fd);
   if (rc != 0) {
     ENVOY_LOG_MISC(warn, "Failed to bind socket to network {}: {}, closing socket", network_handle,
                    Envoy::errorDetails(errno));
