@@ -82,6 +82,9 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 coverage --config=coverage
 coverage --build_tests_only
 
+# Specifies the rustfmt.toml for all rustfmt_test targets.
+build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
+
 
 #############################################################################
 # os
@@ -108,19 +111,6 @@ build:macos --cxxopt=-Wno-nullability-completeness
 #############################################################################
 # compiler
 #############################################################################
-
-# libc++ default for clang
-common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
-common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
-common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
-common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
-common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
-common:libc++ --define force_libcpp=enabled
-common:libc++ --@envoy//bazel:libc++=true
-
-# libstdc++ - currently only used for gcc
-build:libstdc++ --@envoy//bazel:libc++=false
-build:libstdc++ --@envoy//bazel:libstdc++=true
 
 # Common flags for Clang (shared between all clang variants)
 common:clang-common --action_env=BAZEL_COMPILER=clang
@@ -154,11 +144,25 @@ build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --incompatible_enable_cc_toolchain_resolution=false
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 
+# libc++ default for clang
+common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
+common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
+common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
+common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
+common:libc++ --define force_libcpp=enabled
+common:libc++ --@envoy//bazel:libc++=true
+
+# libstdc++ - currently only used for gcc
+build:libstdc++ --@envoy//bazel:libc++=false
+build:libstdc++ --@envoy//bazel:libstdc++=true
+
 
 #############################################################################
 # tests
 #############################################################################
 
+# Coverage
 build:coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
@@ -299,8 +303,7 @@ build:tsan --test_timeout=120,600,1500,4800
 # fuzzing
 #############################################################################
 
-# Fuzz builds
-
+## Fuzz builds
 # Shared fuzzing configuration.
 build:fuzzing --define=ENVOY_CONFIG_ASAN=1
 build:fuzzing --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
@@ -323,15 +326,6 @@ build:fuzz-coverage --define=wasm=disabled
 build:fuzz-coverage --config=fuzz-coverage-config
 build:fuzz-coverage-config --//tools/coverage:config=@envoy//test:fuzz_coverage_config
 
-# Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
-build:plain-fuzzer --config=fuzzing
-build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
-# The fuzzing rules provide their own instrumentation, but it is currently
-# disabled due to bazelbuild/bazel#12888. Instead, we provide instrumentation at
-# the top level through these options.
-build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
-build:plain-fuzzer --linkopt=-fsanitize=fuzzer-no-link
-
 build:oss-fuzz --config=fuzzing
 build:oss-fuzz --config=libc++
 build:oss-fuzz --define=FUZZING_ENGINE=oss-fuzz
@@ -348,16 +342,25 @@ build:oss-fuzz --define=force_libcpp=enabled
 build:oss-fuzz --linkopt=-lc++
 build:oss-fuzz --linkopt=-pthread
 
+# Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
+build:plain-fuzzer --config=fuzzing
+build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
+# The fuzzing rules provide their own instrumentation, but it is currently
+# disabled due to bazelbuild/bazel#12888. Instead, we provide instrumentation at
+# the top level through these options.
+build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
+build:plain-fuzzer --linkopt=-fsanitize=fuzzer-no-link
+
 
 #############################################################################
 # miscellaneous
 #############################################################################
 
+build:cache-local --remote_cache=grpc://localhost:9092
+
 # Flags for Clang + PCH
 build:clang-pch --spawn_strategy=local
 build:clang-pch --define=ENVOY_CLANG_PCH=1
-
-build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
 
 # Clang-tidy
 # TODO(phlax): enable this, its throwing some errors as well as finding more issues
@@ -367,18 +370,15 @@ build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%cla
 build:clang-tidy --output_groups=report
 build:clang-tidy --build_tag_filters=-notidy
 
-# Optimize build for binary size reduction.
-build:sizeopt -c opt --copt -Os
-
-build:cache-local --remote_cache=grpc://localhost:9092
-
 # Compile database generation config
 build:compdb --build_tag_filters=-nocompdb
 
-# Specifies the rustfmt.toml for all rustfmt_test targets.
-build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
-
 common:cves --//tools/dependency:cve-data=//tools/dependency:cve-data-dir
+
+build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
+
+# Optimize build for binary size reduction.
+build:sizeopt -c opt --copt -Os
 
 
 #############################################################################
@@ -509,19 +509,3 @@ try-import %workspace%/repo.bazelrc
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
 try-import %workspace%/local_tsan.bazelrc
-
-
-#############################################################################
-# compat: Remove these as soon as PR lands
-#############################################################################
-
-common:bes-envoy-engflow --config=bes
-
-common:common-envoy-engflow --config=engflow-common
-
-common:rbe-envoy-engflow --config=rbe
-
-common:remote-engflow-cache --config=remote-cache
-common:remote-engflow-cache --config=engflow-common
-
-common:remote-envoy-engflow --config=rbe

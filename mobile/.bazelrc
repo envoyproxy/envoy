@@ -103,15 +103,13 @@ build:mobile-android-release-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-
 # toolchain: clang
 #############################################################################
 # Clang toolchain options
-build:mobile-clang --crosstool_top=//third_party/rbe_configs/cc:toolchain
-build:mobile-clang --extra_execution_platforms=//third_party/rbe_configs/config:platform
-build:mobile-clang --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
-build:mobile-clang --host_platform=//third_party/rbe_configs/config:platform
-build:mobile-clang --platforms=//third_party/rbe_configs/config:platform
 build:mobile-clang --config=libc++
-build:mobile-clang --action_env=CC=/opt/llvm/bin/clang
-build:mobile-clang --action_env=CXX=/opt/llvm/bin/clang++
 
+build:mobile-remote-clang --crosstool_top=//third_party/rbe_configs/cc:toolchain
+build:mobile-remote-clang --extra_execution_platforms=//third_party/rbe_configs/config:platform
+build:mobile-remote-clang --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
+build:mobile-remote-clang --host_platform=//third_party/rbe_configs/config:platform
+build:mobile-remote-clang --platforms=//third_party/rbe_configs/config:platform
 build:mobile-remote-clang --config=mobile-clang
 build:mobile-remote-clang --config=mobile-rbe
 build:mobile-remote-clang --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
@@ -185,7 +183,8 @@ test:mobile-cc-xds-enabled --define=envoy_mobile_xds=enabled
 # Coverage
 build:mobile-coverage --build_tests_only
 build:mobile-coverage --@envoy//tools/coverage:config=@envoy_mobile//test:coverage_config
-build:mobile-coverage --config=mobile-clang
+# TODO: switch this back to mobile-clang!
+build:mobile-coverage --config=mobile-remote-clang
 build:mobile-coverage --legacy_important_outputs=false
 build:mobile-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
@@ -255,11 +254,3 @@ build:mobile-dbg-android --config=android
 # Default flags for iOS debug builds
 build:mobile-dbg-ios --config=mobile-dbg-common
 build:mobile-dbg-ios --config=ios
-
-
-#############################################################################
-# compat: Remove as soon as this PR lands
-#############################################################################
-
-build:rbe-engflow --config=mobile-rbe
-build:mobile-remote --config=mobile-rbe
