@@ -302,6 +302,8 @@ struct CallbackValidationResult {
   bool is_valid_;
   std::string auth_code_;
   std::string original_request_url_;
+  std::string csrf_token_;
+  std::string cookie_suffix_;
   std::string error_details_;
 };
 
@@ -383,8 +385,8 @@ private:
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                  const absl::string_view path_str) const;
-  bool validateCsrfToken(const Http::RequestHeaderMap& headers,
-                         const std::string& csrf_token) const;
+  bool validateCsrfToken(const Http::RequestHeaderMap& headers, const std::string& csrf_token,
+                         absl::string_view cookie_suffix) const;
   void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
   std::string encryptToken(const std::string& token) const;
   std::string decryptToken(const std::string& encrypted_token) const;
