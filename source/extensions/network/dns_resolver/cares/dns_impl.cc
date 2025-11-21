@@ -601,6 +601,10 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
     return {true, true};
   }
 
+  if (!parent_.filter_unroutable_families_) {
+    return {true, true};
+  }
+
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
   if (rc.return_value_ != 0) {

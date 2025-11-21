@@ -67,6 +67,9 @@ bug_fixes:
     Fixed ``shouldDrainConnectionUponCompletion()`` to properly send ``GOAWAY`` frames for HTTP/2 and HTTP/3
     instead of aggressively closing connections. This prevents response body transmission interruption and
     ``ERR_DRAINING`` errors on the client side. HTTP/1.1 behavior remains unchanged.
+- area: dns_resolver
+  change: |
+    Removes unnecessary getifaddrs() system calls when ``filter_unroutable_families`` is disabled (the default).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
