@@ -38,7 +38,7 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     with:
       arch: ${{ matrix.arch }}
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ matrix.target }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
@@ -74,7 +74,7 @@ jobs:
         - target: docs
           name: Docs
           bazel-extra: >-
-            --config=remote-envoy-engflow
+            --config=rbe
             --config=docs-ci
           rbe: true
           steps-post: |

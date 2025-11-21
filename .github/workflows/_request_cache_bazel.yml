@@ -21,10 +21,6 @@ on:
       arch:
         type: string
         default: x64
-      bazel-extra:
-        type: string
-        default: >-
-          --config=remote-envoy-engflow
       caches:
         type: string
         required: true
@@ -99,7 +95,7 @@ jobs:
         command: |
           # Simulate container source directory
           cd /source
-          export BAZEL_BUILD_EXTRA_OPTIONS="--config=ci ${{ inputs.bazel-extra }}"
+          export BAZEL_BUILD_EXTRA_OPTIONS="--config=ci --config=rbe"
           export ENVOY_CACHE_ROOT=/build/bazel_root
           export ENVOY_CACHE_TARGETS=$(echo "${{ inputs.targets }}" | sed 's/ / + /g')
           # ironically the repository_cache is just about the only thing you dont want to cache

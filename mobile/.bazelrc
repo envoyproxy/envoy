@@ -62,7 +62,6 @@ coverage --instrumentation_filter="//library/common[/:]"
 # Common Engflow flags
 build:linux --disk_cache=
 build:linux --incompatible_strict_action_env=true
-build:linux --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 # Default flags for builds targeting iOS
 # Manual stamping is necessary in order to get versioning information in the iOS
@@ -115,6 +114,7 @@ build:mobile-clang --action_env=CXX=/opt/llvm/bin/clang++
 
 build:mobile-remote-clang --config=mobile-clang
 build:mobile-remote-clang --config=mobile-rbe
+build:mobile-remote-clang --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 
 #############################################################################
