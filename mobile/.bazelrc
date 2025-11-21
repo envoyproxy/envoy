@@ -114,21 +114,33 @@ build:mobile-clang --action_env=CC=/opt/llvm/bin/clang
 build:mobile-clang --action_env=CXX=/opt/llvm/bin/clang++
 
 build:mobile-remote-clang --config=mobile-clang
-build:mobile-remote-clang --config=mobile-remote
+build:mobile-remote-clang --config=mobile-rbe
 
 
 #############################################################################
 # platform: remote
 #############################################################################
+# RBE (Engflow mobile)
+build:mobile-rbe --google_default_credentials=false
+build:mobile-rbe --remote_cache=grpcs://envoy.cluster.engflow.com
+build:mobile-rbe --remote_executor=grpcs://envoy.cluster.engflow.com
+build:mobile-rbe --bes_backend=grpcs://envoy.cluster.engflow.com/
+build:mobile-rbe --bes_results_url=https://envoy.cluster.engflow.com/invocation/
+build:mobile-rbe --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
+build:mobile-rbe --grpc_keepalive_time=60s
+build:mobile-rbe --grpc_keepalive_timeout=30s
+build:mobile-rbe --remote_timeout=3600s
+build:mobile-rbe --bes_timeout=3600s
+build:mobile-rbe --bes_upload_mode=fully_async
+build:mobile-rbe --nolegacy_important_outputs
+build:mobile-rbe --jobs=40
+build:mobile-rbe --verbose_failures
+build:mobile-rbe --spawn_strategy=remote,sandboxed,local
+build:mobile-rbe --experimental_ui_max_stdouterr_bytes=10485760
+
 build:mobile-remote-ci --config=mobile-remote-clang
 build:mobile-remote-ci --config=remote-ci
 build:mobile-remote-ci --test_env=ENVOY_IP_TEST_VERSIONS=v4only
-
-build:mobile-remote --config=rbe-engflow
-build:mobile-remote --jobs=40
-build:mobile-remote --verbose_failures
-build:mobile-remote --spawn_strategy=remote,sandboxed,local
-build:mobile-remote --experimental_ui_max_stdouterr_bytes=10485760
 
 # order matters here to ensure downloads
 build:mobile-remote-release --config=mobile-remote-clang
@@ -187,7 +199,7 @@ build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
 # Disable global index store to work around https://github.com/buildbuddy-io/rules_xcodeproj/issues/1878
 build:rules_xcodeproj --features=-swift.use_global_index_store
 
-build:mobile-macos --config=mobile-remote
+build:mobile-macos --config=mobile-rbe
 build:mobile-macos --host_platform=@envoy//bazel/platforms/rbe:macos
 build:mobile-macos --platforms=@envoy//bazel/platforms/rbe:macos
 build:mobile-macos --extra_execution_platforms=@envoy//bazel/platforms/rbe:macos
@@ -249,6 +261,5 @@ build:mobile-dbg-ios --config=ios
 # compat: Remove as soon as this PR lands
 #############################################################################
 
-build:mobile-release-android --config=mobile-android-release
-
-build:mobile-release-android-publish --config=mobile-android-release-publish
+build:rbe-engflow --config=mobile-rbe
+build:mobile-remote --config=mobile-rbe
