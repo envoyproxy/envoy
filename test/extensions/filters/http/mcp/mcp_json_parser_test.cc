@@ -793,6 +793,48 @@ TEST_F(McpJsonParserTest, FloatingPointValues) {
   EXPECT_DOUBLE_EQ(other->number_value(), 1.5);
 }
 
+TEST(McpFieldExtractorTest, DirectIntegerRendering) {
+  McpParserConfig config;
+  std::vector<McpParserConfig::FieldRule> rules = {McpParserConfig::FieldRule("int32_val"),
+                                                   McpParserConfig::FieldRule("uint32_val"),
+                                                   McpParserConfig::FieldRule("int64_val")};
+  config.addMethodConfig("test_method", rules);
+
+  Protobuf::Struct metadata;
+  McpFieldExtractor extractor(metadata, config);
+
+  extractor.StartObject("");
+  extractor.RenderString("jsonrpc", "2.0");
+  extractor.RenderString("method", "test_method");
+
+  // Test RenderInt32
+  extractor.RenderInt32("int32_val", -123);
+
+  // Test RenderUint32
+  extractor.RenderUint32("uint32_val", 456);
+
+  // Test RenderInt64
+  extractor.RenderInt64("int64_val", -789);
+
+  extractor.EndObject();
+  extractor.finalizeExtraction();
+
+  EXPECT_TRUE(extractor.isValidMcp());
+  EXPECT_EQ(extractor.getMethod(), "test_method");
+
+  // Verify results
+  const auto& fields = metadata.fields();
+
+  ASSERT_TRUE(fields.contains("int32_val"));
+  EXPECT_EQ(fields.at("int32_val").number_value(), -123.0);
+
+  ASSERT_TRUE(fields.contains("uint32_val"));
+  EXPECT_EQ(fields.at("uint32_val").number_value(), 456.0);
+
+  ASSERT_TRUE(fields.contains("int64_val"));
+  EXPECT_EQ(fields.at("int64_val").number_value(), -789.0);
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

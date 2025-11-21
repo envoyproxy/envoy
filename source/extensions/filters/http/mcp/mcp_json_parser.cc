@@ -478,11 +478,6 @@ const std::string& McpJsonParser::getMethod() const {
   return extractor_ ? extractor_->getMethod() : empty;
 }
 
-const std::vector<std::string>& McpJsonParser::getMissingRequiredFields() const {
-  static const std::vector<std::string> empty;
-  return extractor_ ? extractor_->getMissingRequiredFields() : empty;
-}
-
 const Protobuf::Value* McpJsonParser::getNestedValue(const std::string& dotted_path) const {
   if (dotted_path.empty()) {
     return nullptr;

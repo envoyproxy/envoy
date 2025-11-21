@@ -149,9 +149,6 @@ public:
   // MCP validation getters
   bool isValidMcp() const { return is_valid_mcp_; }
   const std::string& getMethod() const { return method_; }
-  const std::vector<std::string>& getMissingRequiredFields() const {
-    return missing_required_fields_;
-  }
 
 private:
   // Get current path as string
@@ -226,12 +223,8 @@ public:
   // Get the method string
   const std::string& getMethod() const;
 
-  // Get missing required fields (if any)
-  const std::vector<std::string>& getMissingRequiredFields() const;
-
   // Get the extracted metadata (only contains configured fields)
   const Protobuf::Struct& metadata() const { return metadata_; }
-  Protobuf::Struct& mutableMetadata() { return metadata_; }
 
   // Helper to get nested value from metadata
   const Protobuf::Value* getNestedValue(const std::string& dotted_path) const;

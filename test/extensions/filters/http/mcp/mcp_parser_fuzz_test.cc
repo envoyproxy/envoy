@@ -33,7 +33,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // Exercise the various getter methods
     parser.isValidMcpRequest();
     parser.getMethod();
-    parser.getMissingRequiredFields();
     parser.metadata();
 
     // Try to get nested values with various paths
