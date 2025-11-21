@@ -64,5 +64,8 @@ new_features:
 - area: formatter
   change: |
     Added the new access log formatter support of ``DOWNSTREAM_LOCAL_CLOSE_REASON``.
+- area: stats
+  change: |
+    Added support to limit the number of stats stored in each stats scope in the stats libarary.
 
 deprecated:

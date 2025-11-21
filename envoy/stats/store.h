@@ -177,8 +177,12 @@ public:
   /**
    * @return a scope of the given name.
    */
-  ScopeSharedPtr createScope(const std::string& name, bool evictable = false) {
-    return rootScope()->createScope(name, evictable);
+  ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+                             absl::optional<uint64_t> max_counter_num = absl::nullopt,
+                             absl::optional<uint64_t> max_gauge_num = absl::nullopt,
+                             absl::optional<uint64_t> max_histogram_num = absl::nullopt) {
+    return rootScope()->createScope(name, evictable, max_counter_num, max_gauge_num,
+                                    max_histogram_num);
   }
 
   /**
