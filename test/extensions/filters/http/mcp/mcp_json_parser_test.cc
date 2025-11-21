@@ -835,6 +835,48 @@ TEST(McpFieldExtractorTest, DirectIntegerRendering) {
   EXPECT_EQ(fields.at("int64_val").number_value(), -789.0);
 }
 
+TEST_F(McpJsonParserTest, FinishParseWithoutParsing) {
+  // Test calling finishParse() without calling parse() first
+  auto status = parser_->finishParse();
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status.message(), HasSubstr("No data has been parsed"));
+}
+
+TEST(McpFieldExtractorTest, RenderBytesAndFloat) {
+  McpParserConfig config;
+  std::vector<McpParserConfig::FieldRule> rules = {McpParserConfig::FieldRule("bytes_val"),
+                                                   McpParserConfig::FieldRule("float_val")};
+  config.addMethodConfig("test_method", rules);
+
+  Protobuf::Struct metadata;
+  McpFieldExtractor extractor(metadata, config);
+
+  extractor.StartObject("");
+  extractor.RenderString("jsonrpc", "2.0");
+  extractor.RenderString("method", "test_method");
+
+  // Test RenderBytes - should behave like RenderString
+  extractor.RenderBytes("bytes_val", "binary_data");
+
+  // Test RenderFloat - should behave like RenderDouble
+  extractor.RenderFloat("float_val", 3.14f);
+
+  extractor.EndObject();
+  extractor.finalizeExtraction();
+
+  EXPECT_TRUE(extractor.isValidMcp());
+  EXPECT_EQ(extractor.getMethod(), "test_method");
+
+  // Verify results
+  const auto& fields = metadata.fields();
+
+  ASSERT_TRUE(fields.contains("bytes_val"));
+  EXPECT_EQ(fields.at("bytes_val").string_value(), "binary_data");
+
+  ASSERT_TRUE(fields.contains("float_val"));
+  EXPECT_FLOAT_EQ(fields.at("float_val").number_value(), 3.14);
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters
