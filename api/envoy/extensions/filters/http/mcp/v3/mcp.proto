@@ -56,24 +56,30 @@ message Mcp {
   ParserConfig parser_config = 4;
 }
 
-// Parser configuration with method-specific rules
+// Parser configuration with method-specific rules.
+// This configuration allows overriding the default attribute extraction behavior for specific MCP methods.
 message ParserConfig {
-  // A single field extraction rule
+  // A single field extraction rule.
   message FieldRule {
-    // JSON path to extract (e.g., "params.name", "params.uri")
+    // JSON path to extract (e.g., "params.name", "params.uri").
+    // The path is a dot-separated string representing the location of the field in the JSON payload.
+    // For example, "params.name" extracts the "name" field from the "params" object.
     string path = 1 [(validate.rules).string = {min_len: 1}];
   }
 
-  // Configuration for a specific MCP method
+  // Configuration for a specific MCP method.
   message MethodConfig {
-    // Method name (e.g., "tools/call", "resources/read", "initialize")
+    // Method name (e.g., "tools/call", "resources/read", "initialize").
+    // This matches the "method" field in the JSON-RPC request.
     string method = 1 [(validate.rules).string = {min_len: 1}];
 
-    // Fields to extract for this method
+    // Fields to extract for this method.
+    // If empty, no fields will be extracted for this method beyond the default ones (jsonrpc, method).
     repeated FieldRule fields = 2;
   }
 
-  // Method-specific configurations
+  // Method-specific configurations.
+  // These rules override or supplement the default extraction logic for the specified methods.
   repeated MethodConfig methods = 1;
 }
 
