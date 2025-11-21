@@ -3,11 +3,14 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <memory>
 #include <string>
 
-#include "envoy/stats/tag.h"
+// #include <type_traits>
+
+// #include "third_party/envoy/src/envoy/stats/tag.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/hash.h"
@@ -285,7 +288,10 @@ private:
   using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
   struct ScopeImpl : public Scope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable);
+    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable,
+              absl::optional<uint64_t> max_counter_num = absl::nullopt,
+              absl::optional<uint64_t> max_gauge_num = absl::nullopt,
+              absl::optional<uint64_t> max_histogram_num = absl::nullopt);
     ~ScopeImpl() override;
 
     // Stats::Scope
@@ -298,8 +304,15 @@ private:
                                              Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
-    ScopeSharedPtr createScope(const std::string& name, bool evictale) override;
-    ScopeSharedPtr scopeFromStatName(StatName name, bool evictable) override;
+    ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+                               absl::optional<uint64_t> max_counter_num = absl::nullopt,
+                               absl::optional<uint64_t> max_gauge_num = absl::nullopt,
+                               absl::optional<uint64_t> max_histogram_num = absl::nullopt) override;
+    ScopeSharedPtr
+    scopeFromStatName(StatName name, bool evictable = false,
+                      absl::optional<uint64_t> max_counter_num = absl::nullopt,
+                      absl::optional<uint64_t> max_gauge_num = absl::nullopt,
+                      absl::optional<uint64_t> max_histogram_num = absl::nullopt) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -455,6 +468,9 @@ private:
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     const bool evictable_{};
+    absl::optional<uint64_t> max_counters_;
+    absl::optional<uint64_t> max_gauges_;
+    absl::optional<uint64_t> max_histograms_;
 
   private:
     StatNameStorage prefix_;
@@ -593,6 +609,10 @@ private:
   // (e.g. when a scope is deleted), it is likely more efficient to batch their
   // cleanup, which would otherwise entail a post() per histogram per thread.
   std::vector<uint64_t> histograms_to_cleanup_ ABSL_GUARDED_BY(hist_mutex_);
+
+  CounterSharedPtr counters_overflow_;
+  CounterSharedPtr gauges_overflow_;
+  CounterSharedPtr histograms_overflow_;
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;
