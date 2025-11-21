@@ -443,11 +443,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   // For ON_DOWNSTREAM_DATA mode, always enable receive_before_connect.
   if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_DATA) {
     receive_before_connect_ = true;
-    // If max_buffered_bytes_ hasn't been set yet, use a default value.
-    if (max_buffered_bytes_ == 65536 && !config_->maxEarlyDataBytes().has_value()) {
-      // Use a reasonable default for ON_DOWNSTREAM_DATA mode.
-      max_buffered_bytes_ = 65536;
-    }
+    max_buffered_bytes_ = config_->maxEarlyDataBytes().value();
   }
 
   // Handle TLS handshake wait mode.
@@ -995,26 +991,15 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   } else if (receive_before_connect_) {
     // Buffer data received before upstream connection exists.
     early_data_buffer_.move(data);
-    ASSERT(early_data_buffer_.length() > 0 || data.length() == 0);
 
     // Track end_stream even if buffer is empty so we can propagate it to upstream later.
     if (!early_data_end_stream_) {
       early_data_end_stream_ = end_stream;
     }
 
-    // If no data was received, handle legacy mode and return early.
-    if (early_data_buffer_.length() == 0) {
-      // For legacy mode (max_buffered_bytes_ == 0), read-disable immediately even if buffer is
-      // empty. This maintains backward compatibility with the old behavior.
-      if (max_buffered_bytes_ == 0) {
-        read_callbacks_->connection().readDisable(true);
-        read_disabled_due_to_buffer_ = true;
-      }
-      return Network::FilterStatus::Continue;
-    }
-
     // Mark that we've received initial data and trigger connection if needed.
-    if (!initial_data_received_) {
+    // Only trigger if we actually have data in the buffer.
+    if (!initial_data_received_ && early_data_buffer_.length() > 0) {
       initial_data_received_ = true;
       // For ON_DOWNSTREAM_DATA mode, establish the upstream connection now.
       if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_DATA) {
@@ -1033,7 +1018,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     // For new API, read-disable only when buffer exceeds limit to prevent excessive memory usage.
     // Note: We track read_disabled_due_to_buffer_ to know whether to re-enable reading
     // when the upstream connection is established.
-    if (early_data_buffer_.length() > max_buffered_bytes_) {
+    if (early_data_buffer_.length() >= max_buffered_bytes_) {
       // Read-disable when buffer exceeds limit to prevent excessive memory usage.
       // Note: For legacy mode (max_buffered_bytes_ == 0), this will always trigger.
       ENVOY_CONN_LOG(debug, "Early data buffer exceeded max size {}, read-disabling downstream",

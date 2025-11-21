@@ -2602,7 +2602,7 @@ TEST_P(TcpProxyTest, EmptyDataDoesNotTriggerConnection) {
 
   // Empty data should not trigger connection.
   Buffer::OwnedImpl empty_data;
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(empty_data, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(empty_data, false));
 
   // No connection should be established.
   EXPECT_TRUE(conn_pool_callbacks_.empty());
@@ -3165,7 +3165,7 @@ TEST_P(TcpProxyTest, EmptyDataChunksDoNotSetInitialDataReceived) {
 
   // Empty data. It should NOT trigger connection.
   Buffer::OwnedImpl empty_data("");
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(empty_data, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(empty_data, false));
   EXPECT_TRUE(conn_pool_callbacks_.empty());
 
   // Now send real data. It should trigger connection but NOT readDisable.
