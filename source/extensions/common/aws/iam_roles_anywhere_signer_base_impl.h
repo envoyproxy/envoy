@@ -34,7 +34,7 @@ public:
   static constexpr uint16_t DefaultExpiration = 900;
 };
 
-using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
+using AwsSigningHeaderMatcherVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
 /**
  * Implementation of the Signature V4 signing process using X509 certificates.

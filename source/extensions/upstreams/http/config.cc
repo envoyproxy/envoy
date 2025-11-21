@@ -12,6 +12,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/http/hash_policy.h"
 #include "source/common/http/http1/settings.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -200,6 +201,15 @@ ProtocolOptionsConfigImpl::buildShadowPolicies(
   return policies;
 }
 
+absl::StatusOr<std::unique_ptr<Envoy::Http::HashPolicy>> ProtocolOptionsConfigImpl::buildHashPolicy(
+    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  if (options.hash_policy().empty()) {
+    return nullptr;
+  }
+  return Envoy::Http::HashPolicyImpl::create(options.hash_policy(), server_context.regexEngine());
+}
+
 absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>>
 ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
@@ -212,9 +222,12 @@ ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
   RETURN_IF_NOT_OK_REF(validator_factory_or_error.status());
   auto shadow_policies_or_error = buildShadowPolicies(options, server_context);
   RETURN_IF_NOT_OK_REF(shadow_policies_or_error.status());
+  auto hash_policy_or_error = buildHashPolicy(options, server_context);
+  RETURN_IF_NOT_OK_REF(hash_policy_or_error.status());
   return std::shared_ptr<ProtocolOptionsConfigImpl>(new ProtocolOptionsConfigImpl(
       options, options_or_error.value(), std::move(validator_factory_or_error.value()),
-      cache_options_or_error.value(), std::move(shadow_policies_or_error.value()), server_context));
+      cache_options_or_error.value(), std::move(shadow_policies_or_error.value()),
+      std::move(hash_policy_or_error.value()), server_context));
 }
 
 absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>>
@@ -239,6 +252,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     Envoy::Http::HeaderValidatorFactoryPtr&& header_validator_factory,
     absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
     std::vector<Envoy::Router::ShadowPolicyPtr>&& shadow_policies,
+    std::unique_ptr<Envoy::Http::HashPolicy>&& hash_policy,
     Server::Configuration::ServerFactoryContext& server_context)
     : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(
           getHttpOptions(options), server_context, server_context.messageValidationVisitor())),
@@ -254,7 +268,8 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       header_validator_factory_(std::move(header_validator_factory)),
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
-      use_alpn_(options.has_auto_config()), shadow_policies_(std::move(shadow_policies)) {
+      use_alpn_(options.has_auto_config()), shadow_policies_(std::move(shadow_policies)),
+      hash_policy_(std::move(hash_policy)) {
   ASSERT(Http2::Utility::initializeAndValidateOptions(http2_options_).status().ok());
   // Build outlier detection config.
 

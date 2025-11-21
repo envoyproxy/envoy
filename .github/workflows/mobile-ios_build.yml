@@ -69,7 +69,7 @@ jobs:
         - name: Build Envoy.framework distributable
           args: >-
             build
-            --config=mobile-remote-ci-macos-ios
+            --config=mobile-macos-ios
             //library/swift:ios_framework
           target: ios
           timeout-minutes: 120
@@ -87,7 +87,7 @@ jobs:
   #   with:
   #     args: >-
   #       build
-  #       ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #       ${{ matrix.args || '--config=mobile-macos-ios' }}
   #       ${{ matrix.app }}
   #     command: ./bazelw
   #     container-command:
@@ -101,7 +101,7 @@ jobs:
   #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.30
   #         with:
   #           app: ${{ matrix.app }}
-  #           args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #           args: ${{ matrix.args || '--config=mobile-macos-ios' }}
   #           expected: received headers with status ${{ matrix.expected-status }}
   #         env:
   #           ANDROID_NDK_HOME:
@@ -133,7 +133,7 @@ jobs:
   #   with:
   #     args: >-
   #       build
-  #       ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #       ${{ matrix.args || '--config=mobile-macos-ios' }}
   #       ${{ matrix.app }}
   #     command: ./bazelw
   #     container-command:
@@ -146,7 +146,7 @@ jobs:
   #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.30
   #         with:
   #           app: ${{ matrix.app }}
-  #           args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #           args: ${{ matrix.args || '--config=mobile-macos-ios' }}
   #           expected: >-
   #             ${{ matrix.expected
   #                 || format('received headers with status {0}', matrix.expected-status) }}
@@ -164,7 +164,7 @@ jobs:
   #       include:
   #       - name: Build swift experimental app
   #         args: >-
-  #           --config=mobile-remote-ci-macos-ios
+  #           --config=mobile-macos-ios
   #         app: //test/swift/apps/experimental:app
   #         expected-status: 200
   #         target: swift-experimental-app

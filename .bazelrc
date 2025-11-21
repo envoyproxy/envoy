@@ -31,7 +31,6 @@ build --copt=-DABSL_MIN_LOG_LEVEL=4
 build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 build --copt=-Wno-deprecated-declarations
 build --define envoy_mobile_listener=enabled
-build --define=LLVM_DIRECTORY=/opt/llvm
 build --experimental_repository_downloader_retries=2
 build --enable_platform_specific_config
 build --incompatible_merge_fixed_and_default_shell_env
@@ -414,20 +413,6 @@ build:rbe-google --config=cache-google
 build:rbe-google-bes --bes_backend=grpcs://buildeventservice.googleapis.com
 build:rbe-google-bes --bes_results_url=https://source.cloud.google.com/results/invocations/
 build:rbe-google-bes --bes_upload_mode=fully_async
-
-# RBE (Engflow mobile)
-build:rbe-engflow --google_default_credentials=false
-build:rbe-engflow --remote_cache=grpcs://envoy.cluster.engflow.com
-build:rbe-engflow --remote_executor=grpcs://envoy.cluster.engflow.com
-build:rbe-engflow --bes_backend=grpcs://envoy.cluster.engflow.com/
-build:rbe-engflow --bes_results_url=https://envoy.cluster.engflow.com/invocation/
-build:rbe-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:rbe-engflow --grpc_keepalive_time=60s
-build:rbe-engflow --grpc_keepalive_timeout=30s
-build:rbe-engflow --remote_timeout=3600s
-build:rbe-engflow --bes_timeout=3600s
-build:rbe-engflow --bes_upload_mode=fully_async
-build:rbe-engflow --nolegacy_important_outputs
 
 # RBE (Engflow Envoy)
 common:common-envoy-engflow --google_default_credentials=false

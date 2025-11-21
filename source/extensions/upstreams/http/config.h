@@ -66,11 +66,16 @@ public:
 
   std::vector<Extensions::Common::Matcher::MatcherPtr> outlier_detection_http_error_matcher_;
   const std::vector<Envoy::Router::ShadowPolicyPtr> shadow_policies_;
+  const std::unique_ptr<Envoy::Http::HashPolicy> hash_policy_;
 
 private:
   static absl::StatusOr<std::vector<Envoy::Router::ShadowPolicyPtr>>
   buildShadowPolicies(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
                       Server::Configuration::ServerFactoryContext& server_context);
+
+  static absl::StatusOr<std::unique_ptr<Envoy::Http::HashPolicy>>
+  buildHashPolicy(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+                  Server::Configuration::ServerFactoryContext& server_context);
 
   ProtocolOptionsConfigImpl(
       const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
@@ -78,6 +83,7 @@ private:
       Envoy::Http::HeaderValidatorFactoryPtr&& header_validator_factory,
       absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
       std::vector<Envoy::Router::ShadowPolicyPtr>&& shadow_policies,
+      std::unique_ptr<Envoy::Http::HashPolicy>&& hash_policy,
       Server::Configuration::ServerFactoryContext& server_context);
   // Constructor for legacy (deprecated) config.
   ProtocolOptionsConfigImpl(
