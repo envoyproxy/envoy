@@ -821,10 +821,10 @@ TEST_P(Http11ConnectTest, FragmentedConnectResponse) {
       }));
 
   // Verify the flush.
-  EXPECT_CALL(transport_callbacks_, flushWriteBuffer()).Times(1);
+  EXPECT_CALL(transport_callbacks_, flushWriteBuffer());
 
   EXPECT_CALL(*inner_socket_, doRead(_))
-       .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 0, false}));
+      .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 0, false}));
 
   connect_socket_->doRead(buffer);
 }
