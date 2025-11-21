@@ -88,7 +88,7 @@ public:
       return std::make_unique<TestQuicCryptoServerStream>(crypto_config, compressed_certs_cache,
                                                           session, helper);
     case quic::QUIC_VERSION_UNSUPPORTED:
-      ASSERT(false, "Unknown handshake protocol");
+      ASSERT(false, "Unknown QUIC version");
       break;
     default:
       return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config);
