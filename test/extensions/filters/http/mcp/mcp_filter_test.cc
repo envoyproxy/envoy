@@ -541,6 +541,58 @@ TEST_F(McpFilterTest, ClearRouteCacheConfigGetter) {
   EXPECT_TRUE(config_->clearRouteCache());
 }
 
+TEST_F(McpFilterTest, FilterWithCustomParserConfig) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+
+  // Add custom parser config
+  auto* parser_config = proto_config.mutable_parser_config();
+  auto* method_rule = parser_config->add_methods();
+  method_rule->set_method("custom/method");
+  method_rule->add_fields()->set_path("params.custom_field");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "custom/method",
+    "params": {
+      "custom_field": "extracted_value",
+      "other_field": "ignored"
+    },
+    "id": 1
+  })";
+  Buffer::OwnedImpl buffer(json);
+
+  // Expect dynamic metadata to be set with the custom field
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+        auto it = fields.find("params");
+        ASSERT_NE(it, fields.end());
+        const auto& params = it->second.struct_value().fields();
+
+        // Custom field should be extracted
+        auto custom_it = params.find("custom_field");
+        ASSERT_NE(custom_it, params.end());
+        EXPECT_EQ(custom_it->second.string_value(), "extracted_value");
+
+        // Other field should not be extracted
+        EXPECT_EQ(params.find("other_field"), params.end());
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

@@ -652,6 +652,147 @@ TEST_F(McpJsonParserTest, SpecialCharactersInStrings) {
   EXPECT_EQ(uri->string_value(), "file:///path/with spaces/and-special@chars#test.txt");
 }
 
+TEST_F(McpJsonParserTest, Uint64Values) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "logging/setLevel",
+    "params": {
+      "level": 18446744073709551615
+    },
+    "id": 1
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+
+  const auto* level = parser_->getNestedValue("params.level");
+  ASSERT_NE(level, nullptr);
+  // Protobuf Value stores numbers as doubles, so precision might be lost for very large uint64
+  // but we just want to verify RenderUint64 path is taken and value is stored.
+  EXPECT_EQ(level->number_value(), static_cast<double>(18446744073709551615ULL));
+}
+
+TEST_F(McpJsonParserTest, NestedArraySkipping) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "tool1",
+      "args": [
+        {"nested": "value"},
+        ["more", "nested"]
+      ]
+    },
+    "id": 1
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  const auto* name = parser_->getNestedValue("params.name");
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(name->string_value(), "tool1");
+}
+
+TEST_F(McpJsonParserTest, GetNestedValueIntermediateNonStruct) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "tool1"
+    },
+    "id": 1
+  })";
+
+  parseJson(json);
+
+  // Try to access a child of a string value
+  const auto* value = parser_->getNestedValue("params.name.child");
+  EXPECT_EQ(value, nullptr);
+}
+
+TEST_F(McpJsonParserTest, CopyFieldCollision) {
+  // Config tries to extract both "params.a" and "params.a.b"
+  // This is a configuration error effectively, but parser should handle it gracefully
+  McpParserConfig custom_config;
+  std::vector<McpParserConfig::FieldRule> rules = {McpParserConfig::FieldRule("params.a"),
+                                                   McpParserConfig::FieldRule("params.a.b")};
+  custom_config.addMethodConfig("test", rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "test",
+    "params": {
+      "a": "string_value"
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser->parse(json));
+
+  // params.a should be extracted
+  const auto* a = parser->getNestedValue("params.a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->string_value(), "string_value");
+
+  // params.a.b cannot be extracted because params.a is a string, not a struct
+  const auto* b = parser->getNestedValue("params.a.b");
+  EXPECT_EQ(b, nullptr);
+}
+
+TEST_F(McpJsonParserTest, FromProtoConfig) {
+  envoy::extensions::filters::http::mcp::v3::ParserConfig proto_config;
+  auto* method_rule = proto_config.add_methods();
+  method_rule->set_method("custom/method");
+  method_rule->add_fields()->set_path("params.field1");
+  method_rule->add_fields()->set_path("params.field2");
+
+  McpParserConfig config = McpParserConfig::fromProto(proto_config);
+
+  const auto& fields = config.getFieldsForMethod("custom/method");
+  ASSERT_EQ(fields.size(), 2);
+  EXPECT_EQ(fields[0].path, "params.field1");
+  EXPECT_EQ(fields[1].path, "params.field2");
+
+  // Default fields should still be there (implicit in implementation)
+  EXPECT_TRUE(config.getAlwaysExtract().contains("jsonrpc"));
+}
+
+TEST_F(McpJsonParserTest, FloatingPointValues) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "logging/setLevel",
+    "params": {
+      "level": 3.14159,
+      "other": 1.5
+    },
+    "id": 1
+  })";
+
+  // We need to configure the parser to extract these fields
+  McpParserConfig custom_config;
+  std::vector<McpParserConfig::FieldRule> rules = {McpParserConfig::FieldRule("params.level"),
+                                                   McpParserConfig::FieldRule("params.other")};
+  custom_config.addMethodConfig(McpConstants::Methods::LOGGING_SET_LEVEL, rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  EXPECT_OK(parser->parse(json));
+
+  EXPECT_TRUE(parser->isValidMcpRequest());
+
+  const auto* level = parser->getNestedValue("params.level");
+  ASSERT_NE(level, nullptr);
+  EXPECT_DOUBLE_EQ(level->number_value(), 3.14159);
+
+  const auto* other = parser->getNestedValue("params.other");
+  ASSERT_NE(other, nullptr);
+  EXPECT_DOUBLE_EQ(other->number_value(), 1.5);
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters
