@@ -167,30 +167,31 @@ message ProcessingRequest {
 // [#next-free-field: 11]
 message ProcessingResponse {
   // The response type that is sent by the server.
+  // If the server does not set any of the response type, the data plane will interpret
+  // it as the server has no mutation for the request message.
   oneof response {
-    option (validate.required) = true;
 
-    // The server must send back this message in response to a message with the
+    // The server might send back this message in response to a message with the
     // ``request_headers`` field set.
     HeadersResponse request_headers = 1;
 
-    // The server must send back this message in response to a message with the
+    // The server might send back this message in response to a message with the
     // ``response_headers`` field set.
     HeadersResponse response_headers = 2;
 
-    // The server must send back this message in response to a message with
+    // The server might send back this message in response to a message with
     // the ``request_body`` field set.
     BodyResponse request_body = 3;
 
-    // The server must send back this message in response to a message with
+    // The server might send back this message in response to a message with
     // the ``response_body`` field set.
     BodyResponse response_body = 4;
 
-    // The server must send back this message in response to a message with
+    // The server might send back this message in response to a message with
     // the ``request_trailers`` field set.
     TrailersResponse request_trailers = 5;
 
-    // The server must send back this message in response to a message with
+    // The server might send back this message in response to a message with
     // the ``response_trailers`` field set.
     TrailersResponse response_trailers = 6;
 
