@@ -255,11 +255,3 @@ build:mobile-dbg-android --config=android
 # Default flags for iOS debug builds
 build:mobile-dbg-ios --config=mobile-dbg-common
 build:mobile-dbg-ios --config=ios
-
-
-#############################################################################
-# compat: Remove as soon as this PR lands
-#############################################################################
-
-build:rbe-engflow --config=mobile-rbe
-build:mobile-remote --config=mobile-rbe
