@@ -1,13 +1,20 @@
 diff --git a/src/Makefile b/src/Makefile
-index 83d37e5..db67af6 100644
+index 6b35340..5c81d74 100644
 --- a/src/Makefile
 +++ b/src/Makefile
-@@ -56,7 +56,7 @@ ifneq ($(ICP_ROOT), )
- 			   -lusdm_drv_s
+@@ -57,13 +57,13 @@ ifneq ($(ICP_ROOT), )
+ 			   -lusdm_drv_s -lnuma
  else
- 	QATFLAGS = -DINTREE
--	LDFLAGS  = -lqat -lusdm
-+	LDFLAGS  += -lqat -lusdm
+ 	# In-tree - look for headers in standard locations
+-	QAT_INCLUDE_PATH := $(shell if [ -d /usr/local/include/qat ]; then echo /usr/local/include/qat; elif [ -d /usr/include/qat ]; then echo /usr/include/qat; fi)
++	QAT_INCLUDE_PATH ?= $(shell if [ -d /usr/local/include/qat ]; then echo /usr/local/include/qat; elif [ -d /usr/include/qat ]; then echo /usr/include/qat; fi)
+ 	ifneq ($(QAT_INCLUDE_PATH), )
+         QATFLAGS = -I$(QAT_INCLUDE_PATH)
+ 	else
+         $(error QAT headers not found in Standard path, Please install QATLib development package or set ICP_ROOT for out-of-tree driver)
+ 	endif
+-	LDFLAGS  = -lqat -lusdm -lnuma
++	LDFLAGS  += -lqat -lusdm -lnuma
  endif
  
  ifdef ZSTDLIB

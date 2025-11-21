@@ -10,18 +10,20 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
+common_env = {
+    "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd/lib",
+    "QAT_INCLUDE_PATH": "$$EXT_BUILD_DEPS/qatlib/include/qat",
+    "LDFLAGS": "-L$$EXT_BUILD_DEPS/qatlib/lib",
+}
+
 make(
     name = "qat-zstd",
     build_data = ["@com_github_qat_zstd//:all"],
     env = select({
-        "//bazel:clang_build": {
-            "CFLAGS": "-Wno-error=unused-parameter -Wno-error=unused-command-line-argument -I$$EXT_BUILD_DEPS/qatlib/include",
-            "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd/lib",
+        "//bazel:clang_build": common_env | {
+            "CFLAGS": "-Wno-error=unused-parameter -Wno-error=unused-command-line-argument",
         },
-        "//conditions:default": {
-            "CFLAGS": "-I$$EXT_BUILD_DEPS/qatlib/include",
-            "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd/lib",
-        },
+        "//conditions:default": common_env,
     }),
     includes = [],
     lib_source = "@com_github_qat_zstd//:all",
@@ -32,7 +34,6 @@ make(
         "@platforms//cpu:x86_64",
     ],
     targets = [
-        "ENABLE_USDM_DRV=1",
         "install",
     ],
     deps = [
