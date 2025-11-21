@@ -228,3 +228,11 @@ def crates_repositories():
         lockfile = Label("@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
         manifests = ["@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
     )
+
+    # Crate index for test programs with additional dependencies like rustls.
+    crates_repository(
+        name = "dynamic_modules_test_crate_index",
+        cargo_lockfile = "@envoy//test/extensions/dynamic_modules/test_data/rust:Cargo.lock",
+        lockfile = Label("@envoy//test/extensions/dynamic_modules/test_data/rust:Cargo.Bazel.lock"),
+        manifests = ["@envoy//test/extensions/dynamic_modules/test_data/rust:Cargo.toml"],
+    )

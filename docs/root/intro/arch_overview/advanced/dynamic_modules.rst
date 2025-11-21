@@ -21,7 +21,8 @@ Future development may include support for other languages.
 
 Currently, dynamic modules are only supported at the following extension points:
 
-* As an :ref:`HTTP filter  <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`
+* As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
+* As a :ref:`Transport Socket <envoy_v3_api_msg_extensions.transport_sockets.dynamic_modules.v3.DynamicModuleUpstreamTransportSocket>` for upstream and downstream connections.
 
 There are a few design goals for the dynamic modules:
 

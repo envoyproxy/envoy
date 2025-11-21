@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = [
         "abi.h",
         "dynamic_modules.h",
+        "transport_socket_abi.h",
     ],
     deps = [
         ":abi_version_lib",

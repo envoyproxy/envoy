@@ -37,8 +37,11 @@ IGNORE_DEPS = set([
 # "Test only" section of
 # docs/root/intro/arch_overview/security/external_deps.rst.
 def test_only_ignore(dep):
-    # Rust
+    # Rust (raze)
     if dep.startswith('raze__'):
+        return True
+    # Rust (crate_universe)
+    if dep.endswith('_crate_index'):
         return True
     # Java
     if dep.startswith('remotejdk'):

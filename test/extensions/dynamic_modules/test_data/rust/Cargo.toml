@@ -7,6 +7,10 @@ repository = "https://github.com/envoyproxy/envoy"
 
 [dependencies]
 envoy-proxy-dynamic-modules-rust-sdk = { path = "../../../../../source/extensions/dynamic_modules/sdk/rust" }
+rustls = "0.23"
+rustls-pemfile = "2.0"
+webpki = "0.101"
+webpki-roots = "0.26"
 
 [[example]]
 name = "no_op"
@@ -41,5 +45,17 @@ test = true
 [[example]]
 name = "http_integration_test"
 path = "http_integration_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "transport_socket_integration_test"
+path = "transport_socket_integration_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "rustls_tls_transport_socket"
+path = "rustls_tls_transport_socket.rs"
 crate-type = ["cdylib"]
 test = true
