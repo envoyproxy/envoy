@@ -89,7 +89,8 @@ public:
                                                           session, helper);
     case quic::QUIC_VERSION_UNSUPPORTED:
       ASSERT(false, "Unknown handshake protocol");
-    default::
+      break;
+    default:
       return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config);
     }
     return nullptr;
