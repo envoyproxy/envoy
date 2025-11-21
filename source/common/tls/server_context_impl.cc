@@ -110,7 +110,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   // If creation failed, do not create the selector.
   tls_certificate_selector_ = config.tlsCertificateSelectorFactory()(*this);
 
-  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates &&
+  const auto tls_certificates = config.tlsCertificates();
+  if (tls_certificates.empty() && !config.capabilities().provides_certificates &&
       !tls_certificate_selector_->providesCertificates()) {
     creation_status =
         absl::InvalidArgumentError("Server TlsCertificates must have a certificate specified");
@@ -131,7 +132,6 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   }
 
   // The rest of the code assumes non-empty TLS certificates.
-  const auto tls_certificates = config.tlsCertificates();
   if (tls_certificates.empty()) {
     return;
   }
@@ -519,6 +519,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
              Ssl::CertificateSelectionStatus::Pending,
          "invalid selection result");
 
+  selection_handle_ = std::move(result.handle);
   switch (result.status) {
   case Ssl::SelectionResult::SelectionStatus::Success:
     extended_socket_info->onCertificateSelectionCompleted(*result.selected_ctx, result.staple,

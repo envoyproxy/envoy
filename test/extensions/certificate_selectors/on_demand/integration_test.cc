@@ -228,7 +228,6 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
     // Artifically delay the SDS response using the upstream dispatcher.
     // Note: this would be cleaner if we had a reliable trigger that a certificiate is pending.
     createSdsStream(*sdsUpstream());
-    absl::SleepFor(absl::Seconds(1));
     sendSdsResponse(getServerSecretRsa());
   });
 

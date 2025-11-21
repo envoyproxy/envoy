@@ -60,12 +60,13 @@ public:
   const Ssl::TlsContext& tlsContext() const;
 };
 
-class FetchHandle {
+class Handle : public Ssl::SelectionHandle {
 public:
-  // Sync handle constructor.
-  explicit FetchHandle(AsyncContextConstSharedPtr cert_context) : active_context_(cert_context) {}
-  // Async handle constructor.
-  explicit FetchHandle(Ssl::CertificateSelectionCallbackPtr&& cb) : cb_(std::move(cb)) {}
+  // Synchronous handle constructor must extend the context lifetime since it holds the low TLS
+  // context.
+  explicit Handle(AsyncContextConstSharedPtr cert_context) : active_context_(cert_context) {}
+  // Asynchronous handle constructor must also keep the callback for the secret manager.
+  explicit Handle(Ssl::CertificateSelectionCallbackPtr&& cb) : cb_(std::move(cb)) {}
   void notify(AsyncContextConstSharedPtr cert_ctx);
 
 private:
@@ -73,7 +74,7 @@ private:
   AsyncContextConstSharedPtr active_context_;
   Ssl::CertificateSelectionCallbackPtr cb_;
 };
-using FetchHandleSharedPtr = std::shared_ptr<FetchHandle>;
+using HandleSharedPtr = std::shared_ptr<Handle>;
 
 // Maintains dynamic subscriptions to SDS secrets and converts them from the xDS form to the
 // boringssl TLS contexts, while applying the parent TLS configuration.
@@ -83,7 +84,7 @@ public:
                 Server::Configuration::GenericFactoryContext& factory_context,
                 const Ssl::ServerContextConfig& tls_config);
 
-  void addCertificateConfig(absl::string_view secret_name, FetchHandleSharedPtr handle,
+  void addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
                             OptRef<Init::Manager> init_manager);
   absl::Status updateCertificate(absl::string_view secret_name,
                                  const Ssl::TlsCertificateConfig& cert_config);
@@ -91,8 +92,8 @@ public:
   // Thread-safe.
   void setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx);
   absl::optional<AsyncContextConstSharedPtr> getContext(absl::string_view secret_name) const;
-  FetchHandleSharedPtr fetchCertificate(absl::string_view secret_name,
-                                        Ssl::CertificateSelectionCallbackPtr&& cb);
+  HandleSharedPtr fetchCertificate(absl::string_view secret_name,
+                                   Ssl::CertificateSelectionCallbackPtr&& cb);
 
 private:
   const Stats::ScopeSharedPtr stats_scope_;
@@ -108,7 +109,7 @@ private:
   struct CacheEntry {
     AsyncContextConfigConstPtr cert_config_;
     AsyncContextConstSharedPtr cert_context_;
-    std::vector<std::weak_ptr<FetchHandle>> callbacks_;
+    std::vector<std::weak_ptr<Handle>> callbacks_;
   };
   // TODO(kuat): Needs GC.
   absl::flat_hash_map<std::string, CacheEntry> cache_;
@@ -120,6 +121,7 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCerts> cert_contexts_;
 };
 
+// An asynchronous certificate selector is created for each TLS socket on each worker.
 class AsyncSelector : public Ssl::TlsCertificateSelector,
                       protected Logger::Loggable<Logger::Id::connection> {
 public:
@@ -138,8 +140,6 @@ public:
 private:
   Ssl::TlsCertificateMapper mapper_;
   std::shared_ptr<SecretManager> secret_manager_;
-  // Cancels the certificate callback on destruction.
-  FetchHandleSharedPtr fetch_handle_;
 };
 
 class OnDemandTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory {

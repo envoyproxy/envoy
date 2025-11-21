@@ -180,6 +180,11 @@ public:
   virtual SslCtxCb sslctxCb(HandshakerFactoryContext& handshaker_factory_context) const PURE;
 };
 
+// A handle tracking the certificate selection request. This can be used to supply additonal data
+// to attach to the TLS sockets, and to detect when a request is cancelled.
+class SelectionHandle {};
+using SelectionHandleConstSharedPtr = std::shared_ptr<const SelectionHandle>;
+
 struct SelectionResult {
   enum class SelectionStatus {
     // A certificate was successfully selected.
@@ -189,11 +194,15 @@ struct SelectionResult {
     // Certificate selection failed.
     Failed,
   };
-  SelectionStatus status; // Status of the certificate selection.
-  // Selected TLS context which it only be non-null when status is Success.
+
+  // Status of the certificate selection.
+  SelectionStatus status;
+  // Selected TLS context: it must be non-null when status is Success.
   const Ssl::TlsContext* selected_ctx{nullptr};
   // True if OCSP stapling should be enabled.
   bool staple{false};
+  // Optional handle to attach to the individual TLS socket connection.
+  SelectionHandleConstSharedPtr handle{nullptr};
 };
 
 /**
