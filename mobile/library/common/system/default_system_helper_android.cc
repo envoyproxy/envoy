@@ -1,11 +1,9 @@
 #include <android/multinetwork.h>
 #include <errno.h>
 
-#include "envoy/common/exception.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
 
-#include "source/common/common/assert.h"
-
-#include "library/common/common/utility.h"
 #include "library/common/system/default_system_helper.h"
 #include "library/jni/android_jni_utility.h"
 #include "library/jni/android_network_utility.h"

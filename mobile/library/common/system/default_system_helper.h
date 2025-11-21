@@ -20,7 +20,7 @@ public:
   int64_t getDefaultNetworkHandle() override;
   std::vector<std::pair<int64_t, ConnectionType>> getAllConnectedNetworks() override;
   void bindSocketToNetwork(Network::ConnectionSocket& /*socket*/,
-                           int64_t /*network_handle*/) override {}
+                           int64_t /*network_handle*/) override;
 };
 
 } // namespace Envoy

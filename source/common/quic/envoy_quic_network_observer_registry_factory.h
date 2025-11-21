@@ -6,8 +6,6 @@
 
 #include "source/common/quic/quic_network_connectivity_observer.h"
 
-#include "quiche/quic/core/quic_path_validator.h"
-
 namespace Envoy {
 namespace Quic {
 
@@ -25,10 +23,10 @@ public:
   }
 
   // Get the default network handle.
-  virtual quic::QuicNetworkHandle getDefaultNetwork() PURE;
+  virtual NetworkHandle getDefaultNetwork() PURE;
 
   // Get an alternative network handle different from the given one.
-  virtual quic::QuicNetworkHandle getAlternativeNetwork(quic::QuicNetworkHandle network) PURE;
+  virtual NetworkHandle getAlternativeNetwork(NetworkHandle network) PURE;
 
 protected:
   const absl::flat_hash_set<QuicNetworkConnectivityObserver*>& registeredQuicObservers() const {

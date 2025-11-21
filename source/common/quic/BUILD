@@ -341,6 +341,7 @@ envoy_cc_library(
     ],
     deps = envoy_select_enable_http3([
         "//source/common/common:logger_lib",
+        "@com_github_google_quiche//:quic_core_path_validator_lib",
     ]),
 )
 
@@ -352,7 +353,6 @@ envoy_cc_library(
     deps = [
         ":quic_network_connectivity_observer_interface",
         "//envoy/event:dispatcher_interface",
-        "@com_github_google_quiche//:quic_core_path_validator_lib",
     ],
 )
 
