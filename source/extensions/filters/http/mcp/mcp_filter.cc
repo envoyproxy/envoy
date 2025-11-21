@@ -139,12 +139,12 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
 
   size_t to_parse = buffer_size - bytes_parsed_;
   if (max_request_body_size_ > 0) {
-    size_t remaining = max_request_body_size_ - bytes_parsed_;
-    if (remaining < 0) {
+    if (bytes_parsed_ >= max_request_body_size_) {
       handleParseError("request body is too large.");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
-    to_parse = std::min(to_parse, remaining);
+    size_t remaining_limit = max_request_body_size_ - bytes_parsed_;
+    to_parse = std::min(to_parse, remaining_limit);
   }
 
   std::string parse_buffer;
