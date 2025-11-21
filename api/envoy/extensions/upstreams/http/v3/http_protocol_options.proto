@@ -61,7 +61,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //             http2_protocol_options:
 //               max_concurrent_streams: 100
 //        .... [further cluster config]
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
   // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
@@ -195,4 +195,19 @@ message HttpProtocolOptions {
   //   Mirroring will not be triggered if the :ref:`primary cluster
   //   <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` does not exist.
   repeated config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 9;
+
+  // Specifies a list of hash policies for consistent hashing load balancing (e.g., Ring Hash or
+  // Maglev) for requests routed to this cluster. When configured, cluster-level policies override
+  // route-level policies. When not configured, route-level policies (if any) will be used.
+  //
+  // This enables consistent routing to the same upstream host for all requests to a cluster,
+  // which is particularly useful for stateful services like caching, session management, or
+  // sticky routing requirements.
+  //
+  // .. note::
+  //
+  //   Hash policies are only effective when the cluster is configured with a hash-based load
+  //   balancing policy (e.g., :ref:`RING_HASH <envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.RING_HASH>`
+  //   or :ref:`MAGLEV <envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.MAGLEV>`).
+  repeated config.route.v3.RouteAction.HashPolicy hash_policy = 10;
 }
