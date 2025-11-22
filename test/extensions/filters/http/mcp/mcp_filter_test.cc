@@ -316,8 +316,8 @@ TEST_F(McpFilterTest, RequestBodyUnderLimitSucceeds) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
-// Test request body exceeding the limit gets 413
-TEST_F(McpFilterTest, RequestBodyExceedingLimitRejected) {
+// Test request body exceeding, but it will continue since we get the enough data.
+TEST_F(McpFilterTest, RequestBodyExceedingLimitContinues) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(100); // Very small limit
   config_ = std::make_shared<McpFilterConfig>(proto_config);
@@ -337,6 +337,34 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejected) {
       R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "longkey": "this is a very long string to exceed the limit"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test request body exceeding limit when there is not enough data.
+TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_max_request_body_size()->set_value(20); // Very small limit
+  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(20));
+  filter_->decodeHeaders(headers, false);
+
+  // Create a JSON body that exceeds 20 bytes but is incomplete
+  std::string json = R"({"jsonrpc": "2.0", "me)";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "reached end_stream or configured body size, don't get enough data.",
+                             _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
 // Test request body with limit disabled (0 = no limit) allows large bodies

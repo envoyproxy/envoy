@@ -95,6 +95,9 @@ McpFieldExtractor::McpFieldExtractor(Protobuf::Struct& metadata, const McpParser
     : root_metadata_(metadata), config_(config) {
   // Start with temp storage
   context_stack_.push({&temp_storage_, ""});
+
+  // Pre-calculate total fields needed for early stop optimization
+  fields_needed_ = config_.getAlwaysExtract().size();
 }
 
 McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
@@ -110,6 +113,11 @@ McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
 
   if (!name.empty()) {
     path_stack_.push_back(std::string(name));
+    // Update cached path
+    if (!current_path_cache_.empty()) {
+      current_path_cache_ += ".";
+    }
+    current_path_cache_ += name;
   }
 
   auto* parent = context_stack_.top().struct_ptr;
@@ -129,6 +137,13 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
   if (depth_ > 0) {
     depth_--;
     if (!path_stack_.empty()) {
+      // Update cached path before removing from stack
+      size_t last_dot = current_path_cache_.rfind('.');
+      if (last_dot != std::string::npos) {
+        current_path_cache_.resize(last_dot);
+      } else {
+        current_path_cache_.clear();
+      }
       path_stack_.pop_back();
     }
     if (context_stack_.size() > 1) {
@@ -167,12 +182,19 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
     return this;
   }
 
-  std::string full_path = getCurrentPath();
+  // Build full path efficiently from cached path
+  std::string full_path;
   if (!name.empty()) {
-    if (!full_path.empty()) {
+    if (!current_path_cache_.empty()) {
+      full_path.reserve(current_path_cache_.size() + 1 + name.size());
+      full_path = current_path_cache_;
       full_path += ".";
+      full_path += name;
+    } else {
+      full_path = std::string(name);
     }
-    full_path += name;
+  } else {
+    full_path = current_path_cache_;
   }
   ENVOY_LOG_MISC(debug, "render string name {} path {}, value {}", name, full_path, value);
 
@@ -207,11 +229,19 @@ McpFieldExtractor* McpFieldExtractor::RenderBool(absl::string_view name, bool va
     return this;
   }
 
-  std::string full_path = getCurrentPath();
+  // Build full path efficiently from cached path
+  std::string full_path;
   if (!name.empty()) {
-    if (!full_path.empty())
+    if (!current_path_cache_.empty()) {
+      full_path.reserve(current_path_cache_.size() + 1 + name.size());
+      full_path = current_path_cache_;
       full_path += ".";
-    full_path += name;
+      full_path += name;
+    } else {
+      full_path = std::string(name);
+    }
+  } else {
+    full_path = current_path_cache_;
   }
 
   Protobuf::Value proto_value;
@@ -235,11 +265,19 @@ McpFieldExtractor* McpFieldExtractor::RenderInt64(absl::string_view name, int64_
     return this;
   }
 
-  std::string full_path = getCurrentPath();
+  // Build full path efficiently from cached path
+  std::string full_path;
   if (!name.empty()) {
-    if (!full_path.empty())
+    if (!current_path_cache_.empty()) {
+      full_path.reserve(current_path_cache_.size() + 1 + name.size());
+      full_path = current_path_cache_;
       full_path += ".";
-    full_path += name;
+      full_path += name;
+    } else {
+      full_path = std::string(name);
+    }
+  } else {
+    full_path = current_path_cache_;
   }
 
   Protobuf::Value proto_value;
@@ -255,11 +293,19 @@ McpFieldExtractor* McpFieldExtractor::RenderUint64(absl::string_view name, uint6
     return this;
   }
 
-  std::string full_path = getCurrentPath();
+  // Build full path efficiently from cached path
+  std::string full_path;
   if (!name.empty()) {
-    if (!full_path.empty())
+    if (!current_path_cache_.empty()) {
+      full_path.reserve(current_path_cache_.size() + 1 + name.size());
+      full_path = current_path_cache_;
       full_path += ".";
-    full_path += name;
+      full_path += name;
+    } else {
+      full_path = std::string(name);
+    }
+  } else {
+    full_path = current_path_cache_;
   }
 
   Protobuf::Value proto_value;
@@ -275,11 +321,19 @@ McpFieldExtractor* McpFieldExtractor::RenderDouble(absl::string_view name, doubl
     return this;
   }
 
-  std::string full_path = getCurrentPath();
+  // Build full path efficiently from cached path
+  std::string full_path;
   if (!name.empty()) {
-    if (!full_path.empty())
+    if (!current_path_cache_.empty()) {
+      full_path.reserve(current_path_cache_.size() + 1 + name.size());
+      full_path = current_path_cache_;
       full_path += ".";
-    full_path += name;
+      full_path += name;
+    } else {
+      full_path = std::string(name);
+    }
+  } else {
+    full_path = current_path_cache_;
   }
 
   Protobuf::Value proto_value;
@@ -299,11 +353,19 @@ McpFieldExtractor* McpFieldExtractor::RenderNull(absl::string_view name) {
     return this;
   }
 
-  std::string full_path = getCurrentPath();
+  // Build full path efficiently from cached path
+  std::string full_path;
   if (!name.empty()) {
-    if (!full_path.empty())
+    if (!current_path_cache_.empty()) {
+      full_path.reserve(current_path_cache_.size() + 1 + name.size());
+      full_path = current_path_cache_;
       full_path += ".";
-    full_path += name;
+      full_path += name;
+    } else {
+      full_path = std::string(name);
+    }
+  } else {
+    full_path = current_path_cache_;
   }
 
   Protobuf::Value proto_value;
@@ -318,7 +380,7 @@ McpFieldExtractor* McpFieldExtractor::RenderBytes(absl::string_view name, absl::
   return RenderString(name, value);
 }
 
-std::string McpFieldExtractor::getCurrentPath() const { return absl::StrJoin(path_stack_, "."); }
+std::string McpFieldExtractor::getCurrentPath() const { return current_path_cache_; }
 
 void McpFieldExtractor::storeField(const std::string& path, const Protobuf::Value& value) {
   // Store in nested structure in temp storage
@@ -331,7 +393,10 @@ void McpFieldExtractor::storeField(const std::string& path, const Protobuf::Valu
     }
   }
 
-  collected_fields_.insert(path);
+  // Track new fields for early stop optimization
+  if (collected_fields_.insert(path).second) {
+    fields_collected_count_++;
+  }
 }
 
 void McpFieldExtractor::checkEarlyStop() {
@@ -340,14 +405,26 @@ void McpFieldExtractor::checkEarlyStop() {
     return;
   }
 
-  // Check if we have all global fields we need
+  // Update fields_needed_ now that we know the method
+  static bool fields_needed_updated = false;
+  if (!fields_needed_updated) {
+    const auto& required_fields = config_.getFieldsForMethod(method_);
+    fields_needed_ += required_fields.size();
+    fields_needed_updated = true;
+  }
+
+  // Fast path: check if we have collected enough fields
+  if (fields_collected_count_ < fields_needed_) {
+    return; // Still missing fields
+  }
+
+  // Verify we actually have all required fields (not just the count)
   for (const auto& field : config_.getAlwaysExtract()) {
     if (collected_fields_.count(field) == 0) {
       return;
     }
   }
 
-  // For requests/notifications, check method-specific fields
   const auto& required_fields = config_.getFieldsForMethod(method_);
   for (const auto& field : required_fields) {
     if (collected_fields_.count(field.path) == 0) {

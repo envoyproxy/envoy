@@ -199,6 +199,11 @@ private:
 
   int depth_{0};
   int array_depth_{0};
+
+  // Performance optimization caches
+  std::string current_path_cache_;
+  size_t fields_needed_{0};
+  size_t fields_collected_count_{0};
 };
 
 /**
