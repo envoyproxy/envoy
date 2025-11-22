@@ -200,7 +200,7 @@ def envoy_dependencies(skip_targets = []):
     _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
-    _net_zlib()
+    _zlib()
     _intel_dlb()
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
@@ -451,24 +451,16 @@ def _net_colm_open_source_ragel():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _net_zlib():
+def _zlib():
     external_http_archive(
-        name = "net_zlib",
-        build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
+        name = "zlib",
+        build_file = "@envoy//bazel/external:zlib.BUILD",
     )
 
     # Bind for grpc.
     native.bind(
         name = "madler_zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
-    )
-
-    # Bind for protobuf.
-    native.bind(
-        name = "zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
+        actual = "@zlib//:zlib",
     )
 
 def _com_github_zlib_ng_zlib_ng():
