@@ -1023,7 +1023,6 @@ TEST_F(McpJsonParserTest, MissingRequiredField) {
 }
 
 TEST_F(McpJsonParserTest, MethodBeforeJsonRpc) {
-  // Method appears before jsonrpc in the JSON
   std::string json = R"({
     "method": "tools/call",
     "jsonrpc": "2.0",
@@ -1104,11 +1103,9 @@ TEST_F(McpJsonParserTest, CopyFieldByPathCoverage) {
   EXPECT_OK(parser->parse(json));
   EXPECT_TRUE(parser->isValidMcpRequest());
 
-  // 1. Field not found: "params.missing.field"
   // Should just return without error, and not be in metadata
   EXPECT_EQ(parser->getNestedValue("params.missing.field"), nullptr);
 
-  // 2. Intermediate not struct: "params.name.child"
   // "params.name" is "just_a_string", so .child cannot be traversed
   EXPECT_EQ(parser->getNestedValue("params.name.child"), nullptr);
   // Ensure the parent value is still there
@@ -1116,12 +1113,10 @@ TEST_F(McpJsonParserTest, CopyFieldByPathCoverage) {
   ASSERT_NE(name, nullptr);
   EXPECT_EQ(name->string_value(), "just_a_string");
 
-  // 3. Deep nesting success: "deep.nested.value"
   auto* deep_val = parser->getNestedValue("deep.nested.value");
   ASSERT_NE(deep_val, nullptr);
   EXPECT_EQ(deep_val->string_value(), "found_it");
 
-  // 4. Destination structure creation/append
   auto* item1 = parser->getNestedValue("group.item1");
   ASSERT_NE(item1, nullptr);
   EXPECT_EQ(item1->string_value(), "one");
