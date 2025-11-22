@@ -32,6 +32,12 @@ minor_behavior_changes:
     <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite>` to
     :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` to support substitution
     formatting for path header rewriting.
+- area: overload_manager
+  change: |
+    Fixed :ref:`downstream connections monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`
+    to correctly trigger configured actions, and create a ``pressure`` metric like other resource monitors.
+    Previously, this extension would never trigger an action.
 - area: tracing
   change: |
     The :ref:`request header custom tag <envoy_v3_api_field_type.tracing.v3.CustomTag.request_header>`
