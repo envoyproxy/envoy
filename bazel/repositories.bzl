@@ -112,76 +112,114 @@ def _rust_deps():
         patches = ["@envoy//bazel:rules_rust.patch"],
     )
 
-def envoy_dependencies(skip_targets = []):
-    external_http_archive("platforms")
+def envoy_dependencies(skip_targets = [], bzlmod = False):
+    """Load Envoy dependencies.
+
+    This function loads all Envoy dependencies for both WORKSPACE and bzlmod modes.
+    When bzlmod=True, dependencies already available in Bazel Central Registry (BCR)
+    are skipped since they're loaded via bazel_dep() in MODULE.bazel.
+
+    Args:
+        skip_targets: List of targets to skip (legacy WORKSPACE parameter)
+        bzlmod: If True, skip dependencies already in BCR (loaded via bazel_dep)
+    """
+
+    # Dependencies already in BCR when bzlmod=True (loaded via bazel_dep in MODULE.bazel):
+    # - platforms, rules_shell, rules_cc, rules_foreign_cc
+    # - boringssl (non-FIPS), emsdk
+    # - fmt, spdlog, yaml-cpp, nlohmann_json, xxhash
+    # - gperftools, numactl
+    # - fast_float, highway
+    # - zlib, zstd, org_brotli, re2
+    # - protobuf, flatbuffers, google_benchmark, googletest
+    # - rules_fuzzing, rules_license, rules_pkg, rules_shellcheck, aspect_bazel_lib
+    # - bazel_features, bazel_gazelle, io_bazel_rules_go
+
+    if not bzlmod:
+        external_http_archive("platforms")
 
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
         default_envoy_build_config(name = "envoy_build_config")
 
-    # Setup Bazel shell rules
-    external_http_archive(name = "rules_shell")
+    # Setup Bazel shell rules - already in BCR for bzlmod
+    if not bzlmod:
+        external_http_archive(name = "rules_shell")
 
-    # Setup Bazel C++ rules
-    external_http_archive("rules_cc")
+    # Setup Bazel C++ rules - already in BCR for bzlmod
+    if not bzlmod:
+        external_http_archive("rules_cc")
 
-    # Setup external Bazel rules
-    _foreign_cc_dependencies()
+    # Setup external Bazel rules - already in BCR for bzlmod
+    if not bzlmod:
+        _foreign_cc_dependencies()
 
     # BoringSSL:
     # - BoringSSL FIPS from @boringssl_fips//:ssl,
     # - non-FIPS BoringSSL from @boringssl//:ssl.
     # SSL/crypto dependencies are resolved via EXTERNAL_DEPS_MAP in envoy_internal.bzl
-    _boringssl()
-    _boringssl_fips()
-    _aws_lc()
+    if not bzlmod:
+        _boringssl()  # Non-FIPS boringssl is in BCR for bzlmod
+    _boringssl_fips()  # FIPS variant not in BCR, needed for both modes
+    _aws_lc()  # Not in BCR, needed for both modes
 
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
     _com_github_awslabs_aws_c_auth()
     _com_github_axboe_liburing()
-    _com_github_bazel_buildtools()
+
+    # buildtools moved to dev dependencies extension
+    if not bzlmod:
+        _com_github_bazel_buildtools()
     _com_github_c_ares_c_ares()
     _com_github_openhistogram_libcircllhist()
-    _com_github_cyan4973_xxhash()
+    if not bzlmod:
+        _com_github_cyan4973_xxhash()  # xxhash is in BCR for bzlmod
     _com_github_datadog_dd_trace_cpp()
     _com_github_mirror_tclap()
     _com_github_envoyproxy_sqlparser()
-    _com_github_fmtlib_fmt()
-    _com_github_gabime_spdlog()
-    _com_github_google_benchmark()
+    if not bzlmod:
+        _com_github_fmtlib_fmt()  # fmt is in BCR for bzlmod
+        _com_github_gabime_spdlog()  # spdlog is in BCR for bzlmod
+        _com_github_google_benchmark()  # google_benchmark is in BCR for bzlmod
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
     _com_github_google_libsxg()
     _com_github_google_tcmalloc()
-    _gperftools()
-    _com_github_grpc_grpc()
+    if not bzlmod:
+        _gperftools()  # gperftools is in BCR for bzlmod
+    _com_github_grpc_grpc(bzlmod = bzlmod)
     _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
-    _numactl()
+    if not bzlmod:
+        _numactl()  # numactl is in BCR for bzlmod
     _uadk()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
     _com_github_lz4_lz4()
-    _com_github_jbeder_yaml_cpp()
+    if not bzlmod:
+        _com_github_jbeder_yaml_cpp()  # yaml-cpp is in BCR for bzlmod
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
     _com_github_nghttp2_nghttp2()
     _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
     _com_github_alibaba_hessian2_codec()
-    _com_github_nlohmann_json()
+    if not bzlmod:
+        _com_github_nlohmann_json()  # nlohmann_json is in BCR for bzlmod
     _com_github_ncopa_suexec()
-    _com_google_absl()
-    _com_google_googletest()
-    _com_google_protobuf()
-    _v8()
-    _fast_float()
-    _highway()
+    if not bzlmod:
+        _com_google_absl()  # abseil is in BCR for bzlmod
+        _com_google_googletest()  # googletest is in BCR for bzlmod
+        _com_google_protobuf()  # protobuf is in BCR for bzlmod
+    _v8(bzlmod = bzlmod)
+    if not bzlmod:
+        _fast_float()  # fast_float is in BCR for bzlmod
+        _highway()  # highway is in BCR for bzlmod
     _dragonbox()
     _fp16()
     _simdutf()
@@ -193,64 +231,80 @@ def envoy_dependencies(skip_targets = []):
     _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
-    _zlib()
+    if not bzlmod:
+        _zlib()  # zlib is in BCR for bzlmod
     _intel_dlb()
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
-    _org_brotli()
-    _zstd()
-    _re2()
+    if not bzlmod:
+        _org_brotli()  # brotli is in BCR for bzlmod
+        _zstd()  # zstd is in BCR for bzlmod
+        _re2()  # re2 is in BCR for bzlmod
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
-    _emsdk()
-    _rules_fuzzing()
+    if not bzlmod:
+        _emsdk()  # emsdk is in BCR for bzlmod
+        _rules_fuzzing()  # rules_fuzzing is in BCR for bzlmod
     external_http_archive("proxy_wasm_rust_sdk")
-    _com_google_cel_cpp()
+    _com_google_cel_cpp(bzlmod = bzlmod)
     _com_github_google_perfetto()
-    _rules_ruby()
-    external_http_archive("com_github_google_flatbuffers")
-    external_http_archive("bazel_features")
+
+    # rules_ruby is in BCR for bzlmod
+    if not bzlmod:
+        _rules_ruby()
+    if not bzlmod:
+        external_http_archive("com_github_google_flatbuffers")  # flatbuffers is in BCR for bzlmod
+        external_http_archive("bazel_features")  # bazel_features is in BCR for bzlmod
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive(
-        name = "envoy_examples",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:envoy_examples.patch"],
-    )
-    external_http_archive("envoy_toolshed")
+    if not bzlmod:
+        external_http_archive("envoy_examples")  # envoy_examples is loaded via git_override for bzlmod
+        external_http_archive("envoy_toolshed")  # envoy_toolshed is loaded via git_override for bzlmod
 
     _com_github_maxmind_libmaxminddb()
 
-    external_http_archive("rules_license")
-    external_http_archive("rules_pkg")
-    external_http_archive("com_github_aignas_rules_shellcheck")
-    external_http_archive(
-        "aspect_bazel_lib",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:aspect.patch"],
-    )
+    if not bzlmod:
+        external_http_archive("rules_license")  # rules_license is in BCR for bzlmod
+        external_http_archive("rules_pkg")  # rules_pkg is in BCR for bzlmod
+        external_http_archive("com_github_aignas_rules_shellcheck")  # rules_shellcheck is in BCR for bzlmod
+        external_http_archive(
+            "aspect_bazel_lib",
+            patch_args = ["-p1"],
+            patches = ["@envoy//bazel:aspect.patch"],
+        )  # aspect_bazel_lib is in BCR for bzlmod
 
     _com_github_fdio_vpp_vcl()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
 
-    _toolchains_llvm()
+    # LLVM toolchains - in BCR for bzlmod (using git_override for specific commit)
+    if not bzlmod:
+        _toolchains_llvm()
+
+    # Protoc binaries for different platforms - needed for both modes
+    for platform in PROTOC_VERSIONS:
+        external_http_archive(
+            "com_google_protobuf_protoc_%s" % platform,
+            build_file = "@envoy//bazel/protoc:BUILD.protoc",
+        )
 
     _cc_deps()
-    _go_deps(skip_targets)
-    _rust_deps()
+    if not bzlmod:
+        _go_deps(skip_targets)  # Go deps handled via go_deps extension in bzlmod
+        _rust_deps()  # Rust deps handled via crate extension in bzlmod
     _kafka_deps()
     _com_github_wamr()
     _com_github_wasmtime()
 
-    switched_rules_by_language(
-        name = "com_google_googleapis_imports",
-        cc = True,
-        go = True,
-        python = True,
-        grpc = True,
-    )
+    if not bzlmod:
+        switched_rules_by_language(
+            name = "com_google_googleapis_imports",
+            cc = True,
+            go = True,
+            python = True,
+            grpc = True,
+        )
 
 def _boringssl():
     external_http_archive(name = "boringssl")
@@ -506,7 +560,7 @@ def _zstd():
         build_file = "@envoy//bazel/external:zstd.BUILD",
     )
 
-def _com_google_cel_cpp():
+def _com_google_cel_cpp(bzlmod = False):
     external_http_archive(
         name = "com_google_cel_cpp",
         patch_args = ["-p1"],
@@ -519,10 +573,13 @@ def _com_google_cel_cpp():
     # cel-cpp references ``@antlr4-cpp-runtime//:antlr4-cpp-runtime`` but it internally
     # defines ``antlr4_runtimes`` with a cpp target.
     # We are creating a repository alias to avoid duplicating the ANTLR4 dependency.
-    native.new_local_repository(
-        name = "antlr4-cpp-runtime",
-        path = ".",
-        build_file_content = """
+    # NOTE: native.new_local_repository is not available in module extensions,
+    # so we skip this in bzlmod mode. The repository will need to be handled differently.
+    if not bzlmod:
+        native.new_local_repository(
+            name = "antlr4-cpp-runtime",
+            path = ".",
+            build_file_content = """
 package(default_visibility = ["//visibility:public"])
 
 # Alias to cel-cpp's embedded ANTLR4 runtime.
@@ -531,7 +588,7 @@ alias(
     actual = "@antlr4_runtimes//:cpp",
 )
 """,
-    )
+        )
 
 def _com_github_google_perfetto():
     external_http_archive(
@@ -669,27 +726,33 @@ def _com_google_protobuf():
         },
     )
 
-def _v8():
-    external_http_archive(
-        name = "v8",
-        patches = [
+def _v8(bzlmod = False):
+    # Build kwargs for external_http_archive
+    v8_kwargs = {
+        "name": "v8",
+        "patches": [
             "@envoy//bazel:v8.patch",
             "@envoy//bazel:v8_ppc64le.patch",
             # https://issues.chromium.org/issues/423403090
             "@envoy//bazel:v8_python.patch",
         ],
-        patch_args = ["-p1"],
-        patch_cmds = [
+        "patch_args": ["-p1"],
+        "patch_cmds": [
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/simdutf/simdutf.h\"!#include \"simdutf.h\"!' {} \\;",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fp16/src/include/fp16.h\"!#include \"fp16.h\"!' {} \\;",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/dragonbox/src/include/dragonbox/dragonbox.h\"!#include \"dragonbox/dragonbox.h\"!' {} \\;",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fast_float/src/include/fast_float/!#include \"fast_float/!' {} \\;",
         ],
-        repo_mapping = {
+    }
+
+    # repo_mapping is not supported in bzlmod mode
+    if not bzlmod:
+        v8_kwargs["repo_mapping"] = {
             "@abseil-cpp": "@com_google_absl",
             "@icu": "@com_github_unicode_org_icu",
-        },
-    )
+        }
+
+    external_http_archive(**v8_kwargs)
 
 def _fast_float():
     external_http_archive(
@@ -749,13 +812,18 @@ def _org_llvm_releases_compiler_rt():
         build_file = "@envoy//bazel/external:compiler_rt.BUILD",
     )
 
-def _com_github_grpc_grpc():
-    external_http_archive(
-        name = "com_github_grpc_grpc",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:grpc.patch"],
-        repo_mapping = {"@openssl": "@boringssl"},
-    )
+def _com_github_grpc_grpc(bzlmod = False):
+    grpc_kwargs = {
+        "name": "com_github_grpc_grpc",
+        "patch_args": ["-p1"],
+        "patches": ["@envoy//bazel:grpc.patch"],
+    }
+
+    # repo_mapping is not supported in bzlmod mode
+    if not bzlmod:
+        grpc_kwargs["repo_mapping"] = {"@openssl": "@boringssl"}
+
+    external_http_archive(**grpc_kwargs)
     external_http_archive(
         "build_bazel_rules_apple",
         patch_args = ["-p1"],

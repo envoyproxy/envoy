@@ -513,90 +513,6 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
-    "//bazel:extensions.bzl%envoy_mobile_dependencies": {
-      "general": {
-        "bzlTransitiveDigest": "j3nPg9zL52W1i9iu7jpmVa+intgcMev8Bpv8oJxTUK0=",
-        "usagesDigest": "ldXZ3cmf4M5UrlgxPeWMr9kc/D784DFTgeEsZ2PhjlI=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
-        "generatedRepoSpecs": {
-          "google_bazel_common": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_archive",
-            "attributes": {
-              "sha256": "d8c9586b24ce4a5513d972668f94b62eb7d705b92405d4bc102131f294751f1d",
-              "strip_prefix": "bazel-common-413b433b91f26dbe39cdbc20f742ad6555dd1e27",
-              "urls": [
-                "https://github.com/google/bazel-common/archive/413b433b91f26dbe39cdbc20f742ad6555dd1e27.zip"
-              ]
-            }
-          },
-          "com_github_libevent_libevent": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_archive",
-            "attributes": {
-              "urls": [
-                "https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"
-              ],
-              "strip_prefix": "libevent-0d7d85c2083f7a4c9efe01c061486f332b576d28",
-              "sha256": "549d34065eb2485dfad6c8de638caaa6616ed130eec36dd978f73b6bdd5af113",
-              "build_file_content": "filegroup(name = \"all\", srcs = glob([\"**\"]), visibility = [\"//visibility:public\"])"
-            }
-          },
-          "DrString": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_archive",
-            "attributes": {
-              "build_file_content": "exports_files([\"drstring\"])",
-              "sha256": "860788450cf9900613454a51276366ea324d5bfe71d1844106e9c1f1d7dfd82b",
-              "url": "https://github.com/dduan/DrString/releases/download/0.5.2/drstring-x86_64-apple-darwin.tar.gz"
-            }
-          },
-          "SwiftLint": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_archive",
-            "attributes": {
-              "build_file_content": "exports_files([\"swiftlint\"])",
-              "sha256": "47078845857fa7cf8497f5861967c7ce67f91915e073fb3d3114b8b2486a9270",
-              "url": "https://github.com/realm/SwiftLint/releases/download/0.50.3/portable_swiftlint.zip"
-            }
-          },
-          "com_github_buildbuddy_io_rules_xcodeproj": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_archive",
-            "attributes": {
-              "sha256": "d02932255ba3ffaab1859e44528c69988e93fa353fa349243e1ef5054bd1ba80",
-              "url": "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/1.2.0/release.tar.gz"
-            }
-          },
-          "xctestrunner": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_archive",
-            "attributes": {
-              "urls": [
-                "https://github.com/google/xctestrunner/archive/b7698df3d435b6491b4b4c0f9fc7a63fbed5e3a6.tar.gz"
-              ],
-              "strip_prefix": "xctestrunner-b7698df3d435b6491b4b4c0f9fc7a63fbed5e3a6",
-              "sha256": "ae3a063c985a8633cb7eb566db21656f8db8eb9a0edb8c182312c7f0db53730d",
-              "patch_args": [
-                "-p1"
-              ],
-              "patches": [
-                "@@//bazel:xctestrunner.patch"
-              ]
-            }
-          }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
-      }
-    },
     "@@aspect_rules_esbuild~//esbuild:extensions.bzl%esbuild": {
       "general": {
         "bzlTransitiveDigest": "S1/JGCCSy4uDLY+ccHrTvSRjUoLuvKLw5KAGzrwFgLU=",
@@ -1117,6 +1033,90 @@
             "envoy_api~",
             "envoy_api",
             "envoy_api~"
+          ]
+        ]
+      }
+    },
+    "@@envoy_mobile~//bazel:extensions.bzl%envoy_mobile_dependencies": {
+      "general": {
+        "bzlTransitiveDigest": "j3nPg9zL52W1i9iu7jpmVa+intgcMev8Bpv8oJxTUK0=",
+        "usagesDigest": "LZqQQJI0HJQC95/8bvdvMAr8MrYmssbgNTCZisX+OIs=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "google_bazel_common": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "ruleClassName": "http_archive",
+            "attributes": {
+              "sha256": "d8c9586b24ce4a5513d972668f94b62eb7d705b92405d4bc102131f294751f1d",
+              "strip_prefix": "bazel-common-413b433b91f26dbe39cdbc20f742ad6555dd1e27",
+              "urls": [
+                "https://github.com/google/bazel-common/archive/413b433b91f26dbe39cdbc20f742ad6555dd1e27.zip"
+              ]
+            }
+          },
+          "com_github_libevent_libevent": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "ruleClassName": "http_archive",
+            "attributes": {
+              "urls": [
+                "https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"
+              ],
+              "strip_prefix": "libevent-0d7d85c2083f7a4c9efe01c061486f332b576d28",
+              "sha256": "549d34065eb2485dfad6c8de638caaa6616ed130eec36dd978f73b6bdd5af113",
+              "build_file_content": "filegroup(name = \"all\", srcs = glob([\"**\"]), visibility = [\"//visibility:public\"])"
+            }
+          },
+          "DrString": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "ruleClassName": "http_archive",
+            "attributes": {
+              "build_file_content": "exports_files([\"drstring\"])",
+              "sha256": "860788450cf9900613454a51276366ea324d5bfe71d1844106e9c1f1d7dfd82b",
+              "url": "https://github.com/dduan/DrString/releases/download/0.5.2/drstring-x86_64-apple-darwin.tar.gz"
+            }
+          },
+          "SwiftLint": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "ruleClassName": "http_archive",
+            "attributes": {
+              "build_file_content": "exports_files([\"swiftlint\"])",
+              "sha256": "47078845857fa7cf8497f5861967c7ce67f91915e073fb3d3114b8b2486a9270",
+              "url": "https://github.com/realm/SwiftLint/releases/download/0.50.3/portable_swiftlint.zip"
+            }
+          },
+          "com_github_buildbuddy_io_rules_xcodeproj": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "ruleClassName": "http_archive",
+            "attributes": {
+              "sha256": "d02932255ba3ffaab1859e44528c69988e93fa353fa349243e1ef5054bd1ba80",
+              "url": "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/1.2.0/release.tar.gz"
+            }
+          },
+          "xctestrunner": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "ruleClassName": "http_archive",
+            "attributes": {
+              "urls": [
+                "https://github.com/google/xctestrunner/archive/b7698df3d435b6491b4b4c0f9fc7a63fbed5e3a6.tar.gz"
+              ],
+              "strip_prefix": "xctestrunner-b7698df3d435b6491b4b4c0f9fc7a63fbed5e3a6",
+              "sha256": "ae3a063c985a8633cb7eb566db21656f8db8eb9a0edb8c182312c7f0db53730d",
+              "patch_args": [
+                "-p1"
+              ],
+              "patches": [
+                "@@envoy_mobile~//bazel:xctestrunner.patch"
+              ]
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "envoy_mobile~",
+            "bazel_tools",
+            "bazel_tools"
           ]
         ]
       }
