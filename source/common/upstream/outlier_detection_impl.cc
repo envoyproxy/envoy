@@ -308,7 +308,7 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
           config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))),
       successful_active_health_check_uneject_host_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, successful_active_health_check_uneject_host, true)),
-      detect_degraded_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, detect_degraded, false)) {}
+      detect_degraded_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, detect_degraded_hosts, false)) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
@@ -680,6 +680,8 @@ void DetectorImpl::clearHostDegraded(HostSharedPtr host) {
 
 void DetectorImpl::setHostDegradedMainThread(HostSharedPtr host) {
   if (!host->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION)) {
+    stats_.ejections_detected_degradation_.inc();
+
     // Use the degrade() method which tracks timing
     host_monitors_[host]->degrade(time_source_.monotonicTime());
 

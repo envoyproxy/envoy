@@ -43,9 +43,9 @@ enum class Result {
   // The entries below only make sense when Envoy understands requests/responses for the
   // protocol being proxied. They do not make sense for TcpProxy, for example.
   // External origin errors.
-  ExtOriginRequestFailed,  // The server indicated it cannot process a request
+  ExtOriginRequestFailed,  // The server indicated it cannot process a request.
   ExtOriginRequestSuccess, // Request was completed successfully.
-  ExtOriginRequestDegraded // The server is degraded
+  ExtOriginRequestDegraded // The server is degraded.
 };
 
 /**

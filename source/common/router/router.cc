@@ -1740,12 +1740,12 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   // Check for degraded header
   const bool is_degraded = headers->EnvoyDegraded() != nullptr;
 
-  // Ejection has priority over degradation: 5xx errors always trigger ejection logic
+  // Ejection has priority over degradation: 5xx errors always trigger ejection logic.
   if (response_code_for_outlier_detection >= 500) {
     upstream_request.upstreamHost()->outlierDetector().putResult(
         Upstream::Outlier::Result::ExtOriginRequestFailed, response_code_for_outlier_detection);
   } else if (is_degraded) {
-    // Only mark as degraded if response is successful (not 5xx)
+    // Only mark as degraded if response is successful (not 5xx).
     upstream_request.upstreamHost()->outlierDetector().putResult(
         Upstream::Outlier::Result::ExtOriginRequestDegraded, response_code_for_outlier_detection);
   } else {

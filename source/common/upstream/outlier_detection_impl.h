@@ -247,6 +247,7 @@ private:
   COUNTER(ejections_overflow)                                                                      \
   COUNTER(ejections_success_rate)                                                                  \
   COUNTER(ejections_total)                                                                         \
+  COUNTER(ejections_detected_degradation)                                                          \
   GAUGE(ejections_active, Accumulate)
 
 /**

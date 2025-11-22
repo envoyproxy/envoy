@@ -2765,7 +2765,7 @@ TEST_F(OutlierDetectorImplTest, DegradedHostDetection) {
 interval: 10s
 base_ejection_time: 30s
 consecutive_5xx: 5
-detect_degraded: true
+detect_degraded_hosts: true
   )EOF";
 
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
@@ -2812,7 +2812,7 @@ TEST_F(OutlierDetectorImplTest, DegradedHostDetectionDisabled) {
 interval: 10s
 base_ejection_time: 30s
 consecutive_5xx: 5
-detect_degraded: false
+detect_degraded_hosts: false
   )EOF";
 
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
@@ -2841,7 +2841,7 @@ interval: 10s
 base_ejection_time: 30s
 consecutive_5xx: 3
 max_ejection_percent: 100
-detect_degraded: true
+detect_degraded_hosts: true
   )EOF";
 
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
@@ -2884,7 +2884,7 @@ interval: 10s
 base_ejection_time: 30s
 consecutive_5xx: 3
 max_ejection_percent: 100
-detect_degraded: true
+detect_degraded_hosts: true
   )EOF";
 
   envoy::config::cluster::v3::OutlierDetection outlier_detection;

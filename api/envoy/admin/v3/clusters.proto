@@ -182,7 +182,7 @@ message HostHealthStatus {
   bool active_hc_timeout = 8;
 
   // The host is currently being marked as degraded through outlier detection.
-  bool failed_outlier_degraded_detection = 9;
+  bool failed_degraded_outlier_detection = 9;
 
   // Health status as reported by EDS.
   //

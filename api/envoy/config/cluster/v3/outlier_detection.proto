@@ -181,8 +181,9 @@ message OutlierDetection {
   // If set to true, outlier detection will mark hosts as degraded when they return
   // the ``x-envoy-degraded`` header with a successful (HTTP 200) response.
   // Degraded hosts are deprioritized in load balancing but are not ejected from the cluster.
-  // When the host returns a successful response without the degraded header, it will be
-  // unmarked as degraded.
+  // The degraded state is cleared using the same backoff algorithm as ejection, with the degradation
+  // period calculated as ``base_ejection_time`` multiplied by the number of times the host
+  // has been marked as degraded, capped by ``max_ejection_time``.
   // Defaults to false.
-  google.protobuf.BoolValue detect_degraded = 26;
+  google.protobuf.BoolValue detect_degraded_hosts = 26;
 }
