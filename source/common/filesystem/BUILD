@@ -113,7 +113,6 @@ envoy_cc_library(
         "//conditions:default": "inotify",
     }),
     deps = [
-        "//bazel/foreign_cc:event",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
@@ -123,6 +122,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:default_socket_interface_lib",
+        "@libevent",
     ] + select({
         "//bazel:windows_x86_64": [
             "//source/common/api:os_sys_calls_lib",

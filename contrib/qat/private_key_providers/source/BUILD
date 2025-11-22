@@ -17,7 +17,7 @@ envoy_cc_library(
     ],
     external_deps = ["ssl"],
     repository = "@envoy",
-    deps = ["//contrib/qat:qatlib"],
+    deps = ["@qatlib//:qat"],
 )
 
 envoy_cc_library(

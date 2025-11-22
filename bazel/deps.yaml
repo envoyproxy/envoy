@@ -12,7 +12,7 @@ aws_lc:
   project_name: "AWS libcrypto (AWS-LC)"
   project_desc: "OpenSSL compatible general-purpose crypto library"
   project_url: "https://github.com/aws/aws-lc"
-  release_date: "2026-01-06"
+  release_date: "2025-12-01"
   use_category:
   - controlplane
   - dataplane_core
@@ -55,15 +55,6 @@ boringssl:
   cpe: "cpe:2.3:a:google:boringssl:*"
   license: "Mixed"
   license_url: "https://github.com/google/boringssl/blob/{version}/LICENSE"
-build_bazel_rules_apple:
-  project_name: "Apple Rules for Bazel"
-  project_desc: "Bazel rules for Apple platforms"
-  project_url: "https://github.com/bazelbuild/rules_apple"
-  release_date: "2025-03-14"
-  use_category:
-  - build
-  license: "Apache-2.0"
-  license_url: "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE"
 com_github_aignas_rules_shellcheck:
   project_name: "Shellcheck rules for bazel"
   project_desc: "Now you do not need to depend on the system shellcheck version in your bazel-managed (mono)repos."
@@ -73,7 +64,7 @@ com_github_aignas_rules_shellcheck:
   - build
   license: "MIT"
   license_url: "https://github.com/aignas/rules_shellcheck/blob/{version}/LICENSE"
-com_github_alibaba_hessian2_codec:
+hessian2-codec:
   project_name: "hessian2-codec"
   project_desc: "hessian2-codec is a C++ library for hessian2 codec"
   project_url: "https://github.com/alibaba/hessian2-codec.git"
@@ -86,8 +77,8 @@ com_github_alibaba_hessian2_codec:
   - envoy.generic_proxy.codecs.dubbo
   license: "Apache-2.0"
   license_url: "https://github.com/alibaba/hessian2-codec/blob/{version}/LICENSE"
-com_github_awslabs_aws_c_auth:
-  project_name: "aws-c-auth"
+aws-c-auth-testdata:
+  project_name: "aws-c-auth-testdata"
   project_desc: "C99 library implementation of AWS client-side authentication: standard credentials providers and signing"
   project_url: "https://github.com/awslabs/aws-c-auth"
   release_date: "2026-01-05"
@@ -156,17 +147,6 @@ com_github_envoyproxy_sqlparser:
   - envoy.filters.network.postgres_proxy
   license: "MIT"
   license_url: "https://github.com/envoyproxy/sql-parser/blob/{version}/LICENSE"
-com_github_fdio_vpp_vcl:
-  project_name: "VPP Comms Library"
-  project_desc: "FD.io Vector Packet Processor (VPP) Comms Library"
-  project_url: "https://fd.io/"
-  release_date: "2026-01-11"
-  use_category:
-  - other
-  extensions:
-  - envoy.bootstrap.vcl
-  license: "Apache-2.0"
-  license_url: "https://github.com/FDio/vpp/blob/{version}/LICENSE"
 com_github_fmtlib_fmt:
   project_name: "fmt"
   project_desc: "{fmt} is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams"
@@ -300,42 +280,6 @@ com_github_grpc_grpc:
   cpe: "cpe:2.3:a:grpc:grpc:*"
   license: "Apache-2.0"
   license_url: "https://github.com/grpc/grpc/blob/v{version}/LICENSE"
-com_github_intel_ipp_crypto_crypto_mb:
-  project_name: "libipp-crypto"
-  project_desc: "Intel® Integrated Performance Primitives Cryptography"
-  project_url: "https://github.com/intel/cryptography-primitives"
-  release_date: "2025-10-01"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.tls.key_providers.cryptomb
-  cpe: "cpe:2.3:a:intel:cryptography_for_intel_integrated_performance_primitives:*"
-  license: "Apache-2.0"
-  license_url: "https://github.com/intel/cryptography-primitives/blob/ippcp_{version}/LICENSE"
-com_github_intel_qatlib:
-  project_name: "qatlib"
-  project_desc: "Intel QuickAssist Technology Library"
-  project_url: "https://github.com/intel/qatlib"
-  release_date: "2025-07-17"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.tls.key_providers.qat
-  - envoy.compression.qatzip.compressor
-  - envoy.compression.qatzstd.compressor
-  license: "BSD-3-Clause"
-  license_url: "https://github.com/intel/qatlib/blob/{version}/LICENSE"
-com_github_intel_qatzip:
-  project_name: "qatzip"
-  project_desc: "Intel QuickAssist Technology QATzip Library"
-  project_url: "https://github.com/intel/qatzip"
-  release_date: "2025-04-25"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.compression.qatzip.compressor
-  license: "BSD-3-Clause"
-  license_url: "https://github.com/intel/QATzip/blob/v{version}/LICENSE"
 com_github_jbeder_yaml_cpp:
   project_name: "yaml-cpp"
   project_desc: "YAML parser and emitter in C++ matching the YAML 1.2 spec"
@@ -403,7 +347,7 @@ com_github_mirror_tclap:
   cpe: "cpe:2.3:a:tclap_project:tclap:*"
   license: "MIT"
   license_url: "https://github.com/mirror/tclap/blob/v{version}/COPYING"
-com_github_msgpack_cpp:
+msgpack-cxx:
   project_name: "msgpack for C/C++"
   project_desc: "MessagePack is an efficient binary serialization format"
   project_url: "https://github.com/msgpack/msgpack-c"
@@ -458,16 +402,7 @@ com_github_openhistogram_libcircllhist:
   - dataplane_core
   license: "Apache-2.0"
   license_url: "https://github.com/openhistogram/libcircllhist/blob/{version}/LICENSE"
-com_github_qat_zstd:
-  project_name: "QAT-ZSTD-Plugin"
-  project_desc: "Intel® QuickAssist Technology ZSTD Plugin (QAT ZSTD Plugin)"
-  project_url: "https://github.com/intel/QAT-ZSTD-Plugin/"
-  release_date: "2025-10-07"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.compression.qatzstd.compressor
-com_github_skyapm_cpp2sky:
+cpp2sky:
   project_name: "cpp2sky"
   project_desc: "C++ SDK for Apache SkyWalking"
   project_url: "https://github.com/SkyAPM/cpp2sky"
@@ -478,7 +413,7 @@ com_github_skyapm_cpp2sky:
   - envoy.tracers.skywalking
   license: "Apache-2.0"
   license_url: "https://github.com/SkyAPM/cpp2sky/blob/v{version}/LICENSE"
-com_github_unicode_org_icu:
+icu:
   project_name: "ICU Library"
   project_desc: "Development files for International Components for Unicode"
   project_url: "https://github.com/unicode-org/icu"
@@ -712,17 +647,6 @@ confluentinc_librdkafka:
   - envoy.filters.network.kafka_mesh
   license: "librdkafka"
   license_url: "https://github.com/confluentinc/librdkafka/blob/v{version}/LICENSE"
-dragonbox:
-  project_name: "Dragonbox"
-  project_desc: |
-    Reference implementation of dragonbox, a float-to-string conversion algorithm based on a beautiful algorithm Schubfach,
-    developed by Raffaello Giulietti in 2017-2018. Dragonbox is further inspired by Grisu and Grisu-Exact.
-  project_url: "https://github.com/jk-jeon/dragonbox"
-  release_date: "2024-10-28"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.wasm.runtime.v8
 emsdk:
   project_name: "Emscripten SDK"
   project_desc: "Emscripten SDK (use by Wasm)"
@@ -757,17 +681,6 @@ envoy_toolshed:
   - msan_libs
   license: "Apache-2.0"
   license_url: "https://github.com/envoyproxy/toolshed/blob/bazel-v{version}/LICENSE"
-fast_float:
-  project_name: "fast_float number parsing library"
-  project_desc: |
-    Fast and exact implementation of the C++ from_chars functions for number types: 4x to 10x faster than strtod,
-    part of GCC 12, Chromium, Redis and WebKit/Safari
-  project_url: "https://github.com/fastfloat/fast_float"
-  release_date: "2024-11-21"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.wasm.runtime.v8
 fips_cmake_linux_aarch64:
   project_name: "CMake (Linux aarch64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
@@ -828,15 +741,6 @@ fips_ninja:
   cpe: "cpe:2.3:a:ninja-build:ninja:*"
   license: "Apache-2.0"
   license_url: "https://github.com/ninja-build/ninja/blob/v{version}/COPYING"
-fp16:
-  project_name: "Conversion to/from half-precision floating point formats"
-  project_desc: "Header-only library for conversion to/from half-precision floating point formats."
-  project_url: "https://github.com/Maratyszcza/FP16"
-  release_date: "2021-03-20"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.wasm.runtime.v8
 googleurl:
   project_name: "Chrome URL parsing library"
   project_desc: "Chrome URL parsing library"
@@ -874,15 +778,6 @@ grpc_httpjson_transcoding:
   - envoy.filters.http.mcp
   license: "Apache-2.0"
   license_url: "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/{version}/LICENSE"
-highway:
-  project_name: "Efficient and performance-portable vector software"
-  project_desc: "Performance-portable, length-agnostic SIMD with runtime dispatch"
-  project_url: "https://github.com/google/highway"
-  release_date: "2024-05-31"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.wasm.runtime.v8
 intel_dlb:
   project_name: "Intel Dlb"
   project_desc: "Dlb"
@@ -953,6 +848,18 @@ io_vectorscan:
   - envoy.regex_engines.hyperscan
   license: "BSD-3-Clause"
   license_url: "https://github.com/VectorCamp/vectorscan/blob/vectorscan/{version}/LICENSE"
+ipp-crypto:
+  project_name: "libipp-crypto"
+  project_desc: "Intel® Integrated Performance Primitives Cryptography"
+  project_url: "https://github.com/intel/cryptography-primitives"
+  release_date: "2025-10-01"
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.tls.key_providers.cryptomb
+  cpe: "cpe:2.3:a:intel:cryptography_for_intel_integrated_performance_primitives:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/intel/cryptography-primitives/blob/ippcp_{version}/LICENSE"
 kafka_server_binary:
   project_name: "Kafka (server binary)"
   project_desc: "Open-source distributed event streaming platform"
@@ -1112,6 +1019,48 @@ proxy_wasm_rust_sdk:
   - test_only
   license: "Apache-2.0"
   license_url: "https://github.com/proxy-wasm/proxy-wasm-rust-sdk/blob/v{version}/LICENSE"
+qatlib:
+  project_name: "qatlib"
+  project_desc: "Intel QuickAssist Technology Library"
+  project_url: "https://github.com/intel/qatlib"
+  release_date: "2025-07-17"
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.tls.key_providers.qat
+  - envoy.compression.qatzip.compressor
+  - envoy.compression.qatzstd.compressor
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/intel/qatlib/blob/{version}/LICENSE"
+qatzip:
+  project_name: "qatzip"
+  project_desc: "Intel QuickAssist Technology QATzip Library"
+  project_url: "https://github.com/intel/qatzip"
+  release_date: "2025-04-25"
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.compression.qatzip.compressor
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/intel/QATzip/blob/v{version}/LICENSE"
+qat-zstd:
+  project_name: "QAT-ZSTD-Plugin"
+  project_desc: "Intel® QuickAssist Technology ZSTD Plugin (QAT ZSTD Plugin)"
+  project_url: "https://github.com/intel/QAT-ZSTD-Plugin/"
+  release_date: "2025-10-07"
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.compression.qatzstd.compressor
+rules_apple:
+  project_name: "Apple Rules for Bazel"
+  project_desc: "Bazel rules for Apple platforms"
+  project_url: "https://github.com/bazelbuild/rules_apple"
+  release_date: "2025-03-14"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE"
 rules_cc:
   project_name: "C++ rules for Bazel"
   project_desc: "Bazel rules for the C++ language"
@@ -1227,18 +1176,6 @@ rules_shell:
   - build
   license: "Apache-2.0"
   license_url: "https://github.com/protocolbuffers/rules_shell/blob/{version}/LICENSE"
-simdutf:
-  project_name: "Unicode validation and transcoding at billions of characters per second"
-  project_desc: |
-    Unicode routines (UTF8, UTF16, UTF32) and Base64: billions of characters per second using SSE2, AVX2, NEON,
-    AVX-512, RISC-V Vector Extension, LoongArch64, POWER. Part of Node.js, WebKit/Safari, Ladybird, Chromium,
-    Cloudflare Workers and Bun.
-  project_url: "https://github.com/simdutf/simdutf"
-  release_date: "2025-08-01"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.wasm.runtime.v8
 skywalking_data_collect_protocol:
   project_name: "skywalking-data-collect-protocol"
   project_desc: "Data Collect Protocols of Apache SkyWalking"
@@ -1294,6 +1231,17 @@ v8:
   extensions:
   - envoy.wasm.runtime.v8
   cpe: "cpe:2.3:a:google:v8:*"
+vpp-vcl:
+  project_name: "VPP Comms Library"
+  project_desc: "FD.io Vector Packet Processor (VPP) Comms Library"
+  project_url: "https://fd.io/"
+  release_date: "2026-01-11"
+  use_category:
+  - other
+  extensions:
+  - envoy.bootstrap.vcl
+  license: "Apache-2.0"
+  license_url: "https://github.com/FDio/vpp/blob/{version}/LICENSE"
 yq_bzl:
   project_name: "yq.bzl"
   project_desc: "Bazel rules for yq"
@@ -1304,7 +1252,7 @@ yq_bzl:
   cpe: "N/A"
   license: "Apache-2.0"
   license_url: "https://github.com/bazel-contrib/yq.bzl/blob/v{version}/LICENSE"
-zlib_ng:
+zlib-ng:
   project_name: "zlib-ng"
   project_desc: "zlib fork (higher performance)"
   project_url: "https://github.com/zlib-ng/zlib-ng"

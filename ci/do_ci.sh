@@ -102,7 +102,7 @@ function cp_binary_for_image_build() {
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
-  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+  cp -f bazel-bin/external/su-exec~/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
 
   # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
@@ -168,7 +168,7 @@ function bazel_binary_build() {
     //test/tools/config_load_check:config_load_check_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @com_github_ncopa_suexec//:su-exec
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
@@ -221,7 +221,7 @@ function bazel_envoy_api_go_build() {
             # strip @envoy_api//
         RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
         PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
-        INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
+        INPUT_DIR="${BAZEL_BIN}/external/envoy_api~/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
         OUTPUT_DIR="build_go/${RULE_DIR}"
         mkdir -p "$OUTPUT_DIR"
         if [[ ! -e "$INPUT_DIR" ]]; then
@@ -472,13 +472,14 @@ case $CI_TARGET in
 
     deps)
         setup_clang_toolchain
-        echo "dependency validate_test..."
-        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-              //tools/dependency:validate_test
-        echo "verifying dependencies..."
+        # TODO(phlax): Re-enable once validate tools is converted to bzlmod
+        # echo "dependency validate_test..."
+        # bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+        #       //tools/dependency:validate_test
+        # echo "verifying dependencies..."
         # Validate dependency relationships between core/extensions and external deps.
-        time bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-             //tools/dependency:validate
+        # time bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+        #      //tools/dependency:validate
         # Validate repository metadata.
         echo "check repositories..."
         "${ENVOY_SRCDIR}/tools/check_repositories.sh"
@@ -634,6 +635,7 @@ case $CI_TARGET in
         if [[ -n "${DOCS_BUILD_RST}" ]]; then
             bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
             cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
+            exit 0
         fi
         DOCS_OUTPUT_DIR="$(realpath "$DOCS_OUTPUT_DIR")"
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \

@@ -31,3 +31,29 @@ index eabd17fc..83bcf06f 100644
        if (file_lookup(hquery) == ARES_SUCCESS) {
          end_hquery(hquery, ARES_SUCCESS);
 
+diff --git a/BUILD.bazel b/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/BUILD.bazel
+@@ -0,0 +1,13 @@
++package(default_visibility = ["//visibility:public"])
++
++filegroup(
++    name = "all",
++    srcs = glob(["**"]),
++    visibility = ["//visibility:public"],
++)
++
++# Alias to Envoy's foreign_cc build of c-ares
++alias(
++    name = "ares",
++    actual = "@envoy//bazel/foreign_cc:ares",
++)
+diff --git a/MODULE.bazel b/MODULE.bazel
+new file mode 100644
+--- /dev/null
++++ b/MODULE.bazel
+@@ -0,0 +1,3 @@
++module(
++    name = "c-ares",
++)

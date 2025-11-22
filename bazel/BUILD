@@ -542,7 +542,7 @@ selects.config_setting_group(
 
 label_flag(
     name = "zlib",
-    build_setting_default = "@zlib_ng",
+    build_setting_default = "@zlib-ng",
 )
 
 config_setting(
@@ -583,7 +583,7 @@ alias(
     name = "boringssl",
     actual = select({
         "//bazel:boringssl_fips_ppc": "@aws_lc//:ssl",
-        "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:ssl",
+        "//bazel:boringssl_fips_not_ppc": "@boringssl-fips//:ssl",
         "//conditions:default": "@boringssl//:ssl",
     }),
 )
@@ -592,7 +592,7 @@ alias(
     name = "boringcrypto",
     actual = select({
         "//bazel:boringssl_fips_ppc": "@aws_lc//:crypto",
-        "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:crypto",
+        "//bazel:boringssl_fips_not_ppc": "@boringssl-fips//:crypto",
         "//conditions:default": "@boringssl//:crypto",
     }),
 )
@@ -1022,9 +1022,9 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = selects.with_or({
         ("//bazel:linux_x86_64", "//bazel:linux_aarch64"): [
-            "@com_github_google_tcmalloc//tcmalloc",
-            "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
-            "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
+            "@tcmalloc//tcmalloc",
+            "@tcmalloc//tcmalloc:profile_marshaler",
+            "@tcmalloc//tcmalloc:malloc_extension",
         ],
         "//conditions:default": ["//bazel/external:gperftools"],
     }),
@@ -1037,7 +1037,7 @@ cc_library(
         (
             "//bazel:linux_x86_64",
             "//bazel:linux_aarch64",
-        ): ["@com_github_google_tcmalloc//tcmalloc"],
+        ): ["@tcmalloc//tcmalloc"],
         "//conditions:default": ["//bazel/external:gperftools"],
     }),
 )

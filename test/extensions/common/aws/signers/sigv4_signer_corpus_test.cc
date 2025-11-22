@@ -22,9 +22,8 @@ namespace Aws {
 std::vector<std::string> directoryListing() {
   std::vector<std::string> directories;
   // TODO(phlax): Cleanup once bzlmod migration is complete
-  std::string bzlmod_path =
-      TestEnvironment::runfilesDirectory() +
-      "~envoy_dependencies_extension~com_github_awslabs_aws_c_auth/tests/aws-signing-test-suite/v4";
+  std::string bzlmod_path = TestEnvironment::runfilesDirectory() +
+                            "/external/aws-c-auth-testdata~/tests/aws-signing-test-suite/v4";
   std::string workspace_path =
       TestEnvironment::runfilesDirectory() +
       "/external/com_github_awslabs_aws_c_auth/tests/aws-signing-test-suite/v4";

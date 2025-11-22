@@ -38,7 +38,7 @@ def generate_compilation_database(args):
         source_dir_targets.remove("//contrib/...")
 
     subprocess.check_call(["bazel", *bazel_startup_options, "build"] + bazel_options + [
-        "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
+        "--aspects=@bazel-compdb//:aspects.bzl%compilation_database_aspect",
         "--output_groups=compdb_files,header_files"
     ] + source_dir_targets)
 
