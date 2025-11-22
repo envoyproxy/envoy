@@ -1,5 +1,9 @@
 # Building Envoy with Bazel
 
+> **🚀 Bzlmod Migration**: Envoy is migrating to [Bazel's modern dependency management system (bzlmod)](../docs/root/start/migrating/bzlmod.md). 
+> The repository now supports both traditional WORKSPACE and modern MODULE.bazel dependency management. 
+> See the [migration guide](../docs/root/start/migrating/bzlmod.md) for details.
+
 ## Installing Bazelisk as Bazel
 
 It is recommended to use [Bazelisk](https://github.com/bazelbuild/bazelisk) installed as `bazel`, to avoid Bazel compatibility issues.

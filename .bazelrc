@@ -14,12 +14,30 @@
 startup --host_jvm_args=-Xmx3g
 startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 
+#############################################################################
+# global
+#############################################################################
 
 #############################################################################
 # global
 #############################################################################
 
-common --noenable_bzlmod
+#############################################################################
+# Bzlmod Configuration (Bazel 8+)
+#############################################################################
+# Enable bzlmod for modern dependency management
+# Bazel 8 provides improved MODULE.bazel/WORKSPACE isolation
+# WORKSPACE mode is deprecated and will be removed once bzlmod is enabled on all targets
+common --enable_bzlmod
+
+# Bzlmod-specific configuration
+build:bzlmod --enable_bzlmod
+test:bzlmod --enable_bzlmod
+query:bzlmod --enable_bzlmod
+
+# Legacy WORKSPACE mode (deprecated - for backwards compatibility only)
+build:workspace --noenable_bzlmod
+test:workspace --noenable_bzlmod
 
 fetch --color=yes
 run --color=yes

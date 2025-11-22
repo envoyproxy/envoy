@@ -1,5 +1,17 @@
 ---
 tasks:
+  bzlmod_validation:
+    name: "Bzlmod Validation"
+    platform: ubuntu2004
+    build_targets:
+    - "//source/common/common:assert_lib"
+    - "@envoy_api//envoy/config/core/v3:pkg"
+    test_targets:
+    - "//test/common/common:assert_test"
+    build_flags:
+    - "--enable_bzlmod"
+    test_flags:
+    - "--enable_bzlmod"
   rbe:
     name: "RBE"
     platform: ubuntu2004

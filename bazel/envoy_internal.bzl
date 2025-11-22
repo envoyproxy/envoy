@@ -134,8 +134,9 @@ def envoy_copts(repository, test = False):
            _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
 # References to Envoy external dependencies should be wrapped with this function.
+# This redirects legacy //external: references to the //third_party: compatibility layer.
 def envoy_external_dep_path(dep):
-    return "//external:%s" % dep
+    return "//third_party:%s" % dep
 
 def envoy_linkstatic():
     return select({

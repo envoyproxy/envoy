@@ -10,11 +10,11 @@ envoy_cc_test(
     env = {"ENVOY_NO_LOG_SINK": ""},
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
-        "//library/common:engine_types_lib",
-        "//test/common/integration:engine_with_test_server",
-        "//test/common/integration:test_server_lib",
         "@envoy//source/common/common:assert_lib",
         "@envoy_build_config//:test_extensions",
+        "@envoy_mobile//library/cc:engine_builder_lib",
+        "@envoy_mobile//library/common:engine_types_lib",
+        "@envoy_mobile//test/common/integration:engine_with_test_server",
+        "@envoy_mobile//test/common/integration:test_server_lib",
     ],
 )

@@ -17,6 +17,8 @@ Below is a list of additional documentation to aid the development process:
 
 - [Managing external dependencies with Bazel](https://github.com/envoyproxy/envoy/blob/main/bazel/EXTERNAL_DEPS.md)
 
+- [Bzlmod migration guide (modern dependency management)](https://github.com/envoyproxy/envoy/blob/main/docs/root/start/migrating/bzlmod.md)
+
 - [Guide to Envoy Bazel rules (managing `BUILD` files)](https://github.com/envoyproxy/envoy/blob/main/bazel/DEVELOPER.md)
 
 - [Guide to setup development environment with Visual Studio Code](https://github.com/envoyproxy/envoy/blob/main/tools/vscode/README.md)
