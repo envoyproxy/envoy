@@ -48,6 +48,13 @@ on:
           -e CXX
           -e BAZEL_BUILD_OPTION_LIST
           -e MOBILE_DOCS_CHECKOUT_DIR
+      diskspace-hack:
+        type: boolean
+        default: false
+      diskspace-hack-paths:
+        type: string
+        default: |
+          /opt/hostedtoolcache
       downloads:
         type: string
         default:
@@ -141,6 +148,8 @@ jobs:
       container-output: ${{ inputs.container-output }}
       command: ${{ inputs.command }}
       concurrency-suffix: ${{ inputs.concurrency-suffix }}
+      diskspace-hack: ${{ inputs.diskspace-hack }}
+      diskspace-hack-paths: ${{ inputs.diskspace-hack-paths }}
       docker-ipv6: false
       entrypoint: ${{ inputs.entrypoint || inputs.entrypoint-DEFAULT }}
       downloads: ${{ inputs.downloads }}
