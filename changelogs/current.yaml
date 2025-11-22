@@ -69,7 +69,7 @@ bug_fixes:
     ``ERR_DRAINING`` errors on the client side. HTTP/1.1 behavior remains unchanged.
 - area: dns_resolver
   change: |
-    Removes unnecessary getifaddrs() system calls when ``filter_unroutable_families`` is disabled (the default).
+    Removes unnecessary getifaddrs() system calls when ``filter_unroutable_families`` is disabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
