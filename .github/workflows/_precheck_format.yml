@@ -35,11 +35,14 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name || matrix.target }}
     with:
-      bazel-extra: '--config=remote-envoy-engflow'
+      bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
+      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths }}
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       request: ${{ inputs.request }}
+      # format needs aspell, and format-api requires git
+      docker-ci: false
       error-match: |
         ERROR
         error:
@@ -56,6 +59,8 @@ jobs:
         - target: format
           upload-name: fix_format.diff
           upload-path: /home/runner/work/_temp/container/fix_format.diff
+          diskpace-hack-paths: |
+            /opt/hostedtoolcache
         - target: format-api
           upload-name: fix_proto_format.diff
           upload-path: /home/runner/work/_temp/container/fix_proto_format.diff

@@ -133,8 +133,10 @@ categories:
 - envoy.matching.action
 - envoy.matching.http.input
 - envoy.matching.http.custom_matchers
+- envoy.matching.inputs
 - envoy.matching.network.input
 - envoy.matching.network.custom_matchers
+- envoy.matching.transport_socket.input
 - envoy.string_matcher
 - envoy.filters.http.upstream
 - envoy.path.match

@@ -10,6 +10,7 @@ envoy_mobile_android_test(
     srcs = [
         "JniHelperTest.java",
     ],
+    javacopts = ["-Xep:JUnit4TestNotRun:OFF"],
     native_deps = [
         "//test/jni:libenvoy_jni_helper_test.so",
     ],

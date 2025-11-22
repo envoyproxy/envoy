@@ -6134,6 +6134,9 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
+  Http::TestResponseHeaderMapImpl response_headers;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
   EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0).route);
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
@@ -6188,29 +6191,42 @@ virtual_hosts:
               config.route(headers, 0)->directResponseEntry()->newUri(headers));
   }
   {
+    std::string body;
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("direct.example.com", "/gone", true, false);
     EXPECT_EQ(Http::Code::Gone, config.route(headers, 0)->directResponseEntry()->responseCode());
-    EXPECT_EQ("Example text 1", config.route(headers, 0)->directResponseEntry()->responseBody());
+    EXPECT_EQ("Example text 1", config.route(headers, 0)
+                                    ->directResponseEntry()
+                                    ->formatBody(headers, response_headers, stream_info, body));
   }
   {
+    std::string body;
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("direct.example.com", "/error", true, false);
     EXPECT_EQ(Http::Code::InternalServerError,
               config.route(headers, 0)->directResponseEntry()->responseCode());
-    EXPECT_EQ("Example text 2", config.route(headers, 0)->directResponseEntry()->responseBody());
+    EXPECT_EQ("Example text 2", config.route(headers, 0)
+                                    ->directResponseEntry()
+                                    ->formatBody(headers, response_headers, stream_info, body));
   }
   {
+    std::string body;
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("direct.example.com", "/no_body", true, false);
     EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
-    EXPECT_TRUE(config.route(headers, 0)->directResponseEntry()->responseBody().empty());
+    EXPECT_TRUE(config.route(headers, 0)
+                    ->directResponseEntry()
+                    ->formatBody(headers, response_headers, stream_info, body)
+                    .empty());
   }
   {
+    std::string body;
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("direct.example.com", "/static", true, false);
     EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
-    EXPECT_EQ("Example text 3", config.route(headers, 0)->directResponseEntry()->responseBody());
+    EXPECT_EQ("Example text 3", config.route(headers, 0)
+                                    ->directResponseEntry()
+                                    ->formatBody(headers, response_headers, stream_info, body));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
@@ -7812,6 +7828,48 @@ request_headers_to_add:
                EnvoyException);
 }
 
+// Validate that request_headers_to_add can reference router-set headers like
+// x-envoy-expected-rq-timeout-ms and x-envoy-attempt-count on the initial request.
+TEST_F(CustomRequestHeadersTest, RequestHeadersCanReferenceRouterSetHeaders) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/endpoint"
+    route:
+      cluster: www2
+      timeout: 5s
+    request_headers_to_add:
+    - header:
+        key: x-timeout-copy
+        value: "%REQ(x-envoy-expected-rq-timeout-ms)%"
+    - header:
+        key: x-attempt-copy
+        value: "%REQ(x-envoy-attempt-count)%"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/endpoint", "GET");
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+
+  // Simulate router filter setting these headers before calling finalizeRequestHeaders.
+  // This mimics the fix where router-set headers are added before finalizeRequestHeaders.
+  headers.addCopy(Http::LowerCaseString("x-envoy-expected-rq-timeout-ms"), "5000");
+  headers.addCopy(Http::LowerCaseString("x-envoy-attempt-count"), "1");
+
+  auto formatter_context = Formatter::Context().setRequestHeaders(headers);
+  route_entry->finalizeRequestHeaders(headers, formatter_context, stream_info, true);
+
+  // Verify that request_headers_to_add was able to reference router-set headers.
+  EXPECT_EQ("5000", headers.get_("x-timeout-copy"));
+  EXPECT_EQ("1", headers.get_("x-attempt-copy"));
+}
+
 TEST(MetadataMatchCriteriaImpl, Create) {
   auto v1 = Protobuf::Value();
   v1.set_string_value("v1");
@@ -8063,10 +8121,15 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
+  std::string body;
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("direct.example.com", "/", true, false);
+  Http::TestResponseHeaderMapImpl response_headers;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
-  EXPECT_EQ(response_body, config.route(headers, 0)->directResponseEntry()->responseBody());
+  EXPECT_EQ(response_body, config.route(headers, 0)
+                               ->directResponseEntry()
+                               ->formatBody(headers, response_headers, stream_info, body));
 }
 
 TEST_F(RouteConfigurationDirectResponseBodyTest, DirectResponseBodySizeTooLarge) {
@@ -8151,9 +8214,14 @@ virtual_hosts:
 
   const auto* direct_response =
       config.route(genHeaders("example.com", "/", "GET"), 0)->directResponseEntry();
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  std::string body;
   EXPECT_NE(nullptr, direct_response);
   EXPECT_EQ(Http::Code::OK, direct_response->responseCode());
-  EXPECT_STREQ("content", direct_response->responseBody().c_str());
+  EXPECT_EQ("content",
+            direct_response->formatBody(request_headers, response_headers, stream_info, body));
 }
 
 // Test the parsing of a direct response configuration where the response body is too large.

@@ -49,7 +49,8 @@ jobs:
     with:
       args: >-
         test
-        --config=mobile-remote-ci-cc
+        --config=mobile-remote-ci
+        --config=mobile-cc
         //test/cc/... //test/common/...
       bind-mount: false
       request: ${{ needs.load.outputs.request }}
@@ -66,7 +67,8 @@ jobs:
     with:
       args: >-
         test
-        --config=mobile-remote-ci-cc-xds-enabled
+        --config=mobile-remote-ci
+        --config=mobile-cc-xds-enabled
         //test/common/integration/...
       request: ${{ needs.load.outputs.request }}
       target: cc-xds-integration-tests

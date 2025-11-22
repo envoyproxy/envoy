@@ -167,13 +167,22 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
   processResponseBodyHelper(" EEEEEEE ", want_response_body);
   processResponseBodyHelper(" F ", want_response_body);
   processResponseBodyHelper(" GGGGGGGGG ", want_response_body);
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
   processResponseBodyHelper(" HH ", want_response_body, true, true);
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 
   // The two buffers should match.
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  auto& grpc_calls = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
+  checkGrpcCallBody(*grpc_calls.body_stats_, 10, Grpc::Status::Ok, std::chrono::microseconds(190),
+                    std::chrono::microseconds(40), std::chrono::microseconds(10));
+
   filter_->onDestroy();
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
@@ -220,14 +229,22 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
 
   processResponseBodyStreamedAfterTrailer(" AAAAA ", want_response_body);
   processResponseBodyStreamedAfterTrailer(" BBBB ", want_response_body);
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
   processResponseTrailers(absl::nullopt, true);
-
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
   // The two buffers should match.
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
 
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  auto& grpc_calls = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
+  checkGrpcCallBody(*grpc_calls.body_stats_, 2, Grpc::Status::Ok, std::chrono::microseconds(30),
+                    std::chrono::microseconds(20), std::chrono::microseconds(10));
+  checkGrpcCall(*grpc_calls.trailer_stats_, std::chrono::microseconds(30), Grpc::Status::Ok);
   filter_->onDestroy();
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailer) {
@@ -285,6 +302,10 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailer) {
   EXPECT_FALSE(encoding_watermarked);
 
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+  auto& grpc_calls = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
+  checkGrpcCallBody(*grpc_calls.body_stats_, 2, Grpc::Status::Ok, std::chrono::microseconds(50),
+                    std::chrono::microseconds(30), std::chrono::microseconds(20));
   filter_->onDestroy();
 }
 

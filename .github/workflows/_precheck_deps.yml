@@ -37,27 +37,24 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.target }}
     with:
-      bazel-extra: '--config=remote-envoy-engflow'
+      bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths || '/opt/hostedtoolcache' }}
+      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths }}
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       request: ${{ inputs.request }}
       error-match: |
         ERROR
         error:
         Error:
-      rbe: ${{ matrix.rbe }}
+      rbe: true
       target: ${{ matrix.target }}
       trusted: ${{ inputs.trusted }}
     strategy:
       matrix:
         include:
         - target: deps
-          rbe: false
-          diskspace-hack-paths: |
-            /opt/hostedtoolcache
-            /usr/local/.ghcup
+          diskspace-hack-paths:
 
   dependency-review:
     runs-on: ubuntu-24.04
@@ -69,4 +66,4 @@ jobs:
         ref: ${{ fromJSON(inputs.request).request.sha }}
         persist-credentials: false
     - name: Dependency Review
-      uses: actions/dependency-review-action@40c09b7dc99638e5ddb0bfd91c1673effc064d8a  # v4.8.1
+      uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261  # v4.8.2

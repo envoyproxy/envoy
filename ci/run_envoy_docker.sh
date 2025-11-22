@@ -40,7 +40,10 @@ if [[ -n "$ENVOY_DOCKER_PLATFORM" ]]; then
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 fi
 
+ENVOY_BUILD_IMAGE="${ENVOY_BUILD_IMAGE:-${BUILD_CONTAINER}}"
+
 export DOCKER_COMMAND="${*:-bash}"
+export ENVOY_BUILD_IMAGE
 
 COMPOSE_SERVICE="envoy-build"
 if [[ -n "$MOUNT_GPG_HOME" ]]; then

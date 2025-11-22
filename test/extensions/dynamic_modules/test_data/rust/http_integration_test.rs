@@ -171,6 +171,30 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
     for (name, value) in &self.headers_to_add {
       envoy_filter.set_request_header(name, value.as_bytes());
     }
+
+    // Test setter and getter API.
+    envoy_filter.set_request_header("new", b"value1");
+    let new_value = envoy_filter
+      .get_request_header_value("new")
+      .expect("header new not found");
+    assert_eq!(&new_value.as_slice(), b"value1");
+    let new_values = envoy_filter.get_request_header_values("new");
+    assert_eq!(new_values.len(), 1);
+    assert_eq!(new_values[0].as_slice(), b"value1");
+
+    // Test add API.
+    envoy_filter.add_request_header("new", b"value2");
+    let new_values = envoy_filter.get_request_header_values("new");
+    assert_eq!(new_values.len(), 2);
+    assert_eq!(new_values[1].as_slice(), b"value2");
+
+    // Test remove API.
+    envoy_filter.remove_request_header("new");
+    let new_value = envoy_filter.get_request_header_value("new");
+    assert!(new_value.is_none());
+    let new_values = envoy_filter.get_request_header_values("new");
+    assert_eq!(new_values.len(), 0);
+
     envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
@@ -186,6 +210,30 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
     for (name, value) in &self.headers_to_add {
       envoy_filter.set_request_trailer(name, value.as_bytes());
     }
+
+    // Test setter and getter API.
+    envoy_filter.set_request_trailer("new", b"value1");
+    let new_value = envoy_filter
+      .get_request_trailer_value("new")
+      .expect("trailer new not found");
+    assert_eq!(&new_value.as_slice(), b"value1");
+    let new_values = envoy_filter.get_request_trailer_values("new");
+    assert_eq!(new_values.len(), 1);
+    assert_eq!(new_values[0].as_slice(), b"value1");
+
+    // Test add API.
+    envoy_filter.add_request_trailer("new", b"value2");
+    let new_values = envoy_filter.get_request_trailer_values("new");
+    assert_eq!(new_values.len(), 2);
+    assert_eq!(new_values[1].as_slice(), b"value2");
+
+    // Test remove API.
+    envoy_filter.remove_request_trailer("new");
+    let new_value = envoy_filter.get_request_trailer_value("new");
+    assert!(new_value.is_none());
+    let new_values = envoy_filter.get_request_trailer_values("new");
+    assert_eq!(new_values.len(), 0);
+
     envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
   }
 
@@ -202,6 +250,30 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
     for (name, value) in &self.headers_to_add {
       envoy_filter.set_response_header(name, value.as_bytes());
     }
+
+    // Test setter and getter API.
+    envoy_filter.set_response_header("new", b"value1");
+    let new_value = envoy_filter
+      .get_response_header_value("new")
+      .expect("header new not found");
+    assert_eq!(&new_value.as_slice(), b"value1");
+    let new_values = envoy_filter.get_response_header_values("new");
+    assert_eq!(new_values.len(), 1);
+    assert_eq!(new_values[0].as_slice(), b"value1");
+
+    // Test add API.
+    envoy_filter.add_response_header("new", b"value2");
+    let new_values = envoy_filter.get_response_header_values("new");
+    assert_eq!(new_values.len(), 2);
+    assert_eq!(new_values[1].as_slice(), b"value2");
+
+    // Test remove API.
+    envoy_filter.remove_response_header("new");
+    let new_value = envoy_filter.get_response_header_value("new");
+    assert!(new_value.is_none());
+    let new_values = envoy_filter.get_response_header_values("new");
+    assert_eq!(new_values.len(), 0);
+
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 
@@ -217,6 +289,30 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
     for (name, value) in &self.headers_to_add {
       envoy_filter.set_response_trailer(name, value.as_bytes());
     }
+
+    // Test setter and getter API.
+    envoy_filter.set_response_trailer("new", b"value1");
+    let new_value = envoy_filter
+      .get_response_trailer_value("new")
+      .expect("trailer new not found");
+    assert_eq!(&new_value.as_slice(), b"value1");
+    let new_values = envoy_filter.get_response_trailer_values("new");
+    assert_eq!(new_values.len(), 1);
+    assert_eq!(new_values[0].as_slice(), b"value1");
+
+    // Test add API.
+    envoy_filter.add_response_trailer("new", b"value2");
+    let new_values = envoy_filter.get_response_trailer_values("new");
+    assert_eq!(new_values.len(), 2);
+    assert_eq!(new_values[1].as_slice(), b"value2");
+
+    // Test remove API.
+    envoy_filter.remove_response_trailer("new");
+    let new_value = envoy_filter.get_response_trailer_value("new");
+    assert!(new_value.is_none());
+    let new_values = envoy_filter.get_response_trailer_values("new");
+    assert_eq!(new_values.len(), 0);
+
     envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
 }
@@ -310,6 +406,14 @@ struct BodyCallbacksFilter {
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
   fn on_request_body(
     &mut self,
     envoy_filter: &mut EHF,
@@ -322,23 +426,54 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     }
     self.seen_request_body = true;
 
-    let request_body = envoy_filter
-      .get_request_body()
-      .expect("request body not available");
-    let mut body = String::new();
-    for chunk in request_body {
-      body.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+    let mut received_body_len: usize = 0;
+    let mut buffered_body_len: usize = 0;
+    let mut body_content = String::new();
+
+    let buffered_body = envoy_filter.get_buffered_request_body();
+    if buffered_body.is_some() {
+      for chunk in buffered_body.unwrap() {
+        buffered_body_len += chunk.as_slice().len();
+        body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+      }
+      let buffered_body_len_directly = envoy_filter
+        .get_buffered_request_body_size()
+        .expect("buffered body size");
+      assert_eq!(buffered_body_len, buffered_body_len_directly);
     }
-    assert_eq!(body, "request_body");
+
+    let received_body = envoy_filter.get_received_request_body();
+    if received_body.is_some() {
+      for chunk in received_body.unwrap() {
+        received_body_len += chunk.as_slice().len();
+        body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+      }
+      let received_body_len_directly = envoy_filter
+        .get_received_request_body_size()
+        .expect("received body size");
+      assert_eq!(received_body_len, received_body_len_directly);
+    }
+
+    assert_eq!(body_content, "request_body");
 
     // Drain the request body.
-    envoy_filter.drain_request_body(body.len());
+    envoy_filter.drain_received_request_body(received_body_len);
+    envoy_filter.drain_buffered_request_body(buffered_body_len);
+
     // Append the new request body.
-    envoy_filter.append_request_body(b"new_request_body");
+    envoy_filter.append_received_request_body(b"new_request_body");
     // Plus we need to set the content length.
     envoy_filter.set_request_header("content-length", b"16");
 
     envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
   }
 
   fn on_response_body(
@@ -352,19 +487,41 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     }
     self.seen_response_body = true;
 
-    let response_body = envoy_filter
-      .get_response_body()
-      .expect("response body not available");
-    let mut body = String::new();
-    for chunk in response_body {
-      body.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+    let mut buffered_body_len: usize = 0;
+    let mut received_body_len: usize = 0;
+    let mut body_content = String::new();
+
+    let buffered_body = envoy_filter.get_buffered_response_body();
+    if buffered_body.is_some() {
+      for chunk in buffered_body.unwrap() {
+        buffered_body_len += chunk.as_slice().len();
+        body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+      }
+      let buffered_body_len_directly = envoy_filter
+        .get_buffered_response_body_size()
+        .expect("buffered body size");
+      assert_eq!(buffered_body_len, buffered_body_len_directly);
     }
-    assert_eq!(body, "response_body");
+
+    let received_body = envoy_filter.get_received_response_body();
+    if received_body.is_some() {
+      for chunk in received_body.unwrap() {
+        received_body_len += chunk.as_slice().len();
+        body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+      }
+      let received_body_len_directly = envoy_filter
+        .get_received_response_body_size()
+        .expect("received body size");
+      assert_eq!(received_body_len, received_body_len_directly);
+    }
+
+    assert_eq!(body_content, "response_body");
 
     // Drain the response body.
-    envoy_filter.drain_response_body(body.len());
+    envoy_filter.drain_received_response_body(received_body_len);
+    envoy_filter.drain_buffered_response_body(buffered_body_len);
     // Append the new response body.
-    envoy_filter.append_response_body(b"new_response_body");
+    envoy_filter.append_received_response_body(b"new_response_body");
     // Plus we need to set the content length.
     envoy_filter.set_response_header("content-length", b"17");
 
@@ -419,6 +576,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
         200,
         vec![("some_header", b"some_value")],
         Some(b"local_response_body_from_on_request_headers"),
+        Some("test_details"),
       );
       envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
     } else {
@@ -436,6 +594,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
         200,
         vec![("some_header", b"some_value")],
         Some(b"local_response_body_from_on_request_body"),
+        None,
       );
       envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer
     } else {
@@ -453,6 +612,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
         500,
         vec![("some_header", b"some_value")],
         Some(b"local_response_body_from_on_response_headers"),
+        None,
       );
       return envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration;
     }
@@ -494,7 +654,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       1000,
     );
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, vec![("foo", b"bar")], None);
+      envoy_filter.send_response(500, vec![("foo", b"bar")], None, None);
     } else {
       // Try sending the same callout id, which should fail.
       assert_eq!(
@@ -555,6 +715,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       200,
       vec![("some_header", b"some_value")],
       Some(b"local_response_body"),
+      Some("callout_success"),
     );
   }
 }
@@ -691,7 +852,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
       // Event from the on_scheduled when the cache key was found.
       1 => {
         let result = self.rx.take().unwrap().recv().unwrap();
-        envoy_filter.send_response(200, vec![("cached", b"yes")], Some(result.as_bytes()));
+        envoy_filter.send_response(200, vec![("cached", b"yes")], Some(result.as_bytes()), None);
       },
       // Event from the on_response_headers.
       2 => {
@@ -906,11 +1067,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
 // can happen in filter callbacks or scheduled events. We test scheduled events here
 // since it will be more common for terminal filters.
 //
+// The terminal filter test configures the connection buffer to 1024 bytes. We test
+// watermark events by writing 8 1024 byte chunks, once immediately and the remaining
+// in response to low watermark events.
+//
 // Request flow:
 //   - Client sends headers
 //   - Filter returns headers and body
 //   - Client sends body
-//   - Filter returns body
+//   - Filter returns large body chunks triggering watermark events
 //   - Client closes request
 //   - Filter returns body and trailers
 struct StreamingTerminalFilterConfig {}
@@ -919,6 +1084,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StreamingTerminalFilterConf
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(StreamingTerminalHttpFilter {
       request_closed: false,
+      above_watermark_count: 0,
+      below_watermark_count: 0,
+      large_response_bytes_sent: 0,
     })
   }
 }
@@ -928,6 +1096,9 @@ const EVENT_ID_READ_REQUEST: u64 = 2;
 
 struct StreamingTerminalHttpFilter {
   request_closed: bool,
+  above_watermark_count: usize,
+  below_watermark_count: usize,
+  large_response_bytes_sent: usize,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
@@ -968,24 +1139,55 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
       EVENT_ID_READ_REQUEST => {
         if !self.request_closed {
           let mut body = Vec::new();
-          if let Some(buffers) = envoy_filter.get_request_body() {
+          // The event is scheduled asynchronously and this will be called out of
+          // on_request_body. So, we get the buffered body here.
+          if let Some(buffers) = envoy_filter.get_buffered_request_body() {
             for buffer in buffers {
               body.extend_from_slice(buffer.as_slice());
             }
           }
-          envoy_filter.drain_request_body(body.len());
-          envoy_filter.send_response_data(
-            [b"Hi ", body.as_slice(), b". Anything else?"]
-              .concat()
-              .as_slice(),
-            false,
-          );
+          envoy_filter.drain_buffered_request_body(body.len());
+          self.send_large_response_chunk(envoy_filter);
         } else {
           envoy_filter.send_response_data(b"Thanks!", false);
-          envoy_filter.send_response_trailers(vec![("x-status", b"finished")]);
+          envoy_filter.send_response_trailers(vec![
+            ("x-status", b"finished"),
+            (
+              "x-above-watermark-count",
+              self.above_watermark_count.to_string().as_bytes(),
+            ),
+            (
+              "x-below-watermark-count",
+              self.below_watermark_count.to_string().as_bytes(),
+            ),
+          ]);
         }
       },
       _ => unreachable!(),
     }
+  }
+
+  fn on_downstream_above_write_buffer_high_watermark(&mut self, _envoy_filter: &mut EHF) {
+    self.above_watermark_count += 1;
+  }
+
+  fn on_downstream_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut EHF) {
+    self.below_watermark_count += 1;
+    if self.above_watermark_count == self.below_watermark_count {
+      // Watermark levels are balanced, we can send more data.
+      self.send_large_response_chunk(_envoy_filter);
+    }
+  }
+}
+
+impl StreamingTerminalHttpFilter {
+  fn send_large_response_chunk<EHF: EnvoyHttpFilter>(&mut self, envoy_filter: &mut EHF) {
+    if self.large_response_bytes_sent >= 8 * 1024 {
+      return;
+    }
+    let chunk_size = 1024;
+    let chunk = vec![b'a'; chunk_size];
+    envoy_filter.send_response_data(&chunk, false);
+    self.large_response_bytes_sent += chunk_size;
   }
 }

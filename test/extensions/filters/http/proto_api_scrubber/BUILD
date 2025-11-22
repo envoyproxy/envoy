@@ -28,8 +28,10 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -39,7 +41,10 @@ envoy_cc_test(
     data = ["//test/proto:apikeys_proto_descriptor"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/http/matching:inputs_lib",
         "//source/extensions/filters/http/proto_api_scrubber:filter",
+        "//source/extensions/matching/http/cel_input:cel_input_lib",
+        "//source/extensions/matching/input_matchers/cel_matcher:config",
         "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
@@ -47,5 +52,6 @@ envoy_cc_test(
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings",
     ],
 )

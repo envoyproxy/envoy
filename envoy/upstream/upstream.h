@@ -35,7 +35,13 @@
 namespace Envoy {
 namespace Http {
 class FilterChainManager;
-}
+class HashPolicy;
+} // namespace Http
+
+namespace Router {
+class ShadowPolicy;
+using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
+} // namespace Router
 
 namespace Upstream {
 
@@ -59,13 +65,16 @@ public:
    * Return UpstreamLocalAddress based on the endpoint address.
    * @param endpoint_address is the address used to select upstream local address.
    * @param socket_options applied to the selected address.
+   * @param transport_socket_options transport-level options applied to the connection.
    * @return UpstreamLocalAddress which includes the selected upstream local address and socket
    * options.
    */
-  UpstreamLocalAddress
-  getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr& endpoint_address,
-                          const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const {
-    UpstreamLocalAddress local_address = getUpstreamLocalAddressImpl(endpoint_address);
+  UpstreamLocalAddress getUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      const Network::ConnectionSocket::OptionsSharedPtr& socket_options,
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const {
+    UpstreamLocalAddress local_address =
+        getUpstreamLocalAddressImpl(endpoint_address, transport_socket_options);
     Network::ConnectionSocket::OptionsSharedPtr connection_options =
         std::make_shared<Network::ConnectionSocket::Options>(
             socket_options ? *socket_options
@@ -83,7 +92,8 @@ private:
    * options is the responsibility of the base class.
    */
   virtual UpstreamLocalAddress getUpstreamLocalAddressImpl(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address) const PURE;
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const PURE;
 };
 
 using UpstreamLocalAddressSelectorConstSharedPtr =
@@ -1227,6 +1237,18 @@ public:
    * @return Reference to the optional config for LRS endpoint metric reporting.
    */
   virtual OptRef<const std::vector<std::string>> lrsReportMetricNames() const PURE;
+
+  /**
+   * @return const std::vector<Router::ShadowPolicyPtr>& the shadow policies configured for this
+   * cluster.
+   */
+  virtual const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const PURE;
+
+  /**
+   * @return const Http::HashPolicy* the hash policy configured for this cluster. Returns nullptr
+   * if no cluster-level hash policy is configured.
+   */
+  virtual const Http::HashPolicy* hashPolicy() const PURE;
 
 protected:
   /**

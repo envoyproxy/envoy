@@ -483,8 +483,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (direct_response != nullptr) {
     stats_.rq_direct_response_.inc();
     direct_response->rewritePathHeader(headers, !config_->suppress_envoy_headers_);
+    std::string body;
+    absl::string_view direct_response_body = direct_response->formatBody(
+        (downstream_headers_ == nullptr) ? *Http::StaticEmptyHeaders::get().request_headers
+                                         : *downstream_headers_,
+        *Http::StaticEmptyHeaders::get().response_headers, callbacks_->streamInfo(), body);
+
     callbacks_->sendLocalReply(
-        direct_response->responseCode(), direct_response->responseBody(),
+        direct_response->responseCode(), direct_response_body,
         [this, direct_response](Http::ResponseHeaderMap& response_headers) -> void {
           std::string new_uri;
           ASSERT(downstream_headers_ != nullptr);
@@ -600,7 +606,24 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   attempt_count_++;
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
-  // Finalize the request headers before the host selection.
+  // Set hedging params before finalizeRequestHeaders so timeout calculation is correct.
+  hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
+
+  // Calculate timeout and set x-envoy-expected-rq-timeout-ms before finalizeRequestHeaders.
+  // This allows request_headers_to_add to reference the timeout header.
+  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_->suppress_envoy_headers_,
+                                         grpc_request_, hedging_params_.hedge_on_per_try_timeout_,
+                                         config_->respect_expected_rq_timeout_);
+
+  // Set x-envoy-attempt-count before finalizeRequestHeaders so it can be referenced.
+  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
+  if (include_attempt_count_in_request_) {
+    headers.setEnvoyAttemptCount(attempt_count_);
+  }
+
+  // Finalize request headers (host/path rewriting + request_headers_to_add) before host selection.
+  // At this point, router-set headers (x-envoy-expected-rq-timeout-ms, x-envoy-attempt-count)
+  // are already set, so request_headers_to_add can reference them and affect load balancing.
   const Formatter::Context formatter_context(&headers, {}, {}, {}, {}, &callbacks_->activeSpan());
   route_entry_->finalizeRequestHeaders(headers, formatter_context, callbacks_->streamInfo(),
                                        !config_->suppress_envoy_headers_);
@@ -682,7 +705,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // well as handling unsupported asynchronous host selection by treating it
     // as host selection failure and calling sendNoHealthyUpstreamResponse.
     continueDecodeHeaders(cluster, headers, end_stream, std::move(host_selection_response.host),
-                          std::string(host_selection_response.details));
+                          host_selection_response.details);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -723,7 +746,7 @@ void Filter::onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::stri
 bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
                                    Http::RequestHeaderMap& headers, bool end_stream,
                                    Upstream::HostConstSharedPtr&& selected_host,
-                                   absl::optional<std::string> host_selection_details) {
+                                   absl::string_view host_selection_details) {
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_end_ms", callbacks_->dispatcher().timeSource().monotonicTime());
 
@@ -755,12 +778,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     return false;
   }
 
-  hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
-
-  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_->suppress_envoy_headers_,
-                                         grpc_request_, hedging_params_.hedge_on_per_try_timeout_,
-                                         config_->respect_expected_rq_timeout_);
-
+  // Handle additional header processing.
   const Http::HeaderEntry* header_max_stream_duration_entry =
       headers.EnvoyUpstreamStreamDurationMs();
   if (header_max_stream_duration_entry) {
@@ -769,15 +787,10 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     headers.removeEnvoyUpstreamStreamDurationMs();
   }
 
-  // If this header is set with any value, use an alternate response code on timeout
+  // If this header is set with any value, use an alternate response code on timeout.
   if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
     timeout_response_code_ = Http::Code::NoContent;
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
-  }
-
-  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
-  if (include_attempt_count_in_request_) {
-    headers.setEnvoyAttemptCount(attempt_count_);
   }
 
   FilterUtility::setUpstreamScheme(
@@ -796,7 +809,13 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   // runtime keys. Also the method CONNECT doesn't support shadowing.
   auto method = headers.getMethodValue();
   if (method != Http::Headers::get().MethodValues.Connect) {
-    for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
+    // Use cluster-level shadow policies if they are available (most specific wins).
+    // If no cluster-level policies are configured, fall back to route-level policies.
+    const auto& policies_to_evaluate = !cluster_->shadowPolicies().empty()
+                                           ? cluster_->shadowPolicies()
+                                           : route_entry_->shadowPolicies();
+
+    for (const auto& shadow_policy : policies_to_evaluate) {
       const auto& policy_ref = *shadow_policy;
       if (FilterUtility::shouldShadow(policy_ref, config_->runtime_, callbacks_->streamId())) {
         active_shadow_policies_.push_back(std::cref(policy_ref));
@@ -926,12 +945,12 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalClu
                                         callbacks_->streamInfo().protocol(), this, *message);
 }
 
-void Filter::sendNoHealthyUpstreamResponse(absl::optional<std::string> optional_details) {
+void Filter::sendNoHealthyUpstreamResponse(absl::string_view optional_details) {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, false);
-  absl::string_view details = (optional_details.has_value() && !optional_details->empty())
-                                  ? absl::string_view(*optional_details)
-                                  : StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream;
+  absl::string_view details = optional_details.empty()
+                                  ? StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream
+                                  : optional_details;
   callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", modify_headers_,
                              absl::nullopt, details);
 }
@@ -1863,9 +1882,16 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
 void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
                             bool end_stream) {
-  // This should be true because when we saw headers we either reset the stream
-  // (hence wouldn't have made it to onUpstreamData) or all other in-flight
-  // streams.
+  // When route retry policy is configured and an upstream filter is returning StopIteration
+  // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
+  // and we should just return.
+  if (upstream_requests_.size() == 0) {
+    return;
+  }
+
+  // Other than above case, this should be true because when we saw headers we
+  // either reset the stream (hence wouldn't have made it to onUpstreamData) or
+  // all other in-flight streams.
   ASSERT(upstream_requests_.size() == 1);
   if (end_stream) {
     // gRPC request termination without trailers is an error.
@@ -1880,9 +1906,16 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
 
 void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
                                 UpstreamRequest& upstream_request) {
-  // This should be true because when we saw headers we either reset the stream
-  // (hence wouldn't have made it to onUpstreamTrailers) or all other in-flight
-  // streams.
+  // When route retry policy is configured and an upstream filter is returning StopIteration
+  // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
+  // and we should just return.
+  if (upstream_requests_.size() == 0) {
+    return;
+  }
+
+  // Other than above case, this should be true because when we saw headers we
+  // either reset the stream (hence wouldn't have made it to onUpstreamTrailers) or
+  // all other in-flight streams.
   ASSERT(upstream_requests_.size() == 1);
 
   if (upstream_request.grpcRqSuccessDeferred()) {
@@ -1988,11 +2021,11 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   // convertRequestHeadersForInternalRedirect logs failure reasons but log
   // details for other failure modes here.
   if (!downstream_end_stream_) {
-    ENVOY_STREAM_LOG(trace, "Internal redirect failed: request incomplete", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "Internal redirect failed: request incomplete", *callbacks_);
   } else if (request_buffer_overflowed_) {
-    ENVOY_STREAM_LOG(trace, "Internal redirect failed: request body overflow", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "Internal redirect failed: request body overflow", *callbacks_);
   } else if (location == nullptr) {
-    ENVOY_STREAM_LOG(trace, "Internal redirect failed: missing location header", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "Internal redirect failed: missing location header", *callbacks_);
   }
 
   cluster_->trafficStats()->upstream_internal_redirect_failed_total_.inc();
@@ -2218,7 +2251,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
                              TimeoutRetry is_timeout_retry, Upstream::HostConstSharedPtr&& host,
                              Upstream::ThreadLocalCluster& cluster,
-                             absl::optional<std::string> host_selection_details) {
+                             absl::string_view host_selection_details) {
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_end_ms", callbacks_->dispatcher().timeSource().monotonicTime());
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(cluster, host);
@@ -2241,7 +2274,7 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
   }
 
   // The request timeouts only account for time elapsed since the downstream request completed
-  // which might not have happened yet (in which case zero time has elapsed.)
+  // which might not have happened yet, in which case zero time has elapsed.
   std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
 
   if (DateUtil::timePointValid(downstream_request_complete_time_)) {
