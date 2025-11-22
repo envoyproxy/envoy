@@ -134,6 +134,10 @@ McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
 }
 
 McpFieldExtractor* McpFieldExtractor::EndObject() {
+  if (array_depth_ > 0) {
+    return this;
+  }
+
   if (depth_ > 0) {
     depth_--;
     if (!path_stack_.empty()) {
@@ -379,8 +383,6 @@ McpFieldExtractor* McpFieldExtractor::RenderNull(absl::string_view name) {
 McpFieldExtractor* McpFieldExtractor::RenderBytes(absl::string_view name, absl::string_view value) {
   return RenderString(name, value);
 }
-
-std::string McpFieldExtractor::getCurrentPath() const { return current_path_cache_; }
 
 void McpFieldExtractor::storeField(const std::string& path, const Protobuf::Value& value) {
   // Store in nested structure in temp storage

@@ -956,6 +956,210 @@ TEST_F(McpJsonParserTest, BoolInArrayAndAfterEarlyStop) {
   EXPECT_EQ(extra_bool, nullptr);
 }
 
+TEST_F(McpJsonParserTest, ArraySkippingWithRequiredFieldAfter) {
+  // This test ensures that we hit the array_depth_ > 0 checks in all Render methods.
+  // We do this by requiring a field that comes AFTER the array, so early stop doesn't trigger.
+  McpParserConfig custom_config;
+  std::vector<McpParserConfig::FieldRule> rules = {
+      McpParserConfig::FieldRule("params.end_field"),
+  };
+  custom_config.addMethodConfig("test", rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "test",
+    "params": {
+      "mixed_array": [
+        "string_value",
+        123,
+        45.67,
+        true,
+        false,
+        null,
+        {"nested": "object"},
+        [1, 2]
+      ],
+      "end_field": "required_value"
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser->parse(json));
+  EXPECT_TRUE(parser->isValidMcpRequest());
+
+  // Verify the required field was extracted
+  const auto* end_field = parser->getNestedValue("params.end_field");
+  ASSERT_NE(end_field, nullptr);
+  EXPECT_EQ(end_field->string_value(), "required_value");
+
+  // Verify nothing from the array was extracted (implied by parser logic, but good to check)
+  const auto* array = parser->getNestedValue("params.mixed_array");
+  EXPECT_EQ(array, nullptr);
+}
+
+TEST_F(McpJsonParserTest, MissingRequiredField) {
+  // Valid MCP envelope, but missing required params.name for tools/call
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "other": "value"
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+
+  // The required field should be missing
+  const auto* name = parser_->getNestedValue("params.name");
+  EXPECT_EQ(name, nullptr);
+
+  // Other fields should still be extracted if they were in the config (but "other" is not)
+  const auto* other = parser_->getNestedValue("params.other");
+  EXPECT_EQ(other, nullptr);
+}
+
+TEST_F(McpJsonParserTest, MethodBeforeJsonRpc) {
+  // Method appears before jsonrpc in the JSON
+  std::string json = R"({
+    "method": "tools/call",
+    "jsonrpc": "2.0",
+    "params": {
+      "name": "test_tool"
+    },
+    "id": 1
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+
+  const auto* name = parser_->getNestedValue("params.name");
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(name->string_value(), "test_tool");
+}
+
+TEST_F(McpJsonParserTest, EmptyKeyIgnored) {
+  // Ensure empty keys don't crash or cause issues
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "test",
+      "": "empty_key_value"
+    },
+    "id": 1
+  })";
+
+  parseJson(json);
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+
+  // Empty key should not be accessible/stored
+  const auto* empty = parser_->getNestedValue("params.");
+  EXPECT_EQ(empty, nullptr);
+}
+
+TEST_F(McpJsonParserTest, GetNestedValueEmptyPath) {
+  // Test getNestedValue with empty path
+  EXPECT_EQ(parser_->getNestedValue(""), nullptr);
+}
+
+TEST_F(McpJsonParserTest, CopyFieldByPathCoverage) {
+  // Configure specific fields to test copyFieldByPath logic
+  McpParserConfig custom_config;
+  std::vector<McpParserConfig::FieldRule> rules = {
+      McpParserConfig::FieldRule("params.name"),          // Parent field
+      McpParserConfig::FieldRule("params.missing.field"), // Field not found
+      McpParserConfig::FieldRule("params.name.child"),    // Intermediate not struct
+      McpParserConfig::FieldRule("deep.nested.value"),    // Deep nesting success
+      McpParserConfig::FieldRule("group.item1"),          // Group creation
+      McpParserConfig::FieldRule("group.item2")           // Group append
+  };
+  custom_config.addMethodConfig("test", rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "test",
+    "params": {
+      "name": "just_a_string"
+    },
+    "deep": {
+      "nested": {
+        "value": "found_it"
+      }
+    },
+    "group": {
+      "item1": "one",
+      "item2": "two"
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser->parse(json));
+  EXPECT_TRUE(parser->isValidMcpRequest());
+
+  // 1. Field not found: "params.missing.field"
+  // Should just return without error, and not be in metadata
+  EXPECT_EQ(parser->getNestedValue("params.missing.field"), nullptr);
+
+  // 2. Intermediate not struct: "params.name.child"
+  // "params.name" is "just_a_string", so .child cannot be traversed
+  EXPECT_EQ(parser->getNestedValue("params.name.child"), nullptr);
+  // Ensure the parent value is still there
+  auto* name = parser->getNestedValue("params.name");
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(name->string_value(), "just_a_string");
+
+  // 3. Deep nesting success: "deep.nested.value"
+  auto* deep_val = parser->getNestedValue("deep.nested.value");
+  ASSERT_NE(deep_val, nullptr);
+  EXPECT_EQ(deep_val->string_value(), "found_it");
+
+  // 4. Destination structure creation/append
+  auto* item1 = parser->getNestedValue("group.item1");
+  ASSERT_NE(item1, nullptr);
+  EXPECT_EQ(item1->string_value(), "one");
+
+  auto* item2 = parser->getNestedValue("group.item2");
+  ASSERT_NE(item2, nullptr);
+  EXPECT_EQ(item2->string_value(), "two");
+}
+
+TEST_F(McpJsonParserTest, RootStringValue) {
+  std::string json = R"("hello")";
+
+  EXPECT_OK(parser_->parse(json));
+  // Root string is not a valid MCP request but should be parsed without error
+  // and trigger RenderString with empty name
+  EXPECT_FALSE(parser_->isValidMcpRequest());
+}
+
+TEST_F(McpJsonParserTest, StringsInArray) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "test",
+    "params": {
+      "list": ["a", "b", "c"]
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+
+  // Verify that strings inside the array were skipped (not extracted)
+  // The parser logic for RenderString returns early if array_depth_ > 0
+  const auto* list = parser_->getNestedValue("params.list");
+  // Arrays are not stored in the metadata by McpFieldExtractor
+  EXPECT_EQ(list, nullptr);
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

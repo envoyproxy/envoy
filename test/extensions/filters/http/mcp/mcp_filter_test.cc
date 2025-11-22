@@ -621,6 +621,46 @@ TEST_F(McpFilterTest, FilterWithCustomParserConfig) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
+// Test that extra data is ignored after parsing is complete
+TEST_F(McpFilterTest, ParsingCompleteIgnoresExtraData) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Send a complete JSON-RPC request
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Should complete parsing and return Continue
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+
+  // Send more data
+  Buffer::OwnedImpl extra_buffer("extra data");
+  // Should return Continue immediately because parsing is complete
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(extra_buffer, true));
+}
+
+// Test that partial valid JSON returns StopIterationAndBuffer
+TEST_F(McpFilterTest, PartialValidJsonBuffers) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Send partial JSON with a method that requires params (tools/call requires params.name)
+  // This ensures early stop is not triggered immediately.
+  std::string json = R"({"jsonrpc": "2.0", "method": "tools/call")";
+  Buffer::OwnedImpl buffer(json);
+
+  // Should buffer and wait for more data
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

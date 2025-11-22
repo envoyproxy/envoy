@@ -151,9 +151,6 @@ public:
   const std::string& getMethod() const { return method_; }
 
 private:
-  // Get current path as string
-  std::string getCurrentPath() const;
-
   // Check if we have all fields we need for early stop
   void checkEarlyStop();
 
