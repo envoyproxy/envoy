@@ -122,9 +122,8 @@ public:
   std::string name() const override { return "quic.test_crypto_server_stream"; }
 
   std::unique_ptr<quic::QuicCryptoServerStreamBase> createEnvoyQuicCryptoServerStream(
-      const quic::QuicCryptoServerConfig* crypto_config,
-      quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
-      quic::QuicCryptoServerStreamBase::Helper* helper,
+      const quic::QuicCryptoServerConfig* crypto_config, quic::QuicCompressedCertsCache*,
+      quic::QuicSession* session, quic::QuicCryptoServerStreamBase::Helper*,
       OptRef<const Network::DownstreamTransportSocketFactory> /*transport_socket_factory*/,
       Event::Dispatcher& /*dispatcher*/) override {
     if (session->connection()->version().transport_version > quic::QUIC_VERSION_46) {
