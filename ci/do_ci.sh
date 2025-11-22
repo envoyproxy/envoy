@@ -221,7 +221,7 @@ function bazel_envoy_api_go_build() {
             # strip @envoy_api//
         RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
         PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
-        INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
+        INPUT_DIR="${BAZEL_BIN}/external/envoy_api~/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
         OUTPUT_DIR="build_go/${RULE_DIR}"
         mkdir -p "$OUTPUT_DIR"
         if [[ ! -e "$INPUT_DIR" ]]; then

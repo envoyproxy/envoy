@@ -6,7 +6,7 @@ authors = ["Piotr Sikora <piotrsikora@google.com>"]
 edition = "2018"
 
 [dependencies]
-protobuf = "2"
+protobuf = "=2.24.1"
 
 [profile.release]
 lto = true

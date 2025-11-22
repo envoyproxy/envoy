@@ -19,7 +19,7 @@ startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 # global
 #############################################################################
 
-common --noenable_bzlmod
+common --enable_bzlmod
 
 fetch --color=yes
 run --color=yes
@@ -81,6 +81,9 @@ coverage --build_tests_only
 # Specifies the rustfmt.toml for all rustfmt_test targets.
 build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
 
+common --incompatible_enable_proto_toolchain_resolution=true
+
+build --@rules_rust//rust/settings:experimental_use_cc_common_link=True
 
 #############################################################################
 # os

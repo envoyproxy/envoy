@@ -32,6 +32,7 @@ py_binary(
         "@com_google_protobuf//:protobuf_python",
         "@envoy_api//envoy/annotations:pkg_py_proto",
     ],
+    imports = ["external/googleapis~"]
 )
 
 py_library(

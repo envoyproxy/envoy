@@ -207,12 +207,12 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
 
     if "api_httpbody_protos" in external_deps:
         srcs.append("@com_google_googleapis//google/api:httpbody.proto")
-        include_paths.append("external/com_google_googleapis")
+        include_paths.append("external/googleapis~")
 
     if "http_api_protos" in external_deps:
         srcs.append("@com_google_googleapis//google/api:annotations.proto")
         srcs.append("@com_google_googleapis//google/api:http.proto")
-        include_paths.append("external/com_google_googleapis")
+        include_paths.append("external/googleapis~")
 
     if "well_known_protos" in external_deps:
         # Explicitly reference Well Known Types from their correct packages
