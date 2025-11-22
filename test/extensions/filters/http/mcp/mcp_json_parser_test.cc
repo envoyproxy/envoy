@@ -877,6 +877,85 @@ TEST(McpFieldExtractorTest, RenderBytesAndFloat) {
   EXPECT_FLOAT_EQ(fields.at("float_val").number_value(), 3.14);
 }
 
+TEST_F(McpJsonParserTest, ArrayWithNestedObjectsAndStrings) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "test_tool",
+      "complexArray": [
+        {"nested": "object", "value": 123},
+        "string_in_array",
+        {"another": "object"}
+      ]
+    },
+    "id": 1
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+
+  // Should extract params.name
+  const auto* name = parser_->getNestedValue("params.name");
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(name->string_value(), "test_tool");
+
+  // Array content should not be extracted
+  const auto* complex_array = parser_->getNestedValue("params.complexArray");
+  EXPECT_EQ(complex_array, nullptr);
+}
+
+TEST_F(McpJsonParserTest, JsonRpcBeforeMethod) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "test_tool"
+    }
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+}
+
+TEST_F(McpJsonParserTest, BoolInArrayAndAfterEarlyStop) {
+  // Create a config that will cause early stop
+  McpParserConfig custom_config;
+  std::vector<McpParserConfig::FieldRule> rules = {
+      McpParserConfig::FieldRule("params.name"),
+  };
+  custom_config.addMethodConfig("tools/call", rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "test",
+      "boolArray": [true, false, true],
+      "extraBool": false
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser->parse(json));
+
+  EXPECT_TRUE(parser->isValidMcpRequest());
+
+  // The bool values in array and after early stop should be skipped
+  const auto* bool_array = parser->getNestedValue("params.boolArray");
+  EXPECT_EQ(bool_array, nullptr);
+
+  const auto* extra_bool = parser->getNestedValue("params.extraBool");
+  EXPECT_EQ(extra_bool, nullptr);
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters
