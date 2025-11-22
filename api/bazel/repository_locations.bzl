@@ -176,6 +176,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/envoyproxy/toolshed/archive/bazel-v{version}.tar.gz"],
         use_category = ["build", "controlplane", "dataplane_core"],
         implied_untracked_deps = [
+            "sysroot_linux_amd64",
+            "sysroot_linux_arm64",
             "tsan_libs",
             "msan_libs",
         ],
