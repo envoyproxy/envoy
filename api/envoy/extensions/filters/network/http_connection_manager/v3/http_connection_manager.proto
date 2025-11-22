@@ -98,13 +98,6 @@ message HttpConnectionManager {
     // Always forward the XFCC header in the request, regardless of whether the
     // client connection is mTLS.
     ALWAYS_FORWARD_ONLY = 4;
-
-    // When the client connection is mTLS, reset the XFCC header with the client or
-    // append the client certificate information to the request’s XFCC header and send it to the next hop
-    // based on :ref:`append_forward_matcher
-    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_forward_matcher>. 
-    // This is useful when we want to control the XFCC header based on whether the client is a trusted client or not.
-    SANITIZE_SET_OR_APPEND_FORWARD = 5;
   }
 
   // Determines the action for request that contain ``%2F``, ``%2f``, ``%5C`` or ``%5c`` sequences in the URI path.
