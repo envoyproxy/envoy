@@ -387,13 +387,13 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
   ProtoApiScrubberConfig config;
   std::string method = "/library.BookService/UpdateBook";
 
-  // 1. Top-level repeated primitive: "tags" -> Remove
+  // Top-level repeated primitive: "tags" -> Remove
   addRestriction(config, method, "tags", FieldType::Request, true);
 
-  // 2. Nested repeated primitive: "metadata.history.edits" -> Remove
+  // Nested repeated primitive: "metadata.history.edits" -> Remove
   addRestriction(config, method, "metadata.history.edits", FieldType::Request, true);
 
-  // 3. Repeated Message: "chapters" -> No Rule (Should result in Partial to scrub children)
+  // Repeated Message: "chapters" -> No Rule (Should result in Partial to scrub children)
 
   initializeFilterConfig(config);
 
@@ -558,11 +558,13 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
   ProtoApiScrubberConfig config;
   std::string method = "/library.BookService/GetBook";
 
-  // 1. Top-level repeated primitive: "comments" -> Remove
+  // Top-level repeated primitive: "comments" -> Remove
   addRestriction(config, method, "comments", FieldType::Response, true);
 
-  // 2. Nested repeated primitive: "author.awards" -> Remove
+  // Nested repeated primitive: "author.awards" -> Remove
   addRestriction(config, method, "author.awards", FieldType::Response, true);
+
+  // Repeated Message: "tags" -> No Rule (Should result in Partial to scrub children)
 
   initializeFilterConfig(config);
 
@@ -600,6 +602,17 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
     field.set_cardinality(Protobuf::Field_Cardinality_CARDINALITY_REPEATED);
 
     EXPECT_EQ(field_checker.CheckField({"related_books"}, &field), FieldCheckResults::kPartial);
+  }
+
+  {
+    // Case 4: Repeated Primitive with NO matcher
+    // Should return kInclude (keep the whole list).
+    Protobuf::Field field;
+    field.set_name("tags");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    field.set_cardinality(Protobuf::Field_Cardinality_CARDINALITY_REPEATED);
+
+    EXPECT_EQ(field_checker.CheckField({"tags"}, &field), FieldCheckResults::kInclude);
   }
 }
 
