@@ -325,6 +325,12 @@ new_features:
   change: |
     Added runtime guard ``envoy.reloadable_features.report_load_when_rq_active_is_non_zero``.
     When enabled, LRS continues to send locality_stats reoprt to config server when there is no request_issued in the poll cycle.
+- area: on_demand
+  change: |
+    Added runtime guard ``envoy.reloadable_features.on_demand_track_end_stream``.
+    When enabled, the on_demand filter tracks downstream end_stream state to support stream recreation with fully read request bodies.
+    Previously, the filter rejected all requests with bodies by checking for the presence of a decoding buffer,
+    even when the body was complete.
 - area: router
   change: |
     Added :ref:`request_mirror_policies <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
