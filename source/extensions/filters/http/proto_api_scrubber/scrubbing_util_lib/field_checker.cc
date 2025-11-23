@@ -38,15 +38,13 @@ std::string FieldChecker::constructFieldMask(const std::vector<std::string>& pat
   // Translate the last segment of the `path` wherever required.
   std::string last_segment = path.back();
   switch (field->kind()) {
-  case Protobuf::Field::TYPE_ENUM: {
+  case Protobuf::Field::TYPE_ENUM:
     // For enums, last segment of the path contains integer value of the enum.
     // It needs to be translated to the corresponding string value of the enum.
-    std::string name = resolveEnumName(last_segment, field);
-    if (!name.empty()) {
+    if (std::string name = resolveEnumName(last_segment, field); !name.empty()) {
       last_segment = name;
     }
     break;
-  }
 
   default:
     break;

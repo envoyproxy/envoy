@@ -459,6 +459,33 @@ protected:
     return proto_config;
   }
 
+  // Helper to create a serialized FileDescriptorSet containing a specific Enum.
+  // Defines: enum test.TestEnum { UNKNOWN = 0; ACTIVE = 1; }
+  std::string createDescriptorWithTestEnum() {
+    Protobuf::FileDescriptorProto file_proto;
+    file_proto.set_name("test_enum.proto");
+    file_proto.set_package("test");
+    file_proto.set_syntax("proto3");
+
+    auto* enum_type = file_proto.add_enum_type();
+    enum_type->set_name("TestEnum");
+
+    auto* val0 = enum_type->add_value();
+    val0->set_name("UNKNOWN");
+    val0->set_number(0);
+
+    auto* val1 = enum_type->add_value();
+    val1->set_name("ACTIVE");
+    val1->set_number(1);
+
+    Envoy::Protobuf::FileDescriptorSet descriptor_set;
+    descriptor_set.add_file()->CopyFrom(file_proto);
+
+    std::string descriptor_bytes;
+    descriptor_set.SerializeToString(&descriptor_bytes);
+    return descriptor_bytes;
+  }
+
   Api::ApiPtr api_;
   ProtoApiScrubberConfig proto_config_;
   std::shared_ptr<const ProtoApiScrubberFilterConfig> filter_config_;
@@ -950,6 +977,28 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetRequestType) {
         testing::HasSubstr(
             "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the descriptor pool"));
   }
+}
+
+TEST_F(ProtoApiScrubberFilterConfigTest, GetEnumName) {
+  // Setup Config with the custom Enum descriptor
+  ProtoApiScrubberConfig config;
+  *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+      createDescriptorWithTestEnum();
+
+  // Initialize filter config.
+  auto filter_config_or_status = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+  ASSERT_THAT(filter_config_or_status, IsOk());
+  auto filter_config = filter_config_or_status.value();
+
+  // Case 1: Valid Lookup (Type and Value exist)
+  EXPECT_EQ(filter_config->getEnumName("test.TestEnum", 1), "ACTIVE");
+  EXPECT_EQ(filter_config->getEnumName("test.TestEnum", 0), "UNKNOWN");
+
+  // Case 2: Invalid Value (Type exists, Value does not)
+  EXPECT_EQ(filter_config->getEnumName("test.TestEnum", 999), "");
+
+  // Case 3: Invalid Type Name (Type does not exist)
+  EXPECT_EQ(filter_config->getEnumName("test.NonExistentEnum", 1), "");
 }
 
 TEST_F(ProtoApiScrubberFilterConfigTest, GetTypeFinder) {
