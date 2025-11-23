@@ -270,6 +270,27 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodFieldRestrictions(
   return absl::OkStatus();
 }
 
+std::string ProtoApiScrubberFilterConfig::getEnumName(const std::string& enum_type_name,
+                                                      int enum_value) const {
+  if (!descriptor_pool_) {
+    return "";
+  }
+
+  // Find the Enum Type Definition
+  const auto* enum_desc = descriptor_pool_->FindEnumTypeByName(enum_type_name);
+  if (enum_desc == nullptr) {
+    return "";
+  }
+
+  // Find the specific Value within that Enum
+  const auto* enum_value_desc = enum_desc->FindValueByNumber(enum_value);
+  if (enum_value_desc == nullptr) {
+    return "";
+  }
+
+  return enum_value_desc->name();
+}
+
 MatchTreeHttpMatchingDataSharedPtr
 ProtoApiScrubberFilterConfig::getRequestFieldMatcher(const std::string& method_name,
                                                      const std::string& field_mask) const {

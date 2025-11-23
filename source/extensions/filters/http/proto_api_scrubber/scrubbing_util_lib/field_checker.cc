@@ -1,9 +1,12 @@
 #include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
 
+#include "source/common/grpc/common.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_join.h"
 #include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
 
@@ -12,9 +15,55 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 
+std::string FieldChecker::resolveEnumName(const std::string& value_str,
+                                          const Protobuf::Field* field) const {
+  int enum_number;
+  if (!absl::SimpleAtoi(value_str, &enum_number)) {
+    return "";
+  }
+
+  // Extract Type Name from URL "type.googleapis.com/package.Name"
+  absl::string_view type_name = Envoy::TypeUtil::typeUrlToDescriptorFullName(field->type_url());
+
+  // Return the corresponding enum name.
+  return filter_config_ptr_->getEnumName(std::string(type_name), enum_number);
+}
+
+std::string FieldChecker::constructFieldMask(const std::vector<std::string>& path,
+                                             const Protobuf::Field* field) const {
+  if (path.empty()) {
+    return "";
+  }
+
+  // Translate the last segment of the `path` wherever required.
+  std::string last_segment = path.back();
+  switch (field->kind()) {
+  case Protobuf::Field::TYPE_ENUM: {
+    // For enums, last segment of the path contains integer value of the enum.
+    // It needs to be translated to the corresponding string value of the enum.
+    std::string name = resolveEnumName(last_segment, field);
+    if (!name.empty()) {
+      last_segment = name;
+    }
+    break;
+  }
+
+  default:
+    break;
+  }
+
+  // If path has only 1 segment, just return it (translated or original).
+  if (path.size() == 1) {
+    return last_segment;
+  }
+
+  // Join all segments except the last one, then append the (potentially translated) last segment.
+  return absl::StrCat(absl::StrJoin(path.begin(), path.end() - 1, "."), ".", last_segment);
+}
+
 FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
                                            const Protobuf::Field* field) const {
-  const std::string field_mask = absl::StrJoin(path, ".");
+  const std::string field_mask = constructFieldMask(path, field);
 
   MatchTreeHttpMatchingDataSharedPtr match_tree;
 

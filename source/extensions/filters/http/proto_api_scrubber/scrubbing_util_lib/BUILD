@@ -18,6 +18,7 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/http/proto_api_scrubber:filter_config",
