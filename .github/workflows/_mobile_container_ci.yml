@@ -65,6 +65,7 @@ on:
         type: string
         default: |
           #!/bin/bash -e
+          export PATH=/opt/llvm/bin:$PATH
           git config --global --add safe.directory /source
           exec "$@"
       error-match:
