@@ -61,14 +61,16 @@ jobs:
           target: java_tests_linux
           args: >-
             test
-            --config=mobile-remote-ci
+            --config=ci
+            --config=mobile-rbe
             --config=mobile-android
             //test/java/...
         - name: kotlin
           target: kotlin_tests_linux
           args: >-
             test
-            --config=mobile-remote-ci
+            --config=ci
+            --config=mobile-rbe
             --config=mobile-android
             //test/kotlin/...
 
