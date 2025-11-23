@@ -130,12 +130,6 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
       // Skip any TLV that is not in the set of passthrough TLVs.
       continue;
     }
-    if (seen_types.contains(tlv.type)) {
-      // Skip any duplicate TLVs from being added to the combined TLV vector.
-      ENVOY_LOG_EVERY_POW_2_MISC(info, "Skipping duplicate TLV type {}", tlv.type);
-      continue;
-    }
-    seen_types.insert(tlv.type);
     combined_tlv_vector.emplace_back(tlv);
   }
 
