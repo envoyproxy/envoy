@@ -44,6 +44,7 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: mcp_proxy
           http_filters:
           - name: envoy.filters.http.jwt_authn
             typed_config:
@@ -66,6 +67,15 @@ static_resources:
           - name: envoy.filters.http.mcp
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+          # Example: ext_authz filter can consume MCP metadata
+          # - name: envoy.filters.http.ext_authz
+          #   typed_config:
+          #     '@type': type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+          #     grpc_service:
+          #       envoy_grpc:
+          #         cluster_name: ext-authz
+          #     metadata_context_namespaces:
+          #     - mcp_proxy
           - name: envoy.filters.http.rbac
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
