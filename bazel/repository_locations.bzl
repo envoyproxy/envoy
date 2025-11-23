@@ -1556,6 +1556,25 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Emscripten SDK",
         license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),
+    # NOTE: Required for rules_rust 0.67.0 compatibility with Bazel 7.x.
+    # This provides the UEFI platform constraint used by rules_rust.
+    # May be removable once Envoy upgrades to Bazel 8.0+ which includes this by default.
+    # See: https://github.com/envoyproxy/envoy/pull/41172#issuecomment-2365923085
+    platforms = dict(
+        project_name = "platforms",
+        project_desc = "Constraint values for specifying platforms and toolchains",
+        project_url = "https://github.com/bazelbuild/platforms",
+        version = "1.0.0",
+        sha256 = "852b71bfa15712cec124e4a57179b6bc95d59fdf5052945f5d550e072501a769",
+        strip_prefix = "platforms-{version}",
+        urls = [
+            "https://github.com/bazelbuild/platforms/archive/{version}.tar.gz",
+        ],
+        release_date = "2025-05-27",
+        use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/platforms/blob/{version}/LICENSE",
+    ),
     # After updating you may need to run:
     #
     #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
@@ -1564,8 +1583,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.56.0",
-        sha256 = "f1306aac0b258b790df01ad9abc6abb0df0b65416c74b4ef27f4aab298780a64",
+        version = "0.67.0",
+        sha256 = "dc287e3eca80b29d5cc95e261cae273eedf1af4a00a96ae937e234534dadb24c",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
@@ -1576,7 +1595,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "dataplane_ext",
         ],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        release_date = "2024-12-16",
+        release_date = "2025-10-23",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt",

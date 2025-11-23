@@ -112,10 +112,13 @@ def _go_deps(skip_targets):
 def _rust_deps():
     external_http_archive(
         "rules_rust",
-        patches = ["@envoy//bazel:rules_rust.patch", "@envoy//bazel:rules_rust_ppc64le.patch"],
+        patch_args = ["-p0"],
+        patches = ["@envoy//bazel:rules_rust.patch"],
     )
 
 def envoy_dependencies(skip_targets = []):
+    external_http_archive("platforms")
+
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
