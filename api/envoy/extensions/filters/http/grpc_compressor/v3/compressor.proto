@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.grpc_compressor.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_compressor.v3";
+option java_outer_classname = "CompressorProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/grpc_compressor/v3;grpc_compressorv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: gRPC Compressor]
+// gRPC Compressor :ref:`configuration overview <config_http_filters_grpc_compressor>`.
+// [#extension: envoy.filters.http.grpc_compressor]
+
+message Compressor {
+  // Common configuration for filter behavior on both the request and response direction.
+  message CommonDirectionConfig {
+    // Runtime flag that controls whether compression is enabled for the direction this
+    // common config is applied to. When this field is ``false``, the filter will operate as a
+    // pass-through filter in the chosen direction, unless overridden by ``CompressorPerRoute``.
+    // If this field is not specified, the filter will be enabled.
+    config.core.v3.RuntimeFeatureFlag enabled = 1;
+
+    // If set to true, the filter modifies the grpc-accept-encoding header by removing the compressor_library's encoding.
+    // This can help induce the peer not to compress the message to delegate compression to the filter if compression in
+    // the other direction is enabled.
+    // Defaults to false.
+    google.protobuf.BoolValue remove_grpc_accept_encoding = 2;
+
+    // Minimum message length, in bytes, that will trigger compression. Defaults to 30.
+    google.protobuf.UInt32Value min_message_length = 3;
+
+    // Maximum message length, in bytes. Defaults to 10240. If a message is larger than this value,
+    // Envoy will reset the stream. This is to ensure the filter does not buffer excessive data
+    // while waiting for a message to be fully received.
+    google.protobuf.UInt32Value max_message_length = 4;
+  }
+
+  // Configuration for filter behavior on the request direction.
+  message RequestDirectionConfig {
+    CommonDirectionConfig common_config = 1;
+  }
+
+  // Configuration for filter behavior on the response direction.
+  message ResponseDirectionConfig {
+    CommonDirectionConfig common_config = 1;
+  }
+
+  // A compressor library to use for compression.
+  // [#extension-category: envoy.compression.compressor]
+  config.core.v3.TypedExtensionConfig compressor_library = 1
+      [(validate.rules).message = {required: true}];
+
+  // Configuration for request compression. If this field is not specified, request compression is disabled.
+  RequestDirectionConfig request_direction_config = 2;
+
+  // Configuration for response compression. If this field is not specified, response compression is enabled.
+  ResponseDirectionConfig response_direction_config = 3;
+}
