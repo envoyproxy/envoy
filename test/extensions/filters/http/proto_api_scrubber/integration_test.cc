@@ -1,3 +1,4 @@
+#include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/grpc/status.h"
 
 #include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
@@ -12,6 +13,8 @@ namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
 
+using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
+using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::checkSerializedData;
 
 std::string apikeysDescriptorPath() {
@@ -20,33 +23,35 @@ std::string apikeysDescriptorPath() {
 
 const std::string kCreateApiKeyMethod = "/apikeys.ApiKeys/CreateApiKey";
 
-// CEL Matcher Config: Evaluates to TRUE (Trigger Action)
-const std::string kCelAlwaysTrue = R"EOF(
-                                    cel_expr_parsed:
-                                      expr:
-                                        id: 1
-                                        const_expr:
-                                          bool_value: true
-                                      source_info:
-                                        syntax_version: "cel1"
-                                        location: "inline_expression"
-                                        positions:
-                                          1: 0
-)EOF";
+// CEL Matcher Config (Protobuf Text Format) which evaluates to TRUE.
+const std::string kCelAlwaysTrue = R"pb(
+  cel_expr_parsed {
+    expr {
+      id: 1
+      const_expr { bool_value: true }
+    }
+    source_info {
+      syntax_version: "cel1"
+      location: "inline_expression"
+      positions { key: 1 value: 0 }
+    }
+  }
+)pb";
 
-// CEL Matcher Config: Evaluates to FALSE (Skip Action)
-const std::string kCelAlwaysFalse = R"EOF(
-                                    cel_expr_parsed:
-                                      expr:
-                                        id: 1
-                                        const_expr:
-                                          bool_value: false
-                                      source_info:
-                                        syntax_version: "cel1"
-                                        location: "inline_expression"
-                                        positions:
-                                          1: 0
-)EOF";
+// CEL Matcher Config (Protobuf Text Format) which evaluates to FALSE.
+const std::string kCelAlwaysFalse = R"pb(
+  cel_expr_parsed {
+    expr {
+      id: 1
+      const_expr { bool_value: false }
+    }
+    source_info {
+      syntax_version: "cel1"
+      location: "inline_expression"
+      positions { key: 1 value: 0 }
+    }
+  }
+)pb";
 
 class ProtoApiScrubberIntegrationTest : public HttpProtocolIntegrationTest {
 public:
@@ -57,57 +62,99 @@ public:
     HttpProtocolIntegrationTest::TearDown();
   }
 
+  enum class RestrictionType { Request, Response };
+
+  // Helper to build the configuration using readable Protobuf Text Format.
   std::string getFilterConfig(const std::string& descriptor_path,
                               const std::string& method_name = "",
                               const std::string& field_to_scrub = "",
-                              const std::string& cel_matcher_config = kCelAlwaysTrue) {
+                              RestrictionType type = RestrictionType::Request,
+                              const std::string& cel_matcher_proto_text = kCelAlwaysTrue) {
 
-    std::string restrictions_yaml = "";
+    std::string full_config_text;
+    if (method_name.empty() || field_to_scrub.empty()) {
+      // Simple config with just descriptor
+      full_config_text = fmt::format(
+          R"pb(
+            filtering_mode: OVERRIDE
+            descriptor_set {{ data_source {{ filename: "{0}" }} }}
+          )pb",
+          descriptor_path);
+    } else {
+      std::string restriction_key = (type == RestrictionType::Request)
+                                        ? "request_field_restrictions"
+                                        : "response_field_restrictions";
 
-    if (!method_name.empty() && !field_to_scrub.empty()) {
-      restrictions_yaml = fmt::format(
-          R"EOF(
-  restrictions:
-    method_restrictions:
-      "{0}":
-        request_field_restrictions:
-          "{1}":
-            matcher:
-              matcher_list:
-                matchers:
-                  - predicate:
-                      single_predicate:
-                        input:
-                          name: "envoy.matching.inputs.cel_data_input"
-                          typed_config:
-                            "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
-                        custom_match:
-                          name: "envoy.matching.matchers.cel_matcher"
-                          typed_config:
-                            "@type": type.googleapis.com/xds.type.matcher.v3.CelMatcher
-                            expr_match:
-                              {2}
-                    on_match:
-                      action:
-                        name: remove_field
-                        typed_config:
-                          "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
-        )EOF",
-          method_name, field_to_scrub, cel_matcher_config);
+      // Format the full config.
+      full_config_text = fmt::format(R"pb(
+      filtering_mode: OVERRIDE
+      descriptor_set {{
+        data_source {{
+          filename: "{0}"
+        }}
+      }}
+      restrictions {{
+        method_restrictions {{
+          key: "{1}"
+          value {{
+            {2} {{
+              key: "{3}"
+              value {{
+                matcher {{
+                  matcher_list {{
+                    matchers {{
+                      predicate {{
+                        single_predicate {{
+                          input {{
+                            name: "envoy.matching.inputs.cel_data_input"
+                            typed_config {{
+                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {{}}
+                            }}
+                          }}
+                          custom_match {{
+                            name: "envoy.matching.matchers.cel_matcher"
+                            typed_config {{
+                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {{
+                                expr_match {{
+                                  {4}
+                                }}
+                              }}
+                            }}
+                          }}
+                        }}
+                      }}
+                      on_match {{
+                        action {{
+                          name: "remove_field"
+                          typed_config {{
+                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] {{}}
+                          }}
+                        }}
+                      }}
+                    }}
+                  }}
+                }}
+              }}
+            }}
+          }}
+        }}
+      }}
+    )pb",
+                                     descriptor_path,       // {0}
+                                     method_name,           // {1}
+                                     restriction_key,       // {2}
+                                     field_to_scrub,        // {3}
+                                     cel_matcher_proto_text // {4}
+      );
     }
 
-    return fmt::format(
-        R"EOF(
-name: envoy.filters.http.proto_api_scrubber
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig
-  filtering_mode: OVERRIDE
-  descriptor_set:
-    data_source:
-      filename: {0}
-{1}
-)EOF",
-        descriptor_path, restrictions_yaml);
+    ProtoApiScrubberConfig filter_config_proto;
+    ASSERT(Protobuf::TextFormat::ParseFromString(full_config_text, &filter_config_proto));
+
+    HttpFilter http_filter_config;
+    http_filter_config.set_name("envoy.filters.http.proto_api_scrubber");
+    http_filter_config.mutable_typed_config()->PackFrom(filter_config_proto);
+    return MessageUtil::getJsonStringFromMessageOrError(http_filter_config);
   }
 
   template <typename T>
@@ -143,6 +190,8 @@ apikeys::CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb
 // TEST GROUP 1: PASS THROUGH
 // ============================================================================
 
+// Tests that the simple non-streaming request passes through without modification if there are no
+// restrictions configured in the filter config.
 TEST_P(ProtoApiScrubberIntegrationTest, UnaryRequestPassesThrough) {
   config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath()));
   initialize();
@@ -163,6 +212,8 @@ TEST_P(ProtoApiScrubberIntegrationTest, UnaryRequestPassesThrough) {
   ASSERT_TRUE(response->waitForEndStream());
 }
 
+// Tests that the streaming request passes through without modification if there are no restrictions
+// configured in the filter config.
 TEST_P(ProtoApiScrubberIntegrationTest, StreamingPassesThrough) {
   config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath()));
   initialize();
@@ -198,9 +249,11 @@ TEST_P(ProtoApiScrubberIntegrationTest, StreamingPassesThrough) {
 // TEST GROUP 2: SCRUBBING LOGIC
 // ============================================================================
 
+// Tests scrubbing of top level fields in the request when the corresponding matcher evaluates to
+// true.
 TEST_P(ProtoApiScrubberIntegrationTest, ScrubTopLevelField) {
-  config_helper_.prependFilter(
-      getFilterConfig(apikeysDescriptorPath(), kCreateApiKeyMethod, "parent"));
+  config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath(), kCreateApiKeyMethod,
+                                               "parent", RestrictionType::Request, kCelAlwaysTrue));
   initialize();
 
   auto original_proto = makeCreateApiKeyRequest(R"pb(
@@ -222,9 +275,11 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubTopLevelField) {
   ASSERT_TRUE(response->waitForEndStream());
 }
 
-TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField) {
-  config_helper_.prependFilter(
-      getFilterConfig(apikeysDescriptorPath(), kCreateApiKeyMethod, "key.display_name"));
+// Tests scrubbing of nested fields in the request when the corresponding matcher evaluates to true.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField_MatcherTrue) {
+  config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath(), kCreateApiKeyMethod,
+                                               "key.display_name", RestrictionType::Request,
+                                               kCelAlwaysTrue));
   initialize();
 
   auto original_proto = makeCreateApiKeyRequest(R"pb(
@@ -246,12 +301,19 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField) {
   ASSERT_TRUE(response->waitForEndStream());
 }
 
-TEST_P(ProtoApiScrubberIntegrationTest, ScrubConditionalFalse) {
-  config_helper_.prependFilter(
-      getFilterConfig(apikeysDescriptorPath(), kCreateApiKeyMethod, "parent", kCelAlwaysFalse));
+// Tests scrubbing of nested fields in the request when the corresponding matcher evaluates to
+// false.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField_MatcherFalse) {
+  config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath(), kCreateApiKeyMethod,
+                                               "key.display_name", RestrictionType::Request,
+                                               kCelAlwaysFalse));
   initialize();
 
-  auto original_proto = makeCreateApiKeyRequest(R"pb(parent: "should-stay")pb");
+  auto original_proto = makeCreateApiKeyRequest(R"pb(
+    parent: "public"
+    key { display_name: "should-stay" }
+  )pb");
+
   auto response = sendGrpcRequest(original_proto, kCreateApiKeyMethod);
   waitForNextUpstreamRequest();
 
@@ -267,6 +329,8 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubConditionalFalse) {
 // TEST GROUP 3: VALIDATION & REJECTION
 // ============================================================================
 
+// Tests that the request is rejected if the called gRPC method doesn't exist in the descriptor
+// configured in the filter config.
 TEST_P(ProtoApiScrubberIntegrationTest, RejectsMethodNotInDescriptor) {
   config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath()));
   initialize();
@@ -283,6 +347,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsMethodNotInDescriptor) {
   EXPECT_EQ("3", grpc_status->value().getStringView()); // 3 = Invalid Argument
 }
 
+// Tests that the request is rejected if the gRPC `:path` header is in invalid format.
 TEST_P(ProtoApiScrubberIntegrationTest, RejectsInvalidPathFormat) {
   config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath()));
   initialize();
