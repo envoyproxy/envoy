@@ -278,15 +278,15 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithDuplicateTLVTypesPreserve
   // TLV2: type=0xEF, len=0x0001, value=0x02
   const uint8_t v2_protocol[] = {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
-      0x21,                               // ver=2, command=PROXY
-      0x11,                               // AF_INET, STREAM
-      0x00, 0x14,                         // length (20)
-      0x01, 0x02, 0x03, 0x04,             // src 1.2.3.4
-      0x00, 0x01, 0x01, 0x02,             // dst 0.1.1.2
-      0x03, 0x05,                         // src port 773
-      0x02, 0x01,                         // dst port 513
-      0xEF, 0x00, 0x01, 0x01,             // TLV1
-      0xEF, 0x00, 0x01, 0x02,             // TLV2
+      0x21,                   // ver=2, command=PROXY
+      0x11,                   // AF_INET, STREAM
+      0x00, 0x14,             // length (20)
+      0x01, 0x02, 0x03, 0x04, // src 1.2.3.4
+      0x00, 0x01, 0x01, 0x02, // dst 0.1.1.2
+      0x03, 0x05,             // src port 773
+      0x02, 0x01,             // dst port 513
+      0xEF, 0x00, 0x01, 0x01, // TLV1
+      0xEF, 0x00, 0x01, 0x02, // TLV2
   };
   const Buffer::OwnedImpl expectedBuff(v2_protocol, sizeof(v2_protocol));
 
