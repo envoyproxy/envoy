@@ -249,6 +249,8 @@ build:mobile-dbg-ios --config=ios
 # compat: Remove immediately when PR lands
 #############################################################################
 
+build:mobile-remote-ci --config=ci
+
 build:mobile-remote-release --config=ci
 build:mobile-remote-release --config=mobile-rbe
 build:mobile-remote-release --config=mobile-release
