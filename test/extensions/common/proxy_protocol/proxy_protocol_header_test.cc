@@ -271,6 +271,37 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2WithCustomTLVsNoPassthrough) {
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
 
+// New regression test: verify duplicate TLV types (same type, different values) are preserved.
+TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithDuplicateTLVTypesPreserved) {
+  // Signature + V2 header (IPv4 TCP), length = 0x0014 (20) = 12 (addr) + 8 (two TLVs)
+  // TLV1: type=0xEF, len=0x0001, value=0x01
+  // TLV2: type=0xEF, len=0x0001, value=0x02
+  const uint8_t v2_protocol[] = {
+      0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+      0x21,                               // ver=2, command=PROXY
+      0x11,                               // AF_INET, STREAM
+      0x00, 0x14,                         // length (20)
+      0x01, 0x02, 0x03, 0x04,             // src 1.2.3.4
+      0x00, 0x01, 0x01, 0x02,             // dst 0.1.1.2
+      0x03, 0x05,                         // src port 773
+      0x02, 0x01,                         // dst port 513
+      0xEF, 0x00, 0x01, 0x01,             // TLV1
+      0xEF, 0x00, 0x01, 0x02,             // TLV2
+  };
+  const Buffer::OwnedImpl expectedBuff(v2_protocol, sizeof(v2_protocol));
+
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+  Network::ProxyProtocolTLV tlv1{0xEF, {0x01}};
+  Network::ProxyProtocolTLV tlv2{0xEF, {0x02}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv1, tlv2}};
+  Buffer::OwnedImpl buff{};
+
+  ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, true, {}, {}));
+  EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
+}
 } // namespace
 } // namespace ProxyProtocol
 } // namespace Common
