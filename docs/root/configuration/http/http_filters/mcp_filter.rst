@@ -53,7 +53,4 @@ The MCP filter metadata can be used in per-route configuration to enforce polici
 Full Example
 ------------
 
-A complete example configuration showing how to use the MCP filter with RBAC and JWT authentication:
-
-.. literalinclude:: _include/mcp-filter.yaml
-    :language: yaml
+A complete example configuration is available for download: :download:`mcp-filter.yaml <_include/mcp-filter.yaml>`
