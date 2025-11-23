@@ -148,7 +148,7 @@ message QuicProtocolOptions {
   // If not specified, one of the `default values in QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/quic_constants.h>`_ is used.
   google.protobuf.UInt64Value max_packet_length = 9;
 
-  // A customized UDP socket and a QUIC packet writer using the sockect for
+  // A customized UDP socket and a QUIC packet writer using the socket for
   // client connections. i.e. Mobile uses its own implementation to interact
   // with platform socket APIs.
   // If not present, the default platform-independent socket and writer will be used.

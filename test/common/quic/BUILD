@@ -365,10 +365,10 @@ envoy_cc_test_library(
         "@com_github_google_quiche//:quic_test_tools_first_flight_lib",
         "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
     ]) + [
-        "//test/test_common:environment_lib",
-        "//test/test_common:utility_lib",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

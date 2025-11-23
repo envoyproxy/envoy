@@ -5,6 +5,7 @@
 
 #include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/stats/isolated_store_impl.h"
+
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -419,9 +420,7 @@ public:
 
   NetworkHandle getDefaultNetwork() override { return -1; }
 
-  NetworkHandle getAlternativeNetwork(NetworkHandle) override {
-    return -1;
-  }
+  NetworkHandle getAlternativeNetwork(NetworkHandle) override { return -1; }
 
   using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;
 };
