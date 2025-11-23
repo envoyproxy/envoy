@@ -49,7 +49,8 @@ jobs:
     with:
       args: >-
         build
-        --config=mobile-remote-release
+        --config=ci
+        --config=mobile-rbe
         --config=mobile-android-release
         //:android_dist
       container: ${{ needs.load.outputs.build-image && fromJSON(needs.load.outputs.build-image).mobile || '' }}
@@ -82,7 +83,8 @@ jobs:
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       args: >-
         build
-        --config=mobile-remote-release
+        --config=ci
+        --config=mobile-rbe
         --config=mobile-android-release
         //examples/kotlin/hello_world:hello_envoy_kt
       request: ${{ needs.load.outputs.request }}
@@ -140,7 +142,8 @@ jobs:
           target: java-hello-world
           args: >-
             build
-            --config=mobile-remote-release
+            --config=ci
+            --config=mobile-rbe
             --config=mobile-android-release
             //examples/java/hello_world:hello_envoy
         - name: kotlin-baseline-app
@@ -149,7 +152,8 @@ jobs:
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build
-            --config=mobile-remote-release
+            --config=ci
+            --config=mobile-rbe
             --config=mobile-android-release
             //test/kotlin/apps/baseline:hello_envoy_kt
           steps-post: |
@@ -165,7 +169,8 @@ jobs:
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build
-            --config=mobile-remote-release
+            --config=ci
+            --config=mobile-rbe
             --config=mobile-android-release
             //test/kotlin/apps/experimental:hello_envoy_kt
           steps-post: |
