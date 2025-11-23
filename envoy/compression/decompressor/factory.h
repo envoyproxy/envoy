@@ -10,6 +10,7 @@ class DecompressorFactory {
 public:
   virtual ~DecompressorFactory() = default;
 
+  // Creates a new decompressor instance. This should be thread-safe.
   virtual DecompressorPtr createDecompressor(const std::string& stats_prefix) PURE;
   virtual const std::string& statsPrefix() const PURE;
   // TODO(junr03): this method assumes that decompressors are used on http messages.
