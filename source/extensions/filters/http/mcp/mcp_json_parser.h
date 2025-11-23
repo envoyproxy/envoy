@@ -164,6 +164,9 @@ private:
   // Validate required fields
   void validateRequiredFields();
 
+  // Helper to build full path from cache
+  std::string buildFullPath(absl::string_view name) const;
+
   Protobuf::Struct temp_storage_;   // Store all fields temporarily
   Protobuf::Struct& root_metadata_; // Final filtered metadata
   const McpParserConfig& config_;

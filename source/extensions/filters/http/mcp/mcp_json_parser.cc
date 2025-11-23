@@ -176,17 +176,7 @@ McpFieldExtractor* McpFieldExtractor::EndList() {
   return this;
 }
 
-McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
-                                                   absl::string_view value) {
-  if (can_stop_parsing_) {
-    return this;
-  }
-
-  if (array_depth_ > 0) {
-    return this;
-  }
-
-  // Build full path efficiently from cached path
+std::string McpFieldExtractor::buildFullPath(absl::string_view name) const {
   std::string full_path;
   if (!name.empty()) {
     if (!current_path_cache_.empty()) {
@@ -200,6 +190,20 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
   } else {
     full_path = current_path_cache_;
   }
+  return full_path;
+}
+
+McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
+                                                   absl::string_view value) {
+  if (can_stop_parsing_) {
+    return this;
+  }
+
+  if (array_depth_ > 0) {
+    return this;
+  }
+
+  std::string full_path = buildFullPath(name);
   ENVOY_LOG_MISC(debug, "render string name {} path {}, value {}", name, full_path, value);
 
   // Check top-level fields for method detection
@@ -233,20 +237,7 @@ McpFieldExtractor* McpFieldExtractor::RenderBool(absl::string_view name, bool va
     return this;
   }
 
-  // Build full path efficiently from cached path
-  std::string full_path;
-  if (!name.empty()) {
-    if (!current_path_cache_.empty()) {
-      full_path.reserve(current_path_cache_.size() + 1 + name.size());
-      full_path = current_path_cache_;
-      full_path += ".";
-      full_path += name;
-    } else {
-      full_path = std::string(name);
-    }
-  } else {
-    full_path = current_path_cache_;
-  }
+  std::string full_path = buildFullPath(name);
 
   Protobuf::Value proto_value;
   proto_value.set_bool_value(value);
@@ -269,20 +260,7 @@ McpFieldExtractor* McpFieldExtractor::RenderInt64(absl::string_view name, int64_
     return this;
   }
 
-  // Build full path efficiently from cached path
-  std::string full_path;
-  if (!name.empty()) {
-    if (!current_path_cache_.empty()) {
-      full_path.reserve(current_path_cache_.size() + 1 + name.size());
-      full_path = current_path_cache_;
-      full_path += ".";
-      full_path += name;
-    } else {
-      full_path = std::string(name);
-    }
-  } else {
-    full_path = current_path_cache_;
-  }
+  std::string full_path = buildFullPath(name);
 
   Protobuf::Value proto_value;
   proto_value.set_number_value(static_cast<double>(value));
@@ -297,20 +275,7 @@ McpFieldExtractor* McpFieldExtractor::RenderUint64(absl::string_view name, uint6
     return this;
   }
 
-  // Build full path efficiently from cached path
-  std::string full_path;
-  if (!name.empty()) {
-    if (!current_path_cache_.empty()) {
-      full_path.reserve(current_path_cache_.size() + 1 + name.size());
-      full_path = current_path_cache_;
-      full_path += ".";
-      full_path += name;
-    } else {
-      full_path = std::string(name);
-    }
-  } else {
-    full_path = current_path_cache_;
-  }
+  std::string full_path = buildFullPath(name);
 
   Protobuf::Value proto_value;
   proto_value.set_number_value(static_cast<double>(value));
@@ -325,20 +290,7 @@ McpFieldExtractor* McpFieldExtractor::RenderDouble(absl::string_view name, doubl
     return this;
   }
 
-  // Build full path efficiently from cached path
-  std::string full_path;
-  if (!name.empty()) {
-    if (!current_path_cache_.empty()) {
-      full_path.reserve(current_path_cache_.size() + 1 + name.size());
-      full_path = current_path_cache_;
-      full_path += ".";
-      full_path += name;
-    } else {
-      full_path = std::string(name);
-    }
-  } else {
-    full_path = current_path_cache_;
-  }
+  std::string full_path = buildFullPath(name);
 
   Protobuf::Value proto_value;
   proto_value.set_number_value(value);
@@ -357,20 +309,7 @@ McpFieldExtractor* McpFieldExtractor::RenderNull(absl::string_view name) {
     return this;
   }
 
-  // Build full path efficiently from cached path
-  std::string full_path;
-  if (!name.empty()) {
-    if (!current_path_cache_.empty()) {
-      full_path.reserve(current_path_cache_.size() + 1 + name.size());
-      full_path = current_path_cache_;
-      full_path += ".";
-      full_path += name;
-    } else {
-      full_path = std::string(name);
-    }
-  } else {
-    full_path = current_path_cache_;
-  }
+  std::string full_path = buildFullPath(name);
 
   Protobuf::Value proto_value;
   proto_value.set_null_value(Protobuf::NULL_VALUE);
