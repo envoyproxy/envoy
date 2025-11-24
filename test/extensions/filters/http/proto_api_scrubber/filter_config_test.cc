@@ -952,6 +952,43 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetRequestType) {
   }
 }
 
+TEST_F(ProtoApiScrubberFilterConfigTest, GetResponseType) {
+  // 1. Initialize the config
+  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> config_or_status =
+      ProtoApiScrubberFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_EQ(config_or_status.status().code(), absl::StatusCode::kOk);
+  filter_config_ = std::move(config_or_status.value());
+
+  {
+    // Case 1: Valid Method Name
+    // The method name passed from headers usually has the format /Package.Service/Method
+    std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
+
+    absl::StatusOr<const Protobuf::Type*> type_or_status =
+        filter_config_->getResponseType(method_name);
+
+    ASSERT_EQ(type_or_status.status().code(), absl::StatusCode::kOk);
+    ASSERT_NE(type_or_status.value(), nullptr);
+
+    // Verify the resolved input type is correct
+    EXPECT_EQ(type_or_status.value()->name(), "apikeys.ApiKey");
+  }
+
+  {
+    // Case 2: Invalid Method Name (Not in descriptor)
+    std::string method_name = "/apikeys.ApiKeys/NonExistentMethod";
+
+    absl::StatusOr<const Protobuf::Type*> type_or_status =
+        filter_config_->getResponseType(method_name);
+
+    EXPECT_EQ(type_or_status.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(
+        type_or_status.status().message(),
+        testing::HasSubstr(
+            "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the descriptor pool"));
+  }
+}
+
 TEST_F(ProtoApiScrubberFilterConfigTest, GetTypeFinder) {
   absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> config_or_status =
       ProtoApiScrubberFilterConfig::create(proto_config_, factory_context_);
