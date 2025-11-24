@@ -123,10 +123,13 @@ Utility::createCanonicalRequest(absl::string_view method, absl::string_view path
     }
     new_path = uriEncodePath(new_path);
   } else {
+    // Special case for S3 and its variants when path is not pre-encoded at all
+    auto encoded_path =
+        isUriPathEncoded(path_part) ? std::string(path_part) : uriEncodePath(path_part);
     if (should_normalize_uri_path) {
-      new_path = normalizePath(path_part);
+      new_path = normalizePath(encoded_path);
     } else {
-      new_path = path_part;
+      new_path = encoded_path;
     }
   }
 
@@ -600,6 +603,15 @@ bool Utility::useDoubleUriEncode(const std::string service_name) {
 // other
 bool Utility::shouldNormalizeUriPath(const std::string service) {
   return Utility::useDoubleUriEncode(service);
+}
+
+bool Utility::isUriPathEncoded(absl::string_view path) {
+  for (char ch : path) {
+    if (!isReservedChar(ch) && ch != '%' && ch != '/') {
+      return false;
+    }
+  }
+  return true;
 }
 
 } // namespace Aws
