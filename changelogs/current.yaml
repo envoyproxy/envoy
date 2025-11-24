@@ -73,6 +73,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: adaptive concurrency
+  change: |
+    Fixed a race condition in the gradient controller which would allow more outstanding requests than the concurrency
+    limit, bounded by the number of worker threads.
 - area: http2
   change: |
     Fixed a bug where Envoy would leak memory if an HTTP/2 stream was reset before request headers were
