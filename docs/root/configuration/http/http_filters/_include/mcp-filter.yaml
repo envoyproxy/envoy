@@ -233,8 +233,6 @@ static_resources:
                                         exact: system:serviceaccount:default:admin
                                 allow-users-to-call-safe-tools:
                                   permissions:
-                                  principals:
-                                  - any: true
                                   - and_rules:
                                       rules:
                                       - sourced_metadata:
@@ -254,3 +252,5 @@ static_resources:
                                             value:
                                               string_match:
                                                 exact: get_weather
+                                  principals:
+                                  - any: true
