@@ -621,6 +621,9 @@ private:
                        absl::string_view host_selection_details);
 
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
+  // Returns the effective retry policy to use for this request.
+  // Cluster-level retry policy takes precedence over route-level retry policy.
+  const Router::RetryPolicy* getEffectiveRetryPolicy() const;
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,

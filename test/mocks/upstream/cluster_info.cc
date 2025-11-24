@@ -177,6 +177,7 @@ MockClusterInfo::MockClusterInfo()
             lrs_report_metric_names_.get());
       }));
   ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
+  ON_CALL(*this, retryPolicy()).WillByDefault(Return(nullptr));
   ON_CALL(*this, hashPolicy()).WillByDefault(Return(nullptr));
 }
 

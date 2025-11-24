@@ -2265,9 +2265,11 @@ TEST_F(HostImplTest, HealthPipeAddress) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
   config.set_port_value(8000);
-  EXPECT_EQ(HostDescriptionImpl::create(
-                info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr, nullptr,
-                std::make_shared<const envoy::config::core::v3::Locality>(), config, 1)
+  EXPECT_EQ(HostDescriptionImpl::create(info, "", *Network::Utility::resolveUrl("unix://foo"),
+                                        nullptr, nullptr,
+                                        std::make_shared<const envoy::config::core::v3::Locality>(
+                                            envoy::config::core::v3::Locality().default_instance()),
+                                        config, 1)
                 .status()
                 .message(),
             "Invalid host configuration: non-zero port for non-IP address");
@@ -2282,7 +2284,8 @@ TEST_F(HostImplTest, NetnsInvalid) {
       Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:9999", true, "/netns/filepath");
   EXPECT_EQ(
       HostDescriptionImpl::create(info, "", dest_addr, nullptr, nullptr,
-                                  std::make_shared<const envoy::config::core::v3::Locality>(),
+                                  std::make_shared<const envoy::config::core::v3::Locality>(
+                                      envoy::config::core::v3::Locality().default_instance()),
                                   config, 1)
           .status()
           .message(),
@@ -2303,7 +2306,9 @@ TEST_F(HostImplTest, HealthcheckHostname) {
   config.set_hostname("foo");
   std::unique_ptr<HostDescriptionImpl> descr = *HostDescriptionImpl::create(
       info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr, nullptr,
-      std::make_shared<const envoy::config::core::v3::Locality>(), config, 1);
+      std::make_shared<const envoy::config::core::v3::Locality>(
+          envoy::config::core::v3::Locality().default_instance()),
+      config, 1);
   EXPECT_EQ("foo", descr->hostnameForHealthChecks());
 }
 
@@ -6218,8 +6223,8 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
   EXPECT_EQ(zone_b, hosts_per_locality.get()[1][1]->locality());
 }
 
-// Test cluster-level mirroring policy configuration.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithCluster) {
+// Test cluster-level retry policy with basic retry_on configuration.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyBasic) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string yaml = R"EOF(
@@ -6240,29 +6245,24 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithCluster) {
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {}
-        request_mirror_policies:
-          - cluster: shadow_cluster
-            runtime_fraction:
-              default_value:
-                numerator: 60
-                denominator: HUNDRED
+        retry_policy:
+          retry_on: "5xx,reset,connect-failure"
+          num_retries: 3
+          per_try_timeout: 2s
   )EOF";
 
   auto cluster = makeCluster(yaml);
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(1, shadow_policies.size());
-
-  const auto& policy = shadow_policies[0];
-  EXPECT_EQ("shadow_cluster", policy->cluster());
-  EXPECT_EQ("", policy->clusterHeader().get());
-  EXPECT_FALSE(policy->traceSampled().has_value());
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(3, retry_policy->numRetries());
+  EXPECT_EQ(std::chrono::milliseconds(2000), retry_policy->perTryTimeout());
 }
 
-// Test cluster-level mirroring policy with cluster_header.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithClusterHeader) {
+// Test cluster-level retry policy with retry back-off configuration.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithBackoff) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string yaml = R"EOF(
@@ -6283,27 +6283,25 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithClusterHeader) {
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {}
-        request_mirror_policies:
-          - cluster_header: x-shadow-cluster
-            trace_sampled: true
+        retry_policy:
+          retry_on: "gateway-error,connect-failure,refused-stream"
+          num_retries: 5
+          retry_back_off:
+            base_interval: 0.1s
+            max_interval: 1s
   )EOF";
 
   auto cluster = makeCluster(yaml);
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(1, shadow_policies.size());
-
-  const auto& policy = shadow_policies[0];
-  EXPECT_EQ("", policy->cluster());
-  EXPECT_EQ("x-shadow-cluster", policy->clusterHeader().get());
-  EXPECT_TRUE(policy->traceSampled().has_value());
-  EXPECT_TRUE(policy->traceSampled().value());
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(5, retry_policy->numRetries());
 }
 
-// Test cluster-level mirroring policy with multiple policies.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterMultipleShadowPolicies) {
+// Test cluster-level retry policy with retriable status codes.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithRetriableStatusCodes) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string yaml = R"EOF(
@@ -6324,32 +6322,23 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterMultipleShadowPolicies) {
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {}
-        request_mirror_policies:
-          - cluster: shadow_cluster_1
-            runtime_fraction:
-              default_value:
-                numerator: 11
-                denominator: HUNDRED
-          - cluster: shadow_cluster_2
-            trace_sampled: false
-          - cluster_header: x-shadow-header
+        retry_policy:
+          retry_on: "retriable-status-codes"
+          num_retries: 2
+          retriable_status_codes: [503, 429]
   )EOF";
 
   auto cluster = makeCluster(yaml);
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(3, shadow_policies.size());
-
-  EXPECT_EQ("shadow_cluster_1", shadow_policies[0]->cluster());
-  EXPECT_EQ("shadow_cluster_2", shadow_policies[1]->cluster());
-  EXPECT_EQ("", shadow_policies[2]->cluster());
-  EXPECT_EQ("x-shadow-header", shadow_policies[2]->clusterHeader().get());
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(2, retry_policy->numRetries());
 }
 
-// Test cluster-level mirroring policy with header mutations.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithHeaderMutations) {
+// Test cluster-level retry policy with per try idle timeout.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithPerTryIdleTimeout) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string yaml = R"EOF(
@@ -6370,50 +6359,26 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyWithHeaderMutations) 
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {}
-        request_mirror_policies:
-          - cluster: shadow_cluster
-            request_headers_mutations:
-              - append:
-                  header:
-                    key: x-shadow-header
-                    value: shadow-value
-                  append_action: OVERWRITE_IF_EXISTS_OR_ADD
-              - remove: x-remove-me
-            host_rewrite_literal: shadow-host.example.com
+        retry_policy:
+          retry_on: "5xx"
+          num_retries: 3
+          per_try_timeout: 5s
+          per_try_idle_timeout: 1s
   )EOF";
 
   auto cluster = makeCluster(yaml);
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(1, shadow_policies.size());
-
-  const auto& policy = shadow_policies[0];
-  EXPECT_EQ("shadow_cluster", policy->cluster());
-
-  // Create headers, formatter context, and stream info for header evaluation.
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"}, {":path", "/test"}, {"x-remove-me", "should-be-removed"}};
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  const Envoy::Formatter::Context formatter_context{&headers};
-
-  // Apply header mutations.
-  policy->headerEvaluator().evaluateHeaders(headers, formatter_context, stream_info);
-
-  // Verify the shadow policy header mutations were applied correctly.
-  EXPECT_TRUE(headers.has("x-shadow-header"));
-  EXPECT_EQ("shadow-value", headers.get_("x-shadow-header"));
-
-  // Verify the header removal works correctly.
-  EXPECT_FALSE(headers.has("x-remove-me"));
-
-  // Verify the host rewrite literal is configured correctly.
-  EXPECT_EQ("shadow-host.example.com", policy->hostRewriteLiteral());
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(3, retry_policy->numRetries());
+  EXPECT_EQ(std::chrono::milliseconds(5000), retry_policy->perTryTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(1000), retry_policy->perTryIdleTimeout());
 }
 
-// Test cluster with no mirroring policies.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterNoShadowPolicies) {
+// Test cluster with no retry policy.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterNoRetryPolicy) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string yaml = R"EOF(
@@ -6435,12 +6400,12 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterNoShadowPolicies) {
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(0, shadow_policies.size());
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  EXPECT_EQ(nullptr, retry_policy);
 }
 
-// Test cluster-level mirroring policy with disable_shadow_host_suffix_append.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyDisableShadowHostSuffix) {
+// Test cluster-level retry policy with rate limited retry back-off.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithRateLimitedBackoff) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string yaml = R"EOF(
@@ -6461,293 +6426,24 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterShadowPolicyDisableShadowHostSuff
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {}
-        request_mirror_policies:
-          - cluster: shadow_cluster
-            disable_shadow_host_suffix_append: true
+        retry_policy:
+          retry_on: "retriable-status-codes"
+          num_retries: 3
+          retriable_status_codes: [429]
+          rate_limited_retry_back_off:
+            reset_headers:
+              - name: "Retry-After"
+                format: SECONDS
+            max_interval: 300s
   )EOF";
 
   auto cluster = makeCluster(yaml);
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto& shadow_policies = cluster->info()->shadowPolicies();
-  EXPECT_EQ(1, shadow_policies.size());
-
-  const auto& policy = shadow_policies[0];
-  EXPECT_EQ("shadow_cluster", policy->cluster());
-}
-
-// Test cluster-level hash policy with header hash.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterHashPolicyHeader) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: RING_HASH
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-        hash_policy:
-          - header:
-              header_name: x-user-id
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto* hash_policy = cluster->info()->hashPolicy();
-  ASSERT_NE(hash_policy, nullptr);
-
-  // Test hash generation with header.
-  Http::TestRequestHeaderMapImpl headers{{"x-user-id", "user123"}};
-  auto hash = hash_policy->generateHash(headers, {}, nullptr);
-  EXPECT_TRUE(hash.has_value());
-  EXPECT_NE(0, hash.value());
-
-  // Test that same header value produces same hash.
-  Http::TestRequestHeaderMapImpl headers2{{"x-user-id", "user123"}};
-  auto hash2 = hash_policy->generateHash(headers2, {}, nullptr);
-  EXPECT_TRUE(hash2.has_value());
-  EXPECT_EQ(hash.value(), hash2.value());
-
-  // Test that different header value produces different hash.
-  Http::TestRequestHeaderMapImpl headers3{{"x-user-id", "user456"}};
-  auto hash3 = hash_policy->generateHash(headers3, {}, nullptr);
-  EXPECT_TRUE(hash3.has_value());
-  EXPECT_NE(hash.value(), hash3.value());
-}
-
-// Test cluster-level hash policy with connection properties (source IP).
-TEST_P(ParametrizedClusterInfoImplTest, ClusterHashPolicySourceIp) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: RING_HASH
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-        hash_policy:
-          - connection_properties:
-              source_ip: true
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto* hash_policy = cluster->info()->hashPolicy();
-  ASSERT_NE(hash_policy, nullptr);
-}
-
-// Test cluster-level hash policy with cookie hash.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterHashPolicyCookie) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: MAGLEV
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-        hash_policy:
-          - cookie:
-              name: session-id
-              ttl: 3600s
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto* hash_policy = cluster->info()->hashPolicy();
-  ASSERT_NE(hash_policy, nullptr);
-}
-
-// Test cluster-level hash policy with query parameter hash.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterHashPolicyQueryParam) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: RING_HASH
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-        hash_policy:
-          - query_parameter:
-              name: user_id
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto* hash_policy = cluster->info()->hashPolicy();
-  ASSERT_NE(hash_policy, nullptr);
-}
-
-// Test cluster-level hash policy with multiple policies.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterMultipleHashPolicies) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: RING_HASH
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-        hash_policy:
-          - header:
-              header_name: x-user-id
-            terminal: false
-          - header:
-              header_name: x-session-id
-            terminal: true
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto* hash_policy = cluster->info()->hashPolicy();
-  ASSERT_NE(hash_policy, nullptr);
-
-  // Test that first policy is used when header is present.
-  Http::TestRequestHeaderMapImpl headers{{"x-user-id", "user123"}};
-  auto hash = hash_policy->generateHash(headers, {}, nullptr);
-  EXPECT_TRUE(hash.has_value());
-
-  // Test that second policy is used when first is absent.
-  Http::TestRequestHeaderMapImpl headers2{{"x-session-id", "session456"}};
-  auto hash2 = hash_policy->generateHash(headers2, {}, nullptr);
-  EXPECT_TRUE(hash2.has_value());
-
-  // Hashes should be different since they're based on different headers.
-  EXPECT_NE(hash.value(), hash2.value());
-}
-
-// Test cluster with no hash policy.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterNoHashPolicy) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto* hash_policy = cluster->info()->hashPolicy();
-  EXPECT_EQ(nullptr, hash_policy);
-}
-
-// Test cluster-level hash policy with filter state hash.
-TEST_P(ParametrizedClusterInfoImplTest, ClusterHashPolicyFilterState) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: RING_HASH
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-        hash_policy:
-          - filter_state:
-              key: io.envoy.test.hashable_object
-  )EOF";
-
-  auto cluster = makeCluster(yaml);
-  ASSERT_NE(cluster, nullptr);
-  ASSERT_NE(cluster->info(), nullptr);
-
-  const auto* hash_policy = cluster->info()->hashPolicy();
-  ASSERT_NE(hash_policy, nullptr);
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(3, retry_policy->numRetries());
 }
 
 } // namespace

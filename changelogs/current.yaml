@@ -347,6 +347,11 @@ new_features:
     cluster-level request mirroring. Cluster-level policies override route-level policies when both are configured.
 - area: router
   change: |
+    Added :ref:`retry_policy <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.retry_policy>`
+    to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
+    cluster-level retry policies.
+- area: router
+  change: |
     Added :ref:`hash_policy <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.hash_policy>`
     to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
     cluster-level hash policies.

@@ -61,7 +61,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //             http2_protocol_options:
 //               max_concurrent_streams: 100
 //        .... [further cluster config]
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
   // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
@@ -210,4 +210,14 @@ message HttpProtocolOptions {
   //   balancing policy (e.g., :ref:`RING_HASH <envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.RING_HASH>`
   //   or :ref:`MAGLEV <envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.MAGLEV>`).
   repeated config.route.v3.RouteAction.HashPolicy hash_policy = 10;
+
+  // Specifies the retry policy for requests routed to this cluster. When configured,
+  // cluster-level retry policy overrides route-level retry policy. When not configured,
+  // route-level retry policy (if any) will be used.
+  //
+  // .. note::
+  //
+  //   Cluster-level retry policy will override route-level retry policy entirely. Policies are
+  //   not merged.
+  config.route.v3.RetryPolicy retry_policy = 11;
 }
