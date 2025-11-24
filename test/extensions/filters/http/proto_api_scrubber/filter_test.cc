@@ -57,12 +57,12 @@ class ProtoApiScrubberFilterTest : public ::testing::Test {
 protected:
   ProtoApiScrubberFilterTest() : api_(Api::createApiForTest()) { setup(); }
 
-  // Helper Enum for clarity
+  // Helper Enum for clarity.
   enum class FieldType { Request, Response };
 
   virtual void setup() {
     setupMocks();
-    // Default config is empty, tests will override
+    // Default config is empty, tests will override.
     setupFilterConfig("", kApiKeysDescriptorRelativePath);
     setupFilter();
   }
@@ -185,7 +185,7 @@ protected:
    */
   absl::Status reloadFilter(ProtoApiScrubberConfig& config,
                             const char* descriptor_path = kApiKeysDescriptorRelativePath) {
-    // Ensure descriptors are present
+    // Ensure descriptors are present.
     if (!config.has_descriptor_set()) {
       auto content_or =
           api_->fileSystem().fileReadToEnd(Envoy::TestEnvironment::runfilesPath(descriptor_path));
@@ -195,14 +195,14 @@ protected:
           std::move(content_or.value());
     }
 
-    // Create new Config Object
+    // Create new Config Object.
     auto config_or_status = ProtoApiScrubberFilterConfig::create(config, mock_factory_context_);
     RETURN_IF_NOT_OK(config_or_status.status());
 
-    // Reset the filter config instance
+    // Reset the filter config instance.
     filter_config_ = config_or_status.value();
 
-    // Reset the filter instance
+    // Reset the filter instance.
     setupFilter();
 
     return absl::OkStatus();
@@ -656,7 +656,7 @@ TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
               filter_->decodeHeaders(req_headers, true));
   }
 
-  // Case 9: Extra Leading Slashes
+  // Case 9: Extra Leading Slashes.
   {
     TestRequestHeaderMapImpl req_headers =
         TestRequestHeaderMapImpl{{":method", "POST"},
@@ -677,7 +677,7 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod_RequestFlow) {
   ProtoApiScrubberConfig config;
   ASSERT_TRUE(reloadFilter(config).ok());
 
-  // Prepare request
+  // Prepare request.
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
                                {":path", "/some.nonexistent.Service/UnknownMethod"},
@@ -811,7 +811,7 @@ TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestNestedField) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
-  // Post-check: Verify scrubbing happened
+  // Post-check: Verify scrubbing happened.
   CreateApiKeyRequest expected_scrubbed_request = makeCreateApiKeyRequest();
   expected_scrubbed_request.mutable_key()->mutable_update_time()->clear_seconds();
 
@@ -1011,12 +1011,13 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ResponseScrubbingFailsOnTruncatedN
 }
 
 // Tests for Method Level Restrictions
+// Tests for Method Level Restrictions.
 class MethodLevelRestrictionTest : public ProtoApiScrubberFilterTest {
 protected:
-  // Override setup to load bookstore descriptor
+  // Override setup to load bookstore descriptor.
   void setup() override {
     setupMocks();
-    // Config will be set by each test
+    // Config will be set by each test.
   }
 };
 
@@ -1137,7 +1138,7 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedByMatcher) {
   EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, false));
 
-  // Verify data path is also fine
+  // Verify data path is also fine.
   CreateShelfRequest request = makeCreateShelfRequest();
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
@@ -1159,7 +1160,7 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedNoRule) {
 
   auto req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
-                               {":path", "/bookstore.Bookstore/CreateShelf"}, // Different method
+                               {":path", "/bookstore.Bookstore/CreateShelf"}, // Different method.
                                {"content-type", "application/grpc"}};
 
   EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
@@ -1173,7 +1174,7 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedOnMatcherInsufficientData) {
   // creates the matcher internally. A real-world scenario for UnableToMatch
   // might involve a CEL expression that depends on dynamic metadata not yet available.
 
-  // Setup config with a method restriction
+  // Setup config with a method restriction.
   setupFilterConfig(R"pb(
     restrictions: {
       method_restrictions: {
@@ -1246,7 +1247,7 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
 
   std::string method_name = "/bookstore.Bookstore/CreateShelf";
 
-  // 1. Configure a METHOD-LEVEL rule to ALLOW the request
+  // 1. Configure a METHOD-LEVEL rule to ALLOW the request.
   const char* config_yaml = R"pb(
     restrictions: {
       method_restrictions: {
@@ -1334,18 +1335,18 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
   auto req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
 
-  // Method-level check should pass
+  // Method-level check should pass.
   EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, false));
 
-  // Data phase should still scrub the field
-  CreateShelfRequest request = makeCreateShelfRequest(); // id: 1, theme: "Test Theme"
+  // Data phase should still scrub the field.
+  CreateShelfRequest request = makeCreateShelfRequest(); // id: 1, theme: "Test Theme".
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   CreateShelfRequest expected_request = makeCreateShelfRequest();
-  expected_request.mutable_shelf()->clear_theme(); // Theme should be scrubbed
+  expected_request.mutable_shelf()->clear_theme(); // Theme should be scrubbed.
 
   checkSerializedData<CreateShelfRequest>(*request_data, {expected_request});
 }

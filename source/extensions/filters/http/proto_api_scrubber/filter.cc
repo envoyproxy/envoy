@@ -204,7 +204,7 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
   // Move the data to internal gRPC buffer messages representation.
   auto messages = request_msg_converter_->accumulateMessages(data, end_stream);
   if (const absl::Status& status = messages.status(); !status.ok()) {
-    // Correctly use the status code from the error for rejectRequest
+    // Correctly use the status code from the error for rejectRequest.
     Envoy::Grpc::Status::GrpcStatus grpc_status = Status::WellKnownGrpcStatus::Internal;
     if (status.code() == absl::StatusCode::kFailedPrecondition) {
       grpc_status = Status::WellKnownGrpcStatus::FailedPrecondition;
@@ -247,7 +247,7 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
       return Envoy::Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
-    // Move the created scrubber into the MEMBER variable
+    // Move the created scrubber into the MEMBER variable.
     request_scrubber_ = std::move(request_scrubber_or_status).value();
   }
 
@@ -267,7 +267,7 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
       // stream end.
       ASSERT(msg_idx == messages->size() - 1);
 
-      // Skip the empty message
+      // Skip the empty message.
       continue;
     }
 
