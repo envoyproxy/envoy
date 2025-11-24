@@ -25,12 +25,12 @@
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 #include "source/extensions/path/match/uri_template/config.h"
 #include "source/extensions/path/rewrite/uri_template/config.h"
+#include "source/extensions/quic/client_packet_writer/default_quic_client_packet_writer_factory_config.h"
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 #include "source/extensions/transport_sockets/tls/upstream_config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
-#include "source/extensions/quic/client_packet_writer/default_quic_client_packet_writer_factory_config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
 #include "source/common/listener_manager/listener_manager_impl.h"

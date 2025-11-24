@@ -351,7 +351,8 @@ std::unique_ptr<TextFormatTranscoder> createTranscoder() {
       protobuf::reflection::envoy_extensions_quic_crypto_stream_v3_crypto_stream::
           kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_quic_proof_source_v3_proof_source::kFileDescriptorInfo,
-      protobuf::reflection::envoy_extensions_quic_client_writer_factory_v3_default_client_writer::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_quic_client_writer_factory_v3_default_client_writer::
+          kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_regex_engines_v3_google_re2::kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_request_id_uuid_v3_uuid::kFileDescriptorInfo,
       protobuf::reflection::
