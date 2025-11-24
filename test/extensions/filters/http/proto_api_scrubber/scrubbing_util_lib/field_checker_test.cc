@@ -272,8 +272,10 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
   }
 }
 
-// This tests CheckField() method for request fields.
-TEST_F(FieldCheckerTest, RequestFieldChecker) {
+using RequestFieldCheckerTest = FieldCheckerTest;
+
+// Tests CheckField() method for primitive and message type request fields.
+TEST_F(RequestFieldCheckerTest, PrimitiveAndMessageType) {
   ProtoApiScrubberConfig config;
   std::string method = "/library.BookService/GetBook";
 
@@ -380,8 +382,77 @@ TEST_F(FieldCheckerTest, RequestFieldChecker) {
   }
 }
 
-// This tests CheckField() method for response fields.
-TEST_F(FieldCheckerTest, ResponseFieldChecker) {
+// Tests CheckField() specifically for repeated fields (Arrays) in the request.
+TEST_F(RequestFieldCheckerTest, ArrayType) {
+  ProtoApiScrubberConfig config;
+  std::string method = "/library.BookService/UpdateBook";
+
+  // Top-level repeated primitive: "tags" -> Remove
+  addRestriction(config, method, "tags", FieldType::Request, true);
+
+  // Nested repeated primitive: "metadata.history.edits" -> Remove
+  addRestriction(config, method, "metadata.history.edits", FieldType::Request, true);
+
+  // Repeated Message: "chapters" -> No Rule (Should result in Partial to scrub children)
+
+  initializeFilterConfig(config);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method,
+                             filter_config_.get());
+
+  {
+    // Case 1: Top-level repeated primitive (e.g., repeated string tags)
+    // Configured to be removed.
+    Protobuf::Field field;
+    field.set_name("tags");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    field.set_cardinality(Protobuf::Field_Cardinality_CARDINALITY_REPEATED);
+
+    EXPECT_EQ(field_checker.CheckField({"tags"}, &field), FieldCheckResults::kExclude);
+  }
+
+  {
+    // Case 2: Deeply nested repeated primitive
+    // Path: metadata.history.edits
+    // Configured to be removed.
+    Protobuf::Field field;
+    field.set_name("edits");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    field.set_cardinality(Protobuf::Field_Cardinality_CARDINALITY_REPEATED);
+
+    EXPECT_EQ(field_checker.CheckField({"metadata", "history", "edits"}, &field),
+              FieldCheckResults::kExclude);
+  }
+
+  {
+    // Case 3: Repeated Message (e.g., repeated Chapter chapters)
+    // No specific matcher on the list itself.
+    // Should return kPartial so the scrubber iterates over the elements.
+    Protobuf::Field field;
+    field.set_name("chapters");
+    field.set_kind(Protobuf::Field_Kind_TYPE_MESSAGE);
+    field.set_cardinality(Protobuf::Field_Cardinality_CARDINALITY_REPEATED);
+
+    EXPECT_EQ(field_checker.CheckField({"chapters"}, &field), FieldCheckResults::kPartial);
+  }
+
+  {
+    // Case 4: Repeated Primitive with NO matcher
+    // Should return kInclude (keep the whole list).
+    Protobuf::Field field;
+    field.set_name("flags");
+    field.set_kind(Protobuf::Field_Kind_TYPE_BOOL);
+    field.set_cardinality(Protobuf::Field_Cardinality_CARDINALITY_REPEATED);
+
+    EXPECT_EQ(field_checker.CheckField({"flags"}, &field), FieldCheckResults::kInclude);
+  }
+}
+
+using ResponseFieldCheckerTest = FieldCheckerTest;
+
+// Tests CheckField() method for primitive and message type response fields.
+TEST_F(ResponseFieldCheckerTest, PrimitiveAndMessageType) {
   ProtoApiScrubberConfig config;
   std::string method = "/library.BookService/GetBook";
 
@@ -479,6 +550,69 @@ TEST_F(FieldCheckerTest, ResponseFieldChecker) {
     EXPECT_EQ(
         field_checker.CheckField({"fulfillment", "primary_location", "exact_coordinates"}, &field),
         FieldCheckResults::kPartial);
+  }
+}
+
+// Tests CheckField() specifically for repeated fields (Arrays) in the response.
+TEST_F(ResponseFieldCheckerTest, ArrayType) {
+  ProtoApiScrubberConfig config;
+  std::string method = "/library.BookService/GetBook";
+
+  // Top-level repeated primitive: "comments" -> Remove
+  addRestriction(config, method, "comments", FieldType::Response, true);
+
+  // Nested repeated primitive: "author.awards" -> Remove
+  addRestriction(config, method, "author.awards", FieldType::Response, true);
+
+  // Repeated Message: "tags" -> No Rule (Should result in Partial to scrub children)
+
+  initializeFilterConfig(config);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, method,
+                             filter_config_.get());
+
+  {
+    // Case 1: Top-level repeated primitive
+    Protobuf::Field field;
+    field.set_name("comments");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    field.set_cardinality(Protobuf::Field_Cardinality_CARDINALITY_REPEATED);
+
+    EXPECT_EQ(field_checker.CheckField({"comments"}, &field), FieldCheckResults::kExclude);
+  }
+
+  {
+    // Case 2: Nested repeated primitive
+    Protobuf::Field field;
+    field.set_name("awards");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    field.set_cardinality(Protobuf::Field_Cardinality_CARDINALITY_REPEATED);
+
+    EXPECT_EQ(field_checker.CheckField({"author", "awards"}, &field), FieldCheckResults::kExclude);
+  }
+
+  {
+    // Case 3: Repeated Message (e.g., repeated Book related_books)
+    // No restriction on the list itself.
+    // Should return kPartial to allow scrubbing inside individual books.
+    Protobuf::Field field;
+    field.set_name("related_books");
+    field.set_kind(Protobuf::Field_Kind_TYPE_MESSAGE);
+    field.set_cardinality(Protobuf::Field_Cardinality_CARDINALITY_REPEATED);
+
+    EXPECT_EQ(field_checker.CheckField({"related_books"}, &field), FieldCheckResults::kPartial);
+  }
+
+  {
+    // Case 4: Repeated Primitive with NO matcher
+    // Should return kInclude (keep the whole list).
+    Protobuf::Field field;
+    field.set_name("tags");
+    field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    field.set_cardinality(Protobuf::Field_Cardinality_CARDINALITY_REPEATED);
+
+    EXPECT_EQ(field_checker.CheckField({"tags"}, &field), FieldCheckResults::kInclude);
   }
 }
 
