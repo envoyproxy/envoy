@@ -112,9 +112,9 @@ absl::StatusOr<Router::RetryPolicyConstSharedPtr>
 createRetryPolicy(const envoy::config::core::v3::RetryPolicy& core_retry_policy,
                   Server::Configuration::CommonFactoryContext& context) {
   // Convert core retry policy to route retry policy and create the implementation.
+  // Pass empty string to respect user's configured retry_on, not override it.
   envoy::config::route::v3::RetryPolicy route_retry_policy =
-      Http::Utility::convertCoreToRouteRetryPolicy(core_retry_policy,
-                                                   "5xx,gateway-error,connect-failure,reset");
+      Http::Utility::convertCoreToRouteRetryPolicy(core_retry_policy, "");
 
   return Router::RetryPolicyImpl::create(route_retry_policy, context.messageValidationVisitor(),
                                          context);
