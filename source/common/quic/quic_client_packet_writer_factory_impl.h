@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_packet_writer.h"
 
 namespace Envoy {
 namespace Quic {

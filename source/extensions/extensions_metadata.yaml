@@ -1125,6 +1125,13 @@ envoy.path.rewrite.uri_template.uri_template_rewriter:
   undocumented: true
   type_urls:
   - envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+envoy.quic.packet_writer.default:
+  categories:
+  - envoy.quic.client_packet_writer
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.quic.client_packet_writer.v3.DefaultClientWriter
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source

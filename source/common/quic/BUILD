@@ -397,7 +397,7 @@ envoy_cc_library(
     deps = envoy_select_enable_http3([
         ":envoy_quic_packet_writer_lib",
         ":envoy_quic_utils_lib",
-        ":envoy_quic_client_connection_lib",
+        ":envoy_quic_client_packet_writer_factory_interface",
         "//source/common/network:connection_socket_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
     ]),
