@@ -37,10 +37,19 @@ public:
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
+  Http::FilterHeadersStatus encodeHeaders(Envoy::Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
+
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+
 private:
   // Rejects requests and sends local reply back to the client.
   void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
                      absl::string_view rc_detail);
+
+  // Rejects response and sends local reply back to the client.
+  void rejectResponse(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
+                      absl::string_view rc_detail);
 
   bool is_valid_grpc_request_ = false;
 
@@ -48,8 +57,15 @@ private:
   // vice-versa.
   GrpcFieldExtraction::MessageConverterPtr request_msg_converter_{nullptr};
 
+  // Response message converter which converts Envoy Buffer data to StreamMessage (for scrubbing)
+  // and vice-versa.
+  GrpcFieldExtraction::MessageConverterPtr response_msg_converter_{nullptr};
+
   // Creates and returns an instance of `ProtoScrubber` which can be used for request scrubbing.
   absl::StatusOr<std::unique_ptr<ProtoScrubber>> createRequestProtoScrubber();
+
+  // Creates and returns an instance of `ProtoScrubber` which can be used for response scrubbing.
+  absl::StatusOr<std::unique_ptr<ProtoScrubber>> createResponseProtoScrubber();
 
   const ProtoApiScrubberFilterConfig& filter_config_;
 
@@ -69,6 +85,18 @@ private:
   // once per request, preserving state across multiple data frames (e.g., for
   // gRPC streaming or large payloads).
   std::unique_ptr<ProtoScrubber> request_scrubber_;
+
+  // The field checker which uses match tree configured in the filter config to determine whether a
+  // field should be preserved or removed from the response protobuf payloads.
+  // NOTE: This must outlive `response_scrubber_`, which holds a non-owning reference to this
+  // instance.
+  std::unique_ptr<FieldCheckerInterface> response_match_tree_field_checker_;
+
+  // The scrubber instance for the response path.
+  // It is lazily initialized in encodeData() to ensure it is instantiated exactly
+  // once per request, preserving state across multiple data frames (e.g., for
+  // gRPC streaming or large payloads).
+  std::unique_ptr<ProtoScrubber> response_scrubber_;
 };
 
 class FilterFactory : public Common::FactoryBase<ProtoApiScrubberConfig> {

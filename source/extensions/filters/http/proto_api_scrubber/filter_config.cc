@@ -321,8 +321,8 @@ void ProtoApiScrubberFilterConfig::initializeTypeUtils() {
       });
 }
 
-absl::StatusOr<const Protobuf::Type*>
-ProtoApiScrubberFilterConfig::getRequestType(const std::string& method_name) const {
+absl::StatusOr<const MethodDescriptor*>
+ProtoApiScrubberFilterConfig::getMethodDescriptor(const std::string& method_name) const {
   // Covert grpc method name from `/package.service/method` format to `package.service.method` as
   // the method `FindMethodByName` expects the method name to be in the latter format.
   std::string dot_separated_method_name =
@@ -334,10 +334,30 @@ ProtoApiScrubberFilterConfig::getRequestType(const std::string& method_name) con
         dot_separated_method_name));
   }
 
-  std::string request_type_url =
-      absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", method->input_type()->full_name());
+  return method;
+}
+
+absl::StatusOr<const Protobuf::Type*>
+ProtoApiScrubberFilterConfig::getRequestType(const std::string& method_name) const {
+  absl::StatusOr<const MethodDescriptor*> method_or_status = getMethodDescriptor(method_name);
+  RETURN_IF_NOT_OK(method_or_status.status());
+
+  std::string request_type_url = absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/",
+                                              method_or_status.value()->input_type()->full_name());
   const Protobuf::Type* request_type = (*type_finder_)(request_type_url);
   return request_type;
+}
+
+absl::StatusOr<const Protobuf::Type*>
+ProtoApiScrubberFilterConfig::getResponseType(const std::string& method_name) const {
+  absl::StatusOr<const MethodDescriptor*> method_or_status = getMethodDescriptor(method_name);
+  RETURN_IF_NOT_OK(method_or_status.status());
+
+  std::string response_type_url =
+      absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/",
+                   method_or_status.value()->output_type()->full_name());
+  const Protobuf::Type* response_type = (*type_finder_)(response_type_url);
+  return response_type;
 }
 
 REGISTER_FACTORY(RemoveFilterActionFactory,

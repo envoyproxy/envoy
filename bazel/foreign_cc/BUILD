@@ -467,57 +467,6 @@ envoy_cmake(
 )
 
 envoy_cmake(
-    name = "zlib",
-    cache_entries = {
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-        "CMAKE_C_COMPILER_FORCED": "on",
-        "SKIP_BUILD_EXAMPLES": "on",
-        "BUILD_SHARED_LIBS": "off",
-
-        # The following entries are for zlib-ng. Since zlib and zlib-ng are compatible source
-        # codes and CMake ignores unknown cache entries, it is fine to combine it into one
-        # dictionary.
-        #
-        # Reference: https://github.com/zlib-ng/zlib-ng#build-options.
-        "ZLIB_COMPAT": "on",
-        "ZLIB_ENABLE_TESTS": "off",
-
-        # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
-        "WITH_OPTIM": "on",
-        # However turning off SSE4 fixes it.
-        "WITH_SSE4": "off",
-
-        # Warning: Turning WITH_NEW_STRATEGIES to "on" doesn't pass gzip compressor fuzz test.
-        # Turning this off means falling into NO_QUICK_STRATEGY route.
-        "WITH_NEW_STRATEGIES": "off",
-
-        # Only allow aligned address.
-        # Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
-        "UNALIGNED_OK": "off",
-    },
-    generate_args = [
-        "-G",
-        "Ninja",
-    ],
-    lib_source = select({
-        "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
-        "//conditions:default": "@net_zlib//:all",
-    }),
-    out_static_libs = select({
-        "//bazel:windows_x86_64": ["zlib.lib"],
-        "//conditions:default": ["libz.a"],
-    }),
-    postfix_script = select({
-        "@platforms//cpu:wasm32": """
-            if [[ -f libzlib.a ]]; then
-                cp libzlib.a $$INSTALLDIR/lib/libz.a
-            fi
-        """,
-        "//conditions:default": "",
-    }),
-)
-
-envoy_cmake(
     name = "maxmind",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],

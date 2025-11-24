@@ -1,4 +1,6 @@
-# Envoy specific Bazel build/test options.
+#############################################################################
+# startup
+#############################################################################
 
 # Bazel doesn't need more than 200MB of memory for local build based on memory profiling:
 # https://docs.bazel.build/versions/master/skylark/performance.html#memory-profiling
@@ -11,6 +13,11 @@
 # TODO: Adding just to test android
 startup --host_jvm_args=-Xmx3g
 startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
+
+
+#############################################################################
+# global
+#############################################################################
 
 common --noenable_bzlmod
 
@@ -68,6 +75,21 @@ build --define absl=1
 # Disable ICU linking for googleurl.
 build --@com_github_google_gurl//build_config:system_icu=0
 
+# Test options
+build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
+
+# Coverage options
+coverage --config=coverage
+coverage --build_tests_only
+
+# Specifies the rustfmt.toml for all rustfmt_test targets.
+build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
+
+
+#############################################################################
+# os
+#############################################################################
+
 build:linux --copt=-fdebug-types-section
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
@@ -79,25 +101,22 @@ build:linux --features=per_object_debug_info
 build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:linux --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
-# libc++ default for clang
-common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
-common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
-common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
-common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
-common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
-common:libc++ --define force_libcpp=enabled
-common:libc++ --@envoy//bazel:libc++=true
+# macOS
+build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
+build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
+build:macos --define tcmalloc=disabled
+build:macos --cxxopt=-Wno-nullability-completeness
 
-# libstdc++ - currently only used for gcc
-build:libstdc++ --@envoy//bazel:libc++=false
-build:libstdc++ --@envoy//bazel:libstdc++=true
+
+#############################################################################
+# compiler
+#############################################################################
 
 # Common flags for Clang (shared between all clang variants)
 common:clang-common --action_env=BAZEL_COMPILER=clang
 common:clang-common --linkopt=-fuse-ld=lld
 common:clang-common --action_env=CC=clang --host_action_env=CC=clang
 common:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
-common:clang-common --incompatible_enable_cc_toolchain_resolution=false
 
 # Clang with libc++ (default)
 common:clang --config=clang-common
@@ -121,118 +140,27 @@ build:gcc --copt=-Wno-error=uninitialized
 build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
-build:gcc --incompatible_enable_cc_toolchain_resolution=false
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 
-# Common flags for sanitizers
-build:sanitizer --define tcmalloc=disabled
-build:sanitizer --linkopt -ldl
-test:sanitizer --build_tests_only
+# libc++ default for clang
+common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
+common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
+common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
+common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
+common:libc++ --define force_libcpp=enabled
+common:libc++ --@envoy//bazel:libc++=true
 
-# Flags for Clang + PCH
-build:clang-pch --spawn_strategy=local
-build:clang-pch --define=ENVOY_CLANG_PCH=1
+# libstdc++ - currently only used for gcc
+build:libstdc++ --@envoy//bazel:libc++=false
+build:libstdc++ --@envoy//bazel:libstdc++=true
 
-build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
 
-# Clang-tidy
-# TODO(phlax): enable this, its throwing some errors as well as finding more issues
-# build:clang-tidy --@envoy_toolshed//format/clang_tidy:executable=@envoy//tools/clang-tidy
-build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=//:clang_tidy_config
-build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%clang_tidy_aspect
-build:clang-tidy --output_groups=report
-build:clang-tidy --build_tag_filters=-notidy
+#############################################################################
+# tests
+#############################################################################
 
-# Basic ASAN/UBSAN that works for gcc or llvm
-build:asan-common --config=sanitizer
-# ASAN install its signal handler, disable ours so the stacktrace will be printed by ASAN
-build:asan-common --define signal_trace=disabled
-build:asan-common --define ENVOY_CONFIG_ASAN=1
-build:asan-common --build_tag_filters=-no_san
-build:asan-common --test_tag_filters=-no_san
-build:asan-common --copt -fsanitize=address,undefined
-build:asan-common --linkopt -fsanitize=address,undefined
-# vptr and function sanitizer are enabled in asan if it is set up via bazel/setup_clang.sh.
-build:asan-common --copt -fno-sanitize=vptr,function
-build:asan-common --linkopt -fno-sanitize=vptr,function
-build:asan-common --copt -DADDRESS_SANITIZER=1
-build:asan-common --copt -DUNDEFINED_SANITIZER=1
-build:asan-common --copt -D__SANITIZE_ADDRESS__
-build:asan-common --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
-build:asan-common --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
-build:asan-common --test_env=ASAN_SYMBOLIZER_PATH
-# ASAN needs -O1 to get reasonable performance.
-build:asan-common --copt -O1
-build:asan-common --copt -fno-optimize-sibling-calls
-
-# ASAN config with clang runtime
-build:asan --config=asan-common
-build:asan --linkopt --rtlib=compiler-rt
-build:asan --linkopt --unwindlib=libgcc
-build:asan --linkopt=-l:libclang_rt.ubsan_standalone.a
-build:asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
-build:asan --action_env=ENVOY_UBSAN_VPTR=1
-build:asan --copt=-fsanitize=vptr,function
-build:asan --linkopt=-fsanitize=vptr,function
-build:asan --linkopt='-L/opt/llvm/lib/clang/18/lib/x86_64-unknown-linux-gnu'
-
-# macOS
-build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
-build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
-build:macos --define tcmalloc=disabled
-build:macos --cxxopt=-Wno-nullability-completeness
-
-# macOS ASAN/UBSAN
-build:macos-asan --config=asan
-# Workaround, see https://github.com/bazelbuild/bazel/issues/6932
-build:macos-asan --copt -Wno-macro-redefined
-build:macos-asan --copt -D_FORTIFY_SOURCE=0
-# Workaround, see https://github.com/bazelbuild/bazel/issues/4341
-build:macos-asan --copt -DGRPC_BAZEL_BUILD
-# Dynamic link cause issues like: `dyld: malformed mach-o: load commands size (59272) > 32768`
-build:macos-asan --dynamic_mode=off
-
-# Base TSAN config
-build:tsan --action_env=ENVOY_TSAN=1
-build:tsan --config=sanitizer
-build:tsan --define ENVOY_CONFIG_TSAN=1
-build:tsan --copt -fsanitize=thread
-build:tsan --linkopt -fsanitize=thread
-build:tsan --copt -DTHREAD_SANITIZER=1
-build:tsan --build_tag_filters=-no_san,-no_tsan
-build:tsan --test_tag_filters=-no_san,-no_tsan
-# Needed due to https://github.com/libevent/libevent/issues/777
-build:tsan --copt -DEVENT__DISABLE_DEBUG_MODE
-# https://github.com/abseil/abseil-cpp/issues/760
-# https://github.com/google/sanitizers/issues/953
-build:tsan --test_env="TSAN_OPTIONS=report_atomic_races=0"
-build:tsan --test_timeout=120,600,1500,4800
-
-# Base MSAN config
-build:msan --action_env=ENVOY_MSAN=1
-build:msan --config=sanitizer
-build:msan --build_tag_filters=-no_san
-build:msan --test_tag_filters=-no_san
-build:msan --define ENVOY_CONFIG_MSAN=1
-build:msan --copt -fsanitize=memory
-build:msan --linkopt -fsanitize=memory
-build:msan --copt -fsanitize-memory-track-origins=2
-build:msan --copt -DMEMORY_SANITIZER=1
-build:msan --test_env=MSAN_SYMBOLIZER_PATH
-# MSAN needs -O1 to get reasonable performance.
-build:msan --copt -O1
-build:msan --copt -fno-optimize-sibling-calls
-
-# Optimize build for binary size reduction.
-build:sizeopt -c opt --copt -Os
-
-# Test options
-build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
-
-# Coverage options
-coverage --config=coverage
-coverage --build_tests_only
-
+# Coverage
 build:coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
@@ -263,6 +191,129 @@ build:coverage --coverage_report_generator=@envoy//tools/coverage:report_generat
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
 build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target
+
+## Compile-time-options testing
+# Right now, none of the available compile-time options conflict with each other. If this
+# changes, this build type may need to be broken up.
+build:compile-time-options --define=admin_html=disabled
+build:compile-time-options --define=signal_trace=disabled
+build:compile-time-options --define=hot_restart=disabled
+build:compile-time-options --define=google_grpc=disabled
+build:compile-time-options --define=boringssl=fips
+build:compile-time-options --define=log_debug_assert_in_release=enabled
+build:compile-time-options --define=path_normalization_by_default=true
+build:compile-time-options --define=deprecated_features=disabled
+build:compile-time-options --define=tcmalloc=gperftools
+build:compile-time-options --define=zlib=ng
+build:compile-time-options --define=uhv=enabled
+# gRPC has a lot of deprecated-enum-enum-conversion warnings with C++20
+build:compile-time-options --copt=-Wno-error=deprecated-enum-enum-conversion
+build:compile-time-options --test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true
+build:compile-time-options --@envoy//bazel:http3=False
+build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
+
+
+#############################################################################
+# sanitizers
+#############################################################################
+
+# Common flags for sanitizers
+build:sanitizer --define tcmalloc=disabled
+build:sanitizer --linkopt -ldl
+test:sanitizer --build_tests_only
+
+# ASAN config with clang runtime
+build:asan --config=asan-common
+build:asan --linkopt --rtlib=compiler-rt
+build:asan --linkopt --unwindlib=libgcc
+build:asan --linkopt=-l:libclang_rt.ubsan_standalone.a
+build:asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
+build:asan --action_env=ENVOY_UBSAN_VPTR=1
+build:asan --copt=-fsanitize=vptr,function
+build:asan --linkopt=-fsanitize=vptr,function
+build:asan --linkopt='-L/opt/llvm/lib/clang/18/lib/x86_64-unknown-linux-gnu'
+
+# Basic ASAN/UBSAN that works for gcc or llvm
+build:asan-common --config=sanitizer
+# ASAN install its signal handler, disable ours so the stacktrace will be printed by ASAN
+build:asan-common --define signal_trace=disabled
+build:asan-common --define ENVOY_CONFIG_ASAN=1
+build:asan-common --build_tag_filters=-no_san
+build:asan-common --test_tag_filters=-no_san
+build:asan-common --copt -fsanitize=address,undefined
+build:asan-common --linkopt -fsanitize=address,undefined
+# vptr and function sanitizer are enabled in asan if it is set up via bazel/setup_clang.sh.
+build:asan-common --copt -fno-sanitize=vptr,function
+build:asan-common --linkopt -fno-sanitize=vptr,function
+build:asan-common --copt -DADDRESS_SANITIZER=1
+build:asan-common --copt -DUNDEFINED_SANITIZER=1
+build:asan-common --copt -D__SANITIZE_ADDRESS__
+build:asan-common --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
+build:asan-common --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
+build:asan-common --test_env=ASAN_SYMBOLIZER_PATH
+# ASAN needs -O1 to get reasonable performance.
+build:asan-common --copt -O1
+build:asan-common --copt -fno-optimize-sibling-calls
+
+# macOS ASAN/UBSAN
+build:macos-asan --config=asan
+# Workaround, see https://github.com/bazelbuild/bazel/issues/6932
+build:macos-asan --copt -Wno-macro-redefined
+build:macos-asan --copt -D_FORTIFY_SOURCE=0
+# Workaround, see https://github.com/bazelbuild/bazel/issues/4341
+build:macos-asan --copt -DGRPC_BAZEL_BUILD
+# Dynamic link cause issues like: `dyld: malformed mach-o: load commands size (59272) > 32768`
+build:macos-asan --dynamic_mode=off
+
+# Base MSAN config
+build:msan --action_env=ENVOY_MSAN=1
+build:msan --config=sanitizer
+build:msan --build_tag_filters=-no_san
+build:msan --test_tag_filters=-no_san
+build:msan --define ENVOY_CONFIG_MSAN=1
+build:msan --copt -fsanitize=memory
+build:msan --linkopt -fsanitize=memory
+build:msan --copt -fsanitize-memory-track-origins=2
+build:msan --copt -DMEMORY_SANITIZER=1
+build:msan --test_env=MSAN_SYMBOLIZER_PATH
+# MSAN needs -O1 to get reasonable performance.
+build:msan --copt -O1
+build:msan --copt -fno-optimize-sibling-calls
+
+# Base TSAN config
+build:tsan --action_env=ENVOY_TSAN=1
+build:tsan --config=sanitizer
+build:tsan --define ENVOY_CONFIG_TSAN=1
+build:tsan --copt -fsanitize=thread
+build:tsan --linkopt -fsanitize=thread
+build:tsan --copt -DTHREAD_SANITIZER=1
+build:tsan --build_tag_filters=-no_san,-no_tsan
+build:tsan --test_tag_filters=-no_san,-no_tsan
+# Needed due to https://github.com/libevent/libevent/issues/777
+build:tsan --copt -DEVENT__DISABLE_DEBUG_MODE
+# https://github.com/abseil/abseil-cpp/issues/760
+# https://github.com/google/sanitizers/issues/953
+build:tsan --test_env="TSAN_OPTIONS=report_atomic_races=0"
+build:tsan --test_timeout=120,600,1500,4800
+
+
+#############################################################################
+# fuzzing
+#############################################################################
+
+## Fuzz builds
+# Shared fuzzing configuration.
+build:fuzzing --define=ENVOY_CONFIG_ASAN=1
+build:fuzzing --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+
+# ASAN fuzzer
+build:asan-fuzzer --config=plain-fuzzer
+build:asan-fuzzer --config=asan
+build:asan-fuzzer --copt=-fno-omit-frame-pointer
+# Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
+build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
+build:asan-fuzzer --linkopt=-lc++
+
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 build:fuzz-coverage --test_tag_filters=-nocoverage
@@ -273,11 +324,67 @@ build:fuzz-coverage --define=wasm=disabled
 build:fuzz-coverage --config=fuzz-coverage-config
 build:fuzz-coverage-config --//tools/coverage:config=@envoy//test:fuzz_coverage_config
 
+build:oss-fuzz --config=fuzzing
+build:oss-fuzz --config=libc++
+build:oss-fuzz --define=FUZZING_ENGINE=oss-fuzz
+build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_instrumentation=oss-fuzz
+build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_sanitizer=none
+build:oss-fuzz --dynamic_mode=off
+build:oss-fuzz --strip=never
+build:oss-fuzz --copt=-fno-sanitize=vptr
+build:oss-fuzz --linkopt=-fno-sanitize=vptr
+build:oss-fuzz --define=tcmalloc=disabled
+build:oss-fuzz --define=signal_trace=disabled
+build:oss-fuzz --copt=-D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
+build:oss-fuzz --define=force_libcpp=enabled
+build:oss-fuzz --linkopt=-lc++
+build:oss-fuzz --linkopt=-pthread
+
+# Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
+build:plain-fuzzer --config=fuzzing
+build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
+# The fuzzing rules provide their own instrumentation, but it is currently
+# disabled due to bazelbuild/bazel#12888. Instead, we provide instrumentation at
+# the top level through these options.
+build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
+build:plain-fuzzer --linkopt=-fsanitize=fuzzer-no-link
+
+
+#############################################################################
+# miscellaneous
+#############################################################################
+
 build:cache-local --remote_cache=grpc://localhost:9092
+
+# Flags for Clang + PCH
+build:clang-pch --spawn_strategy=local
+build:clang-pch --define=ENVOY_CLANG_PCH=1
+
+# Clang-tidy
+# TODO(phlax): enable this, its throwing some errors as well as finding more issues
+# build:clang-tidy --@envoy_toolshed//format/clang_tidy:executable=@envoy//tools/clang-tidy
+build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=//:clang_tidy_config
+build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%clang_tidy_aspect
+build:clang-tidy --output_groups=report
+build:clang-tidy --build_tag_filters=-notidy
+
+# Compile database generation config
+build:compdb --build_tag_filters=-nocompdb
+
+common:cves --//tools/dependency:cve-data=//tools/dependency:cve-data-dir
+
+build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
+
+# Optimize build for binary size reduction.
+build:sizeopt -c opt --copt -Os
+
+
+#############################################################################
+# remote: Setup for cache, BES, RBE, and Docker workers
+#############################################################################
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:rbe-toolchain --incompatible_enable_cc_toolchain_resolution=false
 
 build:rbe-toolchain-clang --config=rbe-toolchain
 build:rbe-toolchain-clang --config=clang
@@ -302,28 +409,35 @@ build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 
-## Compile-time-options testing
-# Right now, none of the available compile-time options conflict with each other. If this
-# changes, this build type may need to be broken up.
-build:compile-time-options --define=admin_html=disabled
-build:compile-time-options --define=signal_trace=disabled
-build:compile-time-options --define=hot_restart=disabled
-build:compile-time-options --define=google_grpc=disabled
-build:compile-time-options --define=boringssl=fips
-build:compile-time-options --define=log_debug_assert_in_release=enabled
-build:compile-time-options --define=path_normalization_by_default=true
-build:compile-time-options --define=deprecated_features=disabled
-build:compile-time-options --define=tcmalloc=gperftools
-build:compile-time-options --define=zlib=ng
-build:compile-time-options --define=uhv=enabled
-# gRPC has a lot of deprecated-enum-enum-conversion warnings with C++20
-build:compile-time-options --copt=-Wno-error=deprecated-enum-enum-conversion
-build:compile-time-options --test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true
-build:compile-time-options --@envoy//bazel:http3=False
-build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
+## RBE (Engflow Envoy)
 
-# Docker sandbox
-# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
+# this is not included in the `--config=rbe` target - set it to publish to engflow ui
+common:bes --bes_backend=grpcs://mordenite.cluster.engflow.com/
+common:bes --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
+common:bes --bes_timeout=3600s
+common:bes --bes_upload_mode=fully_async
+common:bes --nolegacy_important_outputs
+
+common:engflow-common --google_default_credentials=false
+common:engflow-common --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
+common:engflow-common --grpc_keepalive_time=60s
+common:engflow-common --grpc_keepalive_timeout=30s
+common:engflow-common --remote_cache_compression
+
+# this provides access to RBE+cache
+common:rbe --config=remote-cache
+common:rbe --config=remote-exec
+
+# this provides access to just cache
+common:remote-cache --config=engflow-common
+common:remote-cache --remote_cache=grpcs://mordenite.cluster.engflow.com
+common:remote-cache --remote_timeout=3600s
+
+common:remote-exec --remote_executor=grpcs://mordenite.cluster.engflow.com
+common:remote-exec --jobs=200
+common:remote-exec --define=engflow_rbe=true
+
+# Docker sandboxes
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -351,6 +465,11 @@ build:docker-tsan --config=docker-sandbox
 build:docker-tsan --config=rbe-toolchain-clang
 build:docker-tsan --config=tsan
 
+
+#############################################################################
+# ci
+#############################################################################
+
 # CI configurations
 build:remote-ci --config=ci
 build:remote-ci --remote_download_minimal
@@ -360,90 +479,6 @@ common:ci --noshow_progress
 common:ci --noshow_loading_progress
 common:ci --test_output=errors
 
-# Fuzz builds
-
-# Shared fuzzing configuration.
-build:fuzzing --define=ENVOY_CONFIG_ASAN=1
-build:fuzzing --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-
-# Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
-build:plain-fuzzer --config=fuzzing
-build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
-# The fuzzing rules provide their own instrumentation, but it is currently
-# disabled due to bazelbuild/bazel#12888. Instead, we provide instrumentation at
-# the top level through these options.
-build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
-build:plain-fuzzer --linkopt=-fsanitize=fuzzer-no-link
-
-# ASAN fuzzer
-build:asan-fuzzer --config=plain-fuzzer
-build:asan-fuzzer --config=asan
-build:asan-fuzzer --copt=-fno-omit-frame-pointer
-# Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
-build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
-build:asan-fuzzer --linkopt=-lc++
-
-build:oss-fuzz --config=fuzzing
-build:oss-fuzz --config=libc++
-build:oss-fuzz --define=FUZZING_ENGINE=oss-fuzz
-build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_instrumentation=oss-fuzz
-build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_sanitizer=none
-build:oss-fuzz --dynamic_mode=off
-build:oss-fuzz --strip=never
-build:oss-fuzz --copt=-fno-sanitize=vptr
-build:oss-fuzz --linkopt=-fno-sanitize=vptr
-build:oss-fuzz --define=tcmalloc=disabled
-build:oss-fuzz --define=signal_trace=disabled
-build:oss-fuzz --copt=-D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
-build:oss-fuzz --define=force_libcpp=enabled
-build:oss-fuzz --linkopt=-lc++
-build:oss-fuzz --linkopt=-pthread
-
-# Compile database generation config
-build:compdb --build_tag_filters=-nocompdb
-
-# RBE (Google)
-build:cache-google --google_default_credentials=true
-build:cache-google --remote_cache=grpcs://remotebuildexecution.googleapis.com
-build:cache-google --remote_instance_name=projects/envoy-ci/instances/default_instance
-build:cache-google --remote_timeout=7200
-build:rbe-google --remote_executor=grpcs://remotebuildexecution.googleapis.com
-build:rbe-google --config=cache-google
-
-build:rbe-google-bes --bes_backend=grpcs://buildeventservice.googleapis.com
-build:rbe-google-bes --bes_results_url=https://source.cloud.google.com/results/invocations/
-build:rbe-google-bes --bes_upload_mode=fully_async
-
-# RBE (Engflow Envoy)
-common:common-envoy-engflow --google_default_credentials=false
-common:common-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-common:common-envoy-engflow --grpc_keepalive_time=60s
-common:common-envoy-engflow --grpc_keepalive_timeout=30s
-common:common-envoy-engflow --remote_cache_compression
-
-common:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
-common:cache-envoy-engflow --remote_timeout=3600s
-# common:cache-envoy-engflow --remote_instance_name=llvm-18
-common:bes-envoy-engflow --bes_backend=grpcs://mordenite.cluster.engflow.com/
-common:bes-envoy-engflow --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
-common:bes-envoy-engflow --bes_timeout=3600s
-common:bes-envoy-engflow --bes_upload_mode=fully_async
-common:bes-envoy-engflow --nolegacy_important_outputs
-common:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
-common:rbe-envoy-engflow --jobs=200
-common:rbe-envoy-engflow --define=engflow_rbe=true
-
-common:remote-envoy-engflow --config=common-envoy-engflow
-common:remote-envoy-engflow --config=cache-envoy-engflow
-common:remote-envoy-engflow --config=rbe-envoy-engflow
-
-common:remote-cache-envoy-engflow --config=common-envoy-engflow
-common:remote-cache-envoy-engflow --config=cache-envoy-engflow
-
-common:cves --//tools/dependency:cve-data=//tools/dependency:cve-data-dir
-
-# Specifies the rustfmt.toml for all rustfmt_test targets.
-build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
 
 #############################################################################
 # debug: Various Bazel debugging flags

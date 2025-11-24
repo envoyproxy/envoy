@@ -32,6 +32,12 @@ minor_behavior_changes:
     <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite>` to
     :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` to support substitution
     formatting for path header rewriting.
+- area: overload_manager
+  change: |
+    Fixed :ref:`downstream connections monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`
+    to correctly trigger configured actions, and create a ``pressure`` metric like other resource monitors.
+    Previously, this extension would never trigger an action.
 - area: tracing
   change: |
     The :ref:`request header custom tag <envoy_v3_api_field_type.tracing.v3.CustomTag.request_header>`
@@ -210,6 +216,15 @@ new_features:
     Added support for dropping stats via
     :ref:`DropAction <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during
     custom metric conversion.
+- area: tcp_proxy
+  change: |
+    Added :ref:`upstream_connect_mode
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`
+    and :ref:`max_early_data_bytes
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>`
+    to control when upstream connections are established and early data buffering behavior.
+    This enables use cases like extracting TLS certificate information or SNI before establishing
+    upstream connections.
 - area: http
   change: |
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to
@@ -319,6 +334,12 @@ new_features:
   change: |
     Added runtime guard ``envoy.reloadable_features.report_load_when_rq_active_is_non_zero``.
     When enabled, LRS continues to send locality_stats reoprt to config server when there is no request_issued in the poll cycle.
+- area: on_demand
+  change: |
+    Added runtime guard ``envoy.reloadable_features.on_demand_track_end_stream``.
+    When enabled, the on_demand filter tracks downstream end_stream state to support stream recreation with fully read request bodies.
+    Previously, the filter rejected all requests with bodies by checking for the presence of a decoding buffer,
+    even when the body was complete.
 - area: router
   change: |
     Added :ref:`request_mirror_policies <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
