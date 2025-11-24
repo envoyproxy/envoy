@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/common/exception.h"
+
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
 #include "source/common/version/version.h"
@@ -84,7 +86,7 @@ void OtlpUtils::populateAnyValue(opentelemetry::proto::common::v1::AnyValue& val
     break;
   }
   default:
-    return;
+    IS_ENVOY_BUG("unexpected otel attribute type");
   }
 }
 
