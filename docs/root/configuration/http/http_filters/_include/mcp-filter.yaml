@@ -78,6 +78,7 @@ static_resources:
           - name: envoy.filters.http.mcp
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+              traffic_mode: PASS_THROUGH
           - name: envoy.filters.http.rbac
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
@@ -106,6 +107,7 @@ static_resources:
                 route:
                   prefix_rewrite: /mcp
                   weighted_clusters:
+                    total_weight: 100
                     clusters:
                     - host_rewrite_literal: mcp.deepwiki.com
                       name: default-remote-mcp-backend
@@ -176,13 +178,13 @@ static_resources:
                                                 exact: get_weather
                                   principals:
                                   - any: true
-                    total_weight: 100
               - match:
                   path_separated_prefix: /local/mcp
                 name: default-httproute-local-mcp-rule0-match0
                 route:
                   prefix_rewrite: /mcp
                   weighted_clusters:
+                    total_weight: 100
                     clusters:
                     - name: default-local-mcp-backend
                       weight: 100
@@ -231,6 +233,8 @@ static_resources:
                                         exact: system:serviceaccount:default:admin
                                 allow-users-to-call-safe-tools:
                                   permissions:
+                                  principals:
+                                  - any: true
                                   - and_rules:
                                       rules:
                                       - sourced_metadata:
@@ -250,6 +254,3 @@ static_resources:
                                             value:
                                               string_match:
                                                 exact: get_weather
-                                  principals:
-                                  - any: true
-                    total_weight: 100

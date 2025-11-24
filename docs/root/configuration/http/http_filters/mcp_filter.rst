@@ -4,56 +4,37 @@ MCP
 ===
 
 The MCP filter provides Model Context Protocol support for Envoy.
+The MCP filter will accept MCP JSON_RPC and extract the MCP methods to make Envoy aware of the MCP attributes.
 
-Configuration
--------------
+Example usage:
+--------------
 
-Example configuration:
+Put the MCP filter before the RBAC filter to apply some RBAC rules based on the MCP attributes:
 
 .. literalinclude:: _include/mcp-filter.yaml
     :language: yaml
-    :lines: 78-80
+    :lines: 78-84
     :lineno-start: 78
     :linenos:
     :caption: :download:`mcp-filter.yaml <_include/mcp-filter.yaml>`
 
-MCP awareness policy
---------------------
-
-A new filter is introducing the MCP JSON_RPC parser, and we can get the internals to apply some RBAC rules based on the MCP attributes:
+The RBAC filter is configured with a per-route configuration to enforce policies based on MCP attributes:
 
 .. literalinclude:: _include/mcp-filter.yaml
     :language: yaml
-    :lines: 78-83
-    :lineno-start: 78
+    :lines: 234-257
+    :lineno-start: 234
     :linenos:
     :caption: :download:`mcp-filter.yaml <_include/mcp-filter.yaml>`
 
-.. literalinclude:: _include/mcp-filter.yaml
-    :language: yaml
-    :lines: 232-254
-    :lineno-start: 232
-    :linenos:
-    :caption: :download:`mcp-filter.yaml <_include/mcp-filter.yaml>`
+The MCP filter can also be used with ext_authz.
 
-It can also be used with the ext_authz. The MCP filter exports metadata under the ``mcp_proxy`` namespace that can be consumed by the ext_authz filter:
+The MCP filter exports metadata under the ``mcp_proxy`` namespace by default, which can be consumed by the ext_authz filter:
 
 .. literalinclude:: _include/mcp-filter.yaml
     :language: yaml
-    :lines: 84-92
-    :lineno-start: 84
-    :linenos:
-    :caption: :download:`mcp-filter.yaml <_include/mcp-filter.yaml>`
-
-Per-Route Configuration
------------------------
-
-The MCP filter metadata can be used in per-route configuration to enforce policies based on MCP attributes.
-
-.. literalinclude:: _include/mcp-filter.yaml
-    :language: yaml
-    :lines: 103-179
-    :lineno-start: 103
+    :lines: 85-93
+    :lineno-start: 85
     :linenos:
     :caption: :download:`mcp-filter.yaml <_include/mcp-filter.yaml>`
 
