@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/stats/v3/stats.pb.h"
 #include "envoy/stats/tag.h"
 
@@ -65,11 +66,20 @@ private:
     uint64_t value_fixed_;
   };
 
+  struct Gauge {
+    NameAndTags stat_;
+    Formatter::FormatterProviderPtr value_formatter_;
+    uint64_t value_fixed_;
+    envoy::extensions::access_loggers::stats::v3::Config::Gauge::OperationType operation_type_;
+    envoy::data::accesslog::v3::AccessLogType access_log_type_;
+  };
+
   const Stats::ScopeSharedPtr scope_;
   Stats::StatNamePool stat_name_pool_;
 
   const std::vector<Histogram> histograms_;
   const std::vector<Counter> counters_;
+  const std::vector<Gauge> gauges_;
 };
 
 } // namespace StatsAccessLog

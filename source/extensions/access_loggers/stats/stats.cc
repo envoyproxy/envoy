@@ -1,5 +1,7 @@
 #include "source/extensions/access_loggers/stats/stats.h"
 
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
+
 #include "source/common/formatter/substitution_formatter.h"
 
 namespace Envoy {
@@ -76,6 +78,31 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
           }
         }
         return counters;
+      }()),
+      gauges_([&]() {
+        std::vector<Gauge> gauges;
+        for (const auto& gauge_cfg : config.gauges()) {
+          Gauge& inserted =
+              gauges.emplace_back(NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands), nullptr,
+                                  0, gauge_cfg.operation_type(), gauge_cfg.access_log_type());
+          if (gauge_cfg.operation_type() ==
+              envoy::extensions::access_loggers::stats::v3::Config::Gauge::Unspecified) {
+            throw EnvoyException("Stats logger gauge must have `operation_type` configured.");
+          }
+          if (!gauge_cfg.value_format().empty() && gauge_cfg.has_value_fixed()) {
+            throw EnvoyException(
+                "Stats logger cannot have both `value_format` and `value_fixed` configured.");
+          }
+          if (!gauge_cfg.value_format().empty()) {
+            inserted.value_formatter_ = parseValueFormat(gauge_cfg.value_format(), commands);
+          } else if (gauge_cfg.has_value_fixed()) {
+            inserted.value_fixed_ = gauge_cfg.value_fixed().value();
+          } else {
+            throw EnvoyException(
+                "Stats logger gauge must have either `value_format` or `value_fixed`.");
+          }
+        }
+        return gauges;
       }()) {}
 
 StatsAccessLog::NameAndTags::NameAndTags(
@@ -181,6 +208,45 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
     auto [tags, storage] = counter.stat_.tags(context, stream_info, *scope_);
     auto& counter_stat = scope_->counterFromStatNameWithTags(counter.stat_.name_, tags);
     counter_stat.add(value);
+  }
+
+  for (const auto& gauge : gauges_) {
+    if (gauge.access_log_type_ != envoy::data::accesslog::v3::NotSet &&
+        gauge.access_log_type_ != context.accessLogType()) {
+      continue;
+    }
+    uint64_t value;
+    if (gauge.value_formatter_ != nullptr) {
+      absl::optional<uint64_t> computed_value_opt =
+          getFormatValue(*gauge.value_formatter_, context, stream_info, false);
+      if (!computed_value_opt.has_value()) {
+        continue;
+      }
+
+      value = *computed_value_opt;
+    } else {
+      value = gauge.value_fixed_;
+    }
+
+    auto [tags, storage] = gauge.stat_.tags(context, stream_info, *scope_);
+    Stats::Gauge::ImportMode import_mode =
+        gauge.operation_type_ == envoy::extensions::access_loggers::stats::v3::Config::Gauge::Set
+            ? Stats::Gauge::ImportMode::NeverImport
+            : Stats::Gauge::ImportMode::Accumulate;
+    auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
+    switch (gauge.operation_type_) {
+    case envoy::extensions::access_loggers::stats::v3::Config::Gauge::Add:
+      gauge_stat.add(value);
+      break;
+    case envoy::extensions::access_loggers::stats::v3::Config::Gauge::Subtract:
+      gauge_stat.sub(value);
+      break;
+    case envoy::extensions::access_loggers::stats::v3::Config::Gauge::Set:
+      gauge_stat.set(value);
+      break;
+    default:
+      break;
+    }
   }
 }
 
