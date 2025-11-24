@@ -287,8 +287,12 @@ public:
   IsolatedScopeImpl(const std::string& prefix, IsolatedStoreImpl& store)
       : prefix_(prefix, store.symbolTable()), store_(store) {}
 
-  IsolatedScopeImpl(StatName prefix, IsolatedStoreImpl& store)
-      : prefix_(prefix, store.symbolTable()), store_(store) {}
+  IsolatedScopeImpl(StatName prefix, IsolatedStoreImpl& store, bool evictable = false,
+                    const ScopeStatsLimitSettings& limits = {})
+      : prefix_(prefix, store.symbolTable()), store_(store) {
+    UNREFERENCED_PARAMETER(evictable);
+    UNREFERENCED_PARAMETER(limits);
+  }
 
   ~IsolatedScopeImpl() override { prefix_.free(store_.symbolTable()); }
 
@@ -300,14 +304,9 @@ public:
     return store_.counters_.get(prefix(), name, tags, symbolTable());
   }
   ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                             absl::optional<uint64_t> max_counter_num = absl::nullopt,
-                             absl::optional<uint64_t> max_gauge_num = absl::nullopt,
-                             absl::optional<uint64_t> max_histogram_num = absl::nullopt) override;
-  ScopeSharedPtr
-  scopeFromStatName(StatName name, bool evictable = false,
-                    absl::optional<uint64_t> max_counter_num = absl::nullopt,
-                    absl::optional<uint64_t> max_gauge_num = absl::nullopt,
-                    absl::optional<uint64_t> max_histogram_num = absl::nullopt) override;
+                             const ScopeStatsLimitSettings& limits = {}) override;
+  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
+                                   const ScopeStatsLimitSettings& limits = {}) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
     Gauge& gauge = store_.gauges_.get(prefix(), name, tags, symbolTable(), import_mode);
