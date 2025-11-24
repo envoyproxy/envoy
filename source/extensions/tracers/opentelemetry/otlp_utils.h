@@ -1,7 +1,11 @@
 #pragma once
 
+#include <map>
 #include <string>
+#include <vector>
 
+#include "absl/strings/string_view.h"
+#include "absl/types/variant.h"
 #include "opentelemetry/common/attribute_value.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
@@ -19,11 +23,16 @@ namespace OpenTelemetry {
 using OTelSpanKind = ::opentelemetry::proto::trace::v1::Span::SpanKind;
 
 /**
- * @brief Open-telemetry Attribute
+ * @brief Based on Open-telemetry OwnedAttributeValue
  * see
- * https://github.com/open-telemetry/opentelemetry-cpp/blob/main/api/include/opentelemetry/common/attribute_value.h
+ * https://github.com/open-telemetry/opentelemetry-cpp/blob/main/sdk/include/opentelemetry/sdk/common/attribute_utils.h
  */
-using OTelAttribute = ::opentelemetry::common::AttributeValue;
+using OTelAttribute =
+    absl::variant<bool, int32_t, uint32_t, int64_t, double, std::string, absl::string_view,
+                  std::vector<bool>, std::vector<int32_t>, std::vector<uint32_t>,
+                  std::vector<int64_t>, std::vector<double>, std::vector<std::string>,
+                  std::vector<absl::string_view>, uint64_t, std::vector<uint64_t>,
+                  std::vector<uint8_t>>;
 
 /**
  * @brief Container holding Open-telemetry Attributes
