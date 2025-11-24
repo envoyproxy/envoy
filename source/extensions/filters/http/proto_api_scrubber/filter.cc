@@ -33,6 +33,7 @@ using proto_processing_lib::proto_scrubber::ScrubberContext;
 const char kRcDetailFilterProtoApiScrubber[] = "proto_api_scrubber";
 const char kRcDetailErrorRequestBufferConversion[] = "REQUEST_BUFFER_CONVERSION_FAIL";
 const char kRcDetailErrorResponseBufferConversion[] = "RESPONSE_BUFFER_CONVERSION_FAIL";
+const char kRcDetailErrorResponseSerialization[] = "RESPONSE_SERIALIZATION_FAIL";
 const char kRcDetailErrorTypeBadRequest[] = "BAD_REQUEST";
 const char kPathValidationError[] = "Error in `:path` header validation.";
 
@@ -275,33 +276,40 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
 
   for (size_t msg_idx = 0; msg_idx < messages->size(); ++msg_idx) {
     std::unique_ptr<StreamMessage> stream_message = std::move(messages->at(msg_idx));
-
     if (stream_message->message() == nullptr) {
       // Expect end_stream=true when the MessageConverter signals an stream end.
       ASSERT(end_stream);
-
       // Expect message_data->isFinalMessage()=true when the MessageConverter signals an stream end.
       ASSERT(stream_message->isFinalMessage());
-
       // Expect message_data is the last element in the vector when the MessageConverter signals an
       // stream end.
       ASSERT(msg_idx == messages->size() - 1);
-
       // Skip the empty message
       continue;
     }
 
-    auto status = response_scrubber_->Scrub(stream_message->message());
-    if (!status.ok()) {
+    auto response_scrubber_or_status = response_scrubber_->Scrub(stream_message->message());
+    if (!response_scrubber_or_status.ok()) {
       ENVOY_STREAM_LOG(warn,
                        "Response scrubbing failed with error: {}. The response will not be "
                        "modified.",
-                       *encoder_callbacks_, status.ToString());
+                       *encoder_callbacks_, response_scrubber_or_status.ToString());
     }
 
     auto buf_convert_status =
         response_msg_converter_->convertBackToBuffer(std::move(stream_message));
-    RELEASE_ASSERT(buf_convert_status.ok(), "failed to convert message back to envoy buffer");
+    if (!buf_convert_status.ok()) {
+      const absl::Status& status = buf_convert_status.status();
+      ENVOY_STREAM_LOG(error, "Failed to convert scrubbed message back to envoy buffer: {}",
+                       *encoder_callbacks_, status.ToString());
+
+      // Send a local reply if response conversion failed.
+      rejectResponse(status.raw_code(), status.message(),
+                     formatError(kRcDetailFilterProtoApiScrubber,
+                                 absl::StatusCodeToString(status.code()),
+                                 kRcDetailErrorResponseBufferConversion));
+      return Envoy::Http::FilterDataStatus::StopIterationNoBuffer;
+    }
 
     data.move(*buf_convert_status.value());
   }
@@ -331,7 +339,6 @@ absl::StatusOr<std::unique_ptr<ProtoScrubber>>
 ProtoApiScrubberFilter::createResponseProtoScrubber() {
   absl::StatusOr<const Protobuf::Type*> response_type_or_status =
       filter_config_.getResponseType(method_name_);
-
   RETURN_IF_NOT_OK(response_type_or_status.status());
 
   response_match_tree_field_checker_ = std::make_unique<FieldChecker>(
@@ -359,7 +366,6 @@ void ProtoApiScrubberFilter::rejectResponse(Envoy::Grpc::Status::GrpcStatus grpc
                                             absl::string_view rc_detail) {
   ENVOY_STREAM_LOG(debug, "Rejecting response grpcStatus={}, message={}", *encoder_callbacks_,
                    grpc_status, error_msg);
-
   encoder_callbacks_->sendLocalReply(
       static_cast<Envoy::Http::Code>(Utility::grpcToHttpStatus(grpc_status)), error_msg, nullptr,
       grpc_status, rc_detail);

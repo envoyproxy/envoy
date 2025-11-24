@@ -780,6 +780,8 @@ TEST_F(ProtoApiScrubberScrubbingTest, RequestScrubbingFailsOnTruncatedNestedMess
 
 using ProtoApiScrubberResponsePassThroughTest = ProtoApiScrubberFilterTest;
 
+// Tests that a single-buffer gRPC response passes through without modification when no scrubbing is
+// configured.
 TEST_F(ProtoApiScrubberResponsePassThroughTest, UnaryResponseSingleBuffer) {
   std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
@@ -798,6 +800,8 @@ TEST_F(ProtoApiScrubberResponsePassThroughTest, UnaryResponseSingleBuffer) {
   checkSerializedData<ApiKey>(*response_data, {response});
 }
 
+// Tests that a multi-buffer gRPC response passes through correctly, buffering internally until
+// complete.
 TEST_F(ProtoApiScrubberResponsePassThroughTest, UnaryResponseMultipleBuffers) {
   std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
@@ -833,6 +837,7 @@ TEST_F(ProtoApiScrubberResponsePassThroughTest, UnaryResponseMultipleBuffers) {
 
 using ProtoApiScrubberResponseScrubbingTest = ProtoApiScrubberFilterTest;
 
+// Tests that a top-level field in the response is successfully scrubbed when configured.
 TEST_F(ProtoApiScrubberResponseScrubbingTest, ScrubResponseSimpleField) {
   ProtoApiScrubberConfig proto_config;
   proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
@@ -867,6 +872,7 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ScrubResponseSimpleField) {
   checkSerializedData<ApiKey>(*response_data, {expected_scrubbed_response});
 }
 
+// Tests that a nested field in the response is successfully scrubbed when configured.
 TEST_F(ProtoApiScrubberResponseScrubbingTest, ScrubResponseNestedField) {
   ProtoApiScrubberConfig proto_config;
   proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
@@ -902,8 +908,7 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ScrubResponseNestedField) {
   checkSerializedData<ApiKey>(*response_data, {expected_scrubbed_response});
 }
 
-// Tests that the response passes through without modification even if the scrubbing fails due to
-// malformed grpc message.
+// Tests that if response parsing fails (e.g., malformed proto), the data passes through unmodified.
 TEST_F(ProtoApiScrubberResponseScrubbingTest, ResponseScrubbingFailsOnTruncatedNestedMessage) {
   ProtoApiScrubberConfig proto_config;
   proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
