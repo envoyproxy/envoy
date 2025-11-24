@@ -22,7 +22,7 @@ The RBAC filter is configured with a per-route configuration to enforce policies
 
 .. literalinclude:: _include/mcp-filter.yaml
     :language: yaml
-    :lines: 234-257
+    :lines: 234-256
     :lineno-start: 234
     :linenos:
     :caption: :download:`mcp-filter.yaml <_include/mcp-filter.yaml>`
