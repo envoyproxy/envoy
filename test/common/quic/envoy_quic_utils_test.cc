@@ -368,6 +368,16 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
   }
   connection_socket->close();
 
+  no_local_addr = nullptr;
+  connection_socket = createConnectionSocket(
+      peer_addr, no_local_addr, nullptr, /*network*/ 1,
+      [](Network::ConnectionSocket& socket, quic::QuicNetworkHandle network) {
+        EXPECT_EQ(1, network);
+        socket.close();
+      });
+  EXPECT_FALSE(connection_socket->isOpen());
+  EXPECT_FALSE(connection_socket->ioHandle().wasConnected());
+
   Network::Address::InstanceConstSharedPtr local_addr_v6 =
       std::make_shared<Network::Address::Ipv6Instance>("::1", 0, nullptr, /*v6only*/ true);
   Network::Address::InstanceConstSharedPtr peer_addr_v6 =
