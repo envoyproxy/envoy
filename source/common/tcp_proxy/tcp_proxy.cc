@@ -992,7 +992,8 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     }
 
     // Mark that we've received initial data and trigger connection if needed.
-    if (!initial_data_received_) {
+    // Don't trigger connection if downstream is closing without sending any data.
+    if (!initial_data_received_ && !(end_stream && early_data_buffer_.length() == 0)) {
       initial_data_received_ = true;
       // For ON_DOWNSTREAM_DATA mode, establish the upstream connection now.
       if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_DATA) {

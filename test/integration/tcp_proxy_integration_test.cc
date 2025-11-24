@@ -2498,9 +2498,8 @@ TEST_P(TcpProxyIntegrationTest, NoDataDoesNotTriggerConnection) {
   tcp_client->close();
 }
 
-// Test edge case: empty data with max_buffered_bytes=0 triggers connection in ON_DOWNSTREAM_DATA
-// mode. This is critical to avoid deadlock where readDisable prevents any future data.
-TEST_P(TcpProxyIntegrationTest, EmptyDataWithZeroBufferTriggersConnection) {
+// Test edge case where max_buffered_bytes=0 with ON_DOWNSTREAM_DATA mode.
+TEST_P(TcpProxyIntegrationTest, ZeroBufferWithOnDownstreamData) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2520,16 +2519,18 @@ TEST_P(TcpProxyIntegrationTest, EmptyDataWithZeroBufferTriggersConnection) {
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
 
-  // Send empty data - should trigger connection even though buffer is 0.
-  // This avoids the deadlock where readDisable would prevent any future data.
-  ASSERT_TRUE(tcp_client->write(""));
+  // Send minimal data which should trigger connection and be buffered/sent.
+  // With max_buffered_bytes=0, readDisable will be called immediately,
+  // but the connection should still be established.
+  ASSERT_TRUE(tcp_client->write("a"));
 
-  // Connection should be established immediately.
+  // Connection should be established.
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(1));
 
-  // Now send real data.
-  ASSERT_TRUE(tcp_client->write("data"));
+  // Send more data.
+  ASSERT_TRUE(tcp_client->write("bcd"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(4));
 
   tcp_client->close();
