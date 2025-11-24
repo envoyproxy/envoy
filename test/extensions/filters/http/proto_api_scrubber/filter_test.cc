@@ -1021,6 +1021,7 @@ protected:
   }
 };
 
+// Tests that a request is blocked if the method-level matcher evaluates to true.
 TEST_F(MethodLevelRestrictionTest, MethodBlockedByMatcher) {
   setupFilterConfig(R"pb(
     restrictions: {
@@ -1084,6 +1085,7 @@ TEST_F(MethodLevelRestrictionTest, MethodBlockedByMatcher) {
             filter_->decodeHeaders(req_headers, false));
 }
 
+// Tests that a request is allowed if the method-level matcher evaluates to false.
 TEST_F(MethodLevelRestrictionTest, MethodAllowedByMatcher) {
   setupFilterConfig(R"pb(
     restrictions: {
@@ -1144,6 +1146,7 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedByMatcher) {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 }
 
+// Tests that a request is allowed if no specific method-level rule is configured for the method.
 TEST_F(MethodLevelRestrictionTest, MethodAllowedNoRule) {
   setupFilterConfig(R"pb(
     restrictions: {
@@ -1167,12 +1170,22 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedNoRule) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, false));
 }
 
-// Test that the filter fails open when the matcher result is UnableToMatch.
+// Tests the behavior when the matcher result is UnableToMatch (e.g., due to missing inputs).
+// Currently, this test demonstrates the fallback behavior with the standard CelMatcher.
 TEST_F(MethodLevelRestrictionTest, MethodAllowedOnMatcherInsufficientData) {
-  // This test is difficult to implement without a way to inject a mock matcher
-  // or a custom matcher that returns UnableToMatch. The current config
-  // creates the matcher internally. A real-world scenario for UnableToMatch
-  // might involve a CEL expression that depends on dynamic metadata not yet available.
+  // NOTE: Accurately simulating an UnableToMatch state from the CelMatcher
+  // typically requires a CEL expression dependent on inputs not available
+  // during decodeHeaders (e.g., dynamic metadata).
+  // Testing the filter's reaction to a generic Matcher returning UnableToMatch
+  // would ideally involve injecting a mock Matcher. This is not easily done
+  // with the current ProtoApiScrubberFilterConfig structure, which builds the
+  // matcher internally.
+  // One could potentially create and register a custom Matcher extension
+  // specifically designed to return UnableToMatch for testing purposes,
+  // but that adds considerable complexity to this test file.
+
+  // Using the standard CelMatcher, it's hard to force UnableToMatch.
+  // This test setup will likely result in the matcher evaluating to true.
 
   // Setup config with a method restriction.
   setupFilterConfig(R"pb(
@@ -1241,6 +1254,7 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedOnMatcherInsufficientData) {
             filter_->decodeHeaders(req_headers, false));
 }
 
+// Tests that field-level restrictions are still applied even if the method-level check passes.
 TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
   ProtoApiScrubberConfig proto_config;
   proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);

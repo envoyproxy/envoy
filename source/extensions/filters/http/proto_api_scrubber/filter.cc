@@ -159,6 +159,8 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
 
   is_valid_grpc_request_ = true;
   const auto* path_header = headers.Path();
+  // The :path pseudo-header is mandatory for HTTP/2 requests.
+  // gRPC runs over HTTP/2, so this header should always be present for valid gRPC requests.
   if (path_header == nullptr) {
     rejectRequest(Status::WellKnownGrpcStatus::InvalidArgument, kPathValidationError,
                   formatError(kRcDetailFilterProtoApiScrubber, kRcDetailErrorTypeBadRequest,
