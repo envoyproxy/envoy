@@ -1131,7 +1131,7 @@ envoy.quic.packet_writer.default:
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
-  - envoy.extensions.quic.client_packet_writer.v3.DefaultClientWriter
+  - envoy.extensions.quic.client_writer_factory.v3.DefaultClientWriter
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source
