@@ -775,7 +775,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
 Http::FilterHeadersStatus OAuth2Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (was_refresh_token_flow_) {
-    addResponseCookies(headers, getEncodedToken());
+    setOAuthResponseCookies(headers, getEncodedToken());
     was_refresh_token_flow_ = false;
   }
 
@@ -1203,11 +1203,11 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
-  addResponseCookies(*response_headers, getEncodedToken());
-  response_headers->setLocation(original_request_url_);
+  setOAuthResponseCookies(*response_headers, getEncodedToken());
   // Delete the csrf and code_verifier cookies after a successful OAuth flow.
   // These cookies are no longer needed and should be deleted to prevent bloating the requests.
   addFlowCookieDeletionHeaders(*response_headers, flow_id_);
+  response_headers->setLocation(original_request_url_);
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
   config_->stats().oauth_success_.inc();
@@ -1275,7 +1275,7 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
   }
 }
 
-void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
+void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
                                       const std::string& encoded_token) const {
   // We use HTTP Only cookies.
   const CookieNames& cookie_names = config_->cookieNames();
