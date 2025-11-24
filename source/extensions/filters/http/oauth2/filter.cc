@@ -240,15 +240,21 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
   return encodeHmacBase64(secret, domain, expires, token, id_token, refresh_token);
 }
 
+struct GeneratedCsrfToken {
+  std::string token;
+  std::string cookie_suffix;
+};
+
 // Generates a CSRF token that can be used to prevent CSRF attacks.
 // The token is in the format of <nonce>.<hmac(nonce)> recommended by
 // https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#signed-double-submit-cookie-recommended
-std::string generateCsrfToken(const std::string& hmac_secret, Random::RandomGenerator& random) {
+GeneratedCsrfToken generateCsrfToken(const std::string& hmac_secret,
+                                     Random::RandomGenerator& random) {
   std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
   std::string random_string = Hex::uint64ToHex(random.random());
   std::string hmac = generateHmacBase64(hmac_secret_vec, random_string);
   std::string csrf_token = fmt::format("{}.{}", random_string, hmac);
-  return csrf_token;
+  return {csrf_token, random_string};
 }
 
 // validate the csrf token hmac to prevent csrf token forgery
@@ -899,10 +905,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   const CookieNames& cookie_names = config_->cookieNames();
 
   // Generate a CSRF token to prevent CSRF attacks.
-  const std::string csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
-  const size_t suffix_pos = csrf_token.find('.');
-  const std::string cookie_suffix =
-      suffix_pos == std::string::npos ? csrf_token : csrf_token.substr(0, suffix_pos);
+  const GeneratedCsrfToken csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
+  const std::string& cookie_suffix = csrf_token.cookie_suffix;
   const std::chrono::seconds csrf_token_expires_in = config_->getCsrfTokenExpiresIn();
   std::string csrf_expires = std::to_string(csrf_token_expires_in.count());
 
@@ -917,9 +921,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
       cookieNameWithSuffix(cookie_names.oauth_nonce_, cookie_suffix);
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat(csrf_cookie_name, "=", csrf_token, csrf_cookie_tail));
+      absl::StrCat(csrf_cookie_name, "=", csrf_token.token, csrf_cookie_tail));
 
-  const std::string state = encodeState(original_url, csrf_token, cookie_suffix);
+  const std::string state = encodeState(original_url, csrf_token.token, cookie_suffix);
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
 
@@ -1391,7 +1395,11 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   auto stateVal = query_parameters.getFirstValue(queryParamsState);
   if (!codeVal.has_value() || !stateVal.has_value()) {
     return {
-        false, "", "", "",
+        false,
+        "",
+        "",
+        "",
+        "",
         fmt::format("Code or state query param does not exist: {}", query_parameters.toString())};
   }
 
@@ -1404,14 +1412,18 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
 
   auto status = MessageUtil::loadFromJsonNoThrow(state, message, has_unknown_field);
   if (!status.ok()) {
-    return {false, "", "", "", fmt::format("State query param is not a valid JSON: {}", state)};
+    return {false, "", "", "", "", fmt::format("State query param is not a valid JSON: {}", state)};
   }
 
   const auto& filed_value_pair = message.fields();
   if (!filed_value_pair.contains(stateParamsUrl) ||
       !filed_value_pair.contains(stateParamsCsrfToken) ||
       !filed_value_pair.contains(stateParamsCookieSuffix)) {
-    return {false, "", "", "",
+    return {false,
+            "",
+            "",
+            "",
+            "",
             fmt::format("State query param does not contain url, CSRF token, or cookie suffix: {}",
                         state)};
   }
@@ -1425,7 +1437,7 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   std::string csrf_token = filed_value_pair.at(stateParamsCsrfToken).string_value();
   std::string cookie_suffix = filed_value_pair.at(stateParamsCookieSuffix).string_value();
   if (cookie_suffix.empty()) {
-    return {false, "", "", "", fmt::format("Cookie suffix in state is empty: {}", state)};
+    return {false, "", "", "", "", fmt::format("Cookie suffix in state is empty: {}", state)};
   }
   if (!validateCsrfToken(headers, csrf_token, cookie_suffix)) {
     return {false, "", "", csrf_token, cookie_suffix, "CSRF token validation failed"};
