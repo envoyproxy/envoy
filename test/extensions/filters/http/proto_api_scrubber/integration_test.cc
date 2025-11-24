@@ -151,10 +151,14 @@ public:
     ProtoApiScrubberConfig filter_config_proto;
     ASSERT(Protobuf::TextFormat::ParseFromString(full_config_text, &filter_config_proto));
 
-    HttpFilter http_filter_config;
-    http_filter_config.set_name("envoy.filters.http.proto_api_scrubber");
-    http_filter_config.mutable_typed_config()->PackFrom(filter_config_proto);
-    return MessageUtil::getJsonStringFromMessageOrError(http_filter_config);
+    Protobuf::Any any_config;
+    any_config.PackFrom(filter_config_proto);
+    std::string json_config = MessageUtil::getJsonStringFromMessageOrError(any_config);
+    return fmt::format(
+        R"EOF(
+name: envoy.filters.http.proto_api_scrubber
+typed_config: {}
+)EOF", json_config);
   }
 
   template <typename T>
