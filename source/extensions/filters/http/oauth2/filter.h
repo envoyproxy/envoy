@@ -359,6 +359,7 @@ private:
   std::string new_expires_;
   absl::string_view host_;
   std::string original_request_url_;
+  std::string flow_cookie_suffix_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
 
@@ -382,6 +383,8 @@ private:
                                        const std::chrono::seconds& expires_in) const;
   std::string BuildCookieTail(int cookie_type) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
+  void addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers,
+                                    absl::string_view cookie_suffix) const;
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                  const absl::string_view path_str) const;
