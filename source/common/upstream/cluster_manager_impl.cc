@@ -499,13 +499,21 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   init_helper_.startInitializingSecondaryClusters();
 
+  // Initialize the load-stats-reporter (LRS).
   const auto& cm_config = bootstrap.cluster_manager();
+  if (cm_config.has_load_stats_config() && cm_config.load_stats_over_ads_config_connection()) {
+    return absl::InvalidArgumentError("Cannot configure both 'load_stats_config' and "
+                                      "'load_stats_over_xds_config_connection' in the bootstrap");
+  }
+
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
 
     absl::Status status = Config::Utility::checkTransportVersion(load_stats_config);
     RETURN_IF_NOT_OK(status);
     absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error;
+    // TODO(adisuissa): remove this runtime flag code as it will be replaced by the
+    // 'load_stats_over_ads_config_connection' config knob.
     if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_cached_grpc_client_for_xds")) {
       absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>> maybe_grpc_service =
           Envoy::Config::Utility::getGrpcConfigFromApiConfigSource(load_stats_config,
@@ -528,6 +536,40 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     RETURN_IF_NOT_OK_REF(client_or_error.status());
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, *stats_.rootScope(), std::move(client_or_error.value()), dispatcher_);
+  } else if (cm_config.load_stats_over_ads_config_connection()) {
+    // Enabled load-stats over the ADS config.
+    if (!bootstrap.dynamic_resources().has_ads_config()) {
+      return absl::InvalidArgumentError("Cannot configure 'load_stats_over_xds_config_connection' "
+                                        "without configuring 'ads_config' in the bootstrap");
+    }
+    ENVOY_LOG_MISC(info, "Setting load-reports using the ads_config connection");
+    // The ADS mux should have been created prior to the load reporter
+    // initialization.
+    ASSERT(xds_manager_.adsMux() != nullptr);
+    const auto& ads_config_source = bootstrap.dynamic_resources().ads_config();
+    absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>> maybe_grpc_service =
+        Envoy::Config::Utility::getGrpcConfigFromApiConfigSource(ads_config_source,
+                                                                 /*grpc_service_idx*/ 0,
+                                                                 /*xdstp_config_source*/ false);
+    RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
+    absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error;
+    if (maybe_grpc_service.value().has_value()) {
+      client_or_error = async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
+          Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value()), *stats_.rootScope(),
+          /*skip_cluster_check*/ false);
+    } else {
+      return absl::InvalidArgumentError(
+          "Invalid grpc service in the 'ads_config' when initializing LRS over ADS.");
+    }
+    RETURN_IF_NOT_OK_REF(client_or_error.status());
+    // Create the load reporter using the ADS client.
+    load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
+        local_info_, *this, *stats_.rootScope(), std::move(client_or_error.value()), dispatcher_);
+    // Allow the xds-manager to replace the load_stats_reporter async-client if an update occurs in
+    // it.
+    xds_manager_.setAdsClientChangeCallback([&](Grpc::RawAsyncClientSharedPtr client) {
+      load_stats_reporter_->replaceAsyncClient(std::move(client));
+    });
   }
   return absl::OkStatus();
 }

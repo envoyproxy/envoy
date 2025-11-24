@@ -119,6 +119,14 @@ public:
   virtual absl::Status
   setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source) PURE;
 
+  using AdsClientChangeCallback = std::function<void(Grpc::RawAsyncClientSharedPtr client)>;
+  /**
+   * Sets a callback that will be invoked when the ADS config source is replaced
+   * (via `setAdsConfigSource`).
+   * @param cb the callback function that will be invoked.
+   */
+  virtual void setAdsClientChangeCallback(AdsClientChangeCallback cb) PURE;
+
   /**
    * Returns a shared_ptr to the singleton xDS-over-gRPC provider for upstream control plane muxing
    * of xDS. This is treated somewhat as a special case in ClusterManager, since it does not relate
