@@ -47,10 +47,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Gazelle",
         project_desc = "Bazel BUILD file generator for Go projects",
         project_url = "https://github.com/bazelbuild/bazel-gazelle",
-        version = "0.46.0",
-        sha256 = "efd44914900fe52eed891b5e11ff443e8b18ea9b84e304213f04d18e8e20df3d",
+        version = "0.47.0",
+        sha256 = "675114d8b433d0a9f54d81171833be96ebc4113115664b791e6f204d58e93446",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
-        release_date = "2025-10-30",
+        release_date = "2025-11-07",
         use_category = ["build"],
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/bazel-gazelle/blob/v{version}/LICENSE",
@@ -97,12 +97,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy_examples",
         project_desc = "Envoy proxy examples",
         project_url = "https://github.com/envoyproxy/examples",
-        version = "0.1.3",
-        sha256 = "8576151dfe0c14bb00d811c955a7f8fa062a6d1778c1d194c622ea763cc4d392",
+        version = "0.1.4",
+        sha256 = "9bb7cd507eb8a090820c8de99f29d9650ce758a84d381a4c63531b5786ed3143",
         strip_prefix = "examples-{version}",
         urls = ["https://github.com/envoyproxy/examples/archive/v{version}.tar.gz"],
         use_category = ["test_only"],
-        release_date = "2025-10-23",
+        release_date = "2025-11-12",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/envoyproxy/examples/blob/v{version}/LICENSE",
@@ -111,8 +111,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy_toolshed",
         project_desc = "Tooling, libraries, runners and checkers for Envoy proxy's CI",
         project_url = "https://github.com/envoyproxy/toolshed",
-        version = "0.3.5",
-        sha256 = "ec59fe6cf1432d33c0207e9f85bda3cbf653b54b3a16f3f94479b6cc8f3d1701",
+        version = "0.3.7",
+        sha256 = "2c6b82d0e326a037f6823042d18b248db9c1d77e7457c4445a35ff4b2a5a52e0",
         strip_prefix = "toolshed-bazel-v{version}/bazel",
         urls = ["https://github.com/envoyproxy/toolshed/archive/bazel-v{version}.tar.gz"],
         use_category = ["build", "controlplane", "dataplane_core"],
@@ -120,7 +120,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "tsan_libs",
             "msan_libs",
         ],
-        release_date = "2025-10-27",
+        release_date = "2025-11-18",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/envoyproxy/toolshed/blob/bazel-v{version}/LICENSE",
@@ -403,7 +403,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/google/tcmalloc/blob/{version}/LICENSE",
     ),
-    com_github_gperftools_gperftools = dict(
+    gperftools = dict(
         project_name = "gperftools",
         project_desc = "tcmalloc and profiling libraries",
         project_url = "https://github.com/gperftools/gperftools",
@@ -748,7 +748,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license_url = "https://github.com/adrian-thurston/ragel/blob/{version}/COPYING",
     ),
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/13261.
-    net_zlib = dict(
+    zlib = dict(
         project_name = "zlib",
         project_desc = "zlib compression library",
         project_url = "https://zlib.net",
@@ -798,7 +798,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "MIT",
         license_url = "https://github.com/google/brotli/blob/v{version}/LICENSE",
     ),
-    com_github_facebook_zstd = dict(
+    zstd = dict(
         project_name = "zstd",
         project_desc = "zstd compression library",
         project_url = "https://facebook.github.io/zstd",
@@ -1277,12 +1277,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "c5087ecf2fb9691bbc6de0e7f7506ea4974aaddb",
-        sha256 = "37688f1184569e73e046a53309597c8d8e73cdf84c35bdf8e9d18ee700efa151",
+        version = "b9bf668dd4b92dc6410f3bfcf21b865a23bd65d7",
+        sha256 = "8317bf81bb11e33deadd2ac8ba2833af6e572fb97d0f8acdebb6ef482629fdf2",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2025-11-03",
+        release_date = "2025-11-20",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1556,6 +1556,25 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Emscripten SDK",
         license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),
+    # NOTE: Required for rules_rust 0.67.0 compatibility with Bazel 7.x.
+    # This provides the UEFI platform constraint used by rules_rust.
+    # May be removable once Envoy upgrades to Bazel 8.0+ which includes this by default.
+    # See: https://github.com/envoyproxy/envoy/pull/41172#issuecomment-2365923085
+    platforms = dict(
+        project_name = "platforms",
+        project_desc = "Constraint values for specifying platforms and toolchains",
+        project_url = "https://github.com/bazelbuild/platforms",
+        version = "1.0.0",
+        sha256 = "852b71bfa15712cec124e4a57179b6bc95d59fdf5052945f5d550e072501a769",
+        strip_prefix = "platforms-{version}",
+        urls = [
+            "https://github.com/bazelbuild/platforms/archive/{version}.tar.gz",
+        ],
+        release_date = "2025-05-27",
+        use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/platforms/blob/{version}/LICENSE",
+    ),
     # After updating you may need to run:
     #
     #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
@@ -1564,8 +1583,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.56.0",
-        sha256 = "f1306aac0b258b790df01ad9abc6abb0df0b65416c74b4ef27f4aab298780a64",
+        version = "0.67.0",
+        sha256 = "dc287e3eca80b29d5cc95e261cae273eedf1af4a00a96ae937e234534dadb24c",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
@@ -1576,7 +1595,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "dataplane_ext",
         ],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        release_date = "2024-12-16",
+        release_date = "2025-10-23",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt",

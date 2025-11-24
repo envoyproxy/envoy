@@ -52,7 +52,7 @@ public:
    * Currently, this method only checks the top level request/response fields. The logic for nested
    * fields will be added in the future.
    */
-  FieldCheckResults CheckField(const std::vector<std::string>&,
+  FieldCheckResults CheckField(const std::vector<std::string>& path,
                                const Protobuf::Field* field) const override;
 
   /**
@@ -76,6 +76,10 @@ private:
    */
   absl::StatusOr<Matcher::MatchResult>
   tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const;
+
+  FieldCheckResults
+  matchResultStatusToFieldCheckResult(absl::StatusOr<Matcher::MatchResult>& match_result,
+                                      const std::string& field_mask) const;
 
   ScrubberContext scrubber_context_;
   Http::Matching::HttpMatchingDataImpl matching_data_;

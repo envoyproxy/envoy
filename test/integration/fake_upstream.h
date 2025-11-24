@@ -72,20 +72,20 @@ public:
              Event::TestTimeSystem& time_system);
 
   uint64_t bodyLength() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     return body_.length();
   }
   // Returns a buffer containing the data that was received since the last
   // invocation of `body()` or since the stream first received data.
   Buffer::OwnedImpl body() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     Buffer::OwnedImpl body_ret;
     body_ret.move(body_);
     ASSERT(body_.length() == 0);
     return body_ret;
   }
   bool complete() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     return end_stream_;
   }
 
@@ -103,7 +103,7 @@ public:
   void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector);
   void readDisable(bool disable);
   const Http::RequestHeaderMap& headers() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     if (client_headers_ != headers_) {
       client_headers_ = headers_;
     }
@@ -111,7 +111,7 @@ public:
   }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   Http::RequestTrailerMapConstSharedPtr trailers() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     Http::RequestTrailerMapConstSharedPtr trailers{trailers_};
     return trailers;
   }
@@ -126,7 +126,7 @@ public:
                  absl::string_view /*details*/) override {
     bool is_head_request;
     {
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       is_head_request = headers_ != nullptr &&
                         headers_->getMethodValue() == Http::Headers::get().MethodValues.Head;
     }
@@ -214,7 +214,7 @@ public:
     }
     int last_body_size = 0;
     {
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       last_body_size = body_.length();
       if (!grpc_decoder_.decode(body_, decoded_grpc_frames_).ok()) {
         return testing::AssertionFailure()
@@ -227,7 +227,7 @@ public:
         return testing::AssertionFailure() << "Timed out waiting for end of gRPC message.";
       }
       {
-        absl::MutexLock lock(&lock_);
+        absl::MutexLock lock(lock_);
         if (!grpc_decoder_.decode(body_, decoded_grpc_frames_).ok()) {
           return testing::AssertionFailure()
                  << "Couldn't decode gRPC data frame: " << body_.toString();
@@ -356,7 +356,7 @@ public:
     // callback is invoked prior to connection_ deferred delete. We also know by locking below,
     // that elsewhere where we also hold lock_, that the connection cannot disappear inside the
     // locked scope.
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     if (event == Network::ConnectionEvent::RemoteClose ||
         event == Network::ConnectionEvent::LocalClose) {
       if (connection_.detectedCloseType() == Network::DetectedCloseType::RemoteReset ||
@@ -373,7 +373,7 @@ public:
   Event::Dispatcher& dispatcher() { return dispatcher_; }
 
   bool connected() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     return connectedLockHeld();
   }
 
@@ -403,7 +403,7 @@ public:
   executeOnDispatcher(std::function<void(Network::Connection&)> f,
                       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
                       bool allow_disconnects = true) {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     if (disconnected_) {
       return testing::AssertionSuccess();
     }
@@ -423,7 +423,7 @@ public:
           } else {
             unexpected_disconnect = true;
           }
-          absl::MutexLock lock_guard(&lock);
+          absl::MutexLock lock_guard(lock);
           callback_ready_event = true;
         });
     Event::TestTimeSystem& time_system =
@@ -440,7 +440,7 @@ public:
   absl::Mutex& lock() { return lock_; }
 
   void setParented() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     ASSERT(!parented_);
     parented_ = true;
   }
@@ -462,7 +462,7 @@ using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
 class FakeConnectionBase : public Logger::Loggable<Logger::Id::testing> {
 public:
   virtual ~FakeConnectionBase() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     ASSERT(initialized_);
     ASSERT(pending_cbs_ == 0);
   }
@@ -491,7 +491,7 @@ public:
   waitForHalfClose(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   virtual void initialize() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     initialized_ = true;
   }
 
@@ -671,7 +671,7 @@ public:
   }
 
   void clearData() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     data_.clear();
   }
 

@@ -36,7 +36,12 @@ void CertCompression::registerSslContext(SSL_CTX* ssl_ctx) {
 int CertCompression::compressZlib(SSL*, CBB* out, const uint8_t* in, size_t in_len) {
 
   z_stream z = {};
+  // The deflateInit macro from zlib.h contains an old-style cast, so we need to suppress the
+  // warning for this call.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
   int rv = deflateInit(&z, Z_DEFAULT_COMPRESSION);
+#pragma GCC diagnostic pop
   if (rv != Z_OK) {
     IS_ENVOY_BUG(fmt::format("Cert compression failure in deflateInit: {}", rv));
     return FAILURE;
@@ -79,7 +84,12 @@ int CertCompression::compressZlib(SSL*, CBB* out, const uint8_t* in, size_t in_l
 int CertCompression::decompressZlib(SSL*, CRYPTO_BUFFER** out, size_t uncompressed_len,
                                     const uint8_t* in, size_t in_len) {
   z_stream z = {};
+  // The inflateInit macro from zlib.h contains an old-style cast, so we need to suppress the
+  // warning for this call.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
   int rv = inflateInit(&z);
+#pragma GCC diagnostic pop
   if (rv != Z_OK) {
     IS_ENVOY_BUG(fmt::format("Cert decompression failure in inflateInit: {}", rv));
     return FAILURE;

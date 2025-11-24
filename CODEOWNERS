@@ -17,6 +17,7 @@
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
+/*/extensions/access_loggers/stats @ggreenway @wbpcode @kyessenov
 /*/extensions/access_loggers/stream @mattklein123 @davinci26
 # alternate protocols cache extensions
 /*/extensions/filters/http/alternate_protocols_cache @RyanTheOptimist @abeyad
@@ -45,7 +46,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # proto_message_extraction http filter extension
 /*/extensions/filters/http/proto_message_extraction @dchakarwarti @taoxuy @shuoyang2016 @yanavlasov
 # proto_api_scrubber http filter extension
-/*/extensions/filters/http/proto_api_scrubber @sumitkmr2 @adisuissa
+/*/extensions/filters/http/proto_api_scrubber @sumitkmr2 @adisuissa @pranavrautgoogle
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
 # alts transport socket extension
@@ -424,7 +425,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/path/uri_template_lib/proto @wbpcode @yanjunxiang-google
 
 # mobile
-/mobile/ @RyanTheOptimist @abeyad @fredyw
+/mobile/ @RyanTheOptimist @abeyad @danzh2010
 
 # Contrib
 /contrib/exe/ @mattklein123 @wbpcode

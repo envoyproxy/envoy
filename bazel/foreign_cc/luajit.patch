@@ -56,7 +56,7 @@ new file mode 100755
 index 00000000..3b4f8eca
 --- /dev/null
 +++ b/luajit_build.sh
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,61 @@
 +#!/bin/bash
 +
 +set -e
@@ -88,9 +88,19 @@ index 00000000..3b4f8eca
 +export MACOSX_DEPLOYMENT_TARGET="10.8"
 +export DEFAULT_CC="${CC:-}"
 +export TARGET_CFLAGS="${CFLAGS:-} -fno-function-sections -fno-data-sections"
-+export TARGET_LDFLAGS="${CFLAGS:-} -fno-function-sections -fno-data-sections"
-+export CFLAGS=""
-+export LDFLAGS=""
++EXTRA_MAKE_ARGS=()
++FUSE_LD_FLAG=$(echo "$LDFLAGS" | grep -o -- '-fuse-ld=[^ ]*' | tail -1 || :)
++SYSROOT_FLAG=$(echo "$LDFLAGS" | grep -o -- '--sysroot=[^ ]*' || :)
++if [[ "$(uname -s)" == "Linux" ]]; then
++    SAN_LDFLAGS="${FUSE_LD_FLAG} ${SYSROOT_FLAG}"
++    EXTRA_MAKE_ARGS+=("TARGET_AR=${AR} ${ARFLAGS:-rcus}")
++    export TARGET_LDFLAGS="${LDFLAGS:-} -fno-function-sections -fno-data-sections"
++    export CFLAGS=""
++else
++    export TARGET_LDFLAGS="${CFLAGS:-} -fno-function-sections -fno-data-sections"
++    export CFLAGS=""
++    export LDFLAGS=""
++fi
 +
 +# Don't strip the binary - it doesn't work when cross-compiling
 +export TARGET_STRIP="@echo"
@@ -98,10 +108,13 @@ index 00000000..3b4f8eca
 +# Remove LuaJIT from ASAN/MSAN for now
 +# TODO(htuch): Remove this when https://github.com/envoyproxy/envoy/issues/6084 is resolved
 +if [[ -n "${ENVOY_CONFIG_ASAN}" ]] || [[ -n "${ENVOY_CONFIG_MSAN}" ]]; then
++    export LDFLAGS="$SAN_LDFLAGS"
 +    BLOCK_PATH=$(realpath clang-asan-blocklist.txt)
 +    export TARGET_CFLAGS="${TARGET_CFLAGS} -fsanitize-blacklist=${BLOCK_PATH}"
 +    echo "fun:*" > clang-asan-blocklist.txt
 +fi
 +
 +# Run make with all available cores
-+"${MAKE:-make}" -j$(nproc) V=1 PREFIX="$PREFIX" install
++"${MAKE:-make}" -j$(nproc) V=1 PREFIX="$PREFIX" \
++  "${EXTRA_MAKE_ARGS[@]}" \
++  install

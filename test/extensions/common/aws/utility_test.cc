@@ -79,8 +79,8 @@ TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
       {"d", "d_value"}, {"f", "f_value"}, {"b", "b_value"},
       {"e", "e_value"}, {"c", "c_value"}, {"a", "a_value"},
   };
-  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
-  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
+  std::vector<Matchers::StringMatcherPtr> exclusion_list, inclusion_list = {};
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list, inclusion_list);
   EXPECT_THAT(map, ElementsAre(Pair("a", "a_value"), Pair("b", "b_value"), Pair("c", "c_value"),
                                Pair("d", "d_value"), Pair("e", "e_value"), Pair("f", "f_value")));
 }
@@ -92,8 +92,8 @@ TEST(UtilityTest, CanonicalizeHeadersSkippingPseudoHeaders) {
       {":method", "GET"},
       {"normal", "normal_value"},
   };
-  std::vector<Envoy::Matchers::StringMatcherPtr> exclusion_list = {};
-  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
+  std::vector<Matchers::StringMatcherPtr> exclusion_list, inclusion_list = {};
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list, inclusion_list);
   EXPECT_THAT(map, ElementsAre(Pair("normal", "normal_value")));
 }
 
@@ -104,8 +104,8 @@ TEST(UtilityTest, CanonicalizeHeadersJoiningDuplicatesWithCommas) {
       {"a", "a_value2"},
       {"a", "a_value3"},
   };
-  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
-  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
+  std::vector<Matchers::StringMatcherPtr> exclusion_list, inclusion_list = {};
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list, inclusion_list);
   EXPECT_THAT(map, ElementsAre(Pair("a", "a_value1,a_value2,a_value3")));
 }
 
@@ -114,8 +114,8 @@ TEST(UtilityTest, CanonicalizeHeadersAuthorityToHost) {
   Http::TestRequestHeaderMapImpl headers{
       {":authority", "authority_value"},
   };
-  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
-  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
+  std::vector<Matchers::StringMatcherPtr> exclusion_list, inclusion_list = {};
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list, inclusion_list);
   EXPECT_THAT(map, ElementsAre(Pair("host", "authority_value")));
 }
 
@@ -124,14 +124,17 @@ TEST(UtilityTest, CanonicalizeHeadersRemovingDefaultPortsFromHost) {
   Http::TestRequestHeaderMapImpl headers_port80{
       {":authority", "example.com:80"},
   };
-  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
-  const auto map_port80 = Utility::canonicalizeHeaders(headers_port80, exclusion_list);
+  std::vector<Matchers::StringMatcherPtr> exclusion_list, inclusion_list = {};
+  const auto map_port80 =
+      Utility::canonicalizeHeaders(headers_port80, exclusion_list, inclusion_list);
+
   EXPECT_THAT(map_port80, ElementsAre(Pair("host", "example.com")));
 
   Http::TestRequestHeaderMapImpl headers_port443{
       {":authority", "example.com:443"},
   };
-  const auto map_port443 = Utility::canonicalizeHeaders(headers_port443, exclusion_list);
+  const auto map_port443 =
+      Utility::canonicalizeHeaders(headers_port443, exclusion_list, inclusion_list);
   EXPECT_THAT(map_port443, ElementsAre(Pair("host", "example.com")));
 }
 
@@ -143,8 +146,8 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
       {"internal", "internal    value"},
       {"all", "    all    value    "},
   };
-  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
-  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
+  std::vector<Matchers::StringMatcherPtr> exclusion_list, inclusion_list = {};
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list, inclusion_list);
   EXPECT_THAT(map,
               ElementsAre(Pair("all", "all value"), Pair("internal", "internal value"),
                           Pair("leading", "leading value"), Pair("trailing", "trailing value")));
@@ -158,7 +161,7 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
       {"x-forwarded-proto", "https"},         {"x-amz-date", "20130708T220855Z"},
       {"x-amz-content-sha256", "e3b0c44..."}, {"x-envoy-retry-on", "5xx,reset"},
       {"x-envoy-max-retries", "3"},           {"x-amzn-trace-id", "0123456789"}};
-  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
+  std::vector<Matchers::StringMatcherPtr> exclusion_list, inclusion_list = {};
   std::vector<std::string> exact_matches = {"x-amzn-trace-id", "x-forwarded-for",
                                             "x-forwarded-proto"};
   for (auto& str : exact_matches) {
@@ -172,7 +175,7 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
     config.set_prefix(match_str);
     exclusion_list.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config, context));
   }
-  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list, inclusion_list);
   EXPECT_THAT(map,
               ElementsAre(Pair("host", "example.com"), Pair("x-amz-content-sha256", "e3b0c44..."),
                           Pair("x-amz-date", "20130708T220855Z")));
@@ -582,6 +585,145 @@ TEST(UtilityTest, RolesAnywhereEndpoint) {
 #else
   EXPECT_EQ("rolesanywhere.eu-west-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
 #endif
+}
+
+// Test that included_headers takes precedence over excluded_headers
+TEST(UtilityTest, IncludedHeadersTakesPrecedence) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Http::TestRequestHeaderMapImpl headers{
+      {":authority", "example.com"}, {"custom-header", "value1"}, {"another-header", "value2"}};
+
+  std::vector<Matchers::StringMatcherPtr> excluded_headers = {};
+  envoy::type::matcher::v3::StringMatcher config;
+  config.set_prefix("custom");
+  excluded_headers.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config, context));
+
+  std::vector<Matchers::StringMatcherPtr> included_headers = {};
+  envoy::type::matcher::v3::StringMatcher include_config;
+  include_config.set_exact("custom-header");
+  included_headers.emplace_back(
+      std::make_unique<Matchers::StringMatcherImpl>(include_config, context));
+
+  // When included_headers is set, excluded_headers should be ignored
+  const auto map = Utility::canonicalizeHeaders(headers, excluded_headers, included_headers);
+  EXPECT_THAT(map, ElementsAre(Pair("custom-header", "value1"), Pair("host", "example.com")));
+}
+
+// Test that x-amz-* headers are always included even with excluded_headers
+TEST(UtilityTest, RequiredHeadersNotExcluded) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":authority", "example.com"},
+                                         {"x-amz-date", "20130708T220855Z"},
+                                         {"x-amz-security-token", "token123"},
+                                         {"content-type", "application/json"},
+                                         {"custom-header", "value1"}};
+
+  std::vector<Matchers::StringMatcherPtr> excluded_headers = {};
+  // Try to exclude x-amz-* headers
+  envoy::type::matcher::v3::StringMatcher config1;
+  config1.set_prefix("x-amz");
+  excluded_headers.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config1, context));
+  // Try to exclude content-type
+  envoy::type::matcher::v3::StringMatcher config2;
+  config2.set_exact("content-type");
+  excluded_headers.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config2, context));
+  // Exclude custom-header
+  envoy::type::matcher::v3::StringMatcher config3;
+  config3.set_exact("custom-header");
+  excluded_headers.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config3, context));
+
+  std::vector<Matchers::StringMatcherPtr> included_headers = {};
+
+  // x-amz-* and content-type should still be included even when excluded, custom-header should be
+  // excluded
+  const auto map = Utility::canonicalizeHeaders(headers, excluded_headers, included_headers);
+  EXPECT_THAT(map, ElementsAre(Pair("content-type", "application/json"),
+                               Pair("host", "example.com"), Pair("x-amz-date", "20130708T220855Z"),
+                               Pair("x-amz-security-token", "token123")));
+}
+
+// Test that x-amz-* headers are always included even with included_headers
+TEST(UtilityTest, RequiredHeadersAlwaysIncluded) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":authority", "example.com"},
+                                         {"x-amz-date", "20130708T220855Z"},
+                                         {"content-type", "application/json"},
+                                         {"custom-header", "value1"}};
+
+  std::vector<Matchers::StringMatcherPtr> excluded_headers = {};
+  std::vector<Matchers::StringMatcherPtr> included_headers = {};
+  // Only include custom-header
+  envoy::type::matcher::v3::StringMatcher config;
+  config.set_exact("custom-header");
+  included_headers.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config, context));
+
+  // x-amz-* and content-type should be included automatically
+  const auto map = Utility::canonicalizeHeaders(headers, excluded_headers, included_headers);
+  EXPECT_THAT(map,
+              ElementsAre(Pair("content-type", "application/json"), Pair("custom-header", "value1"),
+                          Pair("host", "example.com"), Pair("x-amz-date", "20130708T220855Z")));
+}
+
+// Test included_headers with prefix matcher
+TEST(UtilityTest, IncludedHeadersWithPrefix) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":authority", "example.com"},
+                                         {"x-custom-1", "value1"},
+                                         {"x-custom-2", "value2"},
+                                         {"other-header", "value3"}};
+
+  std::vector<Matchers::StringMatcherPtr> excluded_headers = {};
+  std::vector<Matchers::StringMatcherPtr> included_headers = {};
+  envoy::type::matcher::v3::StringMatcher config;
+  config.set_prefix("x-custom");
+  included_headers.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config, context));
+
+  // Only x-custom-* headers should be included (plus host)
+  const auto map = Utility::canonicalizeHeaders(headers, excluded_headers, included_headers);
+  EXPECT_THAT(map, ElementsAre(Pair("host", "example.com"), Pair("x-custom-1", "value1"),
+                               Pair("x-custom-2", "value2")));
+}
+
+// Test that content-type is case-insensitive for required header check
+TEST(UtilityTest, ContentTypeHeaderCaseInsensitive) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":authority", "example.com"},
+                                         {"Content-Type", "application/json"},
+                                         {"custom-header", "value1"}};
+
+  std::vector<Matchers::StringMatcherPtr> excluded_headers = {};
+  std::vector<Matchers::StringMatcherPtr> included_headers = {};
+  // Only include custom-header
+  envoy::type::matcher::v3::StringMatcher config;
+  config.set_exact("custom-header");
+  included_headers.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config, context));
+
+  // Content-Type should be included automatically despite case difference
+  const auto map = Utility::canonicalizeHeaders(headers, excluded_headers, included_headers);
+  EXPECT_THAT(map, ElementsAre(Pair("content-type", "application/json"),
+                               Pair("custom-header", "value1"), Pair("host", "example.com")));
+}
+
+// Test x-amz-* prefix is case-insensitive for required header check
+TEST(UtilityTest, XAmzHeadersCaseInsensitive) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":authority", "example.com"},
+                                         {"X-Amz-Date", "20130708T220855Z"},
+                                         {"X-AMZ-Security-Token", "token123"},
+                                         {"custom-header", "value1"}};
+
+  std::vector<Matchers::StringMatcherPtr> excluded_headers = {};
+  std::vector<Matchers::StringMatcherPtr> included_headers = {};
+  // Only include custom-header
+  envoy::type::matcher::v3::StringMatcher config;
+  config.set_exact("custom-header");
+  included_headers.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config, context));
+
+  // X-Amz-* headers should be included automatically despite case difference
+  const auto map = Utility::canonicalizeHeaders(headers, excluded_headers, included_headers);
+  EXPECT_THAT(map, ElementsAre(Pair("custom-header", "value1"), Pair("host", "example.com"),
+                               Pair("x-amz-date", "20130708T220855Z"),
+                               Pair("x-amz-security-token", "token123")));
 }
 
 } // namespace

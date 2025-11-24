@@ -35,6 +35,10 @@ envoy_cmake(
         "PYTHON_EXECUTABLE": "$(PYTHON3)",
     },
     default_cache_entries = {},
+    env = {
+        "NM": "$(NM)",
+        "OBJCOPY": "$(OBJCOPY)",
+    },
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {
             "Pool": "linux_x64_xlarge",
