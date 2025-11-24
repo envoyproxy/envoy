@@ -149,7 +149,11 @@ public:
     }
 
     ProtoApiScrubberConfig filter_config_proto;
-    ASSERT(Protobuf::TextFormat::ParseFromString(full_config_text, &filter_config_proto));
+    if (!Protobuf::TextFormat::ParseFromString(full_config_text, &filter_config_proto)) {
+      // This ensures we see the error even in Release builds
+      std::cerr << "Failed to parse config: " << full_config_text << std::endl;
+      RELEASE_ASSERT(false, "Failed to parse generated Protobuf Text Config");
+    }
 
     Protobuf::Any any_config;
     any_config.PackFrom(filter_config_proto);
