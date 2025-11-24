@@ -923,12 +923,8 @@ TEST_F(EnvoyQuicServerSessionTest, GoAway) {
 TEST_F(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
   installReadFilter();
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
-  if (!quic_version_[0].UsesTls()) {
-    envoy_quic_session_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
-  } else {
-    EXPECT_CALL(*quic_connection_, SendControlFrame(_));
-    envoy_quic_session_.OnTlsHandshakeComplete();
-  }
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  envoy_quic_session_.OnTlsHandshakeComplete();
   EXPECT_EQ(nullptr, envoy_quic_session_.socketOptions());
   EXPECT_TRUE(quic_connection_->connectionSocket()->ioHandle().isOpen());
   EXPECT_TRUE(quic_connection_->connectionSocket()->ioHandle().close().ok());

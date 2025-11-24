@@ -4,12 +4,7 @@ set -e
 
 # TODO(phlax): Add a check that a usable version of docker compose is available
 
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Source build SHA information
-# shellcheck source=ci/envoy_build_sha.sh
-source "${SCRIPT_DIR}/envoy_build_sha.sh"
 
 # User/group IDs
 USER_UID="$(id -u)"
@@ -40,17 +35,23 @@ if [[ -n "$ENVOY_DOCKER_PLATFORM" ]]; then
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 fi
 
-ENVOY_BUILD_IMAGE="${ENVOY_BUILD_IMAGE:-${BUILD_CONTAINER}}"
-
 export DOCKER_COMMAND="${*:-bash}"
-export ENVOY_BUILD_IMAGE
 
 COMPOSE_SERVICE="envoy-build"
 if [[ -n "$MOUNT_GPG_HOME" ]]; then
     COMPOSE_SERVICE="envoy-build-gpg"
 elif [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
+    ENVOY_BUILD_VARIANT=docker
     COMPOSE_SERVICE="envoy-build-dind"
 fi
+
+# Source build SHA information
+# shellcheck source=ci/envoy_build_sha.sh
+source "${SCRIPT_DIR}/envoy_build_sha.sh"
+
+ENVOY_BUILD_IMAGE="${ENVOY_BUILD_IMAGE:-${BUILD_CONTAINER}}"
+
+export ENVOY_BUILD_IMAGE
 
 exec docker compose \
     -f "${SCRIPT_DIR}/docker-compose.yml" \

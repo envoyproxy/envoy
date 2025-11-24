@@ -110,6 +110,19 @@ typed_config:
   - exact: x-amzn-trace-id
 )EOF";
 
+const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_INCLUDED_HEADERS = R"EOF(
+name: envoy.filters.http.aws_request_signing
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+  service_name: vpc-lattice-svcs
+  region: ap-southeast-2
+  signing_algorithm: aws_sigv4
+  use_unsigned_payload: true
+  match_included_headers:
+  - prefix: x-custom
+  - exact: user-agent
+)EOF";
+
 const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL = R"EOF(
 aws_request_signing:
   service_name: s3
@@ -374,6 +387,36 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationUpstream) {
   EXPECT_FALSE(
       upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
 }
+
+TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationWithIncludedHeaders) {
+
+  config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_INCLUDED_HEADERS, true);
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/path"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-custom-header", "custom-value"},
+                                                 {"user-agent", "test-agent"},
+                                                 {"x-other-header", "other-value"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  // check that AWS signing headers are present
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amz-date")).empty());
+  // check that included headers are present
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-custom-header")).empty());
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("user-agent")).empty());
+  // check that non-included headers are still forwarded
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-other-header")).empty());
+}
+
 class MockLogicalDnsClusterFactory : public Upstream::DnsClusterFactory {
 public:
   MockLogicalDnsClusterFactory() = default;

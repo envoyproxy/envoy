@@ -36,7 +36,7 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       bind-mounts: ${{ matrix.bind-mounts }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
@@ -108,7 +108,7 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
@@ -157,7 +157,7 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       arch: ${{ matrix.arch }}
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ./ci/run_envoy_docker.sh
@@ -209,5 +209,5 @@ jobs:
           target: verify_distro
           arch: arm64
           bazel-extra: >-
-            --config=remote-cache-envoy-engflow
+            --config=remote-cache
           runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}

@@ -3,11 +3,12 @@ build-image:
   # Authoritative configuration for build image/s
   repo: docker.io/envoyproxy/envoy-build-ubuntu
   repo-gcr: gcr.io/envoy-ci/envoy-build
-  sha: de54e91a8d27623ffbd3fb9bd1aba8241567e41c0fb82b167128e3629c2ede18
-  sha-mobile: c0e11c4adaf7c7eec1e3bdc5f598e09ce5e5d5c355f161df8d75f0a10504f6ff
+  sha: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  sha-docker: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  sha-mobile: 224feb2b7d513bf7f2ac0c7c529db1cb46398952f31b7d46e51211642d0b2ba0
   # TODO: remove this dupe (currently used by ci request handler)
-  mobile-sha: c0e11c4adaf7c7eec1e3bdc5f598e09ce5e5d5c355f161df8d75f0a10504f6ff
-  tag: 4ce0cb04f941fb89d475597a640176ae64070bb1
+  mobile-sha: 224feb2b7d513bf7f2ac0c7c529db1cb46398952f31b7d46e51211642d0b2ba0
+  tag: abd41d4081d77bacbb246c9b952d49f816a9ee2f
 
 config:
   envoy:

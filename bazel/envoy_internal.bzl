@@ -171,7 +171,7 @@ def tcmalloc_external_dep(repository):
         (
             _repo("//bazel:debug_tcmalloc"),
             _repo("//bazel:gperftools_tcmalloc"),
-        ): _repo("//bazel/foreign_cc:gperftools"),
+        ): _repo("//bazel/external:gperftools"),
         "//conditions:default": _repo("//bazel:tcmalloc_lib"),
     })
 

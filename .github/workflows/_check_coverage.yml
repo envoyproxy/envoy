@@ -38,7 +38,7 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name ||matrix.target }}
     with:
-      bazel-extra: '--config=remote-envoy-engflow'
+      bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
       diskspace-hack-paths: ${{ matrix.diskspace-hack-paths }}

@@ -81,6 +81,11 @@ def _envoy_repo_impl(repository_ctx):
     api_version_path = repository_ctx.path(repository_ctx.attr.envoy_api_version)
     version = repository_ctx.read(repo_version_path).strip()
     api_version = repository_ctx.read(api_version_path).strip()
+
+    # Read BAZEL_LLVM_PATH environment variable for local LLVM installations
+    llvm_path = repository_ctx.os.environ.get("BAZEL_LLVM_PATH", "")
+
+    repository_ctx.file("compiler.bzl", "LLVM_PATH = '%s'" % (llvm_path))
     repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("envoy_repo.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
@@ -232,6 +237,7 @@ _envoy_repo = repository_rule(
         "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
         "yq": attr.label(default = "@yq"),
     },
+    environ = ["BAZEL_LLVM_PATH"],
 )
 
 def envoy_repo():

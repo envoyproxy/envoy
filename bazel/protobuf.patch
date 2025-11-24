@@ -247,19 +247,6 @@ index 5012ee793..edf9adc5f 100644
      deps = [
          "//src/google/protobuf",
          "//src/google/protobuf:port",
-diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.bazel
-index 192fec3ab..5d12630eb 100644
---- a/src/google/protobuf/io/BUILD.bazel
-+++ b/src/google/protobuf/io/BUILD.bazel
-@@ -159,7 +159,7 @@ cc_library(
-         "@com_google_absl//absl/log:absl_log",
-     ] + select({
-         "//build_defs:config_msvc": [],
--        "//conditions:default": ["@zlib"],
-+        "//conditions:default": ["@envoy//bazel/foreign_cc:zlib"],
-     }),
- )
- 
 diff --git a/src/google/protobuf/map.cc b/src/google/protobuf/map.cc
 index 570b61bec..da6ceb99d 100644
 --- a/src/google/protobuf/map.cc

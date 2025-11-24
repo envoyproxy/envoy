@@ -227,10 +227,6 @@ protected:
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
         }));
-    if (!quic_version_.UsesTls()) {
-      EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-          .Times(connection_count);
-    }
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
         .Times(connection_count);
 
