@@ -1,10 +1,10 @@
 #pragma once
 
 #include "source/common/quic/envoy_quic_client_packet_writer_factory.h"
-#include "source/common/quic/source/common/quic/quic_client_packet_writer_factory_impl.h"
+#include "source/common/quic/quic_client_packet_writer_factory_impl.h"
 #include "envoy/registry/registry.h"
-#include "api/envoy/extensions/quic/client_writer_factory/v3/default_client_writer.pb.h"
-#include "api/envoy/extensions/quic/client_writer_factory/v3/default_client_writer.pb.validate.h"
+#include "envoy/extensions/quic/client_writer_factory/v3/default_client_writer.pb.h"
+#include "envoy/extensions/quic/client_writer_factory/v3/default_client_writer.pb.validate.h"
 
 namespace Envoy {
 namespace Quic {
@@ -17,12 +17,12 @@ class DefaultQuicClientPacketWriterFactoryConfig : public QuicClientPacketWriter
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::quic::client_packet_writer::v3::DefaultClientWriter>();
+        envoy::extensions::quic::client_writer_factory::v3::DefaultClientWriter>();
   }
 
   QuicClientPacketWriterFactoryPtr
-  createQuicClientPacketWriterFactory(const Protobuf::Message& config,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) override {
+  createQuicClientPacketWriterFactory(const Protobuf::Message& /*config*/,
+                                      ProtobufMessage::ValidationVisitor& /*validation_visitor*/) override {
     return std::make_unique<QuicClientPacketWriterFactoryImpl>();
   }
 };

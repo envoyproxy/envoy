@@ -3,13 +3,13 @@
 #include <exception>
 
 #include "envoy/registry/registry.h"
+#include "envoy/extensions/quic/client_writer_factory/v3/default_client_writer.pb.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/envoy_quic_client_packet_writer_factory.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/quic_client_packet_writer_factory_impl.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -68,16 +68,21 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
               quic_config.connection_migration().max_time_on_non_default_network()));
     }
   }
+  envoy::config::core::v3::TypedExtensionConfig client_writer_config;
   if (quic_config.has_client_packet_writer()) {
+    client_writer_config = quic_config.client_packet_writer();
+  } else {
+    client_writer_config.set_name("")
+        ;
+  envoy::extensions::quic::client_writer_factory::v3::DefaultClientWriter empty_default_config;
+  client_writer_config.mutable_typed_config()->PackFrom(empty_default_config);
+  }
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<QuicClientPacketWriterConfigFactory>(
-        quic_config.client_packet_writer());
+        client_writer_config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        quic_config.client_packet_writer(), server_context.messageValidationVisitor(), factory);
+        client_writer_config, server_context.messageValidationVisitor(), factory);
     quic_info->writer_factory_ = factory.createQuicClientPacketWriterFactory(
         *message, server_context.messageValidationVisitor());
-  } else {
-    quic_info->writer_factory_ = std::make_unique<QuicClientPacketWriterFactoryImpl>();
-  }
   return quic_info;
 }
 
