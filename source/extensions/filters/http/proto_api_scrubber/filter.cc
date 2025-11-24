@@ -33,7 +33,6 @@ using proto_processing_lib::proto_scrubber::ScrubberContext;
 const char kRcDetailFilterProtoApiScrubber[] = "proto_api_scrubber";
 const char kRcDetailErrorRequestBufferConversion[] = "REQUEST_BUFFER_CONVERSION_FAIL";
 const char kRcDetailErrorResponseBufferConversion[] = "RESPONSE_BUFFER_CONVERSION_FAIL";
-const char kRcDetailErrorResponseSerialization[] = "RESPONSE_SERIALIZATION_FAIL";
 const char kRcDetailErrorTypeBadRequest[] = "BAD_REQUEST";
 const char kPathValidationError[] = "Error in `:path` header validation.";
 
