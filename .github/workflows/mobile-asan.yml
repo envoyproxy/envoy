@@ -49,7 +49,8 @@ jobs:
     with:
       args: >-
         test
-        --config=remote-ci
+        --config=ci
+        --config=mobile-rbe
         --config=mobile-asan
         //test/common/...
       bind-mount: false

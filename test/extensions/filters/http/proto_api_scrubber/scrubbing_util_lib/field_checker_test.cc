@@ -93,7 +93,7 @@ protected:
                       const std::string& field_path, FieldType field_type, bool match_result) {
 
     // CEL Matcher Template
-    constexpr absl::string_view matcher_template = R"pb(
+    static constexpr absl::string_view matcher_template = R"pb(
       matcher_list: {
         matchers: {
           predicate: {

@@ -1,8 +1,8 @@
 --- rust/private/rustc.bzl
 +++ rust/private/rustc.bzl
-@@ -1451,7 +1451,7 @@ def rustc_compile_action(
-         })
-         crate_info = rust_common.create_crate_info(**crate_info_dict)
+@@ -1612,7 +1612,7 @@ def rustc_compile_action(
+             **crate_info_dict
+         )
  
 -    if crate_info.type in ["staticlib", "cdylib"]:
 +    if crate_info.type in ["staticlib", "cdylib"] and not out_binary:
@@ -12,7 +12,7 @@
 
 --- rust/private/rustc.bzl
 +++ rust/private/rustc.bzl
-@@ -1043,7 +1043,7 @@ def construct_arguments(
+@@ -1061,7 +1061,7 @@ def construct_arguments(
  
      if toolchain.llvm_cov and ctx.configuration.coverage_enabled:
          # https://doc.rust-lang.org/rustc/instrument-coverage.html

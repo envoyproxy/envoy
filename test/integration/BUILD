@@ -738,6 +738,7 @@ envoy_cc_test(
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
         "//test/integration/filters:async_upstream_filter_lib",
+        "//test/integration/filters:encode_headers_return_stop_iteration_filter_config_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:repick_cluster_filter_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
