@@ -34,6 +34,7 @@ using envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionConfi
 using google::grpc::transcoding::TypeHelper;
 using Http::HttpMatchingData;
 using Protobuf::Map;
+using Protobuf::MethodDescriptor;
 using xds::type::matcher::v3::HttpAttributesCelMatchInput;
 using ProtoApiScrubberRemoveFieldAction =
     envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction;
@@ -113,6 +114,9 @@ public:
   // Returns the request type of the method.
   absl::StatusOr<const Protobuf::Type*> getRequestType(const std::string& method_name) const;
 
+  // Returns the response type of the method.
+  absl::StatusOr<const Protobuf::Type*> getResponseType(const std::string& method_name) const;
+
   FilteringMode filteringMode() const { return filtering_mode_; }
 
 private:
@@ -169,6 +173,10 @@ private:
   absl::Status
   initializeMessageRestrictions(const Map<std::string, MessageRestrictions>& message_configs,
                                 Envoy::Server::Configuration::FactoryContext& context);
+
+  // Returns method descriptor by looking up the `descriptor_pool_`.
+  // If the method doesn't exist in the `descriptor_pool`, it returns absl::InvalidArgument error.
+  absl::StatusOr<const MethodDescriptor*> getMethodDescriptor(const std::string& method_name) const;
 
   FilteringMode filtering_mode_;
 

@@ -29,7 +29,35 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 21]
+// Specifies when the TCP proxy establishes the upstream connection.
+enum UpstreamConnectMode {
+  // Establish the upstream connection immediately when the downstream connection is accepted.
+  // This is the default behavior and provides the lowest latency.
+  IMMEDIATE = 0;
+
+  // Wait for initial data from the downstream connection before establishing the upstream connection.
+  // This allows preceding filters to inspect the initial data (e.g., extracting SNI from TLS ClientHello)
+  // before the upstream connection is established.
+  //
+  // This mode requires ``max_early_data_bytes`` to be set.
+  //
+  // .. warning::
+  //   This mode is not suitable for server-first protocols (e.g., SMTP, MySQL, POP3) where the
+  //   server sends the initial greeting. For such protocols, use ``IMMEDIATE`` mode.
+  ON_DOWNSTREAM_DATA = 1;
+
+  // Wait for the downstream TLS handshake to complete before establishing the upstream connection.
+  // This allows access to the full TLS connection information, including client certificates
+  // and negotiated parameters, which can be used for routing decisions or passed as metadata
+  // to the upstream.
+  //
+  // .. note::
+  //   This mode is only effective when the downstream connection uses TLS. For non-TLS
+  //   connections, it behaves the same as ``IMMEDIATE``.
+  ON_DOWNSTREAM_TLS_HANDSHAKE = 2;
+}
+
+// [#next-free-field: 23]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -310,4 +338,30 @@ message TcpProxy {
   //   :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`
   //   for details.
   repeated config.core.v3.TlvEntry proxy_protocol_tlvs = 19;
+
+  // Specifies when to establish the upstream connection.
+  //
+  // When not specified, defaults to ``IMMEDIATE`` for backward compatibility.
+  //
+  // .. attention::
+  //   Server-first protocols (e.g., SMTP, MySQL, POP3) require ``IMMEDIATE`` mode.
+  UpstreamConnectMode upstream_connect_mode = 21 [(validate.rules).enum = {defined_only: true}];
+
+  // Maximum bytes of early data to buffer from the downstream connection before
+  // the upstream connection is established.
+  //
+  // If not set, the TCP proxy will read-disable the downstream connection until the
+  // upstream connection is established (legacy behavior).
+  //
+  // If set, enables ``receive_before_connect`` mode where the filter allows the filter
+  // chain to read downstream data before the upstream connection exists. The data is
+  // buffered and forwarded once the upstream connection is ready. When the buffer exceeds
+  // this limit, the downstream connection is read-disabled to prevent excessive memory usage.
+  //
+  // This field is required when ``upstream_connect_mode`` is ``ON_DOWNSTREAM_DATA``.
+  //
+  // .. note::
+  //   Use this carefully with server-first protocols. The upstream may send data before
+  //   receiving anything from downstream, which could fill the early data buffer.
+  google.protobuf.UInt32Value max_early_data_bytes = 22 [(validate.rules).uint32 = {lte: 1048576}];
 }

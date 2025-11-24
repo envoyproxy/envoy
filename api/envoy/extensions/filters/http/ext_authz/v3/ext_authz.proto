@@ -209,7 +209,7 @@ message ExtAuthz {
   string bootstrap_metadata_labels_key = 15;
 
   // Check request to authorization server will include the client request headers that have a correspondent match
-  // in the :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`. If this option isn't specified, then
+  // in the list. If this option isn't specified, then
   // all client request headers are included in the check request to a gRPC authorization server, whereas no client request headers
   // (besides the ones allowed by default - see note below) are included in the check request to an HTTP authorization server.
   // This inconsistency between gRPC and HTTP servers is to maintain backwards compatibility with legacy behavior.
@@ -440,7 +440,7 @@ message AuthorizationRequest {
       "envoy.config.filter.http.ext_authz.v2.AuthorizationRequest";
 
   // Authorization request includes the client request headers that have a corresponding match
-  // in the :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`.
+  // in the list.
   // This field has been deprecated in favor of :ref:`allowed_headers
   // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
   //
@@ -472,21 +472,21 @@ message AuthorizationResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.AuthorizationResponse";
 
-  // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
+  // When this list is set, authorization
   // response headers that have a correspondent match will be added to the original client request.
   //
   // .. note::
   //   Existing headers will be overridden.
   type.matcher.v3.ListStringMatcher allowed_upstream_headers = 1;
 
-  // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
+  // When this list is set, authorization
   // response headers that have a correspondent match will be added to the original client request.
   //
   // .. note::
   //   Existing headers will be appended.
   type.matcher.v3.ListStringMatcher allowed_upstream_headers_to_append = 3;
 
-  // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
+  // When this list is set, authorization
   // response headers that have a correspondent match will be added to the client's response.
   // When a header is included in this list, ``Path``, ``Status``, ``Content-Length``, ``WWW-Authenticate`` and
   // ``Location`` are automatically added.
@@ -496,13 +496,13 @@ message AuthorizationResponse {
   //   ``Authority (Host)``, will be in the response to the client.
   type.matcher.v3.ListStringMatcher allowed_client_headers = 2;
 
-  // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
+  // When this list is set, authorization
   // response headers that have a correspondent match will be added to the client's response when
   // the authorization response itself is successful, i.e. not failed or denied. When this list is
   // *not* set, no additional headers will be added to the client's response on success.
   type.matcher.v3.ListStringMatcher allowed_client_headers_on_success = 4;
 
-  // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
+  // When this list is set, authorization
   // response headers that have a correspondent match will be emitted as dynamic metadata to be consumed
   // by the next filter. This metadata lives in a namespace specified by the canonical name of extension filter
   // that requires it:
