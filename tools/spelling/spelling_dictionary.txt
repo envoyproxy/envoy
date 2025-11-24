@@ -1595,6 +1595,9 @@ vhosts
 infos
 ElastiCache
 pinterest
+callouts
+streamable
+extern
 NSS
 SSLKEYLOGFILE
 DLB

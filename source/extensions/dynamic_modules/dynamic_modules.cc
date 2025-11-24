@@ -65,9 +65,9 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
         absl::StrCat("Failed to initialize dynamic module: ", object_file_absolute_path.c_str()));
   }
   // Checks the kAbiVersion and the version of the dynamic module.
-  if (absl::string_view(abi_version) != absl::string_view(kAbiVersion)) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("ABI version mismatch: got ", abi_version, ", but expected ", kAbiVersion));
+  if (absl::string_view(abi_version) != absl::string_view(AbiVersion::kAbiVersion)) {
+    return absl::InvalidArgumentError(absl::StrCat("ABI version mismatch: got ", abi_version,
+                                                   ", but expected ", AbiVersion::kAbiVersion));
   }
   return dynamic_module;
 }
