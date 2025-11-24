@@ -81,6 +81,12 @@ minor_behavior_changes:
   change: |
     Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.mobile_use_network_observer_registry``.
+- area: wasm
+  change: |
+    Foreign functions are executed on effective context, if such is defined. Effective context is set by wasm SDKs, but was not used
+    when foreign function was called. This fixes an issue where a foreign function is called from HTTP or GRPC callback and
+    that foreign function needs a stream context, not root context. This behavior can be reverted by
+    setting the runtime guard ``envoy.reloadable_features.wasm_use_effective_ctx_for_foreign_functions`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
