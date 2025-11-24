@@ -299,6 +299,9 @@ new_features:
   change: |
     Added a new :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>` that emits
     configurable metrics.
+- area: access_log
+  change: |
+    Supported emitting gauges in :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
 - area: otlp_stat_sink
   change: |
     Fixed ``start_time_unix_nano`` for exported metrics.

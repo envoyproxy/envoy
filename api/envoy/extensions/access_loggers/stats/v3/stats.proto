@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.stats.v3;
 
+import "envoy/data/accesslog/v3/accesslog.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -27,6 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   leading to a denial of service in Envoy, or can overwhelm any configured
 //   stat sinks by sending too many unique metrics.
 
+// [#next-free-field: 6]
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;
 
@@ -91,6 +94,38 @@ message Config {
     google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
   }
 
+  // Configuration for a gauge stat.
+  // [#next-free-field: 6]
+  message Gauge {
+    // The operation to perform on the gauge.
+    enum OperationType {
+      Unspecified = 0;
+      Add = 1;
+      Subtract = 2;
+      Set = 3;
+    }
+
+    // The name and tags of this gauge.
+    Stat stat = 1 [(validate.rules).message = {required: true}];
+
+    // The format string for the value of this gauge, using :ref:`command
+    // operators <config_access_log_command_operators>`. This must evaluate to a
+    // positive number.
+    string value_format = 2
+        [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
+
+    // A fixed value to add to this counter.
+    // One of ``value_format`` or ``value_fixed`` must be configured.
+    google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
+
+    // The operation to perform on the gauge.
+    OperationType operation_type = 4 [(validate.rules).enum = {defined_only: true not_in: 0}];
+
+    // The access log type to emit this gauge. If set, the gauge will only be
+    // emitted for the specified access log type.
+    data.accesslog.v3.AccessLogType access_log_type = 5;
+  }
+
   // The stat prefix for the generated stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -99,4 +134,7 @@ message Config {
 
   // The counters this logger will emit.
   repeated Counter counters = 4;
+
+  // The gauges this logger will emit.
+  repeated Gauge gauges = 5;
 }
