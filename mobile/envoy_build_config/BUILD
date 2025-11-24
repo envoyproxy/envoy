@@ -38,6 +38,7 @@ envoy_cc_library(
         "@envoy//source/extensions/http/header_formatters/preserve_case:config",
         "@envoy//source/extensions/load_balancing_policies/cluster_provided:config",
         "@envoy//source/extensions/network/dns_resolver/getaddrinfo:config",
+        "@envoy//source/extensions/quic/client_packet_writer:default_quic_client_packet_writer_factory_config",
         "@envoy//source/extensions/path/match/uri_template:config",
         "@envoy//source/extensions/path/rewrite/uri_template:config",
         "@envoy//source/extensions/request_id/uuid:config",

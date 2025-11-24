@@ -72,7 +72,7 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
   if (quic_config.has_client_packet_writer()) {
     client_writer_config = quic_config.client_packet_writer();
   } else {
-    client_writer_config.set_name("");
+    client_writer_config.set_name("envoy.quic.packet_writer.default");
     envoy::extensions::quic::client_writer_factory::v3::DefaultClientWriter empty_default_config;
     client_writer_config.mutable_typed_config()->PackFrom(empty_default_config);
   }

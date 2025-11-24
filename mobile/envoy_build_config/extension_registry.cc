@@ -30,6 +30,7 @@
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 #include "source/extensions/transport_sockets/tls/upstream_config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
+#include "source/extensions/quic/client_packet_writer/default_quic_client_packet_writer_factory_config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
 #include "source/common/listener_manager/listener_manager_impl.h"
@@ -171,6 +172,7 @@ void ExtensionRegistry::registerFactories() {
   // This is required for load balancers of upstream clusters `base` and `base_clear`.
   Envoy::Extensions::LoadBalancingPolicies::ClusterProvided::forceRegisterFactory();
 
+  Quic::forceRegisterDefaultQuicClientPacketWriterFactoryConfig();
   Quic::forceRegisterQuicPlatformPacketWriterConfigFactory();
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
