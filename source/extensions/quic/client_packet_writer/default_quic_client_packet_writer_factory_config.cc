@@ -3,8 +3,7 @@
 namespace Envoy {
 namespace Quic {
 
-REGISTER_FACTORY(DefaultQuicClientPacketWriterFactoryConfig,
-                 QuicClientPacketWriterConfigFactory);
+REGISTER_FACTORY(DefaultQuicClientPacketWriterFactoryConfig, QuicClientPacketWriterConfigFactory);
 
 } // namespace Quic
 } // namespace Envoy

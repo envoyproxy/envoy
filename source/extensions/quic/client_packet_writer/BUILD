@@ -10,6 +10,8 @@ load(
     "envoy_select_enable_http3",
 )
 
+licenses(["notice"])  # Apache 2
+
 # Extensions of QUIC server's preferred address.
 
 envoy_extension_package()
@@ -29,7 +31,7 @@ envoy_cc_library(
 
 envoy_cc_extension(
     name = "default_quic_client_packet_writer_factory_config",
-        extra_visibility = [
+    extra_visibility = [
         "//source/common/quic:__subpackages__",
     ],
     deps = [
