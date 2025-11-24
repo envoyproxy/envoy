@@ -98,7 +98,6 @@ build:linux --cxxopt=-fsized-deallocation --host_cxxopt=-fsized-deallocation
 build:linux --conlyopt=-fexceptions
 build:linux --fission=dbg,opt
 build:linux --features=per_object_debug_info
-build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:linux --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
 # macOS
@@ -113,15 +112,16 @@ build:macos --cxxopt=-Wno-nullability-completeness
 #############################################################################
 
 # Common flags for Clang (shared between all clang variants)
-common:clang-common --action_env=BAZEL_COMPILER=clang
 common:clang-common --linkopt=-fuse-ld=lld
+common:clang-common --action_env=BAZEL_COMPILER=clang
+common:clang-common --action_env=LDFLAGS="-fuse-ld=lld"
 common:clang-common --action_env=CC=clang --host_action_env=CC=clang
 common:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
 
 # Clang with libc++ (default)
 common:clang --config=clang-common
 common:clang --config=libc++
-common:clang --action_env=LDFLAGS="-fuse-ld=lld"
+common:clang --host_platform=@clang_platform
 
 # Use gold linker for gcc compiler.
 build:gcc --config=libstdc++
@@ -141,8 +141,9 @@ build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
+build:gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
 
-# libc++ default for clang
+# libc++ - default for clang
 common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
 common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
@@ -152,6 +153,7 @@ common:libc++ --define force_libcpp=enabled
 common:libc++ --@envoy//bazel:libc++=true
 
 # libstdc++ - currently only used for gcc
+build:libstdc++ --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:libstdc++ --@envoy//bazel:libc++=false
 build:libstdc++ --@envoy//bazel:libstdc++=true
 
@@ -383,31 +385,11 @@ build:sizeopt -c opt --copt -Os
 # remote: Setup for cache, BES, RBE, and Docker workers
 #############################################################################
 
-# Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
-build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-
-build:rbe-toolchain-clang --config=rbe-toolchain
-build:rbe-toolchain-clang --config=clang
-build:rbe-toolchain-clang --platforms=@clang_platform
-build:rbe-toolchain-clang --host_platform=@clang_platform
-build:rbe-toolchain-clang --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang/cc:toolchain
-
-build:rbe-toolchain-gcc --config=rbe-toolchain
-build:rbe-toolchain-gcc --config=gcc
-build:rbe-toolchain-gcc --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
-build:rbe-toolchain-gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
-build:rbe-toolchain-gcc --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/gcc/cc:toolchain
-
-build:remote-clang --config=remote
-build:remote-clang --config=rbe-toolchain-clang
-
-build:remote-gcc --config=remote
-build:remote-gcc --config=rbe-toolchain-gcc
-
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
+build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 ## RBE (Engflow Envoy)
 
@@ -447,22 +429,21 @@ build:docker-sandbox --experimental_docker_verbose
 build:docker-sandbox --experimental_enable_docker_sandbox
 
 build:docker-clang --config=docker-sandbox
-build:docker-clang --config=rbe-toolchain-clang
+build:docker-clang --config=clang
 
 build:docker-gcc --config=docker-sandbox
 build:docker-gcc --config=gcc
-build:docker-gcc --config=rbe-toolchain-gcc
 
 build:docker-asan --config=docker-sandbox
-build:docker-asan --config=rbe-toolchain-clang
+build:docker-asan --config=clang
 build:docker-asan --config=asan
 
 build:docker-msan --config=docker-sandbox
-build:docker-msan --config=rbe-toolchain-clang
+build:docker-msan --config=clang
 build:docker-msan --config=msan
 
 build:docker-tsan --config=docker-sandbox
-build:docker-tsan --config=rbe-toolchain-clang
+build:docker-tsan --config=clang
 build:docker-tsan --config=tsan
 
 
