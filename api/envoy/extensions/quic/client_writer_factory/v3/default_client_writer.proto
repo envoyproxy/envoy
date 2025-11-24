@@ -13,7 +13,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Default QUIC Client Packet Writer]
 // [#extension: envoy.quic.packet_writer.default]
 
-// The default QUIC packet writer used for QUIC upstream connections which can
-// be used on all platforms.
+// The default QUIC packet writer used for QUIC upstream connections which is platform independent.
 message DefaultClientWriter {
 }
