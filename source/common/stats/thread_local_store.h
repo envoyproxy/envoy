@@ -286,9 +286,7 @@ private:
 
   struct ScopeImpl : public Scope {
     ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable,
-              absl::optional<uint64_t> max_counter_num = absl::nullopt,
-              absl::optional<uint64_t> max_gauge_num = absl::nullopt,
-              absl::optional<uint64_t> max_histogram_num = absl::nullopt);
+              const ScopeStatsLimitSettings& limits = {});
     ~ScopeImpl() override;
 
     // Stats::Scope
@@ -302,14 +300,9 @@ private:
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
     ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                               absl::optional<uint64_t> max_counter_num = absl::nullopt,
-                               absl::optional<uint64_t> max_gauge_num = absl::nullopt,
-                               absl::optional<uint64_t> max_histogram_num = absl::nullopt) override;
-    ScopeSharedPtr
-    scopeFromStatName(StatName name, bool evictable = false,
-                      absl::optional<uint64_t> max_counter_num = absl::nullopt,
-                      absl::optional<uint64_t> max_gauge_num = absl::nullopt,
-                      absl::optional<uint64_t> max_histogram_num = absl::nullopt) override;
+                               const ScopeStatsLimitSettings& limits = {}) override;
+    ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
+                                     const ScopeStatsLimitSettings& limits = {}) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -465,9 +458,7 @@ private:
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     const bool evictable_{};
-    absl::optional<uint64_t> max_counters_;
-    absl::optional<uint64_t> max_gauges_;
-    absl::optional<uint64_t> max_histograms_;
+    const ScopeStatsLimitSettings limits_;
 
   private:
     StatNameStorage prefix_;
