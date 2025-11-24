@@ -299,5 +299,70 @@ TEST_F(SocketOptionFactoryTest, TestBuildBindAddressNoPortOptions) {
 }
 
 } // namespace
+TEST_F(SocketOptionFactoryTest, TestBuildTcpNotsentLowatOptions) {
+  // use a shared_ptr due to applyOptions requiring one.
+  const uint32_t lowat_bytes = 16384;
+  std::shared_ptr<Socket::Options> options =
+      SocketOptionFactory::buildTcpNotsentLowatOptions(lowat_bytes);
+
+  const auto expected_option = ENVOY_SOCKET_TCP_NOTSENT_LOWAT;
+  CHECK_OPTION_SUPPORTED(expected_option);
+
+  const int type = expected_option.level();
+  const int option = expected_option.option();
+  EXPECT_CALL(socket_mock_, setSocketOption(_, _, _, sizeof(uint32_t)))
+      .WillOnce(
+          Invoke([type, option, lowat_bytes](int input_type, int input_option, const void* optval,
+                                             socklen_t) -> Api::SysCallIntResult {
+            EXPECT_EQ(lowat_bytes, *static_cast<const uint32_t*>(optval));
+            EXPECT_EQ(type, input_type);
+            EXPECT_EQ(option, input_option);
+            return {0, 0};
+          }));
+
+  EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
+                                            envoy::config::core::v3::SocketOption::STATE_BOUND));
+}
+
+TEST_F(SocketOptionFactoryTest, TestBuildTcpNotsentLowatOptionsWithDifferentValues) {
+  // Test with 4KB value.
+  const uint32_t lowat_4kb = 4096;
+  std::shared_ptr<Socket::Options> options_4kb =
+      SocketOptionFactory::buildTcpNotsentLowatOptions(lowat_4kb);
+
+  const auto expected_option = ENVOY_SOCKET_TCP_NOTSENT_LOWAT;
+  CHECK_OPTION_SUPPORTED(expected_option);
+
+  EXPECT_CALL(socket_mock_, setSocketOption(_, _, _, sizeof(uint32_t)))
+      .WillOnce(
+          Invoke([lowat_4kb](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+            EXPECT_EQ(lowat_4kb, *static_cast<const uint32_t*>(optval));
+            return {0, 0};
+          }));
+
+  EXPECT_TRUE(Network::Socket::applyOptions(options_4kb, socket_mock_,
+                                            envoy::config::core::v3::SocketOption::STATE_BOUND));
+}
+
+TEST_F(SocketOptionFactoryTest, TestBuildTcpNotsentLowatOptionsWithZero) {
+  // Test with 0 value (disables the feature).
+  const uint32_t lowat_zero = 0;
+  std::shared_ptr<Socket::Options> options_zero =
+      SocketOptionFactory::buildTcpNotsentLowatOptions(lowat_zero);
+
+  const auto expected_option = ENVOY_SOCKET_TCP_NOTSENT_LOWAT;
+  CHECK_OPTION_SUPPORTED(expected_option);
+
+  EXPECT_CALL(socket_mock_, setSocketOption(_, _, _, sizeof(uint32_t)))
+      .WillOnce(
+          Invoke([lowat_zero](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+            EXPECT_EQ(lowat_zero, *static_cast<const uint32_t*>(optval));
+            return {0, 0};
+          }));
+
+  EXPECT_TRUE(Network::Socket::applyOptions(options_zero, socket_mock_,
+                                            envoy::config::core::v3::SocketOption::STATE_BOUND));
+}
+
 } // namespace Network
 } // namespace Envoy

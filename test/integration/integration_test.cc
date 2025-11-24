@@ -2795,4 +2795,34 @@ TEST_P(IntegrationTest, TestDuplicatedContentLengthDifferentValue) {
   EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 }
 
+// Verify that `tcp_notsent_lowat` can be configured on both downstream and upstream.
+TEST_P(IntegrationTest, TcpNotsentLowatUpstreamAndDownstream) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    // Configure downstream `tcp_notsent_lowat` on listener.
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_tcp_notsent_lowat()->set_value(16384);
+
+    // Configure upstream `tcp_notsent_lowat` on cluster.
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->mutable_upstream_connection_options()->mutable_tcp_notsent_lowat()->set_value(16384);
+  });
+  initialize();
+
+  // Make a simple request to verify everything works.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+
+  // Clean up.
+  codec_client_->close();
+}
+
 } // namespace Envoy

@@ -149,6 +149,12 @@ private:
 #define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName()
 #endif
 
+#ifdef TCP_NOTSENT_LOWAT
+#define ENVOY_SOCKET_TCP_NOTSENT_LOWAT ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_TCP, TCP_NOTSENT_LOWAT)
+#else
+#define ENVOY_SOCKET_TCP_NOTSENT_LOWAT Network::SocketOptionName()
+#endif
+
 // Linux uses IP_PKTINFO for both sending source address and receiving destination
 // address.
 // FreeBSD uses IP_RECVDSTADDR for receiving destination address and IP_SENDSRCADDR for sending

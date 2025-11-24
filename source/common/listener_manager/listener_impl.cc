@@ -689,6 +689,11 @@ void ListenerImpl::buildListenSocketOptions(
       addListenSocketOptions(listen_socket_options_list_[i],
                              Network::SocketOptionFactory::buildReusePortOptions());
     }
+    if (config.has_tcp_notsent_lowat()) {
+      addListenSocketOptions(listen_socket_options_list_[i],
+                             Network::SocketOptionFactory::buildTcpNotsentLowatOptions(
+                                 config.tcp_notsent_lowat().value()));
+    }
     if (!address_opts_list[i].get().empty()) {
       addListenSocketOptions(
           listen_socket_options_list_[i],

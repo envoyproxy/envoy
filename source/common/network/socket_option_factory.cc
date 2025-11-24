@@ -216,5 +216,21 @@ SocketOptionFactory::buildDoNotFragmentOptions(bool supports_v4_mapped_v6_addres
   return options;
 }
 
+std::unique_ptr<Socket::Options>
+SocketOptionFactory::buildTcpNotsentLowatOptions(uint32_t lowat_bytes) {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  if (!ENVOY_SOCKET_TCP_NOTSENT_LOWAT.hasValue()) {
+    ENVOY_LOG_MISC(debug,
+                   "TCP_NOTSENT_LOWAT is not supported on this platform, skipping configuration.");
+    return options;
+  }
+
+  absl::optional<Network::Socket::Type> tcp_only = {Network::Socket::Type::Stream};
+  options->push_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_SOCKET_TCP_NOTSENT_LOWAT,
+      lowat_bytes, tcp_only));
+  return options;
+}
+
 } // namespace Network
 } // namespace Envoy

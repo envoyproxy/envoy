@@ -215,6 +215,14 @@ buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_config
                                        parseTcpKeepaliveConfig(cluster_config)));
   }
 
+  // Apply `TCP_NOTSENT_LOWAT` from cluster-level upstream_connection_options if configured.
+  if (cluster_config.upstream_connection_options().has_tcp_notsent_lowat()) {
+    Network::Socket::appendOptions(
+        base_options,
+        Network::SocketOptionFactory::buildTcpNotsentLowatOptions(
+            cluster_config.upstream_connection_options().tcp_notsent_lowat().value()));
+  }
+
   return base_options;
 }
 
