@@ -32,6 +32,12 @@ minor_behavior_changes:
     <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite>` to
     :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` to support substitution
     formatting for path header rewriting.
+- area: overload_manager
+  change: |
+    Fixed :ref:`downstream connections monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`
+    to correctly trigger configured actions, and create a ``pressure`` metric like other resource monitors.
+    Previously, this extension would never trigger an action.
 - area: tracing
   change: |
     The :ref:`request header custom tag <envoy_v3_api_field_type.tracing.v3.CustomTag.request_header>`
@@ -62,6 +68,11 @@ minor_behavior_changes:
     Fixed HTTP ext_authz service to properly propagate headers (such as ``set-cookie``) back to clients. The
     filter now correctly uses ``allowed_client_headers`` for denied responses and ``allowed_client_headers_on_success``
     for successful authorization responses.
+- area: ext_authz
+  change: |
+    Fixed a bug where ``filter_enabled_metadata`` was not honored when the filter was marked with ``disabled: true``.
+    The filter is now instantiated when ``filter_enabled_metadata`` is configured, allowing it to check dynamic metadata
+    at runtime and enable itself conditionally.
 - area: quic
   change: |
     Switch to use QUICHE provided migration logic to handle port migration upon path degrading and migration to Server
@@ -119,6 +130,10 @@ bug_fixes:
     were not accessible in ``request_headers_to_add`` configuration on the initial request. Headers configured via
     ``request_headers_to_add`` can now reference router-set headers using formatters like
     ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
+- area: router
+  change: |
+    Fixed an upstream HTTP filter issue if route retries on 5xx and the filter returns
+    FilterHeadersStatus::StopIteration in its encodeHeaders() method.
 - area: ext_proc
   change: |
     Fixed a bug where attributes based on request headers (e.g. ``request.host``) were not sent to
@@ -133,6 +148,10 @@ bug_fixes:
     close events. This ensures the ``connection.transport_failure_reason`` CEL attribute and
     ``DOWNSTREAM_TRANSPORT_FAILURE_REASON`` access log formatter are populated correctly for all connection
     types and available to all network filters.
+- area: aws
+  change: |
+    Changes web identity token file watching behavior in the aws signing common components. This ensures that if the token file is rotated,
+    the new token will be picked up.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -156,11 +175,19 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: dynamic modules
+  change: |
+    Added support for loading dynamic modules globally by setting :ref:`load_globally
+    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.load_globally>` to true.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request
     and response bodies in any position of HTTP filter chain.
     This also make it possible to refresh routes based on the attributes in the request body.
+- area: matcher
+  change: |
+    Removed work-in-progress annotations from RBAC filter ``matcher`` and ``shadow_matcher`` fields in both HTTP
+    and network filters to reflect to mark this feature stable.
 - area: access_log
   change: |
     Support process-level rate limiting on access log emission by
@@ -176,6 +203,11 @@ new_features:
 - area: udp_sink
   change: |
     Enhanced the UDP sink to support tapped messages larger than 64 KB.
+- area: listener
+  change: |
+    Marked the :ref:`filter_chain_matcher <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
+    field as stable by removing the work-in-progress annotation. The xDS matcher API for filter chain selection
+    has been thoroughly tested and should be ready for production use now.
 - area: access_log
   change: |
     Added a new :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>` which emits
@@ -188,6 +220,15 @@ new_features:
     Added support for dropping stats via
     :ref:`DropAction <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during
     custom metric conversion.
+- area: tcp_proxy
+  change: |
+    Added :ref:`upstream_connect_mode
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`
+    and :ref:`max_early_data_bytes
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>`
+    to control when upstream connections are established and early data buffering behavior.
+    This enables use cases like extracting TLS certificate information or SNI before establishing
+    upstream connections.
 - area: http
   change: |
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to
@@ -297,11 +338,22 @@ new_features:
   change: |
     Added runtime guard ``envoy.reloadable_features.report_load_when_rq_active_is_non_zero``.
     When enabled, LRS continues to send locality_stats reoprt to config server when there is no request_issued in the poll cycle.
+- area: on_demand
+  change: |
+    Added runtime guard ``envoy.reloadable_features.on_demand_track_end_stream``.
+    When enabled, the on_demand filter tracks downstream end_stream state to support stream recreation with fully read request bodies.
+    Previously, the filter rejected all requests with bodies by checking for the presence of a decoding buffer,
+    even when the body was complete.
 - area: router
   change: |
     Added :ref:`request_mirror_policies <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
     to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
     cluster-level request mirroring. Cluster-level policies override route-level policies when both are configured.
+- area: router
+  change: |
+    Added :ref:`hash_policy <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.hash_policy>`
+    to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
+    cluster-level hash policies.
 - area: network
   change: |
     Add logging info for network ext_proc to filter state.
@@ -321,5 +373,9 @@ new_features:
 - area: ext_proc
   change: |
     Add support for forwarding cluster metadata to ext_proc server.
+- area: aws
+  change: |
+    Added new feature ``match_included_headers`` to the request signing extension, that allows for a positive header match and
+    excludes all other non-SigV4-required headers.
 
 deprecated:

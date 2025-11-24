@@ -30,10 +30,12 @@ public:
    * @param logger, the callbacks to use for engine logging.
    * @param event_tracker, the event tracker to use for the emission of events.
    * @param thread_priority, an optional thread priority, between -20 and 19.
+   * @param high_watermark, an optional per-stream buffer high watermark size; defaults to 2MB.
    */
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
                  absl::optional<int> thread_priority = absl::nullopt,
+                 absl::optional<size_t> high_watermark = absl::nullopt,
                  bool disable_dns_refresh_on_network_change = false, bool enable_logger = true);
 
   /**
@@ -208,7 +210,8 @@ private:
 
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
-                 absl::optional<int> thread_priority, bool disable_dns_refresh_on_network_change,
+                 absl::optional<int> thread_priority, absl::optional<size_t> high_watermark,
+                 bool disable_dns_refresh_on_network_change,
                  Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger = true);
 
   envoy_status_t main(std::shared_ptr<OptionsImplBase> options);
@@ -239,6 +242,7 @@ private:
   std::unique_ptr<EnvoyLogger> logger_;
   std::unique_ptr<EnvoyEventTracker> event_tracker_;
   absl::optional<int> thread_priority_;
+  absl::optional<size_t> high_watermark_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
   Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;

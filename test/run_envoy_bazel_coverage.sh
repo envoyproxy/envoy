@@ -97,7 +97,7 @@ unpack_coverage_report() {
     mkdir -p "${COVERAGE_DIR}"
     rm -f bazel-out/_coverage/_coverage_report.tar.zst
     mv bazel-out/_coverage/_coverage_report.dat bazel-out/_coverage/_coverage_report.tar.zst
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" --nobuild_tests_only @envoy//tools/zstd -- -d -c "${PWD}/bazel-out/_coverage/_coverage_report.tar.zst" \
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" --nobuild_tests_only @zstd//:zstd_cli -- -d -c "${PWD}/bazel-out/_coverage/_coverage_report.tar.zst" \
         | tar -xf - -C "${COVERAGE_DIR}"
     COVERAGE_JSON="${COVERAGE_DIR}/coverage.json"
 }

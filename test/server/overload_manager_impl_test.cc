@@ -299,9 +299,9 @@ constexpr char proactiveResourceConfig[] = R"YAML(
   actions:
     - name: envoy.overload_actions.shrink_heap
       triggers:
-        - name: envoy.resource_monitors.fake_resource1
+        - name: envoy.resource_monitors.global_downstream_max_connections
           threshold:
-            value: 0.9
+            value: 0.5
 )YAML";
 
 TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
@@ -930,12 +930,21 @@ TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTe
   Stats::Counter& failed_updates =
       stats_.counter("overload.envoy.resource_monitors.global_downstream_max_connections."
                      "failed_updates");
+  Stats::Gauge& pressure =
+      stats_.gauge("overload.envoy.resource_monitors.global_downstream_max_connections.pressure",
+                   Stats::Gauge::ImportMode::NeverImport);
+
   manager->start();
   EXPECT_TRUE(manager->getThreadLocalOverloadState().isResourceMonitorEnabled(
       OverloadProactiveResourceName::GlobalDownstreamMaxConnections));
   bool resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
   EXPECT_TRUE(resource_allocated);
+
+  EXPECT_EQ(pressure.value(), 0);
+  timer_cb_();
+  EXPECT_EQ(pressure.value(), 33);
+
   auto monitor = manager->getThreadLocalOverloadState().getProactiveResourceMonitorForTest(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections);
   EXPECT_NE(absl::nullopt, monitor);
@@ -951,6 +960,34 @@ TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTe
   EXPECT_DEATH(manager->getThreadLocalOverloadState().tryDeallocateResource(
                    Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1),
                ".*Cannot deallocate resource, current resource usage is lower than decrement.*");
+  manager->stop();
+}
+
+// Test that proactive monitors trigger the configured actions when they reach the threshold.
+TEST_F(OverloadManagerImplTest, ProactiveResourceTriggers) {
+  setDispatcherExpectation();
+
+  auto manager(createOverloadManager(proactiveResourceConfig));
+  bool is_active = false;
+  manager->registerForAction("envoy.overload_actions.shrink_heap", dispatcher_,
+                             [&](OverloadActionState state) { is_active = state.isSaturated(); });
+
+  manager->start();
+
+  // Trigger threshold is 50%, max is 3.
+
+  ASSERT_TRUE(factory5_.monitor_->tryAllocateResource(1));
+  timer_cb_();
+  EXPECT_FALSE(is_active);
+
+  ASSERT_TRUE(factory5_.monitor_->tryAllocateResource(1));
+  timer_cb_();
+  EXPECT_TRUE(is_active);
+
+  ASSERT_TRUE(factory5_.monitor_->tryDeallocateResource(1));
+  timer_cb_();
+  EXPECT_FALSE(is_active);
+
   manager->stop();
 }
 
