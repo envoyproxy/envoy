@@ -59,7 +59,7 @@ constexpr absl::string_view queryParamsCodeChallengeMethod = "code_challenge_met
 
 constexpr absl::string_view stateParamsUrl = "url";
 constexpr absl::string_view stateParamsCsrfToken = "csrf_token";
-constexpr absl::string_view stateParamsCookieSuffix = "cookie_suffix";
+constexpr absl::string_view stateParamsFlowId = "flow_id";
 
 constexpr absl::string_view REDIRECT_RACE = "oauth.race_redirect";
 constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
@@ -242,7 +242,7 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
 
 struct GeneratedCsrfToken {
   std::string token;
-  std::string cookie_suffix;
+  std::string flow_id;
 };
 
 // Generates a CSRF token that can be used to prevent CSRF attacks.
@@ -297,22 +297,16 @@ std::string generateCodeChallenge(const std::string& code_verifier) {
 /**
  * Encodes the state parameter for the OAuth2 flow.
  * The state parameter is a base64Url encoded JSON object containing the original request URL, a
- * CSRF token for CSRF protection, and optionally the cookie suffix used to store flow-specific
- * cookies.
+ * CSRF token for CSRF protection, and the flow id used to store flow-specific cookies.
  */
 std::string encodeState(const std::string& original_request_url, const std::string& csrf_token,
-                        absl::string_view cookie_suffix) {
+                        absl::string_view flow_id) {
   std::string buffer;
   absl::string_view sanitized_url = Json::sanitize(buffer, original_request_url);
   absl::string_view sanitized_csrf_token = Json::sanitize(buffer, csrf_token);
-  if (cookie_suffix.empty()) {
-    std::string json =
-        fmt::format(R"({{"url":"{}","csrf_token":"{}"}})", sanitized_url, sanitized_csrf_token);
-    return Base64Url::encode(json.data(), json.size());
-  }
-  absl::string_view sanitized_suffix = Json::sanitize(buffer, cookie_suffix);
-  std::string json = fmt::format(R"({{"url":"{}","csrf_token":"{}","cookie_suffix":"{}"}})",
-                                 sanitized_url, sanitized_csrf_token, sanitized_suffix);
+  absl::string_view sanitized_flow_id = Json::sanitize(buffer, flow_id);
+  std::string json = fmt::format(R"({{"url":"{}","csrf_token":"{}","flow_id":"{}"}})",
+                                 sanitized_url, sanitized_csrf_token, sanitized_flow_id);
   return Base64Url::encode(json.data(), json.size());
 }
 
@@ -676,7 +670,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       // More information can be found here:
       // https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2
       const CallbackValidationResult result = validateOAuthCallback(headers, path_str);
-      flow_cookie_suffix_ = result.cookie_suffix_;
+      flow_id_ = result.flow_id_;
       if (!result.is_valid_) {
         sendUnauthorizedResponse(result.error_details_);
         return Http::FilterHeadersStatus::StopIteration;
@@ -699,7 +693,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
           Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
               {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
                {Http::Headers::get().Location, result.original_request_url_}})};
-      addFlowCookieDeletionHeaders(*response_headers, flow_cookie_suffix_);
+      addFlowCookieDeletionHeaders(*response_headers, flow_id_);
       decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_RACE);
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -744,7 +738,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // server and we expect the query strings to contain the information required to get the access
   // token.
   const CallbackValidationResult result = validateOAuthCallback(headers, path_str);
-  flow_cookie_suffix_ = result.cookie_suffix_;
+  flow_id_ = result.flow_id_;
   if (!result.is_valid_) {
     sendUnauthorizedResponse(result.error_details_);
     return Http::FilterHeadersStatus::StopIteration;
@@ -756,8 +750,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
   const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
 
-  absl::optional<std::string> encrypted_code_verifier = readCookieValueWithSuffix(
-      headers, config_->cookieNames().code_verifier_, result.cookie_suffix_);
+  absl::optional<std::string> encrypted_code_verifier =
+      readCookieValueWithSuffix(headers, config_->cookieNames().code_verifier_, result.flow_id_);
   if (!encrypted_code_verifier.has_value()) {
     sendUnauthorizedResponse("Code verifier cookie is missing in the request");
     return Http::FilterHeadersStatus::StopIteration;
@@ -906,7 +900,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 
   // Generate a CSRF token to prevent CSRF attacks.
   const GeneratedCsrfToken csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
-  const std::string& cookie_suffix = csrf_token.cookie_suffix;
+  const std::string& flow_id = csrf_token.flow_id;
   const std::chrono::seconds csrf_token_expires_in = config_->getCsrfTokenExpiresIn();
   std::string csrf_expires = std::to_string(csrf_token_expires_in.count());
 
@@ -917,13 +911,14 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     csrf_cookie_tail = absl::StrCat(fmt::format(CookieDomainFormatString, config_->cookieDomain()),
                                     csrf_cookie_tail);
   }
-  const std::string csrf_cookie_name =
-      cookieNameWithSuffix(cookie_names.oauth_nonce_, cookie_suffix);
+  // Use the flow id to create a unique cookie name for this OAuth flow.
+  // This allows multiple concurrent OAuth flows to be handled correctly.
+  const std::string csrf_cookie_name = cookieNameWithSuffix(cookie_names.oauth_nonce_, flow_id);
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
       absl::StrCat(csrf_cookie_name, "=", csrf_token.token, csrf_cookie_tail));
 
-  const std::string state = encodeState(original_url, csrf_token.token, cookie_suffix);
+  const std::string state = encodeState(original_url, csrf_token.token, flow_id);
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
 
@@ -947,8 +942,10 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     cookie_tail_http_only = absl::StrCat(
         fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
   }
+  // Use the flow id to create a unique cookie name for this OAuth flow.
+  // This allows multiple concurrent OAuth flows to be handled correctly.
   const std::string code_verifier_cookie_name =
-      cookieNameWithSuffix(cookie_names.code_verifier_, cookie_suffix);
+      cookieNameWithSuffix(cookie_names.code_verifier_, flow_id);
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
       absl::StrCat(code_verifier_cookie_name, "=",
@@ -1210,7 +1207,7 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
   response_headers->setLocation(original_request_url_);
   // Delete the csrf and code_verifier cookies after a successful OAuth flow.
   // These cookies are no longer needed and should be deleted to prevent bloating the requests.
-  addFlowCookieDeletionHeaders(*response_headers, flow_cookie_suffix_);
+  addFlowCookieDeletionHeaders(*response_headers, flow_id_);
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
   config_->stats().oauth_success_.inc();
@@ -1336,7 +1333,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
 }
 
 void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers,
-                                                absl::string_view cookie_suffix) const {
+                                                absl::string_view flow_id) const {
   const CookieNames& cookie_names = config_->cookieNames();
   std::string cookie_domain;
   if (!config_->cookieDomain().empty()) {
@@ -1344,7 +1341,7 @@ void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers
   }
 
   auto add_delete_cookie = [&](absl::string_view base_name) {
-    const std::string cookie_name = cookieNameWithSuffix(base_name, cookie_suffix);
+    const std::string cookie_name = cookieNameWithSuffix(base_name, flow_id);
     const bool add_secure_attr =
         absl::StartsWith(cookie_name, "__Secure-") || absl::StartsWith(cookie_name, "__Host-");
     const absl::string_view maybe_secure_attr = add_secure_attr ? "; Secure" : "";
@@ -1364,11 +1361,11 @@ void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
   decoder_callbacks_->sendLocalReply(
       Http::Code::Unauthorized, UnauthorizedBodyMessage,
       [this](Http::ResponseHeaderMap& headers) {
-        if (!flow_cookie_suffix_.empty()) {
+        if (!flow_id_.empty()) {
           // Delete the csrf and code_verifier cookies if set.
           // These cookies are no longer needed and should be deleted to prevent bloating the
           // requests.
-          addFlowCookieDeletionHeaders(headers, flow_cookie_suffix_);
+          addFlowCookieDeletionHeaders(headers, flow_id_);
         }
       },
       absl::nullopt, details);
@@ -1418,14 +1415,14 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   const auto& filed_value_pair = message.fields();
   if (!filed_value_pair.contains(stateParamsUrl) ||
       !filed_value_pair.contains(stateParamsCsrfToken) ||
-      !filed_value_pair.contains(stateParamsCookieSuffix)) {
-    return {false,
-            "",
-            "",
-            "",
-            "",
-            fmt::format("State query param does not contain url, CSRF token, or cookie suffix: {}",
-                        state)};
+      !filed_value_pair.contains(stateParamsFlowId)) {
+    return {
+        false,
+        "",
+        "",
+        "",
+        "",
+        fmt::format("State query param does not contain url, CSRF token, or flow id: {}", state)};
   }
 
   // Return 401 unauthorized if the CSRF token cookie does not match the CSRF token in the state.
@@ -1435,12 +1432,12 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   // in the attacker's account.
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
   std::string csrf_token = filed_value_pair.at(stateParamsCsrfToken).string_value();
-  std::string cookie_suffix = filed_value_pair.at(stateParamsCookieSuffix).string_value();
-  if (cookie_suffix.empty()) {
-    return {false, "", "", "", "", fmt::format("Cookie suffix in state is empty: {}", state)};
+  std::string flow_id = filed_value_pair.at(stateParamsFlowId).string_value();
+  if (flow_id.empty()) {
+    return {false, "", "", "", "", fmt::format("Flow id in state is empty: {}", state)};
   }
-  if (!validateCsrfToken(headers, csrf_token, cookie_suffix)) {
-    return {false, "", "", csrf_token, cookie_suffix, "CSRF token validation failed"};
+  if (!validateCsrfToken(headers, csrf_token, flow_id)) {
+    return {false, "", "", csrf_token, flow_id, "CSRF token validation failed"};
   }
   const std::string original_request_url = filed_value_pair.at(stateParamsUrl).string_value();
 
@@ -1451,15 +1448,15 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
             "",    "", fmt::format("State url can not be initialized: {}", original_request_url)};
   }
 
-  return {true, codeVal.value(), original_request_url, csrf_token, cookie_suffix, ""};
+  return {true, codeVal.value(), original_request_url, csrf_token, flow_id, ""};
 }
 
 // Validates the csrf_token in the state parameter against the one in the cookie.
 bool OAuth2Filter::validateCsrfToken(const Http::RequestHeaderMap& headers,
                                      const std::string& csrf_token,
-                                     absl::string_view cookie_suffix) const {
+                                     absl::string_view flow_id) const {
   absl::optional<std::string> cookie_value =
-      readCookieValueWithSuffix(headers, config_->cookieNames().oauth_nonce_, cookie_suffix);
+      readCookieValueWithSuffix(headers, config_->cookieNames().oauth_nonce_, flow_id);
   if (!cookie_value.has_value()) {
     return false;
   }

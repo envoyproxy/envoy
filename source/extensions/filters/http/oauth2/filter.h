@@ -303,7 +303,7 @@ struct CallbackValidationResult {
   std::string auth_code_;
   std::string original_request_url_;
   std::string csrf_token_;
-  std::string cookie_suffix_;
+  std::string flow_id_;
   std::string error_details_;
 };
 
@@ -359,7 +359,7 @@ private:
   std::string new_expires_;
   absl::string_view host_;
   std::string original_request_url_;
-  std::string flow_cookie_suffix_;
+  std::string flow_id_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
 
@@ -384,12 +384,12 @@ private:
   std::string BuildCookieTail(int cookie_type) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   void addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers,
-                                    absl::string_view cookie_suffix) const;
+                                    absl::string_view flow_id) const;
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                  const absl::string_view path_str) const;
   bool validateCsrfToken(const Http::RequestHeaderMap& headers, const std::string& csrf_token,
-                         absl::string_view cookie_suffix) const;
+                         absl::string_view flow_id) const;
   void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
   std::string encryptToken(const std::string& token) const;
   std::string decryptToken(const std::string& encrypted_token) const;
