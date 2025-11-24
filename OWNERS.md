@@ -24,6 +24,8 @@ routing PRs, questions, etc. to the right place.
   * HTTP/3, upstream connection management, Envoy Mobile.
 * Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@gmail.com)
   * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
+* Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
+  * Overload manager, security, logging, wasm, data plane.
 
 # Maintainers
 <!--- If you modify maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml -->
@@ -42,8 +44,6 @@ routing PRs, questions, etc. to the right place.
   * Load balancing, GeoIP, overload manager, security.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
   * ext_proc, data plane, flow control, CEL.
-* Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
-  * Overload manager, security, logging, wasm, data plane.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
   * Load balancing, data plane.
 * Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (takeshi@tetrate.io)

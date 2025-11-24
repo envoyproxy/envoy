@@ -23,13 +23,14 @@ on:
         type: string
         required: true
 
+      # TODO: move this to .github/config.yml
       cache-bazel-hash-paths:
         type: string
         default: |
           WORKSPACE
-          **/*.bzl
+          bazel/repository_locations.bzl
+          api/bazel/repository_locations.bzl
           .github/workflows/_request_cache_bazel.yml
-          !mobile/**/*
       config-file:
         type: string
         default: ./.github/config.yml

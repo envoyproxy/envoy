@@ -22,7 +22,6 @@ build --experimental_inmemory_jdeps_files
 build --features=debug_prefix_map_pwd_is_dot
 build --features=swift.cacheable_swiftmodules
 build --features=swift.debug_prefix_map
-build --host_force_python=PY3
 build --macos_minimum_os=14.5
 build --ios_simulator_version=18.1
 build --verbose_failures
@@ -79,6 +78,7 @@ build:android --tool_java_language_version=8
 
 # Default flags for Android
 build:mobile-android --incompatible_enable_android_toolchain_resolution
+build:mobile-android --config=mobile-clang
 build:mobile-android --java_language_version=8
 build:mobile-android --tool_java_language_version=8
 test:mobile-android --build_tests_only
@@ -93,10 +93,10 @@ build:mobile-android-release --linkopt=-fuse-ld=lld
 build:mobile-android-release --android_platforms=@envoy//bazel/platforms/android:x86_64
 build:mobile-android-release --fat_apk_cpu=x86_64
 
-build:mobile-android-release-publish --config=mobile-android-release
-build:mobile-android-release-publish --config=mobile-remote-release
-build:mobile-android-release-publish --android_platforms=@envoy//bazel/platforms/android:x86,@envoy//bazel/platforms/android:x86_64,@envoy//bazel/platforms/android:armeabi-v7a,@envoy//bazel/platforms/android::arm64-v8a
-build:mobile-android-release-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
+build:mobile-android-publish --config=mobile-android-release
+build:mobile-android-publish --config=mobile-release
+build:mobile-android-publish --android_platforms=@envoy//bazel/platforms/android:x86,@envoy//bazel/platforms/android:x86_64,@envoy//bazel/platforms/android:armeabi-v7a,@envoy//bazel/platforms/android::arm64-v8a
+build:mobile-android-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
 
 
 #############################################################################
@@ -104,15 +104,9 @@ build:mobile-android-release-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-
 #############################################################################
 # Clang toolchain options
 build:mobile-clang --config=libc++
-
-build:mobile-remote-clang --crosstool_top=//third_party/rbe_configs/cc:toolchain
-build:mobile-remote-clang --extra_execution_platforms=//third_party/rbe_configs/config:platform
-build:mobile-remote-clang --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
-build:mobile-remote-clang --host_platform=//third_party/rbe_configs/config:platform
-build:mobile-remote-clang --platforms=//third_party/rbe_configs/config:platform
-build:mobile-remote-clang --config=mobile-clang
-build:mobile-remote-clang --config=mobile-rbe
-build:mobile-remote-clang --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:mobile-clang --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:mobile-clang --host_platform=@mobile_clang_platform
+build:mobile-clang --platforms=@mobile_clang_platform
 
 
 #############################################################################
@@ -136,17 +130,6 @@ build:mobile-rbe --verbose_failures
 build:mobile-rbe --spawn_strategy=remote,sandboxed,local
 build:mobile-rbe --experimental_ui_max_stdouterr_bytes=10485760
 
-build:mobile-remote-ci --config=mobile-remote-clang
-build:mobile-remote-ci --config=remote-ci
-build:mobile-remote-ci --test_env=ENVOY_IP_TEST_VERSIONS=v4only
-
-# order matters here to ensure downloads
-build:mobile-remote-release --config=mobile-remote-clang
-build:mobile-remote-release --config=mobile-release-common
-build:mobile-remote-release --remote_download_toplevel
-build:mobile-remote-release --config=ci
-build:mobile-remote-release --config=remote
-
 
 #############################################################################
 # toolchains: sanitizers/linux
@@ -154,7 +137,7 @@ build:mobile-remote-release --config=remote
 # ASAN
 build:mobile-asan --config=asan
 build:mobile-asan --config=clang
-build:mobile-asan --config=mobile-remote-clang
+build:mobile-asan --config=mobile-clang
 build:mobile-asan --build_tests_only
 test:mobile-asan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
@@ -164,7 +147,7 @@ build:mobile-msan --config=msan --config=clang
 # TSAN
 build:mobile-tsan --config=clang
 build:mobile-tsan --config=tsan
-build:mobile-tsan --config=mobile-remote-clang
+build:mobile-tsan --config=mobile-clang
 build:mobile-tsan --build_tests_only
 test:mobile-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
@@ -175,6 +158,8 @@ test:mobile-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 # CC
 test:mobile-cc --action_env=LD_LIBRARY_PATH
+build:mobile-cc --config=mobile-clang
+build:mobile-cc --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 # CC with xDS
 build:mobile-cc-xds-enabled --config=mobile-cc
@@ -183,10 +168,10 @@ test:mobile-cc-xds-enabled --define=envoy_mobile_xds=enabled
 # Coverage
 build:mobile-coverage --build_tests_only
 build:mobile-coverage --@envoy//tools/coverage:config=@envoy_mobile//test:coverage_config
-# TODO: switch this back to mobile-clang!
-build:mobile-coverage --config=mobile-remote-clang
+build:mobile-coverage --config=mobile-clang
 build:mobile-coverage --legacy_important_outputs=false
 build:mobile-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+test:mobile-coverage --action_env=LD_LIBRARY_PATH
 
 
 #############################################################################
@@ -198,7 +183,6 @@ build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
 # Disable global index store to work around https://github.com/buildbuddy-io/rules_xcodeproj/issues/1878
 build:rules_xcodeproj --features=-swift.use_global_index_store
 
-build:mobile-macos --config=mobile-rbe
 build:mobile-macos --host_platform=@envoy//bazel/platforms/rbe:macos
 build:mobile-macos --platforms=@envoy//bazel/platforms/rbe:macos
 build:mobile-macos --extra_execution_platforms=@envoy//bazel/platforms/rbe:macos
@@ -208,20 +192,25 @@ build:mobile-macos --config=ci
 build:mobile-macos --config=remote
 build:mobile-macos --define=envoy_full_protos=disabled
 
-build:mobile-macos-ios --config=mobile-macos
-build:mobile-macos-ios --config=ios
-build:mobile-macos-ios --strategy=ProcessAndSign=sandboxed,local
+build:mobile-ios --config=mobile-macos
+build:mobile-ios --config=ios
+build:mobile-ios --strategy=ProcessAndSign=sandboxed,local
 
-build:mobile-macos-ios-swift --config=mobile-macos-ios
-test:mobile-macos-ios-swift --build_tests_only
+build:mobile-ios-swift --config=mobile-ios
+test:mobile-ios-swift --build_tests_only
 
-build:mobile-macos-ios-obj-c --config=mobile-macos-ios
-test:mobile-macos-ios-obj-c --build_tests_only
+build:mobile-ios-obj-c --config=mobile-ios
+test:mobile-ios-obj-c --build_tests_only
 
 
 #############################################################################
 # release
 #############################################################################
+
+# order matters here to ensure downloads
+build:mobile-release --config=mobile-clang
+build:mobile-release --config=mobile-release-common
+build:mobile-release --remote_download_toplevel
 
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
@@ -254,3 +243,31 @@ build:mobile-dbg-android --config=android
 # Default flags for iOS debug builds
 build:mobile-dbg-ios --config=mobile-dbg-common
 build:mobile-dbg-ios --config=ios
+
+
+#############################################################################
+# compat: Remove immediately when PR lands
+#############################################################################
+
+build:mobile-remote-ci --config=ci
+
+build:mobile-remote-release --config=ci
+build:mobile-remote-release --config=mobile-rbe
+build:mobile-remote-release --config=mobile-release
+
+build:remote-ci --config=ci
+build:remote-ci --config=mobile-rbe
+
+build:mobile-macos-ios --config=ci
+build:mobile-macos-ios --config=mobile-rbe
+build:mobile-macos-ios --config=mobile-ios
+
+build:mobile-macos-ios-swift --config=ci
+build:mobile-macos-ios-swift --config=mobile-rbe
+build:mobile-macos-ios-swift --config=mobile-ios-swift
+
+build:mobile-macos-ios-obj-c --config=ci
+build:mobile-macos-ios-obj-c --config=mobile-rbe
+build:mobile-macos-ios-obj-c --config=mobile-ios-obj-c
+
+build:mobile-android-release-publish --config=mobile-android-publish
