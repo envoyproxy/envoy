@@ -2462,8 +2462,8 @@ TEST_P(TcpProxyIntegrationTest, BidirectionalFlowAfterDelayedConnection) {
   tcp_client->close();
 }
 
-// Test empty data does not trigger connection in ON_DOWNSTREAM_DATA mode.
-TEST_P(TcpProxyIntegrationTest, EmptyDataDoesNotTriggerConnection) {
+// Test that connection without any data does not trigger upstream in ON_DOWNSTREAM_DATA mode.
+TEST_P(TcpProxyIntegrationTest, NoDataDoesNotTriggerConnection) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -2493,6 +2493,43 @@ TEST_P(TcpProxyIntegrationTest, EmptyDataDoesNotTriggerConnection) {
 
   // Connection should now be established.
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(4));
+
+  tcp_client->close();
+}
+
+// Test edge case: empty data with max_buffered_bytes=0 triggers connection in ON_DOWNSTREAM_DATA
+// mode. This is critical to avoid deadlock where readDisable prevents any future data.
+TEST_P(TcpProxyIntegrationTest, EmptyDataWithZeroBufferTriggersConnection) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    tcp_proxy.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(0);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Send empty data - should trigger connection even though buffer is 0.
+  // This avoids the deadlock where readDisable would prevent any future data.
+  ASSERT_TRUE(tcp_client->write(""));
+
+  // Connection should be established immediately.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Now send real data.
+  ASSERT_TRUE(tcp_client->write("data"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(4));
 
   tcp_client->close();

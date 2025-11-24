@@ -440,12 +440,6 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
     }
   }
 
-  // For ON_DOWNSTREAM_DATA mode, always enable receive_before_connect.
-  if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_DATA) {
-    receive_before_connect_ = true;
-    max_buffered_bytes_ = config_->maxEarlyDataBytes().value();
-  }
-
   // Handle TLS handshake wait mode.
   if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_TLS_HANDSHAKE) {
     const auto ssl_connection = read_callbacks_->connection().ssl();
@@ -998,8 +992,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     }
 
     // Mark that we've received initial data and trigger connection if needed.
-    // Only trigger if we actually have data in the buffer.
-    if (!initial_data_received_ && early_data_buffer_.length() > 0) {
+    if (!initial_data_received_) {
       initial_data_received_ = true;
       // For ON_DOWNSTREAM_DATA mode, establish the upstream connection now.
       if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_DATA) {

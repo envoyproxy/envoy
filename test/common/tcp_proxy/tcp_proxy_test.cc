@@ -2587,8 +2587,9 @@ TEST_P(TcpProxyTest, SingleConnectionTriggerWithMultipleDataChunks) {
   EXPECT_EQ(connection_attempts, 1);
 }
 
-// Test empty data doesn't trigger connection in ON_DOWNSTREAM_DATA mode.
-TEST_P(TcpProxyTest, EmptyDataDoesNotTriggerConnection) {
+// Test empty data triggers connection in ON_DOWNSTREAM_DATA mode.
+// This is important for the edge case where max_buffered_bytes is 0.
+TEST_P(TcpProxyTest, EmptyDataTriggersConnection) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.set_upstream_connect_mode(
       envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
@@ -2600,12 +2601,25 @@ TEST_P(TcpProxyTest, EmptyDataDoesNotTriggerConnection) {
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  // Empty data should not trigger connection.
+  // Expect connection to be triggered even with empty data.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // Empty data should trigger connection.
   Buffer::OwnedImpl empty_data;
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(empty_data, false));
 
-  // No connection should be established.
-  EXPECT_TRUE(conn_pool_callbacks_.empty());
+  // Connection should be established.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
 }
 
 // Test that StopIteration in ON_DOWNSTREAM_DATA mode still allows reading.
@@ -3152,23 +3166,19 @@ TEST_P(TcpProxyTest, MultipleTinyChunksSetInitialDataReceivedOnce) {
   EXPECT_EQ(conn_pool_callbacks_.size(), 1); // Still only one connection attempt.
 }
 
-// Test that empty data chunks don't set initial_data_received_.
-TEST_P(TcpProxyTest, EmptyDataChunksDoNotSetInitialDataReceived) {
+// Test that empty data with max_buffered_bytes=0 triggers connection.
+// This tests the edge case mentioned in the review.
+TEST_P(TcpProxyTest, EmptyDataWithZeroBufferTriggersConnection) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.set_upstream_connect_mode(
       envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
-  config.mutable_max_early_data_bytes()->set_value(1024);
+  config.mutable_max_early_data_bytes()->set_value(0);
 
   // Use setupOnDownstreamDataMode to avoid conflicting expectations from base setup.
   setupOnDownstreamDataMode(config, false /* receive_before_connect */);
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  // Empty data. It should NOT trigger connection.
-  Buffer::OwnedImpl empty_data("");
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(empty_data, false));
-  EXPECT_TRUE(conn_pool_callbacks_.empty());
-
-  // Now send real data. It should trigger connection but NOT readDisable.
+  // Expect connection to be triggered even with empty data.
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
@@ -3181,8 +3191,11 @@ TEST_P(TcpProxyTest, EmptyDataChunksDoNotSetInitialDataReceived) {
                 .get();
           }));
 
-  Buffer::OwnedImpl real_data("hello");
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(real_data, false));
+  // Empty data should trigger connection (to handle the edge case).
+  // Also expect readDisable to be called since buffer length (0) >= max_buffered_bytes (0).
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  Buffer::OwnedImpl empty_data("");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(empty_data, false));
   EXPECT_FALSE(conn_pool_callbacks_.empty());
 }
 
