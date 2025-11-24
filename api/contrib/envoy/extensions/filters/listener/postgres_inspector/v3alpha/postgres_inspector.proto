@@ -34,8 +34,10 @@ message PostgresInspector {
   google.protobuf.UInt32Value max_startup_message_size = 2
       [(validate.rules).uint32 = {lte: 10000 gte: 256}];
 
-  // Timeout for the inspector to receive the startup message. If the timeout is reached
-  // before the startup message is received, the connection will be closed.
+  // Timeout for the inspector to receive and process the startup message.
+  // The timeout starts when the connection is accepted by the listener.
+  // If the timeout is reached before the startup message is fully received and processed,
+  // the connection will be closed.
   //
   // If not specified, defaults to 10 seconds. Minimum is 1 second.
   google.protobuf.Duration startup_timeout = 3 [(validate.rules).duration = {gte {seconds: 1}}];

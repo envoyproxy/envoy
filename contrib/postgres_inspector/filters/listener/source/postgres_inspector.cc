@@ -109,7 +109,7 @@ Network::FilterStatus Filter::processInitialData(Network::ListenerFilterBuffer& 
     bytes_processed_for_histogram_ = SSL_REQUEST_MESSAGE_SIZE;
 
     // Inspector only detect and mark the protocol. SSL negotiation must be handled by the
-    // downstream filter chain components:
+    // other filter chain components:
     // 1. The postgres_proxy network filter, OR
     // 2. A starttls transport socket configured in the filter chain.
     //
