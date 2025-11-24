@@ -188,7 +188,6 @@ def envoy_dependencies(skip_targets = []):
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
-    _com_github_envoyproxy_sqlparser()
     _v8()
     _fast_float()
     _highway()
