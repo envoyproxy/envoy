@@ -158,7 +158,8 @@ public:
         R"EOF(
 name: envoy.filters.http.proto_api_scrubber
 typed_config: {}
-)EOF", json_config);
+)EOF",
+        json_config);
   }
 
   template <typename T>
