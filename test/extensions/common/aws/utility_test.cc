@@ -759,7 +759,7 @@ TEST(UtilityTest, CanonicalRequestS3AlreadyEncodedPath) {
   EXPECT_EQ("GET\n/test%40test\n\n\n\ncontent-hash", request);
 }
 
-// A raw (unencoded) path for vpc-lattice-svcs should be percent-encoded once
+// A raw (unencoded) path for lattice should be percent-encoded once
 TEST(UtilityTest, CanonicalRequestVpcLatticeUnencodedPath) {
   std::map<std::string, std::string> headers;
   const auto request =
@@ -769,7 +769,7 @@ TEST(UtilityTest, CanonicalRequestVpcLatticeUnencodedPath) {
   EXPECT_EQ("GET\n/test%40test\n\n\n\ncontent-hash", request);
 }
 
-// An already encoded path for vpc-lattice-svcs should be percent-encoded twice
+// An already encoded path for lattice should be percent-encoded twice
 TEST(UtilityTest, CanonicalRequestVpcLatticeAlreadyEncodedPath) {
   std::map<std::string, std::string> headers;
   const auto request =
