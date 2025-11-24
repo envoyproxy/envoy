@@ -504,7 +504,7 @@ TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  ScopeSharedPtr scope = store_->createScope("scope.", true, 1, 1, 1);
+  ScopeSharedPtr scope = store_->createScope("scope.", true, {1, 1, 1});
   EXPECT_EQ(0, TestUtility::findCounter(*store_, "stats.overflow.counters")->value());
   EXPECT_EQ(0, TestUtility::findCounter(*store_, "stats.overflow.gauges")->value());
   EXPECT_EQ(0, TestUtility::findCounter(*store_, "stats.overflow.histograms")->value());
