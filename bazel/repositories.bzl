@@ -172,6 +172,7 @@ def envoy_dependencies(skip_targets = []):
     _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
+    _com_github_numactl_numactl()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
@@ -398,6 +399,15 @@ def _com_github_intel_ipp_crypto_crypto_mb():
     external_http_archive(
         name = "com_github_intel_ipp_crypto_crypto_mb",
         build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_numactl_numactl():
+    external_http_archive(
+        name = "com_github_numactl_numactl",
+        build_file_content = BUILD_ALL_CONTENT,
+        # Disable the generation of binaries we don't need and are causing build issues
+        patches = ["@envoy//bazel/foreign_cc:numa.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_intel_qatlib():

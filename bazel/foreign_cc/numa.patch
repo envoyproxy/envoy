@@ -1,0 +1,13 @@
+diff --git a/Makefile.am b/Makefile.am
+index d86ce7e..5b66a21 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -4,7 +4,7 @@ CLEANFILES =
+ 
+ AM_CPPFLAGS = -Wall
+ 
+-bin_PROGRAMS = numactl numastat numademo migratepages migspeed memhog
++#bin_PROGRAMS = numactl numastat numademo migratepages migspeed memhog
+ 
+ lib_LTLIBRARIES = libnuma.la
+ 

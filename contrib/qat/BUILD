@@ -14,6 +14,16 @@ envoy_contrib_package()
 # extension.
 
 configure_make(
+    name = "libnuma",
+    autogen = True,
+    configure_in_place = True,
+    lib_source = "@com_github_numactl_numactl//:all",
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    visibility = ["//visibility:public"],
+)
+
+
+configure_make(
     name = "qatlib",
     autogen = True,
     configure_in_place = True,
@@ -33,6 +43,6 @@ configure_make(
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:public"],
     # Use boringssl alias to select fips vs non-fips version.
-    deps = ["//bazel:boringcrypto"],
+    deps = ["//bazel:boringcrypto", ":libnuma"],
     alwayslink = True,
 )
