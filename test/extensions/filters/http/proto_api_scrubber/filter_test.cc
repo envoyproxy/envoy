@@ -101,8 +101,8 @@ protected:
   }
 
   /**
-   * Utility to add a field restriction to the provided `filter_config`.
-   * @param filter_config The filter config to be modified.
+   * Utility to add a field restriction to the provided `config`.
+   * @param config The filter config to be modified.
    * @param method_name The gRPC method name (e.g., "/apikeys.ApiKeys/CreateApiKey").
    * @param field_path The proto field path (e.g., "key.display_name").
    * @param field_type Represents whether the request or response field restrictions need to be set.
@@ -1168,90 +1168,6 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedNoRule) {
 
   EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, false));
-}
-
-// Tests the behavior when the matcher result is UnableToMatch (e.g., due to missing inputs).
-// Currently, this test demonstrates the fallback behavior with the standard CelMatcher.
-TEST_F(MethodLevelRestrictionTest, MethodAllowedOnMatcherInsufficientData) {
-  // NOTE: Accurately simulating an UnableToMatch state from the CelMatcher
-  // typically requires a CEL expression dependent on inputs not available
-  // during decodeHeaders (e.g., dynamic metadata).
-  // Testing the filter's reaction to a generic Matcher returning UnableToMatch
-  // would ideally involve injecting a mock Matcher. This is not easily done
-  // with the current ProtoApiScrubberFilterConfig structure, which builds the
-  // matcher internally.
-  // One could potentially create and register a custom Matcher extension
-  // specifically designed to return UnableToMatch for testing purposes,
-  // but that adds considerable complexity to this test file.
-
-  // Using the standard CelMatcher, it's hard to force UnableToMatch.
-  // This test setup will likely result in the matcher evaluating to true.
-
-  // Setup config with a method restriction.
-  setupFilterConfig(R"pb(
-    restrictions: {
-      method_restrictions: {
-        key: "/bookstore.Bookstore/CreateShelf"
-        value: {
-          method_restriction: {
-            matcher: {
-              matcher_list: {
-                matchers: {
-                  predicate: {
-                    single_predicate: {
-                      input: {
-                        name: "request"
-                        typed_config: {
-                          [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {}
-                        }
-                      }
-                      custom_match: {
-                        name: "cel"
-                        typed_config: {
-                          [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                            # This expression is unlikely to cause UnableToMatch in this setup
-                            expr_match: { parsed_expr: { expr: { const_expr: { bool_value: true } } } }
-                          }
-                        }
-                      }
-                    }
-                  }
-                  on_match: {
-                    action: {
-                      name: "block"
-                      typed_config: {
-                        [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] {}
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  )pb",
-                    kBookstoreDescriptorRelativePath);
-  reSetupFilter(kBookstoreDescriptorRelativePath);
-
-  auto req_headers = TestRequestHeaderMapImpl{{":method", "POST"},
-                                              {":path", "/bookstore.Bookstore/CreateShelf"},
-                                              {"content-type", "application/grpc"}};
-
-  // In the current setup, this will likely result in a block, not UnableToMatch.
-  // To truly test UnableToMatch, matcher mocking/injection is needed.
-  // We'll assert the expected behavior IF UnableToMatch were to occur.
-
-  // EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
-  // EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers,
-  // false));
-
-  // Since we can't force UnableToMatch, this test just confirms the current matcher's behavior.
-  EXPECT_CALL(mock_decoder_callbacks_,
-              sendLocalReply(Http::Code::Forbidden, "Method not allowed", _, _, _));
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(req_headers, false));
 }
 
 // Tests that field-level restrictions are still applied even if the method-level check passes.
