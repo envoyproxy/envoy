@@ -149,36 +149,27 @@ public:
     }
 
     ProtoApiScrubberConfig filter_config_proto;
-    if (!Protobuf::TextFormat::ParseFromString(full_config_text, &filter_config_proto)) {
-      // This ensures we see the error even in Release builds
-      std::cerr << "Failed to parse config: " << full_config_text << std::endl;
-      RELEASE_ASSERT(false, "Failed to parse generated Protobuf Text Config");
-    }
-
     Protobuf::Any any_config;
+
+    Protobuf::TextFormat::ParseFromString(full_config_text, &filter_config_proto);
     any_config.PackFrom(filter_config_proto);
     std::string json_config = MessageUtil::getJsonStringFromMessageOrError(any_config);
-    return fmt::format(
-        R"EOF(
-name: envoy.filters.http.proto_api_scrubber
-typed_config: {}
-)EOF",
-        json_config);
+    return fmt::format(R"EOF(
+      name: envoy.filters.http.proto_api_scrubber
+      typed_config: {})EOF",
+                       json_config);
   }
 
   template <typename T>
   IntegrationStreamDecoderPtr sendGrpcRequest(const T& request_msg,
                                               const std::string& method_path) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
-
     auto request_buf = Grpc::Common::serializeToGrpcFrame(request_msg);
-
     auto request_headers = Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                           {":path", method_path},
                                                           {"content-type", "application/grpc"},
                                                           {":authority", "host"},
                                                           {":scheme", "http"}};
-
     return codec_client_->makeRequestWithBody(request_headers, request_buf->toString());
   }
 };
