@@ -62,11 +62,11 @@ public:
 // Helper to configure the Mock Config for Enum testing.
 void setupMockEnumRule(MockProtoApiScrubberFilterConfig& mock_config, const std::string& method,
                        const std::string& field_path, const std::string& type_url, int enum_int,
-                       const std::string& enum_name, bool should_remove) {
+                       absl::string_view enum_name, bool should_remove) {
   auto type_name = std::string(Envoy::TypeUtil::typeUrlToDescriptorFullName(type_url));
 
-  ON_CALL(mock_config, getEnumName(testing::_, enum_int))
-      .WillByDefault(testing::Return(absl::string_view(enum_name)));
+  ON_CALL(mock_config, getEnumName(type_name, enum_int))
+      .WillByDefault(testing::Return(enum_name));
 
   // Mock Matcher Lookup
   std::string full_mask = absl::StrCat(field_path, ".", enum_name);
