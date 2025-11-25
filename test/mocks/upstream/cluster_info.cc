@@ -93,11 +93,6 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(Invoke([this]() -> OptRef<const LoadBalancerConfig> {
         return makeOptRefFromPtr<LoadBalancerConfig>(typed_lb_config_.get());
       }));
-  ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
-  ON_CALL(*this, http2Options()).WillByDefault(ReturnRef(http2_options_));
-  ON_CALL(*this, http3Options()).WillByDefault(ReturnRef(http3_options_));
-  ON_CALL(*this, commonHttpProtocolOptions())
-      .WillByDefault(ReturnRef(common_http_protocol_options_));
   ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
   ON_CALL(*this, maxResponseHeadersCount())
       .WillByDefault(ReturnPointee(&max_response_headers_count_));
@@ -142,10 +137,6 @@ MockClusterInfo::MockClusterInfo()
 
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
-  ON_CALL(*this, upstreamHttpProtocolOptions())
-      .WillByDefault(ReturnRef(upstream_http_protocol_options_));
-  ON_CALL(*this, alternateProtocolsCacheOptions())
-      .WillByDefault(ReturnRef(alternate_protocols_cache_options_));
   // Delayed construction of typed_metadata_, to allow for injection of metadata
   ON_CALL(*this, typedMetadata())
       .WillByDefault(Invoke([this]() -> const Envoy::Config::TypedMetadata& {
@@ -176,9 +167,6 @@ MockClusterInfo::MockClusterInfo()
         return makeOptRefFromPtr<const Envoy::Orca::LrsReportMetricNames>(
             lrs_report_metric_names_.get());
       }));
-  ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
-  ON_CALL(*this, retryPolicy()).WillByDefault(Return(nullptr));
-  ON_CALL(*this, hashPolicy()).WillByDefault(Return(nullptr));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;
