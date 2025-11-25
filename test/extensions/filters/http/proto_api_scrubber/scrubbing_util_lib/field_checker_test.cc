@@ -65,8 +65,7 @@ void setupMockEnumRule(MockProtoApiScrubberFilterConfig& mock_config, const std:
                        absl::string_view enum_name, bool should_remove) {
   auto type_name = std::string(Envoy::TypeUtil::typeUrlToDescriptorFullName(type_url));
 
-  ON_CALL(mock_config, getEnumName(type_name, enum_int))
-      .WillByDefault(testing::Return(enum_name));
+  ON_CALL(mock_config, getEnumName(type_name, enum_int)).WillByDefault(testing::Return(enum_name));
 
   // Mock Matcher Lookup
   std::string full_mask = absl::StrCat(field_path, ".", enum_name);
