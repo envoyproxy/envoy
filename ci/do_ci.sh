@@ -27,23 +27,22 @@ else
 fi
 
 setup_clang_toolchain() {
+    local config
     if [[ -n "${CLANG_TOOLCHAIN_SETUP}" ]]; then
         return
     fi
-    CONFIG_PARTS=()
-    if [[ -n "${ENVOY_RBE}" ]]; then
-        CONFIG_PARTS+=("remote")
-    fi
-    if [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
-        CONFIG_PARTS+=("arm64")
-    fi
-    CONFIG_PARTS+=("clang")
+    config="clang"
     # We only support clang with libc++ now
-    CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
-    BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
+    BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}" "--config=${config}")
+    BAZEL_QUERY_OPTION_LIST="${BAZEL_QUERY_OPTIONS[*]}"
+    if [[ -n "${ENVOY_RBE}" ]]; then
+        config="remote-${config}"
+    fi
+    BAZEL_BUILD_OPTIONS+=("--config=${config}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
-    echo "clang toolchain configured: ${CONFIG}"
+    export BAZEL_QUERY_OPTION_LIST
+    echo "clang toolchain configured: ${config}"
 }
 
 function collect_build_profile() {
@@ -539,12 +538,12 @@ case $CI_TARGET in
         fi
 
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-              //tools/zstd \
+              @zstd//:zstd_cli \
               -- --stdout \
                  -d "$ENVOY_RELEASE_TARBALL" \
             | tar xfO - envoy > distribution/custom/envoy
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-              //tools/zstd \
+              @zstd//:zstd_cli \
               -- --stdout \
                  -d "$ENVOY_RELEASE_TARBALL" \
             | tar xfO - envoy-contrib > distribution/custom/envoy-contrib

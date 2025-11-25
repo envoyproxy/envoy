@@ -54,6 +54,7 @@ public:
 
 private:
   const Tracing::TraceContextHandler name_;
+  const Http::LowerCaseString header_name_;
   const std::string default_value_;
 };
 

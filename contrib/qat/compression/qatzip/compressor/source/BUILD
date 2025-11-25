@@ -37,7 +37,7 @@ configure_make(
     visibility = ["//visibility:public"],
     deps = [
         "//bazel/foreign_cc:lz4",
-        "//bazel/foreign_cc:zlib",
+        "@zlib",
         "//contrib/qat:qatlib",
         # Use boringssl alias to select fips vs non-fips version.
         "//bazel:boringcrypto",
