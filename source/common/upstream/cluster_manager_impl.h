@@ -30,6 +30,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/cleanup.h"
+#include "source/common/common/thread.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
@@ -479,6 +480,21 @@ protected:
     OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds)
         : parent_(parent), odcds_(std::move(odcds)) {
       ASSERT(odcds_ != nullptr);
+    }
+
+    ~OdCdsApiHandleImpl() override {
+      // The OdCdsApiSharedPtr contains a subscription that must be destroyed on the main thread.
+      // If we're being destroyed on a worker thread, we need to dispatch the destruction to the
+      // main thread dispatcher. Otherwise, the subscription cleanup will trigger an assertion
+      // failure or SIGABRT.
+      if (!Thread::MainThread::isMainThread() && odcds_ != nullptr) {
+        // Move the shared_ptr into a lambda that will be executed on the main thread.
+        // This ensures the subscription is destroyed on the main thread where it was created.
+        parent_.dispatcher_.post([odcds = std::move(odcds_)]() {
+          // The shared_ptr will be destroyed here on the main thread, ensuring proper cleanup
+          // of the subscription.
+        });
+      }
     }
 
     ClusterDiscoveryCallbackHandlePtr
