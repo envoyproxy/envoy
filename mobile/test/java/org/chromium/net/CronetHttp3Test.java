@@ -559,7 +559,7 @@ public class CronetHttp3Test {
     // No connections should have been destroyed.
     assertFalse(postStats, postStats.contains("cluster.base.upstream_cx_destroy:"));
 
-    // Reported capability change should be regarded as switching the default. With connectio
+    // Reported capability change should be regarded as switching the default. With connection
     // migration enabled, the existing connection shouldn't be drained.
     shadowOf(connectivityManager).getNetworkCallbacks().forEach(callback -> {
       LinkProperties link = new LinkProperties();
