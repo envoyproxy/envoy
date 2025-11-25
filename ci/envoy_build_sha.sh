@@ -20,7 +20,7 @@ case $ENVOY_BUILD_VARIANT in
         BUILD_SHA="$BUILD_SHA_CI"
         ;;
     devtools)
-        BUILD_SHA="$BUILD_SHA_DEVTOOLS#"
+        BUILD_SHA="$BUILD_SHA_DEVTOOLS"
         ;;
     docker)
         BUILD_SHA="$BUILD_SHA_DOCKER"
