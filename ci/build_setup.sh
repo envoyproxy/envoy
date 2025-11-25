@@ -130,6 +130,11 @@ if [[ -z "${ENVOY_RBE}" ]]; then
     fi
 fi
 
+# TODO: remove
+BAZEL_BUILD_OPTIONS+=(
+    "--define=LLVM_DIRECTORY=${LLVM_ROOT}"
+    "--action_env=LLVM_DIRECTORY=${LLVM_ROOT}")
+
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean "${BAZEL_BUILD_OPTIONS[@]}" --expunge
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
