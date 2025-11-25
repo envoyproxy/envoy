@@ -117,7 +117,6 @@ common:clang-common --action_env=BAZEL_COMPILER=clang
 common:clang-common --linkopt=-fuse-ld=lld
 common:clang-common --action_env=CC=clang --host_action_env=CC=clang
 common:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
-common:clang-common --incompatible_enable_cc_toolchain_resolution=false
 
 # Clang with libc++ (default)
 common:clang --config=clang-common
@@ -141,7 +140,6 @@ build:gcc --copt=-Wno-error=uninitialized
 build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
-build:gcc --incompatible_enable_cc_toolchain_resolution=false
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 
 # libc++ default for clang
@@ -387,7 +385,6 @@ build:sizeopt -c opt --copt -Os
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:rbe-toolchain --incompatible_enable_cc_toolchain_resolution=false
 
 build:rbe-toolchain-clang --config=rbe-toolchain
 build:rbe-toolchain-clang --config=clang

@@ -1277,12 +1277,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "b9bf668dd4b92dc6410f3bfcf21b865a23bd65d7",
-        sha256 = "8317bf81bb11e33deadd2ac8ba2833af6e572fb97d0f8acdebb6ef482629fdf2",
+        version = "89c28d4ce7df60329173a576ed52aafda88f743b",
+        sha256 = "050e50e1802e61769c70afd63ada31dd85de4fb68925b16398497860bfbf0272",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2025-11-20",
+        release_date = "2025-11-24",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1533,12 +1533,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (Rust SDK)",
         project_desc = "WebAssembly for Proxies (Rust SDK)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-rust-sdk",
-        version = "0.2.2",
-        sha256 = "3d9e8f39f0356016c8ae6c74c0224eae1b44168be0ddf79e387d918a8f2cb4c6",
+        version = "0.2.4",
+        sha256 = "e407f6aaf58437d5ea23393823163fd2b6bf4fac6adb6b8ace6561b1a7afeac6",
         strip_prefix = "proxy-wasm-rust-sdk-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-rust-sdk/archive/v{version}.tar.gz"],
         use_category = ["test_only"],
-        release_date = "2024-07-21",
+        release_date = "2025-10-01",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/proxy-wasm/proxy-wasm-rust-sdk/blob/v{version}/LICENSE",
@@ -1556,6 +1556,25 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Emscripten SDK",
         license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),
+    # NOTE: Required for rules_rust 0.67.0 compatibility with Bazel 7.x.
+    # This provides the UEFI platform constraint used by rules_rust.
+    # May be removable once Envoy upgrades to Bazel 8.0+ which includes this by default.
+    # See: https://github.com/envoyproxy/envoy/pull/41172#issuecomment-2365923085
+    platforms = dict(
+        project_name = "platforms",
+        project_desc = "Constraint values for specifying platforms and toolchains",
+        project_url = "https://github.com/bazelbuild/platforms",
+        version = "1.0.0",
+        sha256 = "852b71bfa15712cec124e4a57179b6bc95d59fdf5052945f5d550e072501a769",
+        strip_prefix = "platforms-{version}",
+        urls = [
+            "https://github.com/bazelbuild/platforms/archive/{version}.tar.gz",
+        ],
+        release_date = "2025-05-27",
+        use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/platforms/blob/{version}/LICENSE",
+    ),
     # After updating you may need to run:
     #
     #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
@@ -1564,8 +1583,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.56.0",
-        sha256 = "f1306aac0b258b790df01ad9abc6abb0df0b65416c74b4ef27f4aab298780a64",
+        version = "0.67.0",
+        sha256 = "dc287e3eca80b29d5cc95e261cae273eedf1af4a00a96ae937e234534dadb24c",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
@@ -1576,7 +1595,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "dataplane_ext",
         ],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        release_date = "2024-12-16",
+        release_date = "2025-10-23",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt",

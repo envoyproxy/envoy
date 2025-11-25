@@ -21,6 +21,7 @@
   },
   "remoteUser": "vscode",
   "containerUser": "vscode",
+  "initializeCommand": ".devcontainer/init.sh",
   "postCreateCommand": ".devcontainer/setup.sh",
   "customizations": {
     "vscode": {

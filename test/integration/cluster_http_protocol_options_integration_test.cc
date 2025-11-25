@@ -867,5 +867,223 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, ClusterMultipleHashPolicies) {
   cleanupUpstreamAndDownstream();
 }
 
+// Test cluster-level retry policy integration test class.
+class ClusterRetryPolicyIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  ClusterRetryPolicyIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    // Start with 1 upstream by default.
+    setUpstreamCount(1);
+  }
+
+  // Configure cluster with retry policy for 5xx errors.
+  void setupClusterRetryPolicy() {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* main_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      auto& options_any = (*main_cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+      envoy::extensions::upstreams::http::v3::HttpProtocolOptions options;
+      options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+
+      // Add retry policy.
+      auto* retry_policy = options.mutable_retry_policy();
+      retry_policy->set_retry_on("5xx");
+      retry_policy->mutable_num_retries()->set_value(2);
+      retry_policy->mutable_per_try_timeout()->set_seconds(10);
+      options_any.PackFrom(options);
+    });
+  }
+
+  TestScopedRuntime scoped_runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterRetryPolicyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         [](const ::testing::TestParamInfo<Network::Address::IpVersion>& params) {
+                           return params.param == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
+                         });
+
+// Test basic cluster-level retry policy with 5xx retries.
+TEST_P(ClusterRetryPolicyIntegrationTest, BasicClusterLevelRetryPolicy) {
+  setupClusterRetryPolicy();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send request with first response being 503, second being 200.
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"}});
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+  codec_client_->sendData(encoder, 0, true);
+
+  waitForNextUpstreamRequest();
+
+  // Send 503 response to trigger retry.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // Wait for retry request.
+  waitForNextUpstreamRequest();
+
+  // Send successful response.
+  Http::TestResponseHeaderMapImpl response_headers_success{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers_success, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+
+  // Verify retry happened.
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+}
+
+// Route has NO policies, cluster has policies so cluster policies should be used.
+TEST_P(ClusterRetryPolicyIntegrationTest, PrecedenceClusterOnlyRetryPolicy) {
+  // Configure cluster-level retry policy.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* main_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto& options_any = (*main_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+    envoy::extensions::upstreams::http::v3::HttpProtocolOptions options;
+    options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+
+    auto* retry_policy = options.mutable_retry_policy();
+    retry_policy->set_retry_on("connect-failure");
+    retry_policy->mutable_num_retries()->set_value(1);
+    options_any.PackFrom(options);
+  });
+
+  // Do NOT configure route-level retry policy.
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+
+  // Verify cluster policy was used (counter exists shows retry policy was configured).
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+}
+
+// Route has policies, cluster has NO policies so route policies should be used.
+TEST_P(ClusterRetryPolicyIntegrationTest, PrecedenceRouteOnlyRetryPolicy) {
+  // Configure route-level retry policy.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* retry_policy = hcm.mutable_route_config()
+                                 ->mutable_virtual_hosts(0)
+                                 ->mutable_routes(0)
+                                 ->mutable_route()
+                                 ->mutable_retry_policy();
+        retry_policy->set_retry_on("gateway-error");
+        retry_policy->mutable_num_retries()->set_value(1);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+  codec_client_->sendData(encoder, 0, true);
+
+  waitForNextUpstreamRequest();
+
+  // Send 502 to trigger retry with gateway-error.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "502"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // Wait for retry.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+
+  // Verify route policy triggered retry.
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+}
+
+// Route has policies, cluster has policies so ONLY cluster policies should be used.
+TEST_P(ClusterRetryPolicyIntegrationTest, PrecedenceClusterOverridesRouteRetryPolicy) {
+  // Configure cluster-level retry policy for connect-failure only.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* main_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto& options_any = (*main_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+    envoy::extensions::upstreams::http::v3::HttpProtocolOptions options;
+    options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+
+    // Cluster policy: retry ONLY on reset.
+    auto* retry_policy = options.mutable_retry_policy();
+    retry_policy->set_retry_on("reset");
+    retry_policy->mutable_num_retries()->set_value(1);
+    options_any.PackFrom(options);
+  });
+
+  // Configure route-level retry policy for 5xx.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* retry_policy = hcm.mutable_route_config()
+                                 ->mutable_virtual_hosts(0)
+                                 ->mutable_routes(0)
+                                 ->mutable_route()
+                                 ->mutable_retry_policy();
+        // Route policy: retry on 5xx.
+        retry_policy->set_retry_on("5xx");
+        retry_policy->mutable_num_retries()->set_value(2);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+  codec_client_->sendData(encoder, 0, true);
+
+  waitForNextUpstreamRequest();
+
+  // Send 503 response. If route policy was used, this would trigger retry.
+  // But cluster policy (reset only) should override, so NO retry should happen.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+
+  // Verify: NO retry happened because cluster policy (reset) overrode route policy (5xx).
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+}
+
 } // namespace
 } // namespace Envoy

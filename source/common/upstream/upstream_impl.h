@@ -1010,6 +1010,11 @@ public:
     return shadow_policies_;
   }
 
+  const Router::RetryPolicy* retryPolicy() const override {
+    return http_protocol_options_ != nullptr ? http_protocol_options_->retry_policy_.get()
+                                             : nullptr;
+  }
+
   const Http::HashPolicy* hashPolicy() const override {
     return http_protocol_options_ != nullptr ? http_protocol_options_->hash_policy_.get() : nullptr;
   }

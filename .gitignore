@@ -128,3 +128,4 @@ mobile/*.doccarchive
 mobile/*.tulsiconf-user
 mobile/tulsi-workspace
 test/extensions/dynamic_modules/test_data/rust/Cargo.lock
+.devcontainer/Dockerfile

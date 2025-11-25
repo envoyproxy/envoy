@@ -38,6 +38,7 @@ jobs:
       bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
+      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths || '/opt/hostedtoolcache' }}
       request: ${{ inputs.request }}
       error-match: |
         ERROR
@@ -57,4 +58,7 @@ jobs:
         - target: msan
           rbe: true
         - target: tsan
+          diskspace-hack-paths: |
+            /opt/hostedtoolcache
+            /usr/local/.ghcup
           rbe: true
