@@ -79,10 +79,11 @@ private:
 
   FieldCheckResults
   matchResultStatusToFieldCheckResult(absl::StatusOr<Matcher::MatchResult>& match_result,
-                                      const std::string& field_mask) const;
+                                      absl::string_view field_mask) const;
 
   // Resolves the string name of an Enum value.
-  std::string resolveEnumName(const std::string& value_str, const Protobuf::Field* field) const;
+  absl::StatusOr<absl::string_view> resolveEnumName(absl::string_view value_str,
+                                                    const Protobuf::Field* field) const;
 
   // Constructs the field mask, handling translations for different data types.
   // Currently, it only handles enum data type. Support for protobuf maps and `Any` types will be

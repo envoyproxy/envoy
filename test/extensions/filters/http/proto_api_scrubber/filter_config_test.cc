@@ -1027,15 +1027,36 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetEnumName) {
   ASSERT_THAT(filter_config_or_status, IsOk());
   auto filter_config = filter_config_or_status.value();
 
-  // Case 1: Valid Lookup (Type and Value exist)
-  EXPECT_EQ(filter_config->getEnumName("test.TestEnum", 1), "ACTIVE");
-  EXPECT_EQ(filter_config->getEnumName("test.TestEnum", 0), "UNKNOWN");
+  {
+    // Case 1.1: Valid Lookup (Type and Value exist)
+    auto result = filter_config->getEnumName("test.TestEnum", 1);
+    ASSERT_THAT(result, IsOk());
+    EXPECT_EQ(result.value(), "ACTIVE");
+  }
 
-  // Case 2: Invalid Value (Type exists, Value does not)
-  EXPECT_EQ(filter_config->getEnumName("test.TestEnum", 999), "");
+  {
+    // Case 1.2: Valid Lookup (Type and Value exist)
+    auto result = filter_config->getEnumName("test.TestEnum", 0);
+    ASSERT_THAT(result, IsOk());
+    EXPECT_EQ(result.value(), "UNKNOWN");
+  }
 
-  // Case 3: Invalid Type Name (Type does not exist)
-  EXPECT_EQ(filter_config->getEnumName("test.NonExistentEnum", 1), "");
+  {
+    // Case 2: Invalid Value (Type exists, Value does not)
+    auto result = filter_config->getEnumName("test.TestEnum", 999);
+    EXPECT_THAT(result,
+                HasStatus(absl::StatusCode::kNotFound,
+                          HasSubstr("Enum value '999' not found in enum type 'test.TestEnum'")));
+  }
+
+  {
+    // Case 3: Invalid Type Name (Type does not exist)
+    auto result = filter_config->getEnumName("test.NonExistentEnum", 1);
+    EXPECT_THAT(
+        result,
+        HasStatus(absl::StatusCode::kNotFound,
+                  HasSubstr("Enum type 'test.NonExistentEnum' not found in descriptor pool")));
+  }
 }
 
 TEST_F(ProtoApiScrubberFilterConfigTest, GetTypeFinder) {

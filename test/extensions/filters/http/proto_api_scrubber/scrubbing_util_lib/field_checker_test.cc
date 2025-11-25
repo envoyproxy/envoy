@@ -33,8 +33,8 @@ public:
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
               (const std::string& method_name, const std::string& field_mask), (const, override));
 
-  MOCK_METHOD(std::string, getEnumName, (const std::string& enum_type_name, int enum_value),
-              (const, override));
+  MOCK_METHOD(absl::StatusOr<absl::string_view>, getEnumName,
+              (absl::string_view enum_type_name, int enum_value), (const, override));
 };
 
 namespace {
@@ -64,7 +64,9 @@ void setupMockEnumRule(MockProtoApiScrubberFilterConfig& mock_config, const std:
                        const std::string& field_path, const std::string& type_url, int enum_int,
                        const std::string& enum_name, bool should_remove) {
   auto type_name = std::string(Envoy::TypeUtil::typeUrlToDescriptorFullName(type_url));
-  ON_CALL(mock_config, getEnumName(type_name, enum_int)).WillByDefault(testing::Return(enum_name));
+
+  ON_CALL(mock_config, getEnumName(testing::_, enum_int))
+      .WillByDefault(testing::Return(absl::string_view(enum_name)));
 
   // Mock Matcher Lookup
   std::string full_mask = absl::StrCat(field_path, ".", enum_name);
@@ -547,6 +549,23 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
     EXPECT_EQ(field_checker.CheckField({"config", "status", "0"}, &field),
               FieldCheckResults::kInclude);
   }
+
+  {
+    // Scenario 4: Unknown Enum Value (Fallback)
+    // Input: Value 123
+    // Logic: getEnumName returns error.
+    // FieldChecker constructs mask "config.status.123".
+    // No matcher for that mask -> kInclude.
+    Protobuf::Field field;
+    field.set_name("status");
+    field.set_kind(Protobuf::Field::TYPE_ENUM);
+    field.set_type_url("type.googleapis.com/pkg.Status");
+
+    EXPECT_LOG_CONTAINS("warn", "Enum translation skipped", {
+      EXPECT_EQ(field_checker.CheckField({"config", "status", "123"}, &field),
+                FieldCheckResults::kInclude);
+    });
+  }
 }
 
 using ResponseFieldCheckerTest = FieldCheckerTest;
@@ -770,10 +789,12 @@ TEST_F(ResponseFieldCheckerTest, EnumType) {
     field.set_kind(Protobuf::Field::TYPE_ENUM);
     field.set_type_url("type.googleapis.com/pkg.State");
 
-    // We didn't mock rule for 1, so getEnumName returns default "",
+    // We didn't mock rule for 1, so getEnumName returns error,
     // fallback to "1", no matcher found -> Include.
-    EXPECT_EQ(field_checker.CheckField({"config", "state", "1"}, &field),
-              FieldCheckResults::kInclude);
+    EXPECT_LOG_CONTAINS("warn", "Enum translation skipped", {
+      EXPECT_EQ(field_checker.CheckField({"config", "state", "1"}, &field),
+                FieldCheckResults::kInclude);
+    });
   }
 }
 

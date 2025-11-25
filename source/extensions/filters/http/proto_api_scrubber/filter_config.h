@@ -115,7 +115,8 @@ public:
    * @return The string name of the enum value (e.g., "DEBUG_MODE").
    * Returns empty string if the type or value is not found.
    */
-  virtual std::string getEnumName(const std::string& enum_type_name, int enum_value) const;
+  virtual absl::StatusOr<absl::string_view> getEnumName(absl::string_view enum_type_name,
+                                                        int enum_value) const;
 
   // Returns a constant reference to the type finder which resolves type URL string to the
   // corresponding `Protobuf::Type*`.
