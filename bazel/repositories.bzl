@@ -172,6 +172,7 @@ def envoy_dependencies(skip_targets = []):
     _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
+    _com_github_huawei_uadk()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
@@ -397,6 +398,14 @@ def _com_github_unicode_org_icu():
 def _com_github_intel_ipp_crypto_crypto_mb():
     external_http_archive(
         name = "com_github_intel_ipp_crypto_crypto_mb",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_huawei_uadk():
+    external_http_archive(
+        name = "com_github_huawei_uadk",
+        patches = ["@envoy//bazel/foreign_cc:uadk.patch"],
+        patch_args = ["-p1"],
         build_file_content = BUILD_ALL_CONTENT,
     )
 

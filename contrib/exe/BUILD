@@ -9,6 +9,7 @@ load(
     "ARM64_SKIP_CONTRIB_TARGETS",
     "FIPS_LINUX_X86_SKIP_CONTRIB_TARGETS",
     "PPC_SKIP_CONTRIB_TARGETS",
+    "X86_SKIP_CONTRIB_TARGETS",
     "envoy_all_contrib_extensions",
 )
 
@@ -25,7 +26,7 @@ SELECTED_CONTRIB_EXTENSIONS = select({
     "//bazel:linux_aarch64": envoy_all_contrib_extensions(ARM64_SKIP_CONTRIB_TARGETS),
     "//bazel:linux_ppc": envoy_all_contrib_extensions(PPC_SKIP_CONTRIB_TARGETS),
     "//bazel:boringssl_fips_x86": envoy_all_contrib_extensions(FIPS_LINUX_X86_SKIP_CONTRIB_TARGETS),
-    "//conditions:default": envoy_all_contrib_extensions(),
+    "//conditions:default": envoy_all_contrib_extensions(X86_SKIP_CONTRIB_TARGETS),
 })
 
 envoy_cc_binary(
