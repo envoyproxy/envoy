@@ -24,7 +24,7 @@ std::string apikeysDescriptorPath() {
 const std::string kCreateApiKeyMethod = "/apikeys.ApiKeys/CreateApiKey";
 
 // CEL Matcher Config (Protobuf Text Format) which evaluates to TRUE.
-const std::string kCelAlwaysTrue = R"pb(
+constexpr absl::string_view kCelAlwaysTrue = R"pb(
   cel_expr_parsed {
     expr {
       id: 1
@@ -39,7 +39,7 @@ const std::string kCelAlwaysTrue = R"pb(
 )pb";
 
 // CEL Matcher Config (Protobuf Text Format) which evaluates to FALSE.
-const std::string kCelAlwaysFalse = R"pb(
+constexpr absl::string_view kCelAlwaysFalse = R"pb(
   cel_expr_parsed {
     expr {
       id: 1
@@ -69,7 +69,7 @@ public:
                               const std::string& method_name = "",
                               const std::string& field_to_scrub = "",
                               RestrictionType type = RestrictionType::Request,
-                              const std::string& cel_matcher_proto_text = kCelAlwaysTrue) {
+                              absl::string_view cel_matcher_proto_text = kCelAlwaysTrue) {
 
     std::string full_config_text;
     if (method_name.empty() || field_to_scrub.empty()) {
@@ -173,6 +173,12 @@ public:
     return codec_client_->makeRequestWithBody(request_headers, request_buf->toString());
   }
 };
+
+INSTANTIATE_TEST_SUITE_P(Protocols, ProtoApiScrubberIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             /*downstream_protocols=*/{Http::CodecType::HTTP2},
+                             /*upstream_protocols=*/{Http::CodecType::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 apikeys::CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb(
   parent: "projects/123"
@@ -367,12 +373,6 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsInvalidPathFormat) {
   ASSERT_TRUE(grpc_status != nullptr);
   EXPECT_EQ("3", grpc_status->value().getStringView()); // 3 = Invalid Argument
 }
-
-INSTANTIATE_TEST_SUITE_P(Protocols, ProtoApiScrubberIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             /*downstream_protocols=*/{Http::CodecType::HTTP2},
-                             /*upstream_protocols=*/{Http::CodecType::HTTP2})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace
 } // namespace ProtoApiScrubber
