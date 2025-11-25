@@ -74,8 +74,9 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
   Server::MockOptions options;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
-  auto monitor = factory->createResourceMonitor(config, context);
-  EXPECT_NE(monitor, nullptr);
+
+  // Factory should throw an exception when no cgroup files exist (neither v1 nor v2)
+  EXPECT_THROW(factory->createResourceMonitor(config, context), EnvoyException);
 }
 
 TEST(CpuUtilizationMonitorFactoryTest, HostMonitorFunctional) {
@@ -114,14 +115,10 @@ TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   Server::MockOptions options;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
-  auto monitor = factory->createResourceMonitor(config, context);
-  ASSERT_NE(monitor, nullptr);
 
-  // Exercise the monitor by calling updateResourceUsage
-  TestResourcePressureCallbacks callbacks;
-  monitor->updateResourceUsage(callbacks);
-  // Either success or error is acceptable depending on system state
-  EXPECT_TRUE(callbacks.hasSuccess() || callbacks.hasError());
+  // Factory should throw an exception when no cgroup files exist (neither v1 nor v2)
+  // This is the expected behavior - the factory performs runtime detection
+  EXPECT_THROW(factory->createResourceMonitor(config, context), EnvoyException);
 }
 
 TEST(CpuUtilizationMonitorFactoryTest, FactoryRegistered) {

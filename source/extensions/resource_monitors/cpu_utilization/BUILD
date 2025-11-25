@@ -29,13 +29,18 @@ envoy_cc_library(
     name = "linux_cpu_stats_reader",
     srcs = ["linux_cpu_stats_reader.cc"],
     hdrs = [
+        "cpu_paths.h",
         "cpu_stats_reader.h",
         "cpu_utilization_monitor.h",
         "linux_cpu_stats_reader.h",
     ],
     tags = ["skip_on_windows"],
     deps = [
+        "//envoy/common:exception_lib",
+        "//envoy/filesystem:filesystem_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
         "@com_google_absl//absl/strings",
         "@envoy_api//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg_cc_proto",
     ],
