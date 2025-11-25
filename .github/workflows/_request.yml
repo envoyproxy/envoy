@@ -30,6 +30,7 @@ on:
           WORKSPACE
           bazel/repository_locations.bzl
           api/bazel/repository_locations.bzl
+          .bazelversion
           .github/workflows/_request_cache_bazel.yml
       config-file:
         type: string
