@@ -221,6 +221,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
@@ -232,6 +233,7 @@ run:
     - .github/config.yml
     - api/**/*
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - envoy/**/*
     - mobile/.bazelrc
@@ -247,6 +249,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
@@ -322,6 +325,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
