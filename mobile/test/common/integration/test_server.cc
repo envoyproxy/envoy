@@ -349,11 +349,10 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
     tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
   }
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-      tls_context, factory_context, false);
+      tls_context, factory_context, {}, false);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-      std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
-      std::vector<std::string>{});
+      std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
 }
 
 } // namespace Envoy

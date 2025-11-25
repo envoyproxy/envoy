@@ -391,6 +391,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Dynamic Modules
 /*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
 /*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry
+/*/extensions/certificate_selectors/on_demand @kyessenov @tonya11en
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov
