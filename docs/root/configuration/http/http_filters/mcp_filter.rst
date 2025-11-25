@@ -12,13 +12,14 @@ The MCP HTTP filter enables native Model Context Protocol support within Envoy.
 
    The MCP filter is actively under development.
 
-This filter enables Envoy to act as an intelligent MCP gateway, facilitating two primary patterns:
+This filter enables Envoy to act as an intelligent MCP gateway, facilitating three primary patterns:
 
-1.  **Identity-Aware Policy Enforcement:** Extracting MCP attributes to enforce fine-grained access control via RBAC or external authorization.
-2.  **Multiplexing and Aggregation:** Acting as a unified endpoint that aggregates tools and resources from multiple backend services (Pending).
+1.  **MCP Policy Enforcement:** Extracting MCP attributes to enforce fine-grained access control via RBAC or external authorization.
+2.  **MCP Observability:** Extracting MCP attributes to populate dynamic metadata, which subsequent access logs or tracers can use.
+3.  **MCP Multiplexing and Aggregation:** Acting as a unified endpoint that aggregates tools and resources from multiple backend services (Pending).
 
-Identity and Policy Enforcement
--------------------------------
+MCP Policy Enforcement
+----------------------
 
 A common usage of the MCP filter is to enforce policies based on MCP payload attributes. The filter parses MCP JSON_RPC messages and populates
 the dynamic metadata, which subsequent filters in the chain can use for decision-making.
