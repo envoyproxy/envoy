@@ -157,7 +157,10 @@ public:
           ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
               CookieConfig_SameSite_DISABLED,
       int csrf_token_expires_in = 0, int code_verifier_token_expires_in = 0,
-      bool disable_token_encryption = false, const std::string& cookies_path = "") {
+      bool disable_token_encryption = false, const std::string& bearer_token_path = "",
+      const std::string& hmac_path = "", const std::string& expires_path = "",
+      const std::string& id_token_path = "", const std::string& refresh_token_path = "",
+      const std::string& nonce_path = "", const std::string& code_verifier_path = "") {
 
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
@@ -219,38 +222,54 @@ public:
     // Initialize CookieConfigs
     auto* cookie_configs = p.mutable_cookie_configs();
 
-    // Set cookie path if provided.
-    if (!cookies_path.empty()) {
-      cookie_configs->set_path(cookies_path);
-    }
-
     // Bearer Token Cookie Config
     auto* bearer_config = cookie_configs->mutable_bearer_token_cookie_config();
     bearer_config->set_same_site(bearer_samesite);
+    if (!bearer_token_path.empty()) {
+      bearer_config->set_path(bearer_token_path);
+    }
 
     // HMAC Cookie Config, Set value to disabled by default.
     auto* hmac_config = cookie_configs->mutable_oauth_hmac_cookie_config();
     hmac_config->set_same_site(hmac_samesite);
+    if (!hmac_path.empty()) {
+      hmac_config->set_path(hmac_path);
+    }
 
     // Set value to disabled by default.
     auto* expires_config = cookie_configs->mutable_oauth_expires_cookie_config();
     expires_config->set_same_site(expires_samesite);
+    if (!expires_path.empty()) {
+      expires_config->set_path(expires_path);
+    }
 
     // Set value to disabled by default.
     auto* id_token_config = cookie_configs->mutable_id_token_cookie_config();
     id_token_config->set_same_site(id_token_samesite);
+    if (!id_token_path.empty()) {
+      id_token_config->set_path(id_token_path);
+    }
 
     // Set value to disabled by default.
     auto* refresh_token_config = cookie_configs->mutable_refresh_token_cookie_config();
     refresh_token_config->set_same_site(refresh_token_samesite);
+    if (!refresh_token_path.empty()) {
+      refresh_token_config->set_path(refresh_token_path);
+    }
 
     // Set value to disabled by default.
     auto* oauth_nonce_config = cookie_configs->mutable_oauth_nonce_cookie_config();
     oauth_nonce_config->set_same_site(nonce_samesite);
+    if (!nonce_path.empty()) {
+      oauth_nonce_config->set_path(nonce_path);
+    }
 
     // Set value to disabled by default.
     auto* code_verifier_config = cookie_configs->mutable_code_verifier_cookie_config();
     code_verifier_config->set_same_site(code_verifier_samesite);
+    if (!code_verifier_path.empty()) {
+      code_verifier_config->set_path(code_verifier_path);
+    }
 
     p.set_disable_token_encryption(disable_token_encryption);
 
@@ -3899,7 +3918,7 @@ TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
 // Verify that cookies are set with the correct path attribute when custom cookie
 // paths are configured.
 TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
-  // Initialize with custom cookie path.
+  // Initialize with custom cookie paths. Set all cookies to /app1 path.
   init(getConfig(true, true,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY,
@@ -3918,7 +3937,7 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
                      CookieConfig_SameSite_DISABLED,
                  ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
                      CookieConfig_SameSite_DISABLED,
-                 0, 0, false, "/app1"));
+                 0, 0, false, "/app1", "/app1", "/app1", "/app1", "/app1", "/app1", "/app1"));
 
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
@@ -3975,9 +3994,9 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
   EXPECT_TRUE(found_code_verifier_cookie) << "CodeVerifier cookie not found in response headers.";
 }
 
-// Test OAuth filter to verify that OAuth cookies are set with custom path.
+// Test OAuth filter to verify that OAuth cookies are set with custom paths.
 TEST_F(OAuth2Test, OAuthTestFullFlowWithCustomCookiePaths) {
-  // Initialize with custom cookie path.
+  // Initialize with custom cookie paths. Set all cookies to /api/v1 path.
   init(getConfig(true, true,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY,
@@ -3996,7 +4015,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithCustomCookiePaths) {
                      CookieConfig_SameSite_DISABLED,
                  ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
                      CookieConfig_SameSite_DISABLED,
-                 0, 0, false, "/api/v1"));
+                 0, 0, false, "/api/v1", "/api/v1", "/api/v1", "/api/v1", "/api/v1", "/api/v1",
+                 "/api/v1"));
 
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
@@ -4086,10 +4106,10 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithCustomCookiePaths) {
   EXPECT_TRUE(found_expires) << "OauthExpires cookie not found.";
 }
 
-// Test the OAuth filter signout with custom cookie path and verify that
+// Test the OAuth filter signout with custom cookie paths and verify that
 // cookie deletion uses the correct path attribute.
 TEST_F(OAuth2Test, OAuthTestSignoutWithCustomCookiePaths) {
-  // Initialize with custom cookie path.
+  // Initialize with custom cookie paths. Set all cookies to /secure path.
   init(getConfig(true, true,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY,
@@ -4108,7 +4128,8 @@ TEST_F(OAuth2Test, OAuthTestSignoutWithCustomCookiePaths) {
                      CookieConfig_SameSite_DISABLED,
                  ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
                      CookieConfig_SameSite_DISABLED,
-                 0, 0, false, "/secure"));
+                 0, 0, false, "/secure", "/secure", "/secure", "/secure", "/secure", "/secure",
+                 "/secure"));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_signout"},
@@ -4200,6 +4221,95 @@ TEST_F(OAuth2Test, OAuthTestDefaultCookiePath) {
     EXPECT_NE(cookie_str.find(";path=/;"), std::string::npos)
         << "Cookie should have default path=/, got: " << cookie_str;
   }
+}
+
+// Test that CSRF/nonce and code verifier cookies can have different paths from session cookies.
+// This is the key use case: CSRF cookie might be scoped to the callback URL path while
+// session cookies are scoped to the application path.
+TEST_F(OAuth2Test, OAuthTestDifferentPathsForCsrfAndSessionCookies) {
+  // Initialize with CSRF/nonce and code verifier cookies on /auth/callback path,
+  // while session cookies (bearer, HMAC, expires, id_token, refresh_token) are on /app path.
+  init(getConfig(true, true,
+                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, false, false, false,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 0, 0, false,
+                 "/app",           // bearer_token_path
+                 "/app",           // hmac_path
+                 "/app",           // expires_path
+                 "/app",           // id_token_path
+                 "/app",           // refresh_token_path
+                 "/auth/callback", // nonce_path (CSRF cookie)
+                 "/auth/callback"  // code_verifier_path
+                 ));
+
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/test"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  // Explicitly fail the validation.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
+
+  // Catch the redirect to the OAuth server and verify the cookie paths.
+  Http::TestResponseHeaderMapImpl response_headers;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
+        response_headers = Http::TestResponseHeaderMapImpl(headers);
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+
+  // Verify that the CSRF token cookie (OauthNonce) and code verifier have /auth/callback path.
+  std::vector<std::string> set_cookie_headers_str;
+  response_headers.iterate(
+      [&set_cookie_headers_str](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+        if (header.key().getStringView() == Http::Headers::get().SetCookie.get()) {
+          set_cookie_headers_str.push_back(std::string(header.value().getStringView()));
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      });
+
+  bool found_nonce_cookie = false;
+  bool found_code_verifier_cookie = false;
+
+  for (const auto& cookie_str : set_cookie_headers_str) {
+    if (cookie_str.find("OauthNonce=") != std::string::npos) {
+      EXPECT_NE(cookie_str.find(";path=/auth/callback;"), std::string::npos)
+          << "OauthNonce cookie should have path=/auth/callback, got: " << cookie_str;
+      found_nonce_cookie = true;
+    }
+    if (cookie_str.find("CodeVerifier=") != std::string::npos) {
+      EXPECT_NE(cookie_str.find(";path=/auth/callback;"), std::string::npos)
+          << "CodeVerifier cookie should have path=/auth/callback, got: " << cookie_str;
+      found_code_verifier_cookie = true;
+    }
+  }
+
+  EXPECT_TRUE(found_nonce_cookie) << "OauthNonce cookie not found in response headers.";
+  EXPECT_TRUE(found_code_verifier_cookie) << "CodeVerifier cookie not found in response headers.";
 }
 
 } // namespace Oauth2

@@ -37,9 +37,19 @@ message CookieConfig {
 
   // The value used for the SameSite cookie attribute.
   SameSite same_site = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // The path attribute for the cookie.
+  //
+  // This controls the scope of the cookie and is useful for path-based routing scenarios
+  // where different logical boundaries or applications may operate with different OAuth2 clients.
+  // The CSRF cookie (nonce cookie) can be configured with a different path than session cookies
+  // to support flows where the callback URL is on a different path or subdomain.
+  //
+  // If not specified, defaults to ``/``.
+  string path = 2;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 8]
 message CookieConfigs {
   // Configuration for the bearer token cookie.
   CookieConfig bearer_token_cookie_config = 1;
@@ -61,15 +71,6 @@ message CookieConfigs {
 
   // Configuration for the code verifier cookie.
   CookieConfig code_verifier_cookie_config = 7;
-
-  // The path attribute for all OAuth2 cookies. All cookies will use this path value to ensure
-  // they work together as a cohesive authentication session.
-  //
-  // This is useful for path-based routing scenarios where multiple OAuth2 filter instances
-  // operate on different path prefixes with different OAuth2 clients to prevent cookie collisions.
-  //
-  // If not specified, defaults to ``/``.
-  string path = 8;
 }
 
 // [#next-free-field: 6]
