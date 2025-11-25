@@ -81,6 +81,9 @@ The following lists the filter state object keys used by the Envoy extensions:
   <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>` override on a per-route basis.
   Accepts a number string as a constructor.
 
+``envoy.network.network_namespace``
+  Contains the value of the downstream connection's Linux network namespace if it differs from the default.
+
 Filter state object fields
 --------------------------
 

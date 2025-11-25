@@ -2265,9 +2265,11 @@ TEST_F(HostImplTest, HealthPipeAddress) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
   config.set_port_value(8000);
-  EXPECT_EQ(HostDescriptionImpl::create(
-                info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr, nullptr,
-                std::make_shared<const envoy::config::core::v3::Locality>(), config, 1)
+  EXPECT_EQ(HostDescriptionImpl::create(info, "", *Network::Utility::resolveUrl("unix://foo"),
+                                        nullptr, nullptr,
+                                        std::make_shared<const envoy::config::core::v3::Locality>(
+                                            envoy::config::core::v3::Locality().default_instance()),
+                                        config, 1)
                 .status()
                 .message(),
             "Invalid host configuration: non-zero port for non-IP address");
@@ -2282,7 +2284,8 @@ TEST_F(HostImplTest, NetnsInvalid) {
       Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:9999", true, "/netns/filepath");
   EXPECT_EQ(
       HostDescriptionImpl::create(info, "", dest_addr, nullptr, nullptr,
-                                  std::make_shared<const envoy::config::core::v3::Locality>(),
+                                  std::make_shared<const envoy::config::core::v3::Locality>(
+                                      envoy::config::core::v3::Locality().default_instance()),
                                   config, 1)
           .status()
           .message(),
@@ -2303,7 +2306,9 @@ TEST_F(HostImplTest, HealthcheckHostname) {
   config.set_hostname("foo");
   std::unique_ptr<HostDescriptionImpl> descr = *HostDescriptionImpl::create(
       info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr, nullptr,
-      std::make_shared<const envoy::config::core::v3::Locality>(), config, 1);
+      std::make_shared<const envoy::config::core::v3::Locality>(
+          envoy::config::core::v3::Locality().default_instance()),
+      config, 1);
   EXPECT_EQ("foo", descr->hostnameForHealthChecks());
 }
 
@@ -3516,7 +3521,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                .address_->asString());
   }
 
@@ -3537,13 +3542,13 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                .address_->asString());
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("[2001::1]:0", cluster->info()
                                  ->getUpstreamLocalAddressSelector()
-                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                  .address_->asString());
   }
 
@@ -3561,7 +3566,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                .address_->asString());
   }
 
@@ -3649,7 +3654,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         *Network::Address::PipeInstance::create("/test");
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                .address_->asString());
   }
 
@@ -3665,7 +3670,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3727,7 +3732,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3746,7 +3751,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                                   ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3795,13 +3800,13 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                .address_->asString());
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("[2001::1]:0", cluster->info()
                                  ->getUpstreamLocalAddressSelector()
-                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                  .address_->asString());
   }
 
@@ -3818,7 +3823,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                .address_->asString());
   }
 
@@ -3880,7 +3885,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         *Network::Address::PipeInstance::create("/test");
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                .address_->asString());
   }
 
@@ -3917,7 +3922,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
-                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   ->getUpstreamLocalAddress(remote_address, nullptr, {})
                                    .address_->ip()
                                    ->addressAsString());
   }
@@ -3978,17 +3983,17 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
       std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
   EXPECT_EQ("[2001::1]:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
-                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr, {})
                                .address_->asString());
   Network::Address::InstanceConstSharedPtr remote_address =
       std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
   EXPECT_EQ("1.2.3.6:0", cluster->info()
                              ->getUpstreamLocalAddressSelector()
-                             ->getUpstreamLocalAddress(remote_address, nullptr)
+                             ->getUpstreamLocalAddress(remote_address, nullptr, {})
                              .address_->asString());
   EXPECT_EQ("1.2.3.5:0", cluster->info()
                              ->getUpstreamLocalAddressSelector()
-                             ->getUpstreamLocalAddress(remote_address, nullptr)
+                             ->getUpstreamLocalAddress(remote_address, nullptr, {})
                              .address_->asString());
 }
 
@@ -6216,6 +6221,229 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
   EXPECT_EQ(2UL, hosts_per_locality.get()[1].size());
   EXPECT_EQ(zone_b, hosts_per_locality.get()[1][0]->locality());
   EXPECT_EQ(zone_b, hosts_per_locality.get()[1][1]->locality());
+}
+
+// Test cluster-level retry policy with basic retry_on configuration.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyBasic) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        retry_policy:
+          retry_on: "5xx,reset,connect-failure"
+          num_retries: 3
+          per_try_timeout: 2s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(3, retry_policy->numRetries());
+  EXPECT_EQ(std::chrono::milliseconds(2000), retry_policy->perTryTimeout());
+}
+
+// Test cluster-level retry policy with retry back-off configuration.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithBackoff) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        retry_policy:
+          retry_on: "gateway-error,connect-failure,refused-stream"
+          num_retries: 5
+          retry_back_off:
+            base_interval: 0.1s
+            max_interval: 1s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(5, retry_policy->numRetries());
+}
+
+// Test cluster-level retry policy with retriable status codes.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithRetriableStatusCodes) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        retry_policy:
+          retry_on: "retriable-status-codes"
+          num_retries: 2
+          retriable_status_codes: [503, 429]
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(2, retry_policy->numRetries());
+}
+
+// Test cluster-level retry policy with per try idle timeout.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithPerTryIdleTimeout) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        retry_policy:
+          retry_on: "5xx"
+          num_retries: 3
+          per_try_timeout: 5s
+          per_try_idle_timeout: 1s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(3, retry_policy->numRetries());
+  EXPECT_EQ(std::chrono::milliseconds(5000), retry_policy->perTryTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(1000), retry_policy->perTryIdleTimeout());
+}
+
+// Test cluster with no retry policy.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterNoRetryPolicy) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  EXPECT_EQ(nullptr, retry_policy);
+}
+
+// Test cluster-level retry policy with rate limited retry back-off.
+TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithRateLimitedBackoff) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        retry_policy:
+          retry_on: "retriable-status-codes"
+          num_retries: 3
+          retriable_status_codes: [429]
+          rate_limited_retry_back_off:
+            reset_headers:
+              - name: "Retry-After"
+                format: SECONDS
+            max_interval: 300s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const auto* retry_policy = cluster->info()->retryPolicy();
+  ASSERT_NE(nullptr, retry_policy);
+  EXPECT_EQ(3, retry_policy->numRetries());
 }
 
 } // namespace

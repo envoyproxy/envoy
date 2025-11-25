@@ -94,6 +94,8 @@ GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
 
 const Protobuf::MethodDescriptor*
 GrpcJsonReverseTranscoderConfig::GetMethodDescriptor(absl::string_view path) const {
+  // HCM guarantees the `:path` header is non-empty here.
+  ASSERT(!path.empty());
   std::string grpc_method = absl::StrReplaceAll(path.substr(1), {{"/", "."}});
   return descriptor_pool_.FindMethodByName(grpc_method);
 }

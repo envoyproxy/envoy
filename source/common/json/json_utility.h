@@ -16,6 +16,13 @@ public:
    * @param dest JSON string.
    */
   static void appendValueToString(const Protobuf::Value& value, std::string& dest);
+
+  /**
+   * Convert a Protobuf::Struct to a JSON string.
+   * @param struct_value message of type type.googleapis.com/google.protobuf.Struct
+   * @param dest JSON string.
+   */
+  static void appendStructToString(const Protobuf::Struct& struct_value, std::string& dest);
 };
 
 } // namespace Json

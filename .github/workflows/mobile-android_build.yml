@@ -49,9 +49,14 @@ jobs:
     with:
       args: >-
         build
-        --config=mobile-remote-release-clang-android
+        --config=ci
+        --config=mobile-rbe
+        --config=mobile-android-release
         //:android_dist
       container: ${{ needs.load.outputs.build-image && fromJSON(needs.load.outputs.build-image).mobile || '' }}
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       request: ${{ needs.load.outputs.request }}
       timeout-minutes: 90
       target: build
@@ -69,21 +74,26 @@ jobs:
     with:
       command: ./bazelw
       container-command:
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       docker-ipv6: false
       # Return to using:
       #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       args: >-
         build
-        --config=mobile-remote-release-clang-android
+        --config=ci
+        --config=mobile-rbe
+        --config=mobile-android-release
         //examples/kotlin/hello_world:hello_envoy_kt
       request: ${{ needs.load.outputs.request }}
       target: kotlin-hello-world
       runs-on: ubuntu-22.04
       steps-pre: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.3.26
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.3.30
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.26
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.30
           with:
             apk: bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
             app: io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
@@ -106,11 +116,14 @@ jobs:
       command: ./bazelw
       container-command:
       args: ${{ matrix.args }}
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       request: ${{ needs.load.outputs.request }}
       target: ${{ matrix.target }}
       runs-on: ubuntu-22.04
       steps-pre: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.3.26
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.3.30
       steps-post: ${{ matrix.steps-post }}
       timeout-minutes: 50
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
@@ -121,7 +134,7 @@ jobs:
         include:
         - name: java-hello-world
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.26
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.30
               with:
                 apk: bazel-bin/examples/java/hello_world/hello_envoy.apk
                 app: io.envoyproxy.envoymobile.helloenvoy/.MainActivity
@@ -129,7 +142,9 @@ jobs:
           target: java-hello-world
           args: >-
             build
-            --config=mobile-remote-release-clang-android
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-android-release
             //examples/java/hello_world:hello_envoy
         - name: kotlin-baseline-app
           # Return to using:
@@ -137,10 +152,12 @@ jobs:
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build
-            --config=mobile-remote-release-clang-android
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-android-release
             //test/kotlin/apps/baseline:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.26
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.30
               with:
                 apk: bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
@@ -152,10 +169,12 @@ jobs:
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build
-            --config=mobile-remote-release-clang-android
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-android-release
             //test/kotlin/apps/experimental:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.26
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.30
               with:
                 apk: bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity

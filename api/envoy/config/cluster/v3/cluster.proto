@@ -22,6 +22,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/core/v3/collection_entry.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
@@ -45,7 +46,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 59]
+// [#next-free-field: 60]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -808,6 +809,41 @@ message Cluster {
   //
   // [#comment:TODO(incfly): add a detailed architecture doc on intended usage.]
   repeated TransportSocketMatch transport_socket_matches = 43;
+
+  // Optional matcher that selects a transport socket from
+  // :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
+  //
+  // This matcher uses the generic xDS matcher framework to select a named transport socket
+  // based on various inputs available at transport socket selection time.
+  //
+  // Supported matching inputs:
+  //
+  // * ``endpoint_metadata``: Extract values from the selected endpoint's metadata.
+  // * ``locality_metadata``: Extract values from the endpoint's locality metadata.
+  // * ``transport_socket_filter_state``: Extract values from filter state that was explicitly shared from
+  //   downstream to upstream via ``TransportSocketOptions``. This enables flexible
+  //   downstream-connection-based matching, such as:
+  //
+  //   - Network namespace matching.
+  //   - Custom connection attributes.
+  //   - Any data explicitly passed via filter state.
+  //
+  // .. note::
+  //   Filter state sharing follows the same pattern as tunneling in Envoy. Filters must explicitly
+  //   share data by setting filter state with the appropriate sharing mode. The filter state is
+  //   then accessible via the ``transport_socket_filter_state`` input during transport socket selection.
+  //
+  // If this field is set, it takes precedence over legacy metadata-based selection
+  // performed by :ref:`transport_socket_matches
+  // <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` alone.
+  // If the matcher does not yield a match, Envoy uses the default transport socket
+  // configured for the cluster.
+  //
+  // When using this field, each entry in
+  // :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`
+  // must have a unique ``name``. The matcher outcome is expected to reference one of
+  // these names.
+  xds.type.matcher.v3.Matcher transport_socket_matcher = 59;
 
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting

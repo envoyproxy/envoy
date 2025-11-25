@@ -273,6 +273,14 @@ public:
     return untyped_receiving_namespaces_;
   }
 
+  const std::vector<std::string>& untypedClusterMetadataForwardingNamespaces() const {
+    return untyped_cluster_metadata_forwarding_namespaces_;
+  }
+
+  const std::vector<std::string>& typedClusterMetadataForwardingNamespaces() const {
+    return typed_cluster_metadata_forwarding_namespaces_;
+  }
+
   const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
   allowedOverrideModes() const {
     return allowed_override_modes_;
@@ -347,6 +355,8 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const std::vector<std::string> untyped_receiving_namespaces_;
+  const std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_;
+  const std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_;
   const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       allowed_override_modes_;
   const ExpressionManager expression_manager_;
@@ -397,6 +407,14 @@ public:
   const absl::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
+  const absl::optional<const std::vector<std::string>>&
+  untypedClusterMetadataForwardingNamespaces() const {
+    return untyped_cluster_metadata_forwarding_namespaces_;
+  }
+  const absl::optional<const std::vector<std::string>>&
+  typedClusterMetadataForwardingNamespaces() const {
+    return typed_cluster_metadata_forwarding_namespaces_;
+  }
   const absl::optional<bool>& failureModeAllow() const { return failure_mode_allow_; }
 
   bool hasProcessingRequestModifierConfig() const {
@@ -420,6 +438,10 @@ private:
   const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
+  const absl::optional<const std::vector<std::string>>
+      untyped_cluster_metadata_forwarding_namespaces_;
+  const absl::optional<const std::vector<std::string>>
+      typed_cluster_metadata_forwarding_namespaces_;
   const absl::optional<bool> failure_mode_allow_;
 
   const std::function<std::unique_ptr<ProcessingRequestModifier>()>
@@ -450,11 +472,15 @@ public:
         decoding_state_(*this, config->processingMode(),
                         config->untypedForwardingMetadataNamespaces(),
                         config->typedForwardingMetadataNamespaces(),
-                        config->untypedReceivingMetadataNamespaces()),
+                        config->untypedReceivingMetadataNamespaces(),
+                        config->untypedClusterMetadataForwardingNamespaces(),
+                        config->typedClusterMetadataForwardingNamespaces()),
         encoding_state_(*this, config->processingMode(),
                         config->untypedForwardingMetadataNamespaces(),
                         config->typedForwardingMetadataNamespaces(),
-                        config->untypedReceivingMetadataNamespaces()),
+                        config->untypedReceivingMetadataNamespaces(),
+                        config->untypedClusterMetadataForwardingNamespaces(),
+                        config->typedClusterMetadataForwardingNamespaces()),
         processing_request_modifier_(config->createProcessingRequestModifier()),
         on_processing_response_(config->createOnProcessingResponse()),
         failure_mode_allow_(config->failureModeAllow()) {}
@@ -589,6 +615,15 @@ private:
       Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
       Server::Configuration::CommonFactoryContext& context);
 
+  // Gracefully close the gRPC stream based on configuration.
+  void closeStreamMaybeGraceful();
+
+  // Closing the gRPC stream if the last ProcessingResponse is received.
+  // This stream closing optimization only applies to STREAMED or FULL_DUPLEX_STREAMED body modes.
+  // For other body modes like BUFFERED or BUFFERED_PARTIAL, it is ignored.
+  void closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
+                                         const bool is_last_body_resp);
+
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
   const ExtProcFilterStats& stats_;
@@ -603,6 +638,8 @@ private:
   std::vector<std::string> untyped_forwarding_namespaces_{};
   std::vector<std::string> typed_forwarding_namespaces_{};
   std::vector<std::string> untyped_receiving_namespaces_{};
+  std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_{};
+  std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_{};
   Http::StreamFilterCallbacks* filter_callbacks_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
 

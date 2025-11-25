@@ -371,7 +371,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
   proto_config_.set_observability_mode(true);
 
   ConfigOptions config_option = {};
-  config_option.downstream_filter = false;
+  config_option.filter_setup = ConfigOptions::FilterSetup::kNone;
 
   initializeConfig(config_option);
   // Add ext_proc as upstream filter.
@@ -444,7 +444,7 @@ TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetHeadersUpstreamObservabilityMod
 
   ConfigOptions config_option = {};
   config_option.add_logging_filter = true;
-  config_option.downstream_filter = false;
+  config_option.filter_setup = ConfigOptions::FilterSetup::kNone;
 
   initializeConfig(config_option);
   // Add ext_proc as upstream filter.

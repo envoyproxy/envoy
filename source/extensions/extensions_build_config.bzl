@@ -6,10 +6,12 @@ EXTENSIONS = {
 
     "envoy.access_loggers.file":                        "//source/extensions/access_loggers/file:config",
     "envoy.access_loggers.extension_filters.cel":       "//source/extensions/access_loggers/filters/cel:config",
+    "envoy.access_loggers.extension_filters.process_ratelimit":       "//source/extensions/access_loggers/filters/process_ratelimit:config",
     "envoy.access_loggers.fluentd"  :                   "//source/extensions/access_loggers/fluentd:config",
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
     "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
     "envoy.access_loggers.open_telemetry":              "//source/extensions/access_loggers/open_telemetry:config",
+    "envoy.access_loggers.stats":                       "//source/extensions/access_loggers/stats:config",
     "envoy.access_loggers.stdout":                      "//source/extensions/access_loggers/stream:config",
     "envoy.access_loggers.stderr":                      "//source/extensions/access_loggers/stream:config",
     "envoy.access_loggers.wasm":                        "//source/extensions/access_loggers/wasm:config",
@@ -125,10 +127,18 @@ EXTENSIONS = {
     "envoy.matching.inputs.dynamic_metadata":           "//source/extensions/matching/http/metadata_input:metadata_input_lib",
 
     #
+    # Transport Socket Matching Inputs
+    #
+    "envoy.matching.inputs.endpoint_metadata":     "//source/extensions/matching/common_inputs/transport_socket:config",
+    "envoy.matching.inputs.locality_metadata":     "//source/extensions/matching/common_inputs/transport_socket:config",
+    "envoy.matching.inputs.transport_socket_filter_state": "//source/extensions/matching/common_inputs/transport_socket:config",
+
+    #
     # Matching actions
     #
 
     "envoy.matching.actions.format_string":             "//source/extensions/matching/actions/format_string:config",
+    "envoy.matching.action.transport_socket.name":      "//source/extensions/matching/common_inputs/transport_socket:config",
 
     #
     # StringMatchers
@@ -200,6 +210,7 @@ EXTENSIONS = {
     "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
     "envoy.filters.http.stateful_session":              "//source/extensions/filters/http/stateful_session:config",
     "envoy.filters.http.header_mutation":               "//source/extensions/filters/http/header_mutation:config",
+    "envoy.filters.http.transform":                     "//source/extensions/filters/http/transform:config",
 
     #
     # Listener filters

@@ -8545,6 +8545,8 @@ TEST_P(ListenerManagerImplTest, CustomSocketInterfaceFailureIsHandledGracefully)
   // Create a failing custom socket interface
   class FailingCustomSocketInterface : public TestCustomSocketInterface {
   public:
+    // Don't hide the other overload.
+    using TestCustomSocketInterface::socket;
     Network::IoHandlePtr socket(Network::Socket::Type socket_type,
                                 const Network::Address::InstanceConstSharedPtr addr,
                                 const Network::SocketCreationOptions& options) const override {

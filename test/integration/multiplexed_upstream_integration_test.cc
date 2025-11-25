@@ -1008,7 +1008,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) 
 
   {
     // Lock up fake upstream so that it won't process handshake.
-    absl::MutexLock l(&fake_upstreams_[0]->lock());
+    absl::MutexLock l(fake_upstreams_[0]->lock());
     auto response2 = codec_client_->makeHeaderOnlyRequest(
         Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                        {":path", "/test/long/url"},
@@ -1061,7 +1061,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
   IntegrationStreamDecoderPtr response4;
   {
     // Lock up fake upstream so that it won't process handshake.
-    absl::MutexLock l(&fake_upstreams_[0]->lock());
+    absl::MutexLock l(fake_upstreams_[0]->lock());
     response2 = codec_client_->makeHeaderOnlyRequest(
         Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                        {":path", "/test/long/url"},

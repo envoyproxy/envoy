@@ -1,6 +1,7 @@
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_cc_test",
     "envoy_cc_test_library",
 )
 load("@envoy//bazel:envoy_select.bzl", "envoy_select_enable_http3")
@@ -85,6 +86,22 @@ def envoy_quic_cc_test_library(
         name = name,
         srcs = envoy_select_enable_http3(srcs, "@envoy"),
         hdrs = envoy_select_enable_http3(hdrs, "@envoy"),
+        copts = quiche_copts,
+        repository = "@envoy",
+        tags = tags,
+        external_deps = external_deps,
+        deps = envoy_select_enable_http3(deps, "@envoy"),
+    )
+
+def envoy_quic_cc_test(
+        name,
+        srcs = [],
+        tags = [],
+        external_deps = [],
+        deps = []):
+    envoy_cc_test(
+        name = name,
+        srcs = envoy_select_enable_http3(srcs, "@envoy"),
         copts = quiche_copts,
         repository = "@envoy",
         tags = tags,

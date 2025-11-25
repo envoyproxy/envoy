@@ -1,9 +1,9 @@
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
-load("@bazel_features//:deps.bzl", "bazel_features_deps")
 load("@com_google_protobuf//bazel/private:proto_bazel_features.bzl", "proto_bazel_features")
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 load("@envoy_examples//bazel:env.bzl", "envoy_examples_env")
 load("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:crates.bzl", "crate_repositories")
+load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
 load("//bazel/external/cargo:crates.bzl", "raze_fetch_remote_crates")
 
@@ -18,7 +18,7 @@ PYTHON_MINOR_VERSION = _python_minor_version(PYTHON_VERSION)
 def envoy_dependencies_extra(
         python_version = PYTHON_VERSION,
         ignore_root_user_error = False):
-    bazel_features_deps()
+    compatibility_proxy_repo()
     emsdk_deps()
     raze_fetch_remote_crates()
     crate_repositories()

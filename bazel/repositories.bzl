@@ -112,10 +112,13 @@ def _go_deps(skip_targets):
 def _rust_deps():
     external_http_archive(
         "rules_rust",
-        patches = ["@envoy//bazel:rules_rust.patch", "@envoy//bazel:rules_rust_ppc64le.patch"],
+        patch_args = ["-p0"],
+        patches = ["@envoy//bazel:rules_rust.patch"],
     )
 
 def envoy_dependencies(skip_targets = []):
+    external_http_archive("platforms")
+
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
@@ -164,11 +167,12 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_libprotobuf_mutator()
     _com_github_google_libsxg()
     _com_github_google_tcmalloc()
-    _com_github_gperftools_gperftools()
+    _gperftools()
     _com_github_grpc_grpc()
     _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
+    _numactl()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
@@ -185,7 +189,6 @@ def envoy_dependencies(skip_targets = []):
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
-    _com_github_envoyproxy_sqlparser()
     _v8()
     _fast_float()
     _highway()
@@ -194,18 +197,18 @@ def envoy_dependencies(skip_targets = []):
     _simdutf()
     _intel_ittapi()
     _com_github_google_quiche()
-    _com_googlesource_googleurl()
+    _googleurl()
     _io_hyperscan()
     _io_vectorscan()
     _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
-    _net_zlib()
+    _zlib()
     _intel_dlb()
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
     _org_brotli()
-    _com_github_facebook_zstd()
+    _zstd()
     _re2()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
@@ -398,16 +401,26 @@ def _com_github_intel_ipp_crypto_crypto_mb():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
+def _numactl():
+    external_http_archive(
+        name = "numactl",
+        build_file = "@envoy//bazel/external:numactl.BUILD",
+    )
+
 def _com_github_intel_qatlib():
     external_http_archive(
         name = "com_github_intel_qatlib",
         build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:qatlib.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_intel_qatzip():
     external_http_archive(
         name = "com_github_intel_qatzip",
         build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:qatzip.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_qat_zstd():
@@ -447,24 +460,16 @@ def _net_colm_open_source_ragel():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _net_zlib():
+def _zlib():
     external_http_archive(
-        name = "net_zlib",
-        build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
+        name = "zlib",
+        build_file = "@envoy//bazel/external:zlib.BUILD",
     )
 
     # Bind for grpc.
     native.bind(
         name = "madler_zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
-    )
-
-    # Bind for protobuf.
-    native.bind(
-        name = "zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
+        actual = "@zlib//:zlib",
     )
 
 def _com_github_zlib_ng_zlib_ng():
@@ -499,10 +504,10 @@ def _org_brotli():
         name = "org_brotli",
     )
 
-def _com_github_facebook_zstd():
+def _zstd():
     external_http_archive(
-        name = "com_github_facebook_zstd",
-        build_file_content = BUILD_ALL_CONTENT,
+        name = "zstd",
+        build_file = "@envoy//bazel/external:zstd.BUILD",
     )
 
 def _com_google_cel_cpp():
@@ -739,6 +744,8 @@ def _v8():
         patches = [
             "@envoy//bazel:v8.patch",
             "@envoy//bazel:v8_ppc64le.patch",
+            # https://issues.chromium.org/issues/423403090
+            "@envoy//bazel:v8_python.patch",
         ],
         patch_args = ["-p1"],
         patch_cmds = [
@@ -804,9 +811,9 @@ def _com_github_google_quiche():
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
 
-def _com_googlesource_googleurl():
+def _googleurl():
     external_http_archive(
-        name = "com_googlesource_googleurl",
+        name = "googleurl",
         patches = ["@envoy//bazel/external:googleurl.patch"],
         patch_args = ["-p1"],
     )
@@ -932,10 +939,9 @@ def _com_github_google_tcmalloc():
         patch_args = ["-p1"],
     )
 
-def _com_github_gperftools_gperftools():
+def _gperftools():
     external_http_archive(
-        name = "com_github_gperftools_gperftools",
-        build_file_content = BUILD_ALL_CONTENT,
+        name = "gperftools",
     )
 
 def _com_github_wamr():

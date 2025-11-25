@@ -86,7 +86,7 @@ public:
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
-  Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
+  Filters::Common::LocalRateLimit::LocalRateLimiter::Result
   requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
@@ -196,7 +196,7 @@ private:
                            Http::RequestHeaderMap& headers);
   VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
-  Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
+  Filters::Common::LocalRateLimit::LocalRateLimiter::Result
   requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors);
 
   FilterConfigSharedPtr config_;

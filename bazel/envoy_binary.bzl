@@ -1,5 +1,6 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy binary targets
+load("@rules_cc//cc:defs.bzl", "cc_binary")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
@@ -42,7 +43,7 @@ def envoy_cc_binary(
         deps = deps + _envoy_stamped_deps()
     linkopts += envoy_dbg_linkopts()
     deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + envoy_stdlib_deps()
-    native.cc_binary(
+    cc_binary(
         name = name,
         srcs = srcs,
         data = data,
