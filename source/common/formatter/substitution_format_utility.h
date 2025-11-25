@@ -49,8 +49,9 @@ public:
   /**
    * Truncate a string to a maximum length. Do nothing if max_length is not set or
    * max_length is greater than the length of the string.
+   * @return true if the string was truncated, false otherwise.
    */
-  static void truncate(std::string& str, absl::optional<size_t> max_length);
+  static bool truncate(std::string& str, absl::optional<size_t> max_length);
 
   /**
    * Truncate an input string view to a maximum length, and return the resulting string view. Do not
