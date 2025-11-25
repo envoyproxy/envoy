@@ -364,7 +364,7 @@ new_features:
     the time point of upstream response body receiving begin.
 - area: ext_proc
   change: |
-    The :ref:`MappedAttributeBuilder 
+    The :ref:`MappedAttributeBuilder
     <envoy_v3_api_msg_extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3.MappedAttributeBuilder>`
     ext_proc extension now supports re-mapping response attributes (in addition to request attributes).
 - area: router
