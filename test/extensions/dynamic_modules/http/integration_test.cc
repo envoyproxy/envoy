@@ -713,7 +713,7 @@ TEST_P(DynamicModulesTerminalIntegrationTest, StreamingTerminalFilter) {
   EXPECT_EQ(below_watermark_count, 8);
 }
 
-// Test basic HTTP stream callout - GET request with streaming response.
+// Test basic HTTP stream callout. A GET request with streaming response.
 TEST_P(DynamicModulesIntegrationTest, HttpStreamBasic) {
   initializeFilter("http_stream_basic", "cluster_0");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -738,7 +738,7 @@ TEST_P(DynamicModulesIntegrationTest, HttpStreamBasic) {
       response->headers().get(Http::LowerCaseString("x-stream-test"))[0]->value().getStringView());
 }
 
-// Test bidirectional HTTP stream callout - POST with streaming request and response.
+// Test bidirectional HTTP stream callout. A POST request with streaming request and response.
 TEST_P(DynamicModulesIntegrationTest, HttpStreamBidirectional) {
   initializeFilter("http_stream_bidirectional", "cluster_0");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

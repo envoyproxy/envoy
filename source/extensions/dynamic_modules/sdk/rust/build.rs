@@ -18,6 +18,7 @@ fn main() {
   println!("cargo:rerun-if-changed=abi.h");
   let bindings = bindgen::Builder::default()
     .header("../../abi.h")
+    .header("../../abi_version.h")
     .clang_arg("-v")
     .default_enum_style(bindgen::EnumVariation::Rust {
       non_exhaustive: false,

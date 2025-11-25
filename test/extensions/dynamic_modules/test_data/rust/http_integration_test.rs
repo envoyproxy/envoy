@@ -1205,7 +1205,7 @@ impl StreamingTerminalHttpFilter {
 // HTTP Stream Callouts Tests
 // =============================================================================
 
-// Basic HTTP Stream Test - simple GET request with streaming response.
+// Basic HTTP Stream Test. A simple GET request with streaming response.
 struct HttpStreamBasicConfig {
   cluster_name: String,
 }
@@ -1320,7 +1320,7 @@ impl Drop for HttpStreamBasicFilter {
   }
 }
 
-// Bidirectional HTTP Stream Test - POST with streaming request and response.
+// Bidirectional HTTP Stream Test. A POST request with streaming request and response.
 struct HttpStreamBidirectionalConfig {
   cluster_name: String,
 }

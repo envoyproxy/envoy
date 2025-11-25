@@ -21,11 +21,6 @@ use std::sync::OnceLock;
 /// This is not meant to be used directly.
 pub mod abi {
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-
-  /// ABI version string. This must match the kAbiVersion in abi_version.h.
-  /// The version is the SHA256 hash of the abi.h file.
-  pub const kAbiVersion: &[u8] =
-    b"671102aad648320f21c53d1c04aa9780d1d2668e3e63e8a993d30a9029a168e4\0";
 }
 
 /// Declare the init functions for the dynamic module.
