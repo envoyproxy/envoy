@@ -50,7 +50,9 @@ jobs:
     with:
       args: >-
         test
-        --config=mobile-remote-ci-linux-tsan
+        --config=ci
+        --config=mobile-rbe
+        --config=mobile-tsan
         //test/common/...
         //test/cc/...
       request: ${{ needs.load.outputs.request }}

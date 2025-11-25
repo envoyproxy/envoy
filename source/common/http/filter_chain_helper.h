@@ -154,6 +154,13 @@ private:
     RETURN_IF_NOT_OK(Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),
                                                               filter_chain_type, is_terminal,
                                                               last_filter_in_current_config));
+
+    // Check if the filter wants to ignore the disabled flag (e.g., when it needs to check
+    // runtime conditions like dynamic metadata).
+    const bool should_ignore_disabled =
+        factory->shouldIgnoreDisabledFlag(*message, server_context_);
+    const bool effective_disabled = disabled_by_default && !should_ignore_disabled;
+
     auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
         callback_or_error.value(), proto_config.name());
 #ifdef ENVOY_ENABLE_YAML
@@ -162,7 +169,7 @@ private:
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 #endif
-    filter_factories.push_back({std::move(filter_config_provider), disabled_by_default});
+    filter_factories.push_back({std::move(filter_config_provider), effective_disabled});
     return absl::OkStatus();
   }
 

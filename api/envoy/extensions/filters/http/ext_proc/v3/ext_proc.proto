@@ -391,14 +391,21 @@ message MetadataOptions {
     repeated string typed = 2;
   }
 
-  // Describes which typed or untyped dynamic metadata namespaces to forward to
+  // Describes which typed or untyped filter dynamic metadata namespaces to forward to
   // the external processing server.
   MetadataNamespaces forwarding_namespaces = 1;
 
-  // Describes which typed or untyped dynamic metadata namespaces to accept from
+  // Describes which typed or untyped filter dynamic metadata namespaces to accept from
   // the external processing server. Set to empty or leave unset to disallow writing
   // any received dynamic metadata. Receiving of typed metadata is not supported.
   MetadataNamespaces receiving_namespaces = 2;
+
+  // Describes which cluster metadata namespaces to forward to
+  // the external processing server.
+  // .. note::
+  // This is the least specific metadata. Should there be any namespace collision,
+  // cluster level metadata can be overridden by filter metadata.
+  MetadataNamespaces cluster_metadata_forwarding_namespaces = 3;
 }
 
 // The HeaderForwardingRules structure specifies what headers are

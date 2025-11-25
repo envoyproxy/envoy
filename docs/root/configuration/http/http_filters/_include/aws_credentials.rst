@@ -23,9 +23,16 @@ secret access key (the session token is optional).
 
 5. From `AssumeRoleWithWebIdentity <https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html>`_ API call
    towards AWS Security Token Service using ``WebIdentityToken`` read from a file pointed by ``AWS_WEB_IDENTITY_TOKEN_FILE`` environment
-   variable and role arn read from ``AWS_ROLE_ARN`` environment variable. The credentials are extracted from the fields ``AccessKeyId``,
+   variable and role arn read from ``AWS_ROLE_ARN`` environment variable. If a :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` is configured, the fields
+   ``role_arn``, ``web_identity_token_data_source`` and ``role_session_name`` can be specified instead of environment variables.
+   The credentials are extracted from the fields ``AccessKeyId``,
    ``SecretAccessKey``, and ``SessionToken`` are used, and credentials are cached for 1 hour or until they expire (according to the field
    ``Expiration``).
+
+   The ``assume_role_with_web_identity_provider`` will automatically watch for changes to the directory of the configured web identity token file.
+   (inferred if not explicitly set in the ``watched_directory`` field) so that if the token file is rotated, the new token will be picked up. Even when file rotation occurs,
+   current credentials will continue to be used until they expire, at which point new credentials will be retrieved using the new token.
+
    To fetch the credentials a static cluster is created with the name ``sts_token_service_internal-<region>`` pointing towards regional
    AWS Security Token Service.
 

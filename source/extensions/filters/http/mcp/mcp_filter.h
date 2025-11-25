@@ -32,7 +32,11 @@ constexpr absl::string_view JsonRpcVersion = "2.0";
 class McpFilterConfig {
 public:
   explicit McpFilterConfig(const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config)
-      : traffic_mode_(proto_config.traffic_mode()) {}
+      : traffic_mode_(proto_config.traffic_mode()),
+        clear_route_cache_(proto_config.clear_route_cache()),
+        max_request_body_size_(proto_config.has_max_request_body_size()
+                                   ? proto_config.max_request_body_size().value()
+                                   : 8192) {} // Default: 8KB
 
   envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode() const {
     return traffic_mode_;
@@ -42,8 +46,14 @@ public:
     return traffic_mode_ == envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP;
   }
 
+  bool clearRouteCache() const { return clear_route_cache_; }
+
+  uint32_t maxRequestBodySize() const { return max_request_body_size_; }
+
 private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
+  const bool clear_route_cache_;
+  const uint32_t max_request_body_size_;
 };
 
 /**

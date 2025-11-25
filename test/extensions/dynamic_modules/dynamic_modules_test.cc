@@ -78,6 +78,23 @@ TEST(DynamicModuleTestLanguages, InitFunctionOnlyCalledOnce) {
   EXPECT_TRUE(m2.ok());
 }
 
+TEST(DynamicModuleTestLanguages, LoadLibGlobally) {
+  const auto path = testSharedObjectPath("program_global", "c");
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModule(path, false, true);
+  EXPECT_TRUE(module.ok());
+
+  // The child module should be able to access the symbol from the global module.
+  const auto child_path = testSharedObjectPath("program_child", "c");
+  absl::StatusOr<DynamicModulePtr> child_module = newDynamicModule(child_path, false, false);
+  EXPECT_TRUE(child_module.ok());
+
+  using GetSomeVariableFuncType = int (*)(void);
+  const auto getSomeVariable =
+      child_module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
+  EXPECT_TRUE(getSomeVariable.ok());
+  EXPECT_EQ(getSomeVariable.value()(), 42);
+}
+
 TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
   std::string language = GetParam();
   absl::StatusOr<DynamicModulePtr> result =
