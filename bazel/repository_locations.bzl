@@ -1302,20 +1302,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
     ),
-    com_googlesource_googleurl = dict(
+    googleurl = dict(
         project_name = "Chrome URL parsing library",
         project_desc = "Chrome URL parsing library",
-        project_url = "https://quiche.googlesource.com/googleurl",
+        project_url = "https://github.com/google/gurl",
         version = "dd4080fec0b443296c0ed0036e1e776df8813aa7",
-        sha256 = "fc694942e8a7491dcc1dde1bddf48a31370a1f46fef862bc17acf07c34dc6325",
-        # Static snapshot of https://quiche.googlesource.com/googleurl/+archive/dd4080fec0b443296c0ed0036e1e776df8813aa7.tar.gz
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
+        sha256 = "4ffa45a827646692e7b26e2a8c0dcbc1b1763a26def2fbbd82362970962a2fcf",
+        urls = ["https://github.com/google/gurl/archive/{version}.tar.gz"],
+        strip_prefix = "gurl-{version}",
         use_category = ["controlplane", "dataplane_core"],
         extensions = [],
         release_date = "2022-11-03",
         cpe = "N/A",
-        license = "googleurl",
-        license_url = "https://quiche.googlesource.com/googleurl/+/{version}/LICENSE",
+        license = "BSD-3-Clause",
+        license_url = "https://github.com/google/gurl/blob/{version}/LICENSE",
     ),
     com_google_cel_spec = dict(
         project_name = "Common Expression Language (CEL) spec",
