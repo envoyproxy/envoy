@@ -24,6 +24,7 @@ A common usage of the MCP filter is to enforce policies based on MCP payload att
 the dynamic metadata, which subsequent filters in the chain can use for decision-making.
 
 This enables scenarios such as:
+
 1.  **Per-route Policy:** Applying specific RBAC rules for different routes or MCP methods.
 2.  **Egress Traffic Control:** Using the filter with a dynamic forward proxy to secure outbound traffic for AI agents.
 
