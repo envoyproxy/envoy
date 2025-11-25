@@ -38,7 +38,7 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
 }
 
 void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
-                                           CallbackState next_state, bool continue_and_replace) {
+                                           CallbackState next_state) {
   ENVOY_STREAM_LOG(debug, "Finish external processing call", *filter_callbacks_);
   filter_.logStreamInfo();
 
@@ -49,8 +49,7 @@ void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
         filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
     ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
     if (logging_info != nullptr) {
-      logging_info->recordGrpcCall(duration, call_status, callback_state_, trafficDirection(),
-                                   continue_and_replace);
+      logging_info->recordGrpcCall(duration, call_status, callback_state_, trafficDirection());
     }
   }
   callback_state_ = next_state;
@@ -165,12 +164,10 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
   }
 
   clearRouteCache(common_response);
+  onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp(common_response));
 
   if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
-    onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp(common_response), true);
     return handleHeaderContinueAndReplace(response);
-  } else {
-    onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp(common_response));
   }
 
   filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
