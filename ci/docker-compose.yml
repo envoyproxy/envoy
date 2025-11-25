@@ -92,9 +92,9 @@ services:
   envoy-build:
     <<: *envoy-build-base
     volumes:
-    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build
-    - ${SOURCE_DIR:-..}:/source
-    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build${MOUNT_ACCESS_MODE:-}
+    - ${SOURCE_DIR:-..}:/source${MOUNT_ACCESS_MODE:-}
+    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}${MOUNT_ACCESS_MODE:-}
 
   envoy-build-gpg:
     <<: *envoy-build-base
