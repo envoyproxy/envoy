@@ -43,7 +43,7 @@ message CookieConfig {
   // This controls the scope of the cookie and is useful for path-based routing scenarios
   // where different logical boundaries or applications may operate with different OAuth2 clients.
   // The CSRF cookie (nonce cookie) can be configured with a different path than session cookies
-  // to support flows where the callback URL is on a different path or subdomain.
+  // to support flows where the callback URL is on a different path.
   //
   // If not specified, defaults to ``/``.
   string path = 2;
