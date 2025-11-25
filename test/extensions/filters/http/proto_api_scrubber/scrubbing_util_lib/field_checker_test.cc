@@ -1,4 +1,5 @@
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 #include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
 
@@ -31,6 +32,9 @@ public:
 
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
               (const std::string& method_name, const std::string& field_mask), (const, override));
+
+  MOCK_METHOD(absl::StatusOr<absl::string_view>, getEnumName,
+              (absl::string_view enum_type_name, int enum_value), (const, override));
 };
 
 namespace {
@@ -38,6 +42,8 @@ namespace {
 inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
 inline constexpr char kRemoveFieldActionType[] =
     "type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction";
+inline constexpr char kRemoveFieldActionTypeWithoutPrefix[] =
+    "envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction";
 
 // Mock class for Matcher::Action to simulate actions other than RemoveFieldAction.
 class MockAction : public Matcher::Action {
@@ -52,6 +58,34 @@ public:
               (const HttpMatchingData& matching_data, Matcher::SkippedMatchCb skipped_match_cb),
               (override));
 };
+
+// Helper to configure the Mock Config for Enum testing.
+void setupMockEnumRule(MockProtoApiScrubberFilterConfig& mock_config, const std::string& method,
+                       const std::string& field_path, const std::string& type_url, int enum_int,
+                       absl::string_view enum_name, bool should_remove) {
+  auto type_name = std::string(Envoy::TypeUtil::typeUrlToDescriptorFullName(type_url));
+
+  ON_CALL(mock_config, getEnumName(type_name, enum_int)).WillByDefault(testing::Return(enum_name));
+
+  // Mock Matcher Lookup
+  std::string full_mask = absl::StrCat(field_path, ".", enum_name);
+  auto match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+
+  if (should_remove) {
+    auto remove_action = std::make_shared<NiceMock<MockAction>>();
+    ON_CALL(*remove_action, typeUrl())
+        .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
+    ON_CALL(*match_tree, match(testing::_, testing::_))
+        .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+  } else {
+    match_tree = nullptr; // No match
+  }
+
+  ON_CALL(mock_config, getRequestFieldMatcher(method, full_mask))
+      .WillByDefault(testing::Return(match_tree));
+  ON_CALL(mock_config, getResponseFieldMatcher(method, full_mask))
+      .WillByDefault(testing::Return(match_tree));
+}
 
 class FieldCheckerTest : public ::testing::Test {
 protected:
@@ -449,6 +483,90 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
   }
 }
 
+// Tests CheckField() specifically for enum fields in the request.
+TEST_F(RequestFieldCheckerTest, EnumType) {
+  // Setup local mock config
+  auto mock_config = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  const std::string method = "/pkg.Service/UpdateConfig";
+
+  // Field-Level Rule: Remove 'legacy_status' entirely
+  // Path passed to `CheckField()` method: "config.legacy_status" (No integer suffix yet)
+  auto exclude_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  auto remove_action = std::make_shared<NiceMock<MockAction>>();
+  ON_CALL(*remove_action, typeUrl())
+      .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
+  ON_CALL(*exclude_tree, match(testing::_, testing::_))
+      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+
+  ON_CALL(*mock_config, getRequestFieldMatcher(method, "config.legacy_status"))
+      .WillByDefault(testing::Return(exclude_tree));
+
+  // Value-Level Rules: 'status' field
+  // Rule 1: "config.status.DEBUG_MODE" (99) -> Remove
+  setupMockEnumRule(*mock_config, method, "config.status", "type.googleapis.com/pkg.Status", 99,
+                    "DEBUG_MODE", true);
+
+  // Rule 2: "config.status.OK" (0) -> Keep
+  setupMockEnumRule(*mock_config, method, "config.status", "type.googleapis.com/pkg.Status", 0,
+                    "OK", false);
+
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method,
+                             mock_config.get());
+
+  {
+    // Scenario 1: Field-Level Scrubbing
+    // The scrubber checks the field definition before reading values.
+    Protobuf::Field field;
+    field.set_name("legacy_status");
+    field.set_kind(Protobuf::Field::TYPE_ENUM);
+
+    EXPECT_EQ(field_checker.CheckField({"config", "legacy_status"}, &field),
+              FieldCheckResults::kExclude);
+  }
+
+  {
+    // Scenario 2: Value-Level Scrubbing (Specific Value matches Rule)
+    // The scrubber reads value 99, translates to DEBUG_MODE.
+    Protobuf::Field field;
+    field.set_name("status");
+    field.set_kind(Protobuf::Field::TYPE_ENUM);
+    field.set_type_url("type.googleapis.com/pkg.Status");
+
+    EXPECT_EQ(field_checker.CheckField({"config", "status", "99"}, &field),
+              FieldCheckResults::kExclude);
+  }
+
+  {
+    // Scenario 3: Value-Level Pass-through (Specific Value has no Rule/Keep)
+    // The scrubber reads value 0, translates to OK.
+    Protobuf::Field field;
+    field.set_name("status");
+    field.set_kind(Protobuf::Field::TYPE_ENUM);
+    field.set_type_url("type.googleapis.com/pkg.Status");
+
+    EXPECT_EQ(field_checker.CheckField({"config", "status", "0"}, &field),
+              FieldCheckResults::kInclude);
+  }
+
+  {
+    // Scenario 4: Unknown Enum Value (Fallback)
+    // Input: Value 123
+    // Logic: getEnumName returns error.
+    // FieldChecker constructs mask "config.status.123".
+    // No matcher for that mask -> kInclude.
+    Protobuf::Field field;
+    field.set_name("status");
+    field.set_kind(Protobuf::Field::TYPE_ENUM);
+    field.set_type_url("type.googleapis.com/pkg.Status");
+
+    EXPECT_LOG_CONTAINS("warn", "Enum translation skipped", {
+      EXPECT_EQ(field_checker.CheckField({"config", "status", "123"}, &field),
+                FieldCheckResults::kInclude);
+    });
+  }
+}
+
 using ResponseFieldCheckerTest = FieldCheckerTest;
 
 // Tests CheckField() method for primitive and message type response fields.
@@ -613,6 +731,69 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
     field.set_cardinality(Protobuf::Field_Cardinality_CARDINALITY_REPEATED);
 
     EXPECT_EQ(field_checker.CheckField({"tags"}, &field), FieldCheckResults::kInclude);
+  }
+}
+
+// Tests CheckField() specifically for enum fields in the response.
+TEST_F(ResponseFieldCheckerTest, EnumType) {
+  auto mock_config = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  const std::string method = "/pkg.Service/GetConfig";
+
+  // Field-Level Rule: Remove 'internal_flags' entirely
+  auto exclude_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  auto remove_action = std::make_shared<NiceMock<MockAction>>();
+  ON_CALL(*remove_action, typeUrl())
+      .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
+  ON_CALL(*exclude_tree, match(testing::_, testing::_))
+      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+
+  ON_CALL(*mock_config, getResponseFieldMatcher(method, "config.internal_flags"))
+      .WillByDefault(testing::Return(exclude_tree));
+
+  // Value-Level Rules: 'state' field
+  // Rule: "config.state.DEPRECATED" (2) -> Remove
+  setupMockEnumRule(*mock_config, method, "config.state", "type.googleapis.com/pkg.State", 2,
+                    "DEPRECATED", true);
+
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, method,
+                             mock_config.get());
+
+  {
+    // Scenario 1: Field-Level Scrubbing
+    Protobuf::Field field;
+    field.set_name("internal_flags");
+    field.set_kind(Protobuf::Field::TYPE_ENUM);
+
+    EXPECT_EQ(field_checker.CheckField({"config", "internal_flags"}, &field),
+              FieldCheckResults::kExclude);
+  }
+
+  {
+    // Scenario 2: Value-Level Scrubbing (Specific Value matches Rule)
+    Protobuf::Field field;
+    field.set_name("state");
+    field.set_kind(Protobuf::Field::TYPE_ENUM);
+    field.set_type_url("type.googleapis.com/pkg.State");
+
+    EXPECT_EQ(field_checker.CheckField({"config", "state", "2"}, &field),
+              FieldCheckResults::kExclude);
+  }
+
+  {
+    // Scenario 3: Value-Level Pass-through (No Rule for this value)
+    // Value 1 ("ACTIVE") -> No rule -> Include
+    Protobuf::Field field;
+    field.set_name("state");
+    field.set_kind(Protobuf::Field::TYPE_ENUM);
+    field.set_type_url("type.googleapis.com/pkg.State");
+
+    // We didn't mock rule for 1, so getEnumName returns error,
+    // fallback to "1", no matcher found -> Include.
+    EXPECT_LOG_CONTAINS("warn", "Enum translation skipped", {
+      EXPECT_EQ(field_checker.CheckField({"config", "state", "1"}, &field),
+                FieldCheckResults::kInclude);
+    });
   }
 }
 

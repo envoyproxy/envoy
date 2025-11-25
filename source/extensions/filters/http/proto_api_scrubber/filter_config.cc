@@ -270,6 +270,23 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodFieldRestrictions(
   return absl::OkStatus();
 }
 
+absl::StatusOr<absl::string_view>
+ProtoApiScrubberFilterConfig::getEnumName(absl::string_view enum_type_name, int enum_value) const {
+  const auto* enum_desc = descriptor_pool_->FindEnumTypeByName(std::string(enum_type_name));
+  if (enum_desc == nullptr) {
+    return absl::NotFoundError(
+        absl::StrCat("Enum type '", enum_type_name, "' not found in descriptor pool."));
+  }
+
+  const auto* enum_value_desc = enum_desc->FindValueByNumber(enum_value);
+  if (enum_value_desc == nullptr) {
+    return absl::NotFoundError(absl::StrCat("Enum value '", enum_value,
+                                            "' not found in enum type '", enum_type_name, "'."));
+  }
+
+  return enum_value_desc->name();
+}
+
 MatchTreeHttpMatchingDataSharedPtr
 ProtoApiScrubberFilterConfig::getRequestFieldMatcher(const std::string& method_name,
                                                      const std::string& field_mask) const {
