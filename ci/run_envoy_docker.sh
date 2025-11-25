@@ -43,6 +43,8 @@ if [[ -n "$MOUNT_GPG_HOME" ]]; then
 elif [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
     ENVOY_BUILD_VARIANT=docker
     COMPOSE_SERVICE="envoy-build-dind"
+elif [[ -n "$ENVOY_DOCKER_CI" ]]; then
+    ENVOY_BUILD_VARIANT=ci
 fi
 
 # Source build SHA information
