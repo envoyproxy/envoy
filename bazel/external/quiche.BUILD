@@ -4708,7 +4708,7 @@ envoy_quiche_platform_impl_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_googleurl_impl.h",
     ],
     deps = [
-        "@com_github_google_gurl//url",
+        "@googleurl//url",
     ],
 )
 

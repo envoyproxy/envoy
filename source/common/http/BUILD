@@ -598,8 +598,8 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_github_google_gurl//url",
         "@com_google_absl//absl/types:optional",
+        "@googleurl//url",
     ],
 )
 

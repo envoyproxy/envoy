@@ -1287,7 +1287,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
     ),
-    com_github_google_gurl = dict(
+    googleurl = dict(
         project_name = "Chrome URL parsing library",
         project_desc = "Chrome URL parsing library",
         project_url = "https://github.com/google/gurl",
