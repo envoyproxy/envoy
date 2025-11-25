@@ -8,7 +8,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/ssl/tls_certificate_config_impl.h"
-#include "source/common/tls/context_impl.h"
+#include "source/common/tls/server_context_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,12 +50,11 @@ class AsyncContext : public Extensions::TransportSockets::Tls::ServerContextImpl
 public:
   AsyncContext(Stats::Scope& scope, Server::Configuration::ServerFactoryContext& factory_context,
                const Ssl::ServerContextConfig& tls_config,
-               const Ssl::TlsCertificateConfig& cert_config,
-               const std::vector<std::string>& server_names, absl::Status& creation_status)
+               const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
       : ServerContextImpl(
             scope, tls_config,
-            std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
-            server_names, factory_context, nullptr, creation_status) {}
+            std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config}, true,
+            factory_context, nullptr, creation_status) {}
 
   // @returns the low-level TLS context stored in this context.
   const Ssl::TlsContext& tlsContext() const;

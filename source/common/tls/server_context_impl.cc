@@ -88,17 +88,18 @@ ServerContextImpl::create(Stats::Scope& scope, const Envoy::Ssl::ServerContextCo
                           Ssl::ContextAdditionalInitFunc additional_init) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<ServerContextImpl>(
-      new ServerContextImpl(scope, config, factory_context, additional_init, creation_status));
+      new ServerContextImpl(scope, config, config.tlsCertificates(), false, factory_context,
+                            additional_init, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
-ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
-                                     const Envoy::Ssl::ServerContextConfig& config,
-                                     Server::Configuration::CommonFactoryContext& factory_context,
-                                     Ssl::ContextAdditionalInitFunc additional_init,
-                                     absl::Status& creation_status)
-    : ContextImpl(scope, config, config.tlsCertificates(), factory_context, additional_init,
+ServerContextImpl::ServerContextImpl(
+    Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+    const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
+    bool skip_selector, Server::Configuration::CommonFactoryContext& factory_context,
+    Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status)
+    : ContextImpl(scope, config, tls_certificates, factory_context, additional_init,
                   creation_status),
       session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()) {
@@ -106,11 +107,12 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     return;
   }
   // If creation failed, do not create the selector.
-  tls_certificate_selector_ = config.tlsCertificateSelectorFactory()(*this);
+  if (!skip_selector) {
+    tls_certificate_selector_ = config.tlsCertificateSelectorFactory()(*this);
+  }
 
-  const auto tls_certificates = config.tlsCertificates();
   if (tls_certificates.empty() && !config.capabilities().provides_certificates &&
-      !tls_certificate_selector_->providesCertificates()) {
+      !(tls_certificate_selector_ && tls_certificate_selector_->providesCertificates())) {
     creation_status =
         absl::InvalidArgumentError("Server TlsCertificates must have a certificate specified");
     return;
@@ -119,7 +121,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   // First, configure the base context for ClientHello interception.
   // TODO(htuch): replace with SSL_IDENTITY when we have this as a means to do multi-cert in
   // BoringSSL.
-  if (!config.capabilities().provides_certificates) {
+  if (!skip_selector && !config.capabilities().provides_certificates) {
     SSL_CTX_set_select_certificate_cb(
         tls_contexts_[0].ssl_ctx_.get(),
         [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
@@ -474,6 +476,7 @@ std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
 ServerContextImpl::findTlsContext(absl::string_view sni,
                                   const Ssl::CurveNIDVector& client_ecdsa_capabilities,
                                   bool client_ocsp_capable, bool* cert_matched_sni) {
+  ASSERT(tls_certificate_selector_ != nullptr);
   return tls_certificate_selector_->findTlsContext(sni, client_ecdsa_capabilities,
                                                    client_ocsp_capable, cert_matched_sni);
 }

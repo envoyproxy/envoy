@@ -70,10 +70,14 @@ public:
   Ssl::CurveNIDVector getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const;
   bool isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const;
 
+protected:
+  ServerContextImpl(
+      Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+      const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
+      bool skip_selector, Server::Configuration::CommonFactoryContext& factory_context,
+      Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
+
 private:
-  ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                    Server::Configuration::CommonFactoryContext& factory_context,
-                    Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
   using SessionContextID = std::array<uint8_t, SSL_MAX_SSL_SESSION_ID_LENGTH>;
 
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,

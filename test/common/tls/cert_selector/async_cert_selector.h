@@ -46,31 +46,23 @@ private:
 
 class AsyncTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory {
 public:
-  Ssl::TlsCertificateSelectorFactory createTlsCertificateSelectorFactory(
-      const Protobuf::Message& config, Server::Configuration::CommonFactoryContext& factory_context,
-      ProtobufMessage::ValidationVisitor&, absl::Status& creation_status, bool for_quic) override {
+  absl::StatusOr<Ssl::TlsCertificateSelectorFactory>
+  createTlsCertificateSelectorFactory(const Protobuf::Message& config,
+                                      Server::Configuration::GenericFactoryContext& factory_context,
+                                      const Ssl::ServerContextConfig&, bool for_quic) override {
     if (for_quic) {
-      creation_status = absl::InvalidArgumentError("does not support for quic");
-      return Ssl::TlsCertificateSelectorFactory();
+      return absl::InvalidArgumentError("does not support for quic");
     }
 
-    std::string mode;
-    const Protobuf::Any* any_config = dynamic_cast<const Protobuf::Any*>(&config);
-    if (any_config) {
-      Protobuf::StringValue string_value;
-      if (any_config->UnpackTo(&string_value)) {
-        mode = string_value.value();
-      }
-    }
+    auto& string_value = dynamic_cast<const Protobuf::StringValue&>(config);
+    std::string mode = string_value.value();
     if (mode.empty()) {
-      creation_status = absl::InvalidArgumentError("invalid cert selection mode");
-      return Ssl::TlsCertificateSelectorFactory();
+      return absl::InvalidArgumentError("invalid cert selection mode");
     }
 
-    auto& scope = factory_context.scope();
+    auto& scope = factory_context.serverFactoryContext().scope();
 
-    return [mode, &scope](const Ssl::ServerContextConfig&,
-                          Ssl::TlsCertificateSelectorContext& selector_ctx) {
+    return [mode, &scope](Ssl::TlsCertificateSelectorContext& selector_ctx) {
       return std::make_unique<AsyncTlsCertificateSelector>(scope, selector_ctx, mode);
     };
   }
