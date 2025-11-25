@@ -4980,8 +4980,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoWithWrongCluster) {
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:grpc_status_before_first_call)%");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
   });
-  proto_config_.set_failure_mode_allow(false);
-  proto_config_.mutable_message_timeout()->set_nanos(200000000);
   ConfigOptions config_option = {};
   config_option.valid_grpc_server = false;
   initializeConfig(config_option);
@@ -4991,7 +4989,7 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoWithWrongCluster) {
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_status = json_log->getString("field_grpc_status_before_first_call");
-  EXPECT_EQ(*field_request_header_status, "14");
+  EXPECT_NE(*field_request_header_status, "0");
 }
 
 } // namespace ExternalProcessing

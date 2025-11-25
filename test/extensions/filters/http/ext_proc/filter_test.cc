@@ -5768,10 +5768,7 @@ TEST_F(HttpFilterTest, GrpcErrorOnOpenStream) {
   )EOF");
 
   do_start_option_ = ON_GRPC_ERROR;
-
-  // Create synthetic HTTP request
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  test_time_->advanceTimeWait(std::chrono::microseconds(10));
   filter_->onDestroy();
   EXPECT_EQ(Grpc::Status::Internal, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());
 }
@@ -5784,10 +5781,7 @@ TEST_F(HttpFilterTest, GrpcCloseOnOpenStream) {
   )EOF");
 
   do_start_option_ = ON_GRPC_CLOSE;
-
-  // Create synthetic HTTP request
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  test_time_->advanceTimeWait(std::chrono::microseconds(10));
   filter_->onDestroy();
   EXPECT_EQ(Grpc::Status::Aborted, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());
 }
