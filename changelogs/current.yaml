@@ -152,6 +152,9 @@ bug_fixes:
   change: |
     Changes web identity token file watching behavior in the aws signing common components. This ensures that if the token file is rotated,
     the new token will be picked up.
+- area: dns_resolver
+  change: |
+    Removes unnecessary getifaddrs() system calls when ``filter_unroutable_families`` is disabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
