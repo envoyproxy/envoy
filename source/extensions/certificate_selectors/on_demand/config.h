@@ -23,8 +23,8 @@ struct CertSelectionStats {
 };
 
 class AsyncContext;
-using ConfigProto = envoy::extensions::certificate_selectors::on_demand_secret::v3::Config;
 using AsyncContextConstSharedPtr = std::shared_ptr<const AsyncContext>;
+using ConfigProto = envoy::extensions::certificate_selectors::on_demand_secret::v3::Config;
 using UpdateCb = std::function<absl::Status(absl::string_view, const Ssl::TlsCertificateConfig&)>;
 
 class AsyncContextConfig {
@@ -46,15 +46,16 @@ private:
 };
 using AsyncContextConfigConstPtr = std::unique_ptr<AsyncContextConfig>;
 
-class AsyncContext : public Extensions::TransportSockets::Tls::ContextImpl {
+class AsyncContext : public Extensions::TransportSockets::Tls::ServerContextImpl {
 public:
   AsyncContext(Stats::Scope& scope, Server::Configuration::ServerFactoryContext& factory_context,
                const Ssl::ServerContextConfig& tls_config,
-               const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
-      : ContextImpl(
+               const Ssl::TlsCertificateConfig& cert_config,
+               const std::vector<std::string>& server_names, absl::Status& creation_status)
+      : ServerContextImpl(
             scope, tls_config,
             std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
-            factory_context, nullptr, creation_status) {}
+            server_names, factory_context, nullptr, creation_status) {}
 
   // @returns the low-level TLS context stored in this context.
   const Ssl::TlsContext& tlsContext() const;

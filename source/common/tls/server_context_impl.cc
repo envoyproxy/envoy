@@ -84,19 +84,17 @@ int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned ch
 
 absl::StatusOr<std::unique_ptr<ServerContextImpl>>
 ServerContextImpl::create(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                          const std::vector<std::string>& server_names,
                           Server::Configuration::CommonFactoryContext& factory_context,
                           Ssl::ContextAdditionalInitFunc additional_init) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<ServerContextImpl>(new ServerContextImpl(
-      scope, config, server_names, factory_context, additional_init, creation_status));
+  auto ret = std::unique_ptr<ServerContextImpl>(
+      new ServerContextImpl(scope, config, factory_context, additional_init, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ServerContextConfig& config,
-                                     const std::vector<std::string>& server_names,
                                      Server::Configuration::CommonFactoryContext& factory_context,
                                      Ssl::ContextAdditionalInitFunc additional_init,
                                      absl::Status& creation_status)
@@ -139,7 +137,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   // Compute the session context ID hash. We use all the certificate identities,
   // since we should have a common ID for session resumption no matter what cert
   // is used. We do this early because it can fail.
-  absl::StatusOr<SessionContextID> id_or_error = generateHashForSessionContextId(server_names);
+  absl::StatusOr<SessionContextID> id_or_error =
+      generateHashForSessionContextId(config.serverNames());
   SET_AND_RETURN_IF_NOT_OK(id_or_error.status(), creation_status);
   const SessionContextID& session_id = *id_or_error;
 
@@ -537,11 +536,9 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
 
 absl::StatusOr<Ssl::ServerContextSharedPtr> ServerContextFactoryImpl::createServerContext(
     Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-    const std::vector<std::string>& server_names,
     Server::Configuration::CommonFactoryContext& factory_context,
     Ssl::ContextAdditionalInitFunc additional_init) {
-  return ServerContextImpl::create(scope, config, server_names, factory_context,
-                                   std::move(additional_init));
+  return ServerContextImpl::create(scope, config, factory_context, std::move(additional_init));
 }
 
 REGISTER_FACTORY(ServerContextFactoryImpl, ServerContextFactory);

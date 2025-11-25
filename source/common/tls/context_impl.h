@@ -185,7 +185,6 @@ public:
   std::string category() const override { return "envoy.ssl.server_context_factory"; }
   virtual absl::StatusOr<Ssl::ServerContextSharedPtr>
   createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                      const std::vector<std::string>& server_names,
                       Server::Configuration::CommonFactoryContext& factory_context,
                       Ssl::ContextAdditionalInitFunc additional_init) PURE;
 };

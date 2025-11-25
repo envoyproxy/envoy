@@ -578,6 +578,13 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
   return entries[entry];
 }
 
+std::string BaseIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
+  if (version_ == Network::Address::IpVersion::v4) {
+    return "listener.127.0.0.1_0." + stat_name;
+  }
+  return "listener.[__1]_0." + stat_name;
+}
+
 void BaseIntegrationTest::createXdsUpstream() {
   if (create_xds_upstream_ == false) {
     return;

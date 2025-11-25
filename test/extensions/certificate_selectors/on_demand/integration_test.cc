@@ -8,38 +8,14 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
-#include "source/common/config/api_version.h"
-#include "source/common/event/dispatcher_impl.h"
-#include "source/common/http/utility.h"
-#include "source/common/network/connection_impl.h"
-#include "source/common/network/utility.h"
-
-#ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/client_connection_factory_impl.h"
-#endif
-
-#include "source/common/tls/context_manager_impl.h"
-#include "source/common/tls/server_context_config_impl.h"
-#include "source/common/tls/server_ssl_socket.h"
-
-#include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/integration/certs/clientcert_hash.h"
-#include "test/config/integration/certs/servercert_info.h"
-#include "test/config/integration/certs/server2cert_info.h"
-#include "test/integration/http_integration.h"
-#include "test/integration/server.h"
-#include "test/integration/ssl_utility.h"
-#include "test/mocks/secret/mocks.h"
-#include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
-#include "test/test_common/resources.h"
-#include "test/test_common/test_time_system.h"
-#include "test/test_common/utility.h"
+#include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
+#include "test/integration/ssl_utility.h"
+#include "test/integration/tcp_proxy_integration.h"
+#include "test/test_common/resources.h"
+#include "test/test_common/utility.h"
 
-#include "absl/strings/match.h"
-
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -50,36 +26,9 @@ namespace OnDemand {
 // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221.
 const envoy::service::secret::v3::SdsDummy _sds_dummy;
 
-struct TestParams {
-  Grpc::ClientType sds_grpc_type;
-};
-
-std::string sdsTestParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
-  return fmt::format("{}", p.param.sds_grpc_type == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
-                                                                                 : "EnvoyGrpc");
-}
-
-std::vector<TestParams> getSdsTestsParams() {
-  std::vector<TestParams> ret;
-  for (auto sds_grpc_type : TestEnvironment::getsGrpcVersionsForTest()) {
-    ret.push_back(TestParams{sds_grpc_type});
-  }
-  return ret;
-}
-
-class OnDemandIntegrationTest : public Grpc::BaseGrpcClientIntegrationParamTest,
-                                public HttpIntegrationTest,
-                                public testing::TestWithParam<TestParams> {
+class OnDemandIntegrationTest : public TcpProxySslIntegrationTest {
 public:
-  OnDemandIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4,
-                            ConfigHelper::httpProxyConfig(false)) {}
-
-  Network::Address::IpVersion ipVersion() const override { return Network::Address::IpVersion::v4; }
-  Grpc::ClientType clientType() const override { return GetParam().sds_grpc_type; }
-  virtual std::unique_ptr<FakeUpstream>& sdsUpstream() { return fake_upstreams_[0]; }
-  // Index in fake_upstreams_ vector of the data plane upstream.
-  int dataPlaneUpstreamIndex() { return 1; }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -89,9 +38,6 @@ public:
               envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
             configToUseSds(common_tls_context);
           });
-      // Add a static SDS cluster as the first cluster in the list.
-      // The SDS cluster needs to appear before the cluster that uses it for secrets, so that it
-      // gets initialized first.
       bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
           bootstrap.static_resources().clusters(0));
       auto* sds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -99,12 +45,8 @@ public:
       sds_cluster->mutable_load_assignment()->set_cluster_name("sds_cluster");
       ConfigHelper::setHttp2(*sds_cluster);
     });
-
-    // The SNI of the certificates loaded in this test.
-    default_request_headers_.setHost("www.home.com");
-    HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
-    creator_ = [&]() -> Network::ClientConnectionPtr { return makeSslClientConnection(); };
+    TcpProxySslIntegrationTest::initialize();
+    test_server_->waitUntilListenersReady();
   }
 
   void configToUseSds(
@@ -127,7 +69,8 @@ public:
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
     auto* grpc_service = api_config_source->add_grpc_services();
-    setGrpcService(*grpc_service, "sds_cluster", sdsUpstream()->localAddress());
+    grpc_service->mutable_timeout()->set_seconds(300);
+    grpc_service->mutable_envoy_grpc()->set_cluster_name("sds_cluster");
     common_tls_context.mutable_custom_tls_certificate_selector()->set_name("on-demand-config");
     common_tls_context.mutable_custom_tls_certificate_selector()->mutable_typed_config()->PackFrom(
         on_demand_config);
@@ -139,37 +82,25 @@ public:
     addFakeUpstream(Http::CodecType::HTTP1);
     xds_upstream_ = fake_upstreams_.front().get();
   }
-
-  void TearDown() override {
-    cleanUpXdsConnection();
-    client_ssl_ctx_.reset();
-  }
-
-  Network::ClientConnectionPtr makeSslClientConnection() {
-    int port = lookupPort("http");
-    Network::Address::InstanceConstSharedPtr address = Ssl::getSslAddress(version_, port);
-    return dispatcher_->createClientConnection(
-        address, Network::Address::InstanceConstSharedPtr(),
-        client_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
-  }
+  FakeUpstream* dataStream() override { return fake_upstreams_.back().get(); }
 
 protected:
-  void createSdsStream(FakeUpstream&) {
+  void createSdsStream() {
     createXdsConnection();
-
     AssertionResult result2 = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result2, result2.message());
     xds_stream_->startGrpcStream();
   }
 
-  envoy::extensions::transport_sockets::tls::v3::Secret getServerSecretRsa() {
+  envoy::extensions::transport_sockets::tls::v3::Secret
+  getServerSecretRsa(absl::string_view cert = "server") {
     envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    secret.set_name(server_cert_rsa_);
+    secret.set_name(cert);
     auto* tls_certificate = secret.mutable_tls_certificate();
-    tls_certificate->mutable_certificate_chain()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
-    tls_certificate->mutable_private_key()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    tls_certificate->mutable_certificate_chain()->set_filename(TestEnvironment::runfilesPath(
+        absl::StrCat("test/config/integration/certs/", cert, "cert.pem")));
+    tls_certificate->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
+        absl::StrCat("test/config/integration/certs/", cert, "key.pem")));
     return secret;
   }
 
@@ -178,23 +109,17 @@ protected:
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);
-
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 
-  const std::string server_cert_rsa_{"server_cert_rsa"};
-  const std::string server2_cert_rsa_{"server2_cert_rsa"};
-  const std::string server_cert_ecdsa_{"server_cert_ecdsa"};
-  const std::string validation_secret_{"validation_secret"};
-  const std::string client_cert_{"client_cert"};
-  Network::UpstreamTransportSocketFactoryPtr client_ssl_ctx_;
+  const std::string server_cert_{"server"};
+  const std::string server2_cert_{"server2"};
   std::string on_demand_config_;
-  ConnectionCreationFunction creator_;
 };
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
   on_server_init_function_ = [this]() {
-    createSdsStream(*sdsUpstream());
+    createSdsStream();
     sendSdsResponse(getServerSecretRsa());
   };
   on_demand_config_ = R"EOF(
@@ -202,16 +127,17 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
     name: static-name
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
-      name: server_cert_rsa
+      name: server
   prefetch_names:
-  - server_cert_rsa
+  - server
   )EOF";
-  initialize();
-  testRouterHeaderOnlyRequestAndResponse(&creator_, dataPlaneUpstreamIndex());
-  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+
+  setupConnections();
+  sendAndReceiveTlsData("hello", "world");
+  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
   EXPECT_EQ(
-      1, test_server_->counter("listener.127.0.0.1_0.on_demand_secret.certificate_added")->value());
+      1, test_server_->counter(listenerStatPrefix("on_demand_secret.certificate_added"))->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
@@ -220,28 +146,111 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
     name: static-name
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
-      name: server_cert_rsa
+      name: server
   )EOF";
   initialize();
 
-  std::thread thread([&] {
-    // Artifically delay the SDS response using the upstream dispatcher.
-    // Note: this would be cleaner if we had a reliable trigger that a certificiate is pending.
-    createSdsStream(*sdsUpstream());
-    sendSdsResponse(getServerSecretRsa());
-  });
+  auto conn = std::make_unique<ClientSslConnection>(*this);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  createSdsStream();
+  sendSdsResponse(getServerSecretRsa());
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
 
-  testRouterHeaderOnlyRequestAndResponse(&creator_, dataPlaneUpstreamIndex());
-  thread.join();
-
-  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
   EXPECT_EQ(
-      1, test_server_->counter("listener.127.0.0.1_0.on_demand_secret.certificate_added")->value());
+      1, test_server_->counter(listenerStatPrefix("on_demand_secret.certificate_added"))->value());
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandIntegrationTest,
-                         testing::ValuesIn(getSdsTestsParams()), sdsTestParamsToString);
+TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
+  on_server_init_function_ = [this]() {
+    createSdsStream();
+    sendSdsResponse(getServerSecretRsa("server2"));
+  };
+  on_demand_config_ = R"EOF(
+  secret_name:
+    name: static-name
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      name: server
+  prefetch_names:
+  - server2
+  )EOF";
+  initialize();
+
+  auto conn = std::make_unique<ClientSslConnection>(*this);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  sendSdsResponse(getServerSecretRsa());
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+
+  EXPECT_EQ(2, test_server_->counter("sds.server.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
+  EXPECT_EQ(
+      2, test_server_->counter(listenerStatPrefix("on_demand_secret.certificate_added"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
+  on_demand_config_ = R"EOF(
+  secret_name:
+    name: static-name
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      name: server
+  )EOF";
+  initialize();
+
+  // Queue two connections in pending state.
+  auto conn1 = std::make_unique<ClientSslConnection>(*this);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  auto conn2 = std::make_unique<ClientSslConnection>(*this);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  createSdsStream();
+  sendSdsResponse(getServerSecretRsa());
+
+  conn1->waitForUpstreamConnection();
+  conn2->waitForUpstreamConnection();
+  conn1->sendAndReceiveTlsData("hello", "world");
+  conn1.reset();
+  conn2->sendAndReceiveTlsData("lorem", "ipsum");
+}
+
+TEST_P(OnDemandIntegrationTest, ClientInterruptedHandshake) {
+  on_demand_config_ = R"EOF(
+  secret_name:
+    name: static-name
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      name: server
+  )EOF";
+  initialize();
+
+  auto conn1 = std::make_unique<ClientSslConnection>(*this);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  conn1->ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  conn1.reset();
+
+  // Request is still outstanding, so we can respond to it, and it will be used later.
+  createSdsStream();
+  sendSdsResponse(getServerSecretRsa());
+
+  /* TODO
+  auto conn2 = std::make_unique<ClientSslConnection>(*this);
+  conn2->waitForUpstreamConnection();
+  conn2->sendAndReceiveTlsData("hello", "world");
+  */
+  EXPECT_EQ(
+      1, test_server_->counter(listenerStatPrefix("on_demand_secret.certificate_added"))->value());
+}
+
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, OnDemandIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 } // namespace OnDemand
 } // namespace CertificateSelectors

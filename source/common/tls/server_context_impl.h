@@ -49,7 +49,6 @@ class ServerContextImpl : public ContextImpl,
 public:
   static absl::StatusOr<std::unique_ptr<ServerContextImpl>>
   create(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-         const std::vector<std::string>& server_names,
          Server::Configuration::CommonFactoryContext& factory_context,
          Ssl::ContextAdditionalInitFunc additional_init);
 
@@ -73,7 +72,6 @@ public:
 
 private:
   ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                    const std::vector<std::string>& server_names,
                     Server::Configuration::CommonFactoryContext& factory_context,
                     Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
   using SessionContextID = std::array<uint8_t, SSL_MAX_SSL_SESSION_ID_LENGTH>;
@@ -96,7 +94,6 @@ public:
   std::string name() const override { return "envoy.ssl.server_context_factory.default"; }
   absl::StatusOr<Ssl::ServerContextSharedPtr>
   createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                      const std::vector<std::string>& server_names,
                       Server::Configuration::CommonFactoryContext& factory_context,
                       Ssl::ContextAdditionalInitFunc additional_init) override;
 };

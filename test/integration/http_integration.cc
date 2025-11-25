@@ -1807,13 +1807,6 @@ std::string HttpIntegrationTest::upstreamProtocolStatsRoot() const {
   return "invalid";
 }
 
-std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
-  if (version_ == Network::Address::IpVersion::v4) {
-    return "listener.127.0.0.1_0." + stat_name;
-  }
-  return "listener.[__1]_0." + stat_name;
-}
-
 void HttpIntegrationTest::expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
                                                              BytesCountExpectation h2_expectation,
                                                              BytesCountExpectation h3_expectation,

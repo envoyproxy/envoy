@@ -2022,7 +2022,12 @@ envoy_proto_library(
 
 envoy_cc_test_library(
     name = "tcp_proxy_integration_test_lib",
-    hdrs = ["tcp_proxy_integration_test.h"],
+    srcs = ["tcp_proxy_integration.cc"],
+    hdrs = ["tcp_proxy_integration.h"],
+    deps = [
+        ":integration_lib",
+        "//test/test_common:utility_lib",
+    ],
 )
 
 envoy_cc_test(

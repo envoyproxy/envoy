@@ -108,10 +108,11 @@ const std::string ServerContextConfigImpl::DEFAULT_CURVES_FIPS = "P-256";
 
 absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> ServerContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context, bool for_quic) {
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+    const std::vector<std::string>& server_names, bool for_quic) {
   absl::Status creation_status = absl::OkStatus();
-  std::unique_ptr<ServerContextConfigImpl> ret = absl::WrapUnique(
-      new ServerContextConfigImpl(config, secret_provider_context, creation_status, for_quic));
+  std::unique_ptr<ServerContextConfigImpl> ret = absl::WrapUnique(new ServerContextConfigImpl(
+      config, secret_provider_context, creation_status, server_names, for_quic));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -119,13 +120,13 @@ absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> ServerContextConfigImpl
 ServerContextConfigImpl::ServerContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    absl::Status& creation_status, bool for_quic)
+    absl::Status& creation_status, const std::vector<std::string>& server_names, bool for_quic)
     : ContextConfigImpl(
           config.common_tls_context(), false /* auto_sni_san_match */, DEFAULT_MIN_VERSION,
           DEFAULT_MAX_VERSION, FIPS_mode() ? DEFAULT_CIPHER_SUITES_FIPS : DEFAULT_CIPHER_SUITES,
           FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES, factory_context, creation_status),
-      require_client_certificate_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
+      server_names_(server_names), require_client_certificate_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                       config, require_client_certificate, false)),
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(
           getTlsSessionTicketKeysConfigProvider(factory_context, config, creation_status)),

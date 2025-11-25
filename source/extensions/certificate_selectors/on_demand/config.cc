@@ -40,6 +40,7 @@ void Handle::notify(AsyncContextConstSharedPtr cert_ctx) {
   ASSERT(cb_);
   active_context_ = cert_ctx;
   Event::Dispatcher& dispatcher = cb_->dispatcher();
+  // TODO: This could benefit from batching events by the dispatcher.
   dispatcher.post([cb = std::move(cb_), cert_ctx] {
     cb->onCertificateSelectionResult(cert_ctx->tlsContext(), false /* TODO(kuat) OCSP */);
   });
@@ -187,12 +188,12 @@ OnDemandTlsCertificateSelectorFactory::createTlsCertificateSelectorFactory(
   // Doing this last since it can kick-start SDS fetches.
   auto secret_manager = std::make_shared<SecretManager>(config, factory_context, tls_config);
   return [mapper = mapper_factory.value(),
-          secret_manager](Ssl::TlsCertificateSelectorContext&) mutable {
+          secret_manager](Ssl::TlsCertificateSelectorContext& ctx) mutable {
     // Envoy ensures that per-worker TLS sockets are destroyed before the
     // filter chain holding the TLS socket factory using a completion. This
     // means the TLS context config will outlive each AsyncSelector, and it is
     // safe to refer to it by reference.
-    return std::make_unique<AsyncSelector>(mapper(), secret_manager);
+    return std::make_unique<AsyncSelector>(mapper(), secret_manager, ctx.serverNames());
   };
 }
 
