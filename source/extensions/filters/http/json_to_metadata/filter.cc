@@ -143,16 +143,10 @@ FilterConfig::FilterConfig(
               ? generateAllowContentTypeRegexs(
                     proto_config.response_rules().allow_content_types_regex(), regex_engine)
               : nullptr) {
-  if (request_rules_.empty() && response_rules_.empty()) {
-    if (per_route) {
-      creation_status =
-          absl::InvalidArgumentError("json_to_metadata_filter: Per route configs must specify "
-                                     "either request or response rules");
-    } else {
-      creation_status = absl::InvalidArgumentError(
-          "json_to_metadata_filter: Per filter configs must at least specify "
-          "either request or response rules");
-    }
+  if (per_route && request_rules_.empty() && response_rules_.empty()) {
+    creation_status = absl::InvalidArgumentError(
+        "json_to_metadata_filter: Per route configs must at least specify one of "
+        "request_rules or response_rules.");
   }
 }
 
