@@ -18,11 +18,15 @@ public:
    * See https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
    * @param headers a header map to canonicalize.
    * @param excluded_headers a list of string matchers to exclude a given header from signing.
+   * @param included_headers a list of string matchers to include a given header from signing.
+   * included_headers will take precedence over excluded_headers and if included_headers is
+   * non-empty, only headers that match included_headers will be signed.
    * @return a std::map of canonicalized headers to be used in building a canonical request.
    */
   static std::map<std::string, std::string>
   canonicalizeHeaders(const Http::RequestHeaderMap& headers,
-                      const std::vector<Matchers::StringMatcherPtr>& excluded_headers);
+                      const std::vector<Matchers::StringMatcherPtr>& excluded_headers,
+                      const std::vector<Matchers::StringMatcherPtr>& included_headers);
 
   /**
    * Creates an AWS Signature V4 canonical request string.

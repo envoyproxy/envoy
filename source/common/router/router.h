@@ -348,7 +348,13 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override {
     if (route_entry_ && downstream_headers_) {
-      auto hash_policy = route_entry_->hashPolicy();
+      // Use cluster-level hash policy if available (most specific wins).
+      // If no cluster-level policy is configured, fall back to route-level policy.
+      const Http::HashPolicy* hash_policy = cluster_ != nullptr ? cluster_->hashPolicy() : nullptr;
+      if (hash_policy == nullptr) {
+        hash_policy = route_entry_->hashPolicy();
+      }
+
       if (hash_policy) {
         return hash_policy->generateHash(
             *downstream_headers_, callbacks_->streamInfo(),
@@ -615,6 +621,9 @@ private:
                        absl::string_view host_selection_details);
 
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
+  // Returns the effective retry policy to use for this request.
+  // Cluster-level retry policy takes precedence over route-level retry policy.
+  const Router::RetryPolicy* getEffectiveRetryPolicy() const;
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,

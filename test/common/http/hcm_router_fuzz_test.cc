@@ -12,7 +12,7 @@
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
 
 #include "test/common/http/conn_manager_impl_test_base.h"
-#include "test/common/http/hcm_router_fuzz.pb.h"
+#include "test/common/http/hcm_router_fuzz.pb.validate.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
@@ -220,6 +220,10 @@ public:
     vhost_ = mock_route_->virtual_host_;
 
     ON_CALL(*tlc_.cluster_.info_, maintenanceMode()).WillByDefault(Return(maintenance_));
+    mock_host_ = std::make_shared<NiceMock<Envoy::Upstream::MockHost>>();
+    ON_CALL(tlc_, chooseHost(_)).WillByDefault(Invoke([this](Upstream::LoadBalancerContext*) {
+      return Upstream::HostSelectionResponse{mock_host_, "foo"};
+    }));
   }
 
   void newUpstream(Router::GenericConnectionPoolCallbacks* request,
@@ -324,6 +328,7 @@ public:
   std::unique_ptr<Router::MockDirectResponseEntry> direct_response_entry_;
 
   std::string direct_response_body_;
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHost>> mock_host_;
 };
 
 // This class holds the upstream `FuzzCluster` instances. This has nothing
@@ -605,6 +610,12 @@ private:
 #ifdef _DISABLE_STATIC_HARNESS
 
 DEFINE_PROTO_FUZZER(FuzzCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
+  }
   auto harness = std::make_unique<Harness>();
   harness->fuzz(input);
 }
@@ -614,6 +625,12 @@ DEFINE_PROTO_FUZZER(FuzzCase& input) {
 static std::unique_ptr<Harness> harness = nullptr;
 static void cleanup() { harness = nullptr; }
 DEFINE_PROTO_FUZZER(FuzzCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
+  }
   if (harness == nullptr) {
     harness = std::make_unique<Harness>();
     atexit(cleanup);

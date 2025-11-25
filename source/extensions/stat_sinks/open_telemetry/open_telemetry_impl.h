@@ -119,10 +119,8 @@ private:
       ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality) {
     data_point.set_time_unix_nano(snapshot_time_ns_);
     if (attributes) {
-      data_point.mutable_attributes()->CopyFrom(*attributes);
       // When attributes are present, set the start time for delta/cumulative metrics.
       data_point.mutable_attributes()->CopyFrom(*attributes);
-      // When attributes are present, set the start time for delta/cumulative metrics.
       switch (temporality) {
       case AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA:
         data_point.set_start_time_unix_nano(delta_start_time_ns_);

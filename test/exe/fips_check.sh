@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
+
 set -e
+
+
+# env vars dont really work in bazels env - so replace with correct var
+OBJDUMP="${OBJDUMP//\$\{LLVM_DIRECTORY\}/$LLVM_DIRECTORY}"
 
 # FIPS requires a consistency self-test. In practice, the FIPS binary has
 # special markers for the start and the end of the crypto code which we can use

@@ -28,38 +28,62 @@ constexpr char DEFAULT_AWS_CONFIG_FILE[] = "/.aws/config";
 
 std::map<std::string, std::string>
 Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
-                             const std::vector<Matchers::StringMatcherPtr>& excluded_headers) {
+                             const std::vector<Matchers::StringMatcherPtr>& excluded_headers,
+                             const std::vector<Matchers::StringMatcherPtr>& included_headers) {
   std::map<std::string, std::string> out;
-  headers.iterate(
-      [&out, &excluded_headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
-        // Skip empty headers
-        if (entry.key().empty() || entry.value().empty()) {
+
+  headers.iterate([&out, &excluded_headers,
+                   &included_headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
+    // Skip empty headers
+    if (entry.key().empty() || entry.value().empty()) {
+      return Http::HeaderMap::Iterate::Continue;
+    }
+    const auto key = entry.key().getStringView();
+
+    // Pseudo-headers should not be canonicalized
+    if (!key.empty() && key[0] == ':') {
+      return Http::HeaderMap::Iterate::Continue;
+    }
+
+    // Always include x-amz-* and content-type headers per AWS signing requirements
+    const auto key_lower = absl::AsciiStrToLower(key);
+    const bool is_required_header =
+        absl::StartsWith(key_lower, "x-amz-") || key_lower == "content-type";
+
+    if (!is_required_header) {
+      if (!included_headers.empty()) {
+        // If included_headers is set, only include headers that match
+        if (!std::any_of(included_headers.begin(), included_headers.end(),
+                         [&key](const Matchers::StringMatcherPtr& matcher) {
+                           return matcher->match(key);
+                         })) {
           return Http::HeaderMap::Iterate::Continue;
         }
-        // Pseudo-headers should not be canonicalized
-        if (!entry.key().getStringView().empty() && entry.key().getStringView()[0] == ':') {
-          return Http::HeaderMap::Iterate::Continue;
-        }
-        const auto key = entry.key().getStringView();
+      } else {
+        // Otherwise use excluded_headers
         if (std::any_of(excluded_headers.begin(), excluded_headers.end(),
                         [&key](const Matchers::StringMatcherPtr& matcher) {
                           return matcher->match(key);
                         })) {
           return Http::HeaderMap::Iterate::Continue;
         }
+      }
+    }
 
-        std::string value(entry.value().getStringView());
-        // Remove leading, trailing, and deduplicate repeated ascii spaces
-        absl::RemoveExtraAsciiWhitespace(&value);
-        const auto iter = out.find(std::string(entry.key().getStringView()));
-        // If the entry already exists, append the new value to the end
-        if (iter != out.end()) {
-          iter->second += fmt::format(",{}", value);
-        } else {
-          out.emplace(std::string(entry.key().getStringView()), value);
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      });
+    std::string value(entry.value().getStringView());
+
+    // Remove leading, trailing, and deduplicate repeated ascii spaces
+    absl::RemoveExtraAsciiWhitespace(&value);
+    const std::string key_str(key);
+    const auto iter = out.find(key_str);
+    // If the entry already exists, append the new value to the end
+    if (iter != out.end()) {
+      iter->second += fmt::format(",{}", value);
+    } else {
+      out.emplace(std::move(key_str), std::move(value));
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
   // The AWS SDK has a quirk where it removes "default ports" (80, 443) from the host headers
   // Additionally, we canonicalize the :authority header as "host"
   // TODO(suniltheta): This may need to be tweaked to canonicalize :authority for HTTP/2 requests

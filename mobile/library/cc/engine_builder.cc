@@ -51,6 +51,11 @@ EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setBufferHighWatermark(size_t high_watermark) {
+  high_watermark_ = high_watermark;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
@@ -1025,9 +1030,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  InternalEngine* envoy_engine = absl::IgnoreLeak(new InternalEngine(
-      std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-      network_thread_priority_, disable_dns_refresh_on_network_change_, enable_logger_));
+  InternalEngine* envoy_engine = absl::IgnoreLeak(
+      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+                         network_thread_priority_, high_watermark_,
+                         disable_dns_refresh_on_network_change_, enable_logger_));
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

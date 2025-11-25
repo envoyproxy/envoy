@@ -20,7 +20,8 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
       "envoy.filters.http.composite",
       "envoy.filters.http.ext_proc",
       "envoy.ext_authz",
-      "envoy.filters.http.ext_authz"};
+      "envoy.filters.http.ext_authz",
+      "envoy.filters.http.kill_request"};
 
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
       [](test::extensions::filters::http::FilterFuzzTestCase* input, unsigned int seed) {

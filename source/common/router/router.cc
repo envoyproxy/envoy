@@ -801,9 +801,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ = createRetryState(
-      *route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_context_,
-      config_->factory_context_, callbacks_->dispatcher(), route_entry_->priority());
+  retry_state_ = createRetryState(*getEffectiveRetryPolicy(), headers, *cluster_, request_vcluster_,
+                                  route_stats_context_, config_->factory_context_,
+                                  callbacks_->dispatcher(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys. Also the method CONNECT doesn't support shadowing.
@@ -1882,9 +1882,16 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
 void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
                             bool end_stream) {
-  // This should be true because when we saw headers we either reset the stream
-  // (hence wouldn't have made it to onUpstreamData) or all other in-flight
-  // streams.
+  // When route retry policy is configured and an upstream filter is returning StopIteration
+  // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
+  // and we should just return.
+  if (upstream_requests_.size() == 0) {
+    return;
+  }
+
+  // Other than above case, this should be true because when we saw headers we
+  // either reset the stream (hence wouldn't have made it to onUpstreamData) or
+  // all other in-flight streams.
   ASSERT(upstream_requests_.size() == 1);
   if (end_stream) {
     // gRPC request termination without trailers is an error.
@@ -1899,9 +1906,16 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
 
 void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
                                 UpstreamRequest& upstream_request) {
-  // This should be true because when we saw headers we either reset the stream
-  // (hence wouldn't have made it to onUpstreamTrailers) or all other in-flight
-  // streams.
+  // When route retry policy is configured and an upstream filter is returning StopIteration
+  // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
+  // and we should just return.
+  if (upstream_requests_.size() == 0) {
+    return;
+  }
+
+  // Other than above case, this should be true because when we saw headers we
+  // either reset the stream (hence wouldn't have made it to onUpstreamTrailers) or
+  // all other in-flight streams.
   ASSERT(upstream_requests_.size() == 1);
 
   if (upstream_request.grpcRqSuccessDeferred()) {
@@ -2171,7 +2185,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(
 }
 
 void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
-  for (const auto& options_predicate : route_entry_->retryPolicy()->retryOptionsPredicates()) {
+  for (const auto& options_predicate : getEffectiveRetryPolicy()->retryOptionsPredicates()) {
     const Upstream::RetryOptionsPredicate::UpdateOptionsParameters parameters{
         retriable_request.streamInfo(), upstreamSocketOptions()};
     auto ret = options_predicate->updateOptions(parameters);
@@ -2401,6 +2415,16 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
                        status.message());
     }
   }
+}
+
+const Router::RetryPolicy* Filter::getEffectiveRetryPolicy() const {
+  // Use cluster-level retry policy if available. The most specific policy wins.
+  // If no cluster-level policy is configured, fall back to route-level policy.
+  const Router::RetryPolicy* retry_policy = cluster_->retryPolicy();
+  if (retry_policy == nullptr) {
+    retry_policy = route_entry_->retryPolicy().get();
+  }
+  return retry_policy;
 }
 
 RetryStatePtr
