@@ -38,7 +38,7 @@ bool MappedAttributeBuilder::modifyRequest(
     const Params& params, envoy::service::ext_proc::v3::ProcessingRequest& request) {
   const bool is_inbound =
       params.traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND;
-  Protobuf::Map<std::string, std::string>* attributes_map = nullptr;
+  const Protobuf::Map<std::string, std::string>* attributes_map = nullptr;
   if (is_inbound) {
     attributes_map = &config_.mapped_request_attributes();
     if (attributes_map->empty() || sent_request_attributes_) {
