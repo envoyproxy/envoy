@@ -383,10 +383,10 @@ public:
     // Set allow_failed=true and allow_missing=true to bypass validation
     // The key difference is we're telling the authenticator to extract claims
     // even when signature validation would fail
-    auto auth =
-        auth_factory_.create(nullptr, absl::nullopt, nit:
-/*=allow failed*/ true
-/*=allow missing*/ true);
+    auto auth = auth_factory_.create(nullptr, absl::nullopt,
+                                     true
+                                     /*=allow failed*/ true
+                                     /*=allow missing*/ true);
 
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
