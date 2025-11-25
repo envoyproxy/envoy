@@ -286,26 +286,6 @@ private:
 };
 
 /**
- * KeysRequest sends the command to all Redis server. The response from each Redis (which
- * must be an array) is merged and returned to the user. If there is any error or failure in
- * processing the fragmented commands, an error will be returned.
- */
-class KeysRequest : public FragmentedRequest {
-public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
-                                SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool delay_command_latency,
-                                const StreamInfo::StreamInfo& stream_info);
-
-private:
-  KeysRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
-              bool delay_command_latency)
-      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
-  // RedisProxy::CommandSplitter::FragmentedRequest
-  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-};
-
-/**
  * ScanRequest is a specialized request for the SCAN command. It sends the command to all Redis
  * servers and merges the results. The SCAN command is used to incrementally iterate over keys in
  * the database, and it may return multiple pages of results. This request handles the pagination
@@ -434,29 +414,6 @@ private:
 };
 
 /**
- * SelectRequest sends the SELECT command to all Redis servers. The SELECT command is used to
- * change the current database for the connection.
- * The response from the server is expected to be a simple string indicating the selected database.
- *
- * Note: The SELECT command is implemented primarily to support Redis standalone mode, where
- * database selection is required.
- */
-class SelectRequest : public FragmentedRequest {
-public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
-                                SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool delay_command_latency,
-                                const StreamInfo::StreamInfo& stream_info);
-
-private:
-  SelectRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
-                bool delay_command_latency)
-      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
-  // RedisProxy::CommandSplitter::FragmentedRequest
-  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-};
-
-/**
  * SplitKeysSumResultRequest takes each key from the command and sends the same incoming command
  * with each key to the appropriate Redis server. The response from each Redis (which must be an
  * integer) is summed and returned to the user. If there is any error or failure in processing the
@@ -478,25 +435,6 @@ private:
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
 
   int64_t total_{0};
-};
-
-/**
- * RoleRequest sends the ROLE command to all Redis servers. The ROLE command is used to
- * get the role of the Redis server.
- */
-class RoleRequest : public FragmentedRequest {
-public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
-                                SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool delay_command_latency,
-                                const StreamInfo::StreamInfo& stream_info);
-
-private:
-  RoleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
-              bool delay_command_latency)
-      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
-  // RedisProxy::CommandSplitter::FragmentedRequest
-  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
 };
 
 /**
@@ -582,11 +520,8 @@ private:
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
-  CommandHandlerFactory<KeysRequest> keys_handler_;
   CommandHandlerFactory<ScanRequest> scan_handler_;
   CommandHandlerFactory<ShardInfoRequest> shard_info_handler_;
-  CommandHandlerFactory<SelectRequest> select_handler_;
-  CommandHandlerFactory<RoleRequest> role_handler_;
   CommandHandlerFactory<RandomShardRequest> random_shard_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
   CommandHandlerFactory<TransactionRequest> transaction_handler_;
