@@ -20,12 +20,12 @@ This filter enables Envoy to act as an intelligent MCP gateway, facilitating two
 Identity and Policy Enforcement
 -------------------------------
 
-A common usage of the MCP filter is to enforce policies based on MCP payload attributes. The filter parses MCP messages and populates dynamic metadata,
-which subsequent filters in the chain can use for decision-making.
+A common usage of the MCP filter is to enforce policies based on MCP payload attributes. The filter parses MCP JSON_RPC messages and populates
+the dynamic metadata, which subsequent filters in the chain can use for decision-making.
 
 This enables scenarios such as:
-* **Per-route Policy:** Applying specific RBAC rules for different routes or MCP methods.
-* **Egress Traffic Control:** Using the filter with a dynamic forward proxy to secure outbound traffic for AI agents.
+1.  **Per-route Policy:** Applying specific RBAC rules for different routes or MCP methods.
+2.  **Egress Traffic Control:** Using the filter with a dynamic forward proxy to secure outbound traffic for AI agents.
 
 Integration with RBAC
 ~~~~~~~~~~~~~~~~~~~~~
