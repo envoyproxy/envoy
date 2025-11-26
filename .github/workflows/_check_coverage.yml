@@ -41,7 +41,6 @@ jobs:
       bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths }}
       error-match: |
         ERROR
         error:
@@ -72,8 +71,5 @@ jobs:
         include:
         - target: coverage
           name: Coverage
-          diskspace-hack-paths:
         - target: fuzz_coverage
           name: Fuzz coverage
-          diskspace-hack-paths: |
-            /opt/hostedtoolcache
