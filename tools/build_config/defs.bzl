@@ -1,15 +1,6 @@
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
-def _toolchain_enforcement_impl(ctx):
-    """Implementation of the toolchain enforcement rule.
-
-    This rule checks if a C++ toolchain has been explicitly selected.
-    If not, it fails with a helpful error message.
-    """
-    toolchain_id = ctx.attr.toolchain_identifier[BuildSettingInfo].value
-
-    if toolchain_id == "":
-        fail("""
+ERR_MSG_TOOLCHAIN = """
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                   C++ Toolchain Selection Required                            ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -26,7 +17,29 @@ You can also set a default in your user.bazelrc file:
   build --config=gcc
 
 For more information, see the Envoy developer documentation.
-""")
+"""
+
+DOC_TOOLCHAIN = """
+Rule that enforces explicit C++ toolchain selection.
+
+This rule reads the toolchain_identifier build setting and fails the build
+if no toolchain has been explicitly selected (i.e., the value is empty).
+
+This rule must be invoked as part of the build process (via
+--//tools/build_config:enforce_toolchain in .bazelrc) to provide enforcement.
+It does not produce any build artifacts.
+"""
+
+def _toolchain_enforcement_impl(ctx):
+    """Implementation of the toolchain enforcement rule.
+
+    This rule checks if a C++ toolchain has been explicitly selected.
+    If not, it fails with a helpful error message.
+    """
+    toolchain_id = ctx.attr.toolchain_identifier[BuildSettingInfo].value
+
+    if toolchain_id == "":
+        fail(ERR_MSG_TOOLCHAIN)
 
     # Return an empty default info provider - this rule doesn't produce any outputs
     return [DefaultInfo()]
@@ -40,14 +53,5 @@ toolchain_enforcement = rule(
             doc = "The toolchain_identifier build setting to check",
         ),
     },
-    doc = """
-Rule that enforces explicit C++ toolchain selection.
-
-This rule reads the toolchain_identifier build setting and fails the build
-if no toolchain has been explicitly selected (i.e., the value is empty).
-
-This rule must be invoked as part of the build process (via
---//tools/build_config:enforce_toolchain in .bazelrc) to provide enforcement.
-It does not produce any build artifacts.
-""",
+    doc = DOC_TOOLCHAIN,
 )
