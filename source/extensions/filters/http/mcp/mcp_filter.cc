@@ -12,14 +12,15 @@ namespace Mcp {
 
 namespace {
 McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = prefix + "mcp.";
-  return McpFilterStats{ALL_MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  const std::string final_prefix = absl::StrCat(prefix, "mcp.");
+  return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 } // namespace
 
 McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
                                  const std::string& stats_prefix, Stats::Scope& scope)
-    : traffic_mode_(proto_config.traffic_mode()), clear_route_cache_(proto_config.clear_route_cache()),
+    : traffic_mode_(proto_config.traffic_mode()),
+      clear_route_cache_(proto_config.clear_route_cache()),
       max_request_body_size_(proto_config.has_max_request_body_size()
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB

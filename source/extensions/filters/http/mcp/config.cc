@@ -14,7 +14,7 @@ Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
   auto config = std::make_shared<McpFilterConfig>(proto_config, stats_prefix,
-                                                   context.serverFactoryContext().scope());
+                                                  context.serverFactoryContext().scope());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<McpFilter>(config));

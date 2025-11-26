@@ -31,7 +31,7 @@ constexpr absl::string_view JsonRpcVersion = "2.0";
 /**
  * All MCP filter stats. @see stats_macros.h
  */
-#define ALL_MCP_FILTER_STATS(COUNTER)                                                              \
+#define MCP_FILTER_STATS(COUNTER)                                                              \
   COUNTER(requests_rejected)                                                                       \
   COUNTER(invalid_json)                                                                            \
   COUNTER(body_too_large)
@@ -40,7 +40,7 @@ constexpr absl::string_view JsonRpcVersion = "2.0";
  * Struct definition for MCP filter stats. @see stats_macros.h
  */
 struct McpFilterStats {
-  ALL_MCP_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+  MCP_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
