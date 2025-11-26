@@ -56,6 +56,13 @@ build --action_env=BAZEL_VOLATILE_DIRTY --host_action_env=BAZEL_VOLATILE_DIRTY
 
 build --test_summary=terse
 
+# Disable automatic C++ toolchain detection
+# Users must explicitly select a toolchain with --config=gcc or --config=clang
+build --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+
+# Enforce explicit toolchain selection
+build --//tools/build_config:enforce_toolchain
+
 # TODO(keith): Remove once these 2 are the default
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
@@ -122,12 +129,14 @@ common:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
 common:clang --config=clang-common
 common:clang --config=libc++
 common:clang --action_env=LDFLAGS="-fuse-ld=lld"
+common:clang --//tools/build_config:toolchain_identifier=clang
 
 # Use gold linker for gcc compiler.
 build:gcc --config=libstdc++
 build:gcc --test_env=HEAPCHECK=
 build:gcc --action_env=BAZEL_COMPILER=gcc
 build:gcc --action_env=CC=gcc --action_env=CXX=g++
+build:gcc --//tools/build_config:toolchain_identifier=gcc
 # This is to work around a bug in GCC that makes debug-types-section
 # option not play well with fission:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=110885
