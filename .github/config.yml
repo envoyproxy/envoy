@@ -4,16 +4,16 @@ build-image:
   repo: docker.io/envoyproxy/envoy-build-ubuntu
   repo-gcr: gcr.io/envoy-ci/envoy-build
   # Until toolchains land, these all just point to the main image or the mobile one
-  sha: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
-  sha-ci: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
-  sha-devtools: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
-  sha-docker: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
-  sha-gcc: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
-  sha-mobile: 224feb2b7d513bf7f2ac0c7c529db1cb46398952f31b7d46e51211642d0b2ba0
-  sha-worker: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  sha: af010b7a4f2d657d5cfce5298940b19bb02a5c9010e1b39f8fbabb84dca6e1d5
+  sha-ci: af010b7a4f2d657d5cfce5298940b19bb02a5c9010e1b39f8fbabb84dca6e1d5
+  sha-devtools: af010b7a4f2d657d5cfce5298940b19bb02a5c9010e1b39f8fbabb84dca6e1d5
+  sha-docker: af010b7a4f2d657d5cfce5298940b19bb02a5c9010e1b39f8fbabb84dca6e1d5
+  sha-gcc: af010b7a4f2d657d5cfce5298940b19bb02a5c9010e1b39f8fbabb84dca6e1d5
+  sha-mobile: 3f449bce3387847da153ca9cae5a13fc8af4ffc381cec10de14189b3143366ac
+  sha-worker: af010b7a4f2d657d5cfce5298940b19bb02a5c9010e1b39f8fbabb84dca6e1d5
   # TODO: remove this dupe (currently used by ci request handler)
-  mobile-sha: 224feb2b7d513bf7f2ac0c7c529db1cb46398952f31b7d46e51211642d0b2ba0
-  tag: abd41d4081d77bacbb246c9b952d49f816a9ee2f
+  mobile-sha: 3f449bce3387847da153ca9cae5a13fc8af4ffc381cec10de14189b3143366ac
+  tag: e0b4993c78551c1638ac00cf21d36313fe35d81d
 
 config:
   envoy:
