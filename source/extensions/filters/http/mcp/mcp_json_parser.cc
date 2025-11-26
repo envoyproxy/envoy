@@ -68,11 +68,11 @@ McpParserConfig::fromProto(const envoy::extensions::filters::http::mcp::v3::Pars
 
   // Process method-specific overrides
   for (const auto& method_proto : proto.methods()) {
-    std::vector<AttributeExtractionRule> attributes;
-    for (const auto& attribute_proto : method_proto.attributes()) {
-      attributes.emplace_back(attribute_proto.path());
+    std::vector<AttributeExtractionRule> extraction_rules;
+    for (const auto& extraction_rule_proto : method_proto.extraction_rules()) {
+      extraction_rules.emplace_back(extraction_rule_proto.path());
     }
-    config.addMethodConfig(method_proto.method(), std::move(attributes));
+    config.addMethodConfig(method_proto.method(), std::move(extraction_rules));
   }
 
   return config;
