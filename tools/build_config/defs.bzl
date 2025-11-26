@@ -2,12 +2,12 @@ load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
 def _toolchain_enforcement_impl(ctx):
     """Implementation of the toolchain enforcement rule.
-    
+
     This rule checks if a C++ toolchain has been explicitly selected.
     If not, it fails with a helpful error message.
     """
     toolchain_id = ctx.attr.toolchain_identifier[BuildSettingInfo].value
-    
+
     if toolchain_id == "":
         fail("""
 ╔═══════════════════════════════════════════════════════════════════════════════╗
@@ -27,7 +27,7 @@ You can also set a default in your user.bazelrc file:
 
 For more information, see the Envoy developer documentation.
 """)
-    
+
     # Return an empty default info provider - this rule doesn't produce any outputs
     return [DefaultInfo()]
 
@@ -41,9 +41,13 @@ toolchain_enforcement = rule(
         ),
     },
     doc = """
-    Rule that enforces explicit C++ toolchain selection.
-    
-    This rule reads the toolchain_identifier build setting and fails the build
-    if no toolchain has been explicitly selected (i.e., the value is empty).
-    """,
+Rule that enforces explicit C++ toolchain selection.
+
+This rule reads the toolchain_identifier build setting and fails the build
+if no toolchain has been explicitly selected (i.e., the value is empty).
+
+This rule must be invoked as part of the build process (via
+--//tools/build_config:enforce_toolchain in .bazelrc) to provide enforcement.
+It does not produce any build artifacts.
+""",
 )

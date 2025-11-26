@@ -61,6 +61,8 @@ build --test_summary=terse
 build --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 # Enforce explicit toolchain selection
+# This flag causes the enforcement rule to run on every build, checking that
+# a toolchain has been explicitly selected via --config=gcc or --config=clang
 build --//tools/build_config:enforce_toolchain
 
 # TODO(keith): Remove once these 2 are the default
