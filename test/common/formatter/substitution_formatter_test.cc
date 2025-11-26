@@ -36,7 +36,6 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "google/protobuf/struct.pb.h"
 #include "gtest/gtest.h"
 
 using testing::Const;
@@ -2791,7 +2790,7 @@ TEST(SubstitutionFormatterTest, TraceIDFormatter) {
 /**
  * Populate a metadata object with the following test data:
  * "com.test":
- * {"test_key":"test_value","test_obj":{"inner_key":"inner_value"},"test_lst":["item0",4.2]}
+ * {"test_key":"test_value","test_obj":{"inner_key":"inner_value"},"test_list":["item0",4.2]}
  */
 void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata) {
   Protobuf::Struct struct_obj;
@@ -2807,7 +2806,7 @@ void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata) {
   *list_inner.add_values() = ValueUtil::numberValue(4.2);
   Protobuf::Value list_value;
   *list_value.mutable_list_value() = list_inner;
-  fields_map["test_lst"] = list_value;
+  fields_map["test_list"] = list_value;
   (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
 }
 
@@ -2823,7 +2822,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
     std::string val = formatter.format(stream_info).value();
     EXPECT_THAT(val, HasSubstr(R"("test_key":"test_value")"));
     EXPECT_THAT(val, HasSubstr(R"("test_obj":{"inner_key":"inner_value"})"));
-    EXPECT_THAT(val, HasSubstr(R"("test_lst":["item0",4.2])"));
+    EXPECT_THAT(val, HasSubstr(R"("test_list":["item0",4.2])"));
 
     Protobuf::Value expected_val;
     expected_val.mutable_struct_value()->CopyFrom(metadata.filter_metadata().at("com.test"));
@@ -2887,7 +2886,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
 
   // size limit on list
   {
-    DynamicMetadataFormatter formatter("com.test", {"test_lst"}, absl::optional<size_t>(5));
+    DynamicMetadataFormatter formatter("com.test", {"test_list"}, absl::optional<size_t>(5));
     // N.B. Does not truncate.
     Protobuf::Value expected_val;
     expected_val.mutable_list_value()->add_values()->set_string_value("item0");
