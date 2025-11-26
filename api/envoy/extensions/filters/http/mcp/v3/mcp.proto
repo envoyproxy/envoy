@@ -75,7 +75,7 @@ message ParserConfig {
 
     // Attributes to extract for this method.
     // If empty, no attributes will be extracted for this method beyond the default ones (jsonrpc, method).
-    repeated AttributeExtractionRule attributes = 2;
+    repeated AttributeExtractionRule extraction_rules = 2;
   }
 
   // Method-specific configurations.
