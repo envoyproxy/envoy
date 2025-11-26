@@ -50,14 +50,14 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     McpParserConfig custom_config;
 
     // Add various method configurations
-    std::vector<McpParserConfig::FieldRule> tools_rules = {
-        McpParserConfig::FieldRule("params.name"),
-        McpParserConfig::FieldRule("params.arguments"),
+    std::vector<McpParserConfig::AttributeExtractionRule> tools_rules = {
+        McpParserConfig::AttributeExtractionRule("params.name"),
+        McpParserConfig::AttributeExtractionRule("params.arguments"),
     };
     custom_config.addMethodConfig("tools/call", tools_rules);
 
-    std::vector<McpParserConfig::FieldRule> resources_rules = {
-        McpParserConfig::FieldRule("params.uri"),
+    std::vector<McpParserConfig::AttributeExtractionRule> resources_rules = {
+        McpParserConfig::AttributeExtractionRule("params.uri"),
     };
     custom_config.addMethodConfig("resources/read", resources_rules);
 
@@ -91,7 +91,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   if (len > 10 && input.find('{') != std::string::npos) {
     // Create a config that tries to extract deeply nested fields
     McpParserConfig deep_config;
-    std::vector<McpParserConfig::FieldRule> deep_rules;
+    std::vector<McpParserConfig::AttributeExtractionRule> deep_rules;
 
     // Generate nested paths
     for (int depth = 1; depth <= 10; ++depth) {
@@ -100,7 +100,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
         path += ".nested";
       }
       path += ".value";
-      deep_rules.push_back(McpParserConfig::FieldRule(path));
+      deep_rules.push_back(McpParserConfig::AttributeExtractionRule(path));
     }
 
     deep_config.addMethodConfig("deep/test", deep_rules);

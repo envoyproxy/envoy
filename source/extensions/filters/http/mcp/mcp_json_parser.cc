@@ -12,7 +12,8 @@ namespace Mcp {
 
 using namespace McpConstants;
 
-void McpParserConfig::addMethodConfig(absl::string_view method, std::vector<FieldRule> fields) {
+void McpParserConfig::addMethodConfig(absl::string_view method,
+                                      std::vector<AttributeExtractionRule> fields) {
   method_fields_[std::string(method)] = std::move(fields);
 }
 // McpParserConfig implementation
@@ -22,38 +23,38 @@ void McpParserConfig::initializeDefaults() {
   always_extract_.insert("method");
 
   // Tools
-  addMethodConfig(Methods::TOOLS_CALL, {FieldRule("params.name")});
+  addMethodConfig(Methods::TOOLS_CALL, {AttributeExtractionRule("params.name")});
 
   // Resources
-  addMethodConfig(Methods::RESOURCES_READ, {FieldRule("params.uri")});
-  addMethodConfig(Methods::RESOURCES_LIST, {FieldRule("params.cursor")});
-  addMethodConfig(Methods::RESOURCES_SUBSCRIBE, {FieldRule("params.uri")});
-  addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE, {FieldRule("params.uri")});
-  addMethodConfig(Methods::RESOURCES_TEMPLATES_LIST, {FieldRule("params.cursor")});
+  addMethodConfig(Methods::RESOURCES_READ, {AttributeExtractionRule("params.uri")});
+  addMethodConfig(Methods::RESOURCES_LIST, {AttributeExtractionRule("params.cursor")});
+  addMethodConfig(Methods::RESOURCES_SUBSCRIBE, {AttributeExtractionRule("params.uri")});
+  addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE, {AttributeExtractionRule("params.uri")});
+  addMethodConfig(Methods::RESOURCES_TEMPLATES_LIST, {AttributeExtractionRule("params.cursor")});
 
   // Prompts
-  addMethodConfig(Methods::PROMPTS_GET, {FieldRule("params.name")});
-  addMethodConfig(Methods::PROMPTS_LIST, {FieldRule("params.cursor")});
+  addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule("params.name")});
+  addMethodConfig(Methods::PROMPTS_LIST, {AttributeExtractionRule("params.cursor")});
 
   // Completion
   addMethodConfig(Methods::COMPLETION_COMPLETE, {});
 
   // Logging
-  addMethodConfig(Methods::LOGGING_SET_LEVEL, {FieldRule("params.level")});
+  addMethodConfig(Methods::LOGGING_SET_LEVEL, {AttributeExtractionRule("params.level")});
 
   // Lifecycle
-  addMethodConfig(Methods::INITIALIZE,
-                  {FieldRule("params.protocolVersion"), FieldRule("params.clientInfo.name")});
+  addMethodConfig(Methods::INITIALIZE, {AttributeExtractionRule("params.protocolVersion"),
+                                        AttributeExtractionRule("params.clientInfo.name")});
 
   // Notifications
-  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED, {FieldRule("params.uri")});
+  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED, {AttributeExtractionRule("params.uri")});
 
-  addMethodConfig(Methods::NOTIFICATION_PROGRESS,
-                  {FieldRule("params.progressToken"), FieldRule("params.progress")});
+  addMethodConfig(Methods::NOTIFICATION_PROGRESS, {AttributeExtractionRule("params.progressToken"),
+                                                   AttributeExtractionRule("params.progress")});
 
-  addMethodConfig(Methods::NOTIFICATION_CANCELLED, {FieldRule("params.requestId")});
+  addMethodConfig(Methods::NOTIFICATION_CANCELLED, {AttributeExtractionRule("params.requestId")});
 
-  addMethodConfig(Methods::NOTIFICATION_MESSAGE, {FieldRule("params.level")});
+  addMethodConfig(Methods::NOTIFICATION_MESSAGE, {AttributeExtractionRule("params.level")});
 }
 
 McpParserConfig
@@ -67,11 +68,11 @@ McpParserConfig::fromProto(const envoy::extensions::filters::http::mcp::v3::Pars
 
   // Process method-specific overrides
   for (const auto& method_proto : proto.methods()) {
-    std::vector<FieldRule> fields;
-    for (const auto& field_proto : method_proto.fields()) {
-      fields.emplace_back(field_proto.path());
+    std::vector<AttributeExtractionRule> attributes;
+    for (const auto& attribute_proto : method_proto.attributes()) {
+      attributes.emplace_back(attribute_proto.path());
     }
-    config.addMethodConfig(method_proto.method(), std::move(fields));
+    config.addMethodConfig(method_proto.method(), std::move(attributes));
   }
 
   return config;
@@ -83,9 +84,9 @@ McpParserConfig McpParserConfig::createDefault() {
   return config;
 }
 
-const std::vector<McpParserConfig::FieldRule>&
+const std::vector<McpParserConfig::AttributeExtractionRule>&
 McpParserConfig::getFieldsForMethod(const std::string& method) const {
-  static const std::vector<FieldRule> empty;
+  static const std::vector<AttributeExtractionRule> empty;
   auto it = method_fields_.find(method);
   return (it != method_fields_.end()) ? it->second : empty;
 }
@@ -195,11 +196,7 @@ std::string McpFieldExtractor::buildFullPath(absl::string_view name) const {
 
 McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
                                                    absl::string_view value) {
-  if (can_stop_parsing_) {
-    return this;
-  }
-
-  if (array_depth_ > 0) {
+  if (can_stop_parsing_ || array_depth_ > 0) {
     return this;
   }
 

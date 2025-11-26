@@ -84,10 +84,10 @@ constexpr absl::string_view NOTIFICATION_INITIALIZED = "notifications/initialize
  */
 class McpParserConfig {
 public:
-  struct FieldRule {
+  struct AttributeExtractionRule {
     std::string path; // JSON path (e.g., "params.name")
 
-    FieldRule(const std::string& p) : path(p) {}
+    AttributeExtractionRule(const std::string& p) : path(p) {}
   };
 
   // Create from proto configuration
@@ -95,10 +95,10 @@ public:
   fromProto(const envoy::extensions::filters::http::mcp::v3::ParserConfig& proto);
 
   // Get extraction policy for a specific method
-  const std::vector<FieldRule>& getFieldsForMethod(const std::string& method) const;
+  const std::vector<AttributeExtractionRule>& getFieldsForMethod(const std::string& method) const;
 
   // Add method configuration
-  void addMethodConfig(absl::string_view method, std::vector<FieldRule> fields);
+  void addMethodConfig(absl::string_view method, std::vector<AttributeExtractionRule> fields);
 
   // Get all global fields to always extract
   const absl::flat_hash_set<std::string>& getAlwaysExtract() const { return always_extract_; }
@@ -110,7 +110,7 @@ private:
   void initializeDefaults();
 
   // Per-method field policies
-  absl::flat_hash_map<std::string, std::vector<FieldRule>> method_fields_;
+  absl::flat_hash_map<std::string, std::vector<AttributeExtractionRule>> method_fields_;
 
   // Global fields to always extract
   absl::flat_hash_set<std::string> always_extract_;

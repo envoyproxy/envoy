@@ -505,9 +505,10 @@ TEST_F(McpJsonParserTest, ResetAndReuse) {
 TEST_F(McpJsonParserTest, CustomFieldExtraction) {
   // Create custom config that extracts additional fields
   McpParserConfig custom_config;
-  std::vector<McpParserConfig::FieldRule> rules = {
-      McpParserConfig::FieldRule("params.name"), McpParserConfig::FieldRule("params.custom_field"),
-      McpParserConfig::FieldRule("params.metadata.version")};
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.name"),
+      McpParserConfig::AttributeExtractionRule("params.custom_field"),
+      McpParserConfig::AttributeExtractionRule("params.metadata.version")};
 
   custom_config.addMethodConfig(McpConstants::Methods::TOOLS_CALL, rules);
 
@@ -562,8 +563,8 @@ TEST_F(McpJsonParserTest, BooleanValues) {
 
   // Create custom config that extracts additional fields
   McpParserConfig custom_config;
-  std::vector<McpParserConfig::FieldRule> rules = {
-      McpParserConfig::FieldRule("params.subscribe"),
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.subscribe"),
   };
 
   custom_config.addMethodConfig(McpConstants::Methods::RESOURCES_SUBSCRIBE, rules);
@@ -716,8 +717,9 @@ TEST_F(McpJsonParserTest, CopyFieldCollision) {
   // Config tries to extract both "params.a" and "params.a.b"
   // This is a configuration error effectively, but parser should handle it gracefully
   McpParserConfig custom_config;
-  std::vector<McpParserConfig::FieldRule> rules = {McpParserConfig::FieldRule("params.a"),
-                                                   McpParserConfig::FieldRule("params.a.b")};
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.a"),
+      McpParserConfig::AttributeExtractionRule("params.a.b")};
   custom_config.addMethodConfig("test", rules);
 
   auto parser = std::make_unique<McpJsonParser>(custom_config);
@@ -747,8 +749,8 @@ TEST_F(McpJsonParserTest, FromProtoConfig) {
   envoy::extensions::filters::http::mcp::v3::ParserConfig proto_config;
   auto* method_rule = proto_config.add_methods();
   method_rule->set_method("custom/method");
-  method_rule->add_fields()->set_path("params.field1");
-  method_rule->add_fields()->set_path("params.field2");
+  method_rule->add_attributes()->set_path("params.field1");
+  method_rule->add_attributes()->set_path("params.field2");
 
   McpParserConfig config = McpParserConfig::fromProto(proto_config);
 
@@ -774,8 +776,9 @@ TEST_F(McpJsonParserTest, FloatingPointValues) {
 
   // We need to configure the parser to extract these fields
   McpParserConfig custom_config;
-  std::vector<McpParserConfig::FieldRule> rules = {McpParserConfig::FieldRule("params.level"),
-                                                   McpParserConfig::FieldRule("params.other")};
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.level"),
+      McpParserConfig::AttributeExtractionRule("params.other")};
   custom_config.addMethodConfig(McpConstants::Methods::LOGGING_SET_LEVEL, rules);
 
   auto parser = std::make_unique<McpJsonParser>(custom_config);
@@ -795,9 +798,10 @@ TEST_F(McpJsonParserTest, FloatingPointValues) {
 
 TEST(McpFieldExtractorTest, DirectIntegerRendering) {
   McpParserConfig config;
-  std::vector<McpParserConfig::FieldRule> rules = {McpParserConfig::FieldRule("int32_val"),
-                                                   McpParserConfig::FieldRule("uint32_val"),
-                                                   McpParserConfig::FieldRule("int64_val")};
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("int32_val"),
+      McpParserConfig::AttributeExtractionRule("uint32_val"),
+      McpParserConfig::AttributeExtractionRule("int64_val")};
   config.addMethodConfig("test_method", rules);
 
   Protobuf::Struct metadata;
@@ -844,8 +848,9 @@ TEST_F(McpJsonParserTest, FinishParseWithoutParsing) {
 
 TEST(McpFieldExtractorTest, RenderBytesAndFloat) {
   McpParserConfig config;
-  std::vector<McpParserConfig::FieldRule> rules = {McpParserConfig::FieldRule("bytes_val"),
-                                                   McpParserConfig::FieldRule("float_val")};
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("bytes_val"),
+      McpParserConfig::AttributeExtractionRule("float_val")};
   config.addMethodConfig("test_method", rules);
 
   Protobuf::Struct metadata;
@@ -926,8 +931,8 @@ TEST_F(McpJsonParserTest, JsonRpcBeforeMethod) {
 TEST_F(McpJsonParserTest, BoolInArrayAndAfterEarlyStop) {
   // Create a config that will cause early stop
   McpParserConfig custom_config;
-  std::vector<McpParserConfig::FieldRule> rules = {
-      McpParserConfig::FieldRule("params.name"),
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.name"),
   };
   custom_config.addMethodConfig("tools/call", rules);
 
@@ -960,8 +965,8 @@ TEST_F(McpJsonParserTest, ArraySkippingWithRequiredFieldAfter) {
   // This test ensures that we hit the array_depth_ > 0 checks in all Render methods.
   // We do this by requiring a field that comes AFTER the array, so early stop doesn't trigger.
   McpParserConfig custom_config;
-  std::vector<McpParserConfig::FieldRule> rules = {
-      McpParserConfig::FieldRule("params.end_field"),
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.end_field"),
   };
   custom_config.addMethodConfig("test", rules);
 
@@ -1070,13 +1075,13 @@ TEST_F(McpJsonParserTest, GetNestedValueEmptyPath) {
 TEST_F(McpJsonParserTest, CopyFieldByPathCoverage) {
   // Configure specific fields to test copyFieldByPath logic
   McpParserConfig custom_config;
-  std::vector<McpParserConfig::FieldRule> rules = {
-      McpParserConfig::FieldRule("params.name"),          // Parent field
-      McpParserConfig::FieldRule("params.missing.field"), // Field not found
-      McpParserConfig::FieldRule("params.name.child"),    // Intermediate not struct
-      McpParserConfig::FieldRule("deep.nested.value"),    // Deep nesting success
-      McpParserConfig::FieldRule("group.item1"),          // Group creation
-      McpParserConfig::FieldRule("group.item2")           // Group append
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.name"),          // Parent field
+      McpParserConfig::AttributeExtractionRule("params.missing.field"), // Field not found
+      McpParserConfig::AttributeExtractionRule("params.name.child"),    // Intermediate not struct
+      McpParserConfig::AttributeExtractionRule("deep.nested.value"),    // Deep nesting success
+      McpParserConfig::AttributeExtractionRule("group.item1"),          // Group creation
+      McpParserConfig::AttributeExtractionRule("group.item2")           // Group append
   };
   custom_config.addMethodConfig("test", rules);
 
