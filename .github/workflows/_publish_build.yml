@@ -48,7 +48,7 @@ jobs:
     with:
       arch: ${{ inputs.arch }}
       bazel-extra: >-
-        --config=remote-envoy-engflow
+        --config=rbe
       target: release.server_only
       target-suffix: ${{ inputs.arch }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
@@ -109,7 +109,7 @@ jobs:
     with:
       arch: ${{ inputs.arch }}
       bazel-extra: >-
-        --config=remote-cache-envoy-engflow
+        --config=remote-cache
       downloads: |
         release.${{ inputs.arch }}: container/release/${{ inputs.arch }}/bin/
       target: distribution

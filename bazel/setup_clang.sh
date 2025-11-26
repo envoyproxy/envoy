@@ -23,6 +23,7 @@ cat <<EOF > "${BAZELRC_FILE}"
 # Generated file, do not edit. If you want to disable clang, just delete this file.
 build:clang --host_action_env=PATH=${PATH} --action_env=PATH=${PATH}
 build:clang --define="LLVM_DIRECTORY=${LLVM_PREFIX}"
+build:clang --action_env="LLVM_DIRECTORY=${LLVM_PREFIX}"
 
 build:clang --action_env=LLVM_CONFIG=${LLVM_CONFIG} --host_action_env=LLVM_CONFIG=${LLVM_CONFIG}
 build:clang --repo_env=LLVM_CONFIG=${LLVM_CONFIG}
