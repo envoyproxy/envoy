@@ -56,10 +56,6 @@ build --action_env=BAZEL_VOLATILE_DIRTY --host_action_env=BAZEL_VOLATILE_DIRTY
 
 build --test_summary=terse
 
-# Disable automatic C++ toolchain detection
-# Users must explicitly select a toolchain with --config=gcc or --config=clang
-build --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-
 # Enforce explicit toolchain selection
 # This flag causes the enforcement rule to run on every build, checking that
 # a toolchain has been explicitly selected via --config=gcc or --config=clang
