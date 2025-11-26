@@ -654,7 +654,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return signOutUser(headers);
   }
 
-  // User has already logged in and not exipired.
+  // The user has already logged in and not expired.
   const bool logged_in = canSkipOAuth(headers);
   if (logged_in) {
     // Update the path header with the query string parameters after a successful OAuth login.
@@ -698,7 +698,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       return Http::FilterHeadersStatus::StopIteration;
     }
 
-    // User is already login, and this is a resourece request.
+    // User is already login, and this is a resource request.
     // Remove OAuth flow cookies to prevent them from being sent upstream.
     removeOAuthFlowCookies(headers);
     // Continue on with the filter stack.
@@ -1276,7 +1276,7 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
 }
 
 void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
-                                      const std::string& encoded_token) const {
+                                           const std::string& encoded_token) const {
   // We use HTTP Only cookies.
   const CookieNames& cookie_names = config_->cookieNames();
 
