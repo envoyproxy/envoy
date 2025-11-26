@@ -914,7 +914,7 @@ public:
       Envoy::OptRef<const Envoy::Network::DownstreamTransportSocketFactory>
       /*transport_socket_factory*/,
       Envoy::Event::Dispatcher& /*dispatcher*/) override {
-    ASSERT(session->connection()->version().handshake_protocol == quic::PROTOCOL_TLS1_3);
+    ASSERT(session->connection()->version().transport_version > quic::QUIC_VERSION_46);
     return std::make_unique<QuicCustomTlsServerHandshaker>(session, crypto_config, fail_handshake_);
   }
 

@@ -50,7 +50,8 @@ public:
   ProactiveResource(const std::string& name, ProactiveResourceMonitorPtr monitor,
                     Stats::Scope& stats_scope)
       : name_(name), monitor_(std::move(monitor)),
-        failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")) {}
+        failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")),
+        pressure_gauge_(makeGauge(stats_scope, name, "pressure")) {}
 
   bool tryAllocateResource(int64_t increment) {
     if (monitor_->tryAllocateResource(increment)) {
@@ -70,6 +71,13 @@ public:
     }
   }
 
+  double updateResourcePressure() {
+    const double pressure = static_cast<double>(monitor_->currentResourceUsage()) /
+                            static_cast<double>(monitor_->maxResourceUsage());
+    pressure_gauge_.set(pressure * 100);
+    return pressure;
+  }
+
   ProactiveResourceMonitorOptRef getProactiveResourceMonitorForTest() {
     return makeOptRefFromPtr<ProactiveResourceMonitor>(monitor_.get());
   };
@@ -78,11 +86,21 @@ private:
   const std::string name_;
   ProactiveResourceMonitorPtr monitor_;
   Stats::Counter& failed_updates_counter_;
+  Stats::Gauge& pressure_gauge_;
+
+  Stats::StatNameManagedStorage makeName(Stats::Scope& scope, absl::string_view a,
+                                         absl::string_view b) {
+    return {absl::StrCat("overload.", a, ".", b), scope.symbolTable()};
+  }
 
   Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
-    Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
-                                            scope.symbolTable());
+    auto stat_name = makeName(scope, a, b);
     return scope.counterFromStatName(stat_name.statName());
+  }
+
+  Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
+    auto stat_name = makeName(scope, a, b);
+    return scope.gaugeFromStatName(stat_name.statName(), Stats::Gauge::ImportMode::NeverImport);
   }
 };
 

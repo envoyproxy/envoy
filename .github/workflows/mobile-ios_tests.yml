@@ -69,14 +69,18 @@ jobs:
         - name: Run swift library tests
           args: >-
             test
-            --config=mobile-macos-ios-swift
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-ios-swift
             //test/swift/...
           target: swift-tests
           timeout-minutes: 120
         - name: Run Objective-C library tests
           args: >-
             test
-            --config=mobile-macos-ios-obj-c
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-ios-obj-c
             //test/objective-c/...
             //test/cc/unit:envoy_config_test
           target: c-and-objc-tests
