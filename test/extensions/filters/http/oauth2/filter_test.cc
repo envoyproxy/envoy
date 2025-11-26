@@ -39,7 +39,7 @@ static const std::string TEST_DEFAULT_SCOPE = "user";
 static const std::string TEST_ENCODED_AUTH_SCOPES = "user%20openid%20email";
 static const std::string TEST_CSRF_TOKEN =
     "00000000075bcd15.na6kru4x1pHgocSIeU/mdtHYn58Gh1bqweS4XXoiqVg=";
-// {"url":"https://traffic.example.com/original_path?var1=1&var2=2","csrf_token":"${extracted},"flow_id":"00000000075bcd15"}
+// {"url":"https://traffic.example.com/original_path?var1=1&var2=2","csrf_token":"${extracted},"flow_id":"${extracted}"}
 static const std::string TEST_ENCODED_STATE =
     "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwiY3NyZl"
     "90b2tlbiI6IjAwMDAwMDAwMDc1YmNkMTUubmE2a3J1NHgxcEhnb2NTSWVVL21kdEhZbjU4R2gxYnF3ZVM0WFhvaXFWZz0i"

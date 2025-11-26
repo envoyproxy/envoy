@@ -19,15 +19,14 @@ namespace {
 static const std::string TEST_FLOW_ID = "8c18b8fcf575b593";
 static const std::string TEST_STATE_CSRF_TOKEN =
     "8c18b8fcf575b593.qE67JkhE3H/0rpNYWCkQXX65Yzk5gEe7uETE3m8tylY=";
-// {"url":"http://traffic.example.com/not/_oauth","csrf_token":"${extracted}","flow_id":"8c18b8fcf575b593"}
+// {"url":"http://traffic.example.com/not/_oauth","csrf_token":"${extracted}","flow_id":"${extracted}"}
 static const std::string TEST_ENCODED_STATE =
     "eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwiY3NyZl90b2tlbiI6IjhjMThiOGZjZj"
     "U3NWI1OTMucUU2N0praEUzSC8wcnBOWVdDa1FYWDY1WXprNWdFZTd1RVRFM204dHlsWT0iLCJmbG93X2lkIjoiOGMxOGI4"
     "ZmNmNTc1YjU5MyJ9";
 static const std::string TEST_STATE_CSRF_TOKEN_1 =
     "8c18b8fcf575b593.ZpkXMDNFiinkL87AoSDONKulBruOpaIiSAd7CNkgOEo=";
-// {"url":"http://traffic.example.com/not/_oauth","csrf_token":
-// "${extracted}}","flow_id":"8c18b8fcf575b593"}
+// {"url":"http://traffic.example.com/not/_oauth","csrf_token":"${extracted}}","flow_id":"${extracted}"}
 static const std::string TEST_ENCODED_STATE_1 =
     "eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwiY3NyZl90b2tlbiI6IjhjMThiOGZjZj"
     "U3NWI1OTMuWnBrWE1ETkZpaW5rTDg3QW9TRE9OS3VsQnJ1T3BhSWlTQWQ3Q05rZ09Fbz0iLCJmbG93X2lkIjoiOGMxOGI4"
