@@ -1146,6 +1146,9 @@ pub trait EnvoyHttpFilter {
   ///
   /// After starting the stream, use the returned stream_handle to send data/trailers or reset.
   /// Stream events will be delivered to the [`HttpFilter::on_http_stream_*`] methods.
+  ///
+  /// When the HTTP stream ends (either successfully or via reset), no further callbacks will
+  /// be invoked for that stream.
   fn start_http_stream<'a>(
     &mut self,
     _cluster_name: &'a str,
@@ -2989,13 +2992,13 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_data(
   filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
   stream_handle: abi::envoy_dynamic_module_type_http_stream_envoy_ptr,
   data: *const abi::envoy_dynamic_module_type_envoy_buffer,
-  data_size: usize,
+  data_count: usize,
   end_stream: bool,
 ) {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  let data = if data_size > 0 {
-    unsafe { std::slice::from_raw_parts(data as *const EnvoyBuffer, data_size) }
+  let data = if data_count > 0 {
+    unsafe { std::slice::from_raw_parts(data as *const EnvoyBuffer, data_count) }
   } else {
     &[]
   };

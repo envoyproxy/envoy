@@ -387,17 +387,16 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onData(Buffer::Instance
   }
 
   const uint64_t length = data.length();
-  if (length > 0) {
-    // We need to linearize the buffer because the module expects a contiguous buffer.
-    auto linear = data.linearize(length);
+  if (length > 0 || end_stream) {
+    std::vector<envoy_dynamic_module_type_envoy_buffer> buffers;
+    const auto& slices = data.getRawSlices();
+    buffers.reserve(slices.size());
+    for (const auto& slice : slices) {
+      buffers.push_back({static_cast<char*>(slice.mem_), slice.len_});
+    }
     filter_->config_->on_http_filter_http_stream_data_(
-        filter_->thisAsVoidPtr(), filter_->in_module_filter_, this_as_void_ptr_,
-        const_cast<char*>(reinterpret_cast<const char*>(linear)), length, end_stream);
-  } else if (end_stream) {
-    // Empty body with end_stream.
-    filter_->config_->on_http_filter_http_stream_data_(filter_->thisAsVoidPtr(),
-                                                       filter_->in_module_filter_,
-                                                       this_as_void_ptr_, nullptr, 0, end_stream);
+        filter_->thisAsVoidPtr(), filter_->in_module_filter_, this_as_void_ptr_, buffers.data(),
+        buffers.size(), end_stream);
   }
 }
 

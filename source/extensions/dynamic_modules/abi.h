@@ -807,8 +807,8 @@ void envoy_dynamic_module_on_http_filter_http_stream_headers(
  * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
  * envoy_dynamic_module_on_http_filter_new.
  * @param stream_ptr is the handle to the HTTP stream.
- * @param data is the pointer to the buffer containing the body chunk.
- * @param data_length is the length of the data.
+ * @param data is the pointer to the array of buffers containing the body chunk.
+ * @param data_count is the number of buffers.
  * @param end_stream is true if this is the last data in the stream (no trailers will follow).
  *
  * data is owned by Envoy and is guaranteed to be valid until the end of this event hook.
@@ -817,7 +817,7 @@ void envoy_dynamic_module_on_http_filter_http_stream_data(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
     envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
-    envoy_dynamic_module_type_buffer_envoy_ptr data, size_t data_length, bool end_stream);
+    const envoy_dynamic_module_type_envoy_buffer* data, size_t data_count, bool end_stream);
 
 /**
  * envoy_dynamic_module_on_http_filter_http_stream_trailers is called when response trailers are
