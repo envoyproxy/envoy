@@ -39,9 +39,9 @@ Key Capabilities
 
 Within these patterns, the filter facilitates three essential functions:
 
-* MCP Policy Enforcement: Extracts MCP attributes to enforce fine-grained access control using either RBAC or an external authorization service.
-* MCP Observability: Extracts MCP attributes to populate dynamic metadata, which is then consumed by access logs or tracers for enhanced monitoring and debugging.
-* MCP Multiplexing and Aggregation: Acts as a unified endpoint that aggregates tools and resources originating from multiple backend services (Feature **Pending**).
+* **MCP Policy Enforcement**: Extracts MCP attributes to enforce fine-grained access control using either RBAC or an external authorization service.
+* **MCP Observability**: Extracts MCP attributes to populate dynamic metadata, which is then consumed by access logs or tracers for enhanced monitoring and debugging.
+* **MCP Multiplexing and Aggregation**: Acts as a unified endpoint that aggregates tools and resources originating from multiple backend services (Feature *Pending*).
 
 MCP Policy Enforcement Examples
 -------------------------------
@@ -51,8 +51,8 @@ the dynamic metadata, which subsequent filters in the chain can use for decision
 
 This enables scenarios such as:
 
-* Per-route Policy: Applying specific RBAC rules for different routes or MCP methods.
-* Egress Traffic Control: Using the filter with a dynamic forward proxy to secure outbound traffic for AI agents.
+* **Per-route Policy**: Applying specific RBAC rules for different routes or MCP methods.
+* **Egress Traffic Control**: Using the filter with a dynamic forward proxy to secure outbound traffic for AI agents.
 
 Integration with RBAC
 ~~~~~~~~~~~~~~~~~~~~~
