@@ -7,7 +7,7 @@ load(
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_CONFIG_VISIBILITY",
 )
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",

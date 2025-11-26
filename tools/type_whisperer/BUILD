@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:py_binary.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_proto_library")
 load("//tools/type_whisperer:api_build_file.bzl", "api_build_file")
 load("//tools/type_whisperer:file_descriptor_set_text.bzl", "file_descriptor_set_text")

@@ -1,8 +1,10 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
-load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_test.bzl", "py_test")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load(":envoy_binary.bzl", "envoy_cc_binary")
 load(

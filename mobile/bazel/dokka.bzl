@@ -1,4 +1,4 @@
-load("@rules_java//java:defs.bzl", "java_common")
+load("@rules_java//java/common:java_common.bzl", "java_common")
 
 def _sources_javadocs_impl(ctx):
     javabase = ctx.attr._javabase[java_common.JavaRuntimeInfo]

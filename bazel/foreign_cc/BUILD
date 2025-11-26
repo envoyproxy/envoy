@@ -1,5 +1,5 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 load("@rules_foreign_cc//foreign_cc:make.bzl", "make")
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cmake", "envoy_package")

@@ -1,7 +1,8 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@aspect_bazel_lib//lib:yq.bzl", "yq")
 load("@base_pip3//:requirements.bzl", "requirement")
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 
 def envoy_jinja_env(

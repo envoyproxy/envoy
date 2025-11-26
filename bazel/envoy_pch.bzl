@@ -1,6 +1,6 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy library targets
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",

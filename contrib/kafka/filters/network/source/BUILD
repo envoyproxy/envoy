@@ -1,5 +1,6 @@
 load("@base_pip3//:requirements.bzl", "requirement")
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",

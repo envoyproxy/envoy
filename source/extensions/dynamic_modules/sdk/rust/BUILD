@@ -1,6 +1,6 @@
 load("@dynamic_modules_rust_sdk_crate_index//:defs.bzl", "all_crate_deps")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:rust_library.bzl", "rust_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_extension_package",

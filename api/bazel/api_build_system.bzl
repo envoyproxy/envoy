@@ -5,7 +5,7 @@ load("@com_google_protobuf//bazel:java_proto_library.bzl", "java_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
-load("@rules_cc//cc:defs.bzl", "cc_test")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load(
     "//bazel:external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",

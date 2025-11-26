@@ -1,5 +1,5 @@
 load("@base_pip3//:requirements.bzl", "requirement")
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",

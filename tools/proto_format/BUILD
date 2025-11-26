@@ -1,6 +1,6 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:py_binary.bzl", "py_binary")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data")
 
 licenses(["notice"])  # Apache 2

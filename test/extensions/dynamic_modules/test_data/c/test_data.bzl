@@ -1,4 +1,5 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_shared_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
 
 # This declares a cc_library target that is used to build a shared library.
 # name + ".c" is the source file that is compiled to create the shared library.

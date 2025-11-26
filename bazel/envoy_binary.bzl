@@ -1,6 +1,6 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy binary targets
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",

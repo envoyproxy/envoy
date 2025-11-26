@@ -98,7 +98,7 @@ def _envoy_repo_impl(repository_ctx):
     repository_ctx.file("envoy_repo.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
     repository_ctx.file("WORKSPACE", "")
     repository_ctx.file("BUILD", '''
-load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_python//python:py_library.bzl", "py_library")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("//:path.bzl", "PATH")
 

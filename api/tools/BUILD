@@ -1,4 +1,5 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_test.bzl", "py_test")
 
 licenses(["notice"])  # Apache 2
 

@@ -1,7 +1,8 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_jinja_env", "envoy_py_data")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 

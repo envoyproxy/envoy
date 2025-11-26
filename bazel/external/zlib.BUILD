@@ -33,7 +33,7 @@
 #  standalone and requires a support library to be linked with it.  This
 #  support library is itself covered by the above license.
 
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_license//rules:license.bzl", "license")
 
 package(

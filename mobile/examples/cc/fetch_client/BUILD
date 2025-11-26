@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 
 licenses(["notice"])  # Apache 2
 
