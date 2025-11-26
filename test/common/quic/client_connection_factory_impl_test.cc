@@ -39,7 +39,9 @@ protected:
     protocol_options->mutable_initial_stream_window_size()->set_value(65555);
     if (enable_connection_migration_) {
       auto* connection_migration = protocol_options->mutable_connection_migration();
-      connection_migration->mutable_max_idle_time_before_migration()->set_seconds(10);
+      connection_migration->mutable_migrate_idle_connections()
+          ->mutable_max_idle_time_before_migration()
+          ->set_seconds(10);
       connection_migration->mutable_max_time_on_non_default_network()->set_seconds(90);
     }
     if (set_num_timeouts_to_trigger_port_migration_) {

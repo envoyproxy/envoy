@@ -53,38 +53,46 @@ message QuicKeepAliveSettings {
   }];
 }
 
+
+// QUIC protocol options which apply to both downstream and upstream connections.
+// [#next-free-field: 12]
+message QuicProtocolOptions {
+
 // Config for QUIC connection migration across network interfaces, i.e. cellular to WIFI, upon
 // network change events from the platform, i.e. the current network gets
 // disconnected, or upon the QUIC detecting a bad connection. After migration, the
 // connection may be on a different network other than the default network
-// picked by the platform. A connection is this special state is only allowed to
+// picked by the platform. Both iOS and Android will use a default network to interact with the internet, usually prefer unmetered network (WIFI) over metered ones (cellular). And users can specify which network to be used as the default. A connection in this special state is only allowed to
 // serve new requests for a certain period of time before being drained, and
 // meanwhile, QUIC will try to migrate to the default network if possible.
 message ConnectionMigrationSettings {
-  // Whether to migrate idle connections which aren't serving any requests.
-  // If false, idle connections will not be migrated but be closed upon
-  // migration signals.
-  bool migrate_idle_connections = 1;
+
+// Config for options to migrate idle connections which aren't serving any requests.
+  message MigrateIdleConnectionSettings {
 
   // If idle connections are allowed to be migrated, only migrate the connection
   // if it hasn't been idle for longer than this idle period. Otherwise, the
   // connection will be closed instead.
   // Default to 30s.
-  google.protobuf.Duration max_idle_time_before_migration = 2
+  google.protobuf.Duration max_idle_time_before_migration = 1
       [(validate.rules).duration = {gte {seconds: 1}}];
+
+  }
+
+  // Config whether and how to migrate idle connections.
+  // If absent, idle connections will not be migrated but be closed upon
+  // migration signals.
+  MigrateIdleConnectionSettings migrate_idle_connections = 1;
 
   // After migrating to a non-default network interface, the connection will
   // only be allowed to stay on that network for up to this period of time before
   // being drained unless it migrates to the default network or that network
   // gets picked as the default by the device by then.
   // Default to 128s.
-  google.protobuf.Duration max_time_on_non_default_network = 3
+  google.protobuf.Duration max_time_on_non_default_network = 2
       [(validate.rules).duration = {gte {seconds: 1}}];
 }
 
-// QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 12]
-message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
   google.protobuf.UInt32Value max_concurrent_streams = 1 [(validate.rules).uint32 = {gte: 1}];

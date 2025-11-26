@@ -903,10 +903,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     }
     if (enable_quic_connection_migration_) {
       auto* migration_setting = quic_protocol_options->mutable_connection_migration();
-      migration_setting->set_migrate_idle_connections(migrate_idle_quic_connection_);
-      if (max_idle_time_before_quic_migration_seconds_ > 0) {
-        migration_setting->mutable_max_idle_time_before_migration()->set_seconds(
-            max_idle_time_before_quic_migration_seconds_);
+      if (migrate_idle_quic_connection_) {
+        auto* migrate_idle_connections = migration_setting->mutable_migrate_idle_connections();
+        if (max_idle_time_before_quic_migration_seconds_ > 0) {
+          migrate_idle_connections->mutable_max_idle_time_before_migration()->set_seconds(
+              max_idle_time_before_quic_migration_seconds_);
+        }
       }
       if (max_time_on_non_default_network_seconds_ > 0) {
         migration_setting->mutable_max_time_on_non_default_network()->set_seconds(

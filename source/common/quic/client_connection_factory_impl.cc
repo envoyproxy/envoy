@@ -53,13 +53,14 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
   if (quic_config.has_connection_migration()) {
     quic_info->migration_config_.migrate_session_on_network_change = true;
     quic_info->migration_config_.migrate_session_early = true;
-    quic_info->migration_config_.migrate_idle_session =
-        quic_config.connection_migration().migrate_idle_connections();
-    if (quic_config.connection_migration().has_max_idle_time_before_migration()) {
-      // Override the QUICHE default value 30s.
-      quic_info->migration_config_.idle_migration_period =
-          quic::QuicTime::Delta::FromSeconds(DurationUtil::durationToSeconds(
-              quic_config.connection_migration().max_idle_time_before_migration()));
+    if (quic_config.connection_migration().has_migrate_idle_connections()) {
+      quic_info->migration_config_.migrate_idle_session = true;
+      quic_info->migration_config_.idle_migration_period = quic::QuicTime::Delta::FromSeconds(
+          DurationUtil::durationToSeconds(quic_config.connection_migration()
+                                              .migrate_idle_connections()
+                                              .max_idle_time_before_migration()));
+    } else {
+      quic_info->migration_config_.migrate_idle_session = false;
     }
     if (quic_config.connection_migration().has_max_time_on_non_default_network()) {
       // Override the QUICHE default value 128s.
