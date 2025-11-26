@@ -3949,8 +3949,10 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
       MappedAttributeBuilder builder;
   auto* mapped_request_attributes = builder.mutable_mapped_request_attributes();
   (*mapped_request_attributes)["remapped.method"] = "request.method";
+  (*mapped_request_attributes)["foo.path"] = "request.path";
   auto* mapped_response_attributes = builder.mutable_mapped_response_attributes();
   (*mapped_response_attributes)["remapped.code"] = "response.code";
+  (*mapped_response_attributes)["user.port"] = "source.port";
   auto* modifier_config = proto_config_.mutable_processing_request_modifier();
   modifier_config->set_name("envoy.extensions.http.ext_proc.mapped_attribute_builder");
   modifier_config->mutable_typed_config()->PackFrom(builder);
@@ -3970,8 +3972,9 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
         EXPECT_EQ(proto_struct.fields().at("remapped.method").string_value(), "POST");
+        EXPECT_EQ(proto_struct.fields().at("foo.path").string_value(), "/");
         // Make sure we did not include anything else
-        EXPECT_EQ(proto_struct.fields().size(), 1);
+        EXPECT_EQ(proto_struct.fields().size(), 2);
         return true;
       });
 
@@ -3999,8 +4002,9 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
                           EXPECT_EQ(req.attributes().size(), 1);
                           auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
                           EXPECT_EQ(proto_struct.fields().at("remapped.code").number_value(), 200);
+                          EXPECT_GT(proto_struct.fields().at("user.port").number_value(), 0);
                           // Make sure we did not include anything else, such as request attributes
-                          EXPECT_EQ(proto_struct.fields().size(), 1);
+                          EXPECT_EQ(proto_struct.fields().size(), 2);
                           return true;
                         });
 
