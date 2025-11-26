@@ -84,6 +84,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: proxy_protocol
+  change: |
+    Fixed PROXY protocol listener filter to work for all address types when running on an ipv4-only or ipv6-only host.
 - area: http2
   change: |
     Fixed a bug where Envoy would leak memory if an HTTP/2 stream was reset before request headers were

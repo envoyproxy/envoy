@@ -284,6 +284,14 @@ public:
    * @return filepath of the network namespace for the address.
    */
   virtual absl::optional<std::string> networkNamespace() const PURE;
+
+  /**
+   * @return true if this address is metadata-only and should not be used for socket operations.
+   * Metadata-only addresses are typically created from protocol headers (e.g., PROXY protocol)
+   * and are used for logging, access control, and header forwarding, but not for actual socket
+   * operations like bind() or connect().
+   */
+  virtual bool isMetadataOnly() const { return false; }
 };
 
 /*

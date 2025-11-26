@@ -252,20 +252,58 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ProxyProtocolTest, V1UnsupportedIPv4) {
-  connect(false);
-  Cleanup cleaner = Network::Address::Ipv4Instance::forceProtocolUnsupportedForTest(true);
+TEST_P(ProxyProtocolTest, V1IPv4AddressesAsMetadata) {
+  // PROXY protocol should work even when the OS doesn't support the address family because
+  // addresses from the protocol header are only used for metadata (logging, ACLs, headers).
+  // This test verifies the metadata-only code path by ensuring PROXY protocol addresses are
+  // created using createMetadataInstance, which works without OS validation.
+  connect();
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
-  expectProxyProtoError();
-  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
+  expectData("more data");
+
+  // Verify the address from the PROXY protocol header is correctly parsed and used.
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V1);
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
 
-TEST_P(ProxyProtocolTest, V1UnsupportedIPv6) {
-  connect(false);
-  Cleanup cleaner = Network::Address::Ipv6Instance::forceProtocolUnsupportedForTest(true);
+TEST_P(ProxyProtocolTest, V1IPv6AddressesAsMetadata) {
+  // PROXY protocol should work even when the OS doesn't support the address family because
+  // addresses from the protocol header are only used for metadata (logging, ACLs, headers).
+  // This test verifies the metadata-only code path by ensuring PROXY protocol addresses are
+  // created using createMetadataInstance, which works without OS validation.
+  connect();
   write("PROXY TCP6 1:2:3::4 5:6::7:8 65535 1234\r\nmore data");
-  expectProxyProtoError();
-  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
+  expectData("more data");
+
+  // Verify the address from the PROXY protocol header is correctly parsed and used.
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
+            "1:2:3::4");
+  EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V1);
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V1Basic) {
@@ -439,21 +477,44 @@ TEST_P(ProxyProtocolTest, V2BasicV6) {
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
-TEST_P(ProxyProtocolTest, V2UnsupportedIPv4) {
+TEST_P(ProxyProtocolTest, V2IPv4AddressesAsMetadata) {
+  // PROXY protocol should work even when the OS doesn't support the address family because
+  // addresses from the protocol header are only used for metadata (logging, ACLs, headers).
+  // This test verifies the metadata-only code path by ensuring PROXY protocol addresses are
+  // created using createMetadataInstance, which works without OS validation.
   // A well-formed ipv4/tcp message, no extensions
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
 
-  connect(false);
-  Cleanup cleaner = Network::Address::Ipv4Instance::forceProtocolUnsupportedForTest(true);
+  connect();
   write(buffer, sizeof(buffer));
-  expectProxyProtoError();
-  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
+  expectData("more data");
+
+  // Verify the address from the PROXY protocol header is correctly parsed and used.
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V2);
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
-TEST_P(ProxyProtocolTest, V2UnsupportedIPv6) {
+TEST_P(ProxyProtocolTest, V2IPv6AddressesAsMetadata) {
+  // PROXY protocol should work even when the OS doesn't support the address family because
+  // addresses from the protocol header are only used for metadata (logging, ACLs, headers).
+  // This test verifies the metadata-only code path by ensuring PROXY protocol addresses are
+  // created using createMetadataInstance, which works without OS validation.
   // A well-formed ipv6/tcp message, no extensions
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
                                 0x0a, 0x21, 0x22, 0x00, 0x24, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
@@ -462,11 +523,94 @@ TEST_P(ProxyProtocolTest, V2UnsupportedIPv6) {
                                 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x02, 'm',  'o',  'r',
                                 'e',  ' ',  'd',  'a',  't',  'a'};
 
+  connect();
+  write(buffer, sizeof(buffer));
+  expectData("more data");
+
+  // Verify the address from the PROXY protocol header is correctly parsed and used.
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
+            "1:2:3::4");
+  EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V2);
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2MalformedIPv4AddressLength) {
+  // V2 header with incorrect address length field for IPv4 should fail parsing.
+  // Setting address length to 0x00 when it should be 0x0c for IPv4.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51,
+                                0x55, 0x49, 0x54, 0x0a, 0x21, 0x11, 0x00, 0x00,
+                                'm',  'o',  'r',  'e',  'd',  'a',  't',  'a'};
   connect(false);
-  Cleanup cleaner = Network::Address::Ipv6Instance::forceProtocolUnsupportedForTest(true);
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2MalformedIPv6AddressLength) {
+  // V2 header with incorrect address length field for IPv6 should fail parsing.
+  // Setting address length to 0x00 when it should be 0x24 for IPv6.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51,
+                                0x55, 0x49, 0x54, 0x0a, 0x21, 0x21, 0x00, 0x00,
+                                'm',  'o',  'r',  'e',  'd',  'a',  't',  'a'};
+  connect(false);
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2InvalidProtocolFamily) {
+  // V2 header with invalid protocol family byte (0xFF instead of 0x11 for IPv4/TCP or 0x21 for
+  // IPv6/TCP).
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0xFF, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  connect(false);
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V1MalformedIPv4Address) {
+  // V1 header with invalid IPv4 address format (too many octets).
+  connect(false);
+  write("PROXY TCP4 1.2.3.4.5 253.253.253.253 65535 1234\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V1MalformedIPv6Address) {
+  // V1 header with invalid IPv6 address format (invalid characters).
+  connect(false);
+  write("PROXY TCP6 1:2:3::GGGG 5:6::7:8 65535 1234\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V1InvalidPortNumber) {
+  // V1 header with port number exceeding valid range.
+  connect(false);
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 99999 1234\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V1MissingFields) {
+  // V1 header missing required port fields.
+  connect(false);
+  write("PROXY TCP4 1.2.3.4 253.253.253.253\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2UnsupportedAF) {

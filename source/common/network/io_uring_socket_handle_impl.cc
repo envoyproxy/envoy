@@ -166,6 +166,13 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::recv(void* buffer, size_t lengt
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::bind(Address::InstanceConstSharedPtr address) {
+  // Reject metadata-only addresses that cannot be used for socket operations.
+  if (address->isMetadataOnly()) {
+    ENVOY_LOG_MISC(error, "Attempted to bind() with metadata-only address: {}",
+                   address->asString());
+    return Api::SysCallIntResult{-1, EINVAL};
+  }
+
   ENVOY_LOG(trace, "bind {}, fd = {}, io_uring_socket_type = {}", address->asString(), fd_,
             ioUringSocketTypeStr());
   return Api::OsSysCallsSingleton::get().bind(fd_, address->sockAddr(), address->sockAddrLen());
@@ -196,6 +203,13 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
+  // Reject metadata-only addresses that cannot be used for socket operations
+  if (address->isMetadataOnly()) {
+    ENVOY_LOG_MISC(error, "Attempted to connect() with metadata-only address: {}",
+                   address->asString());
+    return Api::SysCallIntResult{-1, EINVAL};
+  }
+
   ENVOY_LOG(trace, "connect, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
   ASSERT(io_uring_socket_type_ == IoUringSocketType::Client);

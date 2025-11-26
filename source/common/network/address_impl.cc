@@ -152,11 +152,13 @@ Ipv4Instance::Ipv4Instance(uint32_t port, const SocketInterface* sock_interface,
 
 Ipv4Instance::Ipv4Instance(absl::Status& status, const sockaddr_in* address,
                            const SocketInterface* sock_interface,
-                           absl::optional<std::string> network_namespace)
+                           absl::optional<std::string> network_namespace, bool skip_validation)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface), network_namespace) {
-  status = validateProtocolSupported();
-  if (!status.ok()) {
-    return;
+  if (!skip_validation) {
+    status = validateProtocolSupported();
+    if (!status.ok()) {
+      return;
+    }
   }
   initHelper(address);
 }
@@ -320,11 +322,13 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
 
 Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface,
-                           absl::optional<std::string> network_namespace)
+                           absl::optional<std::string> network_namespace, bool skip_validation)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface), network_namespace) {
-  status = validateProtocolSupported();
-  if (!status.ok()) {
-    return;
+  if (!skip_validation) {
+    status = validateProtocolSupported();
+    if (!status.ok()) {
+      return;
+    }
   }
   initHelper(address, v6only);
 }

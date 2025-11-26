@@ -92,6 +92,12 @@ public:
     }
     return instance;
   }
+
+  // Create IPv4/IPv6 address instances for metadata purposes. These are defined after the
+  // class declarations.
+  static StatusOr<InstanceConstSharedPtr> createMetadataIpv4Instance(const sockaddr_in* address);
+  static StatusOr<InstanceConstSharedPtr> createMetadataIpv6Instance(const sockaddr_in6& address,
+                                                                     bool v6only = true);
 };
 
 /**
@@ -160,10 +166,14 @@ private:
    * Store the status code in passed in parameter instead of throwing.
    * It is called by the factory method and the partially constructed instance will be discarded
    * upon error.
+   * @param skip_validation if true, skip operating system address family validation. This should
+   * only be true when creating addresses from protocol headers (e.g., PROXY protocol) that will
+   * not be used for actual socket operations.
    */
   explicit Ipv4Instance(absl::Status& error, const sockaddr_in* address,
                         const SocketInterface* sock_interface = nullptr,
-                        absl::optional<std::string> network_namespace = absl::nullopt);
+                        absl::optional<std::string> network_namespace = absl::nullopt,
+                        bool skip_validation = false);
 
   struct Ipv4Helper : public Ipv4 {
     uint32_t address() const override { return address_.sin_addr.s_addr; }
@@ -275,10 +285,14 @@ private:
    * Store the status code in passed in parameter instead of throwing.
    * It is called by the factory method and the partially constructed instance will be discarded
    * upon error.
+   * @param skip_validation if true, skip operating system address family validation. This should
+   * only be true when creating addresses from protocol headers (e.g., PROXY protocol) that will
+   * not be used for actual socket operations.
    */
   Ipv6Instance(absl::Status& error, const sockaddr_in6& address, bool v6only = true,
                const SocketInterface* sock_interface = nullptr,
-               absl::optional<std::string> network_namespace = absl::nullopt);
+               absl::optional<std::string> network_namespace = absl::nullopt,
+               bool skip_validation = false);
 
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
@@ -443,6 +457,60 @@ private:
   };
   EnvoyInternalAddressImpl internal_address_;
 };
+
+/**
+ * Metadata-only IPv4 address that should not be used for socket operations.
+ * These addresses are typically created from protocol headers (e.g., PROXY protocol)
+ * and are used for logging, access control, and header forwarding.
+ */
+class MetadataOnlyIpv4Instance : public Ipv4Instance {
+public:
+  // Inherit all constructors but mark them as metadata-only.
+  using Ipv4Instance::Ipv4Instance;
+
+  // Override to indicate this is a metadata-only address.
+  bool isMetadataOnly() const override { return true; }
+};
+
+/**
+ * Metadata-only IPv6 address that should not be used for socket operations.
+ * These addresses are typically created from protocol headers (e.g., PROXY protocol)
+ * and are used for logging, access control, and header forwarding.
+ */
+class MetadataOnlyIpv6Instance : public Ipv6Instance {
+public:
+  // Inherit all constructors but mark them as metadata-only.
+  using Ipv6Instance::Ipv6Instance;
+
+  // Override to indicate this is a metadata-only address.
+  bool isMetadataOnly() const override { return true; }
+};
+
+// Inline definitions for metadata instance creation methods.
+// These are defined here after the class declarations.
+inline StatusOr<InstanceConstSharedPtr>
+InstanceFactory::createMetadataIpv4Instance(const sockaddr_in* address) {
+  absl::Status status = absl::OkStatus();
+  // Create a metadata-only instance that cannot be used for socket operations.
+  std::shared_ptr<MetadataOnlyIpv4Instance> instance(new MetadataOnlyIpv4Instance(
+      status, address, nullptr, absl::nullopt, true /* skip_validation */));
+  if (!status.ok()) {
+    return status;
+  }
+  return instance;
+}
+
+inline StatusOr<InstanceConstSharedPtr>
+InstanceFactory::createMetadataIpv6Instance(const sockaddr_in6& address, bool v6only) {
+  absl::Status status = absl::OkStatus();
+  // Create a metadata-only instance that cannot be used for socket operations.
+  std::shared_ptr<MetadataOnlyIpv6Instance> instance(new MetadataOnlyIpv6Instance(
+      status, address, v6only, nullptr, absl::nullopt, true /* skip_validation */));
+  if (!status.ok()) {
+    return status;
+  }
+  return instance;
+}
 
 } // namespace Address
 } // namespace Network

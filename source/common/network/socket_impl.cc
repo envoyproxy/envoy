@@ -57,6 +57,13 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
 }
 
 Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr address) {
+  // Reject metadata-only addresses that cannot be used for socket operations.
+  if (address->isMetadataOnly()) {
+    ENVOY_LOG_MISC(error, "Attempted to bind() with metadata-only address: {}",
+                   address->asString());
+    return Api::SysCallIntResult{-1, EINVAL};
+  }
+
   Api::SysCallIntResult bind_result;
 
   if (address->type() == Address::Type::Pipe) {
@@ -94,6 +101,13 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
 Api::SysCallIntResult SocketImpl::listen(int backlog) { return io_handle_->listen(backlog); }
 
 Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
+  // Reject metadata-only addresses that cannot be used for socket operations.
+  if (address->isMetadataOnly()) {
+    ENVOY_LOG_MISC(error, "Attempted to connect() with metadata-only address: {}",
+                   address->asString());
+    return Api::SysCallIntResult{-1, EINVAL};
+  }
+
   auto result = io_handle_->connect(address);
   if (address->type() == Address::Type::Ip) {
     auto address_or_error = io_handle_->localAddress();

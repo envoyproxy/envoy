@@ -380,15 +380,15 @@ bool Filter::parseV2Header(const char* buf) {
         la4.sin_port = v4->dst_port;
         la4.sin_addr.s_addr = v4->dst_addr;
 
+        // Create address instances for metadata purposes. These addresses are extracted from the
+        // PROXY protocol header and will only be used for logging, access control, or header
+        // forwarding, not for actual socket operations. The actual connection uses the real socket
+        // address and does not require OS support for the address family specified in the header.
         auto remote_address_status =
-            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv4Instance>(
-                &ra4);
+            Network::Address::InstanceFactory::createMetadataIpv4Instance(&ra4);
         auto local_address_status =
-            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv4Instance>(
-                &la4);
+            Network::Address::InstanceFactory::createMetadataIpv4Instance(&la4);
         if (!remote_address_status.ok() || !local_address_status.ok()) {
-          // TODO(ggreenway): make this work without requiring operating system support for an
-          // address family.
           ENVOY_LOG(debug, "Proxy protocol failure: {}",
                     !remote_address_status.ok() ? remote_address_status.status()
                                                 : local_address_status.status());
@@ -421,15 +421,15 @@ bool Filter::parseV2Header(const char* buf) {
         la6.sin6_port = v6->dst_port;
         safeMemcpy(&(la6.sin6_addr.s6_addr), &(v6->dst_addr));
 
+        // Create address instances for metadata purposes. These addresses are extracted from the
+        // PROXY protocol header and will only be used for logging, access control, or header
+        // forwarding, not for actual socket operations. The actual connection uses the real socket
+        // address and does not require OS support for the address family specified in the header.
         auto remote_address_status =
-            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv6Instance>(
-                ra6);
+            Network::Address::InstanceFactory::createMetadataIpv6Instance(ra6, true);
         auto local_address_status =
-            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv6Instance>(
-                la6);
+            Network::Address::InstanceFactory::createMetadataIpv6Instance(la6, true);
         if (!remote_address_status.ok() || !local_address_status.ok()) {
-          // TODO(ggreenway): make this work without requiring operating system support for an
-          // address family.
           ENVOY_LOG(debug, "Proxy protocol failure: {}",
                     !remote_address_status.ok() ? remote_address_status.status()
                                                 : local_address_status.status());
