@@ -1,11 +1,18 @@
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/grpc/status.h"
 
+#include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
+
 #include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/proto/apikeys.pb.h"
 
+#include "cel/expr/syntax.pb.h"
 #include "fmt/format.h"
+#include "parser/parser.h"
+#include "xds/type/matcher/v3/cel.pb.h"
+#include "xds/type/matcher/v3/matcher.pb.h"
+#include "xds/type/matcher/v3/string.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,36 +30,6 @@ std::string apikeysDescriptorPath() {
 
 const std::string kCreateApiKeyMethod = "/apikeys.ApiKeys/CreateApiKey";
 
-// CEL Matcher Config (Protobuf Text Format) which evaluates to TRUE.
-constexpr absl::string_view kCelAlwaysTrue = R"pb(
-  cel_expr_parsed {
-    expr {
-      id: 1
-      const_expr { bool_value: true }
-    }
-    source_info {
-      syntax_version: "cel1"
-      location: "inline_expression"
-      positions { key: 1 value: 0 }
-    }
-  }
-)pb";
-
-// CEL Matcher Config (Protobuf Text Format) which evaluates to FALSE.
-constexpr absl::string_view kCelAlwaysFalse = R"pb(
-  cel_expr_parsed {
-    expr {
-      id: 1
-      const_expr { bool_value: false }
-    }
-    source_info {
-      syntax_version: "cel1"
-      location: "inline_expression"
-      positions { key: 1 value: 0 }
-    }
-  }
-)pb";
-
 class ProtoApiScrubberIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void SetUp() override { HttpProtocolIntegrationTest::SetUp(); }
@@ -64,34 +41,61 @@ public:
 
   enum class RestrictionType { Request, Response };
 
-  // Helper to build the configuration using readable Protobuf Text Format.
-  std::string getFilterConfig(const std::string& descriptor_path,
-                              const std::string& method_name = "",
-                              const std::string& field_to_scrub = "",
-                              RestrictionType type = RestrictionType::Request,
-                              absl::string_view cel_matcher_proto_text = kCelAlwaysTrue) {
+  static xds::type::matcher::v3::Matcher::MatcherList::Predicate
+  buildCelPredicate(absl::string_view cel_expression) {
+    // Parse the string into an AST.
+    const cel::expr::ParsedExpr ast = *google::api::expr::parser::Parse(cel_expression);
 
+    // Build the envoy matcher config.
+    xds::type::matcher::v3::Matcher::MatcherList::Predicate predicate;
+    auto* single = predicate.mutable_single_predicate();
+
+    // Build CEL input and CEL matcher.
+    single->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
+    xds::type::matcher::v3::HttpAttributesCelMatchInput input_config;
+    single->mutable_input()->mutable_typed_config()->PackFrom(input_config);
+    auto* custom_match = single->mutable_custom_match();
+    custom_match->set_name("envoy.matching.matchers.cel_matcher");
+    xds::type::matcher::v3::CelMatcher cel_matcher;
+
+    // Assign the parsed AST to the configuration and return the predicate.
+    *cel_matcher.mutable_expr_match()->mutable_cel_expr_parsed() = ast;
+    custom_match->mutable_typed_config()->PackFrom(cel_matcher);
+    return predicate;
+  }
+
+  // Helper to build the configuration with a generic predicate.
+  std::string
+  getFilterConfig(const std::string& descriptor_path, const std::string& method_name = "",
+                  const std::string& field_to_scrub = "",
+                  RestrictionType type = RestrictionType::Request,
+                  const xds::type::matcher::v3::Matcher::MatcherList::Predicate& match_predicate =
+                      buildCelPredicate("true")) {
     std::string full_config_text;
     if (method_name.empty() || field_to_scrub.empty()) {
-      // Simple config with just descriptor
-      full_config_text = fmt::format(
-          R"pb(
-            filtering_mode: OVERRIDE
-            descriptor_set {{ data_source {{ filename: "{0}" }} }}
-          )pb",
-          descriptor_path);
+      full_config_text = fmt::format(R"pb(
+      filtering_mode: OVERRIDE
+      descriptor_set {{ data_source {{ filename: "{0}" }} }}
+    )pb",
+                                     descriptor_path);
     } else {
       std::string restriction_key = (type == RestrictionType::Request)
                                         ? "request_field_restrictions"
                                         : "response_field_restrictions";
 
-      // Format the full config.
+      // Build the Matcher
+      xds::type::matcher::v3::Matcher matcher_proto;
+      auto* matcher_entry = matcher_proto.mutable_matcher_list()->add_matchers();
+      *matcher_entry->mutable_predicate() = match_predicate;
+      envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
+      matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+          remove_action);
+      matcher_entry->mutable_on_match()->mutable_action()->set_name("remove_field");
+
       full_config_text = fmt::format(R"pb(
       filtering_mode: OVERRIDE
       descriptor_set {{
-        data_source {{
-          filename: "{0}"
-        }}
+        data_source {{ filename: "{0}" }}
       }}
       restrictions {{
         method_restrictions {{
@@ -100,64 +104,30 @@ public:
             {2} {{
               key: "{3}"
               value {{
-                matcher {{
-                  matcher_list {{
-                    matchers {{
-                      predicate {{
-                        single_predicate {{
-                          input {{
-                            name: "envoy.matching.inputs.cel_data_input"
-                            typed_config {{
-                              [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {{}}
-                            }}
-                          }}
-                          custom_match {{
-                            name: "envoy.matching.matchers.cel_matcher"
-                            typed_config {{
-                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {{
-                                expr_match {{
-                                  {4}
-                                }}
-                              }}
-                            }}
-                          }}
-                        }}
-                      }}
-                      on_match {{
-                        action {{
-                          name: "remove_field"
-                          typed_config {{
-                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] {{}}
-                          }}
-                        }}
-                      }}
-                    }}
-                  }}
-                }}
+                matcher {{ {4} }}
               }}
             }}
           }}
         }}
       }}
     )pb",
-                                     descriptor_path,       // {0}
-                                     method_name,           // {1}
-                                     restriction_key,       // {2}
-                                     field_to_scrub,        // {3}
-                                     cel_matcher_proto_text // {4}
+                                     descriptor_path,            // {0}
+                                     method_name,                // {1}
+                                     restriction_key,            // {2}
+                                     field_to_scrub,             // {3}
+                                     matcher_proto.DebugString() // {4} Inject the Generic Matcher
       );
     }
 
     ProtoApiScrubberConfig filter_config_proto;
-    Protobuf::Any any_config;
-
     Protobuf::TextFormat::ParseFromString(full_config_text, &filter_config_proto);
+
+    Protobuf::Any any_config;
     any_config.PackFrom(filter_config_proto);
-    std::string json_config = MessageUtil::getJsonStringFromMessageOrError(any_config);
     return fmt::format(R"EOF(
-      name: envoy.filters.http.proto_api_scrubber
-      typed_config: {})EOF",
-                       json_config);
+    name: envoy.filters.http.proto_api_scrubber
+    typed_config: {})EOF",
+                       MessageUtil::getJsonStringFromMessageOrError(any_config));
   }
 
   template <typename T>
@@ -259,7 +229,8 @@ TEST_P(ProtoApiScrubberIntegrationTest, StreamingPassesThrough) {
 // true.
 TEST_P(ProtoApiScrubberIntegrationTest, ScrubTopLevelField) {
   config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath(), kCreateApiKeyMethod,
-                                               "parent", RestrictionType::Request, kCelAlwaysTrue));
+                                               "parent", RestrictionType::Request,
+                                               buildCelPredicate("true")));
   initialize();
 
   auto original_proto = makeCreateApiKeyRequest(R"pb(
@@ -285,7 +256,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubTopLevelField) {
 TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField_MatcherTrue) {
   config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath(), kCreateApiKeyMethod,
                                                "key.display_name", RestrictionType::Request,
-                                               kCelAlwaysTrue));
+                                               buildCelPredicate("true")));
   initialize();
 
   auto original_proto = makeCreateApiKeyRequest(R"pb(
@@ -312,7 +283,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField_MatcherTrue) {
 TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField_MatcherFalse) {
   config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath(), kCreateApiKeyMethod,
                                                "key.display_name", RestrictionType::Request,
-                                               kCelAlwaysFalse));
+                                               buildCelPredicate("false")));
   initialize();
 
   auto original_proto = makeCreateApiKeyRequest(R"pb(

@@ -75,6 +75,7 @@ envoy_cc_test(
         "//test/integration:http_protocol_integration_lib",
         "//test/proto:apikeys_proto_cc_proto",
         "@com_google_absl//absl/strings:str_format",
+        "@com_google_cel_cpp//parser",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
     ],
 )
