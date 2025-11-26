@@ -610,7 +610,7 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeSmallerLimit) {
   // Global config with 1024 bytes
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(1024);
-  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  config_ = std::make_shared<McpFilterConfig>(proto_config);
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -655,7 +655,7 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeLargerLimit) {
   // Global config with 100 bytes
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(100);
-  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  config_ = std::make_shared<McpFilterConfig>(proto_config);
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -696,7 +696,7 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeFallbackToGlobal) {
   // Global config with 512 bytes
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(512);
-  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  config_ = std::make_shared<McpFilterConfig>(proto_config);
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
