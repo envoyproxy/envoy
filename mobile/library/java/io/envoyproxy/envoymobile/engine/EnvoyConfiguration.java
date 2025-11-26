@@ -67,7 +67,7 @@ public class EnvoyConfiguration {
   public final boolean enableQuicConnectionMigration;
   public final boolean migrateIdleQuicConnection;
   public final long maxIdleTimeBeforeQuicMigrationSeconds;
-  public final long maxTimeOnNonDefaultQuicNetworkSeconds;
+  public final long maxTimeOnNonDefaultNetworkSeconds;
 
   /**
    * Create a new instance of the configuration.
@@ -141,8 +141,7 @@ public class EnvoyConfiguration {
    *     connections.
    * @param maxIdleTimeBeforeQuicMigrationSeconds           the maximum idle time before QUIC
    *     migration.
-   * @param maxTimeOnNonDefaultQuicNetworkSeconds           the maximum time on non-default QUIC
-   *     network.
+   * @param maxTimeOnNonDefaultNetworkSeconds           the maximum time on non-default network.
    */
   public EnvoyConfiguration(
       int connectTimeoutSeconds, boolean disableDnsRefreshOnFailure,
@@ -165,7 +164,7 @@ public class EnvoyConfiguration {
       boolean enablePlatformCertificatesValidation, String upstreamTlsSni,
       int h3ConnectionKeepaliveInitialIntervalMilliseconds, boolean useQuicPlatformPacketWriter,
       boolean enableQuicConnectionMigration, boolean migrateIdleQuicConnection,
-      long maxIdleTimeBeforeQuicMigrationSeconds, long maxTimeOnNonDefaultQuicNetworkSeconds) {
+      long maxIdleTimeBeforeQuicMigrationSeconds, long maxTimeOnNonDefaultNetworkSeconds) {
     JniLibrary.load();
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.disableDnsRefreshOnFailure = disableDnsRefreshOnFailure;
@@ -228,7 +227,7 @@ public class EnvoyConfiguration {
     this.enableQuicConnectionMigration = enableQuicConnectionMigration;
     this.migrateIdleQuicConnection = migrateIdleQuicConnection;
     this.maxIdleTimeBeforeQuicMigrationSeconds = maxIdleTimeBeforeQuicMigrationSeconds;
-    this.maxTimeOnNonDefaultQuicNetworkSeconds = maxTimeOnNonDefaultQuicNetworkSeconds;
+    this.maxTimeOnNonDefaultNetworkSeconds = maxTimeOnNonDefaultNetworkSeconds;
   }
 
   public long createBootstrap() {
@@ -256,6 +255,6 @@ public class EnvoyConfiguration {
         enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards,
         h3ConnectionKeepaliveInitialIntervalMilliseconds, useQuicPlatformPacketWriter,
         enableQuicConnectionMigration, migrateIdleQuicConnection,
-        maxIdleTimeBeforeQuicMigrationSeconds, maxTimeOnNonDefaultQuicNetworkSeconds);
+        maxIdleTimeBeforeQuicMigrationSeconds, maxTimeOnNonDefaultNetworkSeconds);
   }
 }

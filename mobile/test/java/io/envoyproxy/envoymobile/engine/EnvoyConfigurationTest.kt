@@ -119,7 +119,7 @@ class EnvoyConfigurationTest {
     enableQuicConnectionMigration: Boolean = false,
     migrateIdleQuicConnection: Boolean = false,
     maxIdleTimeBeforeQuicMigrationSeconds: Long = 0,
-    maxTimeOnNonDefaultQuicNetworkSeconds: Long = 0,
+    maxTimeOnNonDefaultNetworkSeconds: Long = 0,
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       connectTimeoutSeconds,
@@ -165,7 +165,7 @@ class EnvoyConfigurationTest {
       enableQuicConnectionMigration,
       migrateIdleQuicConnection,
       maxIdleTimeBeforeQuicMigrationSeconds,
-      maxTimeOnNonDefaultQuicNetworkSeconds,
+      maxTimeOnNonDefaultNetworkSeconds,
     )
   }
 

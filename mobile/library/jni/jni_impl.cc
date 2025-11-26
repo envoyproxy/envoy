@@ -1209,7 +1209,7 @@ void configureBuilder(
     builder.enableQuicConnectionMigration(true);
     builder.setMigrateIdleQuicConnection(migrate_idle_connection == JNI_TRUE);
     builder.setMaxIdleTimeBeforeQuicMigrationSeconds(max_idle_time_before_migration_seconds);
-    builder.setMaxTimeOnNonDefaultQuicNetworkSeconds(max_time_on_non_default_network_seconds);
+    builder.setMaxTimeOnNonDefaultNetworkSeconds(max_time_on_non_default_network_seconds);
   }
   auto guards = javaObjectArrayToStringPairVector(jni_helper, runtime_guards);
   for (std::pair<std::string, std::string>& entry : guards) {

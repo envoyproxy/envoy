@@ -36,10 +36,10 @@ class AndroidEngineBuilder(context: Context) : EngineBuilder() {
     return this
   }
 
-  fun setMaxTimeOnNonDefaultQuicNetworkSeconds(
-    maxTimeOnNonDefaultQuicNetworkSeconds: Long
+  fun setMaxTimeOnNonDefaultNetworkSeconds(
+    maxTimeOnNonDefaultNetworkSeconds: Long
   ): AndroidEngineBuilder {
-    this.maxTimeOnNonDefaultQuicNetworkSeconds = maxTimeOnNonDefaultQuicNetworkSeconds
+    this.maxTimeOnNonDefaultNetworkSeconds = maxTimeOnNonDefaultNetworkSeconds
     return this
   }
 

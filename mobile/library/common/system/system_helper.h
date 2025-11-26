@@ -50,6 +50,9 @@ public:
 
   /**
    * Binds the given socket to the network interface associated with the handle.
+   * @param socket the socket to bind.
+   * @param network_handle the handle of the network to bind to. The caller is responsible for
+   *     ensuring that this handle is valid.
    */
   virtual void bindSocketToNetwork(Network::ConnectionSocket& socket, int64_t network_handle) PURE;
 

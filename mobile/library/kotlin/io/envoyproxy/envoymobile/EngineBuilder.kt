@@ -20,7 +20,7 @@ open class EngineBuilder() {
   protected var enableQuicConnectionMigration = false
   protected var migrateIdleQuicConnection = false
   protected var maxIdleTimeBeforeQuicMigrationSeconds: Long = 0
-  protected var maxTimeOnNonDefaultQuicNetworkSeconds: Long = 0
+  protected var maxTimeOnNonDefaultNetworkSeconds: Long = 0
 
   private var runtimeGuards = mutableMapOf<String, Boolean>()
   private var engineType: () -> EnvoyEngine = {
@@ -579,7 +579,7 @@ open class EngineBuilder() {
         enableQuicConnectionMigration,
         migrateIdleQuicConnection,
         maxIdleTimeBeforeQuicMigrationSeconds,
-        maxTimeOnNonDefaultQuicNetworkSeconds
+        maxTimeOnNonDefaultNetworkSeconds
       )
 
     return EngineImpl(engineType(), engineConfiguration, logLevel)
@@ -631,8 +631,8 @@ open class EngineBuilder() {
    * Set the maximum time a QUIC connection can remain on a non-default network before switching to
    * the default one.
    */
-  fun setMaxTimeOnNonDefaultQuicNetworkSeconds(seconds: Long): EngineBuilder {
-    this.maxTimeOnNonDefaultQuicNetworkSeconds = seconds
+  fun setMaxTimeOnNonDefaultNetworkSeconds(seconds: Long): EngineBuilder {
+    this.maxTimeOnNonDefaultNetworkSeconds = seconds
     return this
   }
 

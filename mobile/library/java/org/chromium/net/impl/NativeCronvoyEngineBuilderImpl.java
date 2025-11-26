@@ -72,7 +72,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private boolean mEnableQuicConnectionMigration = false;
   private boolean mMigrateIdleQuicConnection = false;
   private long mMaxIdleTimeBeforeQuicMigrationSeconds = 0;
-  private long mMaxTimeOnNonDefaultQuicNetworkSeconds = 0;
+  private long mMaxTimeOnNonDefaultNetworkSeconds = 0;
   private boolean mUseNetworkChangeEvent = false;
   private boolean mUseV2NetworkMonitor = false;
 
@@ -275,8 +275,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    * Set the maximum time a QUIC connection can remain on a non-default network before switching to
    * the default one.
    */
-  public NativeCronvoyEngineBuilderImpl setMaxTimeOnNonDefaultQuicNetworkSeconds(long seconds) {
-    mMaxTimeOnNonDefaultQuicNetworkSeconds = seconds;
+  public NativeCronvoyEngineBuilderImpl setMaxTimeOnNonDefaultNetworkSeconds(long seconds) {
+    mMaxTimeOnNonDefaultNetworkSeconds = seconds;
     return this;
   }
 
@@ -351,6 +351,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mH3ConnectionKeepaliveInitialIntervalMilliseconds,
         mUseQuicPlatformPacketWriter && mUseV2NetworkMonitor,
         mEnableQuicConnectionMigration && mUseV2NetworkMonitor, mMigrateIdleQuicConnection,
-        mMaxIdleTimeBeforeQuicMigrationSeconds, mMaxTimeOnNonDefaultQuicNetworkSeconds);
+        mMaxIdleTimeBeforeQuicMigrationSeconds, mMaxTimeOnNonDefaultNetworkSeconds);
   }
 }
