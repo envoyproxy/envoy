@@ -561,6 +561,14 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       untyped_receiving_namespaces_(more_specific.untypedReceivingMetadataNamespaces().has_value()
                                         ? more_specific.untypedReceivingMetadataNamespaces()
                                         : less_specific.untypedReceivingMetadataNamespaces()),
+      untyped_cluster_metadata_forwarding_namespaces_(
+          more_specific.untypedClusterMetadataForwardingNamespaces().has_value()
+              ? more_specific.untypedClusterMetadataForwardingNamespaces()
+              : less_specific.untypedClusterMetadataForwardingNamespaces()),
+      typed_cluster_metadata_forwarding_namespaces_(
+          more_specific.typedClusterMetadataForwardingNamespaces().has_value()
+              ? more_specific.typedClusterMetadataForwardingNamespaces()
+              : less_specific.typedClusterMetadataForwardingNamespaces()),
       failure_mode_allow_(more_specific.failureModeAllow().has_value()
                               ? more_specific.failureModeAllow()
                               : less_specific.failureModeAllow()),

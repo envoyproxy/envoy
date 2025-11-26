@@ -310,3 +310,57 @@ index 6db5fd9..aaf7bd2 100644
 -- 
 2.50.0.727.gbf7dc18ff4-goog
 
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Envoy CI <envoy-ci@users.noreply.github.com>
+Date: Mon, 24 Nov 2025 00:00:00 +0000
+Subject: [PATCH 4/4] Replace //external: bindings with direct references
+
+Replace //external: bindings with direct @repo// style references
+to reduce reliance on native.bind() for bzlmod migration.
+---
+ BUILD | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/BUILD b/BUILD
+index aaf7bd2..b1234567 100644
+--- a/BUILD
++++ b/BUILD
+@@ -134,7 +134,7 @@ cc_library(
+     ],
+     deps = [
+         ":wasm_vm_headers",
+-        "//external:wee8",
++        "@v8//:wee8",
+     ],
+ )
+ 
+@@ -152,7 +152,7 @@ cc_library(
+     ],
+     deps = [
+         ":wasm_vm_headers",
+-        "//external:wamr",
++        "@envoy//bazel/foreign_cc:wamr",
+     ],
+ )
+ 
+@@ -218,7 +218,7 @@ cc_library(
+     }),
+     deps = [
+         ":wasm_vm_headers",
+-        "//external:wasmtime",
++        "@com_github_wasmtime//:wasmtime_lib",
+     ],
+ )
+ 
+@@ -277,7 +277,7 @@ cc_library(
+     }),
+     deps = [
+         ":wasm_vm_headers",
+-        "//external:prefixed_wasmtime",
++        "@com_github_wasmtime//:prefixed_wasmtime_lib",
+     ],
+ )
+
+-- 
+2.50.0.727.gbf7dc18ff4-goog

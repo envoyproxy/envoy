@@ -3672,6 +3672,45 @@ TEST_F(OverrideTest, GrpcMetadataOverride) {
               ProtoEq(cfg2.overrides().grpc_initial_metadata()[1]));
 }
 
+// When merging two ExtProcPerRoute configurations, metadata_options in more_specific overrides
+// the one in less_specific for the cluster metadata namespaces.
+TEST_F(OverrideTest, ClusterMetadataNamespacesOverride) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_typed()
+      ->Add("less_specific_typed_ns_1");
+  cfg1.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_untyped()
+      ->Add("less_specific_untyped_ns_1");
+
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_typed()
+      ->Add("more_specific_typed_ns_2");
+  cfg2.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_untyped()
+      ->Add("more_specific_untyped_ns_2");
+
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
+  FilterConfigPerRoute merged_route(route1, route2);
+
+  ASSERT_TRUE(merged_route.typedClusterMetadataForwardingNamespaces().has_value());
+  EXPECT_THAT(*merged_route.typedClusterMetadataForwardingNamespaces(),
+              testing::ElementsAre("more_specific_typed_ns_2"));
+  ASSERT_TRUE(merged_route.untypedClusterMetadataForwardingNamespaces().has_value());
+  EXPECT_THAT(*merged_route.untypedClusterMetadataForwardingNamespaces(),
+              testing::ElementsAre("more_specific_untyped_ns_2"));
+}
+
 // Verify that attempts to change headers that are not allowed to be changed
 // are ignored and a counter is incremented.
 TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
@@ -4392,6 +4431,11 @@ TEST_F(HttpFilterTest, HeaderRespReceivedBeforeBody) {
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  auto& grpc_calls = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
+  checkGrpcCallBody(*grpc_calls.body_stats_, 6, Grpc::Status::Ok, std::chrono::microseconds(160),
+                    std::chrono::microseconds(50), std::chrono::microseconds(10));
   filter_->onDestroy();
 }
 
@@ -4443,6 +4487,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
   // Header response arrives after some amount of body data sent.
   auto response = std::make_unique<ProcessingResponse>();
   (void)response->mutable_response_headers();
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
   stream_callbacks_->onReceiveMessage(std::move(response));
 
   // Three body responses follows the header response.
@@ -4485,6 +4530,11 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  auto& grpc_calls = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
+  checkGrpcCallBody(*grpc_calls.body_stats_, 11, Grpc::Status::Ok, std::chrono::microseconds(420),
+                    std::chrono::microseconds(80), std::chrono::microseconds(10));
   filter_->onDestroy();
 }
 

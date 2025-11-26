@@ -12,9 +12,9 @@ envoy_cc_library(
     name = "zstd_dictionary_manager_lib",
     hdrs = ["dictionary_manager.h"],
     deps = [
-        "//bazel/foreign_cc:zstd",
         "//envoy/event:dispatcher_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/config:datasource_lib",
+        "@zstd",
     ],
 )

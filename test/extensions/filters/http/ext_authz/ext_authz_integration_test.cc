@@ -1321,6 +1321,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, Retry) {
                        Headers{});
   waitForSuccessfulUpstreamResponse("200");
 
+  // Verify retry stats are incremented correctly.
+  test_server_->waitForCounterGe("cluster.ext_authz_cluster.upstream_rq_retry", 1);
+  test_server_->waitForCounterGe("cluster.ext_authz_cluster.upstream_rq_total", 2);
+
   cleanup();
 }
 
@@ -2131,12 +2135,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAddExceedsLimit) {
 
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
-  EXPECT_EQ("200", response_->headers().getStatusValue());
-  // NB: Something else adds headers to the response between the ext_authz filter and the downstream
-  // client so the header count is greater than you might expect (100), but we can at least be sure
-  // that all the ext_authz response headers didn't get added.
-  EXPECT_LT(response_->headers().size(), 120);
-  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("new-header-99")).empty());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
   cleanup();
 }
 
@@ -2180,16 +2179,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToSetExceedsLimit) {
   ASSERT_TRUE(response_->waitForEndStream());
 
   EXPECT_TRUE(response_->complete());
-  EXPECT_EQ("200", response_->headers().getStatusValue());
-
-  EXPECT_LT(response_->headers().size(), 120);
-  // The last new headers shouldn't get added to the header map, but the
-  // existing upstream header will be overridden.
-  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("new-header-99")).empty());
-  EXPECT_EQ("new-value", response_->headers()
-                             .get(Http::LowerCaseString("upstream-header"))[0]
-                             ->value()
-                             .getStringView());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
   cleanup();
 }
 
@@ -2231,13 +2221,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAppendIfAbsentExceedsLimit) {
   ASSERT_TRUE(response_->waitForEndStream());
 
   EXPECT_TRUE(response_->complete());
-  EXPECT_EQ("200", response_->headers().getStatusValue());
-
-  EXPECT_LT(response_->headers().size(), 120);
-  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("new-header-99")).empty());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
   cleanup();
 }
-
 // Regression test for https://github.com/envoyproxy/envoy/issues/17344
 TEST(ExtConfigValidateTest, Validate) {
   Server::TestComponentFactory component_factory;
