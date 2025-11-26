@@ -31,7 +31,7 @@ constexpr absl::string_view JsonRpcVersion = "2.0";
 /**
  * All MCP filter stats. @see stats_macros.h
  */
-#define MCP_FILTER_STATS(COUNTER)                                                              \
+#define MCP_FILTER_STATS(COUNTER)                                                                  \
   COUNTER(requests_rejected)                                                                       \
   COUNTER(invalid_json)                                                                            \
   COUNTER(body_too_large)
