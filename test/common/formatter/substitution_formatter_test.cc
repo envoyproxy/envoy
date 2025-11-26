@@ -40,6 +40,7 @@
 #include "gtest/gtest.h"
 
 using testing::Const;
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -2820,9 +2821,9 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
   {
     DynamicMetadataFormatter formatter("com.test", {}, absl::optional<size_t>());
     std::string val = formatter.format(stream_info).value();
-    EXPECT_TRUE(val.find("\"test_key\":\"test_value\"") != std::string::npos);
-    EXPECT_TRUE(val.find("\"test_obj\":{\"inner_key\":\"inner_value\"}") != std::string::npos);
-    EXPECT_TRUE(val.find("\"test_lst\":[\"item0\",4.2]") != std::string::npos);
+    EXPECT_THAT(val, HasSubstr(R"("test_key":"test_value")"));
+    EXPECT_THAT(val, HasSubstr(R"("test_obj":{"inner_key":"inner_value"})"));
+    EXPECT_THAT(val, HasSubstr(R"("test_lst":["item0",4.2])"));
 
     Protobuf::Value expected_val;
     expected_val.mutable_struct_value()->CopyFrom(metadata.filter_metadata().at("com.test"));
