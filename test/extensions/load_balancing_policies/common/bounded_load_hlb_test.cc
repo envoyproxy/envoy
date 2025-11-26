@@ -70,7 +70,7 @@ public:
     const double equal_weight = static_cast<double>(1.0 / num_hosts);
     for (uint32_t i = 0; i < num_hosts; i++) {
       normalized_host_weights.push_back(
-          {makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i), simTime()), equal_weight});
+          {makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i)), equal_weight});
     }
   }
 
@@ -79,7 +79,7 @@ public:
                    NormalizedHostWeightVector& ring) {
     const double equal_weight = static_cast<double>(1.0 / num_hosts);
     for (uint32_t i = 0; i < num_hosts; i++) {
-      HostConstSharedPtr h = makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i), simTime());
+      HostConstSharedPtr h = makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i));
       ring.push_back({h, equal_weight});
       ring.push_back({h, equal_weight});
       hosts.push_back({h, equal_weight});
@@ -104,7 +104,7 @@ TEST_F(HashingLoadBalancerTest, HashKey) {
   NormalizedHostWeightVector normalized_host_weights;
   hlb_ = std::make_shared<TestHashingLoadBalancer>(normalized_host_weights);
 
-  HostSharedPtr host = makeTestHost(info_, "hostname", "tcp://127.0.0.1:90", simTime());
+  HostSharedPtr host = makeTestHost(info_, "hostname", "tcp://127.0.0.1:90");
   // don't use hostname
   EXPECT_EQ(hlb_->hashKey(host, false), "127.0.0.1:90");
   // use hostname
@@ -117,7 +117,7 @@ TEST_F(HashingLoadBalancerTest, HashKey) {
       .set_string_value("hash_key");
   host = makeTestHostWithMetadata(
       info_, std::make_shared<const envoy::config::core::v3::Metadata>(string_metadata),
-      "tcp://127.0.0.1:90", simTime());
+      "tcp://127.0.0.1:90");
   EXPECT_EQ(hlb_->hashKey(host, false), "hash_key");
 
   // other type(int) metadata
@@ -127,7 +127,7 @@ TEST_F(HashingLoadBalancerTest, HashKey) {
       .set_number_value(1337);
   host = makeTestHostWithMetadata(
       info_, std::make_shared<const envoy::config::core::v3::Metadata>(int_metadata),
-      "tcp://127.0.0.1:90", simTime());
+      "tcp://127.0.0.1:90");
   EXPECT_EQ(hlb_->hashKey(host, false), "127.0.0.1:90");
 };
 

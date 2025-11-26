@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/server/overload/overload_manager.h"
+
 #include "source/common/http/conn_pool_base.h"
 #include "source/common/http/http3/conn_pool.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
@@ -154,6 +156,8 @@ public:
     ConnectivityGrid& grid_;
     // The decoder for the original newStream, needed to create streams on subsequent pools.
     Http::ResponseDecoder& decoder_;
+    Http::ResponseDecoderHandlePtr decoder_handle_;
+
     // The callbacks from the original caller, which must get onPoolFailure or
     // onPoolReady unless there is call to cancel(). Will be nullptr if the caller
     // has been notified while attempts are still pending.
@@ -172,8 +176,9 @@ public:
     bool tcp_attempt_succeeded_{};
     // Latch the passed-in stream options.
     const Instance::StreamOptions stream_options_{};
-    absl::optional<ConnectionPool::PoolFailureReason> prev_tcp_pool_failure_reason_;
-    std::string prev_tcp_pool_transport_failure_reason_;
+    absl::optional<ConnectionPool::PoolFailureReason> prev_pool_failure_reason_;
+    std::string prev_pool_transport_failure_reason_;
+    bool delete_started_ = false;
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
@@ -185,7 +190,8 @@ public:
                    HttpServerPropertiesCacheSharedPtr alternate_protocols,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
                    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info,
-                   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry);
+                   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
+                   Server::OverloadManager& overload_manager);
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable
@@ -288,6 +294,7 @@ private:
 
   Http::PersistentQuicInfo& quic_info_;
   Upstream::ResourcePriority priority_;
+  Server::OverloadManager& overload_manager_;
 
   // True iff this pool is draining. No new streams or connections should be created
   // in this state.

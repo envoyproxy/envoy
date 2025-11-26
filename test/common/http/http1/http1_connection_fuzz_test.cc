@@ -40,8 +40,7 @@ public:
             [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder_; }));
   }
 
-  void fuzzResponse(Buffer::Instance& payload, bool use_balsa) {
-    client_settings_.use_balsa_parser_ = use_balsa;
+  void fuzzResponse(Buffer::Instance& payload) {
     client_ = std::make_unique<Http1::ClientConnectionImpl>(
         mock_client_connection_,
         Http1::CodecStats::atomicGet(http1_stats_, *stats_store_.rootScope()),
@@ -49,8 +48,7 @@ public:
     Status status = client_->dispatch(payload);
   }
 
-  void fuzzRequest(Buffer::Instance& payload, bool use_balsa) {
-    server_settings_.use_balsa_parser_ = use_balsa;
+  void fuzzRequest(Buffer::Instance& payload) {
     server_ = std::make_unique<Http1::ServerConnectionImpl>(
         mock_server_connection_,
         Http1::CodecStats::atomicGet(http1_stats_, *stats_store_.rootScope()),
@@ -96,10 +94,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   httpmsg.add(buf, len);
   // HTTP requests and responses are handled differently in the codec, hence we
   // setup two instances of the parser, which do not interact.
-  harness->fuzzRequest(httpmsg, false);
-  harness->fuzzResponse(httpmsg, false);
-  harness->fuzzRequest(httpmsg, true);
-  harness->fuzzResponse(httpmsg, true);
+  harness->fuzzRequest(httpmsg);
+  harness->fuzzResponse(httpmsg);
 }
 
 } // namespace

@@ -21,11 +21,10 @@ void LocalRateLimitClientImpl::createBucket(
     const BucketId& bucket_id, size_t id, const BucketAction& default_bucket_action,
     std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
     std::chrono::milliseconds fallback_ttl, bool initial_request_allowed) {
-  std::shared_ptr<GlobalRateLimitClientImpl> global_client = getGlobalClient();
   // Intentionally crash if the local client is initialized with a null global
   // client or TLS slot due to a bug.
-  global_client->createBucket(bucket_id, id, default_bucket_action, std::move(fallback_action),
-                              fallback_ttl, initial_request_allowed);
+  global_client_->createBucket(bucket_id, id, default_bucket_action, std::move(fallback_action),
+                               fallback_ttl, initial_request_allowed);
 }
 
 std::shared_ptr<CachedBucket> LocalRateLimitClientImpl::getBucket(size_t id) {

@@ -38,6 +38,9 @@ type filter struct {
 	clearRoute  bool   // clear route cache
 
 	refreshRoute bool // refresh route cache
+
+	upstreamOverrideHost       string // set upstream override host
+	upstreamOverrideHostStrict bool   // set strict mode for upstream override host
 }
 
 func parseQuery(path string) url.Values {
@@ -85,6 +88,8 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 	f.newPath = f.query_params.Get("newPath")
 	f.clearRoute = f.query_params.Get("clearRoute") != ""
 	f.refreshRoute = f.query_params.Get("refreshRoute") != ""
+	f.upstreamOverrideHost = f.query_params.Get("upstreamOverrideHost")
+	f.upstreamOverrideHostStrict = f.query_params.Get("upstreamOverrideHostStrict") != ""
 }
 
 func (f *filter) fail(callbacks api.FilterProcessCallbacks, msg string, a ...any) api.StatusType {
@@ -128,6 +133,12 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	api.LogWarnf("log test %v", endStream)
 	api.LogErrorf("log test %v", endStream)
 	api.LogCriticalf("log test %v", endStream)
+
+	if f.upstreamOverrideHost != "" {
+		if err := f.callbacks.DecoderFilterCallbacks().SetUpstreamOverrideHost(f.upstreamOverrideHost, f.upstreamOverrideHostStrict); err != nil {
+			return f.sendLocalReply(f.callbacks.DecoderFilterCallbacks(), "decode-header")
+		}
+	}
 
 	if f.callbacks.LogLevel() != api.GetLogLevel() {
 		return f.fail(f.callbacks.DecoderFilterCallbacks(), "log level mismatch")

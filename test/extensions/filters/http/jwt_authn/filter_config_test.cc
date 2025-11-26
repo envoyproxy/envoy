@@ -340,26 +340,6 @@ providers:
                              HasSubstr("invalid URI"));
 }
 
-TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksInvalidUriValidationDisabled) {
-  // Disabling this runtime feature should allow invalid URIs.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.jwt_authn_validate_uri", "false"}});
-  const char config[] = R"(
-providers:
-  provider1:
-    issuer: issuer1
-    remote_jwks:
-      http_uri:
-        uri: http://www.not\nvalid.com
-)";
-
-  JwtAuthentication proto_config;
-  TestUtility::loadFromYaml(config, proto_config);
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_NO_THROW(FilterConfigImpl(proto_config, "", context));
-}
-
 TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksValidUri) {
   // Valid URI should not fail config validation.
   const char config[] = R"(

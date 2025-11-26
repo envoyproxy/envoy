@@ -42,8 +42,9 @@ private:
 
 class UdpDefaultWriterFactory : public Network::UdpPacketWriterFactory {
 public:
-  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
-                                                    Stats::Scope&) override {
+  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope&,
+                                                    Envoy::Event::Dispatcher&,
+                                                    absl::AnyInvocable<void() &&>) override {
     return std::make_unique<UdpDefaultWriter>(io_handle);
   }
 };

@@ -75,7 +75,7 @@ private:
   };
 
   // Common::ImplBase
-  void emitLog(const Formatter::HttpFormatterContext& context,
+  void emitLog(const Formatter::Context& context,
                const StreamInfo::StreamInfo& stream_info) override;
 
   FluentdFormatterPtr formatter_;

@@ -118,6 +118,16 @@ public:
    */
   RequestEncoder& newStream(ResponseDecoder& response_decoder);
 
+  /**
+   * Create a new stream. Note: The CodecClient will NOT buffer multiple requests for HTTP1
+   * connections. Thus, calling newStream() before the previous request has been fully encoded
+   * is an error. Pipelining is supported however.
+   * @param response_decoder_handle supplies the decoder to use for response callbacks if it's still
+   * alive.
+   * @return StreamEncoder& the encoder to use for encoding the request.
+   */
+  RequestEncoder& newStream(ResponseDecoderHandlePtr response_decoder_handle);
+
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) {
     connection_->setConnectionStats(stats);
   }
@@ -248,6 +258,23 @@ private:
       }
     }
 
+    ActiveRequest(CodecClient& parent, ResponseDecoderHandlePtr inner_handle)
+        : ResponseDecoderWrapper(std::move(inner_handle)), RequestEncoderWrapper(nullptr),
+          parent_(parent), header_validator_(parent.host_->cluster().makeHeaderValidator(
+                               parent.codec_->protocol())) {
+      switch (parent.protocol()) {
+      case Protocol::Http10:
+      case Protocol::Http11:
+        // HTTP/1.1 codec does not support half-close on the response completion.
+        wait_encode_complete_ = false;
+        break;
+      case Protocol::Http2:
+      case Protocol::Http3:
+        wait_encode_complete_ = true;
+        break;
+      }
+    }
+
     void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
 
     // StreamCallbacks
@@ -305,6 +332,7 @@ private:
   void onBelowWriteBufferLowWatermark() override {
     codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
   }
+  RequestEncoder& enlistAndCreateEncoder(ActiveRequestPtr request);
 
   std::list<ActiveRequestPtr> active_requests_;
   Http::ConnectionCallbacks* codec_callbacks_{};

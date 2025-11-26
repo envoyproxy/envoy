@@ -4,6 +4,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_admin_functionality",
+    "envoy_select_boringssl",
     "envoy_sh_test",
 )
 
@@ -42,7 +43,9 @@ envoy_sh_test(
     name = "pie_test",
     srcs = ["pie_test.sh"],
     coverage = False,
-    data = ["//source/exe:envoy-static"],
+    data = [
+        "//source/exe:envoy-static",
+    ],
     # Since VS2015 or even earlier, link.exe defaults to PIE generation
     tags = [
         "nofips",
@@ -74,7 +77,6 @@ envoy_cc_test_library(
         "//source/common/stats:isolated_store_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
-        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
@@ -94,7 +96,7 @@ envoy_cc_test(
         "//source/common/formatter:formatter_extension_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
-        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
@@ -113,7 +115,7 @@ envoy_cc_test(
         "//source/common/formatter:formatter_extension_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
-        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
@@ -147,14 +149,23 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "check_extensions_against_registry_test",
+    name = "all_extensions_build_test",
     size = "large",
-    srcs = ["check_extensions_against_registry_test.cc"],
+    srcs = ["all_extensions_build_test.cc"],
+    copts = envoy_select_boringssl(["-DENVOY_SSL_FIPS"]),
     data = [
+        "fips_check.sh",
         "//source/extensions:extensions_metadata.yaml",
     ],
+    env = select({
+        "//bazel:clang_build": {
+            "OBJDUMP": "${LLVM_DIRECTORY}/bin/llvm-objdump",
+        },
+        "//conditions:default": {},
+    }),
     rbe_pool = "6gig",
     deps = [
+        "//source/common/version:version_lib",
         "//test/test_common:environment_lib",
     ] + select({
         # gcc RBE build has trouble compiling target with all extensions

@@ -251,6 +251,10 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& 
   needs_transformation_for_non_proto_encoded_response_ =
       needsTransformationForNonProtoEncodedResponse(headers, end_stream);
 
+  // If upstream sets a content length, we must remove it because we're going to change the
+  // length of the body
+  headers.removeContentLength();
+
   if (is_text_response_) {
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
   } else {

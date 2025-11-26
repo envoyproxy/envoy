@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
@@ -112,11 +113,6 @@ EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
   IS_ENVOY_BUG("Unexpected disallowed server initiated stream");
-  return nullptr;
-}
-
-quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingUnidirectionalStream() {
-  IS_ENVOY_BUG("Unexpected function call");
   return nullptr;
 }
 
@@ -232,6 +228,21 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
   // If L4 filters causes the connection to be closed early during initialization, now
   // is the time to actually close the connection.
   maybeHandleCloseDuringInitialize();
+
+  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+    ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
+                                "sending GOAWAY and close on dispatch");
+    SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
+    closeConnectionImmediately();
+  } else if (should_send_go_away_on_dispatch_ != nullptr &&
+             should_send_go_away_on_dispatch_->shouldShedLoad() && !h3_go_away_sent_) {
+    ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
+                                "sending GOAWAY on dispatch");
+    SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
+    h3_go_away_sent_ = true;
+  }
+
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
   if (connection()->expected_server_preferred_address().IsInitialized() &&
       self_address == connection()->expected_server_preferred_address()) {

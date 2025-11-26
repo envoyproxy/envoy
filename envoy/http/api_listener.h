@@ -5,17 +5,6 @@
 namespace Envoy {
 namespace Http {
 
-class RequestDecoderHandle {
-public:
-  virtual ~RequestDecoderHandle() = default;
-
-  /**
-   * @return a reference to the underlying decoder if it is still valid.
-   */
-  virtual OptRef<RequestDecoder> get() PURE;
-};
-using RequestDecoderHandlePtr = std::unique_ptr<RequestDecoderHandle>;
-
 /**
  * ApiListener that allows consumers to interact with HTTP streams via API calls.
  */

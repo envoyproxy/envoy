@@ -3,7 +3,7 @@
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/signer_base_impl.h"
 
-using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
+using AwsSigningHeaderMatcherVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
 namespace Envoy {
 namespace Extensions {

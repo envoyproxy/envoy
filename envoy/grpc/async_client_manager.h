@@ -55,7 +55,7 @@ public:
 
   const envoy::config::core::v3::GrpcService& config() const { return config_; }
 
-  void setConfig(const envoy::config::core::v3::GrpcService g) {
+  void setConfig(const envoy::config::core::v3::GrpcService& g) {
     config_ = g;
     pre_computed_hash_ = Envoy::MessageUtil::hash(g);
   }

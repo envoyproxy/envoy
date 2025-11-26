@@ -490,7 +490,7 @@ public:
           entry->set_type(tlv.first);
           entry->set_value(std::string(tlv.second.begin(), tlv.second.end()));
         }
-        ProtobufWkt::Any typed_metadata;
+        Protobuf::Any typed_metadata;
         typed_metadata.PackFrom(tlvs_metadata);
         const std::string metadata_key =
             Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;

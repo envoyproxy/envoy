@@ -60,7 +60,7 @@ Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMa
         mut_untyped_metadata[entry.metadata_namespace] = entry.value;
       } else if (entry.allow_overwrite) {
         // Get the existing metadata at this key for merging.
-        ProtobufWkt::Struct& orig_fields = mut_untyped_metadata[entry.metadata_namespace];
+        Protobuf::Struct& orig_fields = mut_untyped_metadata[entry.metadata_namespace];
         const auto& to_merge = entry.value;
 
         // Merge the new metadata into the existing metadata.

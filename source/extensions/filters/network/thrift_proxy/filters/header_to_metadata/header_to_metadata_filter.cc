@@ -78,7 +78,7 @@ const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& ns
 bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::string& meta_namespace,
                                          const std::string& key, std::string value, ValueType type,
                                          ValueEncode encode) const {
-  ProtobufWkt::Value val;
+  Protobuf::Value val;
 
   ASSERT(!value.empty());
 

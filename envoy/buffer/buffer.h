@@ -506,13 +506,13 @@ public:
    *        If set to non-zero, overflow callbacks will be called if the
    *        buffered data exceeds watermark * overflow_multiplier.
    */
-  virtual void setWatermarks(uint32_t watermark, uint32_t overflow_multiplier = 0) PURE;
+  virtual void setWatermarks(uint64_t watermark, uint32_t overflow_multiplier = 0) PURE;
 
   /**
    * Returns the configured high watermark. A return value of 0 indicates that watermark
    * functionality is disabled.
    */
-  virtual uint32_t highWatermark() const PURE;
+  virtual uint64_t highWatermark() const PURE;
   /**
    * Determine if the buffer watermark trigger condition is currently set. The watermark trigger is
    * set when the buffer size exceeds the configured high watermark and is cleared once the buffer

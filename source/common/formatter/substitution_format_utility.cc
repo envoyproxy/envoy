@@ -69,7 +69,7 @@ const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
   return hostname;
 }
 
-const ProtobufWkt::Value& SubstitutionFormatUtils::unspecifiedValue() {
+const Protobuf::Value& SubstitutionFormatUtils::unspecifiedValue() {
   return ValueUtil::nullValue();
 }
 

@@ -34,8 +34,8 @@ void fail(absl::string_view msg) {
 bool isValidRate(double n) { return n >= 0 && n <= 1.0; }
 bool isValidFixedTarget(double n) { return n >= 0 && static_cast<uint32_t>(n) == n; }
 
-bool validateRule(const ProtobufWkt::Struct& rule) {
-  using ProtobufWkt::Value;
+bool validateRule(const Protobuf::Struct& rule) {
+  using Protobuf::Value;
 
   const auto host_it = rule.fields().find(HostJsonKey);
   if (host_it != rule.fields().end() &&
@@ -93,7 +93,7 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
     return;
   }
 
-  ProtobufWkt::Struct document;
+  Protobuf::Struct document;
   TRY_NEEDS_AUDIT { MessageUtil::loadFromJson(rule_json, document); }
   END_TRY catch (EnvoyException& e) {
     fail("invalid JSON format");
@@ -106,7 +106,7 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
     return;
   }
 
-  if (version_it->second.kind_case() != ProtobufWkt::Value::KindCase::kNumberValue ||
+  if (version_it->second.kind_case() != Protobuf::Value::KindCase::kNumberValue ||
       version_it->second.number_value() != SamplingFileVersion) {
     fail("wrong version number");
     return;
@@ -114,7 +114,7 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
 
   const auto default_rule_it = document.fields().find(DefaultRuleJsonKey);
   if (default_rule_it == document.fields().end() ||
-      default_rule_it->second.kind_case() != ProtobufWkt::Value::KindCase::kStructValue) {
+      default_rule_it->second.kind_case() != Protobuf::Value::KindCase::kStructValue) {
     fail("missing default rule");
     return;
   }
@@ -134,13 +134,13 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
     return;
   }
 
-  if (custom_rules_it->second.kind_case() != ProtobufWkt::Value::KindCase::kListValue) {
+  if (custom_rules_it->second.kind_case() != Protobuf::Value::KindCase::kListValue) {
     fail("rules must be JSON array");
     return;
   }
 
   for (auto& el : custom_rules_it->second.list_value().values()) {
-    if (el.kind_case() != ProtobufWkt::Value::KindCase::kStructValue) {
+    if (el.kind_case() != Protobuf::Value::KindCase::kStructValue) {
       fail("rules array must be objects");
       return;
     }

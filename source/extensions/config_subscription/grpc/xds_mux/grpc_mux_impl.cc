@@ -65,7 +65,8 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
 
 template <class S, class F, class RQ, class RS>
 std::unique_ptr<GrpcStreamInterface<RQ, RS>> GrpcMuxImpl<S, F, RQ, RS>::createGrpcStreamObject(
-    Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
+    Grpc::RawAsyncClientSharedPtr&& async_client,
+    Grpc::RawAsyncClientSharedPtr&& failover_async_client,
     const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
     BackOffStrategyPtr&& backoff_strategy, const RateLimitSettings& rate_limit_settings) {
   if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
@@ -77,7 +78,7 @@ std::unique_ptr<GrpcStreamInterface<RQ, RS>> GrpcMuxImpl<S, F, RQ, RS>::createGr
           return std::make_unique<GrpcStream<RQ, RS>>(
               callbacks, std::move(async_client), service_method, dispatcher, scope,
               std::move(backoff_strategy), rate_limit_settings,
-              GrpcStream<RQ, RS>::ConnectedStateValue::FIRST_ENTRY);
+              GrpcStream<RQ, RS>::ConnectedStateValue::FirstEntry);
         },
         /*failover_stream_creator=*/
         failover_async_client
@@ -92,7 +93,7 @@ std::unique_ptr<GrpcStreamInterface<RQ, RS>> GrpcMuxImpl<S, F, RQ, RS>::createGr
                         // be the same as the primary source.
                         std::make_unique<FixedBackOffStrategy>(
                             GrpcMuxFailover<RQ, RS>::DefaultFailoverBackoffMilliseconds),
-                        rate_limit_settings, GrpcStream<RQ, RS>::ConnectedStateValue::SECOND_ENTRY);
+                        rate_limit_settings, GrpcStream<RQ, RS>::ConnectedStateValue::SecondEntry);
                   })
             : absl::nullopt,
         /*grpc_mux_callbacks=*/*this,
@@ -101,7 +102,7 @@ std::unique_ptr<GrpcStreamInterface<RQ, RS>> GrpcMuxImpl<S, F, RQ, RS>::createGr
   return std::make_unique<GrpcStream<RQ, RS>>(this, std::move(async_client), service_method,
                                               dispatcher_, scope, std::move(backoff_strategy),
                                               rate_limit_settings,
-                                              GrpcStream<RQ, RS>::ConnectedStateValue::FIRST_ENTRY);
+                                              GrpcStream<RQ, RS>::ConnectedStateValue::FirstEntry);
 }
 
 template <class S, class F, class RQ, class RS> GrpcMuxImpl<S, F, RQ, RS>::~GrpcMuxImpl() {
@@ -230,8 +231,9 @@ ScopedResume GrpcMuxImpl<S, F, RQ, RS>::pause(const std::vector<std::string> typ
 
 template <class S, class F, class RQ, class RS>
 absl::Status GrpcMuxImpl<S, F, RQ, RS>::updateMuxSource(
-    Grpc::RawAsyncClientPtr&& primary_async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
-    Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
+    Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+    Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
+    BackOffStrategyPtr&& backoff_strategy,
     const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
@@ -480,7 +482,7 @@ Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   SubscriptionCallbacks&,
                                                   OpaqueResourceDecoderSharedPtr,
                                                   const SubscriptionOptions&) {
-  throw EnvoyException("ADS must be configured to support an ADS config source");
+  throwEnvoyExceptionOrPanic("ADS must be configured to support an ADS config source");
 }
 
 class DeltaGrpcMuxFactory : public MuxFactory {
@@ -488,8 +490,9 @@ public:
   std::string name() const override { return "envoy.config_mux.delta_grpc_mux_factory"; }
   void shutdownAll() override { return GrpcMuxDelta::shutdownAll(); }
   std::shared_ptr<GrpcMux>
-  create(Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
-         Event::Dispatcher& dispatcher, Random::RandomGenerator&, Stats::Scope& scope,
+  create(Grpc::RawAsyncClientSharedPtr&& async_client,
+         Grpc::RawAsyncClientSharedPtr&& failover_async_client, Event::Dispatcher& dispatcher,
+         Random::RandomGenerator&, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
@@ -527,8 +530,9 @@ public:
   std::string name() const override { return "envoy.config_mux.sotw_grpc_mux_factory"; }
   void shutdownAll() override { return GrpcMuxSotw::shutdownAll(); }
   std::shared_ptr<GrpcMux>
-  create(Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
-         Event::Dispatcher& dispatcher, Random::RandomGenerator&, Stats::Scope& scope,
+  create(Grpc::RawAsyncClientSharedPtr&& async_client,
+         Grpc::RawAsyncClientSharedPtr&& failover_async_client, Event::Dispatcher& dispatcher,
+         Random::RandomGenerator&, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,

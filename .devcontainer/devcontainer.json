@@ -15,9 +15,13 @@
   ],
   "containerEnv": {
     "ENVOY_SRCDIR": "${containerWorkspaceFolder}",
+    "HTTPS_PROXY": "${env:VSCODE_CONTAINER_HTTPS_PROXY}",
+    "HTTP_PROXY": "${env:VSCODE_CONTAINER_HTTP_PROXY}",
+    "NO_PROXY": "${env:VSCODE_CONTAINER_NO_PROXY}"
   },
   "remoteUser": "vscode",
   "containerUser": "vscode",
+  "initializeCommand": ".devcontainer/init.sh",
   "postCreateCommand": ".devcontainer/setup.sh",
   "customizations": {
     "vscode": {

@@ -14,7 +14,7 @@ public:
 
   // FilterState::Object
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    auto message = std::make_unique<Protobuf::StringValue>();
     message->set_value(value_);
     return message;
   }

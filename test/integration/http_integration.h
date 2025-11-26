@@ -145,7 +145,6 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
-  void setupHttp1ImplOverrides(Http1ParserImpl http1_implementation);
   void setupHttp2ImplOverrides(Http2Impl http2_implementation);
 
 protected:
@@ -393,10 +392,12 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP2, version) {}
 
 protected:
+  void startHttp2Session(const Http2Frame& settings);
   void startHttp2Session();
   Http2Frame readFrame();
   void sendFrame(const Http2Frame& frame);
   virtual void beginSession();
+  virtual void beginSession(const Http2Frame& settings);
 
   IntegrationTcpClientPtr tcp_client_;
 };

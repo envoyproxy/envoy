@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package envoy.extensions.http.stateful_session.envelope.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.stateful_session.envelope.v3";
+option java_outer_classname = "EnvelopeProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/stateful_session/envelope/v3;envelopev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Envelope stateful session extension]
+
+// The extension allows the session state is tracked via existing session context that initialized
+// by the upstream server. It assumes that the upstream server will generate the session context
+// (like session id header or cookie) in the initial response of the session and the client will use
+// the same session context in the subsequent requests without any modification.
+//
+// When processing the response from the upstream, Envoy will check if the response contains the
+// session context. If the response contains the session context, no matter if it's a new session
+// context or an existing one, Envoy will join it and the upstream host as new session context.
+//
+// When processing the request from the downstream, Envoy will check if the request contains the
+// session context. If the request contains the session context, Envoy will strip the
+// upstream host from the session context.
+//
+// [#extension: envoy.http.stateful_session.envelope]
+message EnvelopeSessionState {
+  message Header {
+    // Iff the header specified by the ``name`` field is present in the response (assume the ``name``
+    // is set to ``session-header`` and original header value is ``xxxxxx``), then the upstream host
+    // address and value of ``name`` field specified header will be encoded in following format and
+    // the output will be used to update the ``name`` field specified header in the response:
+    //
+    // .. code-block:: none
+    //
+    //   session-header: "MS4yLjMuNDo4MAo=;UV:eHh4eHh4Cg==" # base64(1.2.3.4:80);UV:base64(xxxxxx)
+    //
+    // The ``UV`` (upstream value) part is used to store the original upstream header value of
+    // ``name`` field specified header.
+    //
+    // If this mode is used then Envoy will assume that the header in the request will also be in the
+    // same format and will contain the ``UV`` part. This extension will parse the upstream host
+    // address and update the ``name`` field specified header in the request to the ``UV`` part.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+  }
+
+  // Set the header config to track the session state.
+  Header header = 1 [(validate.rules).message = {required: true}];
+}

@@ -14,6 +14,7 @@
 #include "quiche/common/http/http_header_block.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
+#include "quiche/quic/core/quic_types.h"
 
 namespace Envoy {
 namespace Quic {
@@ -33,6 +34,13 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
   RegisterMetadataVisitor(this);
+}
+
+void EnvoyQuicClientStream::setResponseDecoder(Http::ResponseDecoder& decoder) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
+    response_decoder_handle_ = decoder.createResponseDecoderHandle();
+  }
+  response_decoder_ = &decoder;
 }
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
@@ -101,6 +109,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
     }
   }
 #endif
+  addDecompressedHeaderBytesSent(spdy_headers);
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
     size_t bytes_sent = WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
@@ -118,7 +127,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
 
 void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
-  encodeTrailersImpl(envoyHeadersToHttp2HeaderBlock(trailers));
+  quiche::HttpHeaderBlock trailer_block = envoyHeadersToHttp2HeaderBlock(trailers);
+  addDecompressedHeaderBytesSent(trailer_block);
+  encodeTrailersImpl(std::move(trailer_block));
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
@@ -147,6 +158,7 @@ void EnvoyQuicClientStream::switchStreamBlockState() {
 void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
+  addDecompressedHeaderBytesReceived(header_list);
   if (read_side_closed()) {
     return;
   }
@@ -202,7 +214,11 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (!optional_status.has_value()) {
     // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
     // request
-    response_decoder_->decodeHeaders(std::move(headers), fin);
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
+      decoder->decodeHeaders(std::move(headers), fin);
+    } else {
+      onResponseDecoderDead();
+    }
     ConsumeHeaderList();
     return;
   }
@@ -219,10 +235,18 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (is_special_1xx && !decoded_1xx_) {
     // This is 100 Continue, only decode it once to support Expect:100-Continue header.
     decoded_1xx_ = true;
-    response_decoder_->decode1xxHeaders(std::move(headers));
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
+      decoder->decode1xxHeaders(std::move(headers));
+    } else {
+      onResponseDecoderDead();
+    }
   } else if (!is_special_1xx) {
-    response_decoder_->decodeHeaders(std::move(headers),
-                                     /*end_stream=*/fin);
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
+      decoder->decodeHeaders(std::move(headers),
+                             /*end_stream=*/fin);
+    } else {
+      onResponseDecoderDead();
+    }
     if (status == enumToInt(Http::Code::NotModified)) {
       got_304_response_ = true;
     }
@@ -257,10 +281,7 @@ bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()),
-                           "|FROM_PEER")
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_PEER"));
   }
   return true;
 }
@@ -299,7 +320,11 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
       // A stream error has occurred, stop processing.
       return;
     }
-    response_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
+      decoder->decodeData(*buffer, fin_read_and_no_trailers);
+    } else {
+      onResponseDecoderDead();
+    }
   }
 
   if (!sequencer()->IsClosed() || read_side_closed()) {
@@ -316,6 +341,7 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
+  addDecompressedHeaderBytesReceived(header_list);
   if (read_side_closed()) {
     return;
   }
@@ -345,7 +371,11 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
       onStreamError(close_connection_upon_invalid_header_, transform_rst);
       return;
     }
-    response_decoder_->decodeTrailers(std::move(trailers));
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
+      decoder->decodeTrailers(std::move(trailers));
+    } else {
+      onResponseDecoderDead();
+    }
     MarkTrailersConsumed();
   }
 }
@@ -360,9 +390,7 @@ void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
   if (write_side_closed() && !end_stream_decoded_and_encoded) {
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(frame.error_code),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER")
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER"));
   }
 }
 
@@ -374,9 +402,7 @@ void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(
       quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-          ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_SELF")
-          : absl::string_view());
+      absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_SELF"));
   if (session()->connection()->connected()) {
     quic::QuicSpdyClientStream::ResetWithError(error);
   }
@@ -433,10 +459,15 @@ void EnvoyQuicClientStream::OnMetadataComplete(size_t /*frame_len*/,
                                                const quic::QuicHeaderList& header_list) {
   if (mustRejectMetadata(header_list.uncompressed_header_bytes())) {
     onStreamError(true, quic::QUIC_HEADERS_TOO_LARGE);
+
     return;
   }
   if (!header_list.empty()) {
-    response_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
+      decoder->decodeMetadata(metadataMapFromHeaderList(header_list));
+    } else {
+      onResponseDecoderDead();
+    }
   }
 }
 
@@ -467,13 +498,34 @@ bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
 // connect-udp".
 void EnvoyQuicClientStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  http_datagram_handler_->setStreamDecoder(response_decoder_);
+  http_datagram_handler_->setStreamDecoder(getResponseDecoder());
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif
 
 void EnvoyQuicClientStream::OnInvalidHeaders() {
   onStreamError(absl::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD);
+}
+
+void EnvoyQuicClientStream::onResponseDecoderDead() const {
+  const std::string error_msg = "response_decoder_ use after free detected.";
+  IS_ENVOY_BUG(error_msg);
+  RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                     "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                 error_msg);
+}
+
+Http::ResponseDecoder* EnvoyQuicClientStream::getResponseDecoder() {
+  if (response_decoder_handle_ == nullptr) {
+    return response_decoder_;
+  }
+  if (response_decoder_handle_) {
+    if (OptRef<Http::ResponseDecoder> decoder = response_decoder_handle_->get();
+        decoder.has_value()) {
+      return &decoder.value().get();
+    }
+  }
+  return nullptr;
 }
 
 } // namespace Quic

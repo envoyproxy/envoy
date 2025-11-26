@@ -96,6 +96,12 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
     return;
   }
 
+  // Rate Limit config in typed_per_filter_config takes precedence over route's rate limit.
+  if (config_->hasRateLimitConfigs()) {
+    config_->populateDescriptors(headers, callbacks_->streamInfo(), descriptors, on_stream_done);
+    return;
+  }
+
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptorsForPolicy(route_entry->rateLimitPolicy(), descriptors, headers,
                                         on_stream_done);
@@ -104,12 +110,12 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   case VhRateLimitOptions::Ignore:
     break;
   case VhRateLimitOptions::Include:
-    populateRateLimitDescriptorsForPolicy(route_->virtualHost().rateLimitPolicy(), descriptors,
+    populateRateLimitDescriptorsForPolicy(route_->virtualHost()->rateLimitPolicy(), descriptors,
                                           headers, on_stream_done);
     break;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
-      populateRateLimitDescriptorsForPolicy(route_->virtualHost().rateLimitPolicy(), descriptors,
+      populateRateLimitDescriptorsForPolicy(route_->virtualHost()->rateLimitPolicy(), descriptors,
                                             headers, on_stream_done);
     }
   }
@@ -127,11 +133,11 @@ double Filter::getHitAddend() {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  request_headers_ = &headers;
   if (!config_->enabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  request_headers_ = &headers;
   initiateCall(headers);
   return (state_ == State::Calling || state_ == State::Responded)
              ? Http::FilterHeadersStatus::StopIteration
@@ -184,15 +190,22 @@ void Filter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
     client_->cancel();
-  } else if (client_ != nullptr) {
+  } else if (client_ != nullptr && request_headers_ != nullptr) {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
     populateRateLimitDescriptors(descriptors, *request_headers_, true);
     if (!descriptors.empty()) {
+      // If the limit() call fails directly then the callback and client will be destroyed
+      // when calling the limit() function. To make sure we can call the detach() function
+      // safely, we convert the client_ to a shared_ptr.
+
+      std::shared_ptr<Filters::Common::RateLimit::Client> shared_client = std::move(client_);
       // Since this filter is being destroyed, we need to keep the client alive until the request
       // is complete by leaking the client with OnStreamDoneCallBack.
-      auto callback = new OnStreamDoneCallBack(std::move(client_));
+      auto callback = new OnStreamDoneCallBack(shared_client);
       callback->client().limit(*callback, getDomain(), descriptors, Tracing::NullSpan::instance(),
-                               absl::nullopt, getHitAddend());
+                               callbacks_->streamInfo(), getHitAddend());
+      // If the limit() call fails directly then the detach() will be no-op.
+      shared_client->detach();
     }
   }
 }

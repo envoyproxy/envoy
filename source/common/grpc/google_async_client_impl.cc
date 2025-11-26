@@ -518,6 +518,18 @@ void GoogleAsyncRequestImpl::cancel() {
   resetStream();
 }
 
+void GoogleAsyncRequestImpl::detach() {
+  // TODO(wbpcode): In most tracers the span will hold a reference to the tracer self
+  // and it's possible that become a dangling reference for long time async request.
+  // This require further PR to resolve.
+
+  options_.sidestream_watermark_callbacks = nullptr;
+  options_.parent_span_ = nullptr;
+  options_.parent_context.stream_info = nullptr;
+
+  streamInfo().clearParentStreamInfo();
+}
+
 void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   Tracing::HttpTraceContext trace_context(metadata);
   Tracing::UpstreamContext upstream_context(nullptr,                          // host_

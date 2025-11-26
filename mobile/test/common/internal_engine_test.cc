@@ -102,6 +102,10 @@ public:
     helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
         .WillRepeatedly(Return(true));
+    EXPECT_CALL(helper_handle_->mock_helper(), getDefaultNetworkHandle())
+        .Times(testing::AtMost(1))
+        .WillOnce(Return(-1));
+    EXPECT_CALL(helper_handle_->mock_helper(), getAllConnectedNetworks()).Times(testing::AtMost(1));
   }
 
   envoy_status_t runEngine(const std::unique_ptr<InternalEngine>& engine,
@@ -335,7 +339,7 @@ TEST_F(InternalEngineTest, BasicStream) {
 
   envoy::extensions::filters::http::buffer::v3::Buffer buffer;
   buffer.mutable_max_request_bytes()->set_value(65000);
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer");
   std::string serialized_buffer;
   buffer.SerializeToString(&serialized_buffer);
@@ -441,8 +445,9 @@ TEST_F(InternalEngineTest, ThreadCreationFailed) {
   EngineTestContext test_context{};
   auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
   EXPECT_CALL(*thread_factory, createThread(_, _, false)).WillOnce(Return(ByMove(nullptr)));
-  std::unique_ptr<InternalEngine> engine(new InternalEngine(
-      createDefaultEngineCallbacks(test_context), {}, {}, {}, false, std::move(thread_factory)));
+  std::unique_ptr<InternalEngine> engine(
+      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}, {}, {}, false,
+                         std::move(thread_factory)));
   Platform::EngineBuilder builder;
   envoy_status_t status = runEngine(engine, builder, LOG_LEVEL);
   EXPECT_EQ(status, ENVOY_FAILURE);

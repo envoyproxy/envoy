@@ -41,7 +41,7 @@ TEST_F(HTTPTypedPerFilterConfigTest, RejectUnknownHttpFilterInTypedPerFilterConf
               hcm) {
         auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
         auto* config = virtual_host->mutable_typed_per_filter_config();
-        (*config)["filter.unknown"].PackFrom(Envoy::ProtobufWkt::Struct());
+        (*config)["filter.unknown"].PackFrom(Envoy::Protobuf::Struct());
       });
   EXPECT_DEATH(initialize(),
                "Didn't find a registered implementation for 'filter.unknown' with type URL: "
@@ -57,7 +57,7 @@ TEST_F(HTTPTypedPerFilterConfigTest, IgnoreUnknownOptionalHttpFilterInTypedPerFi
 
         envoy::config::route::v3::FilterConfig filter_config;
         filter_config.set_is_optional(true);
-        filter_config.mutable_config()->PackFrom(Envoy::ProtobufWkt::Struct());
+        filter_config.mutable_config()->PackFrom(Envoy::Protobuf::Struct());
         (*config)["filter.unknown"].PackFrom(filter_config);
 
         auto* filter = hcm.mutable_http_filters()->Add();

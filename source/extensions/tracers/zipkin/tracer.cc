@@ -6,6 +6,7 @@
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/zipkin/util.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/extensions/tracers/zipkin/zipkin_json_field_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -53,7 +54,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   cs.setEndpoint(std::move(ep));
 
   // Create an all-new span, with no parent id
-  SpanPtr span_ptr = std::make_unique<Span>(time_source_);
+  SpanPtr span_ptr = std::make_unique<Span>(time_source_, *this);
   span_ptr->setName(span_name);
   uint64_t random_number = random_generator_.random();
   span_ptr->setId(random_number);
@@ -75,14 +76,12 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   // Add CS annotation to the span
   span_ptr->addAnnotation(std::move(cs));
 
-  span_ptr->setTracer(this);
-
   return span_ptr;
 }
 
 SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
                           SystemTime timestamp, const SpanContext& previous_context) {
-  SpanPtr span_ptr = std::make_unique<Span>(time_source_);
+  SpanPtr span_ptr = std::make_unique<Span>(time_source_, *this);
   // If the previous context is inner context then this span is span for upstream request.
   Annotation annotation = getAnnotation(split_spans_for_request_ || config.spawnUpstreamSpan(),
                                         previous_context.innerContext(), config.operationName());
@@ -139,8 +138,6 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
                                  time_source_.monotonicTime().time_since_epoch())
                                  .count();
   span_ptr->setStartTime(start_time_micro);
-
-  span_ptr->setTracer(this);
 
   return span_ptr;
 }

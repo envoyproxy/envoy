@@ -19,7 +19,7 @@ namespace ConnectGrpcBridge {
 struct Error {
   Grpc::Status::GrpcStatus code;
   std::string message;
-  std::vector<ProtobufWkt::Any> details;
+  std::vector<Protobuf::Any> details;
 };
 
 struct EndStreamResponse {

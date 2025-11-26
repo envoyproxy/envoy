@@ -1268,7 +1268,7 @@ TEST_F(RateLimitPolicyTest, RequestMatchInputSkip) {
 class ExtensionDescriptorFactory : public Envoy::RateLimit::DescriptorProducerFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
   std::string name() const override { return "test.descriptor_producer"; }
 

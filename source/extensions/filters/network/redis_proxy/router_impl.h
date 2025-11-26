@@ -13,7 +13,7 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/common/trie_lookup_table.h"
+#include "source/common/common/radix_tree.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
@@ -86,7 +86,7 @@ public:
                  const StreamInfo::StreamInfo& stream_info);
 
 private:
-  TrieLookupTable<PrefixSharedPtr> prefix_lookup_table_;
+  RadixTree<PrefixSharedPtr> prefix_lookup_table_;
   const bool case_insensitive_;
   Upstreams upstreams_;
   PrefixSharedPtr catch_all_route_;

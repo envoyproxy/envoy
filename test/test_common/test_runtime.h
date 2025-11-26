@@ -76,10 +76,10 @@ public:
     // Set up runtime.
     auto* runtime = config.add_layers();
     runtime->set_name("test_static_layer_test_runtime");
-    ProtobufWkt::Struct envoy_layer;
-    ProtobufWkt::Struct& runtime_values =
+    Protobuf::Struct envoy_layer;
+    Protobuf::Struct& runtime_values =
         *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
-    ProtobufWkt::Struct& flags =
+    Protobuf::Struct& flags =
         *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
     for (const auto& [key, value] : values) {
       (*flags.mutable_fields())[key].set_bool_value(value);

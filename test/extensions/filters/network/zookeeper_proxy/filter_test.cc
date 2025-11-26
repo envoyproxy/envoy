@@ -16,7 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
-bool protoMapEq(const ProtobufWkt::Struct& obj, const std::map<std::string, std::string>& rhs) {
+bool protoMapEq(const Protobuf::Struct& obj, const std::map<std::string, std::string>& rhs) {
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
@@ -584,7 +584,7 @@ public:
     auto& call = EXPECT_CALL(stream_info_, setDynamicMetadata(_, _));
 
     for (const auto& value : values) {
-      call.WillOnce(Invoke([value](const std::string& key, const ProtobufWkt::Struct& obj) -> void {
+      call.WillOnce(Invoke([value](const std::string& key, const Protobuf::Struct& obj) -> void {
         EXPECT_STREQ(key.c_str(), "envoy.filters.network.zookeeper_proxy");
         protoMapEq(obj, value);
       }));

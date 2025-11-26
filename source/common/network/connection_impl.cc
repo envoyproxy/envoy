@@ -121,7 +121,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 
 ConnectionImpl::~ConnectionImpl() {
   ASSERT(!socket_->isOpen() && delayed_close_timer_ == nullptr,
-         "ConnectionImpl was unexpectedly torn down without being closed.");
+         "ConnectionImpl destroyed with open socket and/or active timer");
 
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
@@ -148,6 +148,8 @@ bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initialize
 
 void ConnectionImpl::close(ConnectionCloseType type) {
   if (!socket_->isOpen()) {
+    ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "Not closing conn, socket is not open",
+                         *this);
     return;
   }
 
@@ -302,6 +304,7 @@ void ConnectionImpl::closeThroughFilterManager(ConnectionCloseAction close_actio
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (!socket_->isOpen()) {
+    ENVOY_CONN_LOG(trace, "closeSocket: socket is not open, returning", *this);
     return;
   }
 
@@ -340,6 +343,14 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   // It is safe to call close() since there is an IO handle check.
   socket_->close();
+
+  // Propagate transport failure reason to StreamInfo before raising close events,
+  // ensuring it's available to all filters and access loggers.
+  // Only set if we have a valid failure reason to avoid accessing potentially invalid state.
+  absl::string_view failure_reason = transportFailureReason();
+  if (!failure_reason.empty()) {
+    stream_info_.setDownstreamTransportFailureReason(failure_reason);
+  }
 
   // Call the base class directly as close() is called in the destructor.
   ConnectionImpl::raiseEvent(close_type);
@@ -919,6 +930,21 @@ bool ConnectionImpl::bothSidesHalfClosed() {
   // If the write_buffer_ is not empty, then the end_stream has not been sent to the transport
   // yet.
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
+}
+
+bool ConnectionImpl::setSocketOption(Network::SocketOptionName name, absl::Span<uint8_t> value) {
+  Api::SysCallIntResult result =
+      SocketOptionImpl::setSocketOption(*socket_, name, value.data(), value.size());
+  if (result.return_value_ != 0) {
+    return false;
+  }
+
+  // Only add a sockopt if it's added successfully.
+  auto sockopt = std::make_shared<SocketOptionImpl>(
+      name, absl::string_view(reinterpret_cast<const char*>(value.data()), value.size()));
+  socket_->addOption(sockopt);
+
+  return true;
 }
 
 absl::string_view ConnectionImpl::transportFailureReason() const {

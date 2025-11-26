@@ -13,6 +13,9 @@ on:
     inputs:
       args:
         type: string
+      bind-mount:
+        type: boolean
+        default: true
       catch-errors:
         type: boolean
         default: false
@@ -43,12 +46,15 @@ on:
           -e GITHUB_TOKEN
           -e CC
           -e CXX
-          -e COVERAGE_THRESHOLD
           -e BAZEL_BUILD_OPTION_LIST
           -e MOBILE_DOCS_CHECKOUT_DIR
       diskspace-hack:
         type: boolean
         default: false
+      diskspace-hack-paths:
+        type: string
+        default: |
+          /opt/hostedtoolcache
       downloads:
         type: string
         default:
@@ -60,6 +66,9 @@ on:
         default: |
           #!/bin/bash -e
           export PATH=/opt/llvm/bin:$PATH
+          if command -v git >/dev/null 2>&1; then
+              git config --global --add safe.directory /source
+          fi
           exec "$@"
       error-match:
         type: string
@@ -134,6 +143,7 @@ jobs:
     with:
       args: ${{ inputs.args }}
       rbe: ${{ inputs.rbe }}
+      bind-mount: ${{ inputs.bind-mount }}
       # This always just caches the main build image, the mobile one is layered on top
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       catch-errors: ${{ inputs.catch-errors }}
@@ -141,6 +151,8 @@ jobs:
       container-output: ${{ inputs.container-output }}
       command: ${{ inputs.command }}
       concurrency-suffix: ${{ inputs.concurrency-suffix }}
+      diskspace-hack: ${{ inputs.diskspace-hack }}
+      diskspace-hack-paths: ${{ inputs.diskspace-hack-paths }}
       docker-ipv6: false
       entrypoint: ${{ inputs.entrypoint || inputs.entrypoint-DEFAULT }}
       downloads: ${{ inputs.downloads }}

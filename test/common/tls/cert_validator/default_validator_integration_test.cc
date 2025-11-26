@@ -172,7 +172,7 @@ public:
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
   std::string name() const override { return "test.tcp_listener.set_dns_filter_state"; }
 };
@@ -182,8 +182,8 @@ REGISTER_FACTORY(TestSanListenerFilterFactory,
 
 class CustomSanStringMatcher : public Matchers::StringMatcher {
 public:
-  bool match(const absl::string_view) const override { return false; }
-  bool match(const absl::string_view, const StringMatcher::Context& context) const override {
+  bool match(absl::string_view) const override { return false; }
+  bool match(absl::string_view, const StringMatcher::Context& context) const override {
     return context.stream_info_ &&
            context.stream_info_->filterState().hasDataWithName("test_san_filter_state");
   }
@@ -200,7 +200,7 @@ public:
   std::string name() const override { return "envoy.string_matcher.test_custom_san_matcher"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 };
 

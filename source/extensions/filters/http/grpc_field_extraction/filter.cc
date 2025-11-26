@@ -211,7 +211,7 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
 void Filter::handleExtractionResult(const ExtractionResult& result) {
   RELEASE_ASSERT(extractor_, "`extractor_ should be inited when extracting fields");
 
-  ProtobufWkt::Struct dest_metadata;
+  Protobuf::Struct dest_metadata;
   for (const auto& req_field : result) {
     RELEASE_ASSERT(!req_field.path.empty(), "`req_field.path` shouldn't be empty");
     (*dest_metadata.mutable_fields())[req_field.path] = req_field.value;

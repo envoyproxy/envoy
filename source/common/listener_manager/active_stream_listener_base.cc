@@ -7,17 +7,6 @@
 namespace Envoy {
 namespace Server {
 
-class FilterChainInfoImpl : public Network::FilterChainInfo {
-public:
-  FilterChainInfoImpl(absl::string_view name) : name_(name) {}
-
-  // Network::FilterChainInfo
-  absl::string_view name() const override { return name_; }
-
-private:
-  const std::string name_;
-};
-
 ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& parent,
                                                    Event::Dispatcher& dispatcher,
                                                    Network::ListenerPtr&& listener,
@@ -52,8 +41,7 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
   }
 
   socket->connectionInfoProvider().setListenerInfo(config_->listenerInfo());
-  socket->connectionInfoProvider().setFilterChainInfo(
-      std::make_shared<FilterChainInfoImpl>(filter_chain->name()));
+  socket->connectionInfoProvider().setFilterChainInfo(filter_chain->filterChainInfo());
 
   auto transport_socket = filter_chain->transportSocketFactory().createDownstreamTransportSocket();
   auto server_conn_ptr = dispatcher().createServerConnection(
@@ -127,7 +115,8 @@ void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
   // Any event leads to destruction of the connection.
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
-    stream_info_->setDownstreamTransportFailureReason(connection_->transportFailureReason());
+    // NOTE: Transport failure reason is set in ConnectionImpl::closeSocket() before events
+    // are raised, so it should already be available in stream_info_ at this point.
     active_connections_.listener_.removeConnection(*this);
   }
 }

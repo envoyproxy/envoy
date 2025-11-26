@@ -86,7 +86,7 @@ private:
   WatcherHandlePtr watcher_handle_;
 
   // The callback function, called via TargetHandleImpl by the manager
-  const std::shared_ptr<InternalInitializeFn> fn_;
+  std::shared_ptr<InternalInitializeFn> fn_;
 };
 
 /**

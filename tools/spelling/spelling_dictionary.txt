@@ -2,9 +2,23 @@
 # lower case and title case (e.g. HTTP will accept http and Http). Entries in all lower case
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
+
+Allshard
+FLUSHALL
+NUMPAT
+PUBSUB
+RANDOMKEY
+SLOWLOG
+addrlen
+evictable
+flushdb
+itr
+STREQ
+htonl
 ABI
 ACK
 ACL
+ACCEPTOR
 AES
 AJAX
 AllMuxes
@@ -37,6 +51,8 @@ Millicores
 NID
 NIST
 NORMALISATION
+Radix
+SQLSTATE
 bm
 BSON
 BPF
@@ -46,6 +62,7 @@ CIO
 cbegin
 cend
 constness
+cstr
 deadcode
 DFP
 Dynatrace
@@ -90,6 +107,7 @@ ETB
 ETX
 FS
 FIXME
+decrypted
 gperf
 HEXDIG
 HEXDIGIT
@@ -111,6 +129,7 @@ STX
 SkyWalking
 TIDs
 Timedout
+ULA
 WRSQ
 WASI
 ceil
@@ -199,6 +218,7 @@ FUZZER
 FUZZERS
 delims
 dereferencing
+deprioritized
 differentially
 dnsresolvers
 endpos
@@ -368,7 +388,12 @@ PERF
 PGV
 PID
 PKCE
+PKCS
 PKCS12
+PKCS1
+PKCS8
+PKCS#1
+PKCS#8
 PKTINFO
 PNG
 Pointwise
@@ -482,6 +507,7 @@ TTLs
 TX
 TXT
 UA
+UAF
 UBSAN
 UDP
 UDS
@@ -623,6 +649,7 @@ cacert
 cacheable
 cacheability
 callee
+callout
 callsite
 callsites
 callstack
@@ -774,6 +801,8 @@ enqueues
 enum
 enums
 environ
+eu
+euprod
 epoll
 errno
 etag
@@ -805,6 +834,7 @@ fdstat
 filename
 filenames
 fileno
+filepath
 filesystem
 firefox
 fixdate
@@ -958,7 +988,9 @@ linkability
 linkable
 linux
 livelock
+liveness
 llvm
+ln
 loc
 localhost
 lockless
@@ -984,6 +1016,7 @@ maxage
 maxbuffer
 Maxmind
 maxmind
+mcp
 megamiss
 mem
 memcmp
@@ -998,6 +1031,7 @@ metaprogramming
 metatable
 microbenchmarks
 midp
+migratable
 milli
 mimics
 misconfiguration
@@ -1042,6 +1076,7 @@ netblocks
 netfilter
 netlink
 netmask
+netns
 NLB
 NLMSG
 nonblocking
@@ -1067,6 +1102,7 @@ oneof
 oneway
 oob
 opcode
+openid
 openssl
 opentracing
 optimizations
@@ -1103,6 +1139,7 @@ pcall
 pcap
 pchar
 pclose
+pdf
 performant
 pfctl
 pipelined
@@ -1175,6 +1212,8 @@ querydetails
 quiesce
 quitquitquit
 qvalue
+radix
+radixtree
 rapidjson
 ratelimit
 ratelimited
@@ -1186,6 +1225,7 @@ readded
 readonly
 readv
 realloc
+rebalance
 rebalanced
 rebalancer
 rebalancing
@@ -1202,6 +1242,7 @@ redis
 redispatch
 redistributions
 reentrant
+reentrants
 refactor
 refactored
 refcount
@@ -1230,6 +1271,7 @@ reperform
 repicked
 replayable
 repo
+representable
 reproducibility
 requirepass
 reselecting
@@ -1301,6 +1343,7 @@ sigactions
 sigaltstack
 siginfo
 signalstack
+signout
 sigv
 sigv4
 sigv4a
@@ -1350,6 +1393,7 @@ struct
 structs
 subclassed
 subclasses
+subcommands
 subcomponent
 subdirectories
 subdirectory
@@ -1403,6 +1447,8 @@ templating
 templatize
 templatized
 templatizing
+temporality
+teredo
 testability
 testcase
 testcases

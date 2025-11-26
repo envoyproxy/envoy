@@ -147,7 +147,7 @@ TEST_F(FilterTest, CorsPreflightMssingAccessControlRequestMethod) {
 // This test verifies the setExtractedData call is handled correctly
 TEST_F(FilterTest, TestSetExtractedData) {
   setupMockConfig();
-  ProtobufWkt::Struct extracted_data;
+  Protobuf::Struct extracted_data;
   // A successful authentication completed inline: callback is called inside verify().
   EXPECT_CALL(*mock_verifier_, verify(_))
       .WillOnce(Invoke([&extracted_data](ContextSharedPtr context) {
@@ -157,7 +157,7 @@ TEST_F(FilterTest, TestSetExtractedData) {
 
   EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([&extracted_data](const std::string& ns, const ProtobufWkt::Struct& out_payload) {
+          Invoke([&extracted_data](const std::string& ns, const Protobuf::Struct& out_payload) {
             EXPECT_EQ(ns, "envoy.filters.http.jwt_authn");
             EXPECT_TRUE(TestUtility::protoEqual(out_payload, extracted_data));
           }));

@@ -119,7 +119,7 @@ public:
     envoy::service::auth::v3::CheckRequest request;
     client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
-    ProtobufWkt::Struct expected_dynamic_metadata;
+    Protobuf::Struct expected_dynamic_metadata;
     auto* metadata_fields = expected_dynamic_metadata.mutable_fields();
     (*metadata_fields)["x-metadata-header-0"] = ValueUtil::stringValue("zero");
     (*metadata_fields)["x-metadata-header-1"] = ValueUtil::stringValue("2");
@@ -208,6 +208,27 @@ public:
   Tracing::MockSpan child_span_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
+
+// Verify ClientConfig could be built directly from HttpService and that the
+// fields get wired correctly.
+TEST_F(ExtAuthzHttpClientTest, ClientConfigFromHttpService) {
+  envoy::extensions::filters::http::ext_authz::v3::HttpService http_service;
+  http_service.mutable_server_uri()->set_uri("ext_authz:9000");
+  http_service.mutable_server_uri()->set_cluster("ext_authz");
+  http_service.mutable_server_uri()->mutable_timeout()->set_seconds(0);
+  http_service.set_path_prefix("/prefix");
+  // Add one header to add to request to exercise header parser creation.
+  auto* add = http_service.mutable_authorization_request()->add_headers_to_add();
+  add->set_key("x-added");
+  add->set_value("v");
+
+  auto cfg = std::make_shared<ClientConfig>(http_service, /*encode_raw_headers=*/true,
+                                            /*timeout_ms=*/123, factory_context_);
+  EXPECT_EQ(cfg->cluster(), "ext_authz");
+  EXPECT_EQ(cfg->pathPrefix(), "/prefix");
+  EXPECT_EQ(cfg->timeout(), std::chrono::milliseconds{123});
+  EXPECT_TRUE(cfg->encodeRawHeaders());
+}
 
 TEST_F(ExtAuthzHttpClientTest, StreamInfo) {
   envoy::service::auth::v3::CheckRequest request;
@@ -629,6 +650,197 @@ TEST_F(ExtAuthzHttpClientTest, NoCluster) {
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(authz_response))));
   client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,
                  stream_info_);
+}
+
+// Test that retry policy is properly configured when set in HttpService.
+TEST_F(ExtAuthzHttpClientTest, RetryPolicyConfiguration) {
+  const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+      retry_policy:
+        retry_on: "5xx,gateway-error,connect-failure,reset"
+        num_retries: 3
+        retry_back_off:
+          base_interval: 0.5s
+          max_interval: 5s
+    )EOF";
+
+  initialize(yaml);
+
+  envoy::service::auth::v3::CheckRequest request;
+
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            // Verify parsed retry policy is set.
+            EXPECT_NE(options.parsed_retry_policy, nullptr);
+            // Verify buffer body for retry is enabled.
+            EXPECT_TRUE(options.buffer_body_for_retry);
+            // Verify retry policy fields from the implementation.
+            EXPECT_EQ(options.parsed_retry_policy->numRetries(), 3);
+            // Verify backoff configuration.
+            EXPECT_TRUE(options.parsed_retry_policy->baseInterval().has_value());
+            EXPECT_EQ(options.parsed_retry_policy->baseInterval().value().count(), 500);
+            EXPECT_TRUE(options.parsed_retry_policy->maxInterval().has_value());
+            EXPECT_EQ(options.parsed_retry_policy->maxInterval().value().count(), 5000);
+            return &async_request_;
+          }));
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  // Cancel the request to clean up.
+  EXPECT_CALL(async_request_, cancel());
+  client_->cancel();
+}
+
+// Test that request works correctly without retry policy.
+TEST_F(ExtAuthzHttpClientTest, NoRetryPolicy) {
+  const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+    )EOF";
+
+  initialize(yaml);
+
+  envoy::service::auth::v3::CheckRequest request;
+  Http::AsyncClient::Request* async_request = &async_request_;
+
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            // Verify parsed retry policy is not set.
+            EXPECT_EQ(options.parsed_retry_policy, nullptr);
+            // Verify buffer body for retry is not enabled.
+            EXPECT_FALSE(options.buffer_body_for_retry);
+            return async_request;
+          }));
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  // Cancel the request to clean up.
+  EXPECT_CALL(async_request_, cancel());
+  client_->cancel();
+}
+
+// Test that set-cookie headers are properly propagated on successful authorization using
+// allowed_client_headers_on_success.
+TEST_F(ExtAuthzHttpClientTest, SetCookieHeaderOnSuccess) {
+  const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+      authorization_response:
+        allowed_client_headers_on_success:
+          patterns:
+          - exact: "set-cookie"
+            ignore_case: true
+          - exact: "x-custom-header"
+            ignore_case: true
+    )EOF";
+
+  initialize(yaml);
+
+  const auto expected_headers =
+      TestCommon::makeHeaderValueOption({{":status", "200", false},
+                                         {"set-cookie", "session=abc123", false},
+                                         {"x-custom-header", "custom-value", false}});
+
+  Response expected_response = TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK);
+  expected_response.response_headers_to_add = {{"set-cookie", "session=abc123"},
+                                               {"x-custom-header", "custom-value"}};
+
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(expected_response))));
+  client_->onSuccess(async_request_, TestCommon::makeMessageResponse(expected_headers));
+}
+
+// Test that set-cookie headers are properly propagated on denied authorization using
+// allowed_client_headers.
+TEST_F(ExtAuthzHttpClientTest, SetCookieHeaderOnDenied) {
+  const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+      authorization_response:
+        allowed_client_headers:
+          patterns:
+          - exact: "set-cookie"
+            ignore_case: true
+          - exact: "x-auth-error"
+            ignore_case: true
+    )EOF";
+
+  initialize(yaml);
+
+  const std::string expected_body = "Unauthorized";
+  const auto expected_headers =
+      TestCommon::makeHeaderValueOption({{":status", "403", false},
+                                         {"set-cookie", "error=invalid", false},
+                                         {"x-auth-error", "invalid_token", false}});
+
+  Response expected_response =
+      TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Forbidden, expected_body);
+  // For denied responses, headers matching allowed_client_headers go to response_headers_to_add.
+  expected_response.response_headers_to_add = {{"set-cookie", "error=invalid"},
+                                               {"x-auth-error", "invalid_token"}};
+
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(expected_response))));
+  client_->onSuccess(async_request_,
+                     TestCommon::makeMessageResponse(expected_headers, expected_body));
+}
+
+// Test that multiple set-cookie headers are properly propagated on successful authorization.
+TEST_F(ExtAuthzHttpClientTest, MultipleSetCookieHeadersOnSuccess) {
+  const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+      authorization_response:
+        allowed_client_headers_on_success:
+          patterns:
+          - exact: "set-cookie"
+            ignore_case: true
+    )EOF";
+
+  initialize(yaml);
+
+  auto message_response = std::make_unique<Http::ResponseMessageImpl>(
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+          {{Http::LowerCaseString(":status"), "200"}}));
+  message_response->headers().addCopy(Http::LowerCaseString{"set-cookie"}, "session=abc123");
+  message_response->headers().addCopy(Http::LowerCaseString{"set-cookie"}, "user=john");
+
+  Response expected_response = TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK);
+  expected_response.response_headers_to_add = {{"set-cookie", "session=abc123"},
+                                               {"set-cookie", "user=john"}};
+
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(expected_response))));
+  client_->onSuccess(async_request_, std::move(message_response));
 }
 
 } // namespace

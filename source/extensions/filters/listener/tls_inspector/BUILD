@@ -13,11 +13,22 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "ja4_fingerprint_lib",
+    srcs = ["ja4_fingerprint.cc"],
+    hdrs = ["ja4_fingerprint.h"],
+    external_deps = ["ssl"],
+    deps = [
+        "//source/common/common:hex_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "tls_inspector_lib",
     srcs = ["tls_inspector.cc"],
     hdrs = ["tls_inspector.h"],
     external_deps = ["ssl"],
     deps = [
+        ":ja4_fingerprint_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/network:filter_interface",
@@ -28,6 +39,7 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/tls:utility_lib",
         "@envoy_api//envoy/extensions/filters/listener/tls_inspector/v3:pkg_cc_proto",
     ],
 )

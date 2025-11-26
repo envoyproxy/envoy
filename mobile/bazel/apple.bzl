@@ -1,14 +1,15 @@
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines")
+load("@rules_cc//cc:objc_library.bzl", "objc_library")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 
 def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], module_name = None, sdk_frameworks = [], srcs = [], testonly = False):
-    native.objc_library(
+    objc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        copts = ["-ObjC++", "-std=c++17", "-Wno-shorten-64-to-32"],
+        copts = ["-ObjC++", "-std=c++20", "-Wno-shorten-64-to-32"],
         defines = envoy_mobile_defines("@envoy"),
         module_name = module_name,
         sdk_frameworks = sdk_frameworks,

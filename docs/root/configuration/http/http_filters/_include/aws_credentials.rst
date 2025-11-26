@@ -9,8 +9,7 @@ secret access key (the session token is optional).
    If this field is configured, no other credentials providers will be used.
 
 2. :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field.
-   By using this field, the filter allows override of the default environment variables, credential parameters and file locations.
-   Currently this supports both AWS credentials file locations and content, and AssumeRoleWithWebIdentity token files.
+   By using this field, the filter allows override of the default credential providers, environment variables, credential parameters and file locations.
    If the :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field is provided,
    it can be used either to modify the default credentials provider chain, or when :ref:`custom_credential_provider_chain <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.custom_credential_provider_chain>`
    is set to ``true``, to create a custom credentials provider chain containing only the specified credentials provider settings. Examples of using these fields
@@ -24,9 +23,16 @@ secret access key (the session token is optional).
 
 5. From `AssumeRoleWithWebIdentity <https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html>`_ API call
    towards AWS Security Token Service using ``WebIdentityToken`` read from a file pointed by ``AWS_WEB_IDENTITY_TOKEN_FILE`` environment
-   variable and role arn read from ``AWS_ROLE_ARN`` environment variable. The credentials are extracted from the fields ``AccessKeyId``,
+   variable and role arn read from ``AWS_ROLE_ARN`` environment variable. If a :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` is configured, the fields
+   ``role_arn``, ``web_identity_token_data_source`` and ``role_session_name`` can be specified instead of environment variables.
+   The credentials are extracted from the fields ``AccessKeyId``,
    ``SecretAccessKey``, and ``SessionToken`` are used, and credentials are cached for 1 hour or until they expire (according to the field
    ``Expiration``).
+
+   The ``assume_role_with_web_identity_provider`` will automatically watch for changes to the directory of the configured web identity token file.
+   (inferred if not explicitly set in the ``watched_directory`` field) so that if the token file is rotated, the new token will be picked up. Even when file rotation occurs,
+   current credentials will continue to be used until they expire, at which point new credentials will be retrieved using the new token.
+
    To fetch the credentials a static cluster is created with the name ``sts_token_service_internal-<region>`` pointing towards regional
    AWS Security Token Service.
 
@@ -73,6 +79,32 @@ secret access key (the session token is optional).
    * They are created even when ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` is disabled. This
      ensures the cluster configuration is ready when you enable HTTP client credential fetching later by setting the
      reloadable feature to ``true``.
+
+Credential Provider Ordering
+----------------------------
+
+By default, credential providers will be searched for credentials in the following order:
+
+1. :ref:`inline_credentials <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.inline_credential>`
+
+2. :ref:`environment credential provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.environment_credential_provider>`
+
+3. :ref:`credentials file provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.credentials_file_provider>`
+
+4. :ref:`assume role credential provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.assume_role_credential_provider>`
+
+5. :ref:`assume role with web identity credential provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.assume_role_with_web_identity_provider>`
+
+6. :ref:`container credential provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.container_credential_provider>`
+
+7. :ref:`instance profile credential provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.instance_profile_credential_provider>`
+
+By using the :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field you can enable only particular
+providers, or override the settings for any of the configurable providers.
+
+The :ref:`assume role credential provider <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.assume_role_credential_provider>` is a special case, having it's
+own `credential_provider` field. This is because the provider itself requires credentials to complete the `sts:AssumeRole` call. The default provider ordering is
+the same in this case, unless you choose to override the providers and settings.
 
 Statistics
 ----------

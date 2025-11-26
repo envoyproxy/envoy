@@ -53,7 +53,7 @@ void ResponseFrameCounter::frameDataEnd() {
   ASSERT(connect_eos_buffer_ != nullptr);
 
   bool has_unknown_field;
-  ProtobufWkt::Struct message;
+  Protobuf::Struct message;
   auto status =
       MessageUtil::loadFromJsonNoThrow(connect_eos_buffer_->toString(), message, has_unknown_field);
   if (!has_unknown_field && !status.ok()) {

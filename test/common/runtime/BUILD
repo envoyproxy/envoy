@@ -64,8 +64,8 @@ envoy_cc_test(
     name = "runtime_flag_override_test",
     srcs = ["runtime_flag_override_test.cc"],
     args = [
-        "--runtime-feature-override-for-tests=envoy.reloadable_features.test_feature_false",
-        "--runtime-feature-disable-for-tests=envoy.reloadable_features.test_feature_true",
+        "--envoy_reloadable_features_test_feature_false=true",
+        "--envoy_reloadable_features_test_feature_true=false",
     ],
     coverage = False,
     rbe_pool = "6gig",

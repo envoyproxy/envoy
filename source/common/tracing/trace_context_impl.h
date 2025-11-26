@@ -43,6 +43,16 @@ public:
    */
   absl::optional<absl::string_view> get(const TraceContext& trace_context) const;
 
+  using GetAllResult = absl::InlinedVector<absl::string_view, 1>;
+
+  /**
+   * Get all values from the trace context by the key. If the underlying trace context is HTTP
+   * header map, then there may be multiple values for the same key and the get() method will
+   * return the first value only. This method will return all values for the key.
+   * @param trace_context the trace context to get the values.
+   */
+  GetAllResult getAll(const TraceContext& trace_context) const;
+
   /*
    * Set the key/value pair in the trace context.
    * @param trace_context the trace context to set the key/value pair.

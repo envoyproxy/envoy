@@ -1,0 +1,11 @@
+date: May 7, 2025
+
+bug_fixes:
+- area: eds
+  change: |
+    Fixed crash when creating an EDS cluster with invalid configuration.
+- area: url_template
+  change: |
+    Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.

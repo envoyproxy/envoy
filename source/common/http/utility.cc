@@ -174,7 +174,7 @@ validateCustomSettingsParameters(const envoy::config::core::v3::Http2ProtocolOpt
 absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const ProtobufWkt::BoolValue& hcm_stream_error) {
+                             const Protobuf::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
   if (ret.status().ok() && !options.has_override_stream_error_on_invalid_http_message() &&
       hcm_stream_error_set) {
@@ -198,24 +198,42 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
     options_clone.mutable_hpack_table_size()->set_value(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
   }
   ASSERT(options_clone.hpack_table_size().value() <= OptionsLimits::MAX_HPACK_TABLE_SIZE);
+  const bool safe_http2_options =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.safe_http2_options");
+
   if (!options_clone.has_max_concurrent_streams()) {
-    options_clone.mutable_max_concurrent_streams()->set_value(
-        OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+    if (safe_http2_options) {
+      options_clone.mutable_max_concurrent_streams()->set_value(
+          OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+    } else {
+      options_clone.mutable_max_concurrent_streams()->set_value(
+          OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS_LEGACY);
+    }
   }
   ASSERT(
       options_clone.max_concurrent_streams().value() >= OptionsLimits::MIN_MAX_CONCURRENT_STREAMS &&
       options_clone.max_concurrent_streams().value() <= OptionsLimits::MAX_MAX_CONCURRENT_STREAMS);
   if (!options_clone.has_initial_stream_window_size()) {
-    options_clone.mutable_initial_stream_window_size()->set_value(
-        OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+    if (safe_http2_options) {
+      options_clone.mutable_initial_stream_window_size()->set_value(
+          OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+    } else {
+      options_clone.mutable_initial_stream_window_size()->set_value(
+          OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE_LEGACY);
+    }
   }
   ASSERT(options_clone.initial_stream_window_size().value() >=
              OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE &&
          options_clone.initial_stream_window_size().value() <=
              OptionsLimits::MAX_INITIAL_STREAM_WINDOW_SIZE);
   if (!options_clone.has_initial_connection_window_size()) {
-    options_clone.mutable_initial_connection_window_size()->set_value(
-        OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+    if (safe_http2_options) {
+      options_clone.mutable_initial_connection_window_size()->set_value(
+          OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+    } else {
+      options_clone.mutable_initial_connection_window_size()->set_value(
+          OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE_LEGACY);
+    }
   }
   ASSERT(options_clone.initial_connection_window_size().value() >=
              OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE &&
@@ -254,7 +272,7 @@ namespace Utility {
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const ProtobufWkt::BoolValue& hcm_stream_error) {
+                             const Protobuf::BoolValue& hcm_stream_error) {
   if (options.has_override_stream_error_on_invalid_http_message()) {
     return options;
   }
@@ -444,20 +462,21 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
 }
 
 void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
-                              const bool append_xfh) {
-  const auto host = headers.getHostValue();
+                              bool append_xfh, bool keep_old) {
+  if (const absl::string_view host = headers.getHostValue(); !host.empty()) {
+    // Insert the x-envoy-original-host header if required.
+    if (keep_old) {
+      headers.setEnvoyOriginalHost(host);
+    }
 
-  // Only append to x-forwarded-host if the value was not the last value appended.
-  const auto xfh = headers.getForwardedHostValue();
-
-  if (append_xfh && !host.empty()) {
-    if (!xfh.empty()) {
-      const auto xfh_split = StringUtil::splitToken(xfh, ",");
-      if (!xfh_split.empty() && xfh_split.back() != host) {
+    // Append the x-forwarded-host header if required. Only append to x-forwarded-host
+    // if the value was not the last value appended.
+    if (append_xfh) {
+      const absl::InlinedVector<absl::string_view, 4> xfh_split =
+          absl::StrSplit(headers.getForwardedHostValue(), ',', absl::SkipWhitespace());
+      if (xfh_split.empty() || xfh_split.back() != host) {
         headers.appendForwardedHost(host, ",");
       }
-    } else {
-      headers.appendForwardedHost(host, ",");
     }
   }
 
@@ -577,15 +596,15 @@ std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const s
   return parseCookie(headers, key, Http::Headers::get().SetCookie);
 }
 
-std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
-                                        const std::string& path, const std::chrono::seconds max_age,
+std::string Utility::makeSetCookieValue(absl::string_view name, absl::string_view value,
+                                        absl::string_view path, std::chrono::seconds max_age,
                                         bool httponly,
-                                        const Http::CookieAttributeRefVector attributes) {
+                                        absl::Span<const CookieAttribute> attributes) {
   std::string cookie_value;
   // Best effort attempt to avoid numerous string copies.
   cookie_value.reserve(value.size() + path.size() + 30);
 
-  cookie_value = absl::StrCat(key, "=\"", value, "\"");
+  cookie_value = absl::StrCat(name, "=\"", value, "\"");
   if (max_age != std::chrono::seconds::zero()) {
     absl::StrAppend(&cookie_value, "; Max-Age=", max_age.count());
   }
@@ -594,10 +613,10 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
   }
 
   for (auto const& attribute : attributes) {
-    if (attribute.get().value().empty()) {
-      absl::StrAppend(&cookie_value, "; ", attribute.get().name());
+    if (attribute.value_.empty()) {
+      absl::StrAppend(&cookie_value, "; ", attribute.name_);
     } else {
-      absl::StrAppend(&cookie_value, "; ", attribute.get().name(), "=", attribute.get().value());
+      absl::StrAppend(&cookie_value, "; ", attribute.name_, "=", attribute.value_);
     }
   }
 
@@ -605,6 +624,27 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
     absl::StrAppend(&cookie_value, "; HttpOnly");
   }
   return cookie_value;
+}
+
+void Utility::removeCookieValue(HeaderMap& headers, const std::string& key) {
+  const LowerCaseString& cookie_header = Http::Headers::get().Cookie;
+  std::vector<std::string> new_cookies;
+
+  forEachCookie(headers, cookie_header,
+                [&new_cookies, &key](absl::string_view k, absl::string_view v) -> bool {
+                  if (key != k) {
+                    new_cookies.emplace_back(fmt::format("{}={}", k, v));
+                  }
+
+                  // continue iterating until all cookies are processed.
+                  return true;
+                });
+
+  // Remove the existing Cookie header
+  headers.remove(cookie_header);
+  if (!new_cookies.empty()) {
+    headers.setReferenceKey(cookie_header, absl::StrJoin(new_cookies, "; "));
+  }
 }
 
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {

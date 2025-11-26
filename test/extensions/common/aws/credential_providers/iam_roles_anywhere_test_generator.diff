@@ -1,0 +1,37 @@
+19d18
+< import io
+32d30
+< from botocore import utils
+104d101
+<         raw_payload: Optional[str] = None,
+111d107
+<         self.raw_payload = raw_payload
+200d195
+<             "roleSessionName": "session"
+202c197
+<
+---
+>
+204,207c199
+<         if self.raw_payload:
+<             credentials_request = AWSRequest(method=method, url=url, data=self.raw_payload)
+<         else:
+<             credentials_request = AWSRequest(method=method, url=url, data=json.dumps(data))
+---
+>         credentials_request = AWSRequest(method=method, url=url, data=json.dumps(data))
+212,216d203
+<         print("***** HEADERS *****");
+<         print(credentials_request.headers)
+<         print("***** BODY *****");
+<         print(credentials_request.body)
+<         print("************");
+280,283d266
+<         print(type(request.body))
+<         request.headers['x-amz-content-sha256'] = utils.calculate_sha256(
+<             io.BytesIO(request.body), as_hex=True
+<         )
+341,342c324
+<         #request.headers["Content-Type"] = "application/x-amz-json-1.0"
+<         request.headers["Content-Type"] = "application/json"
+---
+>         request.headers["Content-Type"] = "application/x-amz-json-1.0"

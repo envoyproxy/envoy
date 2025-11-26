@@ -20,6 +20,51 @@ A typical use case for this filter is to dynamically match requests with load ba
 subsets. For this, a given header's value would be extracted and attached to the request
 as dynamic metadata which would then be used to match a subset of endpoints.
 
+Statistics
+----------
+
+The filter can optionally emit statistics when the :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.stat_prefix>` field is configured.
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.header_to_metadata
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
+      stat_prefix: header_converter
+      request_rules:
+      - header: x-version
+        on_header_present:
+          metadata_namespace: envoy.lb
+          key: version
+          type: STRING
+
+This configuration would emit statistics such as:
+
+- ``http_filter_name.header_converter.request_rules_processed``
+- ``http_filter_name.header_converter.request_metadata_added``
+- ``http_filter_name.header_converter.response_rules_processed``
+- ``http_filter_name.header_converter.response_metadata_added``
+- ``http_filter_name.header_converter.request_header_not_found``
+
+When ``stat_prefix`` is not configured, no statistics are emitted.
+
+These statistics are rooted at *http_filter_name.<stat_prefix>* with the following counters:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  request_rules_processed, Counter, Total number of request rules processed
+  response_rules_processed, Counter, Total number of response rules processed
+  request_metadata_added, Counter, Total number of metadata entries successfully added from request headers
+  response_metadata_added, Counter, Total number of metadata entries successfully added from response headers
+  request_header_not_found, Counter, Total number of times expected request headers were missing
+  response_header_not_found, Counter, Total number of times expected response headers were missing
+  base64_decode_failed, Counter, Total number of times Base64 decoding failed
+  header_value_too_long, Counter, Total number of times header values exceeded the maximum length
+  regex_substitution_failed, Counter, Total number of times regex substitution resulted in empty values
+
 Example
 -------
 
@@ -78,8 +123,3 @@ Note that this filter also supports per route configuration:
 
 This can be used to either override the global configuration or if the global configuration
 is empty (no rules), it can be used to only enable the filter at a per route level.
-
-Statistics
-----------
-
-Currently, this filter generates no statistics.

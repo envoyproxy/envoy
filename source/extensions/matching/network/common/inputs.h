@@ -6,6 +6,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/network/utility.h"
 
 namespace Envoy {
@@ -307,6 +308,47 @@ public:
 
 DECLARE_FACTORY(FilterStateInputFactory);
 DECLARE_FACTORY(HttpFilterStateInputFactory);
+
+template <class MatchingDataType>
+class NetworkNamespaceInput : public Matcher::DataInput<MatchingDataType>,
+                              public Logger::Loggable<Logger::Id::matcher> {
+public:
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const auto& address = data.localAddress();
+    const auto network_namespace = address.networkNamespace();
+
+    if (network_namespace.has_value() && !network_namespace->empty()) {
+      ENVOY_LOG(debug, "NetworkNamespaceInput: local_address={} network_namespace='{}'",
+                address.asString(), network_namespace.value());
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              network_namespace.value()};
+    }
+
+    ENVOY_LOG(debug, "NetworkNamespaceInput: no network namespace for local_address={}",
+              address.asString());
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+  }
+};
+
+template <class MatchingDataType>
+class NetworkNamespaceInputBaseFactory
+    : public BaseFactory<
+          NetworkNamespaceInput<MatchingDataType>,
+          envoy::extensions::matching::common_inputs::network::v3::NetworkNamespaceInput,
+          MatchingDataType> {
+public:
+  NetworkNamespaceInputBaseFactory()
+      : BaseFactory<NetworkNamespaceInput<MatchingDataType>,
+                    envoy::extensions::matching::common_inputs::network::v3::NetworkNamespaceInput,
+                    MatchingDataType>("network_namespace") {}
+
+  // Provide a literal factory name for static discovery by the extensions checker.
+  std::string name() const override { return "envoy.matching.inputs.network_namespace"; }
+};
+
+DECLARE_FACTORY(NetworkNamespaceInputFactory);
+DECLARE_FACTORY(UdpNetworkNamespaceInputFactory);
+DECLARE_FACTORY(HttpNetworkNamespaceInputFactory);
 
 } // namespace Matching
 } // namespace Network

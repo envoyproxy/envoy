@@ -27,6 +27,7 @@ public:
   }
 
   void initialize() {
+    config_.mutable_num_resolver_threads()->set_value(3);
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     typed_dns_resolver_config.mutable_typed_config()->PackFrom(config_);
     typed_dns_resolver_config.set_name(std::string("envoy.network.dns_resolver.getaddrinfo"));

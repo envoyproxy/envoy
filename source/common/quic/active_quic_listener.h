@@ -27,7 +27,7 @@ class ActiveQuicListener : public Envoy::Server::ActiveUdpListenerBase,
                            Logger::Loggable<Logger::Id::quic> {
 public:
   // TODO(bencebeky): Tune this value.
-  static const size_t kNumSessionsToCreatePerLoop = 16;
+  static constexpr size_t kNumSessionsToCreatePerLoop = 16;
 
   ActiveQuicListener(Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
                      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
@@ -102,6 +102,10 @@ private:
   // During hot restart, an optional handler for packets that weren't for existing connections.
   OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
   Network::IoHandle::UdpSaveCmsgConfig udp_save_cmsg_config_;
+  // Maximum number of QUIC sessions to create per event loop.
+  // This is an equivalent of max_connections_to_accept_per_socket_event for TCP
+  // listeners.
+  uint32_t max_sessions_per_event_loop_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

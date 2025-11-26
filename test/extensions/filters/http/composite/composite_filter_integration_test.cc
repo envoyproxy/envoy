@@ -177,6 +177,51 @@ public:
                                  downstream_filter_);
   }
 
+  void prependCompositeFilterResponseMatcher(const std::string& name = "composite") {
+    config_helper_.prependFilter(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        xds_matcher:
+          matcher_list:
+            matchers:
+              - predicate:
+                  and_matcher:
+                    predicate:
+                      - single_predicate:
+                          input:
+                            name: request-header-match
+                            typed_config:
+                              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                              header_name: match-header
+                          value_match:
+                            exact: match
+                      - single_predicate:
+                          input:
+                            name: response-header-match
+                            typed_config:
+                              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput
+                              header_name: match-response
+                          value_match:
+                            exact: match
+                on_match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      typed_config:
+                        name: local-reply-during-encode
+                        typed_config:
+                          "@type": type.googleapis.com/google.protobuf.Struct
+    )EOF",
+                                                 name),
+                                 downstream_filter_);
+  }
+
   void prependCompositeDynamicFilter(const std::string& name = "composite",
                                      const std::string& path = "set_response_code.yaml",
                                      bool sampling = true) {
@@ -280,6 +325,9 @@ resources:
                                                                  {"match-header", "match"},
                                                                  {":authority", "blah"}};
 
+  const Http::TestResponseHeaderMapImpl match_response_headers_ = {{":status", "200"},
+                                                                   {"match-response", "match"}};
+
   void initialize() override {
     if (!downstream_filter_) {
       setUpstreamProtocol(Http::CodecType::HTTP2);
@@ -358,6 +406,31 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
     auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
+  }
+}
+
+TEST_P(CompositeFilterIntegrationTest, TestResponseHeaders) {
+  prependCompositeFilterResponseMatcher();
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    waitForNextUpstreamRequest();
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
+
+  {
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    waitForNextUpstreamRequest();
+
+    upstream_request_->encodeHeaders(match_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(),
+                Http::HttpStatusIs("500")); // local-reply-during-encode sets 500.
   }
 }
 

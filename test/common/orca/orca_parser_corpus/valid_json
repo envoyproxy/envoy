@@ -1,0 +1,9 @@
+response_headers {
+  headers {
+    key: "endpoint-load-metrics"
+    value: "{\"cpu_utilization\": 0.7, \"application_utilization\": 0.8, "
+           "\"mem_utilization\": 0.9, \"rps_fractional\": 1000, \"eps\": 2, "
+           "\"named_metrics\": {\"foo\": 123,\"bar\": 0.2}, "
+           "\"utilization\": {\"total\": 0.5}}"
+  }
+}

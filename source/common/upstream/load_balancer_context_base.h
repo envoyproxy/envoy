@@ -36,6 +36,8 @@ public:
   absl::optional<OverrideHost> overrideHostToSelect() const override { return {}; }
 
   void onAsyncHostSelection(HostConstSharedPtr&&, std::string&&) override {}
+
+  void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)>) override {}
 };
 
 } // namespace Upstream

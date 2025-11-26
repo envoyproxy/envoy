@@ -14,7 +14,7 @@ public:
   MinimumClustersValidatorFactory() = default;
 
   Envoy::Config::ConfigValidatorPtr
-  createConfigValidator(const ProtobufWkt::Any& config,
+  createConfigValidator(const Protobuf::Any& config,
                         ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override;

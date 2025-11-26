@@ -44,10 +44,10 @@ If custom format string is not specified, Envoy uses the following default forma
 
 .. code-block:: none
 
-  [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
+  [%START_TIME%] "%REQUEST_HEADER(:METHOD)% %REQUEST_HEADER(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
   %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
-  %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%"
-  "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
+  %RESPONSE_HEADER(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQUEST_HEADER(X-FORWARDED-FOR)%" "%REQUEST_HEADER(USER-AGENT)%"
+  "%REQUEST_HEADER(X-REQUEST-ID)%" "%REQUEST_HEADER(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
 
 Example of the default Envoy access log format:
 
@@ -75,7 +75,7 @@ For example, with the following format provided in the configuration as ``json_f
       "json_format": {
           "protocol": "%PROTOCOL%",
           "duration": "%DURATION%",
-          "my_custom_header": "%REQ(MY_CUSTOM_HEADER)%"
+          "my_custom_header": "%REQUEST_HEADER(MY_CUSTOM_HEADER)%"
       }
     }
   }
@@ -346,20 +346,35 @@ The following command operators are supported:
     Number of header bytes sent to the upstream by the http stream.
 
   TCP
-    Not implemented (0).
+    Total number of HTTP header bytes sent to the upstream stream, for TCP tunneling flows. Not supported for non-tunneling.
 
   UDP
     Total number of HTTP header bytes sent to the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.
+
+%UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%
+  HTTP
+    Number of decompressed header bytes sent to the upstream by the http stream.
+
+  TCP/UDP
+    Not implemented (0).
 
 %UPSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of header bytes received from the upstream by the http stream.
 
   TCP
-    Not implemented (0).
+    Total number of HTTP header bytes received from the upstream stream, for TCP tunneling flows. Not supported for non-tunneling.
 
   UDP
     Total number of HTTP header bytes received from the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.
+
+%UPSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%
+  HTTP
+    Number of decompressed header bytes received from the upstream by the http stream.
+
+  TCP/UDP
+    Not implemented (0).
+
 
 %DOWNSTREAM_WIRE_BYTES_SENT%
   HTTP
@@ -388,6 +403,13 @@ The following command operators are supported:
   TCP/UDP
     Not implemented (0).
 
+%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%
+  HTTP
+    Number of decompressed header bytes sent to the downstream by the http stream.
+
+  TCP/UDP
+    Not implemented (0).
+
 %DOWNSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of header bytes received from the downstream by the http stream.
@@ -396,6 +418,13 @@ The following command operators are supported:
     Not implemented (0).
 
   Renders a numeric value in typed JSON logs.
+
+%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%
+  HTTP
+    Number of decompressed header bytes received from the downstream by the http stream.
+
+  TCP/UDP
+    Not implemented (0).
 
 .. _config_access_log_format_duration:
 
@@ -427,6 +456,7 @@ The following command operators are supported:
     * ``US_TX_BEG``: The time point of the upstream request sending begin.
     * ``US_TX_END``: The time point of the upstream request sending end.
     * ``US_RX_BEG``: The time point of the upstream response receiving begin.
+    * ``US_RX_BODY_BEG``: The time point of the upstream response body receiving begin.
     * ``US_RX_END``: The time point of the upstream response receiving end.
     * ``DS_TX_BEG``: The time point of the downstream response sending begin.
     * ``DS_TX_END``: The time point of the downstream response sending end.
@@ -556,7 +586,7 @@ HTTP only
   **UpstreamConnectionTermination**, **UC**, Upstream connection termination in addition to 503 response code.
   **DelayInjected**, **DI**, The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
   **FaultInjected**, **FI**, The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-  **RateLimited**, **RL**, The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
+  **RateLimited**, **RL**, The request was rate-limited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
   **UnauthorizedExternalService**, **UAEX**, The request was denied by the external authorization service.
   **RateLimitServiceError**, **RLSE**, The request was rejected because there was an error in rate limit service.
   **InvalidEnvoyRequestHeaders**, **IH**, The request was rejected because it set an invalid value for a :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
@@ -806,8 +836,8 @@ UDP
   An identifier for the stream (HTTP request, long-live HTTP2 stream, TCP connection, etc.). It can be used to
   cross-reference TCP access logs across multiple log sinks, or to cross-reference timer-based reports for the same connection.
   Different with %CONNECTION_ID%, the identifier should be unique across multiple instances or between restarts.
-  And it's value should be same with %REQ(X-REQUEST-ID)% for HTTP request.
-  This should be used to replace %CONNECTION_ID% and %REQ(X-REQUEST-ID)% in most cases.
+  And it's value should be same with %REQUEST_HEADER(X-REQUEST-ID)% for HTTP request.
+  This should be used to replace %CONNECTION_ID% and %REQUEST_HEADER(X-REQUEST-ID)% in most cases.
 
 %GRPC_STATUS(X)%
   `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>`_ formatted according to the optional parameter ``X``, which can be ``CAMEL_STRING``, ``SNAKE_STRING`` and ``NUMBER``.
@@ -819,26 +849,26 @@ UDP
 
 .. _config_access_log_format_req:
 
-%REQ(X?Y):Z%
+%REQUEST_HEADER(X?Y):Z%/%REQ(X?Y):Z%
   HTTP
     An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
     optional parameter denoting string truncation up to Z characters long. The value is taken from
     the HTTP request header named X first and if it's not set, then request header Y is used. If
-    none of the headers are present '-' symbol will be in the log.
+    none of the headers are present ``"-"`` symbol will be in the log.
 
   TCP/UDP
     Not implemented ("-").
 
-%RESP(X?Y):Z%
+%RESPONSE_HEADER(X?Y):Z%/%RESP(X?Y):Z%
   HTTP
-    Same as **%REQ(X?Y):Z%** but taken from HTTP response headers.
+    Same as **%REQUEST_HEADER(X?Y):Z%** but taken from HTTP response headers.
 
   TCP/UDP
     Not implemented ("-").
 
-%TRAILER(X?Y):Z%
+%RESPONSE_TRAILER(X?Y):Z%/%TRAILER(X?Y):Z%
   HTTP
-    Same as **%REQ(X?Y):Z%** but taken from HTTP response trailers.
+    Same as **%REQUEST_HEADER(X?Y):Z%** but taken from HTTP response trailers.
 
   TCP/UDP
     Not implemented ("-").
@@ -1035,10 +1065,10 @@ UDP
     If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
     Z is an optional parameter denoting string truncation up to Z characters long.
     F is an optional parameter used to indicate which method FilterState uses for serialization.
-    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
-    If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
-    If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
-    FIELD parameter should only be used with F set to 'FIELD'.
+    If `PLAIN` is set, the filter state object will be serialized as an unstructured string.
+    If `TYPED` is set or no F provided, the filter state object will be serialized as an JSON string.
+    If F is set to `FIELD`, the filter state object field with the name FIELD will be serialized.
+    FIELD parameter should only be used with F set to `FIELD`.
 
   TCP/UDP
     Same as HTTP, the filter state is from connection instead of a L7 request.
@@ -1059,17 +1089,17 @@ UDP
     If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
     Z is an optional parameter denoting string truncation up to Z characters long.
     F is an optional parameter used to indicate which method FilterState uses for serialization.
-    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
-    If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
-    If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
-    FIELD parameter should only be used with F set to 'FIELD'.
+    If `PLAIN` is set, the filter state object will be serialized as an unstructured string.
+    If `TYPED` is set or no F provided, the filter state object will be serialized as an JSON string.
+    If F is set to `FIELD`, the filter state object field with the name FIELD will be serialized.
+    FIELD parameter should only be used with F set to `FIELD`.
 
   TCP/UDP
     Not implemented.
 
   .. note::
 
-    This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`
+    This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`.
 
 %REQUESTED_SERVER_NAME%
   HTTP/TCP/THRIFT
@@ -1207,7 +1237,7 @@ UDP
 
 %DOWNSTREAM_PEER_CHAIN_SERIALS%
   HTTP/TCP/THRIFT
-    The comma-separated wserial numbers of all client certificates used to establish the downstream TLS connection.
+    The comma-separated serial numbers of all client certificates used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
@@ -1221,9 +1251,31 @@ UDP
   HTTP/TCP/Thrift
     The JA3 fingerprint (MD5 hash) of the TLS Client Hello message from the downstream connection.
     Provides a way to fingerprint TLS clients based on various Client Hello parameters like cipher suites,
-    extensions, elliptic curves, etc. Will be ``-`` if TLS is not used or the handshake is incomplete.
+    extensions, elliptic curves, etc. Will be ``"-"`` if TLS is not used or the handshake is incomplete.
   UDP
-    Not implemented (``-``).
+    Not implemented ("-").
+
+%TLS_JA4_FINGERPRINT%
+  HTTP/TCP/THRIFT
+    The JA4 fingerprint of the TLS Client Hello message from the downstream connection. JA4 is an advanced TLS client
+    fingerprinting method that provides more granularity than JA3 by including the protocol version, cipher preference
+    order, and ALPN (Application-Layer Protocol Negotiation) protocols. This enhanced fingerprinting facilitates
+    improved threat hunting and security analysis.
+
+    The JA4 fingerprint follows the format `a_b_c`, where:
+
+    - **a**: Represents the TLS protocol version and cipher preference order.
+    - **b**: Encodes the list of cipher suites offered by the client.
+    - **c**: Contains the ALPN protocols advertised by the client.
+
+    This structured format allows for detailed analysis of client applications based on their TLS handshake
+    characteristics. It enables the identification of specific applications, underlying TLS libraries, and even
+    potential malicious activities by comparing fingerprints against known profiles.
+
+    If TLS is not used or the handshake is incomplete, the value of ``%TLS_JA4_FINGERPRINT%`` will be ``"-"``.
+
+  UDP
+    Not implemented ("-").
 
 .. _config_access_log_format_downstream_peer_cert_v_start:
 
@@ -1376,7 +1428,7 @@ UDP
    A unique identifier (UUID) that is generated dynamically.
 
 %ENVIRONMENT(X):Z%
-  Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
+  Environment value of environment variable X. If no valid environment variable X, ``"-"`` symbol will be used.
   Z is an optional parameter denoting string truncation up to Z characters long.
 
 %TRACE_ID%
@@ -1387,7 +1439,7 @@ UDP
 
 %QUERY_PARAM(X):Z%
   HTTP
-    The value of the query parameter X. If the query parameter X is not present, '-' symbol will be used.
+    The value of the query parameter X. If the query parameter X is not present, ``"-"`` symbol will be used.
     Z is an optional parameter denoting string truncation up to Z characters long.
   TCP/UDP
     Not implemented ("-").

@@ -94,6 +94,8 @@ GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
 
 const Protobuf::MethodDescriptor*
 GrpcJsonReverseTranscoderConfig::GetMethodDescriptor(absl::string_view path) const {
+  // HCM guarantees the `:path` header is non-empty here.
+  ASSERT(!path.empty());
   std::string grpc_method = absl::StrReplaceAll(path.substr(1), {{"/", "."}});
   return descriptor_pool_.FindMethodByName(grpc_method);
 }
@@ -112,7 +114,7 @@ GrpcJsonReverseTranscoderConfig::ChangeBodyFieldName(absl::string_view message_n
   if (field_descriptor == nullptr) {
     return absl::InvalidArgumentError(absl::StrCat("No field named: ", body_field));
   }
-  return field_descriptor->json_name();
+  return std::string(field_descriptor->json_name());
 }
 
 bool GrpcJsonReverseTranscoderConfig::IsRequestNestedHttpBody(
@@ -123,15 +125,15 @@ bool GrpcJsonReverseTranscoderConfig::IsRequestNestedHttpBody(
   if (http_request_body_field.empty() || http_request_body_field == "*") {
     return false;
   }
-  const ProtobufWkt::Type* request_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
-  std::vector<const ProtobufWkt::Field*> request_body_field_path;
+  const Protobuf::Type* request_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
+  std::vector<const Protobuf::Field*> request_body_field_path;
   absl::Status status = type_helper_->ResolveFieldPath(*request_type, http_request_body_field,
                                                        &request_body_field_path);
   if (!status.ok() || request_body_field_path.empty()) {
     ENVOY_LOG(error, "Failed to resolve the request type: {}", request_type_url);
     return false;
   }
-  const ProtobufWkt::Type* request_body_type =
+  const Protobuf::Type* request_body_type =
       type_helper_->Info()->GetTypeByTypeUrl(request_body_field_path.back()->type_url());
 
   return request_body_type != nullptr &&

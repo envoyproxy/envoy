@@ -63,6 +63,13 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   sink_format_ = sinks[0].format();
   sink_type_ = sinks[0].output_sink_type_case();
 
+  if (PROTOBUF_GET_OPTIONAL_WRAPPED(proto_config.output_config(), min_streamed_sent_bytes) !=
+      absl::nullopt) {
+    min_streamed_sent_bytes_ =
+        std::max(proto_config.output_config().min_streamed_sent_bytes().value(),
+                 DefaultMinStreamedSentBytes);
+  }
+
   switch (sink_type_) {
   case ProtoOutputSink::OutputSinkTypeCase::kBufferedAdmin:
     if (admin_streamer == nullptr) {
@@ -188,11 +195,26 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
     break;
   }
   case envoy::data::tap::v3::TraceWrapper::TraceCase::kSocketStreamedTraceSegment: {
-    auto& event = *trace.mutable_socket_streamed_trace_segment()->mutable_event();
-    if (event.has_read()) {
-      swapBytesToString(*event.mutable_read()->mutable_data());
-    } else if (event.has_write()) {
-      swapBytesToString(*event.mutable_write()->mutable_data());
+    if (trace.socket_streamed_trace_segment().has_events()) {
+      // Multiple events in each streamed trace.
+      auto* socket_trace_events = trace.mutable_socket_streamed_trace_segment()->mutable_events();
+      for (auto& event : *socket_trace_events->mutable_events()) {
+        if (event.has_read()) {
+          swapBytesToString(*event.mutable_read()->mutable_data());
+        } else if (event.has_write()) {
+          swapBytesToString(*event.mutable_write()->mutable_data());
+        }
+        // else.
+        // The event which has no read or write field.
+      }
+    } else {
+      // Single event in each streamed trace.
+      auto& event = *trace.mutable_socket_streamed_trace_segment()->mutable_event();
+      if (event.has_read()) {
+        swapBytesToString(*event.mutable_read()->mutable_data());
+      } else if (event.has_write()) {
+        swapBytesToString(*event.mutable_write()->mutable_data());
+      }
     }
     break;
   }

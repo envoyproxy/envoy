@@ -23,8 +23,8 @@ class ContainerCredentialsProvider : public MetadataCredentialsProviderBase,
                                      public Envoy::Singleton::Instance,
                                      public MetadataFetcher::MetadataReceiver {
 public:
-  ContainerCredentialsProvider(Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-                               AwsClusterManagerOptRef aws_cluster_manager,
+  ContainerCredentialsProvider(Server::Configuration::ServerFactoryContext& context,
+                               AwsClusterManagerPtr aws_cluster_manager,
                                CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                absl::string_view credential_uri,
                                MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -41,7 +41,6 @@ private:
   const std::string credential_uri_;
   const std::string authorization_token_;
 
-  bool needsRefresh() override;
   void refresh() override;
   void extractCredentials(const std::string&& credential_document_value);
 };

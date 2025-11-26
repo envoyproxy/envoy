@@ -40,9 +40,8 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       transport_socket_options_(initTransportSocketOptions(config)),
       transport_socket_match_metadata_(initTransportSocketMatchMetadata(config)),
       member_update_cb_{cluster_.prioritySet().addMemberUpdateCb(
-          [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> absl::Status {
+          [this](const HostVector& hosts_added, const HostVector& hosts_removed) {
             onClusterMemberUpdate(hosts_added, hosts_removed);
-            return absl::OkStatus();
           })} {}
 
 std::shared_ptr<const Network::TransportSocketOptionsImpl>

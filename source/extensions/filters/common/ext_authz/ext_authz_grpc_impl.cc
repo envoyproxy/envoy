@@ -43,7 +43,6 @@ void copyOkResponseMutations(ResponsePtr& response,
       }
     } else {
       switch (header.append_action()) {
-        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
       case Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
         response->response_headers_to_add.emplace_back(header.header().key(),
                                                        header.header().value());
@@ -59,6 +58,9 @@ void copyOkResponseMutations(ResponsePtr& response,
       case Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
         response->response_headers_to_set.emplace_back(header.header().key(),
                                                        header.header().value());
+        break;
+      default:
+        response->saw_invalid_append_actions = true;
         break;
       }
     }

@@ -190,15 +190,48 @@ TEST(TypedExtensionConfigTest, AddTestConfig) {
   MockTapSinkFactory factory_impl;
   EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
   EXPECT_CALL(factory_impl, createEmptyConfigProto)
-      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
-        return std::make_unique<ProtobufWkt::StringValue>();
-      }));
+      .WillRepeatedly(Invoke(
+          []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::StringValue>(); }));
   EXPECT_CALL(factory_impl, createSinkPtr(_, _));
 
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
   TestConfigImpl(tap_config, nullptr, factory_context);
+}
+
+TEST(TypedExtensionConfigTest, AddTestConfigForMinStreamedSentBytes) {
+  const std::string tap_config_yaml =
+      R"EOF(
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY
+        custom_sink:
+          name: custom_sink
+          typed_config:
+            "@type": type.googleapis.cm/google.protobuf.StringValue
+    streaming: true
+    min_streamed_sent_bytes: 1400
+)EOF";
+  envoy::config::tap::v3::TapConfig tap_config;
+  TestUtility::loadFromYaml(tap_config_yaml, tap_config);
+
+  MockTapSinkFactory factory_impl;
+  EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
+  EXPECT_CALL(factory_impl, createEmptyConfigProto)
+      .WillRepeatedly(Invoke(
+          []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::StringValue>(); }));
+  EXPECT_CALL(factory_impl, createSinkPtr(_, _));
+
+  Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
+
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
+  // Trigger construct function for min_streamed_sent_bytes_
+  auto test_config_Impl_ptr =
+      std::make_unique<TestConfigImpl>(tap_config, nullptr, factory_context);
+  EXPECT_EQ(test_config_Impl_ptr->minStreamedSentBytes(), 1400);
 }
 
 // Validates that a BufferedAdmin tap config that is passed without an admin
@@ -218,9 +251,8 @@ TEST(TypedExtensionConfigTest, BufferedAdminNoAdminStreamerRejected) {
   MockTapSinkFactory factory_impl;
   EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
   EXPECT_CALL(factory_impl, createEmptyConfigProto)
-      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
-        return std::make_unique<ProtobufWkt::StringValue>();
-      }));
+      .WillRepeatedly(Invoke(
+          []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::StringValue>(); }));
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
@@ -246,9 +278,8 @@ TEST(TypedExtensionConfigTest, StreamingAdminNoAdminStreamerRejected) {
   MockTapSinkFactory factory_impl;
   EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
   EXPECT_CALL(factory_impl, createEmptyConfigProto)
-      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
-        return std::make_unique<ProtobufWkt::StringValue>();
-      }));
+      .WillRepeatedly(Invoke(
+          []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::StringValue>(); }));
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;

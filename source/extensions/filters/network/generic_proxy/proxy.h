@@ -296,7 +296,7 @@ private:
   // returned by the public tracingConfig() method.
   // Tracing::TracingConfig
   Tracing::OperationName operationName() const override;
-  const Tracing::CustomTagMap* customTags() const override;
+  void modifySpan(Tracing::Span& span) const override;
   bool verbose() const override;
   uint32_t maxPathTagLength() const override;
   bool spawnUpstreamSpan() const override;
@@ -370,6 +370,7 @@ public:
   // Envoy::Network::ReadFilter
   Envoy::Network::FilterStatus onData(Envoy::Buffer::Instance& data, bool end_stream) override;
   Envoy::Network::FilterStatus onNewConnection() override {
+    server_codec_->onConnected();
     return Envoy::Network::FilterStatus::Continue;
   }
   void initializeReadFilterCallbacks(Envoy::Network::ReadFilterCallbacks& callbacks) override {
@@ -442,7 +443,7 @@ private:
 
   bool downstream_connection_closed_{};
 
-  FilterConfigSharedPtr config_{};
+  FilterConfigSharedPtr config_;
   GenericFilterStatsHelper stats_helper_;
 
   const Network::DrainDecision& drain_decision_;

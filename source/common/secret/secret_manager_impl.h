@@ -50,26 +50,28 @@ public:
   GenericSecretConfigProviderSharedPtr createInlineGenericSecretProvider(
       const envoy::extensions::transport_sockets::tls::v3::GenericSecret& generic_secret) override;
 
-  TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
-      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-      Init::Manager& init_manager) override;
+  TlsCertificateConfigProviderSharedPtr
+  findOrCreateTlsCertificateProvider(const envoy::config::core::v3::ConfigSource& config_source,
+                                     const std::string& config_name,
+                                     Server::Configuration::ServerFactoryContext& server_context,
+                                     Init::Manager& init_manager) override;
 
   CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::ServerFactoryContext& server_context,
       Init::Manager& init_manager) override;
 
   TlsSessionTicketKeysConfigProviderSharedPtr findOrCreateTlsSessionTicketKeysContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::ServerFactoryContext& server_context,
       Init::Manager& init_manager) override;
 
-  GenericSecretConfigProviderSharedPtr findOrCreateGenericSecretProvider(
-      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-      Init::Manager& init_manager) override;
+  GenericSecretConfigProviderSharedPtr
+  findOrCreateGenericSecretProvider(const envoy::config::core::v3::ConfigSource& config_source,
+                                    const std::string& config_name,
+                                    Server::Configuration::ServerFactoryContext& server_context,
+                                    Init::Manager& init_manager) override;
 
 private:
   ProtobufTypes::MessagePtr dumpSecretConfigs(const Matchers::StringMatcher& name_matcher);
@@ -81,7 +83,7 @@ private:
     std::shared_ptr<SecretType>
     findOrCreate(const envoy::config::core::v3::ConfigSource& sds_config_source,
                  const std::string& config_name,
-                 Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+                 Server::Configuration::ServerFactoryContext& server_context,
                  Init::Manager& init_manager) {
       const std::string map_key =
           absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
@@ -93,15 +95,15 @@ private:
         std::function<void()> unregister_secret_provider = [map_key, this]() {
           removeDynamicSecretProvider(map_key);
         };
-        secret_provider = SecretType::create(secret_provider_context, sds_config_source,
-                                             config_name, unregister_secret_provider);
+        secret_provider = SecretType::create(server_context, sds_config_source, config_name,
+                                             unregister_secret_provider);
         dynamic_secret_providers_[map_key] = secret_provider;
       }
       // It is important to add the init target to the manager regardless the secret provider is new
       // or existing. Different clusters / listeners can share same secret so they have to be marked
       // warming correctly.
 
-      // Note that we are not using secret_provider_context's init manager because in some cases,
+      // Note that we are not using server_context's init manager because in some cases,
       // for example oauth2 filter with sds config, it could be server's init manager. In oauth2
       // filter example, if the filter config is dynamic, it could be received from xds server when
       // the server's init manager is already in the initialized state. In that situation, adding

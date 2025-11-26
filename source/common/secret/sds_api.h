@@ -71,7 +71,7 @@ protected:
   // Refresh secrets, e.g. re-resolve symlinks in secret paths.
   virtual void resolveSecret(const FileContentMap& /*files*/) {};
   virtual void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) PURE;
-  Common::CallbackManager<> update_callback_manager_;
+  Common::CallbackManager<absl::Status> update_callback_manager_;
 
   // Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
@@ -133,7 +133,7 @@ using GenericSecretSdsApiSharedPtr = std::shared_ptr<GenericSecretSdsApi>;
 class TlsCertificateSdsApi : public SdsApi, public TlsCertificateConfigProvider {
 public:
   static TlsCertificateSdsApiSharedPtr
-  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+  create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
          const std::string& sds_config_name, std::function<void()> destructor_cb);
 
@@ -184,7 +184,7 @@ class CertificateValidationContextSdsApi : public SdsApi,
                                            public CertificateValidationContextConfigProvider {
 public:
   static CertificateValidationContextSdsApiSharedPtr
-  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+  create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
          const std::string& sds_config_name, std::function<void()> destructor_cb);
   CertificateValidationContextSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
@@ -229,6 +229,7 @@ private:
   CertificateValidationContextPtr resolved_certificate_validation_context_secrets_;
   // Path based certificates are inlined for future read consistency.
   Common::CallbackManager<
+      absl::Status,
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&>
       validation_callback_manager_;
 };
@@ -240,7 +241,7 @@ private:
 class TlsSessionTicketKeysSdsApi : public SdsApi, public TlsSessionTicketKeysConfigProvider {
 public:
   static TlsSessionTicketKeysSdsApiSharedPtr
-  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+  create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
          const std::string& sds_config_name, std::function<void()> destructor_cb);
 
@@ -282,7 +283,7 @@ protected:
 private:
   Secret::TlsSessionTicketKeysPtr tls_session_ticket_keys_;
   Common::CallbackManager<
-      const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&>
+      absl::Status, const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&>
       validation_callback_manager_;
 };
 
@@ -292,7 +293,7 @@ private:
 class GenericSecretSdsApi : public SdsApi, public GenericSecretConfigProvider {
 public:
   static GenericSecretSdsApiSharedPtr
-  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+  create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
          const std::string& sds_config_name, std::function<void()> destructor_cb);
 
@@ -333,7 +334,8 @@ protected:
 
 private:
   GenericSecretPtr generic_secret_;
-  Common::CallbackManager<const envoy::extensions::transport_sockets::tls::v3::GenericSecret&>
+  Common::CallbackManager<absl::Status,
+                          const envoy::extensions::transport_sockets::tls::v3::GenericSecret&>
       validation_callback_manager_;
 };
 

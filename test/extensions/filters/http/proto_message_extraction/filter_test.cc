@@ -32,7 +32,7 @@ using ::Envoy::Http::MockStreamDecoderFilterCallbacks;
 using ::Envoy::Http::MockStreamEncoderFilterCallbacks;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
-using ::Envoy::ProtobufWkt::Struct;
+using ::Envoy::Protobuf::Struct;
 using ::testing::Eq;
 
 constexpr absl::string_view kFilterName = "envoy.filters.http.proto_message_extraction";
@@ -95,8 +95,8 @@ fields {
 }
 )pb";
 
-void checkProtoStruct(Envoy::ProtobufWkt::Struct got, absl::string_view expected_in_pbtext) {
-  Envoy::ProtobufWkt::Struct expected;
+void checkProtoStruct(Envoy::Protobuf::Struct got, absl::string_view expected_in_pbtext) {
+  Envoy::Protobuf::Struct expected;
   ASSERT_THAT(Envoy::Protobuf::TextFormat::ParseFromString(expected_in_pbtext, &expected), true);
   EXPECT_THAT(Envoy::TestUtility::protoEqual(got, expected, true), true)
       << "got:\n"
@@ -217,7 +217,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedRequestExtractedResult);
           }));
@@ -240,7 +240,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedResponseExtractedResult);
           }));
@@ -278,7 +278,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBufferWithMultipleFields) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -347,7 +347,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -420,7 +420,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBufferWithMultipleFieldsforResponseOnly) 
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -464,7 +464,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -569,7 +569,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -670,7 +670,7 @@ TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedResponseExtractedResult);
           }));
@@ -737,7 +737,7 @@ extraction_by_method: {
 )pb");
   Envoy::Buffer::InstancePtr request_data4 = Envoy::Grpc::Common::serializeToGrpcFrame(request4);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -854,7 +854,7 @@ fields {
 )pb");
   Envoy::Buffer::InstancePtr response_data4 = Envoy::Grpc::Common::serializeToGrpcFrame(response4);
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -930,7 +930,7 @@ TEST_F(FilterTestExtractOk, RequestResponseWithTrailers) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -988,7 +988,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1025,6 +1025,467 @@ fields {
 
   // No data modification.
   checkSerializedData<apikeys::ApiKey>(*response_data, {response});
+}
+
+TEST_F(FilterTestExtractOk, ExtractCardinalityRepeatedComplexField) {
+  setUp(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.ListApiKeys"
+      value: {
+        response_extraction_by_field: { key: "keys" value: EXTRACT_REPEATED_CARDINALITY }
+      }
+    })pb");
+
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/ListApiKeys"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ListApiKeysResponse response;
+  response.add_keys();
+  response.add_keys();
+
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, kFilterName);
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+            fields {
+              key: "responses"
+              value {
+                struct_value {
+                  fields {
+                    key: "first"
+                    value {
+                      struct_value {
+                        fields {
+                          key: "@type"
+                          value {
+                            string_value: "type.googleapis.com/apikeys.ListApiKeysResponse"
+                          }
+                        }
+                        fields {
+                          key: "numResponseItems"
+                          value {
+                            string_value: "2"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          )pb");
+      });
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+}
+
+TEST_F(FilterTestExtractOk, ExtractCardinalityRepeatedStringField) {
+  setUp(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        response_extraction_by_field: { key: "repeated_string_field" value: EXTRACT_REPEATED_CARDINALITY }
+      }
+    })pb");
+
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ApiKey response = makeCreateApiKeyResponse(R"pb(
+    repeated_string_field: "one"
+    repeated_string_field: "two"
+    repeated_string_field: "three"
+  )pb");
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, kFilterName);
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+            fields {
+              key: "responses"
+              value {
+                struct_value {
+                  fields {
+                    key: "first"
+                    value {
+                      struct_value {
+                        fields {
+                          key: "@type"
+                          value {
+                            string_value: "type.googleapis.com/apikeys.ApiKey"
+                          }
+                        }
+                        fields {
+                          key: "numResponseItems"
+                          value {
+                            string_value: "3"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          )pb");
+      });
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+}
+
+TEST_F(FilterTestExtractOk, ExtractCardinalityNonRepeatedField) {
+  setUp(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        response_extraction_by_field: { key: "name" value: EXTRACT_REPEATED_CARDINALITY }
+      }
+    })pb");
+
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ApiKey response = makeCreateApiKeyResponse(R"pb(
+    name: ""
+  )pb");
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, kFilterName);
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+            fields {
+              key: "responses"
+              value {
+                struct_value {
+                  fields {
+                    key: "first"
+                    value {
+                      struct_value {
+                        fields {
+                          key: "@type"
+                          value {
+                            string_value: "type.googleapis.com/apikeys.ApiKey"
+                          }
+                        }
+                        fields {
+                          key: "numResponseItems"
+                          value {
+                            string_value: "-1"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          )pb");
+      });
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+}
+
+TEST_F(FilterTestExtractOk, ExtractCardinalityOfZero) {
+  setUp(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.ListApiKeys"
+      value: {
+        response_extraction_by_field: { key: "keys" value: EXTRACT_REPEATED_CARDINALITY }
+      }
+    })pb");
+
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/ListApiKeys"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ListApiKeysResponse response;
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, kFilterName);
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+            fields {
+              key: "responses"
+              value {
+                struct_value {
+                  fields {
+                    key: "first"
+                    value {
+                      struct_value {
+                        fields {
+                          key: "@type"
+                          value {
+                            string_value: "type.googleapis.com/apikeys.ListApiKeysResponse"
+                          }
+                        }
+                        fields {
+                          key: "numResponseItems"
+                          value {
+                            string_value: "0"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          )pb");
+      });
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+}
+
+TEST_F(FilterTestExtractOk, ExtractCardinalityInteroperative) {
+  setUp(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.ListApiKeys"
+      value: {
+        response_extraction_by_field: { key: "keys" value: EXTRACT_REPEATED_CARDINALITY }
+        response_extraction_by_field: { key: "next_page_token" value: EXTRACT }
+      }
+    })pb");
+
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/ListApiKeys"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ListApiKeysResponse response;
+  response.add_keys();
+  response.add_keys();
+  response.set_next_page_token("next-page");
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, kFilterName);
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+            fields {
+              key: "responses"
+              value {
+                struct_value {
+                  fields {
+                    key: "first"
+                    value {
+                      struct_value {
+                        fields {
+                          key: "@type"
+                          value {
+                            string_value: "type.googleapis.com/apikeys.ListApiKeysResponse"
+                          }
+                        }
+                        fields {
+                          key: "nextPageToken"
+                          value {
+                            string_value: "next-page"
+                          }
+                        }
+                        fields {
+                          key: "numResponseItems"
+                          value {
+                            string_value: "2"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          )pb");
+      });
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+}
+
+TEST_F(FilterTestExtractOk, ExtractCardinalityStreaming) {
+  setUp(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKeyInStream"
+      value: {
+        response_extraction_by_field: {
+          key: "repeated_string_field"
+          value: EXTRACT_REPEATED_CARDINALITY
+        }
+      }
+    })pb");
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKeyInStream"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, false));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ApiKey response1 = makeCreateApiKeyResponse(R"pb(
+    name: "apikey-name-1"
+    repeated_string_field: "a"
+    repeated_string_field: "b"
+  )pb");
+  Envoy::Buffer::InstancePtr response_data1 = Envoy::Grpc::Common::serializeToGrpcFrame(response1);
+
+  apikeys::ApiKey response2 = makeCreateApiKeyResponse(R"pb(
+    name: "apikey-name-2"
+    repeated_string_field: "c"
+  )pb");
+  Envoy::Buffer::InstancePtr response_data2 = Envoy::Grpc::Common::serializeToGrpcFrame(response2);
+
+  Envoy::Buffer::OwnedImpl response_data;
+  response_data.move(*response_data1);
+  response_data.move(*response_data2);
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+  checkSerializedData<apikeys::ApiKey>(response_data, {response1, response2});
+
+  apikeys::ApiKey response3 = makeCreateApiKeyResponse(R"pb(
+    name: "apikey-name-3"
+    repeated_string_field: "d"
+    repeated_string_field: "e"
+    repeated_string_field: "f"
+  )pb");
+  Envoy::Buffer::InstancePtr response_data3 = Envoy::Grpc::Common::serializeToGrpcFrame(response3);
+  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, kFilterName);
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+fields {
+  key: "responses"
+  value {
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.ApiKey"
+              }
+            }
+            fields {
+              key: "numResponseItems"
+              value {
+                string_value: "2"
+              }
+            }
+          }
+        }
+      }
+      fields {
+        key: "last"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.ApiKey"
+              }
+            }
+            fields {
+              key: "numResponseItems"
+              value {
+                string_value: "3"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+)pb");
+      }));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data3, true));
+  checkSerializedData<apikeys::ApiKey>(*response_data3, {response3});
 }
 
 using FilterTestFieldTypes = FilterTestBase;
@@ -1123,7 +1584,7 @@ supported_types: {
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1250,7 +1711,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1394,7 +1855,7 @@ repeated_supported_types: {
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1628,7 +2089,7 @@ TEST_F(FilterTestWithExtractRedacted, UnarySingleBuffer) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1692,7 +2153,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1793,7 +2254,7 @@ extraction_by_method: {
 )pb");
   Envoy::Buffer::InstancePtr request_data4 = Envoy::Grpc::Common::serializeToGrpcFrame(request4);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1912,7 +2373,7 @@ fields {
 )pb");
   Envoy::Buffer::InstancePtr response_data4 = Envoy::Grpc::Common::serializeToGrpcFrame(response4);
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -2168,7 +2629,7 @@ TEST_F(FilterTestWithExtractModeUnspecified, ModeUnspecified) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedRequestExtractedResult);
           }));
@@ -2191,7 +2652,7 @@ TEST_F(FilterTestWithExtractModeUnspecified, ModeUnspecified) {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedResponseExtractedResult);
           }));
@@ -2228,7 +2689,7 @@ TEST_F(FilterTestWithExtractDirectiveUnspecified, HappyPath) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedRequestExtractedResult);
           }));
@@ -2251,7 +2712,7 @@ TEST_F(FilterTestWithExtractDirectiveUnspecified, HappyPath) {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedResponseExtractedResult);
           }));

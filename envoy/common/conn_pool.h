@@ -49,6 +49,9 @@ enum class DrainBehavior {
   // all new streams take place on a new connection. For example, when a health check failure
   // occurs.
   DrainExistingConnections,
+  // Same as DrainExistingConnections, but only drains connections unable to migrate to a different
+  // network on mobile.
+  DrainExistingNonMigratableConnections,
 };
 
 /**

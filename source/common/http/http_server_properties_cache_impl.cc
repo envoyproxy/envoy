@@ -172,12 +172,22 @@ void HttpServerPropertiesCacheImpl::setSrtt(const Origin& origin, std::chrono::m
   }
 }
 
-std::chrono::microseconds HttpServerPropertiesCacheImpl::getSrtt(const Origin& origin) const {
+std::chrono::microseconds HttpServerPropertiesCacheImpl::getSrtt(const Origin& origin,
+                                                                 bool use_canonical_suffix) const {
   auto entry_it = protocols_.find(origin);
-  if (entry_it == protocols_.end()) {
-    return std::chrono::microseconds(0);
+  if (entry_it != protocols_.end()) {
+    return entry_it->second.srtt;
   }
-  return entry_it->second.srtt;
+  if (use_canonical_suffix) {
+    absl::optional<Origin> canonical = getCanonicalOrigin(origin.hostname_);
+    if (canonical.has_value()) {
+      entry_it = protocols_.find(*canonical);
+      if (entry_it != protocols_.end()) {
+        return entry_it->second.srtt;
+      }
+    }
+  }
+  return std::chrono::microseconds(0);
 }
 
 void HttpServerPropertiesCacheImpl::setConcurrentStreams(const Origin& origin,
@@ -210,6 +220,10 @@ HttpServerPropertiesCacheImpl::setPropertiesImpl(const Origin& origin,
       ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
       protocols.erase(protocols.begin() + max_protocols, protocols.end());
     }
+  } else if (origin_data.srtt.count() > 0 &&
+             Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.use_canonical_suffix_for_srtt")) {
+    maybeSetCanonicalOrigin(origin);
   }
   auto entry_it = protocols_.find(origin);
   if (entry_it != protocols_.end()) {
@@ -371,7 +385,8 @@ void HttpServerPropertiesCacheImpl::resetStatus() {
   }
 }
 
-absl::string_view HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string_view hostname) {
+absl::string_view
+HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string_view hostname) const {
   for (const std::string& suffix : canonical_suffixes_) {
     if (absl::EndsWith(hostname, suffix)) {
       return suffix;
@@ -381,7 +396,7 @@ absl::string_view HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string
 }
 
 absl::optional<HttpServerPropertiesCache::Origin>
-HttpServerPropertiesCacheImpl::getCanonicalOrigin(absl::string_view hostname) {
+HttpServerPropertiesCacheImpl::getCanonicalOrigin(absl::string_view hostname) const {
   absl::string_view suffix = getCanonicalSuffix(hostname);
   if (suffix.empty()) {
     return {};

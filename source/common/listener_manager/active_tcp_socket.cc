@@ -3,6 +3,7 @@
 #include "envoy/network/filter.h"
 
 #include "source/common/listener_manager/active_stream_listener_base.h"
+#include "source/common/network/downstream_network_namespace.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
@@ -18,6 +19,17 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
           listener_.dispatcher().timeSource(), socket_->connectionInfoProviderSharedPtr(),
           StreamInfo::FilterState::LifeSpan::Connection)) {
   listener_.stats_.downstream_pre_cx_active_.inc();
+
+  // Automatically populate network namespace from listener address if present.
+  const auto& local_address = socket_->connectionInfoProvider().localAddress();
+  if (local_address && local_address->networkNamespace().has_value() &&
+      !local_address->networkNamespace()->empty()) {
+    stream_info_->filterState()->setData(Network::DownstreamNetworkNamespace::key(),
+                                         std::make_unique<Network::DownstreamNetworkNamespace>(
+                                             local_address->networkNamespace().value()),
+                                         StreamInfo::FilterState::StateType::ReadOnly,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+  }
 }
 
 ActiveTcpSocket::~ActiveTcpSocket() {
@@ -74,6 +86,7 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
   listener_filter_buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
       socket_->ioHandle(), listener_.dispatcher(),
       [this](bool error) {
+        (*iter_)->onClose();
         socket_->ioHandle().close();
         if (error) {
           listener_.stats_.downstream_listener_filter_error_.inc();
@@ -172,13 +185,11 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
   }
 }
 
-void ActiveTcpSocket::setDynamicMetadata(const std::string& name,
-                                         const ProtobufWkt::Struct& value) {
+void ActiveTcpSocket::setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) {
   stream_info_->setDynamicMetadata(name, value);
 }
 
-void ActiveTcpSocket::setDynamicTypedMetadata(const std::string& name,
-                                              const ProtobufWkt::Any& value) {
+void ActiveTcpSocket::setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) {
   stream_info_->setDynamicTypedMetadata(name, value);
 }
 

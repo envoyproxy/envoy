@@ -93,18 +93,5 @@ private:
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
 };
 
-class LogicalDnsClusterFactory : public ClusterFactoryImplBase {
-public:
-  LogicalDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.logical_dns") {}
-
-private:
-  friend class LogicalDnsClusterTest;
-  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context) override;
-};
-
-DECLARE_FACTORY(LogicalDnsClusterFactory);
-
 } // namespace Upstream
 } // namespace Envoy

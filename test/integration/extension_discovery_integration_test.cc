@@ -276,7 +276,7 @@ public:
   void sendLdsResponse(const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().Listener);
+    response.set_type_url(Config::TestTypeUrl::get().Listener);
     response.add_resources()->PackFrom(listener_config_);
     lds_stream_->sendGrpcMessage(response);
   }
@@ -329,7 +329,7 @@ public:
 
   void sendHttpFilterEcdsResponseWithFullYaml(const std::string& name, const std::string& version,
                                               const std::string& full_yaml) {
-    const auto configuration = TestUtility::parseYaml<ProtobufWkt::Any>(full_yaml);
+    const auto configuration = TestUtility::parseYaml<Protobuf::Any>(full_yaml);
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     typed_config.set_name(name);
     typed_config.mutable_typed_config()->MergeFrom(configuration);

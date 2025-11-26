@@ -104,8 +104,14 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
       gzip_window_bits, memory_level);
   ASSERT_EQ(0, compressor.checksum());
 
+  // Create test data
   TestUtility::feedBufferWithRandomCharacters(compressor_buffer, 4096);
-  compressor.compress(compressor_buffer, Envoy::Compression::Compressor::State::Flush);
+
+  // Make a copy of the original data
+  std::string original_data = compressor_buffer.toString();
+
+  // Use Finish instead of Flush to ensure complete gzip data with checksum
+  compressor.compress(compressor_buffer, Envoy::Compression::Compressor::State::Finish);
   ASSERT_TRUE(compressor.checksum() > 0);
 
   ZlibDecompressorImpl decompressor{stats_scope_, "test.", 4096, 100};
@@ -114,11 +120,13 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
 
   decompressor.decompress(compressor_buffer, decompressor_output_buffer);
 
-  drainBuffer(compressor_buffer);
-  drainBuffer(decompressor_output_buffer);
-
+  // Verify checksum match and is non-zero
+  EXPECT_TRUE(decompressor.checksum() > 0);
   EXPECT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(0, decompressor.decompression_error_);
+
+  // Verify content matches original
+  EXPECT_EQ(original_data, decompressor_output_buffer.toString());
 }
 
 // Detect excessive compression ratio by compressing a long whitespace string

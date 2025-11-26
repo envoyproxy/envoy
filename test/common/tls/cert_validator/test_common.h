@@ -71,6 +71,7 @@ public:
 
   const std::string& caCert() const override { return ca_cert_; }
   const std::string& caCertPath() const override { return ca_cert_path_; }
+  const std::string& caCertName() const override { return ca_cert_name_; }
   const std::string& certificateRevocationList() const override {
     CONSTRUCT_ON_FIRST_USE(std::string, "");
   }
@@ -115,6 +116,7 @@ private:
       san_matchers_{};
   const std::string ca_cert_;
   const std::string ca_cert_path_{"TEST_CA_CERT_PATH"};
+  const std::string ca_cert_name_{"TEST_CA_CERT_NAME"};
   const absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   const bool auto_sni_san_match_{false};
 };

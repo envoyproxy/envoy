@@ -22,12 +22,12 @@ namespace Formatter {
 class StreamInfoFormatterProvider : public FormatterProvider {
 public:
   // FormatterProvider
-  absl::optional<std::string>
-  formatWithContext(const Context&, const StreamInfo::StreamInfo& stream_info) const override {
+  absl::optional<std::string> format(const Context&,
+                                     const StreamInfo::StreamInfo& stream_info) const override {
     return format(stream_info);
   }
-  ProtobufWkt::Value
-  formatValueWithContext(const Context&, const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const Context&,
+                              const StreamInfo::StreamInfo& stream_info) const override {
     return formatValue(stream_info);
   }
 
@@ -42,9 +42,9 @@ public:
   /**
    * Format the value with the given stream info.
    * @param stream_info supplies the stream info.
-   * @return ProtobufWkt::Value containing a single value extracted from the given stream info.
+   * @return Protobuf::Value containing a single value extracted from the given stream info.
    */
-  virtual ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using StreamInfoFormatterProviderPtr = std::unique_ptr<StreamInfoFormatterProvider>;
@@ -67,13 +67,16 @@ public:
                     absl::optional<size_t> max_length, GetMetadataFunction get);
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override;
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
   absl::optional<std::string>
   formatMetadata(const envoy::config::core::v3::Metadata& metadata) const;
-  ProtobufWkt::Value formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const;
+  Protobuf::Value formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const;
 
 private:
   std::string filter_namespace_;
@@ -127,8 +130,11 @@ public:
                        absl::string_view field_name = {});
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
 private:
   const Envoy::StreamInfo::FilterState::Object*
@@ -155,8 +161,11 @@ public:
         duration_precision_(duration_precision) {}
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
   static const absl::flat_hash_map<absl::string_view, TimePointGetter> KnownTimePointGetters;
 
@@ -185,6 +194,8 @@ private:
       "US_TX_END"; // Upstream request sending end.
   static constexpr absl::string_view FirstUpstreamRxByteReceived =
       "US_RX_BEG"; // Upstream response receiving begin.
+  static constexpr absl::string_view FirstUpstreamRxBodyReceived =
+      "US_RX_BODY_BEG"; // Upstream response body receiving begin.
   static constexpr absl::string_view LastUpstreamRxByteReceived =
       "US_RX_END"; // Upstream response receiving end.
   static constexpr absl::string_view FirstDownstreamTxByteSent =
@@ -209,8 +220,11 @@ public:
   SystemTimeFormatter(absl::string_view format, TimeFieldExtractorPtr f, bool local_time = false);
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
 private:
   const Envoy::DateFormatter date_formatter_;
@@ -271,11 +285,14 @@ public:
   EnvironmentFormatter(absl::string_view key, absl::optional<size_t> max_length);
 
   // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
 private:
-  ProtobufWkt::Value str_;
+  Protobuf::Value str_;
 };
 
 class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {

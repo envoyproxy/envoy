@@ -56,7 +56,7 @@ public:
   void storeAuth(AuthenticatorPtr&& auth) { auths_.emplace_back(std::move(auth)); }
 
   // Add a pair of (name, payload), called by Authenticator. It can be either JWT header or payload.
-  void addExtractedData(const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+  void addExtractedData(const std::string& name, const Protobuf::Struct& extracted_data) {
     *(*extracted_data_.mutable_fields())[name].mutable_struct_value() = extracted_data;
   }
 
@@ -72,7 +72,7 @@ private:
   Verifier::Callbacks& callback_;
   absl::node_hash_map<const Verifier*, CompletionState> completion_states_;
   std::vector<AuthenticatorPtr> auths_;
-  ProtobufWkt::Struct extracted_data_;
+  Protobuf::Struct extracted_data_;
 };
 
 // base verifier for provider_name, provider_and_audiences, and allow_missing_or_failed.
@@ -120,7 +120,7 @@ public:
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+        [&ctximpl](const std::string& name, const Protobuf::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
         [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); },
@@ -170,7 +170,7 @@ public:
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+        [&ctximpl](const std::string& name, const Protobuf::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
         [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); },
@@ -203,7 +203,7 @@ public:
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+        [&ctximpl](const std::string& name, const Protobuf::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
         [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); },

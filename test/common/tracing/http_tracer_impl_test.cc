@@ -59,17 +59,27 @@ protected:
     for (const CustomTagCase& cas : cases) {
       envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
-      config.custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
+      custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
       if (cas.set) {
         EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(cas.value)));
       } else {
         EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), _)).Times(0);
       }
     }
+
+    EXPECT_CALL(config, modifySpan(_)).WillOnce(Invoke([this](Span& span) {
+      HttpTraceContext trace_context{request_headers_};
+      const CustomTagContext ctx{trace_context, stream_info, {&request_headers_}};
+      for (const auto& [_, custom_tag] : custom_tags_) {
+        custom_tag->applySpan(span, ctx);
+      }
+    }));
   }
 
   NiceMock<MockSpan> span;
   NiceMock<MockConfig> config;
+  Tracing::CustomTagMap custom_tags_;
+  Http::TestRequestHeaderMapImpl request_headers_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_{
       std::make_shared<NiceMock<Upstream::MockClusterInfo>>()};
@@ -84,11 +94,12 @@ TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
   const auto remote_address = Network::Address::InstanceConstSharedPtr{
       new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
-  Http::TestRequestHeaderMapImpl request_headers{{"x-request-id", "id"},
-                                                 {"x-envoy-original-path", path},
-                                                 {":method", "GET"},
-                                                 {":path", ""},
-                                                 {":scheme", "http"}};
+  request_headers_ = Http::TestRequestHeaderMapImpl{{"x-request-id", "id"},
+                                                    {"x-envoy-original-path", path},
+                                                    {":method", "GET"},
+                                                    {":path", ""},
+                                                    {":scheme", "http"}};
+
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
 
@@ -106,7 +117,9 @@ TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
-  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+  expectSetCustomTags({});
+
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers_, &response_headers,
                                             &response_trailers, stream_info, config);
 }
 
@@ -118,7 +131,7 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   const auto remote_address = Network::Address::InstanceConstSharedPtr{
       new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
-  Http::TestRequestHeaderMapImpl request_headers{
+  request_headers_ = Http::TestRequestHeaderMapImpl{
       {":path", ""}, {"x-envoy-original-path", path}, {":method", "GET"}, {":scheme", "http"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -137,7 +150,9 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
-  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+  expectSetCustomTags({});
+
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers_, &response_headers,
                                             &response_trailers, stream_info, config);
 }
 
@@ -166,6 +181,8 @@ TEST_F(HttpConnManFinalizerImplTest, Connect) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("CONNECT")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
+
+  expectSetCustomTags({});
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -366,13 +383,13 @@ TEST_F(HttpConnManFinalizerImplTest, UnixDomainSocketPeerAddressTag) {
 TEST_F(HttpConnManFinalizerImplTest, SpanCustomTags) {
   TestEnvironment::setEnvVar("E_CC", "c", 1);
 
-  Http::TestRequestHeaderMapImpl request_headers{{"x-request-id", "id"},
-                                                 {":path", "/test"},
-                                                 {":method", "GET"},
-                                                 {":scheme", "https"},
-                                                 {"x-bb", "b"}};
+  request_headers_ = Http::TestRequestHeaderMapImpl{{"x-request-id", "id"},
+                                                    {":path", "/test"},
+                                                    {":method", "GET"},
+                                                    {":scheme", "https"},
+                                                    {"x-bb", "b"}};
 
-  ProtobufWkt::Struct fake_struct;
+  Protobuf::Struct fake_struct;
   std::string yaml = R"EOF(
 ree:
   foo: bar
@@ -400,86 +417,89 @@ ree:
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
   EXPECT_CALL(*host_, metadata()).WillRepeatedly(Return(host_metadata));
 
-  EXPECT_CALL(config, customTags());
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
 
-  expectSetCustomTags(
-      {{"{ tag: aa, literal: { value: a } }", true, "a"},
-       {"{ tag: bb-1, request_header: { name: X-Bb, default_value: _b } }", true, "b"},
-       {"{ tag: bb-2, request_header: { name: X-Bb-Not-Found, default_value: b2 } }", true, "b2"},
-       {"{ tag: bb-3, request_header: { name: X-Bb-Not-Found } }", false, ""},
-       {"{ tag: cc-1, environment: { name: E_CC } }", true, "c"},
-       {"{ tag: cc-1-a, environment: { name: E_CC, default_value: _c } }", true, "c"},
-       {"{ tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }", true, "c2"},
-       {"{ tag: cc-3, environment: { name: E_CC_NOT_FOUND} }", false, ""},
-       {R"EOF(
+  expectSetCustomTags({
+      {"{ tag: aa, literal: { value: a } }", true, "a"},
+      {"{ tag: bb-1, request_header: { name: X-Bb, default_value: _b } }", true, "b"},
+      {"{ tag: bb-2, request_header: { name: X-Bb-Not-Found, default_value: b2 } }", true, "b2"},
+      {"{ tag: bb-3, request_header: { name: X-Bb-Not-Found } }", false, ""},
+      {"{ tag: cc-1, environment: { name: E_CC } }", true, "c"},
+      {"{ tag: cc-1-a, environment: { name: E_CC, default_value: _c } }", true, "c"},
+      {"{ tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }", true, "c2"},
+      {"{ tag: cc-3, environment: { name: E_CC_NOT_FOUND} }", false, ""},
+      {R"EOF(
 tag: dd-1,
 metadata:
   kind: { request: {} }
   metadata_key: { key: m.req, path: [ { key: ree }, { key: foo } ] })EOF",
-        true, "bar"},
-       {R"EOF(
+       true, "bar"},
+      {R"EOF(
 tag: dd-2,
 metadata:
   kind: { request: {} }
   metadata_key: { key: m.req, path: [ { key: not-found } ] }
   default_value: d2)EOF",
-        true, "d2"},
-       {R"EOF(
+       true, "d2"},
+      {R"EOF(
 tag: dd-3,
 metadata:
   kind: { request: {} }
   metadata_key: { key: m.req, path: [ { key: not-found } ] })EOF",
-        false, ""},
-       {R"EOF(
+       false, ""},
+      {R"EOF(
 tag: dd-4,
 metadata:
   kind: { request: {} }
   metadata_key: { key: m.req, path: [ { key: ree }, { key: nuu } ] }
   default_value: _d)EOF",
-        true, "1"},
-       {R"EOF(
+       true, "1"},
+      {R"EOF(
 tag: dd-5,
 metadata:
   kind: { route: {} }
   metadata_key: { key: m.rot, path: [ { key: ree }, { key: boo } ] })EOF",
-        true, "true"},
-       {R"EOF(
+       true, "true"},
+      {R"EOF(
 tag: dd-6,
 metadata:
   kind: { route: {} }
   metadata_key: { key: m.rot, path: [ { key: ree }, { key: poo } ] })EOF",
-        true, "false"},
-       {R"EOF(
+       true, "false"},
+      {R"EOF(
 tag: dd-7,
 metadata:
   kind: { cluster: {} }
   metadata_key: { key: m.cluster, path: [ { key: ree }, { key: emp } ] }
   default_value: _d)EOF",
-        true, ""},
-       {R"EOF(
+       true, ""},
+      {R"EOF(
 tag: dd-8,
 metadata:
   kind: { cluster: {} }
   metadata_key: { key: m.cluster, path: [ { key: ree }, { key: lii } ] }
   default_value: _d)EOF",
-        true, "[\"something\"]"},
-       {R"EOF(
+       true, "[\"something\"]"},
+      {R"EOF(
 tag: dd-9,
 metadata:
   kind: { host: {} }
   metadata_key: { key: m.host, path: [ { key: ree }, { key: stt } ] })EOF",
-        true, R"({"some":"thing"})"},
-       {R"EOF(
+       true, R"({"some":"thing"})"},
+      {R"EOF(
 tag: dd-10,
 metadata:
   kind: { host: {} }
   metadata_key: { key: m.host, path: [ { key: not-found } ] })EOF",
-        false, ""}});
+       false, ""},
+      {"{ tag: ee-1, value: '%REQ(x-bb)%' }", true, "b"},
+      {"{ tag: ee-2, value: '%REQ(x-bb-not-found)%_ee' }", true, "_ee"},
+      {"{ tag: ee-3, value: '%REQ(x-bb-not-found)%' }", false, ""},
+  });
 
-  ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
+  ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers_));
 
-  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers_, nullptr, nullptr, stream_info,
                                             config);
 }
 
@@ -688,12 +708,10 @@ TEST_F(HttpConnManFinalizerImplTest, CustomTagOverwritesCommonTag) {
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
 
-  EXPECT_CALL(config, customTags());
-
   std::string custom_tag_str = "{ tag: component, literal: { value: override_component } }";
   envoy::type::tracing::v3::CustomTag custom_tag;
   TestUtility::loadFromYaml(custom_tag_str, custom_tag);
-  config.custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
+  custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
 
   {
@@ -702,6 +720,8 @@ TEST_F(HttpConnManFinalizerImplTest, CustomTagOverwritesCommonTag) {
     EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), "override_component"));
   }
+
+  expectSetCustomTags({});
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
                                             config);
@@ -756,6 +776,30 @@ TEST(HttpTraceContextTest, HttpTraceContextTest) {
     });
     // 'host' will be converted to ':authority'.
     EXPECT_EQ(23, size);
+  }
+
+  {
+    size_t size = 0;
+    Http::TestRequestHeaderMapImpl request_headers{{"host", "foo"}, {"bar", "var"}, {"ok", "no"}};
+    HttpTraceContext trace_context(request_headers);
+    trace_context.forEach([&size](absl::string_view key, absl::string_view val) {
+      size += key.size();
+      size += val.size();
+      return false;
+    });
+    // 'host' will be converted to ':authority'.
+    EXPECT_EQ(13, size);
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers;
+    ReadOnlyHttpTraceContext trace_context(request_headers);
+
+    // No operations for ReadOnlyHttpTraceContext.
+    trace_context.set("key", "value");
+    trace_context.remove("key");
+    trace_context.requestHeaders();
+    const_cast<const ReadOnlyHttpTraceContext&>(trace_context).requestHeaders();
   }
 }
 

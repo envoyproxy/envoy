@@ -1,0 +1,19 @@
+diff --git a/tools/codesigningtool/codesigningtool.py b/tools/codesigningtool/codesigningtool.py
+index 41091dd9..e8f7f7f7 100644
+--- a/tools/codesigningtool/codesigningtool.py
++++ b/tools/codesigningtool/codesigningtool.py
+@@ -80,6 +80,14 @@ def invoke_codesign(*, codesign_path, identity, entitlements, force_signing,
+   # Just like Xcode, ensure CODESIGN_ALLOCATE is set to point to the correct
+   # version.
+   custom_env = {"CODESIGN_ALLOCATE": _find_codesign_allocate()}
++
++  if force_signing:
++    execute.execute_and_filter_output(
++      [codesign_path, "--remove-signature", full_path_to_sign],
++      custom_env=custom_env,
++      raise_on_failure=False
++    )
++
+   _, stdout, stderr = execute.execute_and_filter_output(cmd,
+                                                         custom_env=custom_env,
+                                                         raise_on_failure=True)

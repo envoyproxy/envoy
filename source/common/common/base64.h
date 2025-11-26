@@ -31,6 +31,12 @@ public:
 
   /**
    * Base64 encode an input char buffer with a given length.
+   * @param input string to encode.
+   */
+  static std::string encode(absl::string_view input);
+
+  /**
+   * Base64 encode an input char buffer with a given length.
    * @param input char array to encode.
    * @param length of the input array.
    * @param whether add padding at the end of the output.

@@ -92,8 +92,6 @@ message Lua {
 
 message LuaPerRoute {
   oneof override {
-    option (validate.required) = true;
-
     // Disable the Lua filter for this particular vhost or route. If disabled is specified in
     // multiple per-filter-configs, the most specific one will be used.
     bool disabled = 1 [(validate.rules).bool = {const: true}];
@@ -111,12 +109,12 @@ message LuaPerRoute {
   // For example:
   //
   // .. code-block:: lua
+  //
   //   function envoy_on_request(request_handle)
   //     local filter_context = request_handle:filterContext()
   //     local filter_context_value = filter_context["key"]
   //     -- Do something with filter_context_value.
   //   end
   //
-  // [#not-implemented-hide:]
   google.protobuf.Struct filter_context = 4;
 }

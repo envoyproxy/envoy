@@ -146,6 +146,7 @@ public:
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                         std::chrono::microseconds rtt) override;
   absl::optional<uint64_t> congestionWindowInBytes() const override;
+  const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
@@ -179,6 +180,8 @@ public:
 
   void incrementSentQuicResetStreamErrorStats(quic::QuicResetStreamError error, bool from_self,
                                               bool is_upstream);
+
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override;
 
 protected:
   // Propagate connection close to network_connection_callbacks_.

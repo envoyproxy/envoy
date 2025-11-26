@@ -103,8 +103,6 @@ public:
         extensionProtocolOptions(_))
         .WillRepeatedly(Return(options));
 
-    EXPECT_CALL(context_, getTransportSocketFactoryContext())
-        .WillRepeatedly(testing::ReturnRef(factory_context_));
     EXPECT_CALL(factory_context_.server_context_, localInfo())
         .WillRepeatedly(testing::ReturnRef(local_info_));
 

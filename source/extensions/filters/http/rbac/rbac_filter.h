@@ -5,7 +5,6 @@
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/common/rbac/engine_impl.h"
@@ -16,11 +15,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
-class ActionValidationVisitor : public Filters::Common::RBAC::ActionValidationVisitor {
+class ActionValidationVisitor final : public Filters::Common::RBAC::ActionValidationVisitor {
 public:
-  absl::Status performDataInputValidation(
-      const Envoy::Matcher::DataInputFactory<Http::HttpMatchingData>& data_input,
-      absl::string_view type_url) override;
+  absl::Status
+  performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>& data_input,
+                             absl::string_view type_url) override;
+
+private:
+  static const absl::flat_hash_set<std::string> allowed_inputs_set_;
 };
 
 class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
@@ -35,9 +37,9 @@ public:
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_.get()
                                                                     : shadow_engine_.get();
   }
-  std::string rulesStatPrefix() const { return rules_stat_prefix_; }
+  absl::string_view rulesStatPrefix() const { return rules_stat_prefix_; }
 
-  std::string shadowRulesStatPrefix() const { return shadow_rules_stat_prefix_; }
+  absl::string_view shadowRulesStatPrefix() const { return shadow_rules_stat_prefix_; }
 
   bool perRuleStatsEnabled() const { return per_rule_stats_; }
 
@@ -97,8 +99,8 @@ using RoleBasedAccessControlFilterConfigSharedPtr =
 /**
  * A filter that provides role-based access control authorization for HTTP requests.
  */
-class RoleBasedAccessControlFilter : public Http::StreamDecoderFilter,
-                                     public Logger::Loggable<Logger::Id::rbac> {
+class RoleBasedAccessControlFilter final : public Http::StreamDecoderFilter,
+                                           public Logger::Loggable<Logger::Id::rbac> {
 public:
   RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
       : config_(std::move(config)) {}
@@ -123,6 +125,13 @@ public:
   void onDestroy() override {}
 
 private:
+  // Handles shadow engine evaluation and updates metrics
+  bool evaluateShadowEngine(const Http::RequestHeaderMap& headers, Protobuf::Struct& metrics) const;
+
+  // Handles enforced engine evaluation and updates metrics
+  Http::FilterHeadersStatus evaluateEnforcedEngine(Http::RequestHeaderMap& headers,
+                                                   Protobuf::Struct& metrics) const;
+
   RoleBasedAccessControlFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };

@@ -30,10 +30,10 @@ RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
   };
 }
 
-std::string responseDetail(const std::string& policy_id) {
+std::string responseDetail(absl::string_view policy_id) {
   // Replace whitespaces in policy_id with '_' to avoid breaking the access log (inconsistent number
   // of segments between log entries when the separator is whitespace).
-  std::string sanitized = StringUtil::replaceAllEmptySpace(policy_id);
+  const std::string sanitized = StringUtil::replaceAllEmptySpace(policy_id);
   return fmt::format("rbac_access_denied_matched_policy[{}]", sanitized);
 }
 

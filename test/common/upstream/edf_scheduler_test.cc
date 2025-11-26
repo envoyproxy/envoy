@@ -195,6 +195,30 @@ TEST_F(EdfSchedulerTest, SchedulerWithZeroPicksEqualToEmptyWithAddedEntries) {
   compareEdfSchedulers(sched1, sched2);
 }
 
+// Validates that creating a scheduler with calculate_weight function result
+// changing over time is working correctly.
+TEST_F(EdfSchedulerTest, SchedulerWithChangingWeights) {
+  constexpr uint32_t num_entries = 128;
+  std::vector<std::shared_ptr<uint32_t>> entries;
+  entries.reserve(num_entries);
+
+  for (uint32_t i = 0; i < num_entries; ++i) {
+    entries.emplace_back(std::make_shared<uint32_t>(i + 100));
+  }
+
+  int call_count = 0;
+  // Expect no assert in `createWithPicks` even though entry weights are
+  // increasing with each call.
+  EdfScheduler<uint32_t> sched = EdfScheduler<uint32_t>::createWithPicks(
+      entries,
+      [&call_count](const uint32_t& entry) {
+        // Report different weights for each call iteration.
+        auto weight = entry * ++call_count;
+        return weight;
+      },
+      123);
+}
+
 // Validates that creating a scheduler using the createWithPicks (with 5 picks)
 // is equal to creating an empty scheduler and adding entries one after the other,
 // and then performing some number of picks.

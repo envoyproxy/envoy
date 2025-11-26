@@ -78,5 +78,6 @@ per geolocation database type (rooted at ``<stat_prefix>.maxmind.``). Database t
    ``<db_type>.lookup_error``, Counter, Total number of errors that occured during lookups for a given geolocation database file.
    ``<db_type>.db_reload_success``, Counter, Total number of times when the geolocation database file was reloaded successfully.
    ``<db_type>.db_reload_error``, Counter, Total number of times when the geolocation database file failed to reload.
+   ``<db_type>.db_build_epoch``, Gauge, The build timestamp of the geolocation database file represented as a Unix epoch value.
 
 

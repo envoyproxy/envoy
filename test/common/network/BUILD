@@ -7,6 +7,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -61,6 +62,24 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "address_impl_speed_test_benchmark_test",
     benchmark_binary = "address_impl_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "lc_trie_ip_list_speed_test",
+    srcs = ["lc_trie_ip_list_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network:cidr_range_lib",
+        "//source/common/network:lc_trie_lib",
+        "//source/common/network:utility_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "lc_trie_ip_list_speed_test_benchmark_test",
+    benchmark_binary = "lc_trie_ip_list_speed_test",
 )
 
 envoy_cc_test(
@@ -118,6 +137,7 @@ envoy_cc_test(
     srcs = ["multi_connection_base_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/network:socket_interface",
         "//source/common/network:multi_connection_base_impl_lib",
         "//source/common/network:socket_option_lib",
         "//test/mocks/event:event_mocks",
@@ -273,14 +293,13 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "udp_listener_impl_batch_writer_test",
-    srcs = ["udp_listener_impl_batch_writer_test.cc"],
+    srcs = envoy_select_enable_http3(["udp_listener_impl_batch_writer_test.cc"]),
     rbe_pool = "6gig",
     # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
     tags = [
-        "nofips",
         "skip_on_windows",
     ],
-    deps = [
+    deps = envoy_select_enable_http3([
         ":udp_listener_impl_test_base_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
@@ -298,7 +317,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:quic_test_tools_mock_syscall_wrapper_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    ]),
 )
 
 envoy_cc_test(
@@ -383,6 +402,15 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "ip_address_parsing_test",
+    srcs = ["ip_address_parsing_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network:ip_address_parsing_lib",
     ],
 )
 

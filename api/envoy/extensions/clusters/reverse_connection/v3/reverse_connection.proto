@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package envoy.extensions.clusters.reverse_connection.v3;
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.clusters.reverse_connection.v3";
+option java_outer_classname = "ReverseConnectionProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/reverse_connection/v3;reverse_connectionv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Reverse connection cluster]
+// [#extension: envoy.clusters.reverse_connection]
+
+// Configuration for a cluster of type REVERSE_CONNECTION.
+message ReverseConnectionClusterConfig {
+  // Time interval after which Envoy removes unused dynamic hosts created for reverse connections.
+  // Hosts that are not referenced by any connection pool are deleted during cleanup.
+  //
+  // If unset, Envoy uses a default of 60s.
+  google.protobuf.Duration cleanup_interval = 1 [(validate.rules).duration = {gt {}}];
+
+  // Host identifier format string.
+  //
+  // This format string is evaluated against the downstream request context to compute
+  // the host identifier for selecting the reverse connection endpoint. The format string
+  // supports Envoy's standard formatter syntax, including:
+  //
+  // * ``%REQ(header-name)%``: Extract request header value.
+  // * ``%DYNAMIC_METADATA(namespace:key)%``: Extract dynamic metadata value.
+  // * ``%CEL(expression)%``: Evaluate CEL expression.
+  // * ``%DOWNSTREAM_REMOTE_ADDRESS%``: Downstream connection address.
+  // * ``%DOWNSTREAM_LOCAL_ADDRESS%``: Downstream local address.
+  // * Plain text and combinations of the above.
+  //
+  // Examples:
+  //
+  // * ``%REQ(x-remote-node-id)%``: Use the value of the ``x-remote-node-id`` header.
+  // * ``%REQ(host):EXTRACT_FIRST_PART%``: Extract the first part of the Host header before a dot.
+  // * ``%CEL(request.headers['x-node-id'] | orValue('default'))%``: Use CEL with fallback.
+  // * ``node-%REQ(x-tenant-id)%-%REQ(x-region)%``: Combine multiple values.
+  //
+  // If the format string evaluates to an empty value, the request will not be routed.
+  string host_id_format = 2 [(validate.rules).string = {min_len: 1}];
+}

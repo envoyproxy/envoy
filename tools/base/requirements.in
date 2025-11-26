@@ -10,7 +10,9 @@ clang-format==18.1.8
 clang-tidy==18.1.8
 colorama
 coloredlogs
-cryptography>=43.0.1
+# NB: When updating this dep you _must_ strip out all the unused wheel hashes
+#  ie - only keep python3.9+ glibc2.28 for arm/x86 and macos
+cryptography>=44.0.1
 dependatool>=0.2.2
 envoy.base.utils>=0.5.10
 envoy.ci.report>=0.0.3
@@ -35,7 +37,7 @@ pep8-naming
 ply
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
-protobuf<5.30.0
+protobuf<6.34.0
 pygithub
 pyopenssl>=24.2.1
 pyreadline

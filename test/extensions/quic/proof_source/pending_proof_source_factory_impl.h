@@ -13,7 +13,7 @@ class PendingProofSourceFactoryImpl : public EnvoyQuicProofSourceFactoryInterfac
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   std::string name() const override { return "envoy.quic.proof_source.pending_signing"; }

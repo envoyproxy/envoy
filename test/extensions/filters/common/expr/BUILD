@@ -55,6 +55,20 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "cel_config_test",
+    srcs = ["cel_config_test.cc"],
+    extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "evaluator_fuzz_proto",
     srcs = ["evaluator_fuzz.proto"],

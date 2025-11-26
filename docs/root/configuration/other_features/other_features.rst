@@ -8,6 +8,7 @@ Other features
   hyperscan
   internal_listener
   rate_limit
+  reverse_tunnel
   io_uring
   vcl
   wasm

@@ -46,7 +46,7 @@ TEST(NamedHttpFilterConfigFactoryTest, CreateFilterFactory) {
   TestHttpFilterConfigFactory factory;
   const std::string stats_prefix = "foo";
   Server::Configuration::MockFactoryContext context;
-  ProtobufTypes::MessagePtr message{new Envoy::ProtobufWkt::Struct()};
+  ProtobufTypes::MessagePtr message{new Envoy::Protobuf::Struct()};
 
   EXPECT_TRUE(factory.createFilterFactoryFromProto(*message, stats_prefix, context).status().ok());
 }
@@ -55,7 +55,7 @@ TEST(NamedHttpFilterConfigFactoryTest, Dependencies) {
   TestHttpFilterConfigFactory factory;
   const std::string stats_prefix = "foo";
   Server::Configuration::MockFactoryContext context;
-  ProtobufTypes::MessagePtr message{new Envoy::ProtobufWkt::Struct()};
+  ProtobufTypes::MessagePtr message{new Envoy::Protobuf::Struct()};
 
   EXPECT_TRUE(factory.createFilterFactoryFromProto(*message, stats_prefix, context).status().ok());
 

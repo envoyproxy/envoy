@@ -27,13 +27,13 @@ public:
   std::string name() const override { return std::string(kMetadataKey); }
 
   std::unique_ptr<const Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Struct&) const override {
+  parse(const Protobuf::Struct&) const override {
     ADD_FAILURE() << "Filter should not parse struct-typed metadata.";
     return nullptr;
   }
   std::unique_ptr<const Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Any& d) const override {
-    ProtobufWkt::StringValue v;
+  parse(const Protobuf::Any& d) const override {
+    Protobuf::StringValue v;
     EXPECT_TRUE(d.UnpackTo(&v));
     auto object = std::make_unique<Baz>();
     object->item_ = v.value();

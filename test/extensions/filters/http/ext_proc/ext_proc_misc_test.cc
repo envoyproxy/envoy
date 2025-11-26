@@ -213,11 +213,9 @@ body_format:
 
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "401"}}, true);
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_ext_proc_on_local_reply")) {
-      processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
-    }
-    verifyDownstreamResponse(*response, 401);
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+    verifyDownstreamResponse(*response, 200);
   }
 
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
@@ -294,16 +292,6 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
 
 // Test Ext_Proc filter and WebSocket configuration combination.
 TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcCombo) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.skip_ext_proc_on_local_reply", "true"}});
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.router_filter_resetall_on_local_reply", "false"}});
-  websocketExtProcTest();
-}
-
-// TODO(yanjunxiang-google): Delete this test after both runtime flags are removed.
-TEST_P(ExtProcMiscIntegrationTest, UpstreamRequestEncoderDanglingPointerTest) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.skip_ext_proc_on_local_reply", "false"}});
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.router_filter_resetall_on_local_reply", "true"}});
   websocketExtProcTest();

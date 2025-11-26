@@ -329,10 +329,10 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortGrpcConfig) {
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("200"));
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "5"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Http::Headers::get().GrpcStatus, "5"));
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Http::Headers::get().GrpcMessage, "fault filter abort"));
+              ContainsHeader(Http::Headers::get().GrpcMessage, "fault filter abort"));
   EXPECT_EQ(nullptr, response->trailers());
 
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
@@ -380,10 +380,10 @@ TEST_P(FaultIntegrationTestAllProtocols, FaultAbortGrpcConfig) {
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("200"));
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "5"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Http::Headers::get().GrpcStatus, "5"));
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Http::Headers::get().GrpcMessage, "fault filter abort"));
+              ContainsHeader(Http::Headers::get().GrpcMessage, "fault filter abort"));
   EXPECT_EQ(nullptr, response->trailers());
 
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());

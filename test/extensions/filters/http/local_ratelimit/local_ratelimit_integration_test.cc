@@ -1,4 +1,7 @@
+#include <chrono>
+
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+#include "source/extensions/filters/http/common/ratelimit_headers.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_runtime.h"
@@ -51,10 +54,10 @@ protected:
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
 
-      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                               {route_config_name}, true));
       sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-          Config::TypeUrl::get().RouteConfiguration,
+          Config::TestTypeUrl::get().RouteConfiguration,
           {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
               initial_route_config)},
           "1");
@@ -83,10 +86,10 @@ protected:
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
 
-      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "",
                                               {"local_cluster"}, true));
       sendSotwDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          Config::TypeUrl::get().ClusterLoadAssignment,
+          Config::TestTypeUrl::get().ClusterLoadAssignment,
           {TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(
               initial_local_cluster_endpoints)},
           "1");
@@ -159,6 +162,28 @@ protected:
     EXPECT_EQ(expected_status, response->headers().getStatusValue());
     EXPECT_EQ(expected_body_size, response->body().size());
   }
+  void verifyResponse(IntegrationStreamDecoderPtr response, const std::string& expected_status,
+                      size_t expected_body_size, const std::string& expected_limit,
+                      const std::string& expected_remaining, const std::string& expected_reset) {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ(expected_status, response->headers().getStatusValue());
+    EXPECT_EQ(expected_body_size, response->body().size());
+    EXPECT_THAT(
+        response->headers(),
+        ContainsHeader(
+            Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
+            expected_limit));
+    EXPECT_THAT(response->headers(),
+                ContainsHeader(Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get()
+                                   .XRateLimitRemaining,
+                               expected_remaining));
+    EXPECT_THAT(
+        response->headers(),
+        ContainsHeader(
+            Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
+            expected_reset));
+  }
 
   void sendAndVerifyRequest(const std::string& cluster, const std::string& expected_status,
                             size_t expected_body_size) {
@@ -169,10 +194,28 @@ protected:
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
   }
+  void sendAndVerifyRequest(const std::string& expected_limit,
+                            const std::string& expected_remaining,
+                            const std::string& expected_reset) {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, 1);
+    verifyResponse(std::move(response), "200", 0, expected_limit, expected_remaining,
+                   expected_reset);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ(0U, upstream_request_->bodyLength());
+  }
   void sendRateLimitedRequest(const std::string& cluster) {
     auto response = makeRequest(cluster);
     verifyResponse(std::move(response), "429",
                    18); // 18 is the expected body size for rate-limited responses.
+  }
+  void sendRateLimitedRequest(const std::string& expected_limit,
+                              const std::string& expected_remaining,
+                              const std::string& expected_reset) {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+    verifyResponse(std::move(response), "429", 18, expected_limit, expected_remaining,
+                   expected_reset);
   }
 
   static constexpr absl::string_view filter_config_ =
@@ -185,6 +228,35 @@ typed_config:
     max_tokens: 1
     tokens_per_fill: 1
     fill_interval: 1000s
+  filter_enabled:
+    runtime_key: local_rate_limit_enabled
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enforced:
+    runtime_key: local_rate_limit_enforced
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  response_headers_to_add:
+    - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+      header:
+        key: x-local-rate-limit
+        value: 'true'
+  local_rate_limit_per_downstream_connection: {}
+)EOF";
+
+  static constexpr absl::string_view limit_header_filter_config_ =
+      R"EOF(
+name: envoy.filters.http.local_ratelimit
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+  stat_prefix: http_local_rate_limiter
+  enableXRatelimitHeaders: DRAFT_VERSION_03
+  token_bucket:
+    max_tokens: 2
+    tokens_per_fill: 2
+    fill_interval: 4s
   filter_enabled:
     runtime_key: local_rate_limit_enabled
     default_value:
@@ -489,6 +561,30 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestWithinSameConnection) {
   EXPECT_EQ(18, response->body().size());
 }
 
+TEST_P(LocalRateLimitFilterIntegrationTest, HeaderTest) {
+  initializeFilter(fmt::format(limit_header_filter_config_, "false"));
+
+  // The first request should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("2", "1", "0");
+  cleanupUpstreamAndDownstream();
+
+  // Max tokens is 2, the second request should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("2", "0", "2");
+  cleanupUpstreamAndDownstream();
+
+  // The third request should be rate limited, x-ratelimit-reset should be 2s.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendRateLimitedRequest("2", "0", "2");
+  cleanupUpstreamAndDownstream();
+
+  // After 1s, the forth request should be rate limited, x-ratelimit-reset should be 1s.
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendRateLimitedRequest("2", "0", "1");
+}
+
 TEST_P(LocalRateLimitFilterIntegrationTest, PermitRequestAcrossDifferentConnections) {
   initializeFilter(fmt::format(filter_config_, "true"));
 
@@ -536,7 +632,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, BasicTestPerRouteAndRds) {
 
   // Update route config by RDS when request is sending. Test whether RDS can work normally.
   sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
+      Config::TestTypeUrl::get().RouteConfiguration,
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(update_route_config_)},
       "2");
   test_server_->waitForCounterGe("http.config_test.rds.basic_routes.update_success", 2);
@@ -562,7 +658,6 @@ TEST_P(LocalRateLimitFilterIntegrationTest, BasicTestPerRouteAndRds) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(0, response->body().size());
-
   cleanupUpstreamAndDownstream();
 
   cleanUpXdsConnection();
@@ -587,7 +682,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, TestLocalClusterRateLimit) {
   EXPECT_EQ(1.0, share_provider->getTokensShareFactor());
 
   sendSotwDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment,
+      Config::TestTypeUrl::get().ClusterLoadAssignment,
       {TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           update_local_cluster_endpoints_)},
       "2");

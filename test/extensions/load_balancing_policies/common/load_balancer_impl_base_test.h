@@ -51,15 +51,12 @@ public:
 
 class TestZoneAwareLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
-  TestZoneAwareLoadBalancer(
-      const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
-      Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(
-            priority_set, nullptr, lb_stats, runtime, random,
-            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
-                                                           100, 50),
-            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config)) {}
+  TestZoneAwareLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& lb_stats,
+                            Runtime::Loader& runtime, Random::RandomGenerator& random,
+                            uint32_t healthy_panic_threshold,
+                            absl::optional<LocalityLbConfig> locality_config)
+      : ZoneAwareLoadBalancerBase(priority_set, nullptr, lb_stats, runtime, random,
+                                  healthy_panic_threshold, locality_config) {}
   void runInvalidLocalitySourceType() {
     localitySourceType(static_cast<LoadBalancerBase::HostAvailability>(123));
   }
@@ -82,9 +79,7 @@ protected:
   }
 
   LoadBalancerTestBase()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {
-    least_request_lb_config_.mutable_choice_count()->set_value(2);
-  }
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {}
 
   Stats::IsolatedStoreImpl stats_store_;
   ClusterLbStatNames stat_names_;
@@ -96,9 +91,6 @@ protected:
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config_;
-  envoy::config::cluster::v3::Cluster::RoundRobinLbConfig round_robin_lb_config_;
-  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin round_robin_lb_policy_;
 };
 
 } // namespace Upstream

@@ -78,10 +78,10 @@ public:
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
 
-    EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+    EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                             {"my_route"}, true));
     sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-        Config::TypeUrl::get().RouteConfiguration,
+        Config::TestTypeUrl::get().RouteConfiguration,
         {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
             RdsWithoutVhdsConfig)},
         "1");
@@ -110,7 +110,7 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
 
   // Update RouteConfig, this time include VHDS config
   sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
+      Config::TestTypeUrl::get().RouteConfiguration,
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(RdsConfigWithVhosts)},
       "2");
 
@@ -118,15 +118,15 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
   RELEASE_ASSERT(result, result.message());
   vhds_stream_->startGrpcStream();
 
-  EXPECT_TRUE(
-      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_.get()));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-      Config::TypeUrl::get().VirtualHost,
+      Config::TestTypeUrl::get().VirtualHost,
       {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
           fmt::format(VhostTemplate, "my_route/vhost_0", "vhost.first"))},
       {}, "1", vhds_stream_.get());
-  EXPECT_TRUE(
-      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_.get()));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
 
   // Confirm vhost.first that was configured via VHDS is reachable
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "vhost.first");
@@ -144,7 +144,7 @@ TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
 
   // Update RouteConfig, but don't change VHDS config
   sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
+      Config::TestTypeUrl::get().RouteConfiguration,
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(RdsConfigWithVhosts)},
       "2");
 

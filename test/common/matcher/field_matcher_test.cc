@@ -41,76 +41,71 @@ public:
 };
 
 TEST_F(FieldMatcherTest, SingleFieldMatcher) {
-  EXPECT_EQ(
-      createSingleMatcher("foo", [](auto v) { return v == "foo"; })->match(TestData()).match_state_,
-      MatchState::MatchComplete);
+  EXPECT_EQ(createSingleMatcher("foo", [](auto v) { return v == "foo"; })->match(TestData()),
+            FieldMatchResult::matched());
+  EXPECT_EQ(createSingleMatcher("foo", [](auto v) { return v != "foo"; })->match(TestData()),
+            FieldMatchResult::noMatch());
   EXPECT_EQ(createSingleMatcher(
                 absl::nullopt, [](auto v) { return v == "foo"; },
                 DataInputGetResult::DataAvailability::NotAvailable)
-                ->match(TestData())
-                .match_state_,
-            MatchState::UnableToMatch);
+                ->match(TestData()),
+            FieldMatchResult::insufficientData());
   EXPECT_EQ(createSingleMatcher(
                 "fo", [](auto v) { return v == "foo"; },
                 DataInputGetResult::DataAvailability::MoreDataMightBeAvailable)
-                ->match(TestData())
-                .match_state_,
-            MatchState::UnableToMatch);
-  EXPECT_TRUE(
-      createSingleMatcher("foo", [](auto v) { return v == "foo"; })->match(TestData()).result());
-  EXPECT_FALSE(
-      createSingleMatcher("foo", [](auto v) { return v != "foo"; })->match(TestData()).result());
-
-  EXPECT_FALSE(createSingleMatcher(absl::nullopt, [](auto v) { return v == "foo"; })
-                   ->match(TestData())
-                   .result());
+                ->match(TestData()),
+            FieldMatchResult::insufficientData());
+  EXPECT_EQ(
+      createSingleMatcher(absl::nullopt, [](auto v) { return v == "foo"; })->match(TestData()),
+      FieldMatchResult::noMatch());
 }
 
 TEST_F(FieldMatcherTest, AnyMatcher) {
-  EXPECT_TRUE(AnyFieldMatcher<TestData>(createMatchers({true, false})).match(TestData()).result());
-  EXPECT_TRUE(AnyFieldMatcher<TestData>(createMatchers({true, true})).match(TestData()).result());
-  EXPECT_FALSE(
-      AnyFieldMatcher<TestData>(createMatchers({false, false})).match(TestData()).result());
+  EXPECT_EQ(AnyFieldMatcher<TestData>(createMatchers({true, false})).match(TestData()),
+            FieldMatchResult::matched());
+  EXPECT_EQ(AnyFieldMatcher<TestData>(createMatchers({true, true})).match(TestData()),
+            FieldMatchResult::matched());
+  EXPECT_EQ(AnyFieldMatcher<TestData>(createMatchers({false, false})).match(TestData()),
+            FieldMatchResult::noMatch());
   EXPECT_EQ(AnyFieldMatcher<TestData>(
                 createMatchers(
                     {std::make_pair(false,
                                     DataInputGetResult::DataAvailability::MoreDataMightBeAvailable),
                      std::make_pair(true, DataInputGetResult::DataAvailability::AllDataAvailable)}))
-                .match(TestData())
-                .match_state_,
-            MatchState::MatchComplete);
+                .match(TestData()),
+            FieldMatchResult::matched());
   EXPECT_EQ(
       AnyFieldMatcher<TestData>(
           createMatchers(
               {std::make_pair(false,
                               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable),
                std::make_pair(false, DataInputGetResult::DataAvailability::AllDataAvailable)}))
-          .match(TestData())
-          .match_state_,
-      MatchState::UnableToMatch);
+          .match(TestData()),
+      FieldMatchResult::insufficientData());
 }
 
 TEST_F(FieldMatcherTest, AllMatcher) {
-  EXPECT_FALSE(AllFieldMatcher<TestData>(createMatchers({true, false})).match(TestData()).result());
-  EXPECT_TRUE(AllFieldMatcher<TestData>(createMatchers({true, true})).match(TestData()).result());
-  EXPECT_FALSE(
-      AllFieldMatcher<TestData>(createMatchers({false, false})).match(TestData()).result());
+  EXPECT_EQ(AllFieldMatcher<TestData>(createMatchers({true, false})).match(TestData()),
+            FieldMatchResult::noMatch());
+  EXPECT_EQ(AllFieldMatcher<TestData>(createMatchers({true, true})).match(TestData()),
+            FieldMatchResult::matched());
+  EXPECT_EQ(AllFieldMatcher<TestData>(createMatchers({false, false})).match(TestData()),
+            FieldMatchResult::noMatch());
   EXPECT_EQ(
       AllFieldMatcher<TestData>(
           createMatchers(
               {std::make_pair(false,
                               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable),
                std::make_pair(false, DataInputGetResult::DataAvailability::AllDataAvailable)}))
-          .match(TestData())
-          .match_state_,
-      MatchState::UnableToMatch);
+          .match(TestData()),
+      FieldMatchResult::insufficientData());
 }
 
 TEST_F(FieldMatcherTest, NotMatcher) {
-  EXPECT_TRUE(NotFieldMatcher<TestData>(
-                  std::make_unique<AllFieldMatcher<TestData>>(createMatchers({true, false})))
-                  .match(TestData())
-                  .result());
+  EXPECT_EQ(NotFieldMatcher<TestData>(
+                std::make_unique<AllFieldMatcher<TestData>>(createMatchers({true, false})))
+                .match(TestData()),
+            FieldMatchResult::matched());
 
   EXPECT_EQ(
       NotFieldMatcher<TestData>(
@@ -118,9 +113,8 @@ TEST_F(FieldMatcherTest, NotMatcher) {
               {std::make_pair(false,
                               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable),
                std::make_pair(false, DataInputGetResult::DataAvailability::AllDataAvailable)})))
-          .match(TestData())
-          .match_state_,
-      MatchState::UnableToMatch);
+          .match(TestData()),
+      FieldMatchResult::insufficientData());
 }
 
 } // namespace Matcher

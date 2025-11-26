@@ -168,7 +168,7 @@ void ConnectionManager::onHeartbeat(RemotingCommandPtr request) {
 
   purgeDirectiveTable();
 
-  ProtobufWkt::Struct body_struct;
+  Protobuf::Struct body_struct;
   try {
     MessageUtil::loadFromJson(body, body_struct);
   } catch (std::exception& e) {
@@ -294,7 +294,7 @@ void ConnectionManager::onGetConsumerListByGroup(RemotingCommandPtr request) {
     ENVOY_LOG(warn, "There is no consumer belongs to consumer_group: {}",
               requestExtHeader->consumerGroup());
   }
-  ProtobufWkt::Struct body_struct;
+  Protobuf::Struct body_struct;
 
   getConsumerListByGroupResponseBody.encode(body_struct);
 

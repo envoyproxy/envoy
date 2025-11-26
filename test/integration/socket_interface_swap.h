@@ -19,7 +19,7 @@ public:
     Api::IoErrorPtr
     returnOverride(Envoy::Network::TestIoSocketHandle* io_handle,
                    Network::Address::InstanceConstSharedPtr& peer_address_override_out) {
-      absl::MutexLock lock(&mutex_);
+      absl::MutexLock lock(mutex_);
       if (absl::StatusOr<Network::Address::InstanceConstSharedPtr> addr = io_handle->localAddress();
           socket_type_ == io_handle->getSocketType() && error_ &&
           ((addr.ok() && (*addr)->ip()->port() == src_port_) ||
@@ -43,7 +43,7 @@ public:
     Api::IoErrorPtr
     returnConnectOverride(Envoy::Network::TestIoSocketHandle* io_handle,
                           Network::Address::InstanceConstSharedPtr& peer_address_override_out) {
-      absl::MutexLock lock(&mutex_);
+      absl::MutexLock lock(mutex_);
       if (absl::StatusOr<Network::Address::InstanceConstSharedPtr> addr = io_handle->localAddress();
           block_connect_ && socket_type_ == io_handle->getSocketType() &&
           ((addr.ok() && (*addr)->ip()->port() == src_port_) ||
@@ -61,7 +61,7 @@ public:
     }
 
     void readOverride(Network::IoHandle::RecvMsgOutput& output) {
-      absl::MutexLock lock(&mutex_);
+      absl::MutexLock lock(mutex_);
       if (translated_dnat_address_ != nullptr) {
         for (auto& pkt : output.msg_) {
           // Reverse DNAT when receiving packets.
@@ -75,14 +75,14 @@ public:
 
     // Source port to match. The port specified should be associated with a listener.
     void setSourcePort(uint32_t port) {
-      absl::WriterMutexLock lock(&mutex_);
+      absl::WriterMutexLock lock(mutex_);
       dst_port_ = 0;
       src_port_ = port;
     }
 
     // Destination port to match. The port specified should be associated with a listener.
     void setDestinationPort(uint32_t port) {
-      absl::WriterMutexLock lock(&mutex_);
+      absl::WriterMutexLock lock(mutex_);
       src_port_ = 0;
       dst_port_ = port;
     }
@@ -93,20 +93,20 @@ public:
 
     // The caller is responsible for memory management.
     void setWriteOverride(Api::IoErrorPtr error) {
-      absl::WriterMutexLock lock(&mutex_);
+      absl::WriterMutexLock lock(mutex_);
       ASSERT(src_port_ != 0 || dst_port_ != 0);
       error_ = std::move(error);
     }
 
     void setConnectBlock(bool block) {
-      absl::WriterMutexLock lock(&mutex_);
+      absl::WriterMutexLock lock(mutex_);
       ASSERT(src_port_ != 0 || dst_port_ != 0);
       block_connect_ = block;
     }
 
     void setDnat(Network::Address::InstanceConstSharedPtr orig_address,
                  Network::Address::InstanceConstSharedPtr translated_address) {
-      absl::WriterMutexLock lock(&mutex_);
+      absl::WriterMutexLock lock(mutex_);
       orig_dnat_address_ = orig_address;
       translated_dnat_address_ = translated_address;
     }

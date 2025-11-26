@@ -347,7 +347,7 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
                        ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls)
     : server_context_(server_context), cluster_(std::move(cluster)), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
-      hosts_(new HostVector()), time_source_(server_context_.mainThreadDispatcher().timeSource()) {
+      hosts_(new HostVector()) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
   // Set initial hashes for possible delta updates.
@@ -373,10 +373,13 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
       // Initialize an endpoint host object.
       auto address_or_error = Network::Address::resolveProtoAddress(host.endpoint().address());
       THROW_IF_NOT_OK_REF(address_or_error.status());
+      auto const_locality_shared_pool = LocalityPool::getConstLocalitySharedPool(
+          server_context_.singletonManager(), server_context_.mainThreadDispatcher());
       HostSharedPtr endpoint = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
           HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
-                           locality_endpoints.locality(), host.endpoint().health_check_config(), 0,
-                           envoy::config::core::v3::UNKNOWN, time_source_),
+                           const_locality_shared_pool->getObject(locality_endpoints.locality()),
+                           host.endpoint().health_check_config(), 0,
+                           envoy::config::core::v3::UNKNOWN),
           std::unique_ptr<HostImpl>));
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
       hosts_->push_back(endpoint);
@@ -489,10 +492,13 @@ void HdsCluster::updateHosts(
         auto address_or_error =
             Network::Address::resolveProtoAddress(endpoint.endpoint().address());
         THROW_IF_NOT_OK_REF(address_or_error.status());
+        auto const_locality_shared_pool = LocalityPool::getConstLocalitySharedPool(
+            server_context_.singletonManager(), server_context_.mainThreadDispatcher());
         host = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
             HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
-                             endpoints.locality(), endpoint.endpoint().health_check_config(), 0,
-                             envoy::config::core::v3::UNKNOWN, time_source_),
+                             const_locality_shared_pool->getObject(endpoints.locality()),
+                             endpoint.endpoint().health_check_config(), 0,
+                             envoy::config::core::v3::UNKNOWN),
             std::unique_ptr<HostImpl>));
 
         // Set the initial health status as in HdsCluster::initialize.
@@ -527,9 +533,8 @@ void HdsCluster::updateHosts(
   // Update the priority set.
   hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
-  priority_set_.updateHosts(
-      0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {}, hosts_added, hosts_removed,
-      server_context_.api().randomGenerator().random(), absl::nullopt, absl::nullopt);
+  priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
+                            hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { return nullptr; }
@@ -558,8 +563,7 @@ void HdsCluster::initialize(std::function<absl::Status()> callback) {
     }
     // Use the ungrouped and grouped hosts lists to retain locality structure in the priority set.
     priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                              *hosts_, {}, server_context_.api().randomGenerator().random(),
-                              absl::nullopt, absl::nullopt);
+                              *hosts_, {}, absl::nullopt, absl::nullopt);
 
     initialized_ = true;
   }

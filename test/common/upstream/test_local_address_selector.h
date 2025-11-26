@@ -17,7 +17,8 @@ public:
         return_empty_source_address_{return_empty_source_address} {}
 
   UpstreamLocalAddress
-  getUpstreamLocalAddressImpl(const Network::Address::InstanceConstSharedPtr&) const override {
+  getUpstreamLocalAddressImpl(const Network::Address::InstanceConstSharedPtr&,
+                              OptRef<const Network::TransportSocketOptions>) const override {
     ++(*num_calls_);
     if (return_empty_source_address_) {
       return {};
@@ -48,7 +49,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Empty>();
+    return std::make_unique<Protobuf::Empty>();
   }
 
   std::string name() const override { return "test.upstream.local.address.selector"; }

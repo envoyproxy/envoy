@@ -176,6 +176,14 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamRxByteReceiv
   return duration(timing.value().get().last_upstream_rx_byte_received_, stream_info_);
 }
 
+absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamRxBodyByteReceived() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().first_upstream_rx_body_byte_received_, stream_info_);
+}
+
 absl::optional<std::chrono::nanoseconds> TimingUtility::upstreamHandshakeComplete() {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
@@ -445,41 +453,28 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
     return ProxyStatusError::HttpResponseTimeout;
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.proxy_status_mapping_more_core_response_flags")) {
-    if (stream_info.hasResponseFlag(CoreResponseFlag::DurationTimeout)) {
-      return ProxyStatusError::ConnectionTimeout;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::LocalReset)) {
-      return ProxyStatusError::ConnectionTimeout;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamRemoteReset)) {
-      return ProxyStatusError::ConnectionTerminated;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionFailure)) {
-      return ProxyStatusError::ConnectionRefused;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UnauthorizedExternalService)) {
-      return ProxyStatusError::ConnectionRefused;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionTermination)) {
-      return ProxyStatusError::ConnectionTerminated;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::OverloadManager)) {
-      return ProxyStatusError::ConnectionLimitReached;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::DropOverLoad)) {
-      return ProxyStatusError::ConnectionLimitReached;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::FaultInjected)) {
-      return ProxyStatusError::HttpRequestError;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::DownstreamConnectionTermination)) {
-      return ProxyStatusError::ConnectionTerminated;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::DownstreamRemoteReset)) {
-      return ProxyStatusError::ConnectionTerminated;
-    }
-  } else {
-    if (stream_info.hasResponseFlag(CoreResponseFlag::LocalReset)) {
-      return ProxyStatusError::ConnectionTimeout;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamRemoteReset)) {
-      return ProxyStatusError::ConnectionTerminated;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionFailure)) {
-      return ProxyStatusError::ConnectionRefused;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionTermination)) {
-      return ProxyStatusError::ConnectionTerminated;
-    }
+  if (stream_info.hasResponseFlag(CoreResponseFlag::DurationTimeout)) {
+    return ProxyStatusError::ConnectionTimeout;
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::LocalReset)) {
+    return ProxyStatusError::ConnectionTimeout;
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamRemoteReset)) {
+    return ProxyStatusError::ConnectionTerminated;
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionFailure)) {
+    return ProxyStatusError::ConnectionRefused;
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UnauthorizedExternalService)) {
+    return ProxyStatusError::ConnectionRefused;
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionTermination)) {
+    return ProxyStatusError::ConnectionTerminated;
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::OverloadManager)) {
+    return ProxyStatusError::ConnectionLimitReached;
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::DropOverLoad)) {
+    return ProxyStatusError::ConnectionLimitReached;
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::FaultInjected)) {
+    return ProxyStatusError::HttpRequestError;
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::DownstreamConnectionTermination)) {
+    return ProxyStatusError::ConnectionTerminated;
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::DownstreamRemoteReset)) {
+    return ProxyStatusError::ConnectionTerminated;
   }
 
   if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamOverflow)) {

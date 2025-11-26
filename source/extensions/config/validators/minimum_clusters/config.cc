@@ -12,7 +12,7 @@ namespace Config {
 namespace Validators {
 
 Envoy::Config::ConfigValidatorPtr MinimumClustersValidatorFactory::createConfigValidator(
-    const ProtobufWkt::Any& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
+    const Protobuf::Any& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& validator_config = MessageUtil::anyConvertAndValidate<
       envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator>(
       config, validation_visitor);

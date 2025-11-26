@@ -77,12 +77,12 @@ public:
   TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope, Store& store)
       : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
-  ScopeSharedPtr createScope(const std::string& name) override {
+  ScopeSharedPtr createScope(const std::string& name, bool) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->createScope(name), store_);
   }
 
-  ScopeSharedPtr scopeFromStatName(StatName name) override {
+  ScopeSharedPtr scopeFromStatName(StatName name, bool) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->scopeFromStatName(name),
                                               store_);
@@ -184,7 +184,7 @@ public:
   }
   void add(uint64_t amount) override {
     counter_->add(amount);
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     condvar_.Signal();
   }
   void inc() override { add(1); }
@@ -196,6 +196,7 @@ public:
   uint32_t use_count() const override { return counter_->use_count(); }
   StatName tagExtractedStatName() const override { return counter_->tagExtractedStatName(); }
   bool used() const override { return counter_->used(); }
+  void markUnused() override { counter_->markUnused(); }
   bool hidden() const override { return counter_->hidden(); }
   SymbolTable& symbolTable() override { return counter_->symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }
@@ -212,7 +213,7 @@ public:
   using Stats::AllocatorImpl::AllocatorImpl;
 
   void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
     while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() != value) {
       condvar_.Wait(&mutex_);
@@ -221,7 +222,7 @@ public:
   }
 
   void waitForCounterFromStringGe(const std::string& name, uint64_t value) {
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
     while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() < value) {
       condvar_.Wait(&mutex_);
@@ -230,7 +231,7 @@ public:
   }
 
   void waitForCounterExists(const std::string& name) {
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to exist", name);
     while (getCounterLockHeld(name) == nullptr) {
       condvar_.Wait(&mutex_);
@@ -245,7 +246,7 @@ protected:
         Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
         condvar_);
     {
-      absl::MutexLock l(&mutex_);
+      absl::MutexLock l(mutex_);
       // Allow getting the counter directly from the allocator, since it's harder to
       // signal when the counter has been added to a given stats store.
       counters_.emplace(counter->name(), counter);
@@ -365,6 +366,16 @@ public:
   void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {};
   const Stats::TagVector& fixedTags() override { CONSTRUCT_ON_FIRST_USE(Stats::TagVector); }
 
+  void evictUnused() override {
+    Thread::LockGuard lock(lock_);
+    eviction_count_++;
+  }
+
+  uint32_t evictionCount() const {
+    Thread::LockGuard lock(lock_);
+    return eviction_count_;
+  }
+
   // Stats::StoreRoot
   void addSink(Sink&) override {}
   void setTagProducer(TagProducerPtr&&) override {}
@@ -381,6 +392,7 @@ private:
   IsolatedStoreImpl store_;
   PostMergeCb merge_cb_;
   ScopeSharedPtr lazy_default_scope_;
+  uint32_t eviction_count_{0};
 };
 
 } // namespace Stats

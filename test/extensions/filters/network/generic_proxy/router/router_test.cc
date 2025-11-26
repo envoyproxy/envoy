@@ -196,8 +196,8 @@ public:
   }
 
   void verifyMetadataMatchCriteria() {
-    ProtobufWkt::Struct request_struct;
-    ProtobufWkt::Value val;
+    Protobuf::Struct request_struct;
+    Protobuf::Value val;
 
     // Populate metadata like StreamInfo.setDynamicMetadata() would.
     auto& fields_map = *request_struct.mutable_fields();
@@ -956,6 +956,35 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndRequestEncodingFailure) {
   EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
   notifyUpstreamSuccess();
+
+  // Mock downstream closing.
+  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseStatusError) {
+  setup();
+  kickOffNewUpstreamRequest(true);
+
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
+      .WillOnce(Invoke([this](const StreamFrame&, EncodingContext& ctx) -> EncodingResult {
+        EXPECT_EQ(ctx.routeEntry().ptr(), &mock_route_entry_);
+        return 0;
+      }));
+
+  expectInjectContextToUpstreamRequest();
+
+  notifyUpstreamSuccess();
+
+  EXPECT_CALL(mock_filter_callback_, onResponseHeaderFrame(_)).WillOnce(Invoke([this](ResponsePtr) {
+    // When the response is sent to callback, the upstream request should be removed.
+    EXPECT_EQ(0, filter_->upstreamRequestsSize());
+  }));
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(false));
+  expectFinalizeUpstreamSpanWithError();
+
+  auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>(0, false);
+  notifyDecodingSuccess(std::move(response), {});
 
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);

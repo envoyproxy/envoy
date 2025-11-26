@@ -276,8 +276,10 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
   if (allow_unknown_fields.getValue()) {
-    ENVOY_LOG(warn,
-              "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.");
+    if (!skip_deprecated_logs.getValue()) {
+      ENVOY_LOG(warn,
+                "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.");
+    }
   }
   allow_unknown_static_fields_ =
       allow_unknown_static_fields.getValue() || allow_unknown_fields.getValue();

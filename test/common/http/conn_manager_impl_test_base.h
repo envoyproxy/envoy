@@ -122,6 +122,9 @@ public:
     return http1_safe_max_connection_duration_;
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
+  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+    return stream_flush_timeout_;
+  }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds requestHeadersTimeout() const override {
     return request_headers_timeout_;
@@ -201,7 +204,7 @@ public:
   const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
     return early_header_mutations_;
   }
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint32_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
@@ -280,15 +283,16 @@ public:
   absl::optional<std::string> user_agent_;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
-  uint64_t max_requests_per_connection_{};
+  uint32_t max_requests_per_connection_{};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   bool http1_safe_max_connection_duration_{false};
   std::chrono::milliseconds stream_idle_timeout_{};
+  absl::optional<std::chrono::milliseconds> stream_flush_timeout_{};
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds request_headers_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
-  absl::optional<std::chrono::milliseconds> max_stream_duration_{};
+  absl::optional<std::chrono::milliseconds> max_stream_duration_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -317,8 +321,8 @@ public:
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
-  std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
-  std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};
+  std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_;
+  std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
   bool add_proxy_protocol_connection_state_ = true;
 
   const LocalReply::LocalReplyPtr local_reply_;

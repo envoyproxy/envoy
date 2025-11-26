@@ -35,7 +35,14 @@
 namespace Envoy {
 namespace Http {
 class FilterChainManager;
-}
+class HashPolicy;
+} // namespace Http
+
+namespace Router {
+class ShadowPolicy;
+using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
+class RetryPolicy;
+} // namespace Router
 
 namespace Upstream {
 
@@ -59,13 +66,16 @@ public:
    * Return UpstreamLocalAddress based on the endpoint address.
    * @param endpoint_address is the address used to select upstream local address.
    * @param socket_options applied to the selected address.
+   * @param transport_socket_options transport-level options applied to the connection.
    * @return UpstreamLocalAddress which includes the selected upstream local address and socket
    * options.
    */
-  UpstreamLocalAddress
-  getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr& endpoint_address,
-                          const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const {
-    UpstreamLocalAddress local_address = getUpstreamLocalAddressImpl(endpoint_address);
+  UpstreamLocalAddress getUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      const Network::ConnectionSocket::OptionsSharedPtr& socket_options,
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const {
+    UpstreamLocalAddress local_address =
+        getUpstreamLocalAddressImpl(endpoint_address, transport_socket_options);
     Network::ConnectionSocket::OptionsSharedPtr connection_options =
         std::make_shared<Network::ConnectionSocket::Options>(
             socket_options ? *socket_options
@@ -83,7 +93,8 @@ private:
    * options is the responsibility of the base class.
    */
   virtual UpstreamLocalAddress getUpstreamLocalAddressImpl(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address) const PURE;
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const PURE;
 };
 
 using UpstreamLocalAddressSelectorConstSharedPtr =
@@ -475,18 +486,6 @@ public:
   virtual LocalityWeightsConstSharedPtr localityWeights() const PURE;
 
   /**
-   * @return next locality index to route to if performing locality weighted balancing
-   * against healthy hosts.
-   */
-  virtual absl::optional<uint32_t> chooseHealthyLocality() PURE;
-
-  /**
-   * @return next locality index to route to if performing locality weighted balancing
-   * against degraded hosts.
-   */
-  virtual absl::optional<uint32_t> chooseDegradedLocality() PURE;
-
-  /**
    * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
@@ -511,32 +510,36 @@ using HostSetPtr = std::unique_ptr<HostSet>;
 class PrioritySet {
 public:
   using MemberUpdateCb =
-      std::function<absl::Status(const HostVector& hosts_added, const HostVector& hosts_removed)>;
+      std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>;
 
-  using PriorityUpdateCb = std::function<absl::Status(
-      uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed)>;
+  using PriorityUpdateCb = std::function<void(uint32_t priority, const HostVector& hosts_added,
+                                              const HostVector& hosts_removed)>;
 
   virtual ~PrioritySet() = default;
 
   /**
-   * Install a callback that will be invoked when any of the HostSets in the PrioritySet changes.
-   * hosts_added and hosts_removed will only be populated when a host is added or completely removed
-   * from the PrioritySet.
-   * This includes when a new HostSet is created.
+   * Install a callback that will be invoked when anything on any host in the PrioritySet is
+   * changed.
+   *
+   * hosts_added and hosts_removed will only be populated when a host is added or
+   * completely removed from the PrioritySet. This includes when a new HostSet is created.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which unregisters the callback upon its destruction.
    */
   ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
   addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
-   * Install a callback that will be invoked when a host set changes. Triggers when any change
-   * happens to the hosts within the host set. If hosts are added/removed from the host set, the
-   * added/removed hosts will be passed to the callback.
+   * Install a callback that will be invoked when a host changes. Triggers when any change
+   * happens to the hosts within that priority, and is invoked once for each priority that has a
+   * change.
+   *
+   * If hosts are added/removed from the host set, the added/removed hosts will be passed to
+   * the callback.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which unregisters the callback upon its destruction.
    */
   ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
   addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
@@ -574,7 +577,6 @@ public:
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
-   * @param seed a random number to initialize the locality load-balancing algorithm.
    * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
    * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
    * @param cross_priority_host_map read only cross-priority host map which is created in the main
@@ -583,7 +585,7 @@ public:
   virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
-                           uint64_t seed, absl::optional<bool> weighted_priority_health,
+                           absl::optional<bool> weighted_priority_health,
                            absl::optional<uint32_t> overprovisioning_factor,
                            HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
@@ -607,7 +609,7 @@ public:
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
-                             uint64_t seed, absl::optional<bool> weighted_priority_health,
+                             absl::optional<bool> weighted_priority_health,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
   };
 
@@ -678,7 +680,6 @@ public:
   COUNTER(lb_subsets_selected)                                                                     \
   COUNTER(lb_zone_cluster_too_small)                                                               \
   COUNTER(lb_zone_no_capacity_left)                                                                \
-  COUNTER(lb_zone_number_differs)                                                                  \
   COUNTER(lb_zone_routing_all_directly)                                                            \
   COUNTER(lb_zone_routing_cross_zone)                                                              \
   COUNTER(lb_zone_routing_sampled)                                                                 \
@@ -748,7 +749,8 @@ public:
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
-  HISTOGRAM(upstream_cx_length_ms, Milliseconds)
+  HISTOGRAM(upstream_cx_length_ms, Milliseconds)                                                   \
+  HISTOGRAM(upstream_rq_per_cx, Unspecified)
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
@@ -875,6 +877,74 @@ public:
 using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOptionsConfig>;
 
 /**
+ * Interface describing HTTP protocol options exposed by a cluster.
+ */
+class HttpProtocolOptionsConfig : public ProtocolOptionsConfig {
+public:
+  ~HttpProtocolOptionsConfig() override = default;
+
+  /**
+   * @return const Http::Http1Settings& the HTTP/1.1 settings for upstream connections.
+   */
+  virtual const Http::Http1Settings& http1Settings() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Http2ProtocolOptions& the HTTP/2 protocol options for
+   *         upstream connections.
+   */
+  virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Http3ProtocolOptions& the HTTP/3 protocol options for
+   *         upstream connections.
+   */
+  virtual const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::HttpProtocolOptions& the common HTTP protocol options
+   *         that apply to all HTTP versions for upstream connections.
+   */
+  virtual const envoy::config::core::v3::HttpProtocolOptions&
+  commonHttpProtocolOptions() const PURE;
+
+  /**
+   * @return const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>& the
+   *         optional upstream-specific HTTP protocol options. Returns absl::nullopt if not
+   *         configured.
+   */
+  virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
+  upstreamHttpProtocolOptions() const PURE;
+
+  /**
+   * @return const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+   *         the optional alternate protocols cache options for upstream connections. Returns
+   *         absl::nullopt if not configured.
+   */
+  virtual const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  alternateProtocolsCacheOptions() const PURE;
+
+  /**
+   * @return const std::vector<Router::ShadowPolicyPtr>& the shadow policies configured for this
+   *         cluster. The vector is empty if no shadowing takes place.
+   */
+  virtual const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const PURE;
+
+  /**
+   * @return const Router::RetryPolicy* the retry policy configured for this cluster. Returns
+   *         nullptr if no cluster-level retry policy is configured.
+   */
+  virtual const Router::RetryPolicy* retryPolicy() const PURE;
+
+  /**
+   * @return const Http::HashPolicy* the optional hash policy for load balancing. Returns nullptr
+   *         if no hash policy is configured.
+   */
+  virtual const Http::HashPolicy* hashPolicy() const PURE;
+};
+
+using HttpProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const HttpProtocolOptionsConfig>;
+
+/**
  *  Base class for all cluster typed metadata factory.
  */
 class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
@@ -960,29 +1030,9 @@ public:
   virtual uint64_t features() const PURE;
 
   /**
-   * @return const Http::Http1Settings& for HTTP/1.1 connections created on behalf of this cluster.
-   *         @see Http::Http1Settings.
+   * @return const HttpProtocolOptionsConfig& HTTP protocol options for this cluster.
    */
-  virtual const Http::Http1Settings& http1Settings() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Http2ProtocolOptions& for HTTP/2 connections
-   * created on behalf of this cluster.
-   *         @see envoy::config::core::v3::Http2ProtocolOptions.
-   */
-  virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Http3ProtocolOptions& for HTTP/3 connections
-   * created on behalf of this cluster. @see envoy::config::core::v3::Http3ProtocolOptions.
-   */
-  virtual const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::HttpProtocolOptions for all of HTTP versions.
-   */
-  virtual const envoy::config::core::v3::HttpProtocolOptions&
-  commonHttpProtocolOptions() const PURE;
+  virtual const HttpProtocolOptionsConfig& httpProtocolOptions() const PURE;
 
   /**
    * @param name std::string containing the well-known name of the extension for which protocol
@@ -1014,6 +1064,15 @@ public:
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
   /**
+   * @param response Http::ResponseHeaderMap response headers received from upstream
+   * @return absl::optional<bool> absl::nullopt is returned when matching did not took place.
+   *         Otherwise, the boolean value indicates the matching result. True indicates that
+   *         response should be treated as error, False as success.
+   */
+  virtual absl::optional<bool>
+  processHttpForOutlierDetection(Http::ResponseHeaderMap& response) const PURE;
+
+  /**
    * @return the service discovery type to use for resolving the cluster.
    */
   virtual envoy::config::cluster::v3::Cluster::DiscoveryType type() const PURE;
@@ -1039,11 +1098,11 @@ public:
   virtual bool maintenanceMode() const PURE;
 
   /**
-   * @return uint64_t the maximum number of outbound requests that a connection pool will make on
+   * @return uint32_t the maximum number of outbound requests that a connection pool will make on
    *         each upstream connection. This can be used to increase spread if the backends cannot
    *         tolerate imbalance. 0 indicates no maximum.
    */
-  virtual uint64_t maxRequestsPerConnection() const PURE;
+  virtual uint32_t maxRequestsPerConnection() const PURE;
 
   /**
    * @return uint32_t the maximum number of response headers. The default value is 100. Results in a
@@ -1182,18 +1241,6 @@ public:
    */
   virtual std::vector<Http::Protocol>
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
-
-  /**
-   * @return http protocol options for upstream connection
-   */
-  virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
-  upstreamHttpProtocolOptions() const PURE;
-
-  /**
-   * @return alternate protocols cache options for upstream connections.
-   */
-  virtual const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
-  alternateProtocolsCacheOptions() const PURE;
 
   /**
    * @return the Http1 Codec Stats.

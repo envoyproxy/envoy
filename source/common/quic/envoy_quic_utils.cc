@@ -1,17 +1,53 @@
 #include "source/common/quic/envoy_quic_utils.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <memory>
+#include <string>
 
-#include "envoy/common/platform.h"
-#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/api/os_sys_calls_common.h"
+#include "envoy/http/header_map.h"
+#include "envoy/http/stream_reset_handler.h"
+#include "envoy/network/address.h"
+#include "envoy/network/io_handle.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
+#include "envoy/network/socket_interface.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/http/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/http_option_limits.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
-#include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/quic/quic_io_handle_wrapper.h"
+#include "source/common/runtime/runtime_features.h"
 
+#include "absl/numeric/int128.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "openssl/crypto.h"
+#include "openssl/ec.h"
+#include "openssl/ec_key.h"
+#include "openssl/evp.h"
+#include "openssl/nid.h"
+#include "openssl/rsa.h"
+#include "openssl/ssl.h"
+#include "openssl/x509.h"
+#include "quiche/common/http/http_header_block.h"
+#include "quiche/common/quiche_ip_address_family.h"
+#include "quiche/quic/core/quic_config.h"
+#include "quiche/quic/core/quic_constants.h"
+#include "quiche/quic/core/quic_error_codes.h"
+#include "quiche/quic/core/quic_tag.h"
+#include "quiche/quic/core/quic_time.h"
+#include "quiche/quic/core/quic_types.h"
+#include "quiche/quic/platform/api/quic_socket_address.h"
 
 namespace Envoy {
 namespace Quic {
@@ -184,8 +220,7 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       const bool prefer_gro) {
+                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
   ASSERT(peer_addr != nullptr);
   // NOTE: If changing the default cache size from 4 entries, make sure to profile it using
   // the benchmark test: //test/common/network:io_socket_handle_impl_benchmark
@@ -212,7 +247,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
-  if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
   }
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
@@ -256,6 +291,8 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   }
 
   local_addr = connection_socket->connectionInfoProvider().localAddress();
+  ENVOY_LOG_MISC(trace, "connected to local address: {}",
+                 local_addr != nullptr ? local_addr->asString() : "<none>");
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");

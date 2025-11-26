@@ -15,12 +15,9 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/enum_to_int.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/safe_memcpy.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/codes.h"
-#include "source/common/http/exception.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http2/codec_stats.h"
@@ -28,7 +25,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/cleanup/cleanup.h"
-#include "absl/container/fixed_array.h"
+#include "absl/container/flat_hash_map.h"
 #include "quiche/common/quiche_endian.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"
 #include "quiche/http2/adapter/oghttp2_adapter.h"
@@ -36,6 +33,83 @@
 namespace Envoy {
 namespace Http {
 namespace Http2 {
+
+namespace {
+
+// Optimization: Map of well-known header names to Envoy's static LowerCaseString objects.
+// This allows us to avoid copying header names for common HTTP/2 headers.
+// The string_views point to compile-time string literals which live forever.
+class StaticHeaderNameLookup {
+public:
+  StaticHeaderNameLookup() {
+    const auto& headers = Headers::get();
+    const auto& custom_headers = CustomHeaders::get();
+
+    // HTTP/2 pseudo-headers (most common).
+    addMapping(":authority", headers.Host);
+    addMapping(":method", headers.Method);
+    addMapping(":path", headers.Path);
+    addMapping(":scheme", headers.Scheme);
+    addMapping(":status", headers.Status);
+    addMapping(":protocol", headers.Protocol);
+
+    // Common request headers.
+    addMapping("accept", custom_headers.Accept);
+    addMapping("accept-encoding", custom_headers.AcceptEncoding);
+    addMapping("authorization", custom_headers.Authorization);
+    addMapping("cache-control", custom_headers.CacheControl);
+    addMapping("content-encoding", custom_headers.ContentEncoding);
+    addMapping("content-length", headers.ContentLength);
+    addMapping("content-type", headers.ContentType);
+    addMapping("cookie", headers.Cookie);
+    addMapping("date", headers.Date);
+    addMapping("expect", headers.Expect);
+    addMapping("grpc-timeout", headers.GrpcTimeout);
+    addMapping("host", headers.HostLegacy);
+    addMapping("user-agent", headers.UserAgent);
+
+    // Common response headers.
+    addMapping("location", headers.Location);
+    addMapping("server", headers.Server);
+    addMapping("set-cookie", headers.SetCookie);
+    addMapping("grpc-status", headers.GrpcStatus);
+    addMapping("grpc-message", headers.GrpcMessage);
+
+    // Common request/response headers.
+    addMapping("connection", headers.Connection);
+    addMapping("keep-alive", headers.KeepAlive);
+    addMapping("proxy-connection", headers.ProxyConnection);
+    addMapping("te", headers.TE);
+    addMapping("transfer-encoding", headers.TransferEncoding);
+    addMapping("upgrade", headers.Upgrade);
+    addMapping("via", headers.Via);
+    addMapping("x-request-id", headers.RequestId);
+
+    // X-Forwarded headers.
+    addMapping("x-forwarded-for", headers.ForwardedFor);
+    addMapping("x-forwarded-host", headers.ForwardedHost);
+    addMapping("x-forwarded-proto", headers.ForwardedProto);
+    addMapping("x-forwarded-port", headers.ForwardedPort);
+  }
+
+  const LowerCaseString* lookup(absl::string_view name) const {
+    auto it = map_.find(name);
+    return it != map_.end() ? it->second : nullptr;
+  }
+
+private:
+  void addMapping(absl::string_view name, const LowerCaseString& header) {
+    map_.emplace(name, &header);
+  }
+
+  absl::flat_hash_map<absl::string_view, const LowerCaseString*> map_;
+};
+
+const StaticHeaderNameLookup& getStaticHeaderNameLookup() {
+  CONSTRUCT_ON_FIRST_USE(StaticHeaderNameLookup);
+}
+
+} // namespace
 
 // for nghttp2 compatibility.
 const int ERR_CALLBACK_FAILURE = -902;
@@ -262,6 +336,9 @@ void ConnectionImpl::ServerStreamImpl::encode1xxHeaders(const ResponseHeaderMap&
 
 void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
   local_end_stream_ = end_stream;
+
+  bytes_meter_->addDecompressedHeaderBytesSent(headers.byteSize());
+
   submitHeaders(headers, end_stream);
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
@@ -332,6 +409,9 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   parent_.updateActiveStreamsOnEncode(*this);
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
+
+  bytes_meter_->addDecompressedHeaderBytesSent(trailers.byteSize());
+
   if (pending_send_data_->length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
@@ -406,10 +486,8 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
     ENVOY_CONN_LOG(debug, "invoking onStreamClose for stream: {} via processBufferedData",
                    parent_.connection_, stream_id_);
     // We only buffer the onStreamClose if we had no errors.
-    if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
-      ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
-                     status.message()); // LCOV_EXCL_LINE
-    }
+    Status status = parent_.onStreamClose(this, 0);
+    ASSERT(status.ok());
   }
 }
 
@@ -498,6 +576,7 @@ void ConnectionImpl::StreamImpl::decodeData() {
         stream_manager_.decodeAsChunks() &&
         pending_recv_data_->length() > stream_manager_.defer_processing_segment_size_;
 
+    StreamDecoder* stream_decoder = decoder();
     if (decode_data_in_chunk) {
       Buffer::OwnedImpl chunk_buffer;
       // TODO(kbaichoo): Consider implementing an approximate move for chunking.
@@ -508,7 +587,9 @@ void ConnectionImpl::StreamImpl::decodeData() {
       stream_manager_.body_buffered_ = true;
       ASSERT(pending_recv_data_->length() > 0);
 
-      decoder().decodeData(chunk_buffer, sendEndStream());
+      if (stream_decoder) {
+        stream_decoder->decodeData(chunk_buffer, sendEndStream());
+      }
       already_drained_data = true;
 
       if (!buffersOverrun()) {
@@ -516,7 +597,9 @@ void ConnectionImpl::StreamImpl::decodeData() {
       }
     } else {
       // Send the entire buffer through.
-      decoder().decodeData(*pending_recv_data_, sendEndStream());
+      if (stream_decoder) {
+        stream_decoder->decodeData(*pending_recv_data_, sendEndStream());
+      }
     }
   }
 
@@ -597,7 +680,11 @@ void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
 #endif
-  request_decoder_->decodeHeaders(std::move(headers), sendEndStream());
+  RequestDecoder* request_decoder = request_decoder_handle_->get().ptr();
+  ENVOY_BUG(request_decoder != nullptr, "Missing request_decoder_");
+  if (request_decoder) {
+    request_decoder->decodeHeaders(std::move(headers), sendEndStream());
+  }
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
@@ -608,8 +695,12 @@ void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
   // Consume any buffered trailers.
   stream_manager_.trailers_buffered_ = false;
 
-  request_decoder_->decodeTrailers(
-      std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+  RequestDecoder* request_decoder = request_decoder_handle_->get().ptr();
+  ENVOY_BUG(request_decoder != nullptr, "Missing request_decoder_");
+  if (request_decoder) {
+    request_decoder->decodeTrailers(
+        std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+  }
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
@@ -795,6 +886,11 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
   if (stream_id_ == -1) {
     // Handle the case where client streams are reset before headers are created.
+    // For example, if we send local reply after the stream is created but before
+    // headers are sent, we will end up here.
+    ENVOY_CONN_LOG(trace, "Stream {} reset before headers sent.", parent_.connection_, stream_id_);
+    Status status = parent_.onStreamClose(this, 0);
+    ASSERT(status.ok());
     return;
   }
   if (codec_callbacks_) {
@@ -827,7 +923,10 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
     ENVOY_CONN_LOG(debug, "decode metadata called with empty map, skipping", parent_.connection_);
     parent_.stats_.metadata_empty_frames_.inc();
   } else {
-    decoder().decodeMetadata(std::move(metadata_map_ptr));
+    StreamDecoder* stream_decoder = decoder();
+    if (stream_decoder) {
+      stream_decoder->decodeMetadata(std::move(metadata_map_ptr));
+    }
   }
 }
 
@@ -1216,7 +1315,7 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
       // teardown. As part of the work to remove exceptions we should aim to clean up all of this
       // error handling logic and only handle this type of case at the end of dispatch.
       for (auto& stream : active_streams_) {
-        stream->disarmStreamIdleTimer();
+        stream->disarmStreamFlushTimer();
       }
       return ERR_CALLBACK_FAILURE;
     }
@@ -1505,6 +1604,8 @@ int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderStr
     return 0;
   }
 
+  stream->bytes_meter_->addDecompressedHeaderBytesReceived(name.size() + value.size());
+
   // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
   if (should_return) {
@@ -1764,11 +1865,25 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
 OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
                                                                absl::string_view name_view,
                                                                absl::string_view value_view) {
-  // TODO PERF: Can reference count here to avoid copies.
+  // We use reference counting to avoid copying well-known header names.
+  // For common HTTP/2 headers (e.g., :method, :path, :status), we reference Envoy's
+  // static LowerCaseString objects instead of allocating and copying the name string.
+  // This significantly reduces memory allocations and copy operations for typical requests.
   HeaderString name;
-  name.setCopy(name_view.data(), name_view.size());
+  const LowerCaseString* static_name = getStaticHeaderNameLookup().lookup(name_view);
+  if (static_name != nullptr) {
+    // Header name matches a well-known header. Use setReference to avoid copying.
+    name.setReference(static_name->get());
+  } else {
+    // Unknown header name. Copy the data.
+    name.setCopy(name_view.data(), name_view.size());
+  }
+
+  // Always copy the value, as header values are highly variable and the data from
+  // the HTTP/2 adapter is only valid during this callback.
   HeaderString value;
   value.setCopy(value_view.data(), value_view.size());
+
   const int result = connection_->onHeader(stream_id, std::move(name), std::move(value));
   switch (result) {
   case 0:
@@ -1863,6 +1978,7 @@ void ConnectionImpl::Http2Visitor::OnRstStream(Http2StreamId stream_id, Http2Err
 bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id,
                                                  Http2ErrorCode error_code) {
   Status status = connection_->onStreamClose(stream_id, static_cast<uint32_t>(error_code));
+  ASSERT(status.ok());
   if (stream_close_listener_) {
     ENVOY_CONN_LOG(trace, "Http2Visitor invoking stream close listener for stream {}",
                    connection_->connection_, stream_id);
@@ -1994,7 +2110,7 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
     : Http2Options(http2_options, max_headers_kb) {
   og_options_.perspective = http2::adapter::Perspective::kClient;
   og_options_.remote_max_concurrent_streams =
-      ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS;
+      ::Envoy::Http2::Utility::OptionsLimits::MAX_MAX_CONCURRENT_STREAMS;
 
 #ifdef ENVOY_NGHTTP2
   // Temporarily disable initial max streams limit/protection, since we might want to create
@@ -2002,7 +2118,7 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
   //
   // TODO(PiotrSikora): remove this once multiple upstream connections or queuing are implemented.
   nghttp2_option_set_peer_max_concurrent_streams(
-      options_, ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+      options_, ::Envoy::Http2::Utility::OptionsLimits::MAX_MAX_CONCURRENT_STREAMS);
 
   // nghttp2 REQUIRES setting max number of CONTINUATION frames.
   // 1024 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb
@@ -2209,10 +2325,16 @@ ServerConnectionImpl::ServerConnectionImpl(
                      max_request_headers_count),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
-          Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)) {
+          Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
+      should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch)) {
   ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.http2_server_go_away_on_dispatch is not "
                     "found. Is it configured?");
+  ENVOY_LOG_ONCE_IF(
+      trace, should_send_go_away_and_close_on_dispatch_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
+      "found. Is it configured?");
   Http2Options h2_options(http2_options, max_request_headers_kb);
 
   auto direct_visitor = std::make_unique<Http2Visitor>(this);
@@ -2278,6 +2400,13 @@ int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
+  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+    ConnectionImpl::goAway();
+    sent_go_away_on_dispatch_ = true;
+    return envoyOverloadError(
+        "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
+  }
   if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
       should_send_go_away_on_dispatch_->shouldShedLoad()) {
     ConnectionImpl::goAway();

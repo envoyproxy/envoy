@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_mobile_package",
     "envoy_select_envoy_mobile_listener",
+    "envoy_select_envoy_mobile_xds",
 )
 
 licenses(["notice"])  # Apache 2
@@ -24,6 +25,7 @@ envoy_cc_library(
         "@envoy//source/common/router:upstream_codec_filter_lib",
         "@envoy//source/common/tls/cert_validator:cert_validator_lib",
         "@envoy//source/common/upstream:default_local_address_selector_factory",
+        "@envoy//source/extensions/api_listeners/default_api_listener:api_listener_lib",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "@envoy//source/extensions/compression/brotli/decompressor:config",
         "@envoy//source/extensions/compression/gzip/decompressor:config",
@@ -58,10 +60,14 @@ envoy_cc_library(
             "@envoy//source/common/listener_manager:connection_handler_lib",
         ],
         "@envoy",
-    ) + select({
-        "@envoy//bazel:apple": [],
-        "//conditions:default": ["@envoy//source/extensions/network/dns_resolver/cares:config"],
-    }),
+    ) + envoy_select_envoy_mobile_xds(
+        [
+            "@envoy//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+            "@envoy//source/extensions/config_subscription/grpc:grpc_mux_lib",
+            "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+        ],
+        "@envoy",
+    ),
 )
 
 envoy_cc_library(

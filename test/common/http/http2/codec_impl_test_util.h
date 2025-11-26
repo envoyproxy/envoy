@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/codec.h"
+#include "envoy/server/overload/load_shed_point.h"
 
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/http/utility.h"
@@ -63,11 +64,20 @@ class TestCodecOverloadManagerProvider {
 public:
   TestCodecOverloadManagerProvider() {
     ON_CALL(overload_manager_, getLoadShedPoint(testing::_))
-        .WillByDefault(testing::Return(&server_go_away_on_dispatch));
+        .WillByDefault(testing::Invoke([this](absl::string_view name) -> Server::LoadShedPoint* {
+          if (name == Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch) {
+            return &server_go_away_on_dispatch;
+          }
+          if (name == Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch) {
+            return &server_go_away_and_close_on_dispatch;
+          }
+          return nullptr;
+        }));
   }
 
   testing::NiceMock<Server::MockOverloadManager> overload_manager_;
   testing::NiceMock<Server::MockLoadShedPoint> server_go_away_on_dispatch;
+  testing::NiceMock<Server::MockLoadShedPoint> server_go_away_and_close_on_dispatch;
 };
 
 class TestServerConnectionImpl : public TestCodecStatsProvider,

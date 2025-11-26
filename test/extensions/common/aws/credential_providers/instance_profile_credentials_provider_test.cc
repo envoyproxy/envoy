@@ -1,18 +1,14 @@
-#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
-
 #include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 
 #include "test/extensions/common/aws/mocks.h"
-#include "test/mocks/server/factory_context.h"
-#include "test/test_common/environment.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/test_runtime.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Eq;
-using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 namespace Envoy {
@@ -64,19 +60,17 @@ public:
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     mock_manager_ = std::make_shared<MockAwsClusterManager>();
-    base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
-
-    manager_optref_.emplace(base_manager_);
     EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
         .WillRepeatedly(Return("169.254.170.2:80/path/to/doc"));
 
     provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
-        *api_, context_, manager_optref_,
+        context_, mock_manager_,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
         refresh_state, initialization_timer, "credentials_provider_cluster");
+    EXPECT_EQ(provider_->providerName(), "InstanceProfileCredentialsProvider");
   }
 
   void expectSessionToken(const uint64_t status_code, const std::string&& token) {
@@ -240,9 +234,7 @@ public:
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
-  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;
 };
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1) {
@@ -254,10 +246,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -281,10 +271,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv2) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -306,10 +294,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingIMDSv1) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -330,10 +316,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingIMDSv2) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -355,10 +339,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingIMDSv1)
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -380,10 +362,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingIMDSv2)
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -407,10 +387,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentIMDSv1) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -434,10 +412,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentIMDSv2) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -460,10 +436,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentIMDSv1) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -486,10 +460,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentIMDSv2) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -514,10 +486,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentIMDSv1) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -542,10 +512,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentIMDSv2) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -574,10 +542,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesIMDSv1) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -606,10 +572,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesIMDSv2) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -638,10 +602,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationIMDS
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -670,10 +632,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationIMDS
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -706,7 +666,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1Duri
                 std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
 
   // Kick off a refresh
@@ -731,7 +691,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv2Duri
                 std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
 
   // Kick off a refresh
@@ -757,7 +717,7 @@ TEST_F(InstanceProfileCredentialsProviderTest,
                 std::chrono::seconds(16));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(16)), nullptr));
 
   // Kick off a refresh
@@ -765,13 +725,13 @@ TEST_F(InstanceProfileCredentialsProviderTest,
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(32)), nullptr));
 
   // Kick off a refresh
   timer_->invokeCallback();
 
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(AtLeast(1));
   // We max out at 32 seconds
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(32)), nullptr));
 
@@ -782,6 +742,57 @@ TEST_F(InstanceProfileCredentialsProviderTest,
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(InstanceProfileCredentialsProviderTest, TestCancel) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+
+  expectDocument(200, std::move(R"EOF(
+not json
+)EOF"));
+
+  setupProvider();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  auto mock_fetcher = std::make_unique<MockMetadataFetcher>();
+
+  EXPECT_CALL(*mock_fetcher, cancel).Times(2);
+  EXPECT_CALL(*mock_fetcher, fetch(_, _, _));
+  // Ensure we have a metadata fetcher configured, so we expect this to receive a cancel
+  provider_friend.setMetadataFetcher(std::move(mock_fetcher));
+
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+  delete (raw_metadata_fetcher_);
+}
+
+// Tests ASAN failure when cancel wrapper is not used
+TEST_F(InstanceProfileCredentialsProviderTest, CancelWrapperPreventsUseAfterFree) {
+  std::function<void()> captured_callback;
+
+  EXPECT_CALL(context_.thread_local_, runOnAllThreads(testing::_, testing::_))
+      .WillOnce(testing::Invoke([&captured_callback](const std::function<void()>&,
+                                                     const std::function<void()>& complete_cb) {
+        captured_callback = complete_cb;
+      }));
+
+  setupProvider();
+
+  {
+    auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+    provider_friend.setCredentialsToAllThreads(std::make_unique<Credentials>());
+
+    ASSERT_TRUE(captured_callback != nullptr);
+
+    provider_friend.provider_.reset();
+    provider_.reset();
+  }
+
+  captured_callback();
+  delete raw_metadata_fetcher_;
 }
 
 } // namespace Aws

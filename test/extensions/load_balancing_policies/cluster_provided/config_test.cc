@@ -10,7 +10,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace ClusterProvided {
 namespace {
 
@@ -36,6 +36,6 @@ TEST(ClusterProvidedConfigTest, ClusterProvidedConfigTest) {
 
 } // namespace
 } // namespace ClusterProvided
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

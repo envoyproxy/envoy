@@ -21,6 +21,7 @@ namespace Extensions {
 namespace Upstreams {
 namespace Http {
 
+using ::testing::ContainsRegex;
 using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
 using ::testing::StrictMock;
@@ -98,11 +99,11 @@ TEST_F(ConfigTest, KvStoreConcurrencyFail) {
       ->mutable_alternate_protocols_cache_options()
       ->mutable_key_value_store_config();
   server_context_.options_.concurrency_ = 2;
-  EXPECT_EQ(
-      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-          .status()
-          .message(),
-      "options has key value store but Envoy has concurrency = 2 : key_value_store_config {\n}\n");
+  EXPECT_THAT(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                  .status()
+                  .message(),
+              ContainsRegex("(?s)options has key value store but Envoy has concurrency = 2 "
+                            ":.*key_value_store_config {\n}\n"));
 }
 
 namespace {
@@ -147,7 +148,7 @@ public:
   createFromProto(const Protobuf::Message& message,
                   Server::Configuration::ServerFactoryContext& server_context) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const ProtobufWkt::Any&>(message), server_context.messageValidationVisitor(),
+        dynamic_cast<const Protobuf::Any&>(message), server_context.messageValidationVisitor(),
         *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::

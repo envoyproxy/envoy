@@ -104,16 +104,16 @@ public:
     (*fields)["ext_authz_duration"] = ValueUtil::numberValue(10);
 
     EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
-        .WillOnce(Invoke([&response](const std::string& ns,
-                                     const ProtobufWkt::Struct& returned_dynamic_metadata) {
-          EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
-          EXPECT_TRUE(
-              returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
-          EXPECT_TRUE(
-              TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
-          EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
-                    returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
-        }));
+        .WillOnce(Invoke(
+            [&response](const std::string& ns, const Protobuf::Struct& returned_dynamic_metadata) {
+              EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
+              EXPECT_TRUE(
+                  returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
+              EXPECT_TRUE(
+                  TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
+              EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
+                        returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
+            }));
 
     EXPECT_CALL(filter_callbacks_, continueReading());
     request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
@@ -385,7 +385,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
       addr_);
   filter_callbacks_.connection_.dispatcher_.globalTimeSystem().advanceTimeWait(
       std::chrono::milliseconds(5));
-  ProtobufWkt::Struct dynamic_metadata;
+  Protobuf::Struct dynamic_metadata;
   (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-ok");
   (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(12);
   // Since this is a stack response, duration should be 0;
@@ -404,7 +404,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
 
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
-                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+                                           const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_TRUE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
         EXPECT_TRUE(dynamic_metadata.fields().contains("ext_authz_duration"));
         EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
@@ -440,7 +440,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
       addr_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
-  ProtobufWkt::Struct dynamic_metadata;
+  Protobuf::Struct dynamic_metadata;
   (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-nok");
   (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(15);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
@@ -454,7 +454,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
           })));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
-                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+                                           const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
         EXPECT_FALSE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
         EXPECT_FALSE(dynamic_metadata.fields().contains("ext_authz_duration"));

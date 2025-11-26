@@ -18,7 +18,7 @@ struct XRayConfiguration {
   const std::string segment_name_;
   const std::string sampling_rules_;
   const std::string origin_;
-  const absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
+  const absl::flat_hash_map<std::string, Protobuf::Value> aws_metadata_;
 };
 
 enum class SamplingDecision {

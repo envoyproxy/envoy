@@ -56,15 +56,15 @@ By *default* response compression is enabled, but it will be *skipped* when:
 
 - A request does **not** contain ``accept-encoding`` header.
 - A request contains an ``accept-encoding`` header, but it does not contain ``gzip`` or ``\*``.
-- A request contains an ``accept-encoding`` header with ``gzip`` or ``\*```` with the weight ``q=0``. Note
+- A request contains an ``accept-encoding`` header with ``gzip`` or ``\*`` with the weight ``q=0``. Note
   that the ``gzip`` will have a higher weight than ``\*``. For example, if ``accept-encoding``
   is ``gzip;q=0,\*;q=1``, the filter will not compress. But if the header is set to
   ``\*;q=0,gzip;q=1``, the filter will compress.
 - A request whose ``accept-encoding`` header includes any encoding type with a higher
   weight than ``gzip``'s given the corresponding compression filter is present in the chain.
 - A response contains a ``content-encoding`` header.
-- A response contains a ``cache-control```` header whose value includes ``no-transform``.
-- A response contains a ``transfer-encoding```` header whose value includes a known
+- A response contains a ``cache-control`` header whose value includes ``no-transform``.
+- A response contains a ``transfer-encoding`` header whose value includes a known
   compression name.
 - A response does **not** contain a ``content-type`` value that matches one of the selected
   mime-types, which default to:
@@ -107,6 +107,35 @@ When request compression is *applied*:
 - ``content-encoding`` with the compression scheme used (e.g., ``gzip``) is added to
   request headers.
 
+Compression Status Header
+-------------------------
+
+To aid upstream caches and clients in understanding why a response was or was not compressed, the Compressor filter can add a response header ``x-envoy-compression-status``. This header provides visibility into the filter's decision-making process, which is particularly useful for cache invalidation strategies when compression settings or request/response characteristics change.
+
+To enable this feature, the ``status_header_enabled`` configuration option within ``ResponseDirectionConfig`` must be set to ``true``.
+
+The header value follows the format: ``<encoder-type>;<status>[;<additional-params>]``. Where:
+
+- ``<encoder-type>``: The name of the compressor library configured (e.g., ``gzip``, ``br``).
+- ``<status>``: The result of the compression check.
+- ``<additional-params>``: Optional key-value pairs providing more context.
+
+If multiple Compressor filters are present in the chain, each filter will append its status to the header, separated by commas. For example: ``gzip;ContentTypeNotAllowed,br;Compressed;OriginalLength=1024``
+
+Possible status values:
+
+- ``Compressed``: The response was compressed by this filter.
+   - Additional Parameter: ``OriginalLength=<value>``, where ``<value>`` is the original value of the ``Content-Length`` header before compression.
+- ``ContentLengthTooSmall``: Compression was skipped because the content length is below the configured minimum threshold.
+- ``ContentTypeNotAllowed``: Compression was skipped because the response ``Content-Type`` is not in the allowed list.
+- ``EtagNotAllowed``: Compression was skipped because the response contains an ``ETag`` header and the ``disable_on_etag_header`` option is enabled.
+- ``StatusCodeNotAllowed``: Compression was skipped because the response status code is in the list of uncompressible status codes.
+
+Behavior Notes:
+
+- When the ``status_header_enabled`` configuration option is enabled, the order of internal checks within the filter is adjusted to ensure the most accurate reason for skipping compression is reported.
+- The conditions are evaluated in a specific order. The first condition that causes compression to be skipped is the one reported in the ``x-envoy-compression-status`` header. Subsequent checks are not performed for that filter instance. For example, if a response has both a disallowed content type and a content length below the threshold, only the reason that is checked first will be reported.
+
 Per-Route Configuration
 -----------------------
 
@@ -119,6 +148,27 @@ For example, to disable response compression for a particular virtual host, but 
     :lineno-start: 14
     :lines: 14-36
     :caption: :download:`compressor-filter.yaml <_include/compressor-filter.yaml>`
+
+Additionally, the compressor library can be overridden on a per-route basis. This allows
+different routes to use different compression algorithms (e.g., gzip, brotli, zstd) while
+maintaining the same filter configuration. For example, to use brotli compression for a
+specific route while using gzip as the default:
+
+.. code-block:: yaml
+
+  routes:
+  - match:
+      prefix: "/api"
+    route:
+      cluster: service
+    typed_per_filter_config:
+      envoy.filters.http.compressor:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
+        overrides:
+          compressor_library:
+            name: brotli
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli
 
 Using different compressors for requests and responses
 --------------------------------------------------------

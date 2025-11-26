@@ -59,8 +59,6 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           http_protocol_options: {}
-          upgrade_configs:
-          - upgrade_type: CONNECT
   clusters:
   - name: service_google
     connect_timeout: 0.25s

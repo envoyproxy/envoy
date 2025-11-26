@@ -25,7 +25,7 @@ TEST(UInt32AccessorImplTest, TestProto) {
   auto message = accessor.serializeAsProto();
   EXPECT_NE(nullptr, message);
 
-  auto* uint32_struct = dynamic_cast<ProtobufWkt::UInt32Value*>(message.get());
+  auto* uint32_struct = dynamic_cast<Protobuf::UInt32Value*>(message.get());
   EXPECT_NE(nullptr, uint32_struct);
   EXPECT_EQ(init_value, uint32_struct->value());
 }

@@ -6,6 +6,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -47,7 +48,8 @@ envoy_cc_test_library(
         "//source/common/init:manager_lib",
         "//source/common/listener_manager:listener_manager_lib",
         "//source/common/tls:server_context_lib",
-        "//source/extensions/common/matcher:trie_matcher_lib",
+        "//source/extensions/api_listeners/default_api_listener:api_listener_lib",
+        "//source/extensions/common/matcher:ip_range_matcher_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/network:network_mocks",
@@ -109,13 +111,13 @@ envoy_cc_test(
 # Stand-alone quic test because of FIPS.
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
-    srcs = ["listener_manager_impl_quic_only_test.cc"],
+    srcs = envoy_select_enable_http3(["listener_manager_impl_quic_only_test.cc"]),
     rbe_pool = "6gig",
-    tags = ["nofips"],
-    deps = [
+    deps = envoy_select_enable_http3([
         ":listener_manager_impl_test_lib",
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//source/extensions/request_id/uuid:config",
@@ -127,7 +129,7 @@ envoy_cc_test(
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-    ],
+    ]),
 )
 
 envoy_cc_test(
@@ -175,6 +177,7 @@ envoy_cc_test(
         "//source/common/listener_manager:lds_api_lib",
         "//source/common/protobuf:utility_lib",
         "//test/mocks/config:config_mocks",
+        "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:listener_manager_mocks",

@@ -62,7 +62,7 @@ struct HostSelectionResponse {
   HostSelectionResponse(HostConstSharedPtr host, std::string details)
       : host(host), details(details) {}
   HostConstSharedPtr host;
-  // Optional details if host selection fails.
+  // Optional details if host selection fails (empty string implies no details).
   std::string details;
   std::unique_ptr<AsyncHostSelectionHandle> cancelable;
 };
@@ -166,6 +166,15 @@ public:
    * @param details gives optional details about the resolution success/failure.
    */
   virtual void onAsyncHostSelection(HostConstSharedPtr&& host, std::string&& details) PURE;
+
+  /**
+   * Called by the load balancer to set the headers modifier that will be used to modify the
+   * response headers before sending them downstream.
+   * NOTE: this should be called only once per request, no matter how many times the retrying
+   * happens.
+   * @param modifier supplies the function that will modify the response headers.
+   */
+  virtual void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)> modifier) PURE;
 };
 
 /**
@@ -324,6 +333,14 @@ using ThreadAwareLoadBalancerPtr = std::unique_ptr<ThreadAwareLoadBalancer>;
 class LoadBalancerConfig {
 public:
   virtual ~LoadBalancerConfig() = default;
+
+  /**
+   * Optional method to allow a load balancer to validate endpoints before they're applied. If an
+   * error is returned from this method, the endpoints are rejected. If this method does not return
+   * an error, the load balancer must be able to use these endpoints in an update from the priority
+   * set.
+   */
+  virtual absl::Status validateEndpoints(const PriorityState&) const { return absl::OkStatus(); }
 };
 using LoadBalancerConfigPtr = std::unique_ptr<LoadBalancerConfig>;
 

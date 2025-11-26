@@ -62,9 +62,14 @@ if [[ -f "/etc/redhat-release" ]]; then
 fi
 
 function cleanup() {
-  # Remove build artifacts. This doesn't mess with incremental builds as these
-  # are just symlinks.
-  rm -rf "${ENVOY_SRCDIR}"/bazel-* clang.bazelrc
+    if [[ "${ENVOY_BUILD_SKIP_CLEANUP}" == "true" ]]; then
+        echo "Skipping cleanup as requested."
+        return
+    fi
+
+    # Remove build artifacts. This doesn't mess with incremental builds as these
+    # are just symlinks.
+    rm -rf "${ENVOY_SRCDIR}"/bazel-* clang.bazelrc
 }
 
 cleanup
@@ -124,6 +129,11 @@ if [[ -z "${ENVOY_RBE}" ]]; then
         echo "LLVM_ROOT not found, not setting up llvm."
     fi
 fi
+
+# TODO: remove
+BAZEL_BUILD_OPTIONS+=(
+    "--define=LLVM_DIRECTORY=${LLVM_ROOT}"
+    "--action_env=LLVM_DIRECTORY=${LLVM_ROOT}")
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean "${BAZEL_BUILD_OPTIONS[@]}" --expunge
 

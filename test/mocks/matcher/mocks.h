@@ -24,6 +24,7 @@ namespace Matchers {
 class MockStringMatcher : public StringMatcher {
 public:
   MOCK_METHOD(bool, match, (absl::string_view), (const, override));
+  MOCK_METHOD(bool, match, (absl::string_view, const Context&), (const, override));
 };
 } // namespace Matchers
 } // namespace Envoy

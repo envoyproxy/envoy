@@ -48,7 +48,7 @@ private:
   QuicPacketPtr serialize(quic::QuicFrame frame);
   QuicPacketPtr serializeStreamFrame(const test::common::quic::QuicStreamFrame& frame);
   QuicPacketPtr serializeNewTokenFrame(const test::common::quic::QuicNewTokenFrame& frame);
-  QuicPacketPtr serializeMessageFrame(const test::common::quic::QuicMessageFrame& frame);
+  QuicPacketPtr serializeDatagramFrame(const test::common::quic::QuicDatagramFrame& frame);
   QuicPacketPtr serializeCryptoFrame(const test::common::quic::QuicCryptoFrame& frame);
   QuicPacketPtr serializeAckFrame(const test::common::quic::QuicAckFrame& frame);
   QuicPacketPtr

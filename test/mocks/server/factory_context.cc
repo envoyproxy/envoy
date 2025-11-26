@@ -20,8 +20,6 @@ MockFactoryContext::MockFactoryContext() {
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
-  ON_CALL(*this, getTransportSocketFactoryContext())
-      .WillByDefault(ReturnRef(transport_socket_factory_context_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*listener_store_.rootScope()));
 }

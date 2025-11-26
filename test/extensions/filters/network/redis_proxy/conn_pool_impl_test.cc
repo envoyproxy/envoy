@@ -98,7 +98,8 @@ public:
         cluster_name_, cm_, *this, tls_,
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns,
                                                       read_policy_, redis_cx_rate_limit_per_sec),
-        api_, store_.rootScope(), redis_command_stats, cluster_refresh_manager_, dns_cache);
+        api_, store_.rootScope(), redis_command_stats, cluster_refresh_manager_, dns_cache,
+        absl::nullopt, absl::nullopt);
     conn_pool_impl->init();
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_username_ = auth_username_;
@@ -234,11 +235,13 @@ public:
   }
 
   // Common::Redis::Client::ClientFactory
-  Common::Redis::Client::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
-                                          const Common::Redis::Client::ConfigSharedPtr&,
-                                          const Common::Redis::RedisCommandStatsSharedPtr&,
-                                          Stats::Scope&, const std::string& username,
-                                          const std::string& password, bool) override {
+  Common::Redis::Client::ClientPtr create(
+      Upstream::HostConstSharedPtr host, Event::Dispatcher&,
+      const Common::Redis::Client::ConfigSharedPtr&,
+      const Common::Redis::RedisCommandStatsSharedPtr&, Stats::Scope&, const std::string& username,
+      const std::string& password, bool,
+      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
+      absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>) override {
     EXPECT_EQ(auth_username_, username);
     EXPECT_EQ(auth_password_, password);
     return Common::Redis::Client::ClientPtr{create_(host)};
@@ -1722,7 +1725,8 @@ TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
   conn_pool_ = std::make_shared<InstanceImpl>(
       cluster_name_, cm_, *this, tls_,
       Common::Redis::Client::createConnPoolSettings(20, true, true, 100, read_policy_), api_,
-      store_.rootScope(), redis_command_stats, cluster_refresh_manager_, nullptr);
+      store_.rootScope(), redis_command_stats, cluster_refresh_manager_, nullptr, absl::nullopt,
+      absl::nullopt);
   conn_pool_->init();
 
   auto& local_pool = threadLocalPool();

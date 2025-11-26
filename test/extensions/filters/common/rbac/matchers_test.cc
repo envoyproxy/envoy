@@ -14,6 +14,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -227,28 +228,136 @@ TEST(IPMatcher, IPMatcher) {
   downstream_remote_cidr.set_address_prefix("8.9.10.11");
   downstream_remote_cidr.mutable_prefix_len()->set_value(32);
 
-  checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), true, conn,
-               headers, info);
-  checkMatcher(IPMatcher(downstream_local_cidr, IPMatcher::Type::DownstreamLocal), true, conn,
-               headers, info);
-  checkMatcher(IPMatcher(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote),
-               true, conn, headers, info);
-  checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), true, conn,
-               headers, info);
+  auto connection_remote_matcher =
+      IPMatcher::create(connection_remote_cidr, IPMatcher::Type::ConnectionRemote);
+  ASSERT_OK(connection_remote_matcher);
+  checkMatcher(*connection_remote_matcher.value(), true, conn, headers, info);
+
+  auto downstream_local_matcher =
+      IPMatcher::create(downstream_local_cidr, IPMatcher::Type::DownstreamLocal);
+  ASSERT_OK(downstream_local_matcher);
+  checkMatcher(*downstream_local_matcher.value(), true, conn, headers, info);
+
+  auto downstream_direct_remote_matcher =
+      IPMatcher::create(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote);
+  ASSERT_OK(downstream_direct_remote_matcher);
+  checkMatcher(*downstream_direct_remote_matcher.value(), true, conn, headers, info);
+
+  auto downstream_remote_matcher =
+      IPMatcher::create(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote);
+  ASSERT_OK(downstream_remote_matcher);
+  checkMatcher(*downstream_remote_matcher.value(), true, conn, headers, info);
 
   connection_remote_cidr.set_address_prefix("4.5.6.7");
   downstream_local_cidr.set_address_prefix("1.2.4.8");
   downstream_direct_remote_cidr.set_address_prefix("4.5.6.0");
   downstream_remote_cidr.set_address_prefix("4.5.6.7");
 
-  checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), false, conn,
-               headers, info);
-  checkMatcher(IPMatcher(downstream_local_cidr, IPMatcher::Type::DownstreamLocal), false, conn,
-               headers, info);
-  checkMatcher(IPMatcher(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote),
-               false, conn, headers, info);
-  checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), false, conn,
-               headers, info);
+  auto connection_remote_matcher2 =
+      IPMatcher::create(connection_remote_cidr, IPMatcher::Type::ConnectionRemote);
+  ASSERT_OK(connection_remote_matcher2);
+  checkMatcher(*connection_remote_matcher2.value(), false, conn, headers, info);
+
+  auto downstream_local_matcher2 =
+      IPMatcher::create(downstream_local_cidr, IPMatcher::Type::DownstreamLocal);
+  ASSERT_OK(downstream_local_matcher2);
+  checkMatcher(*downstream_local_matcher2.value(), false, conn, headers, info);
+
+  auto downstream_direct_remote_matcher2 =
+      IPMatcher::create(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote);
+  ASSERT_OK(downstream_direct_remote_matcher2);
+  checkMatcher(*downstream_direct_remote_matcher2.value(), false, conn, headers, info);
+
+  auto downstream_remote_matcher2 =
+      IPMatcher::create(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote);
+  ASSERT_OK(downstream_remote_matcher2);
+  checkMatcher(*downstream_remote_matcher2.value(), false, conn, headers, info);
+}
+
+// Ensure non-IP addresses (e.g., pipe) do not crash IPMatcher and simply return false.
+TEST(IPMatcher, NonIpAddressesReturnFalseAndDoNotCrash) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  // Principal: source_ip (ConnectionRemote)
+  {
+    envoy::config::rbac::v3::Principal principal;
+    auto* cidr = principal.mutable_source_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher = Matcher::create(principal, factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
+
+  // Permission: destination_ip (DownstreamLocal)
+  {
+    envoy::config::rbac::v3::Permission permission;
+    auto* cidr = permission.mutable_destination_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher =
+        Matcher::create(permission, ProtobufMessage::getStrictValidationVisitor(), factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    info.downstream_connection_info_provider_->setLocalAddress(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
+
+  // Principal: direct_remote_ip (DownstreamDirectRemote)
+  {
+    envoy::config::rbac::v3::Principal principal;
+    auto* cidr = principal.mutable_direct_remote_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher = Matcher::create(principal, factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
+
+  // Principal: remote_ip (DownstreamRemote)
+  {
+    envoy::config::rbac::v3::Principal principal;
+    auto* cidr = principal.mutable_remote_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher = Matcher::create(principal, factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    info.downstream_connection_info_provider_->setRemoteAddress(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
 }
 
 TEST(PortMatcher, PortMatcher) {
@@ -528,9 +637,9 @@ TEST(MetadataMatcher, MetadataMatcher) {
   auto label = MessageUtil::keyValueStruct("label", "prod");
   envoy::config::core::v3::Metadata metadata;
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("other", label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("other", label));
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("rbac", label));
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   envoy::type::matcher::v3::MetadataMatcher matcher;
@@ -554,10 +663,9 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_permissions()->set_destination_port(456);
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("foo");
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
-  Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
 
-  RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor(),
-                              factory_context);
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, nullptr);
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
@@ -745,14 +853,14 @@ TEST(MetadataMatcher, SourcedMetadataMatcher) {
   auto dynamic_label = MessageUtil::keyValueStruct("dynamic_key", "dynamic_value");
   envoy::config::core::v3::Metadata dynamic_metadata;
   dynamic_metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", dynamic_label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("rbac", dynamic_label));
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(dynamic_metadata));
 
   // Set up route metadata
   auto route_label = MessageUtil::keyValueStruct("route_key", "route_value");
   envoy::config::core::v3::Metadata route_metadata;
   route_metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", route_label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("rbac", route_label));
   EXPECT_CALL(*route, metadata()).WillRepeatedly(ReturnRef(route_metadata));
   EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
 
@@ -938,15 +1046,15 @@ TEST(MetadataMatcher, NestedMetadata) {
   NiceMock<StreamInfo::MockStreamInfo> info;
 
   // Create nested metadata structure
-  ProtobufWkt::Struct nested_struct;
+  Protobuf::Struct nested_struct;
   (*nested_struct.mutable_fields())["nested_key"] = ValueUtil::stringValue("nested_value");
 
-  ProtobufWkt::Struct top_struct;
+  Protobuf::Struct top_struct;
   (*top_struct.mutable_fields())["top_key"] = ValueUtil::structValue(nested_struct);
 
   envoy::config::core::v3::Metadata metadata;
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", top_struct));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("rbac", top_struct));
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   // Test matching nested value
@@ -1086,6 +1194,654 @@ TEST(PrincipalMatcher, OrIds) {
   addr = Envoy::Network::Utility::parseInternetAddressNoThrow("5.6.7.8", 123, false);
   info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
   checkMatcher(OrMatcher(principals, factory_context), false, conn, headers, info);
+}
+
+// Tests to cover missing lines in coverage report
+TEST(IPMatcher, PrincipalSourceIpMatching) {
+  // Tests lines 77-79: kSourceIp case in Principal creation
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_source_ip();
+  cidr->set_address_prefix("192.168.1.0");
+  cidr->mutable_prefix_len()->set_value(24);
+
+  auto matcher = Matcher::create(principal, factory_context);
+  ASSERT_NE(matcher, nullptr);
+
+  NiceMock<Envoy::Network::MockConnection> conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Set connection remote address that matches the CIDR
+  auto addr = Envoy::Network::Utility::parseInternetAddressNoThrow("192.168.1.100", 123, false);
+  conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+
+  EXPECT_TRUE(matcher->matches(conn, headers, info));
+
+  // Set address that doesn't match
+  addr = Envoy::Network::Utility::parseInternetAddressNoThrow("10.0.0.1", 123, false);
+  conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+
+  EXPECT_FALSE(matcher->matches(conn, headers, info));
+}
+
+TEST(IPMatcher, PrincipalRemoteIpMatching) {
+  // Tests lines 83-85: kRemoteIp case in Principal creation
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_remote_ip();
+  cidr->set_address_prefix("10.0.0.0");
+  cidr->mutable_prefix_len()->set_value(16);
+
+  auto matcher = Matcher::create(principal, factory_context);
+  ASSERT_NE(matcher, nullptr);
+
+  NiceMock<Envoy::Network::MockConnection> conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Set downstream remote address that matches the CIDR
+  auto addr = Envoy::Network::Utility::parseInternetAddressNoThrow("10.0.5.100", 456, false);
+  info.downstream_connection_info_provider_->setRemoteAddress(addr);
+
+  EXPECT_TRUE(matcher->matches(conn, headers, info));
+
+  // Set address that doesn't match
+  addr = Envoy::Network::Utility::parseInternetAddressNoThrow("172.16.1.1", 456, false);
+  info.downstream_connection_info_provider_->setRemoteAddress(addr);
+
+  EXPECT_FALSE(matcher->matches(conn, headers, info));
+}
+
+TEST(IPMatcher, CreateWithInvalidCidrRange) {
+  // Tests lines 206-208: Invalid CIDR range error handling in IPMatcher::create
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange> ranges;
+
+  // Add valid range first
+  auto* valid_range = ranges.Add();
+  valid_range->set_address_prefix("192.168.1.0");
+  valid_range->mutable_prefix_len()->set_value(24);
+
+  // Add invalid range (invalid IP address)
+  auto* invalid_range = ranges.Add();
+  invalid_range->set_address_prefix("invalid.ip.address");
+  invalid_range->mutable_prefix_len()->set_value(24);
+
+  auto result = IPMatcher::create(ranges, IPMatcher::Type::ConnectionRemote);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to create CIDR range"));
+}
+
+TEST(IPMatcher, CreateWithEmptyRangeList) {
+  // Tests empty range validation
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange> empty_ranges;
+
+  auto result = IPMatcher::create(empty_ranges, IPMatcher::Type::ConnectionRemote);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("Empty IP range list provided"));
+}
+
+TEST(IPMatcher, MatchesWithNullIpAddress) {
+  // Tests line 227: null IP address check in matches method
+  envoy::config::core::v3::CidrRange range;
+  range.set_address_prefix("192.168.1.0");
+  range.mutable_prefix_len()->set_value(24);
+
+  auto matcher_result = IPMatcher::create(range, IPMatcher::Type::ConnectionRemote);
+  ASSERT_OK(matcher_result);
+  const auto& matcher = *matcher_result.value();
+
+  NiceMock<Envoy::Network::MockConnection> conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Set null remote address
+  conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
+
+  EXPECT_FALSE(matcher.matches(conn, headers, info));
+}
+
+TEST(IPMatcher, MatchesWithConnectionRemoteAddress) {
+  // Tests that IPMatcher correctly extracts and matches connection remote addresses.
+  envoy::config::core::v3::CidrRange range;
+  range.set_address_prefix("192.168.1.0");
+  range.mutable_prefix_len()->set_value(24);
+
+  // Create matcher with a specific type
+  auto matcher_result = IPMatcher::create(range, IPMatcher::Type::ConnectionRemote);
+  ASSERT_OK(matcher_result);
+  const auto& matcher = *matcher_result.value();
+
+  NiceMock<Envoy::Network::MockConnection> conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Set all address types to non-null to ensure we test the extraction logic
+  auto addr = Envoy::Network::Utility::parseInternetAddressNoThrow("192.168.1.100", 123, false);
+  conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+  info.downstream_connection_info_provider_->setLocalAddress(addr);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
+  info.downstream_connection_info_provider_->setRemoteAddress(addr);
+
+  // This should match and extract the connection remote address correctly
+  EXPECT_TRUE(matcher.matches(conn, headers, info));
+}
+
+TEST(IPMatcher, MultipleRangesCreateSuccess) {
+  // Tests successful creation with multiple ranges
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange> ranges;
+
+  // Add multiple valid ranges
+  auto* range1 = ranges.Add();
+  range1->set_address_prefix("192.168.1.0");
+  range1->mutable_prefix_len()->set_value(24);
+
+  auto* range2 = ranges.Add();
+  range2->set_address_prefix("10.0.0.0");
+  range2->mutable_prefix_len()->set_value(16);
+
+  auto* range3 = ranges.Add();
+  range3->set_address_prefix("2001:db8::");
+  range3->mutable_prefix_len()->set_value(32);
+
+  auto result = IPMatcher::create(ranges, IPMatcher::Type::ConnectionRemote);
+  EXPECT_TRUE(result.ok());
+  EXPECT_NE(result.value(), nullptr);
+
+  // Test that the created matcher works
+  NiceMock<Envoy::Network::MockConnection> conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Test IPv4 match
+  auto addr = Envoy::Network::Utility::parseInternetAddressNoThrow("192.168.1.100", 123, false);
+  conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+  EXPECT_TRUE(result.value()->matches(conn, headers, info));
+
+  // Test IPv4 no match
+  addr = Envoy::Network::Utility::parseInternetAddressNoThrow("172.16.1.1", 123, false);
+  conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+  EXPECT_FALSE(result.value()->matches(conn, headers, info));
+}
+
+// Tests for kDestinationIp case in Permission matcher creation.
+TEST(Matcher, CreatePermissionDestinationIp) {
+  envoy::config::rbac::v3::Permission permission;
+  auto* cidr = permission.mutable_destination_ip();
+  cidr->set_address_prefix("192.168.1.0");
+  cidr->mutable_prefix_len()->set_value(24);
+
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto matcher = Matcher::create(permission, validation_visitor, context);
+  EXPECT_NE(matcher, nullptr);
+}
+
+// Tests error handling in kDestinationIp case with invalid CIDR.
+TEST(Matcher, CreatePermissionDestinationIpInvalidCidr) {
+  envoy::config::rbac::v3::Permission permission;
+  auto* cidr = permission.mutable_destination_ip();
+  cidr->set_address_prefix("invalid.ip.address");
+  cidr->mutable_prefix_len()->set_value(24);
+
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_THROW_WITH_REGEX(Matcher::create(permission, validation_visitor, context), EnvoyException,
+                          "Failed to create CIDR range:.*malformed IP address");
+}
+
+// Tests for RULE_NOT_SET case that falls through to PANIC.
+TEST(Matcher, CreatePermissionRuleNotSet) {
+  EXPECT_DEATH(
+      {
+        envoy::config::rbac::v3::Permission permission;
+
+        NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+        NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+        Matcher::create(permission, validation_visitor, context);
+      },
+      "panic: corrupted enum");
+}
+
+// Tests for kSourceIp case in Principal matcher creation.
+TEST(Matcher, CreatePrincipalSourceIp) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_source_ip();
+  cidr->set_address_prefix("10.0.0.0");
+  cidr->mutable_prefix_len()->set_value(16);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto matcher = Matcher::create(principal, context);
+  EXPECT_NE(matcher, nullptr);
+}
+
+// Tests error handling in kSourceIp case with invalid CIDR.
+TEST(Matcher, CreatePrincipalSourceIpInvalidCidr) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_source_ip();
+  cidr->set_address_prefix("999.999.999.999");
+  cidr->mutable_prefix_len()->set_value(24);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_THROW_WITH_REGEX(Matcher::create(principal, context), EnvoyException,
+                          "Failed to create CIDR range:.*malformed IP address");
+}
+
+// Tests for kDirectRemoteIp case in Principal matcher creation.
+TEST(Matcher, CreatePrincipalDirectRemoteIp) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_direct_remote_ip();
+  cidr->set_address_prefix("172.16.0.0");
+  cidr->mutable_prefix_len()->set_value(12);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto matcher = Matcher::create(principal, context);
+  EXPECT_NE(matcher, nullptr);
+}
+
+// Tests error handling in kDirectRemoteIp case with invalid CIDR.
+TEST(Matcher, CreatePrincipalDirectRemoteIpInvalidCidr) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_direct_remote_ip();
+  cidr->set_address_prefix(""); // Empty IP address
+  cidr->mutable_prefix_len()->set_value(24);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_THROW_WITH_REGEX(Matcher::create(principal, context), EnvoyException,
+                          "Failed to create CIDR range:.*malformed IP address");
+}
+
+// Tests for kRemoteIp case in Principal matcher creation.
+TEST(Matcher, CreatePrincipalRemoteIp) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_remote_ip();
+  cidr->set_address_prefix("2001:db8::");
+  cidr->mutable_prefix_len()->set_value(32);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto matcher = Matcher::create(principal, context);
+  EXPECT_NE(matcher, nullptr);
+}
+
+// Tests error handling in kRemoteIp case with invalid CIDR.
+TEST(Matcher, CreatePrincipalRemoteIpInvalidCidr) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_remote_ip();
+  cidr->set_address_prefix("2001:db8::gggg"); // Invalid IPv6
+  cidr->mutable_prefix_len()->set_value(32);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_THROW_WITH_REGEX(Matcher::create(principal, context), EnvoyException,
+                          "Failed to create CIDR range:.*malformed IP address");
+}
+
+// Tests for IDENTIFIER_NOT_SET case that falls through to PANIC.
+TEST(Matcher, CreatePrincipalIdentifierNotSet) {
+  EXPECT_DEATH(
+      {
+        envoy::config::rbac::v3::Principal principal;
+
+        NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+        Matcher::create(principal, context);
+      },
+      "panic: corrupted enum");
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithCelConfig) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  // Test with CEL config enabling string functions.
+  {
+    envoy::config::rbac::v3::Policy policy;
+    policy.add_permissions()->set_any(true);
+    policy.add_principals()->set_any(true);
+
+    // Set up a condition that uses string functions.
+    auto* condition = policy.mutable_condition();
+    auto* call_expr = condition->mutable_call_expr();
+    call_expr->set_function("_==_");
+
+    // Left side: request.headers[":method"].lowerAscii()
+    auto* left = call_expr->add_args();
+    auto* lower_call = left->mutable_call_expr();
+    lower_call->set_function("lowerAscii");
+    auto* header_access = lower_call->mutable_target();
+    auto* header_call = header_access->mutable_call_expr();
+    header_call->set_function("_[_]");
+    auto* headers_select = header_call->add_args();
+    auto* request_ident = headers_select->mutable_select_expr();
+    request_ident->mutable_operand()->mutable_ident_expr()->set_name("request");
+    request_ident->set_field("headers");
+    header_call->add_args()->mutable_const_expr()->set_string_value(":method");
+
+    // Right side: "get"
+    call_expr->add_args()->mutable_const_expr()->set_string_value("get");
+
+    // Enable string functions in CEL config.
+    auto* cel_config = policy.mutable_cel_config();
+    cel_config->set_enable_string_functions(true);
+
+    RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                                factory_context, nullptr);
+
+    Envoy::Network::MockConnection conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}};
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    // The matcher should match because "GET".lowerAscii() == "get".
+    EXPECT_TRUE(matcher.matches(conn, headers, info));
+
+    // Test with lowercase method.
+    Envoy::Http::TestRequestHeaderMapImpl headers2{{":method", "get"}};
+    EXPECT_TRUE(matcher.matches(conn, headers2, info));
+
+    // Test with non-matching method.
+    Envoy::Http::TestRequestHeaderMapImpl headers3{{":method", "POST"}};
+    EXPECT_FALSE(matcher.matches(conn, headers3, info));
+  }
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithCelConfigStringConversion) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+
+  // Set up a condition that uses string conversion: string(response.code) == "200"
+  auto* condition = policy.mutable_condition();
+  auto* call_expr = condition->mutable_call_expr();
+  call_expr->set_function("_==_");
+
+  // Left side: string(response.code)
+  auto* left = call_expr->add_args();
+  auto* string_call = left->mutable_call_expr();
+  string_call->set_function("string");
+  auto* code_select = string_call->add_args();
+  auto* response_select = code_select->mutable_select_expr();
+  response_select->mutable_operand()->mutable_ident_expr()->set_name("response");
+  response_select->set_field("code");
+
+  // Right side: "200"
+  call_expr->add_args()->mutable_const_expr()->set_string_value("200");
+
+  // Enable string conversion in CEL config.
+  auto* cel_config = policy.mutable_cel_config();
+  cel_config->set_enable_string_conversion(true);
+
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, nullptr);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Note: The condition checks response.code which is part of the response context,
+  // but in this test context it may not be available, so the condition may evaluate to false.
+  // This test primarily verifies that the PolicyMatcher can be created with cel_config.
+  EXPECT_FALSE(matcher.matches(conn, headers, info));
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithCelConfigStringConcat) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+
+  // Set up a condition that uses string concatenation: request.headers[":path"] + "/suffix" ==
+  // "/test/suffix"
+  auto* condition = policy.mutable_condition();
+  auto* call_expr = condition->mutable_call_expr();
+  call_expr->set_function("_==_");
+
+  // Left side: request.headers[":path"] + "/suffix"
+  auto* left = call_expr->add_args();
+  auto* concat_call = left->mutable_call_expr();
+  concat_call->set_function("_+_");
+
+  // First operand: request.headers[":path"]
+  auto* header_access = concat_call->add_args();
+  auto* header_call = header_access->mutable_call_expr();
+  header_call->set_function("_[_]");
+  auto* headers_select = header_call->add_args();
+  auto* request_ident = headers_select->mutable_select_expr();
+  request_ident->mutable_operand()->mutable_ident_expr()->set_name("request");
+  request_ident->set_field("headers");
+  header_call->add_args()->mutable_const_expr()->set_string_value(":path");
+
+  // Second operand: "/suffix"
+  concat_call->add_args()->mutable_const_expr()->set_string_value("/suffix");
+
+  // Right side: "/test/suffix"
+  call_expr->add_args()->mutable_const_expr()->set_string_value("/test/suffix");
+
+  // Enable string concatenation in CEL config.
+  auto* cel_config = policy.mutable_cel_config();
+  cel_config->set_enable_string_concat(true);
+
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, nullptr);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/test"}};
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // The matcher should match because "/test" + "/suffix" == "/test/suffix".
+  EXPECT_TRUE(matcher.matches(conn, headers, info));
+
+  // Test with non-matching path.
+  Envoy::Http::TestRequestHeaderMapImpl headers2{{":path", "/other"}};
+  EXPECT_FALSE(matcher.matches(conn, headers2, info));
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithoutCelConfig) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+
+  // Set up a simple condition: request.headers[":method"] == "GET"
+  auto* condition = policy.mutable_condition();
+  auto* call_expr = condition->mutable_call_expr();
+  call_expr->set_function("_==_");
+
+  // Left side: request.headers[":method"]
+  auto* left = call_expr->add_args();
+  auto* header_call = left->mutable_call_expr();
+  header_call->set_function("_[_]");
+  auto* headers_select = header_call->add_args();
+  auto* request_ident = headers_select->mutable_select_expr();
+  request_ident->mutable_operand()->mutable_ident_expr()->set_name("request");
+  request_ident->set_field("headers");
+  header_call->add_args()->mutable_const_expr()->set_string_value(":method");
+
+  // Right side: "GET"
+  call_expr->add_args()->mutable_const_expr()->set_string_value("GET");
+
+  // No cel_config specified - create arena builder for backward compatibility.
+  Protobuf::Arena constant_arena;
+  auto builder_ptr = Extensions::Filters::Common::Expr::createBuilder({}, &constant_arena);
+  auto arena_builder = std::make_shared<Extensions::Filters::Common::Expr::BuilderInstance>(
+      std::move(builder_ptr), nullptr);
+
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, arena_builder);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}};
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // The matcher should match.
+  EXPECT_TRUE(matcher.matches(conn, headers, info));
+
+  // Test with non-matching method.
+  Envoy::Http::TestRequestHeaderMapImpl headers2{{":method", "POST"}};
+  EXPECT_FALSE(matcher.matches(conn, headers2, info));
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithEmptyCelConfig) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+
+  // Set up a simple condition.
+  auto* condition = policy.mutable_condition();
+  auto* call_expr = condition->mutable_call_expr();
+  call_expr->set_function("_==_");
+
+  // Left side: request.headers[":method"]
+  auto* left = call_expr->add_args();
+  auto* header_call = left->mutable_call_expr();
+  header_call->set_function("_[_]");
+  auto* headers_select = header_call->add_args();
+  auto* request_ident = headers_select->mutable_select_expr();
+  request_ident->mutable_operand()->mutable_ident_expr()->set_name("request");
+  request_ident->set_field("headers");
+  header_call->add_args()->mutable_const_expr()->set_string_value(":method");
+
+  // Right side: "GET"
+  call_expr->add_args()->mutable_const_expr()->set_string_value("GET");
+
+  // Set an empty cel_config (all features disabled).
+  policy.mutable_cel_config();
+
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, nullptr);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}};
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // The matcher should still work with basic expressions.
+  EXPECT_TRUE(matcher.matches(conn, headers, info));
+}
+
+TEST(PolicyMatcher, PolicyMatcherWithAllCelFeaturesEnabled) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+
+  // Set up a complex condition using multiple string features.
+  // string(request.headers[":status"]).replace("20", "30") + "_suffix" == "300_suffix"
+  auto* condition = policy.mutable_condition();
+  auto* call_expr = condition->mutable_call_expr();
+  call_expr->set_function("_==_");
+
+  // Left side: string concatenation of replace result and suffix
+  auto* left = call_expr->add_args();
+  auto* concat_call = left->mutable_call_expr();
+  concat_call->set_function("_+_");
+
+  // First operand: string(200).replace("20", "30")
+  auto* replace_expr = concat_call->add_args();
+  auto* replace_call = replace_expr->mutable_call_expr();
+  replace_call->set_function("replace");
+
+  // Target: string(200) - simulating a numeric status code
+  auto* string_expr = replace_call->mutable_target();
+  auto* string_call = string_expr->mutable_call_expr();
+  string_call->set_function("string");
+  string_call->add_args()->mutable_const_expr()->set_int64_value(200);
+
+  // Replace arguments
+  replace_call->add_args()->mutable_const_expr()->set_string_value("20");
+  replace_call->add_args()->mutable_const_expr()->set_string_value("30");
+
+  // Second operand: "_suffix"
+  concat_call->add_args()->mutable_const_expr()->set_string_value("_suffix");
+
+  // Right side: "300_suffix"
+  call_expr->add_args()->mutable_const_expr()->set_string_value("300_suffix");
+
+  // Enable all string features in CEL config.
+  auto* cel_config = policy.mutable_cel_config();
+  cel_config->set_enable_string_conversion(true);
+  cel_config->set_enable_string_concat(true);
+  cel_config->set_enable_string_functions(true);
+
+  RBAC::PolicyMatcher matcher(policy, ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context, nullptr);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // The matcher should match because string(200).replace("20", "30") + "_suffix" == "300_suffix".
+  EXPECT_TRUE(matcher.matches(conn, headers, info));
+}
+
+TEST(PermissionMatcher, AndRulesCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Permission permission;
+  auto* and_rules = permission.mutable_and_rules();
+  and_rules->add_rules()->set_any(true);
+  and_rules->add_rules()->set_any(true);
+
+  auto matcher =
+      Matcher::create(permission, ProtobufMessage::getStrictValidationVisitor(), factory_context);
+  EXPECT_NE(matcher, nullptr);
+  checkMatcher(*matcher, true);
+}
+
+TEST(PermissionMatcher, NotRuleCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Permission permission;
+  permission.mutable_not_rule()->set_any(true);
+
+  auto matcher =
+      Matcher::create(permission, ProtobufMessage::getStrictValidationVisitor(), factory_context);
+  EXPECT_NE(matcher, nullptr);
+  checkMatcher(*matcher, false);
+}
+
+TEST(PrincipalMatcher, AndIdsCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal principal;
+  auto* and_ids = principal.mutable_and_ids();
+  and_ids->add_ids()->set_any(true);
+  and_ids->add_ids()->set_any(true);
+
+  auto matcher = Matcher::create(principal, factory_context);
+  EXPECT_NE(matcher, nullptr);
+  checkMatcher(*matcher, true);
+}
+
+TEST(PrincipalMatcher, MetadataCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal principal;
+  auto* metadata_matcher = principal.mutable_metadata();
+  metadata_matcher->set_filter("test.filter");
+  metadata_matcher->add_path()->set_key("test_key");
+  metadata_matcher->mutable_value()->mutable_string_match()->set_exact("test_value");
+
+  auto matcher = Matcher::create(principal, factory_context);
+  EXPECT_NE(matcher, nullptr);
+
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  auto label = MessageUtil::keyValueStruct("test_key", "test_value");
+  envoy::config::core::v3::Metadata metadata;
+  metadata.mutable_filter_metadata()->insert(
+      Protobuf::MapPair<std::string, Protobuf::Struct>("test.filter", label));
+  EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  checkMatcher(*matcher, true, Envoy::Network::MockConnection(),
+               Envoy::Http::TestRequestHeaderMapImpl(), info);
 }
 
 } // namespace

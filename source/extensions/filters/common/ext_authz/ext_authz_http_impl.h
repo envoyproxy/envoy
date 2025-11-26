@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/router/router.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/tracing/tracer.h"
 #include "envoy/type/matcher/v3/string.pb.h"
@@ -26,6 +27,11 @@ class ClientConfig {
 public:
   ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                uint32_t timeout, absl::string_view path_prefix,
+               Server::Configuration::CommonFactoryContext& context);
+
+  // Build config directly from HttpService without constructing a temporary ExtAuthz.
+  ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
+               bool encode_raw_headers, uint32_t timeout,
                Server::Configuration::CommonFactoryContext& context);
 
   /**
@@ -92,6 +98,11 @@ public:
    */
   bool encodeRawHeaders() const { return encode_raw_headers_; }
 
+  /**
+   * Returns the retry policy for the authorization service.
+   */
+  const Router::RetryPolicyConstSharedPtr& retryPolicy() const { return retry_policy_; }
+
 private:
   static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
                                            Server::Configuration::CommonFactoryContext& context);
@@ -117,6 +128,7 @@ private:
   const std::string tracing_name_;
   Router::HeaderParserPtr request_headers_parser_;
   const bool encode_raw_headers_;
+  const Router::RetryPolicyConstSharedPtr retry_policy_;
 };
 
 using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;

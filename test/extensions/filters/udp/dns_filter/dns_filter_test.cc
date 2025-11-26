@@ -4,6 +4,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/instance.h"
@@ -1910,12 +1911,6 @@ TEST_F(DnsFilterTest, InvalidShortBufferTest) {
 }
 
 TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
-#if defined(__linux__) && defined(__s390x__)
-  // Skip on s390x because this test incorrectly depends on the ordering of
-  // addresses that happens to work on other platforms.
-  // See https://github.com/envoyproxy/envoy/pull/24330
-  GTEST_SKIP() << "Skipping RandomizeFirstAnswerTest on s390x";
-#endif
   InSequence s;
 
   setup(forward_query_off_config);
@@ -1924,6 +1919,9 @@ TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
   const std::string query =
       Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
   ASSERT_FALSE(query.empty());
+  // Generate a new "random" value different from the original 3 to make the retrieval and insertion
+  // order in the response_ctx_->answers_ different.
+  ON_CALL(random_, random()).WillByDefault(Return(5));
   sendQueryFromClient("10.0.0.1:1000", query);
 
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
@@ -1933,10 +1931,16 @@ TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
   // Although 16 addresses are defined, only 8 are returned
   EXPECT_EQ(8, response_ctx_->answers_.size());
 
-  // We shuffle the list of addresses when we read the config, and in the case of more than
-  // 8 defined addresses, we randomize the initial starting index. We should not end up with
-  // the first answer being the first defined address, or the answers appearing in the same
-  // order as they are defined.
+  // DNS filter shuffles the list of addresses when reading the config, and in the case of more than
+  // 8 defined addresses, it randomizes the initial starting index.
+  // There is 1/16 chance that the answer will return the initial 8 addresses, however since the
+  // test is using the same "random" number, the set of addresses in the answer is well defined, and
+  // should not be the initial 8 addresses.
+  //
+  // NOTE: this depends on the std::unordered_multimap order of retrieval, which is unspecified in
+  // the standard. It is possible that a future version of STL , will produce this exact order when
+  // retrieving elements starting with index 5 hardcoded in this test. In this case the retrieval
+  // order can be tweaked by making RNG return a different number above.
   const std::list<std::string> defined_order{"10.0.16.1", "10.0.16.2", "10.0.16.3", "10.0.16.4",
                                              "10.0.16.5", "10.0.16.6", "10.0.16.7", "10.0.16.8"};
   auto defined_answer_iter = defined_order.begin();
@@ -2558,6 +2562,43 @@ server_config:
   // Validate stats
   EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
   EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+// Test that the bootstrap typed_dns_resolver_config is used when client_config is not set.
+TEST_F(DnsFilterTest, BootstrapTypedDnsResolverTest) {
+  // Create bootstrap config with typed DNS resolver configuration.
+  const std::string dns_config_yaml = R"EOF(
+name: envoy.network.dns_resolver.getaddrinfo
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+)EOF";
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  TestUtility::loadFromYaml(dns_config_yaml, typed_config);
+  auto& bootstrap = listener_factory_.server_factory_context_.bootstrap();
+  bootstrap.mutable_typed_dns_resolver_config()->MergeFrom(typed_config);
+
+  // Create DNS filter configuration.
+  const std::string filter_config_yaml = R"EOF(
+stat_prefix: bar
+server_config:
+  inline_dns_table:
+    virtual_domains:
+      - name: www.foo.com
+        endpoint:
+          address_list:
+            address:
+            - 10.0.0.1
+)EOF";
+  envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+  DnsFilterEnvoyConfig envoy_config(listener_factory_, filter_config);
+
+  // Verify the filter is configured with bootstrap DNS resolver configuration.
+  const auto& resolver_config = envoy_config.typedDnsResolverConfig();
+  EXPECT_EQ(resolver_config.name(), "envoy.network.dns_resolver.getaddrinfo");
+  EXPECT_EQ(resolver_config.typed_config().type_url(),
+            "type.googleapis.com/"
+            "envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig");
 }
 
 } // namespace

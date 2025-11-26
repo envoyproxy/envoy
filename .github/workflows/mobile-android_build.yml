@@ -30,7 +30,10 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: |
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
     uses: ./.github/workflows/_load.yml
     with:
       check-name: mobile-android
@@ -39,17 +42,21 @@ jobs:
     permissions:
       contents: read
       packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-android }}
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-android }}
     needs: load
     name: Build envoy.aar distributable
     uses: ./.github/workflows/_mobile_container_ci.yml
     with:
       args: >-
         build
-        --config=mobile-remote-release-clang-android
+        --config=ci
+        --config=mobile-rbe
+        --config=mobile-android-release
         //:android_dist
-      container: ${{ fromJSON(needs.load.outputs.build-image).mobile }}
-      diskspace-hack: true
+      container: ${{ needs.load.outputs.build-image && fromJSON(needs.load.outputs.build-image).mobile || '' }}
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       request: ${{ needs.load.outputs.request }}
       timeout-minutes: 90
       target: build
@@ -60,34 +67,39 @@ jobs:
       packages: read
     name: kotlin-hello-world
     uses: ./.github/workflows/_run.yml
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-android }}
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-android }}
     needs:
     - load
     - build
     with:
       command: ./bazelw
       container-command:
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       docker-ipv6: false
       # Return to using:
       #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       args: >-
         build
-        --config=mobile-remote-release-clang-android
+        --config=ci
+        --config=mobile-rbe
+        --config=mobile-android-release
         //examples/kotlin/hello_world:hello_envoy_kt
       request: ${{ needs.load.outputs.request }}
       target: kotlin-hello-world
       runs-on: ubuntu-22.04
       steps-pre: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.3.16
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.3.30
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.16
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.30
           with:
             apk: bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
             app: io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
             status: 200
       timeout-minutes: 50
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
       working-directory: mobile
 
   apps:
@@ -96,7 +108,7 @@ jobs:
       packages: read
     name: Android apps
     uses: ./.github/workflows/_run.yml
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-android-all }}
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-android-all }}
     needs:
     - load
     - build
@@ -104,14 +116,17 @@ jobs:
       command: ./bazelw
       container-command:
       args: ${{ matrix.args }}
+      diskspace-hack-paths: |
+        /opt/hostedtoolcache
+        /usr/local/.ghcup
       request: ${{ needs.load.outputs.request }}
       target: ${{ matrix.target }}
       runs-on: ubuntu-22.04
       steps-pre: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.3.16
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.3.30
       steps-post: ${{ matrix.steps-post }}
       timeout-minutes: 50
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
       working-directory: mobile
     strategy:
       fail-fast: false
@@ -119,7 +134,7 @@ jobs:
         include:
         - name: java-hello-world
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.16
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.30
               with:
                 apk: bazel-bin/examples/java/hello_world/hello_envoy.apk
                 app: io.envoyproxy.envoymobile.helloenvoy/.MainActivity
@@ -127,7 +142,9 @@ jobs:
           target: java-hello-world
           args: >-
             build
-            --config=mobile-remote-release-clang-android
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-android-release
             //examples/java/hello_world:hello_envoy
         - name: kotlin-baseline-app
           # Return to using:
@@ -135,10 +152,12 @@ jobs:
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build
-            --config=mobile-remote-release-clang-android
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-android-release
             //test/kotlin/apps/baseline:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.16
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.30
               with:
                 apk: bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
@@ -150,10 +169,12 @@ jobs:
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build
-            --config=mobile-remote-release-clang-android
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-android-release
             //test/kotlin/apps/experimental:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.16
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.3.30
               with:
                 apk: bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity
@@ -168,10 +189,13 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
-    if: >-
-      ${{ always()
-          && github.event.workflow_run.conclusion == 'success'
-          && fromJSON(needs.load.outputs.request).run.mobile-android }}
+    if: |
+      always()
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && needs.load.outputs.request
+      && fromJSON(needs.load.outputs.request).run.mobile-android
     needs:
     - load
     - build

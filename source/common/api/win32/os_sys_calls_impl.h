@@ -71,6 +71,8 @@ public:
   SysCallIntResult getaddrinfo(const char* node, const char* service, const addrinfo* hints,
                                addrinfo** res) override;
   void freeaddrinfo(addrinfo* res) override;
+  SysCallIntResult getrlimit(int resource, struct rlimit* rlim) override;
+  SysCallIntResult setrlimit(int resource, const struct rlimit* rlim) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

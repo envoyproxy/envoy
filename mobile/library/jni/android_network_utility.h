@@ -5,6 +5,7 @@
 
 #include "absl/strings/string_view.h"
 #include "library/common/extensions/cert_validator/platform_bridge/c_types.h"
+#include "library/common/network/network_types.h"
 #include "library/jni/jni_helper.h"
 
 namespace Envoy {
@@ -20,6 +21,10 @@ LocalRefUniquePtr<jobject> callJvmVerifyX509CertChain(JniHelper& jni_helper,
 
 envoy_cert_validation_result verifyX509CertChain(const std::vector<std::string>& certs,
                                                  absl::string_view hostname);
+
+int64_t getDefaultNetworkHandle();
+
+std::vector<std::pair<int64_t, ConnectionType>> getAllConnectedNetworks();
 
 void jvmDetachThread();
 

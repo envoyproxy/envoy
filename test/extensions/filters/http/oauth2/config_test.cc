@@ -63,8 +63,9 @@ config:
   TestUtility::loadFromYaml(yaml, *proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager,
           findStaticGenericSecretProvider(failed_secret_name == "token" ? "hmac" : "token"))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
@@ -127,8 +128,9 @@ config:
   context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for token_secret and hmac_secret.
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
@@ -138,7 +140,6 @@ config:
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
   EXPECT_CALL(context, initManager()).Times(2);
-  EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -266,8 +267,9 @@ config:
   context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for token_secret and hmac_secret.
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
@@ -322,8 +324,9 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
@@ -368,8 +371,9 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
@@ -407,14 +411,99 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   EXPECT_TRUE(result.ok());
+}
+
+TEST(ConfigTest, EndSessionEndpointWithOpenId) {
+  const std::string yaml = R"EOF(
+    config:
+      token_endpoint:
+        cluster: foo
+        uri: oauth.com/token
+        timeout: 3s
+      credentials:
+        client_id: "secret"
+        token_secret:
+          name: token
+        hmac_secret:
+          name: hmac
+      authorization_endpoint: https://oauth.com/oauth/authorize/
+      end_session_endpoint: https://oauth.com/oauth/logout
+      auth_scopes: openid
+      redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+      redirect_path_matcher:
+        path:
+          exact: /callback
+      signout_path:
+        path:
+          exact: /signout
+      )EOF";
+
+  OAuth2Config factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
+
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_TRUE(result.ok());
+}
+
+TEST(ConfigTest, EndSessionEndpointWithoutOpenId) {
+  const std::string yaml = R"EOF(
+    config:
+      token_endpoint:
+        cluster: foo
+        uri: oauth.com/token
+        timeout: 3s
+      credentials:
+        client_id: "secret"
+        token_secret:
+          name: token
+        hmac_secret:
+          name: hmac
+      authorization_endpoint: https://oauth.com/oauth/authorize/
+      end_session_endpoint: https://oauth.com/oauth/logout
+      redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+      redirect_path_matcher:
+        path:
+          exact: /callback
+      signout_path:
+        path:
+          exact: /signout
+      )EOF";
+
+  OAuth2Config factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
+
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value(), EnvoyException,
+      "OAuth2 filter: end session endpoint is only supported for OpenID Connect.");
 }
 
 } // namespace Oauth2

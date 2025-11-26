@@ -48,7 +48,7 @@ public:
       : filter_config_name_(filter_config_name) {}
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    auto message = std::make_unique<Protobuf::StringValue>();
     message->set_value(filter_config_name_);
     return message;
   }
@@ -142,8 +142,6 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual void doMetadata() PURE;
   // TODO(soya3129): make this pure when adding impl to encoder filter.
   virtual void handleMetadataAfterHeadersCallback() PURE;
-
-  virtual void onMatchCallback(const Matcher::Action& action) PURE;
 
   // Http::StreamFilterCallbacks
   OptRef<const Network::Connection> connection() override;
@@ -265,9 +263,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void drainSavedRequestMetadata();
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
   void handleMetadataAfterHeadersCallback() override;
-  void onMatchCallback(const Matcher::Action& action) override {
-    handle_->onMatchCallback(std::move(action));
-  }
 
   // Http::StreamDecoderFilterCallbacks
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
@@ -294,8 +289,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
-  void setDecoderBufferLimit(uint32_t limit) override;
-  uint32_t decoderBufferLimit() override;
+  void setDecoderBufferLimit(uint64_t limit) override;
+  uint64_t decoderBufferLimit() override;
   bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
@@ -305,7 +300,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
   absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
   bool shouldLoadShed() const override;
-  void sendGoAwayAndClose() override;
+  void sendGoAwayAndClose(bool graceful = false) override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -325,7 +320,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   StreamDecoderFilters::Iterator entry() const { return entry_; }
 
   StreamDecoderFilterSharedPtr handle_;
-  StreamDecoderFilters::Iterator entry_{};
+  StreamDecoderFilters::Iterator entry_;
   bool is_grpc_request_{};
 };
 
@@ -351,7 +346,6 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void doData(bool end_stream) override;
   void drainSavedResponseMetadata();
   void handleMetadataAfterHeadersCallback() override;
-  void onMatchCallback(const Matcher::Action& action) override { handle_->onMatchCallback(action); }
 
   void doMetadata() override {
     if (saved_response_metadata_ != nullptr) {
@@ -383,7 +377,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   StreamEncoderFilters::Iterator entry() const { return entry_; }
 
   StreamEncoderFilterSharedPtr handle_;
-  StreamEncoderFilters::Iterator entry_{};
+  StreamEncoderFilters::Iterator entry_;
 };
 
 /**
@@ -495,7 +489,7 @@ public:
   /**
    * Attempt to send GOAWAY and close the connection.
    */
-  virtual void sendGoAwayAndClose() PURE;
+  virtual void sendGoAwayAndClose(bool graceful = false) PURE;
 
   /**
    * Called when the stream write buffer is no longer above the low watermark.
@@ -660,6 +654,9 @@ public:
   absl::string_view ja3Hash() const override {
     return StreamInfoImpl::downstreamAddressProvider().ja3Hash();
   }
+  absl::string_view ja4Hash() const override {
+    return StreamInfoImpl::downstreamAddressProvider().ja4Hash();
+  }
   const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
     return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
   }
@@ -685,7 +682,7 @@ public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
                 OptRef<const Network::Connection> connection, uint64_t stream_id,
                 Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
-                uint32_t buffer_limit)
+                uint64_t buffer_limit)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit) {}
@@ -715,7 +712,7 @@ public:
   // FilterChainManager
   void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
-  void log(const Formatter::HttpFormatterContext log_context) {
+  void log(const Formatter::Context log_context) {
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(log_context, streamInfo());
     }
@@ -803,7 +800,7 @@ public:
   virtual void executeLocalReplyIfPrepared() PURE;
 
   // Possibly increases buffer_limit_ to the value of limit.
-  void setBufferLimit(uint32_t limit);
+  void setBufferLimit(uint64_t limit);
 
   /**
    * @return bool whether any above high watermark triggers are currently active
@@ -909,14 +906,14 @@ public:
 
   virtual bool shouldLoadShed() { return false; };
 
-  void sendGoAwayAndClose() {
+  void sendGoAwayAndClose(bool graceful = false) {
     // Stop filter chain iteration by checking encoder or decoder chain.
     if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
       state_.decoder_filter_chain_aborted_ = true;
     } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
       state_.encoder_filter_chain_aborted_ = true;
     }
-    filter_manager_callbacks_.sendGoAwayAndClose();
+    filter_manager_callbacks_.sendGoAwayAndClose(graceful);
   }
 
 protected:
@@ -969,7 +966,7 @@ protected:
     bool destroyed_{false};
 
     // Result of filter chain creation.
-    CreateChainResult create_chain_result_{};
+    CreateChainResult create_chain_result_;
 
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
@@ -1117,7 +1114,7 @@ private:
   std::unique_ptr<MetadataMapVector> request_metadata_map_vector_;
   Buffer::InstancePtr buffered_response_data_;
   Buffer::InstancePtr buffered_request_data_;
-  uint32_t buffer_limit_{0};
+  uint64_t buffer_limit_{0};
   uint32_t high_watermark_count_{0};
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
@@ -1184,9 +1181,7 @@ public:
                      std::move(parent_filter_state)),
         local_reply_(local_reply), filter_chain_factory_(filter_chain_factory),
         downstream_filter_load_shed_point_(overload_manager.getLoadShedPoint(
-            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)),
-        use_filter_manager_state_for_downstream_end_stream_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream")) {
+            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)) {
     ENVOY_LOG_ONCE_IF(
         trace, downstream_filter_load_shed_point_ == nullptr,
         "LoadShedPoint envoy.load_shed_points.http_downstream_filter_check is not found. "
@@ -1222,15 +1217,7 @@ public:
   /**
    * Whether downstream has observed end_stream.
    */
-  bool decoderObservedEndStream() const override {
-    // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream
-    // runtime flag.
-    if (use_filter_manager_state_for_downstream_end_stream_) {
-      return state_.observed_decode_end_stream_;
-    }
-
-    return hasLastDownstreamByteReceived();
-  }
+  bool decoderObservedEndStream() const override { return state_.observed_decode_end_stream_; }
 
   /**
    * Return true if the timestamp of the downstream end_stream was recorded.
@@ -1287,9 +1274,6 @@ private:
   const FilterChainFactory& filter_chain_factory_;
   Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
   Server::LoadShedPoint* downstream_filter_load_shed_point_{nullptr};
-  // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream runtime
-  // flag.
-  const bool use_filter_manager_state_for_downstream_end_stream_{};
 };
 
 } // namespace Http

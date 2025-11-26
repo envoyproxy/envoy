@@ -1,15 +1,10 @@
 #pragma once
 
+#include "envoy/common/matchers.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
-#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
-#include "envoy/http/message.h"
+#include "envoy/json/json_object.h"
 
-#include "source/common/common/matchers.h"
-#include "source/common/http/headers.h"
-#include "source/common/http/utility.h"
-#include "source/common/json/json_loader.h"
-#include "source/extensions/common/aws/signer_base_impl.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,11 +18,15 @@ public:
    * See https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
    * @param headers a header map to canonicalize.
    * @param excluded_headers a list of string matchers to exclude a given header from signing.
+   * @param included_headers a list of string matchers to include a given header from signing.
+   * included_headers will take precedence over excluded_headers and if included_headers is
+   * non-empty, only headers that match included_headers will be signed.
    * @return a std::map of canonicalized headers to be used in building a canonical request.
    */
   static std::map<std::string, std::string>
   canonicalizeHeaders(const Http::RequestHeaderMap& headers,
-                      const std::vector<Matchers::StringMatcherPtr>& excluded_headers);
+                      const std::vector<Matchers::StringMatcherPtr>& excluded_headers,
+                      const std::vector<Matchers::StringMatcherPtr>& included_headers);
 
   /**
    * Creates an AWS Signature V4 canonical request string.
@@ -69,12 +68,12 @@ public:
   static std::string canonicalizeQueryString(absl::string_view query_string);
 
   /**
-   * URI encodes the given string based on AWS requirements.
-   * See step 3 in https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
-   * @param decoded the decoded string.
-   * @return the URI encoded string.
+   * URI encodes query component while preserving %2B semantics.
+   * %2B remains as literal +, raw + becomes %20 (space).
+   * @param original the original string (may contain percent-encoded sequences).
+   * @return the properly encoded string.
    */
-  static std::string encodeQueryComponent(absl::string_view decoded);
+  static std::string encodeQueryComponentPreservingPlus(absl::string_view original);
 
   /**
    * Get the semicolon-delimited string of canonical header names.
@@ -83,6 +82,17 @@ public:
    */
   static std::string
   joinCanonicalHeaderNames(const std::map<std::string, std::string>& canonical_headers);
+
+  /**
+   * Get the IAM Roles Anywhere Service endpoint for a given region:
+   * rolesanywhere.<region>.amazonaws.com See:
+   * https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication-sign-process.html#authentication-task1
+   * @param trust_anchor_arn The configured roles anywhere trust anchor arn for the region to be
+   * extracted from
+   * @return an sts endpoint url.
+   */
+
+  static std::string getRolesAnywhereEndpoint(const std::string& trust_anchor_arn);
 
   /**
    * Get the Security Token Service endpoint for a given region: sts.<region>.amazonaws.com
@@ -208,6 +218,22 @@ public:
    * @return boolean
    */
   static bool shouldNormalizeUriPath(const std::string service_name);
+
+  /**
+   * Checks if a URI path is already percent-encoded according to RFC 3986.
+   * Returns false if any character that should be percent-encoded is found unencoded.
+   * @param path the URI path to check.
+   * @return true if the path is already properly encoded, false otherwise.
+   */
+  static bool isUriPathEncoded(absl::string_view path);
+
+private:
+  /**
+   * Helper method to encode a character based on reserved character rules.
+   * @param c the character to encode.
+   * @param result the string to append the encoded result to.
+   */
+  static void encodeCharacter(unsigned char c, std::string& result);
 };
 
 } // namespace Aws

@@ -175,8 +175,10 @@ TEST(GolangFilterConfigTest, GolangFilterWithDuplicateSecret) {
   envoy::extensions::filters::http::golang::v3alpha::Config proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(testing::Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));

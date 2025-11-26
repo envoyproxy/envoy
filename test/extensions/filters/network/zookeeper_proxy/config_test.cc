@@ -20,7 +20,7 @@ using ZooKeeperProxyProtoConfig =
 
 class ZookeeperFilterConfigTest : public testing::Test {
 public:
-  std::string populateFullConfig(const ProtobufWkt::EnumDescriptor* opcode_descriptor) {
+  std::string populateFullConfig(const Protobuf::EnumDescriptor* opcode_descriptor) {
     std::string yaml = R"EOF(
 stat_prefix: test_prefix
 max_packet_bytes: 1048576
@@ -185,7 +185,7 @@ stat_prefix: test_prefix
   EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), false);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), false);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
-            ProtobufWkt::util::TimeUtil::SecondsToDuration(0));
+            Protobuf::util::TimeUtil::SecondsToDuration(0));
   EXPECT_EQ(proto_config_.latency_threshold_overrides_size(), 0);
 
   Network::FilterFactoryCb cb =
@@ -208,7 +208,7 @@ default_latency_threshold: "0.15s"
   EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), false);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), false);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
-            ProtobufWkt::util::TimeUtil::MillisecondsToDuration(150));
+            Protobuf::util::TimeUtil::MillisecondsToDuration(150));
   EXPECT_EQ(proto_config_.latency_threshold_overrides_size(), 0);
 
   Network::FilterFactoryCb cb =
@@ -233,12 +233,11 @@ latency_threshold_overrides:
   EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), false);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), false);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
-            ProtobufWkt::util::TimeUtil::SecondsToDuration(0));
+            Protobuf::util::TimeUtil::SecondsToDuration(0));
   EXPECT_EQ(proto_config_.latency_threshold_overrides_size(), 1);
   LatencyThresholdOverride threshold_override = proto_config_.latency_threshold_overrides().at(0);
   EXPECT_EQ(threshold_override.opcode(), LatencyThresholdOverride::Connect);
-  EXPECT_EQ(threshold_override.threshold(),
-            ProtobufWkt::util::TimeUtil::MillisecondsToDuration(151));
+  EXPECT_EQ(threshold_override.threshold(), Protobuf::util::TimeUtil::MillisecondsToDuration(151));
 
   Network::FilterFactoryCb cb =
       factory_.createFilterFactoryFromProto(proto_config_, context_).value();
@@ -247,7 +246,7 @@ latency_threshold_overrides:
 }
 
 TEST_F(ZookeeperFilterConfigTest, FullConfig) {
-  const ProtobufWkt::EnumDescriptor* opcode_descriptor = envoy::extensions::filters::network::
+  const Protobuf::EnumDescriptor* opcode_descriptor = envoy::extensions::filters::network::
       zookeeper_proxy::v3::LatencyThresholdOverride_Opcode_descriptor();
   std::string yaml = populateFullConfig(opcode_descriptor);
   TestUtility::loadFromYamlAndValidate(yaml, proto_config_);
@@ -259,7 +258,7 @@ TEST_F(ZookeeperFilterConfigTest, FullConfig) {
   EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), true);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), true);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
-            ProtobufWkt::util::TimeUtil::MillisecondsToDuration(100));
+            Protobuf::util::TimeUtil::MillisecondsToDuration(100));
   EXPECT_EQ(proto_config_.latency_threshold_overrides_size(), 27);
 
   for (int i = 0; i < opcode_descriptor->value_count(); i++) {
@@ -270,7 +269,7 @@ TEST_F(ZookeeperFilterConfigTest, FullConfig) {
     EXPECT_EQ(opcode_name, opcode_tuple->name());
     uint64_t threshold_delta = static_cast<uint64_t>(opcode_tuple->number());
     EXPECT_EQ(threshold_override.threshold(),
-              ProtobufWkt::util::TimeUtil::MillisecondsToDuration(150 + threshold_delta));
+              Protobuf::util::TimeUtil::MillisecondsToDuration(150 + threshold_delta));
   }
 
   Network::FilterFactoryCb cb =

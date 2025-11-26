@@ -579,9 +579,9 @@ protected:
 
   std::vector<std::string> actions_;
   std::vector<std::string> events_;
-  RecordGuardDogActionFactory<Envoy::ProtobufWkt::Struct> log_factory_;
+  RecordGuardDogActionFactory<Envoy::Protobuf::Struct> log_factory_;
   Registry::InjectFactory<Configuration::GuardDogActionFactory> register_log_factory_;
-  AssertGuardDogActionFactory<Envoy::ProtobufWkt::Empty> assert_factory_;
+  AssertGuardDogActionFactory<Envoy::Protobuf::Empty> assert_factory_;
   Registry::InjectFactory<Configuration::GuardDogActionFactory> register_assert_factory_;
   NiceMock<Stats::MockStore> fake_stats_;
   WatchDogSharedPtr first_dog_;

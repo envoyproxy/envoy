@@ -5,7 +5,7 @@
 #include "source/common/json/json_internal.h"
 
 #include "absl/strings/str_format.h"
-#include "utf8_validity.h"
+#include "third_party/utf8_range/utf8_validity.h"
 
 namespace Envoy {
 namespace Json {

@@ -33,7 +33,7 @@ class GrpcAccessLoggerImpl
           // OpenTelemetry logging uses LogRecord for both HTTP and TCP, so protobuf::Empty is used
           // as an empty placeholder for the non-used addEntry method.
           // TODO(itamarkam): Don't cache OpenTelemetry loggers by type (HTTP/TCP).
-          ProtobufWkt::Empty, opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
+          Protobuf::Empty, opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
 public:
   GrpcAccessLoggerImpl(
@@ -88,7 +88,7 @@ private:
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) override;
   // Non used addEntry method (the above is used for both TCP and HTTP).
-  void addEntry(ProtobufWkt::Empty&& entry) override { (void)entry; };
+  void addEntry(Protobuf::Empty&& entry) override { (void)entry; };
   bool isEmpty() override;
   void initMessage() override;
   void clearMessage() override;

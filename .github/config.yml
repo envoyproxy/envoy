@@ -1,12 +1,19 @@
 agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
-  repo: envoyproxy/envoy-build-ubuntu
-  sha: d38457962937370aa867620a5cc7d01c568621fc0d1a57e044847599372a8571
-  mobile-sha: 5ff2c9ce8f3abdb89d305095a39fd0e7ee97422cc017d9578e738f9a56bc33d8
-  # this is authoritative, but is not currently used in github ci
-  gcr-sha: 56b66cc84065c88a141963cedbbe4198850ffae0dacad769f516d0e9081439da
-  tag: cb86d91cf406995012e330ab58830e6ee10240cb
+  repo: docker.io/envoyproxy/envoy-build-ubuntu
+  repo-gcr: gcr.io/envoy-ci/envoy-build
+  # Until toolchains land, these all just point to the main image or the mobile one
+  sha: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  sha-ci: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  sha-devtools: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  sha-docker: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  sha-gcc: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  sha-mobile: 224feb2b7d513bf7f2ac0c7c529db1cb46398952f31b7d46e51211642d0b2ba0
+  sha-worker: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  # TODO: remove this dupe (currently used by ci request handler)
+  mobile-sha: 224feb2b7d513bf7f2ac0c7c529db1cb46398952f31b7d46e51211642d0b2ba0
+  tag: abd41d4081d77bacbb246c9b952d49f816a9ee2f
 
 config:
   envoy:
@@ -28,6 +35,7 @@ checks:
     on-run:
     - check-build
     - check-coverage
+    - check-runtime
     - check-san
     required: true
   macos:
@@ -146,7 +154,7 @@ checks:
     name: >-
       Envoy/Publish and verify
     on-run:
-    - publish
+    - release
     - verify
     required: true
 
@@ -170,6 +178,12 @@ run:
   check-coverage:
     paths:
     - "**/*"
+  check-runtime:
+    paths:
+    - source/server/cgroup_cpu_util.*
+    - test/server/*cgroup*
+    # this can be switched to always run once related ci lands.
+    push: paths
   check-san:
     paths:
     - "**/*"
@@ -212,6 +226,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
@@ -223,6 +238,7 @@ run:
     - .github/config.yml
     - api/**/*
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - envoy/**/*
     - mobile/.bazelrc
@@ -238,10 +254,13 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
+    - test/run_envoy_bazel_coverage.sh
     - tools/code_format/check_format.py
+    - tools/coverage/**/*
   mobile-format:
     paths:
     - .bazelrc
@@ -311,6 +330,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
@@ -334,7 +354,7 @@ run:
   precheck-publish:
     paths:
     - "**/*"
-  publish:
+  release:
     paths:
     - .bazelrc
     - .bazelversion
@@ -343,6 +363,7 @@ run:
     - bazel/**/*
     - ci/**/*
     - contrib/**/*
+    - distribution/**/*
     - envoy/**/*
     - examples/**/*
     - source/**/*
@@ -357,6 +378,7 @@ run:
     - bazel/**/*
     - ci/**/*
     - contrib/**/*
+    - distribution/**/*
     - envoy/**/*
     - examples/**/*
     - source/**/*

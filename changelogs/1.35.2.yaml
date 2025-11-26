@@ -1,0 +1,17 @@
+date: September 3, 2025
+
+bug_fixes:
+- area: oauth2
+  change: |
+    Fixed an issue where cookies prefixed with ``__Secure-`` or ``__Host-`` were not receiving a
+    Secure attribute.
+- area: dns
+  change: |
+    Fixed an UAF in DNS cache that can occur when the Host header is modified between the Dynamic Forwarding and Router
+    filters.
+- area: stats
+  change: |
+    Fixed a bug where the metric name ``expiration_unix_time_seconds`` of
+    ``cluster.<cluster_name>.ssl.certificate.<cert_name>.<metric_name>``
+    and ``listener.<address>.ssl.certificate.<cert_name>.<metric_name>``
+    was not being properly extracted in the final prometheus stat name.

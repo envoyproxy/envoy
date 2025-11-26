@@ -30,7 +30,20 @@ from aio.run import runner
 ENVOY_REPO = "envoyproxy/envoy"
 
 # Oncall calendar
-CALENDAR = "https://calendar.google.com/calendar/ical/d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com/public/basic.ics"
+# This calendar is currently in the Google calndar account of @adisuissa. Once
+# his account is closed, the calendar will not be available. In order to create
+# a new calendar link, please do the following:
+# 1. Find the link on the opsgenie page -> "Who is on-call" -> "Envoy maintainer
+#    rotation" -> calendar icon on the top-right of the screen. This will point to
+#    a webcall link, similar to:
+#    webcal://kubernetes.app.opsgenie.com/webapi/webcal/getRecentSchedule?webcalToken=<someToken>&scheduleId=a3505963-c064-4c97-8865-947dfcb06060
+# 2. Go to your personal Google calendar, and add a new one (press '+' next to
+#    "Other calendars") -> then press "From URL".
+# 3. Paste the webcal link to the "URL of calendar", check the "Make the
+#    calendar publicly accessible", and press "Add calendar".
+# 4. In the calendar settings you can now change the calendar's name, and copy
+#    paste the "public address in iCal format" link here.
+CALENDAR = "https://calendar.google.com/calendar/ical/jlcv20uad0arnm7g69ip9iu956vvnrf6%40import.calendar.google.com/public/basic.ics"
 
 ISSUE_LINK = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+label%3Atriage"
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
@@ -125,21 +138,37 @@ class RepoNotifier(runner.Runner):
     async def oncall_string(self):
         now = datetime.datetime.now()
         sunday = now - datetime.timedelta(days=now.weekday() + 1)
-        monday = now - datetime.timedelta(days=now.weekday())
         priorweek = now - datetime.timedelta(14)
 
         # Handle the event being created before today.
         date = priorweek.strftime("%Y%m%d")
-        response = await self.session.get(f"{CALENDAR}?getdate={date}")
-        content = await response.read()
-        parsed_calendar = icalendar.Calendar.from_ical(content)
+        try:
+            response = await self.session.get(f"{CALENDAR}?getdate={date}")
+            content = await response.read()
+            parsed_calendar = icalendar.Calendar.from_ical(content)
 
-        for component in parsed_calendar.walk():
-            if component.name == "VEVENT":
-                if (sunday.date() == component.decoded("dtstart").date()):
-                    return component.get("summary")
-                if (monday.date() == component.decoded("dtstart").date()):
-                    return component.get("summary")
+            # First priority: Look for Sunday data
+            sunday_oncall = None
+            fallback_oncall = None
+
+            for component in parsed_calendar.walk():
+                if component.name == "VEVENT":
+                    event_date = component.decoded("dtstart").date()
+                    if event_date == sunday.date():
+                        sunday_oncall = component.get("summary")
+                    # Sometimes the event gets truncated and now starts on some other day beside Sunday.
+                    # Fallback to tightest bound before now but after Sunday.
+                    elif event_date > sunday.date() and event_date <= now.date():
+                        fallback_oncall = component.get("summary")
+
+            # Return Sunday data if available, otherwise fall back to current day
+            if sunday_oncall:
+                return sunday_oncall
+            elif fallback_oncall:
+                return fallback_oncall
+
+        except Exception as e:
+            print("Error while fetching and parsing the on-call calendar: {e}")
         print("unable to find this week's oncall")
         return "unable to find this week's oncall"
 

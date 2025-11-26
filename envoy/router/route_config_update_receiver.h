@@ -40,7 +40,7 @@ public:
    * @return bool whether RouteConfiguration has been updated.
    */
   virtual bool onVhdsUpdate(const VirtualHostRefVector& added_vhosts,
-                            const std::set<std::string>& added_resource_ids,
+                            std::set<std::string>&& added_resource_ids,
                             const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                             const std::string& version_info) PURE;
 

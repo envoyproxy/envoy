@@ -95,7 +95,7 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
     if (reflection->HasField(message, any_field)) {
       ASSERT(any_field != nullptr);
       // Unpack to a DynamicMessage.
-      ProtobufWkt::Any any_message;
+      Protobuf::Any any_message;
       any_message.MergeFrom(reflection->GetMessage(message, any_field));
       Protobuf::DynamicMessageFactory dmf;
       const absl::string_view inner_type_name =
@@ -194,8 +194,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
-    auto all_clusters = server_.clusterManager().clusters();
-    if (!all_clusters.active_clusters_.empty()) {
+    if (server_.clusterManager().hasActiveClusters()) {
       callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
         return dumpEndpointConfigs(name_matcher);
       });
@@ -248,8 +247,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConf
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
-    auto all_clusters = server_.clusterManager().clusters();
-    if (!all_clusters.active_clusters_.empty()) {
+    if (server_.clusterManager().hasActiveClusters()) {
       callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
         return dumpEndpointConfigs(name_matcher);
       });

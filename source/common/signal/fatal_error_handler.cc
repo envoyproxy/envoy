@@ -103,7 +103,7 @@ FatalAction::Status runFatalActions(FatalActionType action_type) {
 
 void registerFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 #ifdef ENVOY_OBJECT_TRACE_ON_DUMP
-  absl::MutexLock l(&failure_mutex);
+  absl::MutexLock l(failure_mutex);
   FailureFunctionList* list = fatal_error_handlers.exchange(nullptr);
   if (list == nullptr) {
     list = new FailureFunctionList;
@@ -118,7 +118,7 @@ void registerFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 
 void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 #ifdef ENVOY_OBJECT_TRACE_ON_DUMP
-  absl::MutexLock l(&failure_mutex);
+  absl::MutexLock l(failure_mutex);
   FailureFunctionList* list = fatal_error_handlers.exchange(nullptr);
   if (list == nullptr) {
     // removeFatalErrorHandler() may see an empty list of fatal error handlers

@@ -1,19 +1,23 @@
 #include "source/extensions/common/aws/credential_providers/webidentity_credentials_provider.h"
 
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
 
 WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view cluster_name, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
     const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
         web_identity_config)
-    : MetadataCredentialsProviderBase(context.api(), context, aws_cluster_manager, cluster_name,
+    : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       role_arn_(web_identity_config.role_arn()),
@@ -40,13 +44,13 @@ void WebIdentityCredentialsProvider::refresh() {
   }
 
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}",
-            aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value());
+            aws_cluster_manager_->getUriFromClusterName(cluster_name_).value());
   web_identity_data = web_identity_data_source_provider_.value()->data();
 
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
-  auto statusOr = aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_);
+  auto statusOr = aws_cluster_manager_->getUriFromClusterName(cluster_name_);
   message.headers().setHost(Http::Utility::parseAuthority(statusOr.value()).host_);
   message.headers().setPath(
       fmt::format("/?Action=AssumeRoleWithWebIdentity"
@@ -60,10 +64,7 @@ void WebIdentityCredentialsProvider::refresh() {
   // Use the Accept header to ensure that AssumeRoleWithWebIdentityResponse is returned as JSON.
   message.headers().setReference(Http::CustomHeaders::get().Accept,
                                  Http::Headers::get().ContentTypeValues.Json);
-  // Stop any existing timer.
-  if (cache_duration_timer_ && cache_duration_timer_->enabled()) {
-    cache_duration_timer_->disableTimer();
-  }
+
   // Using Http async client to fetch the AWS credentials.
   if (!metadata_fetcher_) {
     metadata_fetcher_ = create_metadata_fetcher_cb_(context_.clusterManager(), clusterName());
@@ -141,8 +142,7 @@ void WebIdentityCredentialsProvider::extractCredentials(
   // Set receiver state in statistics
   stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
 
-  const auto expiration =
-      Utility::getIntegerFromJsonOrDefault(credentials.value(), WEB_IDENTITY_EXPIRATION, 0);
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(credentials.value(), EXPIRATION, 0);
 
   if (expiration != 0) {
     expiration_time_ =
@@ -153,7 +153,7 @@ void WebIdentityCredentialsProvider::extractCredentials(
     expiration_time_.reset();
   }
 
-  last_updated_ = api_.timeSource().systemTime();
+  last_updated_ = context_.api().timeSource().systemTime();
   handleFetchDone();
 }
 

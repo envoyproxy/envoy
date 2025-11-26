@@ -24,9 +24,8 @@ class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBas
                                            public Envoy::Singleton::Instance,
                                            public MetadataFetcher::MetadataReceiver {
 public:
-  InstanceProfileCredentialsProvider(Api::Api& api,
-                                     Server::Configuration::ServerFactoryContext& context,
-                                     AwsClusterManagerOptRef aws_cluster_manager,
+  InstanceProfileCredentialsProvider(Server::Configuration::ServerFactoryContext& context,
+                                     AwsClusterManagerPtr aws_cluster_manager,
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                      std::chrono::seconds initialization_timer,
@@ -38,7 +37,6 @@ public:
   std::string providerName() override { return "InstanceProfileCredentialsProvider"; };
 
 private:
-  bool needsRefresh() override;
   void refresh() override;
   void fetchInstanceRoleAsync(const std::string&& token);
   void fetchCredentialFromInstanceRoleAsync(const std::string&& instance_role,

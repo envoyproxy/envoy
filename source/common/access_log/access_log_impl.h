@@ -34,7 +34,7 @@ public:
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
   static FilterPtr fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                             Server::Configuration::FactoryContext& context);
+                             Server::Configuration::GenericFactoryContext& context);
 };
 
 /**
@@ -61,7 +61,7 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -75,7 +75,7 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -86,7 +86,7 @@ class OperatorFilter : public Filter {
 public:
   OperatorFilter(
       const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-      Server::Configuration::FactoryContext& context);
+      Server::Configuration::GenericFactoryContext& context);
 
 protected:
   std::vector<FilterPtr> filters_;
@@ -98,10 +98,10 @@ protected:
 class AndFilter : public OperatorFilter {
 public:
   AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
-            Server::Configuration::FactoryContext& context);
+            Server::Configuration::GenericFactoryContext& context);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -111,10 +111,10 @@ public:
 class OrFilter : public OperatorFilter {
 public:
   OrFilter(const envoy::config::accesslog::v3::OrFilter& config,
-           Server::Configuration::FactoryContext& context);
+           Server::Configuration::GenericFactoryContext& context);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -126,7 +126,7 @@ public:
   NotHealthCheckFilter() = default;
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -136,7 +136,7 @@ public:
 class TraceableRequestFilter : public Filter {
 public:
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -149,7 +149,7 @@ public:
                 Random::RandomGenerator& random);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -169,7 +169,7 @@ public:
                Server::Configuration::CommonFactoryContext& context);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -184,11 +184,10 @@ public:
   ResponseFlagFilter(const envoy::config::accesslog::v3::ResponseFlagFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
-  const bool has_configured_flags_{};
   std::vector<bool> configured_flags_{};
 };
 
@@ -205,7 +204,7 @@ public:
   GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatusFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -229,7 +228,7 @@ public:
 
   LogTypeFilter(const envoy::config::accesslog::v3::LogTypeFilter& filter_config);
 
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -245,11 +244,11 @@ public:
   MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config,
                  Server::Configuration::CommonFactoryContext& context);
 
-  bool evaluate(const Formatter::HttpFormatterContext& context,
+  bool evaluate(const Formatter::Context& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
-  Matchers::ValueMatcherConstSharedPtr present_matcher_;
+  Matchers::PresentMatcher present_matcher_;
   Matchers::ValueMatcherConstSharedPtr value_matcher_;
 
   std::vector<std::string> path_;
@@ -269,7 +268,7 @@ public:
    */
   static InstanceSharedPtr
   fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-            Server::Configuration::FactoryContext& context,
+            Server::Configuration::GenericFactoryContext& context,
             std::vector<Formatter::CommandParserPtr>&& command_parsers = {});
 };
 

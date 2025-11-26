@@ -8,7 +8,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace ClientSideWeightedRoundRobin {
 namespace {
 
@@ -47,6 +47,6 @@ TEST(ClientSideWeightedRoundRobinConfigTest, ValidateFail) {
 
 } // namespace
 } // namespace ClientSideWeightedRoundRobin
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

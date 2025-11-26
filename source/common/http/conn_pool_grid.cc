@@ -4,6 +4,7 @@
 
 #include "source/common/http/http3_status_tracker_impl.h"
 #include "source/common/http/mixed_conn_pool.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "quiche/quic/core/http/spdy_utils.h"
 #include "quiche/quic/core/quic_versions.h"
@@ -33,8 +34,7 @@ std::string getTargetHostname(const Network::TransportSocketOptionsConstSharedPt
   }
   std::string default_sni =
       std::string(host->transportSocketFactory().defaultServerNameIndication());
-  if (!default_sni.empty() ||
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_alt_svc_for_ips")) {
+  if (!default_sni.empty()) {
     return default_sni;
   }
   // If there's no configured SNI the hostname is probably an IP address. Return it here.
@@ -51,6 +51,10 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { onNextAttemptTimer(); })),
       stream_options_(options) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
+    decoder_handle_ = decoder.createResponseDecoderHandle();
+  }
+
   if (!stream_options_.can_use_http3_) {
     // If alternate protocols are explicitly disabled, there must have been a failed request over
     // HTTP/3 and the failure must be post-handshake. So disable HTTP/3 for this request.
@@ -71,7 +75,21 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::~ConnectionAttem
 ConnectivityGrid::StreamCreationResult
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
   ASSERT(!parent_.grid_.isPoolHttp3(pool()) || parent_.stream_options_.can_use_http3_);
-  auto* cancellable = pool().newStream(parent_.decoder_, *this, parent_.stream_options_);
+  Http::ResponseDecoder& decoder = parent_.decoder_;
+  if (parent_.decoder_handle_ != nullptr) {
+    if (OptRef<ResponseDecoder> opt_ref = parent_.decoder_handle_->get(); opt_ref.has_value()) {
+      decoder = opt_ref.value().get();
+    } else {
+      const std::string error_msg = "parent_.decoder_ use after free detected.";
+      IS_ENVOY_BUG(error_msg);
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     error_msg);
+      return StreamCreationResult::ImmediateResult;
+    }
+  }
+
+  auto* cancellable = pool().newStream(decoder, *this, parent_.stream_options_);
   if (cancellable == nullptr) {
     return StreamCreationResult::ImmediateResult;
   }
@@ -140,11 +158,9 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
 
   // If there is another connection attempt in flight then let that proceed.
   if (!connection_attempts_.empty()) {
-    if (!grid_.isPoolHttp3(attempt->pool())) {
-      // TCP pool failed before HTTP/3 pool.
-      prev_tcp_pool_failure_reason_ = reason;
-      prev_tcp_pool_transport_failure_reason_ = transport_failure_reason;
-    }
+    prev_pool_failure_reason_ = reason;
+    prev_pool_transport_failure_reason_ = fmt::format(
+        "{}: {}", grid_.isPoolHttp3(attempt->pool()) ? "QUIC" : "TCP", transport_failure_reason);
     return;
   }
 
@@ -167,12 +183,12 @@ void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
   if (callbacks != nullptr) {
     ENVOY_LOG(trace, "Passing pool failure up to caller.");
     std::string failure_str;
-    if (prev_tcp_pool_failure_reason_.has_value()) {
-      // TCP pool failed early on, log its error details as well.
-      failure_str = fmt::format("{} (with earlier TCP attempt failure reason {}, {})",
-                                transport_failure_reason,
-                                static_cast<int>(prev_tcp_pool_failure_reason_.value()),
-                                prev_tcp_pool_transport_failure_reason_);
+    if (prev_pool_failure_reason_.has_value()) {
+      // The other pool (either TCP or QUIC depending on which failed first) also failed, log its
+      // error details as well.
+      failure_str = fmt::format(
+          "{} (with earlier attempt failure reason {}, {})", transport_failure_reason,
+          static_cast<int>(prev_pool_failure_reason_.value()), prev_pool_transport_failure_reason_);
       transport_failure_reason = failure_str;
     }
     callbacks->onPoolFailure(reason, transport_failure_reason, host);
@@ -180,6 +196,12 @@ void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
 }
 
 void ConnectivityGrid::WrapperCallbacks::deleteThis() {
+  if (delete_started_) {
+    // This instance has already been removed from the `wrapped_callbacks_` list and scheduled for
+    // deferred deletion.
+    return;
+  }
+  delete_started_ = true;
   // Set this to delete on the next dispatcher loop.
   grid_.dispatcher_.deferredDelete(removeFromList(grid_.wrapped_callbacks_));
 }
@@ -298,7 +320,8 @@ ConnectivityGrid::ConnectivityGrid(
     HttpServerPropertiesCacheSharedPtr alternate_protocols,
     ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
     Stats::Scope& scope, Http::PersistentQuicInfo& quic_info,
-    OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry)
+    OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
+    Server::OverloadManager& overload_manager)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host), options_(options),
       transport_socket_options_(transport_socket_options), state_(state),
       next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
@@ -307,16 +330,17 @@ ConnectivityGrid::ConnectivityGrid(
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
       origin_("https", getTargetHostname(transport_socket_options, host_),
               host_->address()->ip()->port()),
-      quic_info_(quic_info), priority_(priority),
+      quic_info_(quic_info), priority_(priority), overload_manager_(overload_manager),
       network_observer_registry_(network_observer_registry) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   ASSERT(connectivity_options.protocols_.size() == 3);
   ASSERT(alternate_protocols);
-  std::chrono::milliseconds rtt =
-      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(origin_));
+  std::chrono::microseconds rtt = alternate_protocols_->getSrtt(
+      origin_,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_canonical_suffix_for_srtt"));
   if (rtt.count() != 0) {
-    next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 2);
+    next_attempt_duration_ = std::chrono::duration_cast<std::chrono::milliseconds>(rtt * 1.5);
   }
 }
 
@@ -380,15 +404,15 @@ ConnectionPool::Instance* ConnectivityGrid::getOrCreateHttp2Pool() {
 ConnectionPool::InstancePtr ConnectivityGrid::createHttp2Pool() {
   return std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
                                                  options_, transport_socket_options_, state_,
-                                                 origin_, alternate_protocols_);
+                                                 origin_, alternate_protocols_, overload_manager_);
 }
 
 ConnectionPool::InstancePtr ConnectivityGrid::createHttp3Pool(bool attempt_alternate_address) {
-  return Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
-                                 transport_socket_options_, state_, quic_stat_names_,
-                                 *alternate_protocols_, scope_,
-                                 makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this),
-                                 quic_info_, network_observer_registry_, attempt_alternate_address);
+  return Http3::allocateConnPool(
+      dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_, state_,
+      quic_stat_names_, *alternate_protocols_, scope_,
+      makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_,
+      network_observer_registry_, overload_manager_, attempt_alternate_address);
 }
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {

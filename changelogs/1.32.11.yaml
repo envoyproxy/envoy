@@ -1,0 +1,7 @@
+date: September 2, 2025
+
+bug_fixes:
+- area: oauth2
+  change: |
+    Fixed an issue where cookies prefixed with ``__Secure-`` or ``__Host-`` were not receiving a
+    Secure attribute (`CVE-2025-55162 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-95j4-hw7f-v2rh>`_).

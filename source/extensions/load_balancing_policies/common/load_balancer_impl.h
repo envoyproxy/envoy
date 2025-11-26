@@ -20,9 +20,11 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/common/upstream/edf_scheduler.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/extensions/load_balancing_policies/common/locality_wrr.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -51,28 +53,6 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
 
 class LoadBalancerConfigHelper {
 public:
-  template <class LegacyProto>
-  static absl::optional<envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig>
-  slowStartConfigFromLegacyProto(const LegacyProto& proto_config) {
-    if (!proto_config.has_slow_start_config()) {
-      return {};
-    }
-
-    envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig slow_start_config;
-    const auto& legacy_slow_start_config = proto_config.slow_start_config();
-    if (legacy_slow_start_config.has_slow_start_window()) {
-      *slow_start_config.mutable_slow_start_window() = legacy_slow_start_config.slow_start_window();
-    }
-    if (legacy_slow_start_config.has_aggression()) {
-      *slow_start_config.mutable_aggression() = legacy_slow_start_config.aggression();
-    }
-    if (legacy_slow_start_config.has_min_weight_percent()) {
-      *slow_start_config.mutable_min_weight_percent() =
-          legacy_slow_start_config.min_weight_percent();
-    }
-    return slow_start_config;
-  }
-
   template <class Proto>
   static absl::optional<envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig>
   slowStartConfigFromProto(const Proto& proto_config) {
@@ -82,10 +62,6 @@ public:
     return proto_config.slow_start_config();
   }
 
-  static absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
-  localityLbConfigFromCommonLbConfig(
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
-
   template <class Proto>
   static absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
   localityLbConfigFromProto(const Proto& proto_config) {
@@ -93,6 +69,63 @@ public:
       return {};
     }
     return proto_config.locality_lb_config();
+  }
+
+  template <class TargetProto>
+  static void
+  convertHashLbConfigTo(const envoy::config::cluster::v3::Cluster::CommonLbConfig& source,
+                        TargetProto& target) {
+    if (source.has_consistent_hashing_lb_config()) {
+      target.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(
+          source.consistent_hashing_lb_config().use_hostname_for_hashing());
+
+      if (source.consistent_hashing_lb_config().has_hash_balance_factor()) {
+        *target.mutable_consistent_hashing_lb_config()->mutable_hash_balance_factor() =
+            source.consistent_hashing_lb_config().hash_balance_factor();
+      }
+    }
+  }
+
+  template <class TargetProto>
+  static void
+  convertLocalityLbConfigTo(const envoy::config::cluster::v3::Cluster::CommonLbConfig& source,
+                            TargetProto& target) {
+    if (source.has_locality_weighted_lb_config()) {
+      target.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
+    } else if (source.has_zone_aware_lb_config()) {
+      auto& zone_aware_lb_config =
+          *target.mutable_locality_lb_config()->mutable_zone_aware_lb_config();
+      const auto& legacy = source.zone_aware_lb_config();
+
+      zone_aware_lb_config.set_fail_traffic_on_panic(legacy.fail_traffic_on_panic());
+
+      if (legacy.has_routing_enabled()) {
+        *zone_aware_lb_config.mutable_routing_enabled() = legacy.routing_enabled();
+      }
+      if (legacy.has_min_cluster_size()) {
+        *zone_aware_lb_config.mutable_min_cluster_size() = legacy.min_cluster_size();
+      }
+    }
+  }
+
+  template <class SourceProto, class TargetProto>
+  static void convertSlowStartConfigTo(const SourceProto& source, TargetProto& target) {
+    if (!source.has_slow_start_config()) {
+      return;
+    }
+
+    auto& slow_start_config = *target.mutable_slow_start_config();
+    const auto& legacy = source.slow_start_config();
+
+    if (legacy.has_slow_start_window()) {
+      *slow_start_config.mutable_slow_start_window() = legacy.slow_start_window();
+    }
+    if (legacy.has_aggression()) {
+      *slow_start_config.mutable_aggression() = legacy.aggression();
+    }
+    if (legacy.has_min_weight_percent()) {
+      *slow_start_config.mutable_min_weight_percent() = legacy.min_weight_percent();
+    }
   }
 };
 
@@ -404,6 +437,16 @@ private:
     return absl::nullopt;
   }
 
+  absl::optional<uint32_t> chooseHealthyLocality(HostSet& host_set) const {
+    ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
+    return per_priority_state_[host_set.priority()]->locality_wrr_->chooseHealthyLocality();
+  };
+
+  absl::optional<uint32_t> chooseDegradedLocality(HostSet& host_set) const {
+    ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
+    return per_priority_state_[host_set.priority()]->locality_wrr_->chooseDegradedLocality();
+  };
+
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 
@@ -416,8 +459,14 @@ private:
     // for each of the non-local localities to determine what traffic should be
     // routed where.
     std::vector<uint64_t> residual_capacity_;
+
+    // Locality Weighted Round Robin config.
+    std::unique_ptr<LocalityWrr> locality_wrr_;
   };
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
+
+  void rebuildLocalityWrrForPriority(uint32_t priority);
+
   // Routing state broken out for each priority level in priority_set_.
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandlePtr priority_update_cb_;
@@ -425,10 +474,11 @@ private:
 
   // Config for zone aware routing.
   const uint64_t min_cluster_size_;
+  const absl::optional<uint32_t> force_local_zone_min_size_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t routing_enabled_;
+  const LocalityLbConfig::ZoneAwareLbConfig::LocalityBasis locality_basis_;
   const bool fail_traffic_on_panic_ : 1;
-  const bool force_locality_direct_routing_ : 1;
 
   // If locality weight aware routing is enabled.
   const bool locality_weighted_balancing_ : 1;

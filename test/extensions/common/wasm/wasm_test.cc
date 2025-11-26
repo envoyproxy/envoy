@@ -148,7 +148,7 @@ TEST_P(WasmCommonTest, WasmFailState) {
             Filters::Common::Expr::CelValue::Type::kNullType);
   wasm_state->setValue("foo");
   auto any = wasm_state->serializeAsProto();
-  EXPECT_TRUE(static_cast<ProtobufWkt::Any*>(any.get())->Is<ProtobufWkt::BytesValue>());
+  EXPECT_TRUE(static_cast<Protobuf::Any*>(any.get())->Is<Protobuf::BytesValue>());
 }
 
 TEST_P(WasmCommonTest, Logging) {
@@ -580,7 +580,7 @@ TEST_P(WasmCommonTest, VmCache) {
 
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
-  ProtobufWkt::StringValue vm_configuration_string;
+  Protobuf::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
   vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
   std::string code;
@@ -669,7 +669,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
 
     auto vm_config = plugin_config.mutable_vm_config();
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
-    ProtobufWkt::BytesValue vm_configuration_bytes;
+    Protobuf::BytesValue vm_configuration_bytes;
     vm_configuration_bytes.set_value(vm_configuration);
     vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
     std::string sha256 = Extensions::Common::Wasm::sha256(code);
@@ -772,7 +772,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
 
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
-  ProtobufWkt::StringValue vm_configuration_string;
+  Protobuf::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
   vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
   std::string sha256 = Extensions::Common::Wasm::sha256(code);

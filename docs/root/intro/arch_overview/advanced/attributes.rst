@@ -141,6 +141,7 @@ The following attributes are available once the upstream connection is establish
    :widths: 1, 1, 4
 
    upstream.address, string, Upstream connection remote address
+   upstream.num_endpoints, uint64, the number of endpoints of the upstream cluster.
    upstream.port, int, Upstream connection remote port
    upstream.tls_version, string, TLS version of the upstream TLS connection
    upstream.subject_local_certificate, string, The subject field of the local certificate in the upstream TLS connection
@@ -201,6 +202,7 @@ following attributes:
    xds.virtual_host_name, string, Virtual host name.
    xds.virtual_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Virtual host metadata
    xds.upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata
+   xds.upstream_host_locality_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host locality metadata
    xds.filter_chain_name, string, Listener filter chain name
 
 

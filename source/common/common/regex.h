@@ -28,6 +28,9 @@ public:
   static absl::StatusOr<std::unique_ptr<CompiledGoogleReMatcher>>
   create(const xds::type::matcher::v3::RegexMatcher& config);
 
+  // To avoid hiding other implementations of match.
+  using CompiledMatcher::match;
+
   // CompiledMatcher
   bool match(absl::string_view value) const override { return re2::RE2::FullMatch(value, regex_); }
 

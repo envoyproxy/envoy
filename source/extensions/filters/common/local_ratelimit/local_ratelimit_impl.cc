@@ -37,10 +37,8 @@ ShareProviderManager::ShareProviderManager(Event::Dispatcher& main_dispatcher,
     : main_dispatcher_(main_dispatcher), cluster_(cluster) {
   // It's safe to capture the local cluster reference here because the local cluster is
   // guaranteed to be static cluster and should never be removed.
-  handle_ = cluster_.prioritySet().addMemberUpdateCb([this](const auto&, const auto&) {
-    share_monitor_->onLocalClusterUpdate(cluster_);
-    return absl::OkStatus();
-  });
+  handle_ = cluster_.prioritySet().addMemberUpdateCb(
+      [this](const auto&, const auto&) { share_monitor_->onLocalClusterUpdate(cluster_); });
   share_monitor_ = std::make_shared<DefaultEvenShareMonitor>();
   share_monitor_->onLocalClusterUpdate(cluster_);
 }
@@ -67,7 +65,7 @@ ShareProviderManagerSharedPtr ShareProviderManager::singleton(Event::Dispatcher&
         if (!local_cluster_name.has_value()) {
           return nullptr;
         }
-        auto cluster = cm.clusters().getCluster(local_cluster_name.value());
+        auto cluster = cm.getActiveOrWarmingCluster(local_cluster_name.value());
         if (!cluster.has_value()) {
           return nullptr;
         }
@@ -291,7 +289,7 @@ DynamicDescriptor::DynamicDescriptor(uint64_t per_descriptor_max_tokens,
 
 RateLimitTokenBucketSharedPtr
 DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descriptor) {
-  absl::WriterMutexLock lock(&dyn_desc_lock_);
+  absl::WriterMutexLock lock(dyn_desc_lock_);
   auto iter = dynamic_descriptors_.find(request_descriptor);
   if (iter != dynamic_descriptors_.end()) {
     if (iter->second.second != lru_list_.begin()) {

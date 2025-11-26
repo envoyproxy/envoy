@@ -84,4 +84,10 @@ TEST(OsSyscallsTest, IoCtlInvalidFd) {
   EXPECT_NE(0, Api::OsSysCallsSingleton::get().ioctl(0, 0, nullptr, 0, nullptr, 0, nullptr).errno_);
 }
 
+TEST(OsSyscallsTest, Setrlimit) {
+  // Not all environments support it, but it is safe to read limits.
+  struct rlimit rlim;
+  Api::OsSysCallsSingleton::get().getrlimit(RLIMIT_NOFILE, &rlim);
+}
+
 } // namespace Envoy

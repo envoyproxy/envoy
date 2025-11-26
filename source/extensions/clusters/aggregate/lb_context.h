@@ -65,6 +65,9 @@ public:
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return context_->upstreamTransportSocketOptions();
   }
+  void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)> modifier) override {
+    context_->setHeadersModifier(std::move(modifier));
+  }
 
 private:
   Upstream::HealthyAndDegradedLoad priority_load_;

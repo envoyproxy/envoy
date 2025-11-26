@@ -119,7 +119,7 @@ TEST_P(WasmFactoryTest, UnknownRuntime) {
 }
 
 TEST_P(WasmFactoryTest, StartFailed) {
-  ProtobufWkt::StringValue plugin_configuration;
+  Protobuf::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
   config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
       plugin_configuration);
@@ -129,7 +129,7 @@ TEST_P(WasmFactoryTest, StartFailed) {
 }
 
 TEST_P(WasmFactoryTest, ConfigureFailed) {
-  ProtobufWkt::StringValue plugin_configuration;
+  Protobuf::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
   config_.mutable_config()->mutable_configuration()->PackFrom(plugin_configuration);
 

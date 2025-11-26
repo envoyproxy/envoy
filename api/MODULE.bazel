@@ -1,0 +1,102 @@
+module(
+    name = "envoy_api",
+    version = "1.37.0-dev",
+)
+
+# Version overrides to ensure compatibility between grpc and googleapis
+# grpc 1.72.0 depends on envoy_api BCR module which has a different googleapis version
+# We override to use the version that grpc itself expects
+single_version_override(
+    module_name = "googleapis",
+    version = "0.0.0-20240819-fe8ba054a",
+)
+
+# All bazel_dep entries are organized alphabetically for improved readability.
+
+# Core dependencies from Bazel Central Registry
+bazel_dep(name = "abseil-cpp", version = "20250127.1", repo_name = "com_google_absl")
+bazel_dep(name = "bazel_skylib", version = "1.8.2")
+bazel_dep(name = "cel-spec", version = "0.24.0", repo_name = "dev_cel")
+bazel_dep(name = "gazelle", version = "0.45.0", repo_name = "bazel_gazelle")
+bazel_dep(name = "googleapis", version = "0.0.0-20240819-fe8ba054a", repo_name = "com_google_googleapis")
+bazel_dep(name = "grpc", version = "1.66.0.bcr.2", repo_name = "com_github_grpc_grpc")
+bazel_dep(name = "opencensus-proto", version = "0.4.1", repo_name = "opencensus_proto")
+bazel_dep(name = "opentelemetry-proto", version = "1.8.0", repo_name = "opentelemetry_proto")
+bazel_dep(name = "protobuf", version = "29.3", repo_name = "com_google_protobuf")
+bazel_dep(name = "protoc-gen-validate", version = "1.2.1.bcr.1", repo_name = "com_envoyproxy_protoc_gen_validate")
+bazel_dep(name = "re2", version = "2024-07-02.bcr.1", repo_name = "com_googlesource_code_re2")
+bazel_dep(name = "rules_cc", version = "0.2.10")
+bazel_dep(name = "rules_go", version = "0.57.0", repo_name = "io_bazel_rules_go")
+bazel_dep(name = "rules_java", version = "8.7.1")
+bazel_dep(name = "rules_jvm_external", version = "6.8")
+bazel_dep(name = "rules_proto", version = "7.1.0")
+bazel_dep(name = "rules_python", version = "1.4.1")
+bazel_dep(name = "xds", version = "0.0.0-20240423-555b57e", repo_name = "com_github_cncf_xds")
+bazel_dep(name = "zipkin-api", version = "1.0.0", repo_name = "com_github_openzipkin_zipkinapi")
+
+# Test dependencies from Bazel Central Registry
+bazel_dep(name = "googletest", version = "1.17.0", dev_dependency = True, repo_name = "com_google_googletest")
+
+# Go SDK and toolchain configuration
+go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.24.6")
+use_repo(
+    go_sdk,
+    "go_toolchains",
+)
+
+# Googleapis extension for language-specific rules
+# Using switched_rules from googleapis for compatibility with grpc
+switched_rules = use_extension("@com_google_googleapis//:extensions.bzl", "switched_rules")
+switched_rules.use_languages(
+    cc = True,
+    go = True,
+    java = True,
+)
+use_repo(switched_rules, "com_google_googleapis_imports")
+
+# Non-BCR dependencies extension
+# These dependencies are not yet available in BCR or require custom build files
+non_module_deps = use_extension("//bazel:extensions.bzl", "non_module_deps")
+use_repo(
+    non_module_deps,
+    "com_github_chrusty_protoc_gen_jsonschema",
+    "envoy_toolshed",
+    "prometheus_metrics_model",
+)
+
+# Go dependencies extension
+go_deps = use_extension("@bazel_gazelle//:extensions.bzl", "go_deps")
+go_deps.module(
+    path = "github.com/planetscale/vtprotobuf",
+    sum = "h1:ujRGEVWJEoaxQ+8+HMl8YEpGaDAgohgZxJ5S+d2TTFQ=",
+    version = "v0.6.1-0.20240409071808-615f978279ca",
+)
+go_deps.module(
+    path = "google.golang.org/protobuf",
+    sum = "h1:82DV7MYdb8anAVi3qge1wSnMDrnKK7ebr+I0hHRN1BU=",
+    version = "v1.36.3",
+)
+go_deps.module(
+    path = "google.golang.org/genproto/googleapis/rpc",
+    sum = "h1:OxYkA3wjPsZyBylwymxSHa7ViiW1Sml4ToBrncvFehI=",
+    version = "v0.0.0-20250115164207-1a7da9e5054f",
+)
+go_deps.module(
+    path = "google.golang.org/genproto/googleapis/api",
+    sum = "h1:gap6+3Gk41EItBuyi4XX/bp4oqJ3UwuIMl25yGinuAA=",
+    version = "v0.0.0-20250115164207-1a7da9e5054f",
+)
+go_deps.module(
+    path = "github.com/golang/protobuf",
+    sum = "h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=",
+    version = "v1.5.4",
+)
+use_repo(
+    go_deps,
+    "com_github_golang_protobuf",
+    "com_github_planetscale_vtprotobuf",
+    "org_golang_google_genproto_googleapis_api",
+    "org_golang_google_genproto_googleapis_rpc",
+    "org_golang_google_protobuf",
+)

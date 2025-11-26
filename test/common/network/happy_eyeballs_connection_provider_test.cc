@@ -62,7 +62,8 @@ TEST_F(HappyEyeballsConnectionProviderTest, SortAddressesWithHappyEyeballsConfig
   he_config.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
   he_config.mutable_first_address_family_count()->set_value(2);
-  auto config = absl::make_optional(he_config);
+  OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig> config =
+      he_config;
 
   // All v4 address so unchanged.
   std::vector<Address::InstanceConstSharedPtr> v4_list = {ip_v4_1, ip_v4_2, ip_v4_3, ip_v4_4};
@@ -95,7 +96,8 @@ TEST_F(HappyEyeballsConnectionProviderTest, SortAddressesWithHappyEyeballsConfig
   // missing first_address_family_version
   envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig he_config_no_version;
   he_config_no_version.mutable_first_address_family_count()->set_value(2);
-  auto config_no_version = absl::make_optional(he_config_no_version);
+  OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      config_no_version = he_config_no_version;
   // first_address_family_version should default to DEFAULT when absent.
   // v6 then v4, return interleaved list.
   std::vector<Address::InstanceConstSharedPtr> interleaved4 = {ip_v6_1, ip_v6_2, ip_v4_1, ip_v4_2};
@@ -106,7 +108,8 @@ TEST_F(HappyEyeballsConnectionProviderTest, SortAddressesWithHappyEyeballsConfig
   envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig he_config_no_count;
   he_config_no_count.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
-  auto config_no_count = absl::make_optional(he_config_no_count);
+  OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      config_no_count = he_config_no_count;
   // first_address_family_count should default to 1 when absent.
   // v6 then v4, return interleaved list.
   std::vector<Address::InstanceConstSharedPtr> interleaved5 = {ip_v4_1, ip_v6_1, ip_v4_2, ip_v6_2};

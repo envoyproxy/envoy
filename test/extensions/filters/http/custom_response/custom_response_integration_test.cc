@@ -24,8 +24,8 @@ using LocalResponsePolicyProto =
 using RedirectPolicyProto =
     envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy;
 using RedirectActionProto = envoy::config::route::v3::RedirectAction;
+using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
-using Envoy::ProtobufWkt::Any;
 
 namespace {
 

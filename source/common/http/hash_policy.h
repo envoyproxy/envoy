@@ -22,18 +22,16 @@ public:
          Regex::Engine& regex_engine);
 
   // Http::HashPolicy
-  absl::optional<uint64_t>
-  generateHash(const Network::Address::Instance* downstream_addr, const RequestHeaderMap& headers,
-               const AddCookieCallback add_cookie,
-               const StreamInfo::FilterStateSharedPtr filter_state) const override;
+  absl::optional<uint64_t> generateHash(OptRef<const RequestHeaderMap> headers,
+                                        OptRef<const StreamInfo::StreamInfo> info,
+                                        AddCookieCallback add_cookie = nullptr) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() = default;
-    virtual absl::optional<uint64_t>
-    evaluate(const Network::Address::Instance* downstream_addr, const RequestHeaderMap& headers,
-             const AddCookieCallback add_cookie,
-             const StreamInfo::FilterStateSharedPtr filter_state) const PURE;
+    virtual absl::optional<uint64_t> evaluate(OptRef<const RequestHeaderMap> headers,
+                                              OptRef<const StreamInfo::StreamInfo> info,
+                                              AddCookieCallback add_cookie = nullptr) const PURE;
 
     // If the method is a terminal method, ignore rest of the hash policy chain.
     virtual bool terminal() const PURE;

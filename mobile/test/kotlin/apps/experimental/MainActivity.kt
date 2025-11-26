@@ -84,7 +84,6 @@ class MainActivity : Activity() {
             Log.d(TAG, "Event emitted: ${entry.key}, ${entry.value}")
           }
         })
-        .useCares(true)
         .build()
 
     recyclerView = findViewById<RecyclerView>(R.id.recycler_view)!!

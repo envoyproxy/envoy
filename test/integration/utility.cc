@@ -226,9 +226,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
           cluster, "",
           *Network::Utility::resolveUrl(
               fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp"))),
-          nullptr, nullptr, envoy::config::core::v3::Locality().default_instance(),
-          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-          time_system));
+          nullptr, nullptr, std::make_shared<envoy::config::core::v3::Locality>(),
+          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0));
 
   if (type <= Http::CodecType::HTTP2) {
     Http::CodecClientProd client(type,
@@ -249,7 +248,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                                "spiffe://lyft.com/backend-team");
   auto& quic_transport_socket_factory =
       dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*transport_socket_factory);
-  auto persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher, 0);
+  std::unique_ptr<Quic::PersistentQuicInfoImpl> persistent_info =
+      Quic::createPersistentQuicInfoForCluster(*dispatcher, *cluster);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {

@@ -142,6 +142,7 @@ public:
   MOCK_METHOD(uint64_t, latch, ());
   MOCK_METHOD(void, reset, ());
   MOCK_METHOD(bool, used, (), (const));
+  MOCK_METHOD(void, markUnused, ());
   MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(uint64_t, value, (), (const));
 
@@ -164,6 +165,7 @@ public:
   MOCK_METHOD(void, sub, (uint64_t amount));
   MOCK_METHOD(void, mergeImportMode, (ImportMode));
   MOCK_METHOD(bool, used, (), (const));
+  MOCK_METHOD(void, markUnused, ());
   MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(uint64_t, value, (), (const));
   MOCK_METHOD(absl::optional<bool>, cachedShouldImport, (), (const));
@@ -181,6 +183,7 @@ public:
   ~MockHistogram() override;
 
   MOCK_METHOD(bool, used, (), (const));
+  MOCK_METHOD(void, markUnused, ());
   MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(Histogram::Unit, unit, (), (const));
   MOCK_METHOD(void, recordValue, (uint64_t value));
@@ -206,6 +209,7 @@ public:
   std::string quantileSummary() const override { return ""; };
   std::string bucketSummary() const override { return ""; };
   MOCK_METHOD(bool, used, (), (const));
+  MOCK_METHOD(void, markUnused, ());
   MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(Histogram::Unit, unit, (), (const));
   MOCK_METHOD(void, recordValue, (uint64_t value));
@@ -292,10 +296,10 @@ class MockScope : public TestUtil::TestScope {
 public:
   MockScope(StatName prefix, MockStore& store);
 
-  ScopeSharedPtr createScope(const std::string& name) override {
+  ScopeSharedPtr createScope(const std::string& name, bool) override {
     return ScopeSharedPtr(createScope_(name));
   }
-  ScopeSharedPtr scopeFromStatName(StatName name) override {
+  ScopeSharedPtr scopeFromStatName(StatName name, bool) override {
     return createScope_(symbolTable().toString(name));
   }
 
@@ -308,7 +312,10 @@ public:
   // Override the lowest level of stat creation based on StatName to redirect
   // back to the old string-based mechanisms still on the MockStore object
   // to allow tests to inject EXPECT_CALL hooks for those.
-  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef) override;
+  MOCK_METHOD(Counter&, counterFromStatNameWithTags,
+              (const StatName&, StatNameTagVectorOptConstRef));
+  Counter& counterFromStatNameWithTags_(const StatName& name, StatNameTagVectorOptConstRef);
+
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
                                    Gauge::ImportMode import_mode) override;
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,

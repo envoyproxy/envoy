@@ -191,6 +191,7 @@ private:
   HEADER_FUNC(EnvoyRetriableHeaderNames)                                                           \
   HEADER_FUNC(EnvoyIsTimeoutRetry)                                                                 \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
+  HEADER_FUNC(EnvoyOriginalHost)                                                                   \
   HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutAltResponse)                                              \
@@ -682,7 +683,7 @@ public:
   RegisterCustomInlineHeader(const LowerCaseString& header)
       : handle_(CustomInlineHeaderRegistry::registerInlineHeader<type>(header)) {}
 
-  typename CustomInlineHeaderRegistry::Handle<type> handle() { return handle_; }
+  typename CustomInlineHeaderRegistry::Handle<type> handle() const { return handle_; }
 
 private:
   const typename CustomInlineHeaderRegistry::Handle<type> handle_;

@@ -14,7 +14,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace ClusterProvided {
 namespace {
 
@@ -118,6 +118,6 @@ TEST_P(ClusterProvidedIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
 
 } // namespace
 } // namespace ClusterProvided
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

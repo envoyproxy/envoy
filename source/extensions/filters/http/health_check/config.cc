@@ -44,6 +44,10 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   if (!pass_through_mode && !proto_config.cluster_min_healthy_percentages().empty()) {
     auto cluster_to_percentage = std::make_unique<ClusterMinHealthyPercentages>();
     for (const auto& item : proto_config.cluster_min_healthy_percentages()) {
+      if (std::isnan(item.second.value())) {
+        throw EnvoyException(absl::StrCat(
+            "cluster_min_healthy_percentages contains a NaN value for cluster: ", item.first));
+      }
       cluster_to_percentage->emplace(std::make_pair(item.first, item.second.value()));
     }
     cluster_min_healthy_percentages = std::move(cluster_to_percentage);

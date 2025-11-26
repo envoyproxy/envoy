@@ -20,7 +20,7 @@ using AuthenticatorPtr = std::unique_ptr<Authenticator>;
 using AuthenticatorCallback = std::function<void(const ::google::jwt_verify::Status& status)>;
 
 using SetExtractedJwtDataCallback =
-    std::function<void(const std::string&, const ProtobufWkt::Struct&)>;
+    std::function<void(const std::string&, const Protobuf::Struct&)>;
 
 using ClearRouteCacheCallback = std::function<void()>;
 

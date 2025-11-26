@@ -5,30 +5,28 @@
 namespace Envoy {
 namespace Upstream {
 
+using RoundRobinLbProto = envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin;
+using CommonLbConfigProto = envoy::config::cluster::v3::Cluster::CommonLbConfig;
+using LegacyRoundRobinLbProto = envoy::config::cluster::v3::Cluster::RoundRobinLbConfig;
+
+/**
+ * Load balancer config that used to wrap the proto config.
+ */
+class TypedRoundRobinLbConfig : public Upstream::LoadBalancerConfig {
+public:
+  TypedRoundRobinLbConfig(const RoundRobinLbProto& lb_config);
+  TypedRoundRobinLbConfig(const CommonLbConfigProto& common_lb_config,
+                          const LegacyRoundRobinLbProto& lb_config);
+
+  RoundRobinLbProto lb_config_;
+};
+
 /**
  * A round robin load balancer. When in weighted mode, EDF scheduling is used. When in not
  * weighted mode, simple RR index selection is used.
  */
 class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
 public:
-  RoundRobinLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
-      TimeSource& time_source)
-      : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random,
-            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
-                                                           100, 50),
-            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
-            round_robin_config.has_value()
-                ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(round_robin_config.ref())
-                : absl::nullopt,
-            time_source) {
-    initialize();
-  }
-
   RoundRobinLoadBalancer(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,

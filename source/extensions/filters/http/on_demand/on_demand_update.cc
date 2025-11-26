@@ -6,6 +6,7 @@
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
@@ -58,20 +59,50 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
   if (!odcds_config.has_value()) {
     return DecodeHeadersBehavior::rds();
   }
-  Upstream::OdCdsApiHandlePtr odcds;
-  if (odcds_config->resources_locator().empty()) {
-    odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
-                                                      odcds_config->source(), absl::nullopt,
-                                                      validation_visitor),
-                                  Upstream::OdCdsApiHandlePtr);
-  } else {
-    auto locator = THROW_OR_RETURN_VALUE(
-        Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator()),
-        xds::core::v3::ResourceLocator);
-    odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
-                                                      odcds_config->source(), locator,
-                                                      validation_visitor),
-                                  Upstream::OdCdsApiHandlePtr);
+  Upstream::OdCdsApiHandlePtr odcds = nullptr;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions")) {
+    // For xDS-TP based configs, both the odcds_config->source and
+    // odcds_config->resources_locator must be empty.
+    if (!odcds_config->has_source() && odcds_config->resources_locator().empty()) {
+      odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create,
+                                                        odcds_config->source(), absl::nullopt,
+                                                        validation_visitor),
+                                    Upstream::OdCdsApiHandlePtr);
+    }
+  }
+  // TODO(adisuissa): Once the
+  // "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions" runtime flag is
+  // deprecated, change "if (odcds == nullptr)" to "else" (and further merge the else with the "if
+  // (odcds_config->resources_locator().empty())").
+  if (odcds == nullptr) {
+    if (odcds_config->resources_locator().empty()) {
+      // If the config-source is ADS, use a singleton-subscription mechanism,
+      // similar to xDS-TP based configs.
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.odcds_over_ads_fix")) {
+        if (odcds_config->source().config_source_specifier_case() ==
+            envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
+          odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create,
+                                                            odcds_config->source(), absl::nullopt,
+                                                            validation_visitor),
+                                        Upstream::OdCdsApiHandlePtr);
+        }
+      }
+      if (odcds == nullptr) {
+        odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
+                                                          odcds_config->source(), absl::nullopt,
+                                                          validation_visitor),
+                                      Upstream::OdCdsApiHandlePtr);
+      }
+    } else {
+      auto locator = THROW_OR_RETURN_VALUE(
+          Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator()),
+          xds::core::v3::ResourceLocator);
+      odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
+                                                        odcds_config->source(), locator,
+                                                        validation_visitor),
+                                    Upstream::OdCdsApiHandlePtr);
+    }
   }
   // If changing the default timeout, please update the documentation in on_demand.proto too.
   auto timeout =
@@ -130,7 +161,9 @@ OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
   return makeOptRefFromPtr(callbacks_->route().get());
 }
 
-Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&, bool) {
+Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&,
+                                                             bool end_stream) {
+  downstream_end_stream_ = end_stream;
   auto config = getConfig();
 
   config->decodeHeadersBehavior().decodeHeaders(*this);
@@ -176,13 +209,15 @@ const OnDemandFilterConfig* OnDemandRouteUpdate::getConfig() {
   return config_.get();
 }
 
-Http::FilterDataStatus OnDemandRouteUpdate::decodeData(Buffer::Instance&, bool) {
+Http::FilterDataStatus OnDemandRouteUpdate::decodeData(Buffer::Instance&, bool end_stream) {
+  downstream_end_stream_ = end_stream;
   return filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration
              ? Http::FilterDataStatus::StopIterationAndWatermark
              : Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus OnDemandRouteUpdate::decodeTrailers(Http::RequestTrailerMap&) {
+  downstream_end_stream_ = true;
   return Http::FilterTrailersStatus::Continue;
 }
 
@@ -210,9 +245,17 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     return;
   }
 
-  if (route_exists &&                  // route can be resolved after an on-demand
-                                       // VHDS update
-      !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
+  bool can_recreate_stream = false;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.on_demand_track_end_stream")) {
+    // New behavior: track end_stream state to support stream recreation with fully read bodies.
+    can_recreate_stream = downstream_end_stream_;
+  } else {
+    // Old behavior: reject all requests with bodies.
+    can_recreate_stream = !callbacks_->decodingBuffer();
+  }
+  if (route_exists &&        // route can be resolved after an on-demand
+                             // VHDS update
+      can_recreate_stream && // Redirects require fully read body.
       callbacks_->recreateStream(/*headers=*/nullptr)) {
     return;
   }
@@ -226,8 +269,16 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     Upstream::ClusterDiscoveryStatus cluster_status) {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
   cluster_discovery_handle_.reset();
+  bool can_recreate_stream = false;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.on_demand_track_end_stream")) {
+    // New behavior: track end_stream state to support stream recreation with fully read bodies.
+    can_recreate_stream = downstream_end_stream_;
+  } else {
+    // Old behavior: reject all requests with bodies.
+    can_recreate_stream = !callbacks_->decodingBuffer();
+  }
   if (cluster_status == Upstream::ClusterDiscoveryStatus::Available &&
-      !callbacks_->decodingBuffer()) { // Redirects with body not yet supported.
+      can_recreate_stream) { // Redirects require fully read body.
     const Http::ResponseHeaderMap* headers = nullptr;
     if (callbacks_->recreateStream(headers)) {
       callbacks_->downstreamCallbacks()->clearRouteCache();

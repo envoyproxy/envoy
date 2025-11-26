@@ -34,7 +34,7 @@ class LoadStatsReporter
       Logger::Loggable<Logger::Id::upstream> {
 public:
   LoadStatsReporter(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
-                    Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
+                    Stats::Scope& scope, Grpc::RawAsyncClientSharedPtr&& async_client,
                     Event::Dispatcher& dispatcher);
 
   // Grpc::AsyncStreamCallbacks

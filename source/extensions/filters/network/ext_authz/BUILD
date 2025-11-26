@@ -24,6 +24,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:matchers_lib",
+        "//source/common/tls:connection_info_impl_base_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",

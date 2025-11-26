@@ -32,8 +32,10 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
     return;
   }
 
-  const Formatter::HttpFormatterContext formatter_context{
-      request_headers.get(), response_headers.get(), response_trailers.get()};
+  Formatter::Context formatter_context;
+  formatter_context.setRequestHeaders(*request_headers)
+      .setResponseHeaders(*response_headers)
+      .setResponseTrailers(*response_trailers);
 
   // Text formatter.
   {
@@ -52,23 +54,25 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
     }
 
     // This should never throw.
-    formatter->formatWithContext(formatter_context, *stream_info);
+    formatter->format(formatter_context, *stream_info);
     ENVOY_LOG_MISC(trace, "TEXT formatter Success");
   }
 
   // JSON formatter.
   {
 
-    Formatter::FormatterPtr formatter;
-    Formatter::FormatterPtr typed_formatter;
+    Formatter::FormatterPtr formatter_keep_empty;
+    Formatter::FormatterPtr formatter_omit_empty;
 
     try {
       // Create struct for JSON formatter.
-      ProtobufWkt::Struct struct_for_json_formatter;
+      Protobuf::Struct struct_for_json_formatter;
       TestUtility::loadFromYaml(fmt::format(R"EOF(
+      may_empty_a: '%REQ(may_empty)%'
       raw_bool_value: true
       raw_nummber_value: 6
       nested_list:
+        - '%REQ(may_empty)%'
         - 14
         - "3.14"
         - false
@@ -76,26 +80,43 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
         - '%REQ(key_1)%'
         - '%REQ(error)%'
         - {}
+        -'%REQ(may_empty)%'
       request_duration: '%REQUEST_DURATION%'
+      may_empty_f: '%REQ(may_empty)%'
       nested_level:
+        may_empty_c: '%REQ(may_empty)%'
         plain_string: plain_string_value
+        may_empty_e: '%REQ(may_empty)%'
         protocol: '%PROTOCOL%'
         fuzz_format: {}
+        may_empty_d: '%REQ(may_empty)%'
       request_key: '%REQ(key_1)%_@!!!_"_%REQ(key_2)%'
+      may_empty_b: '%REQ(may_empty)%'
       )EOF",
                                             input.format(), input.format()),
                                 struct_for_json_formatter);
 
       // Create JSON formatter.
-      formatter = std::make_unique<Formatter::JsonFormatterImpl>(struct_for_json_formatter, false);
+      formatter_keep_empty =
+          std::make_unique<Formatter::JsonFormatterImpl>(struct_for_json_formatter, false);
+      formatter_omit_empty =
+          std::make_unique<Formatter::JsonFormatterImpl>(struct_for_json_formatter, true);
     } catch (const EnvoyException& e) {
       ENVOY_LOG_MISC(debug, "JSON formatter failed, EnvoyException: {}", e.what());
       return;
     }
 
     // This should never throw.
-    formatter->formatWithContext(formatter_context, *stream_info);
-    typed_formatter->formatWithContext(formatter_context, *stream_info);
+    const std::string keep_empty_result =
+        formatter_keep_empty->format(formatter_context, *stream_info);
+    const std::string omit_empty_result =
+        formatter_omit_empty->format(formatter_context, *stream_info);
+
+    // Ensure the result is legal JSON.
+    Protobuf::Struct proto_struct;
+    TestUtility::loadFromJson(keep_empty_result, proto_struct);
+    TestUtility::loadFromJson(omit_empty_result, proto_struct);
+
     ENVOY_LOG_MISC(trace, "JSON formatter Success");
   }
 }

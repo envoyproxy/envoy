@@ -3,9 +3,9 @@ DOCS_LINK_MESSAGE = """
 
 Docs for this Pull Request will be rendered here:
 
-https://storage.googleapis.com/envoy-pr/%s/docs/index.html
+https://storage.googleapis.com/envoy-cncf-pr/%s/docs/index.html
 
-The docs are (re-)rendered each time the CI `envoy-presubmit (precheck docs)` job completes.
+The docs are (re-)rendered each time the CI `Envoy/Prechecks (docs)` job completes.
 
 """
 

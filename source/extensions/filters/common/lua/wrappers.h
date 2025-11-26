@@ -53,14 +53,14 @@ private:
 class MetadataMapWrapper;
 
 struct MetadataMapHelper {
-  static void setValue(lua_State* state, const ProtobufWkt::Value& value);
+  static void setValue(lua_State* state, const Protobuf::Value& value);
   static void createTable(lua_State* state,
-                          const Protobuf::Map<std::string, ProtobufWkt::Value>& fields);
-  static ProtobufWkt::Value loadValue(lua_State* state);
+                          const Protobuf::Map<std::string, Protobuf::Value>& fields);
+  static Protobuf::Value loadValue(lua_State* state);
 
 private:
-  static ProtobufWkt::Struct loadStruct(lua_State* state);
-  static ProtobufWkt::ListValue loadList(lua_State* state, int length);
+  static Protobuf::Struct loadStruct(lua_State* state);
+  static Protobuf::ListValue loadList(lua_State* state, int length);
   static int tableLength(lua_State* state);
 };
 
@@ -77,7 +77,7 @@ public:
 
 private:
   MetadataMapWrapper& parent_;
-  Protobuf::Map<std::string, ProtobufWkt::Value>::const_iterator current_;
+  Protobuf::Map<std::string, Protobuf::Value>::const_iterator current_;
 };
 
 /**
@@ -85,7 +85,7 @@ private:
  */
 class MetadataMapWrapper : public BaseLuaObject<MetadataMapWrapper> {
 public:
-  MetadataMapWrapper(const ProtobufWkt::Struct& metadata) : metadata_{metadata} {}
+  MetadataMapWrapper(const Protobuf::Struct& metadata) : metadata_{metadata} {}
 
   static ExportedFunctions exportedFunctions() {
     return {{"get", static_luaGet}, {"__pairs", static_luaPairs}};
@@ -111,7 +111,7 @@ private:
     iterator_.reset();
   }
 
-  const ProtobufWkt::Struct metadata_;
+  const Protobuf::Struct metadata_;
   LuaDeathRef<MetadataMapIterator> iterator_;
 
   friend class MetadataMapIterator;

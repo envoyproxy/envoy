@@ -87,7 +87,7 @@ public:
   ProtocolPtr createProtocol() override;
   Router::Config& routerConfig() override { return *this; }
   bool payloadPassthrough() const override { return payload_passthrough_; }
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint32_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const AccessLog::InstanceSharedPtrVector& accessLogs() const override { return access_logs_; }
   bool headerKeysPreserveCase() const override { return header_keys_preserve_case_; }
 
@@ -105,7 +105,7 @@ private:
   std::list<ThriftFilters::FilterFactoryCb> filter_factories_;
   const bool payload_passthrough_;
 
-  const uint64_t max_requests_per_connection_{};
+  const uint32_t max_requests_per_connection_{};
   AccessLog::InstanceSharedPtrVector access_logs_;
   const bool header_keys_preserve_case_;
 };

@@ -30,7 +30,7 @@ public:
 
   virtual void onRefreshAccessTokenFailure() PURE;
 
-  virtual void sendUnauthorizedResponse() PURE;
+  virtual void sendUnauthorizedResponse(const std::string& details) PURE;
 };
 
 /**

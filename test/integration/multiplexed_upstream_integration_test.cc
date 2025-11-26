@@ -43,6 +43,16 @@ INSTANTIATE_TEST_SUITE_P(Protocols, MultiplexedUpstreamIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(MultiplexedUpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_response_decoder_handle",
+                                    "true");
+  testRouterRequestAndResponseWithBody(1024, 512, false);
+}
+
+// Needed for test coverage.
+TEST_P(MultiplexedUpstreamIntegrationTest,
+       RouterRequestAndResponseWithBodyNoBufferWithoutDecoderHandle) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_response_decoder_handle",
+                                    "false");
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
@@ -642,6 +652,37 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamFilterSendLocalReply) {
+  if (upstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  envoy::config::core::v3::Http2ProtocolOptions config;
+  config.mutable_max_concurrent_streams()->set_value(20000);
+  mergeOptions(config);
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: local-reply-during-decode
+)EOF"),
+                               false);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start sending the request, but ensure no end stream will be sent, so the
+  // stream will stay in use.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"wait-upstream-connection", "true"}});
+  // Wait until the response is sent to ensure the SETTINGS frame has been read
+  // by Envoy.
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.http2.streams_active")->value());
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/13933
 TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
   initialize();
@@ -701,7 +742,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, AutoRetrySafeRequestUponTooEarlyRespo
   waitForNextUpstreamRequest(0);
   // If the request already has Early-Data header, no additional Early-Data header should be added
   // and the header should be forwarded as is.
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Http::Headers::get().EarlyData, "1"));
   upstream_request_->encodeHeaders(too_early_response_headers, true);
   ASSERT_TRUE(response2->waitForEndStream());
   // 425 response should be forwarded back to the client.
@@ -791,40 +832,6 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
   ASSERT_TRUE(response2->waitForEndStream());
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, ClientDisableUpstreamEarlyData) {
-#ifdef WIN32
-  // TODO: debug why waiting on the 2nd upstream connection times out on Windows.
-  GTEST_SKIP() << "Skipping on Windows";
-#endif
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_disable_client_early_data",
-                                    "true");
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
-
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  upstream_request_.reset();
-
-  ASSERT_TRUE(fake_upstream_connection_->close());
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
-
-  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
-
-  default_request_headers_.addCopy("second_request", "1");
-  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
-
-  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
-  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response2->waitForEndStream());
-}
-
 // Tests that Envoy will automatically retry a GET request sent over early data if the upstream
 // rejects it with TooEarly response.
 TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
@@ -896,7 +903,7 @@ class QuicFailHandshakeCryptoServerStreamFactory
     : public Quic::EnvoyQuicCryptoServerStreamFactoryInterface {
 public:
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
   std::string name() const override { return "envoy.quic.crypto_stream.server.fail_handshake"; }
 
@@ -935,7 +942,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   envoy::config::listener::v3::QuicProtocolOptions options;
   auto* crypto_stream_config = options.mutable_crypto_stream_config();
   crypto_stream_config->set_name("envoy.quic.crypto_stream.server.fail_handshake");
-  crypto_stream_config->mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
+  crypto_stream_config->mutable_typed_config()->PackFrom(Protobuf::Struct());
   mergeOptions(options);
 
   initialize();
@@ -1001,7 +1008,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) 
 
   {
     // Lock up fake upstream so that it won't process handshake.
-    absl::MutexLock l(&fake_upstreams_[0]->lock());
+    absl::MutexLock l(fake_upstreams_[0]->lock());
     auto response2 = codec_client_->makeHeaderOnlyRequest(
         Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                        {":path", "/test/long/url"},
@@ -1054,7 +1061,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
   IntegrationStreamDecoderPtr response4;
   {
     // Lock up fake upstream so that it won't process handshake.
-    absl::MutexLock l(&fake_upstreams_[0]->lock());
+    absl::MutexLock l(fake_upstreams_[0]->lock());
     response2 = codec_client_->makeHeaderOnlyRequest(
         Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                        {":path", "/test/long/url"},

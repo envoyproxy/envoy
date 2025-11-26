@@ -111,15 +111,16 @@ Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& cre
 
 absl::StatusOr<ConfigSharedPtr>
 Config::create(const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,
-               Regex::Engine& regex_engine, bool per_route) {
+               Regex::Engine& regex_engine, Stats::Scope& scope, bool per_route) {
   absl::Status creation_status = absl::OkStatus();
-  auto cfg = ConfigSharedPtr(new Config(config, regex_engine, per_route, creation_status));
+  auto cfg = ConfigSharedPtr(new Config(config, regex_engine, scope, per_route, creation_status));
   RETURN_IF_NOT_OK_REF(creation_status);
   return cfg;
 }
 
 Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
-               Regex::Engine& regex_engine, const bool per_route, absl::Status& creation_status) {
+               Regex::Engine& regex_engine, Stats::Scope& scope, const bool per_route,
+               absl::Status& creation_status) {
   absl::StatusOr<bool> request_set_or =
       Config::configToVector(config.request_rules(), request_rules_, regex_engine);
   SET_AND_RETURN_IF_NOT_OK(request_set_or.status(), creation_status);
@@ -129,6 +130,11 @@ Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::C
       Config::configToVector(config.response_rules(), response_rules_, regex_engine);
   SET_AND_RETURN_IF_NOT_OK(response_set_or.status(), creation_status);
   response_set_ = response_set_or.value();
+
+  // Generate stats only if stat_prefix is configured (opt-in behavior).
+  if (!config.stat_prefix().empty()) {
+    stats_.emplace(generateStats(config.stat_prefix(), scope));
+  }
 
   // Note: empty configs are fine for the global config, which would be the case for enabling
   //       the filter globally without rules and then applying them at the virtual host or
@@ -158,6 +164,51 @@ absl::StatusOr<bool> Config::configToVector(const ProtobufRepeatedRule& proto_ru
   return true;
 }
 
+HeaderToMetadataFilterStats Config::generateStats(const std::string& stat_prefix,
+                                                  Stats::Scope& scope) {
+  const std::string final_prefix = fmt::format("http_filter_name.{}", stat_prefix);
+  return {ALL_HEADER_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+}
+
+void Config::chargeStat(StatsEvent event, HeaderDirection direction) const {
+  if (!stats_.has_value()) {
+    return;
+  }
+
+  switch (event) {
+  case StatsEvent::RulesProcessed:
+    if (direction == HeaderDirection::Request) {
+      stats_->request_rules_processed_.inc();
+    } else {
+      stats_->response_rules_processed_.inc();
+    }
+    break;
+  case StatsEvent::MetadataAdded:
+    if (direction == HeaderDirection::Request) {
+      stats_->request_metadata_added_.inc();
+    } else {
+      stats_->response_metadata_added_.inc();
+    }
+    break;
+  case StatsEvent::HeaderNotFound:
+    if (direction == HeaderDirection::Request) {
+      stats_->request_header_not_found_.inc();
+    } else {
+      stats_->response_header_not_found_.inc();
+    }
+    break;
+  case StatsEvent::Base64DecodeFailed:
+    stats_->base64_decode_failed_.inc();
+    break;
+  case StatsEvent::HeaderValueTooLong:
+    stats_->header_value_too_long_.inc();
+    break;
+  case StatsEvent::RegexSubstitutionFailed:
+    stats_->regex_substitution_failed_.inc();
+    break;
+  }
+}
+
 HeaderToMetadataFilter::HeaderToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
 
 HeaderToMetadataFilter::~HeaderToMetadataFilter() = default;
@@ -166,7 +217,8 @@ Http::FilterHeadersStatus HeaderToMetadataFilter::decodeHeaders(Http::RequestHea
                                                                 bool) {
   const auto* config = getConfig();
   if (config->doRequest()) {
-    writeHeaderToMetadata(headers, config->requestRules(), *decoder_callbacks_);
+    writeHeaderToMetadata(headers, config->requestRules(), *decoder_callbacks_,
+                          HeaderDirection::Request);
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -181,7 +233,8 @@ Http::FilterHeadersStatus HeaderToMetadataFilter::encodeHeaders(Http::ResponseHe
                                                                 bool) {
   const auto* config = getConfig();
   if (config->doResponse()) {
-    writeHeaderToMetadata(headers, config->responseRules(), *encoder_callbacks_);
+    writeHeaderToMetadata(headers, config->responseRules(), *encoder_callbacks_,
+                          HeaderDirection::Response);
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -193,14 +246,16 @@ void HeaderToMetadataFilter::setEncoderFilterCallbacks(
 
 bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::string& meta_namespace,
                                          const std::string& key, std::string value, ValueType type,
-                                         ValueEncode encode) const {
-  ProtobufWkt::Value val;
+                                         ValueEncode encode, HeaderDirection direction) const {
+  Protobuf::Value val;
+  const auto* config = getConfig();
 
   ASSERT(!value.empty());
 
   if (value.size() >= MAX_HEADER_VALUE_LEN) {
     // Too long, go away.
     ENVOY_LOG(debug, "metadata value is too long");
+    config->chargeStat(StatsEvent::HeaderValueTooLong, direction);
     return false;
   }
 
@@ -208,6 +263,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::strin
     value = Base64::decodeWithoutPadding(value);
     if (value.empty()) {
       ENVOY_LOG(debug, "Base64 decode failed");
+      config->chargeStat(StatsEvent::Base64DecodeFailed, direction);
       return false;
     }
   }
@@ -240,6 +296,9 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::strin
   auto& keyval = struct_map[meta_namespace];
   (*keyval.mutable_fields())[key] = std::move(val);
 
+  // Increment metadata_added stat if stats are enabled.
+  config->chargeStat(StatsEvent::MetadataAdded, direction);
+
   return true;
 }
 
@@ -249,18 +308,27 @@ const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& ns
 
 // add metadata['key']= value depending on header present or missing case
 void HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule,
-                                           const KeyValuePair& keyval, StructMap& np) {
+                                           const KeyValuePair& keyval, StructMap& np,
+                                           HeaderDirection direction) {
+  const auto* config = getConfig();
+
   if (!keyval.value().empty()) {
     value = keyval.value();
   } else {
     const auto& matcher = rule.regexRewrite();
     if (matcher != nullptr) {
+      const bool was_non_empty = !value.empty();
       value = matcher->replaceAll(value, rule.regexSubstitution());
+      // If we had a non-empty input but got an empty result from regex, it could indicate a
+      // failure.
+      if (was_non_empty && value.empty()) {
+        config->chargeStat(StatsEvent::RegexSubstitutionFailed, direction);
+      }
     }
   }
   if (!value.empty()) {
     const auto& nspace = decideNamespace(keyval.metadata_namespace());
-    addMetadata(np, nspace, keyval.key(), value, keyval.type(), keyval.encode());
+    addMetadata(np, nspace, keyval.key(), value, keyval.type(), keyval.encode(), direction);
   } else {
     ENVOY_LOG(debug, "value is empty, not adding metadata");
   }
@@ -268,19 +336,26 @@ void HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule
 
 void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
                                                    const HeaderToMetadataRules& rules,
-                                                   Http::StreamFilterCallbacks& callbacks) {
+                                                   Http::StreamFilterCallbacks& callbacks,
+                                                   HeaderDirection direction) {
   StructMap structs_by_namespace;
+  const auto* config = getConfig();
 
   for (const auto& rule : rules) {
     const auto& proto_rule = rule.rule();
     absl::optional<std::string> value = rule.selector_->extract(headers);
 
+    // Increment rules_processed stat if stats are enabled.
+    config->chargeStat(StatsEvent::RulesProcessed, direction);
+
     if (value && proto_rule.has_on_header_present()) {
       applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_present(),
-                    structs_by_namespace);
+                    structs_by_namespace, direction);
     } else if (!value && proto_rule.has_on_header_missing()) {
+      // Increment header_not_found stat if stats are enabled.
+      config->chargeStat(StatsEvent::HeaderNotFound, direction);
       applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_missing(),
-                    structs_by_namespace);
+                    structs_by_namespace, direction);
     }
   }
   // Any matching rules?

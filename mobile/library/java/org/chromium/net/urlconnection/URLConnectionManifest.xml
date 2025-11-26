@@ -2,6 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.urlconnection">
   <uses-sdk
-      android:minSdkVersion="26"
+      android:minSdkVersion="23"
       android:targetSdkVersion="29" />
 </manifest>

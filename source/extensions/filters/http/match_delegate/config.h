@@ -27,7 +27,7 @@ public:
   class FilterMatchState {
   public:
     FilterMatchState(Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
-        : match_tree_(std::move(match_tree)), has_match_tree_(match_tree_ != nullptr) {}
+        : match_tree_(std::move(match_tree)) {}
 
     void evaluateMatchTree(MatchDataUpdateFunc data_update_func);
     bool skipFilter() const { return skip_filter_; }
@@ -41,14 +41,12 @@ public:
     // filter config.
     void setMatchTree(Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree) {
       match_tree_ = std::move(match_tree);
-      has_match_tree_ = match_tree_ != nullptr;
     }
 
     void setBaseFilter(Envoy::Http::StreamFilterBase* base_filter) { base_filter_ = base_filter; }
 
   private:
     Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
-    bool has_match_tree_{};
     Envoy::Http::StreamFilterBase* base_filter_{};
 
     Envoy::Http::Matching::HttpMatchingDataImplSharedPtr matching_data_;

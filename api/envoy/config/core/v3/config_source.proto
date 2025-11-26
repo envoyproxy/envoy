@@ -276,7 +276,8 @@ message ExtensionConfigSource {
   // to be supplied.
   bool apply_default_config_without_warming = 3;
 
-  // A set of permitted extension type URLs. Extension configuration updates are rejected
-  // if they do not match any type URL in the set.
+  // A set of permitted extension type URLs for the type encoded inside of the
+  // :ref:`TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`. Extension
+  // configuration updates are rejected if they do not match any type URL in the set.
   repeated string type_urls = 4 [(validate.rules).repeated = {min_items: 1}];
 }

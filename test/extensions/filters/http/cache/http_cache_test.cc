@@ -199,7 +199,7 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
   EXPECT_THAT(*lookup_response.headers_,
-              HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
+              ContainsHeader(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, 0);
 }
 
@@ -217,7 +217,7 @@ TEST_P(LookupRequestTest, ResultWithUnknownContentLengthMatchesExpectation) {
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
   EXPECT_THAT(*lookup_response.headers_,
-              HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
+              ContainsHeader(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_FALSE(lookup_response.content_length_.has_value());
 }
 
@@ -237,7 +237,7 @@ TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
   EXPECT_THAT(*lookup_response.headers_,
-              HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
+              ContainsHeader(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, content_length);
 }
 
@@ -357,7 +357,7 @@ TEST_P(LookupRequestTest, ResultWithBodyAndTrailersMatchesExpectation) {
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
   // Age is populated in LookupRequest::makeLookupResult, which is called in makeLookupResult.
   EXPECT_THAT(*lookup_response.headers_,
-              HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
+              ContainsHeader(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, content_length);
 }
 

@@ -44,8 +44,8 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
       return factory_context.serverFactoryContext()
           .secretManager()
           .findOrCreateTlsSessionTicketKeysContextProvider(
-              sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
-              factory_context.initManager());
+              sds_secret_config.sds_config(), sds_secret_config.name(),
+              factory_context.serverFactoryContext(), factory_context.initManager());
     } else {
       // Load static secret.
       auto secret_provider =
@@ -178,9 +178,21 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     return;
   }
 
+  if (!config.has_require_client_certificate() &&
+      config.common_tls_context().validation_context_type_case() !=
+          envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::
+              ValidationContextTypeCase::VALIDATION_CONTEXT_TYPE_NOT_SET) {
+    ENVOY_LOG_MISC(
+        warn,
+        "Using deprecated insecure default of not requiring client cert when a validation context "
+        "is configured. This default will be changed in a future version. Please explicitly "
+        "configure a value for require_client_certificate.");
+    factory_context.serverFactoryContext().runtime().countDeprecatedFeatureUse();
+  }
+
   auto factory =
       TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
-  const ProtobufWkt::Any any;
+  const Protobuf::Any any;
   tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
       any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor(),
       creation_status, for_quic);

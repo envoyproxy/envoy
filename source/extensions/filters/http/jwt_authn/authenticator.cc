@@ -79,7 +79,7 @@ private:
   void handleGoodJwt(bool cache_hit);
 
   // Normalize and set the payload metadata.
-  void setPayloadMetadata(const ProtobufWkt::Struct& jwt_payload);
+  void setPayloadMetadata(const Protobuf::Struct& jwt_payload);
 
   // Calls the callback with status.
   void doneWithStatus(const Status& status);
@@ -333,23 +333,23 @@ void AuthenticatorImpl::verifyKey() {
 bool AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
                                             const std::string& header_name) {
   StructUtils payload_getter(jwt_->payload_pb_);
-  const ProtobufWkt::Value* claim_value;
+  const Protobuf::Value* claim_value;
   const auto status = payload_getter.GetValue(claim_name, claim_value);
   std::string str_claim_value;
   if (status == StructUtils::OK) {
     switch (claim_value->kind_case()) {
-    case Envoy::ProtobufWkt::Value::kStringValue:
+    case Envoy::Protobuf::Value::kStringValue:
       str_claim_value = claim_value->string_value();
       break;
-    case Envoy::ProtobufWkt::Value::kNumberValue:
+    case Envoy::Protobuf::Value::kNumberValue:
       str_claim_value = convertClaimDoubleToString(claim_value->number_value());
       break;
-    case Envoy::ProtobufWkt::Value::kBoolValue:
+    case Envoy::Protobuf::Value::kBoolValue:
       str_claim_value = claim_value->bool_value() ? "true" : "false";
       break;
-    case Envoy::ProtobufWkt::Value::kStructValue:
+    case Envoy::Protobuf::Value::kStructValue:
       ABSL_FALLTHROUGH_INTENDED;
-    case Envoy::ProtobufWkt::Value::kListValue: {
+    case Envoy::Protobuf::Value::kListValue: {
       std::string output;
       auto status = claim_value->has_struct_value()
                         ? ProtobufUtil::MessageToJsonString(claim_value->struct_value(), &output)
@@ -422,14 +422,14 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   doneWithStatus(Status::Ok);
 }
 
-void AuthenticatorImpl::setPayloadMetadata(const ProtobufWkt::Struct& jwt_payload) {
+void AuthenticatorImpl::setPayloadMetadata(const Protobuf::Struct& jwt_payload) {
   const auto& provider = jwks_data_->getJwtProvider();
   const auto& normalize = provider.normalize_payload_in_metadata();
   if (normalize.space_delimited_claims().empty()) {
     set_extracted_jwt_data_cb_(provider.payload_in_metadata(), jwt_payload);
   }
   // Make a temporary copy to normalize the JWT struct.
-  ProtobufWkt::Struct out_payload = jwt_payload;
+  Protobuf::Struct out_payload = jwt_payload;
   for (const auto& claim : normalize.space_delimited_claims()) {
     const auto& it = jwt_payload.fields().find(claim);
     if (it != jwt_payload.fields().end() && it->second.has_string_value()) {
@@ -462,7 +462,7 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
     if (!failed_status_in_metadata.empty()) {
 
-      ProtobufWkt::Struct failed_status;
+      Protobuf::Struct failed_status;
       auto& failed_status_fields = *failed_status.mutable_fields();
       failed_status_fields["code"].set_number_value(enumToInt(status));
       failed_status_fields["message"].set_string_value(google::jwt_verify::getStatusString(status));

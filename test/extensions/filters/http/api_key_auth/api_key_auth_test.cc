@@ -486,6 +486,277 @@ TEST_F(FilterTest, KnownApiKeyButNotAllowed) {
   }
 }
 
+TEST_F(FilterTest, HeaderApiKeyWithForwarding) {
+  const std::string config_yaml = R"EOF(
+  credentials:
+  - key: key1
+    client: user1
+  key_sources:
+  - header: "Authorization"
+  forwarding:
+    header: "x-client-id"
+    hide_credentials: false
+  )EOF";
+
+  setup(config_yaml, {});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "host"},
+                                                 {":method", "GET"},
+                                                 {":path", "/path"},
+                                                 {"Authorization", "Bearer key1"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
+
+  // The forwarded client header should be set
+  EXPECT_EQ(request_headers.get_("x-client-id"), "user1");
+  // The authorization header should still be present, confirming that hide_credentials is
+  // effectively false
+  EXPECT_EQ(request_headers.get_("authorization"), "Bearer key1");
+}
+
+TEST_F(FilterTest, QueryApiKeyWithForwarding) {
+  const std::string config_yaml = R"EOF(
+  credentials:
+  - key: key1
+    client: user1
+  key_sources:
+  - query: "api_key"
+  forwarding:
+    header: "x-client-id"
+    hide_credentials: false
+  )EOF";
+
+  setup(config_yaml, {});
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":method", "GET"}, {":path", "/path?api_key=key1"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
+
+  // The forwarded client header should be set
+  EXPECT_EQ(request_headers.get_("x-client-id"), "user1");
+  // The query should still be present, confirming that hide_credentials is effectively false
+  const std::string path = std::string(request_headers.getPathValue());
+  EXPECT_EQ(path, "/path?api_key=key1");
+}
+
+TEST_F(FilterTest, CookieApiKeyWithForwarding) {
+  const std::string config_yaml = R"EOF(
+  credentials:
+  - key: key1
+    client: user1
+  key_sources:
+  - cookie: "api_key"
+  forwarding:
+    header: "x-client-id"
+    hide_credentials: false
+  )EOF";
+
+  setup(config_yaml, {});
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":method", "GET"}, {":path", "/path"}, {"cookie", "api_key=key1"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
+
+  // The forwarded client header should be set
+  EXPECT_EQ(request_headers.get_("x-client-id"), "user1");
+  // The cookie should still be present, confirming that hide_credentials is effectively false
+  EXPECT_EQ(request_headers.get_("cookie"), "api_key=key1");
+}
+
+TEST_F(FilterTest, HideCredentialsHeader) {
+  const std::string config_yaml = R"EOF(
+  credentials:
+  - key: key1
+    client: user1
+  key_sources:
+  - header: "Authorization"
+  forwarding:
+    hide_credentials: true
+  )EOF";
+
+  setup(config_yaml, {});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "host"},
+                                                 {":method", "GET"},
+                                                 {":path", "/path"},
+                                                 {"Authorization", "Bearer key1"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
+  // Authorization header should be removed
+  EXPECT_FALSE(request_headers.has("authorization"));
+}
+
+TEST_F(FilterTest, HideCredentialsHeaderWithForwarding) {
+  const std::string config_yaml = R"EOF(
+  credentials:
+  - key: key1
+    client: user1
+  key_sources:
+  - header: "Authorization"
+  forwarding:
+    header: "x-client-id"
+    hide_credentials: true
+  )EOF";
+
+  setup(config_yaml, {});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "host"},
+                                                 {":method", "GET"},
+                                                 {":path", "/path"},
+                                                 {"Authorization", "Bearer key1"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
+  EXPECT_EQ(request_headers.get_("x-client-id"), "user1");
+  // Authorization header should be removed
+  EXPECT_FALSE(request_headers.has("authorization"));
+}
+
+TEST_F(FilterTest, HideCredentialsQueryWithForwarding) {
+  const std::string config_yaml = R"EOF(
+  credentials:
+  - key: key1
+    client: user1
+  key_sources:
+  - query: "api_key"
+  forwarding:
+    header: "x-client-id"
+    hide_credentials: true
+  )EOF";
+
+  setup(config_yaml, {});
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":authority", "host"}, {":method", "GET"}, {":path", "/path?api_key=key1"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
+    EXPECT_EQ(request_headers.get_("x-client-id"), "user1");
+
+    // Query parameter should be stripped from path
+    const std::string path = std::string(request_headers.getPathValue());
+    EXPECT_EQ(path, "/path");
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":authority", "host"}, {":method", "GET"}, {":path", "/path?api_key=key1&foo=bar"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 2);
+    EXPECT_EQ(request_headers.get_("x-client-id"), "user1");
+
+    const std::string path = std::string(request_headers.getPathValue());
+    // Only the API key query parameter should be removed
+    EXPECT_EQ(path, "/path?foo=bar");
+  }
+}
+
+TEST_F(FilterTest, HideCredentialsCookieWithForwarding) {
+  const std::string config_yaml = R"EOF(
+  credentials:
+  - key: key1
+    client: user1
+  key_sources:
+  - cookie: "api_key"
+  forwarding:
+    header: "x-client-id"
+    hide_credentials: true
+  )EOF";
+
+  setup(config_yaml, {});
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":authority", "host"}, {":method", "GET"}, {":path", "/path"}, {"cookie", "api_key=key1"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
+    EXPECT_EQ(request_headers.get_("x-client-id"), "user1");
+    // Cookie should be removed
+    EXPECT_FALSE(request_headers.has("cookie"));
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{":authority", "host"},
+                                                   {":method", "GET"},
+                                                   {":path", "/path"},
+                                                   {"cookie", "api_key=key1; foo=bar"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 2);
+    EXPECT_EQ(request_headers.get_("x-client-id"), "user1");
+    // Only the API key cookie should be removed
+    EXPECT_EQ(request_headers.get_("cookie"), "foo=bar");
+  }
+}
+
+TEST_F(FilterTest, HideCredentialsMultipleKeySourcesWithForwarding) {
+  const std::string config_yaml = R"EOF(
+  credentials:
+  - key: key1
+    client: user1
+  key_sources:
+  - header: "Authorization"
+  - query: "api_key"
+  - cookie: "api_key"
+  forwarding:
+    header: "x-client-id"
+    hide_credentials: true
+  )EOF";
+
+  setup(config_yaml, {});
+
+  // Header, query, and cookie all have the key.
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "host"},
+                                                 {":method", "GET"},
+                                                 {":path", "/path?api_key=key1"},
+                                                 {"cookie", "api_key=key1"},
+                                                 {"Authorization", "Bearer key1"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
+  EXPECT_EQ(request_headers.get_("x-client-id"), "user1");
+
+  // Verify that the API key has been removed from all key sources
+  EXPECT_FALSE(request_headers.has("authorization"));
+  const std::string path = std::string(request_headers.getPathValue());
+  EXPECT_EQ(path, "/path");
+  EXPECT_FALSE(request_headers.has("cookie"));
+}
+
+TEST_F(FilterTest, RouteConfigOverrideForwarding) {
+  const std::string config_yaml = R"EOF(
+  credentials:
+  - key: key1
+    client: user1
+  key_sources:
+  - header: "Authorization"
+  forwarding:
+    header: "x-client-id"
+    hide_credentials: false
+  )EOF";
+
+  const std::string route_config_yaml = R"EOF(
+  forwarding:
+    header: "x-client-header"
+    hide_credentials: true
+  )EOF";
+
+  setup(config_yaml, route_config_yaml);
+
+  // Forwarding is overridden and the API key will be hidden.
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "host"},
+                                                 {":method", "GET"},
+                                                 {":path", "/path"},
+                                                 {"Authorization", "Bearer key1"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
+  EXPECT_FALSE(request_headers.has("x-client-id"));
+  EXPECT_EQ(request_headers.get_("x-client-header"), "user1");
+
+  // Authorization header should be removed
+  EXPECT_FALSE(request_headers.has("authorization"));
+}
+
 } // namespace ApiKeyAuth
 } // namespace HttpFilters
 } // namespace Extensions

@@ -21,7 +21,7 @@ TEST_F(UnregisterClientRequestHeaderTest, Encode) {
   request_header.producerGroup(producer_group_);
   request_header.consumerGroup(consumer_group_);
 
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   request_header.encode(doc);
 
   const auto& members = doc.struct_value().fields();
@@ -40,7 +40,7 @@ TEST_F(UnregisterClientRequestHeaderTest, Decode) {
   }
   )EOF";
 
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   UnregisterClientRequestHeader unregister_client_request_header;
   unregister_client_request_header.decode(doc);
@@ -54,7 +54,7 @@ TEST(GetConsumerListByGroupResponseBodyTest, Encode) {
   response_body.add("localhost@1");
   response_body.add("localhost@2");
 
-  ProtobufWkt::Struct doc;
+  Protobuf::Struct doc;
   response_body.encode(doc);
 
   const auto& members = doc.fields();
@@ -79,7 +79,7 @@ TEST_F(AckMessageRequestHeaderTest, Encode) {
   ack_header.extraInfo(extra_info);
   ack_header.offset(offset);
 
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   ack_header.encode(doc);
 
   const auto& members = doc.struct_value().fields();
@@ -111,7 +111,7 @@ TEST_F(AckMessageRequestHeaderTest, Decode) {
   }
   )EOF";
 
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
 
   AckMessageRequestHeader ack_header;
@@ -134,7 +134,7 @@ TEST_F(AckMessageRequestHeaderTest, DecodeNumSerializedAsString) {
   }
   )EOF";
 
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
 
   AckMessageRequestHeader ack_header;
@@ -174,7 +174,7 @@ TEST_F(PopMessageRequestHeaderTest, Encode) {
   pop_request_header.expType(exp_type);
   pop_request_header.exp(exp);
 
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   pop_request_header.encode(doc);
 
   const auto& members = doc.struct_value().fields();
@@ -226,7 +226,7 @@ TEST_F(PopMessageRequestHeaderTest, Decode) {
   }
   )EOF";
 
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   PopMessageRequestHeader pop_request_header;
   pop_request_header.decode(doc);
@@ -259,7 +259,7 @@ TEST_F(PopMessageRequestHeaderTest, DecodeNumSerializedAsString) {
   }
   )EOF";
 
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   PopMessageRequestHeader pop_request_header;
   pop_request_header.decode(doc);
@@ -298,7 +298,7 @@ TEST_F(PopMessageResponseHeaderTest, Encode) {
   pop_response_header.msgOffsetInfo(msg_offset_info);
   pop_response_header.orderCountInfo(order_count_info);
 
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   pop_response_header.encode(doc);
 
   const auto& members = doc.struct_value().fields();
@@ -333,7 +333,7 @@ TEST_F(PopMessageResponseHeaderTest, Decode) {
   }
   )EOF";
 
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
 
   PopMessageResponseHeader header;
@@ -362,7 +362,7 @@ TEST_F(PopMessageResponseHeaderTest, DecodeNumSerializedAsString) {
   }
   )EOF";
 
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
 
   PopMessageResponseHeader header;
@@ -388,7 +388,7 @@ TEST_F(SendMessageResponseHeaderTest, Encode) {
   response_header_.queueId(1);
   response_header_.queueOffset(100);
   response_header_.transactionId("TX_01");
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   response_header_.encode(doc);
 
   const auto& members = doc.struct_value().fields();
@@ -412,7 +412,7 @@ TEST_F(SendMessageResponseHeaderTest, Decode) {
     "transactionId": "TX_1"
   }
   )EOF";
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   response_header_.decode(doc);
   EXPECT_STREQ("abc", response_header_.msgId().c_str());
@@ -430,7 +430,7 @@ TEST_F(SendMessageResponseHeaderTest, DecodeNumSerializedAsString) {
     "transactionId": "TX_1"
    }
   )EOF";
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   response_header_.decode(doc);
   EXPECT_STREQ("abc", response_header_.msgId().c_str());
@@ -443,7 +443,7 @@ class SendMessageRequestHeaderTest : public testing::Test {};
 
 TEST_F(SendMessageRequestHeaderTest, EncodeDefault) {
   SendMessageRequestHeader header;
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   header.encode(doc);
   const auto& members = doc.struct_value().fields();
   EXPECT_TRUE(members.contains("producerGroup"));
@@ -468,7 +468,7 @@ TEST_F(SendMessageRequestHeaderTest, EncodeOptional) {
   header.unitMode(true);
   header.batch(true);
   header.maxReconsumeTimes(32);
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   header.encode(doc);
   const auto& members = doc.struct_value().fields();
   EXPECT_TRUE(members.contains("producerGroup"));
@@ -495,7 +495,7 @@ TEST_F(SendMessageRequestHeaderTest, EncodeOptional) {
 TEST_F(SendMessageRequestHeaderTest, EncodeDefaultV2) {
   SendMessageRequestHeader header;
   header.version(SendMessageRequestVersion::V2);
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   header.encode(doc);
   const auto& members = doc.struct_value().fields();
   EXPECT_TRUE(members.contains("a"));
@@ -521,7 +521,7 @@ TEST_F(SendMessageRequestHeaderTest, EncodeOptionalV2) {
   header.batch(true);
   header.maxReconsumeTimes(32);
   header.version(SendMessageRequestVersion::V2);
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   header.encode(doc);
 
   const auto& members = doc.struct_value().fields();
@@ -549,7 +549,7 @@ TEST_F(SendMessageRequestHeaderTest, EncodeOptionalV2) {
 TEST_F(SendMessageRequestHeaderTest, EncodeV3) {
   SendMessageRequestHeader header;
   header.version(SendMessageRequestVersion::V3);
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   header.encode(doc);
 }
 
@@ -571,7 +571,7 @@ TEST_F(SendMessageRequestHeaderTest, DecodeV1) {
   )EOF";
 
   SendMessageRequestHeader header;
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   header.decode(doc);
   EXPECT_STREQ("FooBar", header.topic().c_str());
@@ -609,7 +609,7 @@ TEST_F(SendMessageRequestHeaderTest, DecodeV1Optional) {
   )EOF";
 
   SendMessageRequestHeader header;
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   header.decode(doc);
   EXPECT_STREQ("FooBar", header.topic().c_str());
@@ -647,7 +647,7 @@ TEST_F(SendMessageRequestHeaderTest, DecodeV1OptionalNumSerializedAsString) {
   )EOF";
 
   SendMessageRequestHeader header;
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   header.decode(doc);
   EXPECT_STREQ("FooBar", header.topic().c_str());
@@ -684,7 +684,7 @@ TEST_F(SendMessageRequestHeaderTest, DecodeV2) {
 
   SendMessageRequestHeader header;
   header.version(SendMessageRequestVersion::V2);
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   header.decode(doc);
   EXPECT_STREQ("FooBar", header.topic().c_str());
@@ -723,7 +723,7 @@ TEST_F(SendMessageRequestHeaderTest, DecodeV2Optional) {
 
   SendMessageRequestHeader header;
   header.version(SendMessageRequestVersion::V2);
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   header.decode(doc);
   EXPECT_STREQ("FooBar", header.topic().c_str());
@@ -762,7 +762,7 @@ TEST_F(SendMessageRequestHeaderTest, DecodeV2OptionalNumSerializedAsString) {
 
   SendMessageRequestHeader header;
   header.version(SendMessageRequestVersion::V2);
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   header.decode(doc);
   EXPECT_STREQ("FooBar", header.topic().c_str());
@@ -798,7 +798,7 @@ TEST_F(SendMessageRequestHeaderTest, DecodeV3) {
   )EOF";
 
   SendMessageRequestHeader header;
-  ProtobufWkt::Value doc;
+  Protobuf::Value doc;
   MessageUtil::loadFromJson(json, *(doc.mutable_struct_value()));
   header.version(SendMessageRequestVersion::V3);
   header.decode(doc);
@@ -845,7 +845,7 @@ TEST_F(HeartbeatDataTest, Decoding) {
   const char* consumerGroup = "please_rename_unique_group_name_4";
 
   HeartbeatData heart_beat_data;
-  ProtobufWkt::Struct doc;
+  Protobuf::Struct doc;
   MessageUtil::loadFromJson(json, doc);
 
   heart_beat_data.decode(doc);
@@ -885,14 +885,14 @@ TEST_F(HeartbeatDataTest, DecodeClientIdMissing) {
   }
   )EOF";
 
-  ProtobufWkt::Struct doc;
+  Protobuf::Struct doc;
   MessageUtil::loadFromJson(json, doc);
   EXPECT_FALSE(data_.decode(doc));
 }
 
 TEST_F(HeartbeatDataTest, Encode) {
   data_.clientId("CID_01");
-  ProtobufWkt::Struct doc;
+  Protobuf::Struct doc;
   data_.encode(doc);
   const auto& members = doc.fields();
   EXPECT_TRUE(members.contains("clientID"));

@@ -30,7 +30,7 @@ public:
    * Creates an HealthCheckEventSink using the given config.
    */
   virtual HealthCheckEventSinkPtr
-  createHealthCheckEventSink(const ProtobufWkt::Any& config,
+  createHealthCheckEventSink(const Protobuf::Any& config,
                              Server::Configuration::HealthCheckerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.health_check.event_sinks"; }

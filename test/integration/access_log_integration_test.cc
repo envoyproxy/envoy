@@ -45,7 +45,7 @@ TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {
 
         auto* log_format = access_log_config.mutable_log_format();
         auto* json = log_format->mutable_json_format();
-        Envoy::ProtobufWkt::Value v;
+        Envoy::Protobuf::Value v;
         v.set_string_value("%REQ(X-FORWARDED-FOR)%");
         auto fields = json->mutable_fields();
         (*fields)["x_forwarded_for"] = v;

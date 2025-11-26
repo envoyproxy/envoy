@@ -27,7 +27,7 @@ TEST(Evaluator, Print) {
   EXPECT_EQ(print(CelValue::CreateString(&test)), "test");
   EXPECT_EQ(print(CelValue::CreateBytes(&test)), "test");
 
-  ProtobufWkt::Arena arena;
+  Protobuf::Arena arena;
   envoy::config::core::v3::Node node;
   std::string node_yaml = "id: test";
   TestUtility::loadFromYaml(node_yaml, node);
@@ -48,7 +48,7 @@ TEST(Evaluator, Activation) {
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
   info.upstreamInfo()->setUpstreamFilterState(filter_state);
-  ProtobufWkt::Arena arena;
+  Protobuf::Arena arena;
   const auto activation = createActivation(nullptr, info, nullptr, nullptr, nullptr);
   EXPECT_TRUE(activation->FindValue("filter_state", &arena).has_value());
   EXPECT_TRUE(activation->FindValue("upstream_filter_state", &arena).has_value());

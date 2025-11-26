@@ -105,9 +105,9 @@ void parseOptionsFromTable(lua_State* state, int index,
   }
 }
 
-const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
+const Protobuf::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   if (callbacks->route() == nullptr) {
-    return ProtobufWkt::Struct::default_instance();
+    return Protobuf::Struct::default_instance();
   }
   const auto& metadata = callbacks->route()->metadata();
 
@@ -123,7 +123,7 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
     }
   }
 
-  return ProtobufWkt::Struct::default_instance();
+  return Protobuf::Struct::default_instance();
 }
 
 // Okay to return non-const reference because this doesn't ever get changed.
@@ -206,11 +206,14 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<StreamInfoWrapper>();
   lua_state_.registerType<DynamicMetadataMapWrapper>();
   lua_state_.registerType<DynamicMetadataMapIterator>();
+  lua_state_.registerType<FilterStateWrapper>();
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
   lua_state_.registerType<ConnectionStreamInfoWrapper>();
   lua_state_.registerType<ConnectionDynamicMetadataMapWrapper>();
   lua_state_.registerType<ConnectionDynamicMetadataMapIterator>();
+  lua_state_.registerType<VirtualHostWrapper>();
+  lua_state_.registerType<RouteWrapper>();
 
   const Filters::Common::Lua::InitializerList initializers(
       // EnvoyTimestampResolution "enum".
@@ -627,6 +630,29 @@ int StreamHandleWrapper::luaMetadata(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaVirtualHost(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (virtual_host_wrapper_.get() != nullptr) {
+    virtual_host_wrapper_.pushStack();
+  } else {
+    virtual_host_wrapper_.reset(
+        VirtualHostWrapper::create(state, callbacks_.streamInfo(), callbacks_.filterConfigName()),
+        true);
+  }
+  return 1;
+}
+
+int StreamHandleWrapper::luaRoute(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (route_wrapper_.get() != nullptr) {
+    route_wrapper_.pushStack();
+  } else {
+    route_wrapper_.reset(
+        RouteWrapper::create(state, callbacks_.streamInfo(), callbacks_.filterConfigName()), true);
+  }
+  return 1;
+}
+
 int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
   ASSERT(state_ == State::Running);
   if (stream_info_wrapper_.get() != nullptr) {
@@ -684,11 +710,12 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   // Step 5: Verify signature.
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   auto output = crypto_util.verifySignature(hash, *ptr->second, sig_vec, text_vec);
-  lua_pushboolean(state, output.result_);
-  if (output.result_) {
+  if (output.ok()) {
+    lua_pushboolean(state, true);
     lua_pushnil(state);
   } else {
-    lua_pushlstring(state, output.error_message_.data(), output.error_message_.size());
+    lua_pushboolean(state, false);
+    lua_pushlstring(state, output.message().data(), output.message().size());
   }
   return 2;
 }
@@ -702,15 +729,19 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
     public_key_wrapper_.pushStack();
   } else {
     auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-    Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKey(key);
-    auto wrapper = Envoy::Common::Crypto::Access::getTyped<Envoy::Common::Crypto::PublicKeyObject>(
-        *crypto_ptr);
-    EVP_PKEY* pkey = wrapper->getEVP_PKEY();
+    Envoy::Common::Crypto::PKeyObjectPtr crypto_ptr = crypto_util.importPublicKeyDER(key);
+    if (crypto_ptr == nullptr) {
+      // Failed to import key, create empty wrapper
+      public_key_wrapper_.reset(PublicKeyWrapper::create(state, EMPTY_STRING), true);
+      return 1;
+    }
+    EVP_PKEY* pkey = crypto_ptr->getEVP_PKEY();
     if (pkey == nullptr) {
       // TODO(dio): Call luaL_error here instead of failing silently. However, the current behavior
       // is to return nil (when calling get() to the wrapped object, hence we create a wrapper
       // initialized by an empty string here) when importing a public key is failed.
       public_key_wrapper_.reset(PublicKeyWrapper::create(state, EMPTY_STRING), true);
+      return 1;
     }
 
     public_key_storage_.insert({std::string(str).substr(0, n), std::move(crypto_ptr)});
@@ -822,14 +853,16 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
     Server::Configuration::ServerFactoryContext& context)
-    : disabled_(config.disabled()), name_(config.name()) {
+    : disabled_(config.disabled()), name_(config.name()), filter_context_(config.filter_context()) {
   if (disabled_ || !name_.empty()) {
-    return;
+    return; // Filter is disabled or explicit script name is provided.
   }
-  // Read and parse the inline Lua code defined in the route configuration.
-  const std::string code_str = THROW_OR_RETURN_VALUE(
-      Config::DataSource::read(config.source_code(), true, context.api()), std::string);
-  per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+  if (config.has_source_code()) {
+    // Read and parse the inline Lua code defined in the route configuration.
+    const std::string code_str = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(config.source_code(), true, context.api()), std::string);
+    per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+  }
 }
 
 void Filter::onDestroy() {
@@ -858,6 +891,10 @@ Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& c
 
   Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
   TRY_NEEDS_AUDIT {
+    // The counter will increment twice if the supplied script has both request and response
+    // handles. This is intentionally kept so as to provide consistency with the way the 'errors'
+    // counter is incremented.
+    stats_.executions_.inc();
     status = handle.get()->start(function_ref);
     handle.markDead();
   }
@@ -933,6 +970,17 @@ int StreamHandleWrapper::luaClearRouteCache(lua_State*) {
   return 0;
 }
 
+int StreamHandleWrapper::luaFilterContext(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (filter_context_wrapper_.get() != nullptr) {
+    filter_context_wrapper_.pushStack();
+  } else {
+    filter_context_wrapper_.reset(
+        Filters::Common::Lua::MetadataMapWrapper::create(state, callbacks_.filterContext()), true);
+  }
+  return 1;
+}
+
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
   uint64_t status = Http::Utility::getResponseStatus(*headers);
@@ -949,7 +997,7 @@ void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buf
                              HttpResponseCodeDetails::get().LuaResponse);
 }
 
-const ProtobufWkt::Struct& Filter::DecoderCallbacks::metadata() const {
+const Protobuf::Struct& Filter::DecoderCallbacks::metadata() const {
   return getMetadata(callbacks_);
 }
 
@@ -960,7 +1008,7 @@ void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Ins
   luaL_error(state, "respond not currently supported in the response path");
 }
 
-const ProtobufWkt::Struct& Filter::EncoderCallbacks::metadata() const {
+const Protobuf::Struct& Filter::EncoderCallbacks::metadata() const {
   return getMetadata(callbacks_);
 }
 

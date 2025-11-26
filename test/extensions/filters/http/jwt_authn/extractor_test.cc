@@ -205,26 +205,10 @@ TEST_F(ExtractorTest, TestDefaultParamLocation) {
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("unknown_issuer"));
 
   // Test token remove from the query parameter
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "false"}});
-
-    tokens[0]->removeJwt(headers);
-    Http::Utility::QueryParamsMulti query_params =
-        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
-    EXPECT_EQ(query_params.getFirstValue("access_token").has_value(), true);
-  }
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "true"}});
-
-    tokens[0]->removeJwt(headers);
-    Http::Utility::QueryParamsMulti query_params =
-        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
-    EXPECT_EQ(query_params.getFirstValue("access_token").has_value(), false);
-  }
+  tokens[0]->removeJwt(headers);
+  Http::Utility::QueryParamsMulti query_params =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+  EXPECT_EQ(query_params.getFirstValue("access_token").has_value(), false);
 }
 
 // Test extracting token from the custom header: "token-header"
@@ -341,26 +325,10 @@ TEST_F(ExtractorTest, TestCustomParamToken) {
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer5"));
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("unknown_issuer"));
 
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "false"}});
-
-    tokens[0]->removeJwt(headers);
-    Http::Utility::QueryParamsMulti query_params =
-        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
-    EXPECT_EQ(query_params.getFirstValue("token_param").has_value(), true);
-  }
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "true"}});
-
-    tokens[0]->removeJwt(headers);
-    Http::Utility::QueryParamsMulti query_params =
-        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
-    EXPECT_EQ(query_params.getFirstValue("token_param").has_value(), false);
-  }
+  tokens[0]->removeJwt(headers);
+  Http::Utility::QueryParamsMulti query_params =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+  EXPECT_EQ(query_params.getFirstValue("token_param").has_value(), false);
 }
 
 // Test extracting token from a cookie

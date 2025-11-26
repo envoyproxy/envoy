@@ -2,7 +2,6 @@
 
 #include "test/test_common/environment.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -53,6 +52,10 @@ TEST_F(EvironmentCredentialsProviderTest, NoSessionToken) {
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(EvironmentCredentialsProviderTest, Coverage) {
+  EXPECT_EQ(provider_.providerName(), "EnvironmentCredentialsProvider");
 }
 
 } // namespace Aws

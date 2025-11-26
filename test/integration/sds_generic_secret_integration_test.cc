@@ -72,13 +72,9 @@ public:
   createFilter(const std::string&,
                Server::Configuration::FactoryContext& factory_context) override {
     auto secret_provider =
-        factory_context.serverFactoryContext()
-            .clusterManager()
-            .clusterManagerFactory()
-            .secretManager()
-            .findOrCreateGenericSecretProvider(config_source_, "encryption_key",
-                                               factory_context.getTransportSocketFactoryContext(),
-                                               factory_context.initManager());
+        factory_context.serverFactoryContext().secretManager().findOrCreateGenericSecretProvider(
+            config_source_, "encryption_key", factory_context.serverFactoryContext(),
+            factory_context.initManager());
     return
         [&factory_context, secret_provider](Http::FilterChainFactoryCallbacks& callbacks) -> void {
           callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::SdsGenericSecretTestFilter>(
@@ -138,7 +134,7 @@ public:
     generic_secret->mutable_secret()->set_inline_string("DUMMY_AES_128_KEY");
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("0");
-    discovery_response.set_type_url(Config::TypeUrl::get().Secret);
+    discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);
     xds_stream_->sendGrpcMessage(discovery_response);
   }

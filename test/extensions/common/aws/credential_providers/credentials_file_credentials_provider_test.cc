@@ -1,10 +1,8 @@
 #include "source/extensions/common/aws/credential_providers/credentials_file_credentials_provider.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_runtime.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::InSequence;
@@ -270,6 +268,10 @@ TEST_F(CredentialsFileCredentialsProviderTest, RefreshInterval) {
   EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
   EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
   EXPECT_EQ("default_token", credentials.sessionToken().value());
+}
+
+TEST_F(CredentialsFileCredentialsProviderTest, Coverage) {
+  EXPECT_EQ(provider_.providerName(), "CredentialsFileCredentialsProvider");
 }
 
 } // namespace Aws

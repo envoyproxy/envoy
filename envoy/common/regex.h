@@ -14,6 +14,9 @@ namespace Regex {
  */
 class CompiledMatcher : public Matchers::StringMatcher {
 public:
+  // To avoid hiding other implementations of match.
+  using Matchers::StringMatcher::match;
+
   /**
    * Replaces all non-overlapping occurrences of the pattern in "value" with
    * "substitution". The "substitution" string can make references to

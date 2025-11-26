@@ -54,6 +54,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/network/echo:config",
         "//source/extensions/filters/network/rbac:config",
+        "//source/extensions/filters/network/set_filter_state:config",
         "//test/integration:integration_lib",
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

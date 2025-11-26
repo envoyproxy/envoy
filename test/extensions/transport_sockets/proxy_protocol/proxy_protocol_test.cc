@@ -781,7 +781,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
   host_added_tlvs->set_type(0x96);
   host_added_tlvs->set_value("moredata");
 
-  ProtobufWkt::Any typed_metadata;
+  Protobuf::Any typed_metadata;
   typed_metadata.PackFrom(host_metadata_config);
   metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
   EXPECT_CALL(*host, metadata()).Times(testing::AnyNumber()).WillRepeatedly(Return(metadata));
@@ -844,7 +844,7 @@ TEST_F(ProxyProtocolTest, V2CombinedPrecedenceHostConfigPassthrough) {
   host_added_tlvs->set_type(0x99);
   host_added_tlvs->set_value("hostValue");
 
-  ProtobufWkt::Any typed_metadata;
+  Protobuf::Any typed_metadata;
   typed_metadata.PackFrom(host_metadata_config);
   metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
   EXPECT_CALL(*host, metadata()).WillRepeatedly(Return(metadata));
@@ -908,7 +908,7 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperly) {
   auto duplicate_host_entry = host_metadata_config.add_added_tlvs();
   duplicate_host_entry->set_type(0x98);
   duplicate_host_entry->set_value("d2"); // Last duplicate value
-  ProtobufWkt::Any typed_metadata;
+  Protobuf::Any typed_metadata;
   typed_metadata.PackFrom(host_metadata_config);
   metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
   EXPECT_CALL(*host, metadata()).WillRepeatedly(Return(metadata));
@@ -979,7 +979,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVMetadataInvalidFormat) {
   envoy::config::core::v3::Address addr_proto;
   addr_proto.mutable_socket_address()->set_address("0.0.0.0");
   addr_proto.mutable_socket_address()->set_port_value(1234);
-  ProtobufWkt::Any typed_metadata;
+  Protobuf::Any typed_metadata;
   typed_metadata.PackFrom(addr_proto);
   metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
   EXPECT_CALL(*host, metadata()).Times(testing::AnyNumber()).WillRepeatedly(Return(metadata));
@@ -1034,7 +1034,7 @@ filter_metadata:
     outbound-proxy-protocol: true
 )EOF",
                             socket_match_metadata);
-  ProtobufWkt::Any typed_metadata;
+  Protobuf::Any typed_metadata;
   typed_metadata.PackFrom(socket_match_metadata);
 
   auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();

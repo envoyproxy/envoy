@@ -17,7 +17,7 @@ TEST(SendTrailersTest, Success) {
   auto trailer = http_request_trailers_match->add_headers();
   trailer->set_name("trailer-key");
   trailer->set_exact_match("trailer-value");
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.set_type_url(
       "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion");
   std::string serialized_assertion;
@@ -27,6 +27,7 @@ TEST(SendTrailersTest, Success) {
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   engine_builder.enforceTrustChainVerification(false)
+      .enableLogger(false)
       .setLogLevel(Logger::Logger::debug)
       .addNativeFilter("envoy.filters.http.assertion", typed_config)
 

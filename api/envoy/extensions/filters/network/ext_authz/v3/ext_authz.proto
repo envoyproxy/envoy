@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC Authorization API defined by
 // :ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
 // A failed check will cause this filter to close the TCP connection.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.ext_authz.v2.ExtAuthz";
@@ -68,4 +68,12 @@ message ExtAuthz {
   // When this field is true, Envoy will include the SNI name used for TLSClientHello, if available, in the
   // :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`.
   bool include_tls_session = 8;
+
+  // When set to ``true``, the filter will send a TLS ``access_denied(49)`` alert before closing
+  // the connection when authorization is denied. This provides better visibility to TLS clients
+  // about the reason for connection closure. This alert is only sent for TLS connections. The
+  // non-TLS connections will be closed without sending an alert.
+  //
+  // Defaults to ``false``.
+  bool send_tls_alert_on_denial = 9;
 }

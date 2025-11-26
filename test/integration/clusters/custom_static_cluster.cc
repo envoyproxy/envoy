@@ -27,9 +27,9 @@ Upstream::HostSharedPtr CustomStaticCluster::makeHost() {
   return Upstream::HostSharedPtr{*Upstream::HostImpl::create(
       info(), "", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(info()->metadata()), nullptr, 1,
-      envoy::config::core::v3::Locality::default_instance(),
+      std::make_shared<const envoy::config::core::v3::Locality>(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), priority_,
-      envoy::config::core::v3::UNKNOWN, time_source_)};
+      envoy::config::core::v3::UNKNOWN)};
 }
 
 Upstream::ThreadAwareLoadBalancerPtr CustomStaticCluster::threadAwareLb() {

@@ -6,8 +6,10 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -17,6 +19,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
+#include "source/common/grpc/typed_async_client.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/runtime/runtime_protos.h"
@@ -43,7 +46,10 @@ namespace ExtAuthz {
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(invalid)                                                                                 \
   COUNTER(ignored_dynamic_metadata)                                                                \
-  COUNTER(filter_state_name_collision)
+  COUNTER(filter_state_name_collision)                                                             \
+  COUNTER(omitted_response_headers)                                                                \
+  COUNTER(request_header_limits_reached)                                                           \
+  COUNTER(response_header_limits_reached)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -54,10 +60,10 @@ struct ExtAuthzFilterStats {
 
 class ExtAuthzLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
-  explicit ExtAuthzLoggingInfo(const absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata)
+  explicit ExtAuthzLoggingInfo(const absl::optional<Envoy::Protobuf::Struct> filter_metadata)
       : filter_metadata_(filter_metadata) {}
 
-  const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
+  const absl::optional<Protobuf::Struct>& filterMetadata() const { return filter_metadata_; }
   absl::optional<std::chrono::microseconds> latency() const { return latency_; };
   absl::optional<uint64_t> bytesSent() const { return bytes_sent_; }
   absl::optional<uint64_t> bytesReceived() const { return bytes_received_; }
@@ -99,7 +105,7 @@ public:
   void clearUpstreamHost() { upstream_host_ = nullptr; }
 
 private:
-  const absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata_;
+  const absl::optional<Envoy::Protobuf::Struct> filter_metadata_;
   absl::optional<std::chrono::microseconds> latency_;
   // The following stats are populated for ext_authz filters using Envoy gRPC only.
   absl::optional<uint64_t> bytes_sent_;
@@ -132,6 +138,8 @@ public:
   bool clearRouteCache() const { return clear_route_cache_; }
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
+
+  uint32_t maxDeniedResponseBodyBytes() const { return max_denied_response_body_bytes_; }
 
   bool packAsBytes() const { return pack_as_bytes_; }
 
@@ -198,9 +206,11 @@ public:
   bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
 
-  const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
+  const absl::optional<Protobuf::Struct>& filterMetadata() const { return filter_metadata_; }
 
   bool emitFilterStateStats() const { return emit_filter_state_stats_; }
+
+  bool enforceResponseHeaderLimits() const { return enforce_response_header_limits_; }
 
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
@@ -242,6 +252,7 @@ private:
   const bool failure_mode_allow_header_add_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
+  const uint32_t max_denied_response_body_bytes_;
   const bool pack_as_bytes_;
   const bool encode_raw_headers_;
   const Http::Code status_on_error_;
@@ -252,8 +263,9 @@ private:
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
-  const absl::optional<ProtobufWkt::Struct> filter_metadata_;
+  const absl::optional<Protobuf::Struct> filter_metadata_;
   const bool emit_filter_state_stats_;
+  const bool enforce_response_header_limits_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
@@ -305,7 +317,13 @@ public:
         check_settings_(config.has_check_settings()
                             ? config.check_settings()
                             : envoy::extensions::filters::http::ext_authz::v3::CheckSettings()),
-        disabled_(config.disabled()) {
+        disabled_(config.disabled()),
+        grpc_service_(config.has_check_settings() && config.check_settings().has_grpc_service()
+                          ? absl::make_optional(config.check_settings().grpc_service())
+                          : absl::nullopt),
+        http_service_(config.has_check_settings() && config.check_settings().has_http_service()
+                          ? absl::make_optional(config.check_settings().http_service())
+                          : absl::nullopt) {
     if (config.has_check_settings() && config.check_settings().disable_request_body_buffering() &&
         config.check_settings().has_with_request_body()) {
       ExceptionUtil::throwEnvoyException(
@@ -313,6 +331,12 @@ public:
           "with_request_body can be set.");
     }
   }
+
+  // This constructor is used as a way to merge more-specific config into less-specific config in a
+  // clearly defined way (e.g. route config into VH config). All fields on this class must be const
+  // and thus must be initialized in the constructor initialization list.
+  FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
+                       const FilterConfigPerRoute& more_specific);
 
   void merge(const FilterConfigPerRoute& other);
 
@@ -325,8 +349,23 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  envoy::extensions::filters::http::ext_authz::v3::CheckSettings checkSettings() const {
+  const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& checkSettings() const {
     return check_settings_;
+  }
+
+  /**
+   * @return The gRPC service override for this route, if any.
+   */
+  const absl::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
+    return grpc_service_;
+  }
+
+  /**
+   * @return The HTTP service override for this route, if any.
+   */
+  const absl::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>&
+  httpService() const {
+    return http_service_;
   }
 
 private:
@@ -334,7 +373,10 @@ private:
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
   envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
-  bool disabled_;
+  const bool disabled_;
+  const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  const absl::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>
+      http_service_;
 };
 
 /**
@@ -347,6 +389,12 @@ class Filter : public Logger::Loggable<Logger::Id::ext_authz>,
 public:
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()) {}
+
+  // Constructor that includes server context for per-route service support.
+  Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client,
+         Server::Configuration::ServerFactoryContext& server_context)
+      : config_(config), client_(std::move(client)), server_context_(&server_context),
+        stats_(config->stats()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -378,10 +426,20 @@ private:
   validateAndCheckDecoderHeaderMutation(Filters::Common::MutationRules::CheckOperation operation,
                                         absl::string_view key, absl::string_view value) const;
 
+  void responseHeaderLimitsReached();
+
   // Called when the filter is configured to reject invalid responses & the authz response contains
   // invalid header or query parameters. Sends a local response with the configured rejection status
   // code.
   void rejectResponse();
+
+  // Create a new gRPC client for per-route gRPC service configuration.
+  Filters::Common::ExtAuthz::ClientPtr
+  createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service);
+
+  // Create a new HTTP client for per-route HTTP service configuration.
+  Filters::Common::ExtAuthz::ClientPtr createPerRouteHttpClient(
+      const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service);
 
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
@@ -393,7 +451,7 @@ private:
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
     const bool skip_check_;
-    const envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
+    const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& check_settings_;
   };
   PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
 
@@ -410,6 +468,10 @@ private:
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
+  // Per-route gRPC client that overrides the default client when specified.
+  Filters::Common::ExtAuthz::ClientPtr per_route_client_;
+  // Server context for creating per-route clients.
+  Server::Configuration::ServerFactoryContext* server_context_{nullptr};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::RequestHeaderMap* request_headers_;

@@ -31,8 +31,8 @@ public:
 
 private:
   // Following two functions are for Verifier::Callbacks interface.
-  // Pass the extracted data from a verified JWT as an opaque ProtobufWkt::Struct.
-  void setExtractedData(const ProtobufWkt::Struct& extracted_data) override;
+  // Pass the extracted data from a verified JWT as an opaque Protobuf::Struct.
+  void setExtractedData(const Protobuf::Struct& extracted_data) override;
   void clearRouteCache() override;
   // It will be called when its verify() call is completed.
   void onComplete(const ::google::jwt_verify::Status& status) override;

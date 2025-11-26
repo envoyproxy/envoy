@@ -1,0 +1,26 @@
+diff --git a/BUILD b/BUILD
+index c825050b..7dd168db 100644
+--- a/BUILD
++++ b/BUILD
+@@ -198,6 +198,7 @@ cc_library(
+         "hwy/ops/x86_128-inl.h",
+         "hwy/ops/x86_256-inl.h",
+         "hwy/ops/x86_512-inl.h",
++        "hwy/ops/ppc_vsx-inl.h",
+         # Select avoids recompiling native arch if only non-native changed
+     ] + select({
+         ":compiler_emscripten": [
+diff --git a/BUILD b/BUILD
+index c825050b..23f5a03c 100644
+--- a/BUILD
++++ b/BUILD
+@@ -130,6 +130,9 @@ COPTS = select({
+         "-march=rv64gcv1p0",
+         "-menable-experimental-extensions",
+     ],
++    "@platforms//cpu:ppc64le": [
++        "-DTOOLCHAIN_MISS_ASM_HWCAP_H"
++    ],
+     "//conditions:default": [
+     ],
+ })

@@ -1,0 +1,125 @@
+x-common: &common-base
+  build:
+    context: ../..
+    dockerfile: ci/matrix/Dockerfile
+  volumes:
+  - ../..:/workspace
+  environment: &common-env
+    ENVOY_UID: "${UID:?UID not set, **try** `export UID`}"
+    ENVOY_GID: ${GID}
+
+x-gcc-setup: &gcc-setup |
+  #!/usr/bin/env bash
+  set -eo pipefail
+  apt-get update --error-on=any
+  apt-get -qq install -y gnupg2 gpg-agent
+  add-apt-repository -y ppa:ubuntu-toolchain-r/test
+  apt-get update --error-on=any
+  apt-get -qq install -y --no-install-recommends gcc-13 g++-13 libstdc++-13-dev libc6-dev build-essential
+  update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+  update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+
+x-llvm-setup: &llvm-setup |
+  #!/usr/bin/env bash
+  set -eo pipefail
+  apt-get -qq update --error-on=any
+  apt-get -qq install -y gnupg2 gpg-agent
+  add-apt-repository -y ppa:ubuntu-toolchain-r/test
+  apt-get update --error-on=any
+  apt-get -qq install -y libtinfo5 wget xz-utils libgcc-s1 libgcc-13-dev
+  mkdir -p /opt/llvm
+  cd /opt/llvm
+  wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+  tar -xf clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
+
+services:
+  gcc:
+    <<: *common-base
+    build:
+      context: ../..
+      dockerfile: ci/matrix/Dockerfile
+      args:
+        MATRIX_SETUP: *gcc-setup
+    environment:
+      <<: *common-env
+      EXPECTED_NO_ARGS: gcc-libstdc++
+      EXPECTED_GCC: gcc-libstdc++
+      EXPECTED_CLANG: fail
+      EXPECTED_GCC_ENV: gcc-libstdc++
+      EXPECTED_CLANG_ENV: fail
+    command:
+    - bash
+    - -c
+    - |
+      ! which clang || (echo "ERROR: clang found when it shouldn't be" && exit 1)
+      /usr/local/bin/test.sh
+
+  llvm:
+    <<: *common-base
+    build:
+      context: ../..
+      dockerfile: ci/matrix/Dockerfile
+      args:
+        MATRIX_SETUP: *llvm-setup
+    environment:
+      <<: *common-env
+      EXPECTED_NO_ARGS: fail
+      EXPECTED_GCC: fail
+      EXPECTED_CLANG: clang-libc++
+      EXPECTED_GCC_ENV: fail
+      EXPECTED_CLANG_ENV: fail
+    command:
+    - bash
+    - -c
+    - |
+      ! which gcc || (echo "ERROR: gcc found when it shouldn't be" && exit 1)
+      bazel/setup_clang.sh /opt/llvm
+      export PATH=/opt/llvm/bin:$PATH
+      clang --version
+      /usr/local/bin/test.sh
+
+  all:
+    <<: *common-base
+    build:
+      context: ../..
+      dockerfile: ci/matrix/Dockerfile
+      args:
+        MATRIX_SETUP: *llvm-setup
+        MATRIX_SETUP_EXTRA: *gcc-setup
+    environment:
+      <<: *common-env
+      EXPECTED_NO_ARGS: gcc-libstdc++
+      EXPECTED_GCC: gcc-libstdc++
+      EXPECTED_CLANG: clang-libc++
+      EXPECTED_GCC_ENV: gcc-libstdc++
+      EXPECTED_CLANG_ENV: clang-libstdc++
+    command:
+    - bash
+    - -c
+    - |
+      bazel/setup_clang.sh /opt/llvm
+      export PATH=/opt/llvm/bin:$PATH
+      gcc --version
+      clang --version
+      /usr/local/bin/test.sh
+
+  # this fails all now, but should start working with hermetic toolchains
+  none:
+    <<: *common-base
+    build:
+      context: ../..
+      dockerfile: ci/matrix/Dockerfile
+    environment:
+      <<: *common-env
+      EXPECTED_NO_ARGS: fail
+      EXPECTED_GCC: fail
+      EXPECTED_CLANG: fail
+      EXPECTED_GCC_ENV: fail
+      EXPECTED_CLANG_ENV: fail
+    command:
+    - bash
+    - -c
+    - |
+      ! which clang || (echo "ERROR: clang found when it shouldn't be" && exit 1)
+      ! which gcc || (echo "ERROR: gcc found when it shouldn't be" && exit 1)
+      /usr/local/bin/test.sh

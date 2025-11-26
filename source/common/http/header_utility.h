@@ -271,6 +271,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers,
       Server::Configuration::CommonFactoryContext& context) {
     std::vector<HeaderUtility::HeaderDataPtr> ret;
+    ret.reserve(header_matchers.size());
     for (const auto& header_matcher : header_matchers) {
       ret.emplace_back(HeaderUtility::createHeaderData(header_matcher, context));
     }
@@ -284,6 +285,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers,
       Server::Configuration::CommonFactoryContext& context) {
     std::vector<Http::HeaderMatcherSharedPtr> ret;
+    ret.reserve(header_matchers.size());
     for (const auto& header_matcher : header_matchers) {
       ret.emplace_back(HeaderUtility::createHeaderData(header_matcher, context));
     }

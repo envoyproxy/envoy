@@ -154,6 +154,12 @@ generate_x509_cert_no_extension() {
     openssl x509 -req -days "$days" -in "${1}_cert.csr" -sha256 -CA "${2}_cert.pem" -CAkey \
             "${2}_key.pem" -out "${1}_cert.pem" -extensions v3_req -extfile "${1}_cert.cfg"
     generate_info_header "$1"
+    # Older OpenSSLs do not correctly generate this certificate. See
+    # https://github.com/openssl/openssl/issues/28397
+    if openssl asn1parse -in "${1}_cert.pem" | grep -F 'cont [ 3 ]' > /dev/null; then
+      echo "ERROR: ${1}_cert.pem was not generated correctly. Use a newer OpenSSL."
+      exit 1
+    fi
 }
 
 # $1=<certificate name> $2=<CA name> $3=[days]
@@ -446,8 +452,10 @@ generate_rsa_key no_subject
 generate_x509_cert_nosubject no_subject ca
 
 # Generate a certificate with no extensions
-generate_rsa_key no_extension
-generate_x509_cert_no_extension no_extension ca
+# This is skipped for now because OpenSSL cannot generate it correctly.
+# See https://github.com/openssl/openssl/issues/28397.
+# generate_rsa_key no_extension
+# generate_x509_cert_no_extension no_extension ca
 
 # Generate unit test certificate
 generate_rsa_key unittest

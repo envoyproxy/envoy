@@ -1,7 +1,5 @@
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
-#include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -30,9 +28,10 @@ public:
     chain_ = std::make_shared<CredentialsProviderChain>();
     credentials_provider_ = std::make_shared<NiceMock<MockCredentialsProvider>>();
     chain_->add(credentials_provider_);
-    signer_ = std::make_shared<SigV4SignerImpl>(
-        "service", "region", chain_, context_,
-        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+    signer_ =
+        std::make_shared<SigV4SignerImpl>("service", "region", chain_, context_,
+                                          Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+                                          Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
   }
 
   void addMethod(const std::string& method) { message_->headers().setMethod(method); }
@@ -57,7 +56,8 @@ public:
     headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
     chain_->add(credentials_provider_);
     SigV4SignerImpl signer(service_name, "region", chain_, context_,
-                           Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false, 5);
+                           Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+                           Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, false, 5);
     if (use_unsigned_payload) {
       status = signer.signUnsignedPayload(headers, override_region);
     } else {
@@ -87,7 +87,8 @@ public:
     }
 
     SigV4SignerImpl signer(service_name, "region", chain_, context_,
-                           Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, 5);
+                           Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+                           Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, true, 5);
 
     auto status = signer.signUnsignedPayload(extra_headers, override_region);
     EXPECT_TRUE(status.ok());
@@ -343,7 +344,8 @@ TEST_F(SigV4SignerImplTest, QueryStringDefault5s) {
   headers.addCopy("testheader", "value1");
   chain_->add(credentials_provider);
   SigV4SignerImpl querysigner("service", "region", chain_, context_,
-                              Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, 5);
+                              Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+                              Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, true, 5);
 
   auto status = querysigner.signUnsignedPayload(headers);
   EXPECT_TRUE(status.ok());

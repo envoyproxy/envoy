@@ -32,6 +32,7 @@ public:
 };
 
 using PassthroughStateSharedPtr = std::shared_ptr<PassthroughState>;
+using PassthroughStatePtr = std::unique_ptr<PassthroughState>;
 
 /**
  * The interface for the peer as a writer and supplied read status query.

@@ -44,7 +44,7 @@ public:
   /**
    * Unspecified value for protobuf.
    */
-  static const ProtobufWkt::Value& unspecifiedValue();
+  static const Protobuf::Value& unspecifiedValue();
 
   /**
    * Truncate a string to a maximum length. Do nothing if max_length is not set or

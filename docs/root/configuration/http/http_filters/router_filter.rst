@@ -83,8 +83,8 @@ can be specified using a ',' delimited list. The supported policies are:
     request, including any retries that take place.
 
 gateway-error
-  This policy is similar to the *5xx* policy but will only retry requests that result in a 502, 503,
-  or 504.
+  This policy is similar to the *5xx* policy but will attempt a retry if the upstream server responds
+  with 502, 503, or 504 response code, or does not respond at all (disconnect/reset/read timeout).
 
 reset
   Envoy will attempt a retry if the upstream server does not respond at all (disconnect/reset/read timeout.)
@@ -374,6 +374,19 @@ x-envoy-original-path
 If the route utilizes :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`
 or :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
 Envoy will put the original path header in this header. This can be useful for logging and
+debugging.
+
+.. _config_http_filters_router_x-envoy-original-host:
+
+x-envoy-original-host
+^^^^^^^^^^^^^^^^^^^^^
+
+If the route utilizes
+:ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`,
+:ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`,
+:ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`,
+:ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`,
+Envoy will put the original host header in this header. This can be useful for logging and
 debugging.
 
 .. _config_http_filters_router_x-envoy-upstream-stream-duration-ms:

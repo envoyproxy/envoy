@@ -23,7 +23,7 @@ Http::Code RuntimeHandler::handlerRuntime(Http::ResponseHeaderMap& response_head
   // TODO(jsedgwick): Use proto to structure this output instead of arbitrary JSON.
   const auto& layers = server_.runtime().snapshot().getLayers();
 
-  std::vector<ProtobufWkt::Value> layer_names;
+  std::vector<Protobuf::Value> layer_names;
   layer_names.reserve(layers.size());
   std::map<std::string, std::vector<std::string>> entries;
   for (const auto& layer : layers) {
@@ -45,10 +45,10 @@ Http::Code RuntimeHandler::handlerRuntime(Http::ResponseHeaderMap& response_head
     }
   }
 
-  ProtobufWkt::Struct layer_entries;
+  Protobuf::Struct layer_entries;
   auto* layer_entry_fields = layer_entries.mutable_fields();
   for (const auto& entry : entries) {
-    std::vector<ProtobufWkt::Value> layer_entry_values;
+    std::vector<Protobuf::Value> layer_entry_values;
     layer_entry_values.reserve(entry.second.size());
     std::string final_value;
     for (const auto& value : entry.second) {
@@ -58,7 +58,7 @@ Http::Code RuntimeHandler::handlerRuntime(Http::ResponseHeaderMap& response_head
       layer_entry_values.push_back(ValueUtil::stringValue(value));
     }
 
-    ProtobufWkt::Struct layer_entry_value;
+    Protobuf::Struct layer_entry_value;
     auto* layer_entry_value_fields = layer_entry_value.mutable_fields();
 
     (*layer_entry_value_fields)["final_value"] = ValueUtil::stringValue(final_value);
@@ -66,7 +66,7 @@ Http::Code RuntimeHandler::handlerRuntime(Http::ResponseHeaderMap& response_head
     (*layer_entry_fields)[entry.first] = ValueUtil::structValue(layer_entry_value);
   }
 
-  ProtobufWkt::Struct runtime;
+  Protobuf::Struct runtime;
   auto* fields = runtime.mutable_fields();
 
   (*fields)["layers"] = ValueUtil::listValue(layer_names);

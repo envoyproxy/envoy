@@ -76,6 +76,19 @@ public:
     http_connection_callbacks_ = &callbacks;
   }
 
+  void setH3GoAwayLoadShedPoints(Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch,
+                                 Server::LoadShedPoint* should_send_go_away_on_dispatch) {
+    ENVOY_LOG_ONCE_IF(trace, should_send_go_away_and_close_on_dispatch == nullptr,
+                      "LoadShedPoint "
+                      "envoy.load_shed_points.http3_server_go_away_and_close_on_dispatch "
+                      "is not found. Is it configured?");
+    ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch == nullptr,
+                      "LoadShedPoint envoy.load_shed_points.http3_server_go_away_on_dispatch "
+                      "is not found. Is it configured?");
+    should_send_go_away_and_close_on_dispatch_ = should_send_go_away_and_close_on_dispatch;
+    should_send_go_away_on_dispatch_ = should_send_go_away_on_dispatch;
+  }
+
   // quic::QuicSession
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;
@@ -99,6 +112,10 @@ public:
                                   const Network::FilterChain& filter_chain,
                                   ConnectionMapIter position);
 
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override {
+    return false;
+  }
+
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
   using quic::QuicSession::PerformActionOnActiveStreams;
 
@@ -114,7 +131,6 @@ protected:
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
-  quic::QuicSpdyStream* CreateOutgoingUnidirectionalStream() override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
 
@@ -140,6 +156,10 @@ private:
   QuicConnectionStats& connection_stats_;
   quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
   std::unique_ptr<quic::QuicConnectionDebugVisitor> debug_visitor_;
+  // Load shed points for H3 GoAway
+  Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_ = nullptr;
+  Server::LoadShedPoint* should_send_go_away_on_dispatch_ = nullptr;
+  bool h3_go_away_sent_ = false;
 };
 
 } // namespace Quic

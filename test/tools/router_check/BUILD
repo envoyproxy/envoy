@@ -58,6 +58,7 @@ envoy_cc_test_library(
         "@com_github_mirror_tclap//:tclap",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
@@ -68,5 +69,6 @@ envoy_proto_library(
     deps = [
         "@envoy_api//envoy/config/core/v3:pkg",
         "@envoy_api//envoy/config/route/v3:pkg",
+        "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg",
     ],
 )

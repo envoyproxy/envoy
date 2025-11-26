@@ -46,7 +46,7 @@ struct TestFactory : public Envoy::Server::Configuration::NamedNetworkFilterConf
   std::string name() const override { return "test"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 
   absl::StatusOr<Envoy::Network::FilterFactoryCb>
@@ -243,7 +243,7 @@ createMatchingTree(const std::string& name, const std::string& value) {
       std::make_unique<InputType>(name), absl::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Network::MatchingData>{
-                            []() { return std::make_unique<ActionType>(); }, nullptr});
+                            std::make_shared<ActionType>(), nullptr, false});
 
   return tree;
 }
@@ -376,7 +376,7 @@ TEST(DelegatingNetworkFilterManager, RemoveReadFilterAndInitializeReadFilters) {
 }
 
 // Custom action type for testing non-skip action
-class TestAction : public Matcher::ActionBase<ProtobufWkt::StringValue> {
+class TestAction : public Matcher::ActionBase<Protobuf::StringValue> {
 public:
   explicit TestAction(const std::string& value = "test_value") : value_(value) {}
 
@@ -394,7 +394,7 @@ createMatchingTreeWithTestAction(const std::string& name, const std::string& val
       std::make_unique<InputType>(name), absl::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Network::MatchingData>{
-                            []() { return std::make_unique<TestAction>(); }, nullptr});
+                            std::make_shared<TestAction>(), nullptr, false});
   return tree;
 }
 

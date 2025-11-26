@@ -21,6 +21,7 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
@@ -636,6 +637,7 @@ public:
   const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
   absl::string_view addressType() const override { PANIC("not implemented"); }
+  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
 
   Address::Type type() const override { return instance_.type(); }
   const SocketInterface& socketInterface() const override {
@@ -726,6 +728,14 @@ public:
     cares.set_allocated_udp_max_queries(udpMaxQueries());
     cares.set_rotate_nameservers(setRotateNameservers());
 
+    // Set EDNS0 configuration if specified
+    if (getEdns0MaxPayloadSize() > 0) {
+      cares.mutable_edns0_max_payload_size()->set_value(getEdns0MaxPayloadSize());
+    }
+
+    // Enable `reinit_channel_on_timeout` if requested by the test case.
+    cares.set_reinit_channel_on_timeout(reinitOnTimeout());
+
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
     // setup the typed config
@@ -734,6 +744,8 @@ public:
 
     return typed_dns_resolver_config;
   }
+  // Whether to enable `reinit_channel_on_timeout` in the resolver config for this test.
+  virtual bool reinitOnTimeout() const { return false; }
 
   void SetUp() override {
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
@@ -901,21 +913,26 @@ public:
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
     EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(getifaddrs_supported));
-    if (getifaddrs_supported) {
-      if (getifaddrs_success) {
-        EXPECT_CALL(os_sys_calls, getifaddrs(_))
-            .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
-              for (uint32_t i = 0; i < ifaddrs.size(); i++) {
-                auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(ifaddrs[i]);
-                vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
-              }
-              return {0, 0};
-            }));
-      } else {
-        EXPECT_CALL(os_sys_calls, getifaddrs(_))
-            .WillOnce(Invoke(
-                [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; }));
+    if (filterUnroutableFamilies()) {
+      if (getifaddrs_supported) {
+        if (getifaddrs_success) {
+          EXPECT_CALL(os_sys_calls, getifaddrs(_))
+              .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+                for (uint32_t i = 0; i < ifaddrs.size(); i++) {
+                  auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(ifaddrs[i]);
+                  vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
+                }
+                return {0, 0};
+              }));
+        } else {
+          EXPECT_CALL(os_sys_calls, getifaddrs(_))
+              .WillOnce(Invoke(
+                  [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; }));
+        }
       }
+    } else {
+      // When filter_unroutable_families is false, getifaddrs should NOT be called
+      EXPECT_CALL(os_sys_calls, getifaddrs(_)).Times(0);
     }
 
     // These passthrough calls are needed to let the resolver communicate with the DNS server
@@ -974,7 +991,8 @@ protected:
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
   virtual bool setRotateNameservers() const { return false; }
-  virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return nullptr; }
+  virtual Protobuf::UInt32Value* udpMaxQueries() const { return nullptr; }
+  virtual uint32_t getEdns0MaxPayloadSize() const { return 0; }
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;
@@ -1950,6 +1968,7 @@ TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterAllV6) {
 class DnsImplZeroTimeoutTest : public DnsImplTest {
 protected:
   bool queryTimeout() const override { return true; }
+  bool reinitOnTimeout() const override { return true; }
 };
 
 // Parameterize the DNS test server socket address.
@@ -1957,7 +1976,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplZeroTimeoutTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Validate that timeouts result in an empty callback.
+// Validate that timeouts result in an empty callback and trigger channel reinitialization.
 TEST_P(DnsImplZeroTimeoutTest, Timeout) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
 
@@ -1965,8 +1984,9 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // After `ARES_ETIMEOUT`, the channel should reinitialize.
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
-             0 /*get_addr_failure*/, 3 /*timeouts*/, 0 /*reinitializations*/);
+             0 /*get_addr_failure*/, 3 /*timeouts*/, 1 /*reinitializations*/);
 }
 
 // Validate that c-ares query cache is disabled by default.
@@ -2197,10 +2217,10 @@ TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
       dns_resolvers);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(dns_resolvers);
-  auto query_timeout_seconds = std::make_unique<ProtobufWkt::UInt64Value>();
+  auto query_timeout_seconds = std::make_unique<Protobuf::UInt64Value>();
   query_timeout_seconds->set_value(9);
   cares.set_allocated_query_timeout_seconds(query_timeout_seconds.release());
-  auto query_tries = std::make_unique<ProtobufWkt::UInt32Value>();
+  auto query_tries = std::make_unique<Protobuf::UInt32Value>();
   query_tries->set_value(7);
   cares.set_allocated_query_tries(query_tries.release());
   Network::Utility::addressToProtobufAddress(
@@ -2242,10 +2262,10 @@ TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
 class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {
 protected:
   bool tcpOnly() const override { return false; }
-  ProtobufWkt::UInt32Value* udpMaxQueries() const override {
-    auto udp_max_queries = std::make_unique<ProtobufWkt::UInt32Value>();
+  Protobuf::UInt32Value* udpMaxQueries() const override {
+    auto udp_max_queries = std::make_unique<Protobuf::UInt32Value>();
     udp_max_queries->set_value(100);
-    return dynamic_cast<ProtobufWkt::UInt32Value*>(udp_max_queries.release());
+    return dynamic_cast<Protobuf::UInt32Value*>(udp_max_queries.release());
   }
 };
 
@@ -2310,6 +2330,35 @@ TEST_P(DnsImplAresFlagsForNoNameserverRotationTest, NameserverRotationDisabled) 
   EXPECT_TRUE((optmask & ARES_OPT_NOROTATE) == ARES_OPT_NOROTATE);
   EXPECT_NE(nullptr,
             resolveWithUnreferencedParameters("some.good.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
+}
+
+// EDNS0 configuration test
+
+class DnsImplEdns0Test : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  uint32_t getEdns0MaxPayloadSize() const override { return 4096; }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplEdns0Test,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Test: Verify EDNS0 configuration is applied to c-ares options
+// Note: EDNS0 is only relevant for UDP DNS queries.
+// The DNS tests in this file use TCP-only mode to avoid instability and flakiness from UDP.
+// Therefore, this test only verifies that the EDNS0 configuration flag is set in c-ares,
+// not its functional behavior.
+TEST_P(DnsImplEdns0Test, Edns0ConfigurationApplied) {
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+
+  // Verify EDNS0 payload size flag is set and value is correct
+  EXPECT_TRUE((optmask & ARES_OPT_EDNSPSZ) == ARES_OPT_EDNSPSZ);
+  EXPECT_EQ(opts.ednspsz, 4096);
+
   ares_destroy_options(&opts);
 }
 

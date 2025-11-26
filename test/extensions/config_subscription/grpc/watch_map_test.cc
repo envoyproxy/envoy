@@ -88,8 +88,7 @@ void expectEmptySotwNoDeltaUpdate(MockSubscriptionCallbacks& callbacks,
 }
 
 Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
-wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
-               const std::string& version) {
+wrapInResource(const Protobuf::RepeatedPtrField<Protobuf::Any>& anys, const std::string& version) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> ret;
   for (const auto& a : anys) {
     envoy::config::endpoint::v3::ClusterLoadAssignment cur_endpoint;
@@ -103,7 +102,7 @@ wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
 }
 
 void doDeltaUpdate(WatchMap& watch_map,
-                   const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& sotw_resources,
+                   const Protobuf::RepeatedPtrField<Protobuf::Any>& sotw_resources,
                    const std::vector<std::string>& removed_names, const std::string& version) {
 
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> delta_resources =
@@ -118,7 +117,7 @@ void doDeltaUpdate(WatchMap& watch_map,
 // Similar to expectDeltaAndSotwUpdate(), but making the onConfigUpdate() happen, rather than
 // EXPECT-ing it.
 void doDeltaAndSotwUpdate(WatchMap& watch_map,
-                          const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& sotw_resources,
+                          const Protobuf::RepeatedPtrField<Protobuf::Any>& sotw_resources,
                           const std::vector<std::string>& removed_names,
                           const std::string& version) {
   watch_map.onConfigUpdate(sotw_resources, version);
@@ -150,7 +149,7 @@ TEST(WatchMapTest, Basic) {
     EXPECT_TRUE(added_removed.removed_.empty());
 
     // ...the update is going to contain Bob and Carol...
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
+    Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
     envoy::config::endpoint::v3::ClusterLoadAssignment bob;
     bob.set_cluster_name("bob");
     updated_resources.Add()->PackFrom(bob);
@@ -173,7 +172,7 @@ TEST(WatchMapTest, Basic) {
     EXPECT_EQ(absl::flat_hash_set<std::string>({"alice"}), added_removed.removed_);
 
     // ...the update is going to contain Alice, Carol, Dave...
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
+    Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
     envoy::config::endpoint::v3::ClusterLoadAssignment alice;
     alice.set_cluster_name("alice");
     updated_resources.Add()->PackFrom(alice);
@@ -211,7 +210,7 @@ TEST(WatchMapTest, Overlap) {
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
+  Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
   updated_resources.Add()->PackFrom(alice);
@@ -283,7 +282,7 @@ TEST(WatchMapTest, CacheResourceAddResource) {
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
+  Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
   updated_resources.Add()->PackFrom(alice);
@@ -383,7 +382,7 @@ public:
   WatchMap watch_map_;
   NiceMock<MockSubscriptionCallbacks> callbacks1_;
   MockSubscriptionCallbacks callbacks2_;
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources_;
+  Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources_;
   Watch* watch1_;
   Watch* watch2_;
   bool watch_cb_invoked_{};
@@ -441,7 +440,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
+  Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
   updated_resources.Add()->PackFrom(alice);
@@ -498,12 +497,12 @@ TEST(WatchMapTest, UninterestingUpdate) {
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"alice"});
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> alice_update;
+  Protobuf::RepeatedPtrField<Protobuf::Any> alice_update;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
   alice_update.Add()->PackFrom(alice);
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> bob_update;
+  Protobuf::RepeatedPtrField<Protobuf::Any> bob_update;
   envoy::config::endpoint::v3::ClusterLoadAssignment bob;
   bob.set_cluster_name("bob");
   bob_update.Add()->PackFrom(bob);
@@ -545,7 +544,7 @@ TEST(WatchMapTest, WatchingEverything) {
   // watch1 never specifies any names, and so is treated as interested in everything.
   watch_map.updateWatchInterest(watch2, {"alice"});
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
+  Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
   updated_resources.Add()->PackFrom(alice);
@@ -588,7 +587,7 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
   // onConfigUpdate. But, if SotW holds no resources, then an update with nothing it cares about
   // will just not trigger any onConfigUpdate at all.
   {
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> prepare_removed;
+    Protobuf::RepeatedPtrField<Protobuf::Any> prepare_removed;
     envoy::config::endpoint::v3::ClusterLoadAssignment will_be_removed_later;
     will_be_removed_later.set_cluster_name("removed");
     prepare_removed.Add()->PackFrom(will_be_removed_later);
@@ -597,7 +596,7 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
     doDeltaAndSotwUpdate(watch_map, prepare_removed, {}, "version0");
   }
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+  Protobuf::RepeatedPtrField<Protobuf::Any> update;
   envoy::config::endpoint::v3::ClusterLoadAssignment updated;
   updated.set_cluster_name("updated");
   update.Add()->PackFrom(updated);
@@ -640,7 +639,7 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
   {
     // Verify that we pay attention to all matching resources, no matter the order of context
     // params.
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    Protobuf::RepeatedPtrField<Protobuf::Any> update;
     envoy::config::endpoint::v3::ClusterLoadAssignment resource1;
     resource1.set_cluster_name("xdstp://foo/bar/baz/a?some=thing&thing=some");
     update.Add()->PackFrom(resource1);
@@ -662,7 +661,7 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
   }
   // verify removal
   {
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    Protobuf::RepeatedPtrField<Protobuf::Any> update;
     expectDeltaUpdate(callbacks, {}, {"xdstp://foo/bar/baz/a?thing=some&some=thing"}, "version1");
     doDeltaUpdate(
         watch_map, update,
@@ -685,7 +684,7 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpSingletons) {
   {
     // Verify that we pay attention to all matching resources, no matter the order of context
     // params.
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    Protobuf::RepeatedPtrField<Protobuf::Any> update;
     envoy::config::endpoint::v3::ClusterLoadAssignment resource1;
     resource1.set_cluster_name("xdstp://foo/bar/baz?thing=some&some=thing");
     update.Add()->PackFrom(resource1);
@@ -704,7 +703,7 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpSingletons) {
   }
   // verify removal
   {
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    Protobuf::RepeatedPtrField<Protobuf::Any> update;
     expectDeltaUpdate(callbacks, {}, {"xdstp://foo/bar/baz?thing=some&some=thing"}, "version1");
     doDeltaUpdate(watch_map, update, {"xdstp://foo/bar/baz?thing=some&some=thing", "whatevs"},
                   "version1");
@@ -728,7 +727,7 @@ TEST(WatchMapTest, OnConfigUpdateUsingNamespaces) {
 
   // verify update
   {
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    Protobuf::RepeatedPtrField<Protobuf::Any> update;
     envoy::config::endpoint::v3::ClusterLoadAssignment resource;
     resource.set_cluster_name("ns1/resource1");
     update.Add()->PackFrom(resource);
@@ -738,7 +737,7 @@ TEST(WatchMapTest, OnConfigUpdateUsingNamespaces) {
   }
   // verify removal
   {
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    Protobuf::RepeatedPtrField<Protobuf::Any> update;
     expectDeltaUpdate(callbacks2, {}, {"ns2/removed"}, "version1");
     doDeltaUpdate(watch_map, update, {"ns2/removed"}, "version1");
   }

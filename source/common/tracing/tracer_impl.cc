@@ -84,8 +84,7 @@ Decision TracerUtility::shouldTraceRequest(const StreamInfo::StreamInfo& stream_
   }
 }
 
-void TracerUtility::finalizeSpan(Span& span, const TraceContext& trace_context,
-                                 const StreamInfo::StreamInfo& stream_info,
+void TracerUtility::finalizeSpan(Span& span, const StreamInfo::StreamInfo& stream_info,
                                  const Config& tracing_config, bool upstream_span) {
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 
@@ -123,14 +122,7 @@ void TracerUtility::finalizeSpan(Span& span, const TraceContext& trace_context,
   if (tracing_config.verbose()) {
     annotateVerbose(span, stream_info);
   }
-
-  // Custom tag from configuration.
-  CustomTagContext ctx{trace_context, stream_info};
-  if (const CustomTagMap* custom_tag_map = tracing_config.customTags(); custom_tag_map) {
-    for (const auto& it : *custom_tag_map) {
-      it.second->applySpan(span, ctx);
-    }
-  }
+  tracing_config.modifySpan(span);
 
   // Finish the span.
   span.finishSpan();

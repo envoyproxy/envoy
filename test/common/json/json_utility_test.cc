@@ -8,19 +8,19 @@ namespace Envoy {
 namespace Json {
 namespace {
 
-std::string toJson(const ProtobufWkt::Value& v) {
+std::string toJson(const Protobuf::Value& v) {
   std::string json_string;
   Utility::appendValueToString(v, json_string);
   return json_string;
 }
 
 TEST(JsonUtilityTest, AppendValueToString) {
-  ProtobufWkt::Value v;
+  Protobuf::Value v;
 
   // null
   EXPECT_EQ(toJson(v), "null");
 
-  v.set_null_value(ProtobufWkt::NULL_VALUE);
+  v.set_null_value(Protobuf::NULL_VALUE);
   EXPECT_EQ(toJson(v), "null");
 
   // bool

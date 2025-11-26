@@ -108,7 +108,7 @@ void MySQLFilter::onCommand(Command& command) {
   // Parse a given query
   envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
-  ProtobufWkt::Struct metadata(
+  Protobuf::Struct metadata(
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
 
   auto result = Common::SQLUtils::SQLUtils::setMetadata(command.getData(),

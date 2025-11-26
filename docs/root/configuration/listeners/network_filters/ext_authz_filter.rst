@@ -39,6 +39,8 @@ A sample filter configuration could be:
           envoy_grpc:
             cluster_name: ext-authz
         include_peer_certificate: true
+        # Optional: Send TLS alert on denial for better client diagnostics.
+        send_tls_alert_on_denial: true
 
   clusters:
     - name: ext-authz
@@ -100,6 +102,21 @@ The network filter outputs statistics in the *config.ext_authz.* namespace.
   ok, Counter, Total responses from the authorization service that were to allow the traffic.
   cx_closed, Counter, Total connections that were closed.
   active, Gauge, Total currently active requests in transit to the authorization service.
+
+TLS Alert on Denial
+-------------------
+
+When :ref:`send_tls_alert_on_denial <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.send_tls_alert_on_denial>`
+is set to ``true``, the filter will send a TLS ``access_denied(49)`` alert before closing the connection
+when authorization is denied. This improves debuggability by providing TLS clients with explicit information
+about why the connection was closed, rather than experiencing a silent connection closure.
+
+The TLS alert is only sent when:
+
+* The connection is using TLS/SSL.
+* Authorization is denied either due to explicit denial or error with ``failure_mode_allow`` set to ``false``.
+
+For non-TLS connections, the connection is closed without sending an alert.
 
 Dynamic Metadata
 ----------------

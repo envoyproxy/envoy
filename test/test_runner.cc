@@ -12,8 +12,10 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_listener.h"
 
+#include "absl/debugging/leak_check.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -81,16 +83,17 @@ int TestRunner::runTests(int argc, char** argv) {
   // We hold on to process_wide to provide RAII cleanup of process-wide
   // state.
   ProcessWide process_wide(false);
+
+  // Use the recommended, but not default, "threadsafe" style for the Death Tests.
+  // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+
   // Add a test-listener so we can call a hook where we can do a quiescence
   // check after each method. See
   // https://github.com/google/googletest/blob/master/googletest/docs/advanced.md
   // for details.
   ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
   listeners.Append(new TestListener);
-
-  // Use the recommended, but not default, "threadsafe" style for the Death Tests.
-  // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
-  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
 
   // Set gtest properties
   // (https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#logging-additional-information),
@@ -159,6 +162,13 @@ int TestRunner::runTests(int argc, char** argv) {
 
   // Reset all ENVOY_BUG counters.
   Envoy::Assert::resetEnvoyBugCountersForTest();
+
+  // Initialize log recording sink.
+  LogRecordingSink* recorder;
+  if (std::getenv("ENVOY_NO_LOG_SINK") == nullptr) {
+    recorder = absl::IgnoreLeak(new LogRecordingSink(Logger::Registry::getSink()));
+    Logger::Registry::getSink()->recorder_test_only_ = recorder;
+  }
 
 #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
   // Fuzz tests may run Envoy tests in fuzzing mode to generate corpora. In this case, we do not

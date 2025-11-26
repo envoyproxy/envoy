@@ -12,8 +12,6 @@
 #include "fmt/printf.h"
 #include "gtest/gtest.h"
 
-using Envoy::Http::HeaderValueOf;
-
 // for ::operator""s (which Windows compiler does not support):
 using namespace std::string_literals;
 
@@ -87,7 +85,7 @@ TEST_P(ReverseBridgeIntegrationTest, DisabledRoute) {
   // Ensure that we don't do anything
   EXPECT_EQ("abcdef", upstream_request_->body().toString());
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
 
   // Respond to the request.
   Http::TestResponseHeaderMapImpl response_headers;
@@ -107,8 +105,8 @@ TEST_P(ReverseBridgeIntegrationTest, DisabledRoute) {
 
   EXPECT_EQ(response->body(), response_data.toString());
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
-  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(*response->trailers(), ContainsHeader(Http::Headers::get().GrpcStatus, "0"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -138,9 +136,9 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   EXPECT_EQ("f", upstream_request_->body().toString());
 
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/x-protobuf"));
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
+              ContainsHeader(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
 
   // Respond to the request.
   Http::TestResponseHeaderMapImpl response_headers;
@@ -165,8 +163,8 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   EXPECT_TRUE(
       std::equal(response->body().begin(), response->body().begin() + 5, expected_prefix.begin()));
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
-  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(*response->trailers(), ContainsHeader(Http::Headers::get().GrpcStatus, "0"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -195,8 +193,8 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
 
   // The response should indicate an error.
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Http::Headers::get().GrpcStatus, "2"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -229,9 +227,9 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
   EXPECT_EQ("f", upstream_request_->body().toString());
 
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/x-protobuf"));
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
+              ContainsHeader(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
 
   // Respond to the request.
   Http::TestResponseHeaderMapImpl response_headers;
@@ -265,8 +263,8 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
   EXPECT_TRUE(
       std::equal(response->body().begin(), response->body().begin() + 5, expected_prefix.begin()));
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
-  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(*response->trailers(), ContainsHeader(Http::Headers::get().GrpcStatus, "0"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -298,9 +296,9 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamWithholdResponse) {
   EXPECT_EQ("f", upstream_request_->body().toString());
 
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/x-protobuf"));
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
+              ContainsHeader(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
 
   // Respond to the request.
   Http::TestResponseHeaderMapImpl response_headers;

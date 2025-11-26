@@ -64,12 +64,12 @@ The CDS configuration for the subset selectors is meant to allow future extensio
 
 Subsets are stored in a trie-like fashion. Keys in the selectors are lexically sorted. An
 `LbSubsetMap` is an `unordered_map` of string keys to `ValueSubsetMap`. `ValueSubsetMap` is an
-`unordered_map` of (wrapped, see below) `ProtobufWkt::Value` to `LbSubsetEntry`. The
+`unordered_map` of (wrapped, see below) `Protobuf::Value` to `LbSubsetEntry`. The
 `LbSubsetEntry` may contain an `LbSubsetMap` of additional keys or a `Subset`. `Subset`
 encapsulates the filtered `Upstream::HostSet` and `Upstream::LoadBalancer` for a subset.
 
-`ProtobufWkt::Value` is wrapped to provide a cached hash value for the value. Currently,
-`ProtobufWkt::Value` is hashed by first encoding the value as a string and then hashing the
+`Protobuf::Value` is wrapped to provide a cached hash value for the value. Currently,
+`Protobuf::Value` is hashed by first encoding the value as a string and then hashing the
 string. By wrapping it, we can compute the hash value outside the request path for both the
 metadata values provided in `LoadBalancerContext` and those used internally by the SLB.
 

@@ -4,6 +4,7 @@ load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC
 load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
 load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@envoy_toolshed//dependency:macros.bzl", "updater")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
@@ -65,17 +66,6 @@ genrule(
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
-)
-
-# A target to optionally link C++ standard library dynamically in sanitizer runs.
-# TSAN doesn't support libc/libstdc++ static linking per doc:
-#   http://releases.llvm.org/8.0.1/tools/clang/docs/ThreadSanitizer.html
-cc_library(
-    name = "dynamic_stdlib",
-    linkopts = envoy_select_force_libcpp(
-        ["-lc++"],
-        ["-lstdc++"],
-    ),
 )
 
 cc_library(
@@ -198,34 +188,10 @@ config_setting(
 )
 
 config_setting(
-    name = "gcc_build_gcc",
+    name = "gcc_build",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "gcc",
     },
-)
-
-# This is needed due to a Bazel bug (https://github.com/bazelbuild/bazel/issues/12707)
-config_setting(
-    name = "gcc_build_compiler",
-    flag_values = {
-        "@bazel_tools//tools/cpp:compiler": "compiler",
-    },
-)
-
-selects.config_setting_group(
-    name = "gcc_build_compiler_on_linux",
-    match_all = [
-        ":gcc_build_compiler",
-        ":linux",
-    ],
-)
-
-selects.config_setting_group(
-    name = "gcc_build",
-    match_any = [
-        ":gcc_build_gcc",
-        ":gcc_build_compiler_on_linux",
-    ],
 )
 
 config_setting(
@@ -298,7 +264,6 @@ selects.config_setting_group(
     name = "disable_http3",
     match_any = [
         ":disable_http3_setting",
-        ":boringssl_fips",
     ],
 )
 
@@ -361,6 +326,14 @@ config_setting(
 )
 
 selects.config_setting_group(
+    name = "http3_enabled_and_linux",
+    match_all = [
+        "//bazel:linux",
+        "//bazel:enable_http3",
+    ],
+)
+
+selects.config_setting_group(
     name = "enable_http3_on_linux_ppc",
     match_all = [
         ":enable_http3",
@@ -392,6 +365,11 @@ config_setting(
 config_setting(
     name = "disable_static_extension_registration",
     values = {"define": "static_extension_registration=disabled"},
+)
+
+config_setting(
+    name = "disable_envoy_mobile_xds",
+    values = {"define": "envoy_mobile_xds=disabled"},
 )
 
 config_setting(
@@ -786,6 +764,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "engflow_rbe_aarch64",
+    match_all = [
+        ":engflow_rbe",
+        ":linux_aarch64",
+    ],
+)
+
+selects.config_setting_group(
     name = "apple",
     match_any = [
         ":darwin",
@@ -925,81 +911,6 @@ json_data(
     ),
 )
 
-platform(
-    name = "android_aarch64",
-    constraint_values = [
-        "@platforms//cpu:aarch64",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_armeabi",
-    constraint_values = [
-        "@platforms//cpu:armv7",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_x86",
-    constraint_values = [
-        "@platforms//cpu:x86_32",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_x86_64",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "macos_x86_64",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:macos",
-    ],
-)
-
-platform(
-    name = "macos_arm64",
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:macos",
-    ],
-)
-
-platform(
-    name = "ios_x86_64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:simulator",
-    ],
-)
-
-platform(
-    name = "ios_sim_arm64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:simulator",
-    ],
-)
-
-platform(
-    name = "ios_arm64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:device",
-    ],
-)
-
 # A dependency required by python protobuf
 # Envoy does not have any C++ code that includes python.h so this dummy
 # target is enough. However if such code is added in the future when this
@@ -1043,7 +954,7 @@ cc_library(
             "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
             "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
         ],
-        "//conditions:default": ["//bazel/foreign_cc:gperftools"],
+        "//conditions:default": ["//bazel/external:gperftools"],
     }),
 )
 
@@ -1055,6 +966,45 @@ cc_library(
             "//bazel:linux_x86_64",
             "//bazel:linux_aarch64",
         ): ["@com_github_google_tcmalloc//tcmalloc"],
-        "//conditions:default": ["//bazel/foreign_cc:gperftools"],
+        "//conditions:default": ["//bazel/external:gperftools"],
     }),
+)
+
+bool_flag(
+    name = "enable_liburing",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "liburing_enabled",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        ":enable_liburing": "True",
+    },
+)
+
+bool_flag(
+    name = "libc++",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "libc++_enabled",
+    flag_values = {
+        ":libc++": "True",
+    },
+)
+
+bool_flag(
+    name = "libstdc++",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "libstdc++_enabled",
+    flag_values = {
+        ":libstdc++": "True",
+    },
 )

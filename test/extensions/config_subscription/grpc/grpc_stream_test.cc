@@ -39,7 +39,7 @@ protected:
             dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_), rate_limit_settings_,
             GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
                        envoy::service::discovery::v3::DiscoveryResponse>::ConnectedStateValue::
-                FIRST_ENTRY)) {}
+                FirstEntry)) {}
 
   void setUpCustomBackoffRetryTimer(uint32_t retry_initial_delay_ms,
                                     absl::optional<uint32_t> retry_max_delay_ms,
@@ -59,7 +59,7 @@ protected:
         dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_), rate_limit_settings_,
         GrpcStream<
             envoy::service::discovery::v3::DiscoveryRequest,
-            envoy::service::discovery::v3::DiscoveryResponse>::ConnectedStateValue::FIRST_ENTRY);
+            envoy::service::discovery::v3::DiscoveryResponse>::ConnectedStateValue::FirstEntry);
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;

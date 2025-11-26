@@ -62,7 +62,7 @@ public:
     return [](Http::FilterChainFactoryCallbacks&) -> void {};
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "envoy.test.filter"; }
   bool isTerminalFilterByProto(const Protobuf::Message&,
@@ -89,7 +89,7 @@ public:
     return [](Network::FilterManager&) -> void {};
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "envoy.test.filter"; }
   bool isTerminalFilterByProto(const Protobuf::Message&,
@@ -109,7 +109,7 @@ public:
     return [](Network::ListenerFilterManager&) -> void {};
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "envoy.test.filter"; }
 };
@@ -125,7 +125,7 @@ public:
     return [](Network::UdpListenerFilterManager&, Network::UdpReadFilterCallbacks&) -> void {};
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "envoy.test.filter"; }
 };
@@ -141,7 +141,7 @@ public:
     return [](Network::UdpSessionFilterChainFactoryCallbacks&) -> void {};
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "envoy.test.filter"; }
 };
@@ -158,7 +158,7 @@ public:
     return [](Network::QuicListenerFilterManager&) -> void {};
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "envoy.test.filter"; }
 };
@@ -218,7 +218,7 @@ public:
     config_source.add_type_urls(getTypeUrl());
     config_source.set_apply_default_config_without_warming(!warm);
     if (default_configuration || !warm) {
-      ProtobufWkt::StringValue default_config;
+      Protobuf::StringValue default_config;
       config_source.mutable_default_config()->PackFrom(default_config);
     }
 

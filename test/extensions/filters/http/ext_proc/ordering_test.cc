@@ -36,6 +36,7 @@ using Http::FilterTrailersStatus;
 using Http::LowerCaseString;
 
 using testing::AnyNumber;
+using testing::AtMost;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
@@ -71,11 +72,12 @@ protected:
     if (cb) {
       (*cb)(proto_config);
     }
-    config_ = std::make_shared<FilterConfig>(
-        proto_config, kMessageTimeout, kMaxMessageTimeoutMs, *stats_store_.rootScope(), "", false,
-        std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-        factory_context_);
+    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder({});
+    auto builder = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+        std::move(builder_ptr));
+    config_ = std::make_shared<FilterConfig>(proto_config, kMessageTimeout, kMaxMessageTimeoutMs,
+                                             *stats_store_.rootScope(), "", false, builder,
+                                             factory_context_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -92,7 +94,8 @@ protected:
     auto stream = std::make_unique<NiceMock<MockStream>>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
     EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
-    EXPECT_CALL(*stream, close());
+    EXPECT_CALL(*stream, close()).Times(AtMost(1));
+    EXPECT_CALL(*stream, halfCloseAndDeleteOnRemoteClose()).Times(AtMost(1));
     return stream;
   }
 
@@ -237,7 +240,7 @@ class FastFailOrderingTest : public OrderingTest {
 
 // A call with a totally crazy response
 TEST_F(OrderingTest, TotallyInvalidResponse) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -463,7 +466,7 @@ TEST_F(OrderingTest, ResponseAllDataComesFast) {
   sendResponseHeaders(true);
   // The rest of the data might come in even before the response headers
   // response comes back.
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(resp_body_1, true));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_body_1, true));
 
   // When the response does comes back, we should immediately send the body to the server
   EXPECT_CALL(stream_delegate_, send(_, false));
@@ -492,7 +495,7 @@ TEST_F(OrderingTest, ResponseSomeDataComesFast) {
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(resp_body_1, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_body_1, false));
   sendResponseHeadersReply();
 
   EXPECT_CALL(stream_delegate_, send(_, false));
@@ -581,7 +584,7 @@ TEST_F(OrderingTest, ImmediateResponseOnResponse) {
 // headers message -- should close stream and stop sending, but otherwise
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestHeadersReply) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -598,7 +601,7 @@ TEST_F(OrderingTest, IncorrectRequestHeadersReply) {
 // headers message -- should close stream and stop sending, but otherwise
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestHeadersReply2) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -616,6 +619,7 @@ TEST_F(OrderingTest, IncorrectRequestHeadersReply2) {
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestBodyReply) {
   initialize([](ExternalProcessor& cfg) {
+    cfg.set_failure_mode_allow(true);
     auto* pm = cfg.mutable_processing_mode();
     pm->set_request_body_mode(ProcessingMode::BUFFERED);
     pm->set_response_body_mode(ProcessingMode::BUFFERED);
@@ -645,7 +649,7 @@ TEST_F(OrderingTest, IncorrectRequestBodyReply) {
 // Receive a request headers reply in response to the response
 // headers message -- should continue without error.
 TEST_F(OrderingTest, IncorrectResponseHeadersReply) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);

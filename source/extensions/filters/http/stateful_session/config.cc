@@ -12,10 +12,10 @@ namespace HttpFilters {
 namespace StatefulSession {
 
 Http::FilterFactoryCb StatefulSessionFactoryConfig::createFilterFactoryFromProtoTyped(
-    const ProtoConfig& proto_config, const std::string&,
+    const ProtoConfig& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
-
-  auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, context));
+  auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, context, stats_prefix,
+                                                             context.scope()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new StatefulSession(filter_config)});
   };
