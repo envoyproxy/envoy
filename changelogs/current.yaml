@@ -192,6 +192,11 @@ new_features:
     Added :ref:`transform http filter <config_http_filters_transform>` which adds the ability to modify request
     and response bodies in any position of HTTP filter chain.
     This also make it possible to refresh routes based on the attributes in the request body.
+- area: http filter
+  change: |
+    Added :ref:`connection pool cardinality http filter <config_http_filters_connection_pool_cardinality>` which
+    allows one to create more connection pools to given upstreams for a downstream request. This is useful when
+    using envoy as an ingress sidecar to the local application.
 - area: matcher
   change: |
     Removed work-in-progress annotations from RBAC filter ``matcher`` and ``shadow_matcher`` fields in both HTTP
