@@ -577,7 +577,7 @@ TEST_F(McpFilterTest, FilterWithCustomParserConfig) {
   auto* parser_config = proto_config.mutable_parser_config();
   auto* method_rule = parser_config->add_methods();
   method_rule->set_method("custom/method");
-  method_rule->add_attributes()->set_path("params.custom_field");
+  method_rule->add_extraction_rules()->set_path("params.custom_field");
 
   config_ = std::make_shared<McpFilterConfig>(proto_config);
   filter_ = std::make_unique<McpFilter>(config_);

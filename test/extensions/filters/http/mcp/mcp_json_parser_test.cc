@@ -749,8 +749,8 @@ TEST_F(McpJsonParserTest, FromProtoConfig) {
   envoy::extensions::filters::http::mcp::v3::ParserConfig proto_config;
   auto* method_rule = proto_config.add_methods();
   method_rule->set_method("custom/method");
-  method_rule->add_attributes()->set_path("params.field1");
-  method_rule->add_attributes()->set_path("params.field2");
+  method_rule->add_extraction_rules()->set_path("params.field1");
+  method_rule->add_extraction_rules()->set_path("params.field2");
 
   McpParserConfig config = McpParserConfig::fromProto(proto_config);
 
