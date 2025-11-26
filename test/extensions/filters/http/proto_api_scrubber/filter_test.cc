@@ -84,9 +84,9 @@ protected:
     filter_->setEncoderFilterCallbacks(mock_encoder_callbacks_);
   }
 
-  void setupFilterConfig(absl::string_view config_yaml,
+  void setupFilterConfig(absl::string_view config_pb,
                          const char* descriptor_path = kApiKeysDescriptorRelativePath) {
-    Protobuf::TextFormat::ParseFromString(config_yaml, &proto_config_);
+    Protobuf::TextFormat::ParseFromString(config_pb, &proto_config_);
     if (!proto_config_.has_descriptor_set()) {
       *proto_config_.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
           api_->fileSystem()
@@ -1011,7 +1011,6 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ResponseScrubbingFailsOnTruncatedN
 }
 
 // Tests for Method Level Restrictions
-// Tests for Method Level Restrictions.
 class MethodLevelRestrictionTest : public ProtoApiScrubberFilterTest {
 protected:
   // Override setup to load bookstore descriptor.
@@ -1019,55 +1018,55 @@ protected:
     setupMocks();
     // Config will be set by each test.
   }
+
+  // Helper to load config from YAML
+  void setupFilterConfigFromYaml(const std::string& yaml_string,
+                                 const char* descriptor_path = kBookstoreDescriptorRelativePath) {
+    proto_config_ = TestUtility::parseYaml<ProtoApiScrubberConfig>(yaml_string);
+    if (!proto_config_.has_descriptor_set()) {
+      *proto_config_.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+          api_->fileSystem()
+              .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(descriptor_path))
+              .value();
+    }
+    auto config_or_status =
+        ProtoApiScrubberFilterConfig::create(proto_config_, mock_factory_context_);
+    ASSERT_TRUE(config_or_status.ok());
+
+    filter_config_ = config_or_status.value();
+    setupFilter();
+  }
 };
 
 // Tests that a request is blocked if the method-level matcher evaluates to true.
 TEST_F(MethodLevelRestrictionTest, MethodBlockedByMatcher) {
-  setupFilterConfig(R"pb(
-    restrictions: {
-      method_restrictions: {
-        key: "/bookstore.Bookstore/CreateShelf"
-        value: {
-          method_restriction: {
-            matcher: {
-              matcher_list: {
-                matchers: {
-                  predicate: {
-                    single_predicate: {
-                      input: {
-                        name: "request"
-                        typed_config: {
-                          [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {}
-                        }
-                      }
-                      custom_match: {
-                        name: "cel"
-                        typed_config: {
-                          [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                            expr_match: { parsed_expr: { expr: { const_expr: { bool_value: true } } } }
-                          }
-                        }
-                      }
-                    }
-                  }
-                  on_match: {
-                    action: {
-                      name: "block"
-                      typed_config: {
-                        [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] {}
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  )pb",
-                    kBookstoreDescriptorRelativePath);
-  reSetupFilter(kBookstoreDescriptorRelativePath);
+  const std::string yaml_config = R"YAML(
+restrictions:
+  method_restrictions:
+    "/bookstore.Bookstore/CreateShelf":
+      method_restriction:
+        matcher:
+          matcher_list:
+            matchers:
+              - predicate:
+                  single_predicate:
+                    input:
+                      name: request
+                      typed_config:
+                        "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
+                    custom_match:
+                      name: cel
+                      typed_config:
+                        "@type": type.googleapis.com/xds.type.matcher.v3.CelMatcher
+                        expr_match:
+                          parsed_expr: { expr: { const_expr: { bool_value: true } } }
+                on_match:
+                  action:
+                    name: block
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
+)YAML";
+  setupFilterConfigFromYaml(yaml_config);
 
   auto req_headers = TestRequestHeaderMapImpl{{":method", "POST"},
                                               {":path", "/bookstore.Bookstore/CreateShelf"},
@@ -1087,51 +1086,33 @@ TEST_F(MethodLevelRestrictionTest, MethodBlockedByMatcher) {
 
 // Tests that a request is allowed if the method-level matcher evaluates to false.
 TEST_F(MethodLevelRestrictionTest, MethodAllowedByMatcher) {
-  setupFilterConfig(R"pb(
-    restrictions: {
-      method_restrictions: {
-        key: "/bookstore.Bookstore/CreateShelf"
-        value: {
-          method_restriction: {
-            matcher: {
-              matcher_list: {
-                matchers: {
-                  predicate: {
-                    single_predicate: {
-                      input: {
-                        name: "request"
-                        typed_config: {
-                          [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {}
-                        }
-                      }
-                      custom_match: {
-                        name: "cel"
-                        typed_config: {
-                          [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                            expr_match: { parsed_expr: { expr: { const_expr: { bool_value: false } } } }
-                          }
-                        }
-                      }
-                    }
-                  }
-                  on_match: {
-                    action: {
-                      name: "block"
-                      typed_config: {
-                        [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] {}
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  )pb",
-                    kBookstoreDescriptorRelativePath);
-  reSetupFilter(kBookstoreDescriptorRelativePath);
+  const std::string yaml_config = R"YAML(
+restrictions:
+  method_restrictions:
+    "/bookstore.Bookstore/CreateShelf":
+      method_restriction:
+        matcher:
+          matcher_list:
+            matchers:
+              - predicate:
+                  single_predicate:
+                    input:
+                      name: request
+                      typed_config:
+                        "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
+                    custom_match:
+                      name: cel
+                      typed_config:
+                        "@type": type.googleapis.com/xds.type.matcher.v3.CelMatcher
+                        expr_match:
+                          parsed_expr: { expr: { const_expr: { bool_value: false } } }
+                on_match:
+                  action:
+                    name: block
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
+)YAML";
+  setupFilterConfigFromYaml(yaml_config);
 
   auto req_headers = TestRequestHeaderMapImpl{{":method", "POST"},
                                               {":path", "/bookstore.Bookstore/CreateShelf"},
@@ -1148,18 +1129,12 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedByMatcher) {
 
 // Tests that a request is allowed if no specific method-level rule is configured for the method.
 TEST_F(MethodLevelRestrictionTest, MethodAllowedNoRule) {
-  setupFilterConfig(R"pb(
-    restrictions: {
-      method_restrictions: {
-        key: "/bookstore.Bookstore/ListShelves"
-        value: {
-          # No method_restriction field
-        }
-      }
-    }
-  )pb",
-                    kBookstoreDescriptorRelativePath);
-  reSetupFilter(kBookstoreDescriptorRelativePath);
+  const std::string yaml_config = R"YAML(
+restrictions:
+  method_restrictions:
+    "/bookstore.Bookstore/ListShelves": {}  # No method_restriction field
+)YAML";
+  setupFilterConfigFromYaml(yaml_config);
 
   auto req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1172,98 +1147,60 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedNoRule) {
 
 // Tests that field-level restrictions are still applied even if the method-level check passes.
 TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
-  ProtoApiScrubberConfig proto_config;
-  proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+  const std::string yaml_config = R"YAML(
+restrictions:
+  method_restrictions:
+    "/bookstore.Bookstore/CreateShelf":
+      method_restriction:
+        matcher:
+          matcher_list:
+            matchers:
+              - predicate:
+                  single_predicate:
+                    input:
+                      name: request
+                      typed_config:
+                        "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
+                    custom_match:
+                      name: cel
+                      typed_config:
+                        "@type": type.googleapis.com/xds.type.matcher.v3.CelMatcher
+                        expr_match:
+                          parsed_expr: { expr: { const_expr: { bool_value: false } } } # Evaluates to false - No Block
+                on_match: # This on_match won't be triggered
+                  action:
+                    name: block
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
+      # Field restrictions for the same method
+      request_field_restrictions:
+        "shelf.theme":
+          matcher:
+            matcher_list:
+              matchers:
+                - predicate:
+                    single_predicate:
+                      input:
+                        name: request
+                        typed_config:
+                          "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
+                      custom_match:
+                        name: cel
+                        typed_config:
+                          "@type": type.googleapis.com/xds.type.matcher.v3.CelMatcher
+                          expr_match:
+                            parsed_expr: { expr: { const_expr: { bool_value: true } } } # Always scrub field
+                  on_match:
+                    action:
+                      name: remove
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
+)YAML";
+  setupFilterConfigFromYaml(yaml_config);
 
-  std::string method_name = "/bookstore.Bookstore/CreateShelf";
-
-  // 1. Configure a METHOD-LEVEL rule to ALLOW the request.
-  const char* config_yaml = R"pb(
-    restrictions: {
-      method_restrictions: {
-        key: "/bookstore.Bookstore/CreateShelf"
-        value: {
-          method_restriction: {
-            matcher: {
-              matcher_list: {
-                matchers: {
-                  predicate: {
-                    single_predicate: {
-                      input: {
-                        name: "request"
-                        typed_config: {
-                          [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {}
-                        }
-                      }
-                      custom_match: {
-                        name: "cel"
-                        typed_config: {
-                          [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                            expr_match: { parsed_expr: { expr: { const_expr: { bool_value: false } } } } # Evaluates to false - No Block
-                          }
-                        }
-                      }
-                    }
-                  }
-                  on_match: { # This on_match won't be triggered
-                    action: {
-                      name: "block"
-                      typed_config: {
-                        [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] {}
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-          # Field restrictions for the same method
-          request_field_restrictions: {
-            key: "shelf.theme"
-            value: {
-              matcher: {
-                matcher_list: {
-                  matchers: {
-                    predicate: {
-                      single_predicate: {
-                        input: {
-                          name: "request"
-                          typed_config: {
-                            [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {}
-                          }
-                        }
-                        custom_match: {
-                           name: "cel"
-                          typed_config: {
-                            [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
-                              expr_match: { parsed_expr: { expr: { const_expr: { bool_value: true } } } } # Always scrub field
-                            }
-                          }
-                        }
-                      }
-                    }
-                    on_match: {
-                      action: {
-                         name: "remove"
-                        typed_config: {
-                          [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] {}
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  )pb";
-  setupFilterConfig(config_yaml, kBookstoreDescriptorRelativePath);
-  reSetupFilter(kBookstoreDescriptorRelativePath);
-
-  auto req_headers = TestRequestHeaderMapImpl{
-      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+  auto req_headers = TestRequestHeaderMapImpl{{":method", "POST"},
+                                              {":path", "/bookstore.Bookstore/CreateShelf"},
+                                              {"content-type", "application/grpc"}};
 
   // Method-level check should pass.
   EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
