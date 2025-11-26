@@ -1959,7 +1959,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   }
 
   absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
-      alternate_protocol_options = host->cluster().alternateProtocolsCacheOptions();
+      alternate_protocol_options =
+          host->cluster().httpProtocolOptions().alternateProtocolsCacheOptions();
   Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
   if (context) {
     // Inherit socket options from downstream connection, if set.

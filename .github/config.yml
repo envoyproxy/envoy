@@ -3,9 +3,14 @@ build-image:
   # Authoritative configuration for build image/s
   repo: docker.io/envoyproxy/envoy-build-ubuntu
   repo-gcr: gcr.io/envoy-ci/envoy-build
+  # Until toolchains land, these all just point to the main image or the mobile one
   sha: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  sha-ci: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  sha-devtools: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
   sha-docker: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
+  sha-gcc: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
   sha-mobile: 224feb2b7d513bf7f2ac0c7c529db1cb46398952f31b7d46e51211642d0b2ba0
+  sha-worker: faefd182b53aa2148382b3aaf4a8253f0981b77cb6e6104c7bdda6aa3e3ea2ca
   # TODO: remove this dupe (currently used by ci request handler)
   mobile-sha: 224feb2b7d513bf7f2ac0c7c529db1cb46398952f31b7d46e51211642d0b2ba0
   tag: abd41d4081d77bacbb246c9b952d49f816a9ee2f
@@ -221,6 +226,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
@@ -232,6 +238,7 @@ run:
     - .github/config.yml
     - api/**/*
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - envoy/**/*
     - mobile/.bazelrc
@@ -247,6 +254,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
@@ -322,6 +330,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
