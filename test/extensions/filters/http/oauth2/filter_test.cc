@@ -1438,15 +1438,17 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoCsrfToken) {
  * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
  */
 TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidCsrfTokenWithoutDot) {
-  // {"url":"https://traffic.example.com/original_path?var1=1&var2=2","csrf_token":"${extracted}"}
+  // {"url":"https://traffic.example.com/original_path?var1=1&var2=2","csrf_token":"${extracted}","flow_id":"${extracted}"}}
   static const std::string state_with_invalid_csrf_token =
       "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwiY3Ny"
-      "Zl90b2tlbiI6IjAwMDAwMDAwMDc1YmNkMTUifQ";
+      "Zl90b2tlbiI6IjAwMDAwMDAwMDc1YmNkMTUiLCJmbG93X2lkIjoiMDAwMDAwMDAwNzViY2QxNSJ9";
+
   static const std::string invalid_csrf_token_cookie = "00000000075bcd15";
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_with_invalid_csrf_token},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + invalid_csrf_token_cookie + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce.00000000075bcd15=" + invalid_csrf_token_cookie +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
