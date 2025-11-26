@@ -38,6 +38,7 @@ configure_make(
     deps = [
         "//bazel/foreign_cc:lz4",
         "@zlib",
+        "@numactl//:numa",
         "//contrib/qat:qatlib",
         # Use boringssl alias to select fips vs non-fips version.
         "//bazel:boringcrypto",
