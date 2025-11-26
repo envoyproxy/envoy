@@ -19,6 +19,10 @@ behavior_changes:
     The dynamic module ABI has been updated to support streaming body manipulation. This change also
     fixed potential incorrect behavior when access or modify the request or response body. See
     https://github.com/envoyproxy/envoy/issues/40918 for more details.
+- area: http
+  change: |
+    Changing the default reset code from NO_ERROR to INTERNAL_ERROR. This behavioral change can be reverted by setting runtime
+    guard ``envoy.reloadable_features.reset_with_error`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

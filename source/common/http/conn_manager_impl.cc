@@ -2046,7 +2046,8 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
 
   // If the codec sets its responseDetails() for a reason other than peer reset, set a
   // DownstreamProtocolError. Either way, propagate details.
-  if (!encoder_details.empty() && reset_reason == StreamResetReason::LocalReset) {
+  if (reset_reason == StreamResetReason::ProtocolError ||
+      (!encoder_details.empty() && reset_reason == StreamResetReason::LocalReset)) {
     filter_manager_.streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::DownstreamProtocolError);
   }
