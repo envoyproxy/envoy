@@ -7,6 +7,7 @@ load(
 )
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_static_library.bzl", "cc_static_library")
 
 # Generate config.h
 write_file(
@@ -224,5 +225,25 @@ cc_binary(
 alias(
     name = "libnuma",
     actual = ":numa",
+    visibility = ["//visibility:public"],
+)
+
+# Create a proper static library archive from the cc_library.
+cc_static_library(
+    name = "numa_static",
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    deps = [":numa"],
+)
+
+# Create a properly named libnuma.a archive for foreign_cc dependencies.
+# The cc_library above produces Bazel-internal archives, but foreign_cc
+# configure_make rules (like qatlib) expect a traditional libnuma.a file
+# that can be found with -lnuma.
+genrule(
+    name = "numa_archive",
+    srcs = [":numa_static"],
+    outs = ["lib/libnuma.a"],
+    cmd = "mkdir -p $$(dirname $@) && cp $< $@",
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:public"],
 )

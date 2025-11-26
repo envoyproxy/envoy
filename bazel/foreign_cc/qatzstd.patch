@@ -1,5 +1,5 @@
 diff --git a/src/Makefile b/src/Makefile
-index 6b35340..5c81d74 100644
+index 6b35340..b45e528 100644
 --- a/src/Makefile
 +++ b/src/Makefile
 @@ -57,13 +57,13 @@ ifneq ($(ICP_ROOT), )
@@ -18,3 +18,21 @@ index 6b35340..5c81d74 100644
  endif
  
  ifdef ZSTDLIB
+@@ -101,17 +101,11 @@ qatseqprod.o: qatseqprod.c
+ 
+ lib: qatseqprod.o
+ 	$(AR) rc libqatseqprod.a $^
+-	$(CC) -shared $^ $(LDFLAGS) -Wl,-soname,libqatseqprod.so.$(VERSION_MAJOR) -o libqatseqprod.so.$(VERSION)
+-	ln -sf libqatseqprod.so.$(VERSION) libqatseqprod.so.$(VERSION_MAJOR)
+-	ln -sf libqatseqprod.so.$(VERSION_MAJOR) libqatseqprod.so
+ 
+ .PHONY: install
+ install: lib
+ 	[ -e $(DESTDIR)$(LIBDIR) ] || $(INSTALL) -d -m 755 $(DESTDIR)$(LIBDIR)/
+ 	[ -e $(DESTDIR)$(INCLUDEDIR) ] || $(INSTALL) -d -m 755 $(DESTDIR)$(INCLUDEDIR)/
+-	$(INSTALL_PROGRAM) libqatseqprod.so.$(VERSION) $(DESTDIR)$(LIBDIR)
+-	ln -sf libqatseqprod.so.$(VERSION) $(DESTDIR)$(LIBDIR)/libqatseqprod.so.$(VERSION_MAJOR)
+-	ln -sf libqatseqprod.so.$(VERSION_MAJOR) $(DESTDIR)$(LIBDIR)/libqatseqprod.so
+ 	$(INSTALL_DATA) libqatseqprod.a $(DESTDIR)$(LIBDIR)
+ 	$(INSTALL_DATA) qatseqprod.h $(DESTDIR)$(INCLUDEDIR)
+ 	@echo qatseqprod library successfully installed
