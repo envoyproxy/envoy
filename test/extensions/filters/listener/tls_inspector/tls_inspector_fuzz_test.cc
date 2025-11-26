@@ -21,12 +21,7 @@ DEFINE_PROTO_FUZZER(
   Stats::IsolatedStoreImpl store;
   ConfigSharedPtr cfg;
 
-  if (input.max_size() == 0) {
-    // If max_size not set, use default constructor
-    cfg = std::make_shared<Config>(*store.rootScope(), input.config());
-  } else {
-    cfg = std::make_shared<Config>(*store.rootScope(), input.config(), input.max_size());
-  }
+  cfg = std::make_shared<Config>(*store.rootScope(), input.config());
 
   auto filter = std::make_unique<Filter>(std::move(cfg));
 
