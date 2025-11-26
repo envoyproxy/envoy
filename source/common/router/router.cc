@@ -629,7 +629,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                        !config_->suppress_envoy_headers_);
 
   // Fetch a connection pool for the upstream cluster.
-  const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
+  const auto& upstream_http_protocol_options =
+      cluster_->httpProtocolOptions().upstreamHttpProtocolOptions();
   if (upstream_http_protocol_options && (upstream_http_protocol_options->auto_sni() ||
                                          upstream_http_protocol_options->auto_san_validation())) {
     // Default the header to Host/Authority header.
@@ -811,9 +812,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   if (method != Http::Headers::get().MethodValues.Connect) {
     // Use cluster-level shadow policies if they are available (most specific wins).
     // If no cluster-level policies are configured, fall back to route-level policies.
-    const auto& policies_to_evaluate = !cluster_->shadowPolicies().empty()
-                                           ? cluster_->shadowPolicies()
-                                           : route_entry_->shadowPolicies();
+    const auto& cluster_shadow_policies = cluster_->httpProtocolOptions().shadowPolicies();
+    const auto& policies_to_evaluate =
+        !cluster_shadow_policies.empty() ? cluster_shadow_policies : route_entry_->shadowPolicies();
 
     for (const auto& shadow_policy : policies_to_evaluate) {
       const auto& policy_ref = *shadow_policy;
@@ -2420,7 +2421,7 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
 const Router::RetryPolicy* Filter::getEffectiveRetryPolicy() const {
   // Use cluster-level retry policy if available. The most specific policy wins.
   // If no cluster-level policy is configured, fall back to route-level policy.
-  const Router::RetryPolicy* retry_policy = cluster_->retryPolicy();
+  const Router::RetryPolicy* retry_policy = cluster_->httpProtocolOptions().retryPolicy();
   if (retry_policy == nullptr) {
     retry_policy = route_entry_->retryPolicy().get();
   }

@@ -651,9 +651,9 @@ TEST_P(StrictDnsClusterImplParamTest, Basic) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
   EXPECT_EQ(4U, cluster->info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster->info()->maxRequestsPerConnection());
-  EXPECT_EQ(0U, cluster->info()->http2Options().hpack_table_size().value());
+  EXPECT_EQ(0U, cluster->info()->httpProtocolOptions().http2Options().hpack_table_size().value());
   EXPECT_EQ(Http::Http1Settings::HeaderKeyFormat::ProperCase,
-            cluster->info()->http1Settings().header_key_format_);
+            cluster->info()->httpProtocolOptions().http1Settings().header_key_format_);
   EXPECT_EQ(1U,
             cluster->info()->resourceManager(ResourcePriority::Default).maxConnectionsPerHost());
   EXPECT_EQ(990U, cluster->info()->resourceManager(ResourcePriority::High).maxConnectionsPerHost());
@@ -1080,7 +1080,7 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasic) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
   EXPECT_EQ(4U, cluster->info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster->info()->maxRequestsPerConnection());
-  EXPECT_EQ(0U, cluster->info()->http2Options().hpack_table_size().value());
+  EXPECT_EQ(0U, cluster->info()->httpProtocolOptions().http2Options().hpack_table_size().value());
 
   cluster->info()->trafficStats()->upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
@@ -3066,7 +3066,7 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(3U, cluster->info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(0U, cluster->info()->maxRequestsPerConnection());
   EXPECT_EQ(::Envoy::Http2::Utility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE,
-            cluster->info()->http2Options().hpack_table_size().value());
+            cluster->info()->httpProtocolOptions().http2Options().hpack_table_size().value());
   EXPECT_EQ("envoy.load_balancing_policies.random", cluster->info()->loadBalancerFactory().name());
   EXPECT_THAT(
       std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
@@ -4947,14 +4947,38 @@ TEST_P(ParametrizedClusterInfoImplTest, Http2ProtocolOptions) {
   )EOF";
 
   auto cluster = makeCluster(yaml);
-  EXPECT_EQ(cluster->info()->http2Options().hpack_table_size().value(), 2048);
-  EXPECT_EQ(cluster->info()->http2Options().initial_stream_window_size().value(), 65536);
-  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[0].identifier().value(),
+  EXPECT_EQ(cluster->info()->httpProtocolOptions().http2Options().hpack_table_size().value(), 2048);
+  EXPECT_EQ(
+      cluster->info()->httpProtocolOptions().http2Options().initial_stream_window_size().value(),
+      65536);
+  EXPECT_EQ(cluster->info()
+                ->httpProtocolOptions()
+                .http2Options()
+                .custom_settings_parameters()[0]
+                .identifier()
+                .value(),
             0x10);
-  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[0].value().value(), 10);
-  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[1].identifier().value(),
+  EXPECT_EQ(cluster->info()
+                ->httpProtocolOptions()
+                .http2Options()
+                .custom_settings_parameters()[0]
+                .value()
+                .value(),
+            10);
+  EXPECT_EQ(cluster->info()
+                ->httpProtocolOptions()
+                .http2Options()
+                .custom_settings_parameters()[1]
+                .identifier()
+                .value(),
             0x12);
-  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[1].value().value(), 12);
+  EXPECT_EQ(cluster->info()
+                ->httpProtocolOptions()
+                .http2Options()
+                .custom_settings_parameters()[1]
+                .value()
+                .value(),
+            12);
 }
 
 class TestFilterConfigFactoryBase {
@@ -5339,15 +5363,22 @@ TEST_F(ClusterInfoImplTest, Http3) {
   auto explicit_h3 = makeCluster(yaml + explicit_http3);
   EXPECT_EQ(Http::Protocol::Http3,
             explicit_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
-  EXPECT_EQ(
-      explicit_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(),
-      2);
+  EXPECT_EQ(explicit_h3->info()
+                ->httpProtocolOptions()
+                .http3Options()
+                .quic_protocol_options()
+                .max_concurrent_streams()
+                .value(),
+            2);
 
   auto downstream_h3 = makeCluster(yaml + downstream_http3);
   EXPECT_EQ(Http::Protocol::Http3,
             downstream_h3->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
-  EXPECT_FALSE(
-      downstream_h3->info()->http3Options().quic_protocol_options().has_max_concurrent_streams());
+  EXPECT_FALSE(downstream_h3->info()
+                   ->httpProtocolOptions()
+                   .http3Options()
+                   .quic_protocol_options()
+                   .has_max_concurrent_streams());
 }
 
 TEST_F(ClusterInfoImplTest, Http3WithHttp11WrappedSocket) {
@@ -5421,15 +5452,22 @@ TEST_F(ClusterInfoImplTest, Http3WithHttp11WrappedSocket) {
   auto explicit_h3 = makeCluster(yaml + explicit_http3);
   EXPECT_EQ(Http::Protocol::Http3,
             explicit_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
-  EXPECT_EQ(
-      explicit_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(),
-      2);
+  EXPECT_EQ(explicit_h3->info()
+                ->httpProtocolOptions()
+                .http3Options()
+                .quic_protocol_options()
+                .max_concurrent_streams()
+                .value(),
+            2);
 
   auto downstream_h3 = makeCluster(yaml + downstream_http3);
   EXPECT_EQ(Http::Protocol::Http3,
             downstream_h3->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
-  EXPECT_FALSE(
-      downstream_h3->info()->http3Options().quic_protocol_options().has_max_concurrent_streams());
+  EXPECT_FALSE(downstream_h3->info()
+                   ->httpProtocolOptions()
+                   .http3Options()
+                   .quic_protocol_options()
+                   .has_max_concurrent_streams());
 }
 
 TEST_F(ClusterInfoImplTest, Http3BadConfig) {
@@ -5540,8 +5578,13 @@ TEST_F(ClusterInfoImplTest, Http3Auto) {
   auto auto_h3 = makeCluster(yaml + auto_http3);
   EXPECT_EQ(Http::Protocol::Http3,
             auto_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
-  EXPECT_EQ(
-      auto_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(), 2);
+  EXPECT_EQ(auto_h3->info()
+                ->httpProtocolOptions()
+                .http3Options()
+                .quic_protocol_options()
+                .max_concurrent_streams()
+                .value(),
+            2);
 }
 
 TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
@@ -6255,7 +6298,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyBasic) {
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto* retry_policy = cluster->info()->retryPolicy();
+  const auto* retry_policy = cluster->info()->httpProtocolOptions().retryPolicy();
   ASSERT_NE(nullptr, retry_policy);
   EXPECT_EQ(3, retry_policy->numRetries());
   EXPECT_EQ(std::chrono::milliseconds(2000), retry_policy->perTryTimeout());
@@ -6295,7 +6338,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithBackoff) {
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto* retry_policy = cluster->info()->retryPolicy();
+  const auto* retry_policy = cluster->info()->httpProtocolOptions().retryPolicy();
   ASSERT_NE(nullptr, retry_policy);
   EXPECT_EQ(5, retry_policy->numRetries());
 }
@@ -6332,7 +6375,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithRetriableStatusCod
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto* retry_policy = cluster->info()->retryPolicy();
+  const auto* retry_policy = cluster->info()->httpProtocolOptions().retryPolicy();
   ASSERT_NE(nullptr, retry_policy);
   EXPECT_EQ(2, retry_policy->numRetries());
 }
@@ -6370,7 +6413,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithPerTryIdleTimeout)
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto* retry_policy = cluster->info()->retryPolicy();
+  const auto* retry_policy = cluster->info()->httpProtocolOptions().retryPolicy();
   ASSERT_NE(nullptr, retry_policy);
   EXPECT_EQ(3, retry_policy->numRetries());
   EXPECT_EQ(std::chrono::milliseconds(5000), retry_policy->perTryTimeout());
@@ -6400,7 +6443,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterNoRetryPolicy) {
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto* retry_policy = cluster->info()->retryPolicy();
+  const auto* retry_policy = cluster->info()->httpProtocolOptions().retryPolicy();
   EXPECT_EQ(nullptr, retry_policy);
 }
 
@@ -6441,7 +6484,7 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithRateLimitedBackoff
   ASSERT_NE(cluster, nullptr);
   ASSERT_NE(cluster->info(), nullptr);
 
-  const auto* retry_policy = cluster->info()->retryPolicy();
+  const auto* retry_policy = cluster->info()->httpProtocolOptions().retryPolicy();
   ASSERT_NE(nullptr, retry_policy);
   EXPECT_EQ(3, retry_policy->numRetries());
 }
