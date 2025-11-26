@@ -349,8 +349,8 @@ public class JniLibrary {
       boolean trustChainVerification, byte[][] filterChain,
       boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards,
       long h3ConnectionKeepaliveInitialIntervalMilliseconds, boolean useQuicPlatformPacketWriter,
-      boolean enableConnectionMigration, boolean migrateIdleConnection,
-      long maxIdleTimeBeforeMigrationSeconds, long maxTimeOnNonDefaultNetworkSeconds);
+      boolean enableQuicConnectionMigration, boolean migrateIdleQuicConnection,
+      long maxIdleTimeBeforeQuicMigrationSeconds, long maxTimeOnNonDefaultQuicNetworkSeconds);
 
   /**
    * Returns true if the runtime feature is enabled.

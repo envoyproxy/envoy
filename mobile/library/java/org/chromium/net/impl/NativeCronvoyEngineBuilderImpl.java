@@ -69,10 +69,10 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private String mUpstreamTlsSni = "";
   private int mH3ConnectionKeepaliveInitialIntervalMilliseconds = 0;
   private boolean mUseQuicPlatformPacketWriter = false;
-  private boolean mEnableConnectionMigration = false;
-  private boolean mMigrateIdleConnection = false;
-  private long mMaxIdleTimeBeforeMigrationSeconds = 0;
-  private long mMaxTimeOnNonDefaultNetworkSeconds = 0;
+  private boolean mEnableQuicConnectionMigration = false;
+  private boolean mMigrateIdleQuicConnection = false;
+  private long mMaxIdleTimeBeforeQuicMigrationSeconds = 0;
+  private long mMaxTimeOnNonDefaultQuicNetworkSeconds = 0;
   private boolean mUseNetworkChangeEvent = false;
   private boolean mUseV2NetworkMonitor = false;
 
@@ -248,26 +248,26 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    * Note that `setUseV2NetworkMonitor()` also needs to be called to take effect.
    * If enabled, the engine will automatically be configured to use platform packet writer. *
    */
-  public NativeCronvoyEngineBuilderImpl setEnableConnectionMigration(boolean enable) {
-    mEnableConnectionMigration = enable;
+  public NativeCronvoyEngineBuilderImpl setEnableQuicConnectionMigration(boolean enable) {
+    mEnableQuicConnectionMigration = enable;
     return this;
   }
 
   /**
-   * Set whether to migrate idle connections to a different network upon network events.
+   * Set whether to migrate idle QUIC connections to a different network upon network events.
    * If not, the connection might be closed or drained or ignore the network event depends on the
    * event type.
    */
-  public NativeCronvoyEngineBuilderImpl setMigrateIdleConnection(boolean migrate) {
-    mMigrateIdleConnection = migrate;
+  public NativeCronvoyEngineBuilderImpl setMigrateIdleQuicConnection(boolean migrate) {
+    mMigrateIdleQuicConnection = migrate;
     return this;
   }
 
   /**
    * Set the maximum idle time allowed for a QUIC connection before migration.
    */
-  public NativeCronvoyEngineBuilderImpl setMaxIdleTimeBeforeMigrationSeconds(long seconds) {
-    mMaxIdleTimeBeforeMigrationSeconds = seconds;
+  public NativeCronvoyEngineBuilderImpl setMaxIdleTimeBeforeQuicMigrationSeconds(long seconds) {
+    mMaxIdleTimeBeforeQuicMigrationSeconds = seconds;
     return this;
   }
 
@@ -275,8 +275,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    * Set the maximum time a QUIC connection can remain on a non-default network before switching to
    * the default one.
    */
-  public NativeCronvoyEngineBuilderImpl setMaxTimeOnNonDefaultNetworkSeconds(long seconds) {
-    mMaxTimeOnNonDefaultNetworkSeconds = seconds;
+  public NativeCronvoyEngineBuilderImpl setMaxTimeOnNonDefaultQuicNetworkSeconds(long seconds) {
+    mMaxTimeOnNonDefaultQuicNetworkSeconds = seconds;
     return this;
   }
 
@@ -350,7 +350,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         keyValueStores, mRuntimeGuards, mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
         mH3ConnectionKeepaliveInitialIntervalMilliseconds,
         mUseQuicPlatformPacketWriter && mUseV2NetworkMonitor,
-        mEnableConnectionMigration && mUseV2NetworkMonitor, mMigrateIdleConnection,
-        mMaxIdleTimeBeforeMigrationSeconds, mMaxTimeOnNonDefaultNetworkSeconds);
+        mEnableQuicConnectionMigration && mUseV2NetworkMonitor, mMigrateIdleQuicConnection,
+        mMaxIdleTimeBeforeQuicMigrationSeconds, mMaxTimeOnNonDefaultQuicNetworkSeconds);
   }
 }

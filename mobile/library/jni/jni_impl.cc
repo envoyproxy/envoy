@@ -1206,10 +1206,10 @@ void configureBuilder(
       (h3_connection_keepalive_initial_interval_milliseconds));
   builder.setUseQuicPlatformPacketWriter(use_quic_platform_packet_writer == JNI_TRUE);
   if (enable_connection_migration == JNI_TRUE) {
-    builder.enableConnectionMigration(true);
-    builder.setMigrateIdleConnection(migrate_idle_connection == JNI_TRUE);
-    builder.setMaxIdleTimeBeforeMigrationSeconds(max_idle_time_before_migration_seconds);
-    builder.setMaxTimeOnNonDefaultNetworkSeconds(max_time_on_non_default_network_seconds);
+    builder.enableQuicConnectionMigration(true);
+    builder.setMigrateIdleQuicConnection(migrate_idle_connection == JNI_TRUE);
+    builder.setMaxIdleTimeBeforeQuicMigrationSeconds(max_idle_time_before_migration_seconds);
+    builder.setMaxTimeOnNonDefaultQuicNetworkSeconds(max_time_on_non_default_network_seconds);
   }
   auto guards = javaObjectArrayToStringPairVector(jni_helper, runtime_guards);
   for (std::pair<std::string, std::string>& entry : guards) {

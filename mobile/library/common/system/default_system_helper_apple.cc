@@ -22,6 +22,8 @@ std::vector<std::pair<int64_t, ConnectionType>> DefaultSystemHelper::getAllConne
 }
 
 void DefaultSystemHelper::bindSocketToNetwork(Network::ConnectionSocket&, int64_t) {
+  // iOS network monitor doesn't propagate network handle to native code, so this should not be
+  // called.
   PANIC("unreachable");
 }
 

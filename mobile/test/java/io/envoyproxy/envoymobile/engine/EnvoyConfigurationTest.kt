@@ -116,10 +116,10 @@ class EnvoyConfigurationTest {
     disableDnsRefreshOnFailure: Boolean = false,
     disableDnsRefreshOnNetworkChange: Boolean = false,
     useQuicPlatformPacketWriter: Boolean = true,
-    enableConnectionMigration: Boolean = false,
-    migrateIdleConnection: Boolean = false,
-    maxIdleTimeBeforeMigrationSeconds: Long = 0,
-    maxTimeOnNonDefaultNetworkSeconds: Long = 0,
+    enableQuicConnectionMigration: Boolean = false,
+    migrateIdleQuicConnection: Boolean = false,
+    maxIdleTimeBeforeQuicMigrationSeconds: Long = 0,
+    maxTimeOnNonDefaultQuicNetworkSeconds: Long = 0,
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       connectTimeoutSeconds,
@@ -162,10 +162,10 @@ class EnvoyConfigurationTest {
       upstreamTlsSni,
       h3ConnectionKeepaliveInitialIntervalMilliseconds,
       useQuicPlatformPacketWriter,
-      enableConnectionMigration,
-      migrateIdleConnection,
-      maxIdleTimeBeforeMigrationSeconds,
-      maxTimeOnNonDefaultNetworkSeconds,
+      enableQuicConnectionMigration,
+      migrateIdleQuicConnection,
+      maxIdleTimeBeforeQuicMigrationSeconds,
+      maxTimeOnNonDefaultQuicNetworkSeconds,
     )
   }
 
@@ -320,8 +320,8 @@ class EnvoyConfigurationTest {
   fun `configuration resolves with quic migration enabled`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      enableConnectionMigration = true,
-      migrateIdleConnection = true
+      enableQuicConnectionMigration = true,
+      migrateIdleQuicConnection = true
     )
 
     val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)

@@ -386,19 +386,19 @@ EngineBuilder& EngineBuilder::setUseQuicPlatformPacketWriter(bool use_quic_platf
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableConnectionMigration(bool connection_migration_on) {
-  enable_connection_migration_ = connection_migration_on;
+EngineBuilder& EngineBuilder::enableQuicConnectionMigration(bool quic_connection_migration_on) {
+  enable_quic_connection_migration_ = quic_connection_migration_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setMigrateIdleConnection(bool migrate_idle_connection) {
-  migrate_idle_connection_ = migrate_idle_connection;
+EngineBuilder& EngineBuilder::setMigrateIdleQuicConnection(bool migrate_idle_quic_connection) {
+  migrate_idle_quic_connection_ = migrate_idle_quic_connection;
   return *this;
 }
 
 EngineBuilder&
-EngineBuilder::setMaxIdleTimeBeforeMigrationSeconds(int max_idle_time_before_migration) {
-  max_idle_time_before_migration_seconds_ = max_idle_time_before_migration;
+EngineBuilder::setMaxIdleTimeBeforeQuicMigrationSeconds(int max_idle_time_before_quic_migration) {
+  max_idle_time_before_quic_migration_seconds_ = max_idle_time_before_quic_migration;
   return *this;
 }
 
@@ -901,12 +901,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     if (max_concurrent_streams_ > 0) {
       quic_protocol_options->mutable_max_concurrent_streams()->set_value(max_concurrent_streams_);
     }
-    if (enable_connection_migration_) {
+    if (enable_quic_connection_migration_) {
       auto* migration_setting = quic_protocol_options->mutable_connection_migration();
-      migration_setting->set_migrate_idle_connections(migrate_idle_connection_);
-      if (max_idle_time_before_migration_seconds_ > 0) {
+      migration_setting->set_migrate_idle_connections(migrate_idle_quic_connection_);
+      if (max_idle_time_before_quic_migration_seconds_ > 0) {
         migration_setting->mutable_max_idle_time_before_migration()->set_seconds(
-            max_idle_time_before_migration_seconds_);
+            max_idle_time_before_quic_migration_seconds_);
       }
       if (max_time_on_non_default_network_seconds_ > 0) {
         migration_setting->mutable_max_time_on_non_default_network()->set_seconds(
@@ -914,7 +914,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       }
     }
 
-    if (use_quic_platform_packet_writer_ || enable_connection_migration_) {
+    if (use_quic_platform_packet_writer_ || enable_quic_connection_migration_) {
       envoy_mobile::extensions::quic_packet_writer::platform::QuicPlatformPacketWriterConfig
           writer_config;
       quic_protocol_options->mutable_client_packet_writer()->mutable_typed_config()->PackFrom(

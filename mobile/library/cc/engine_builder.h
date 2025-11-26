@@ -171,12 +171,12 @@ public:
   EngineBuilder& setUpstreamTlsSni(std::string sni);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
   EngineBuilder& setUseQuicPlatformPacketWriter(bool use_quic_platform_packet_writer);
-  // If called to enable connection migration, no need to call setUseQuicPlatformPacketWriter()
+  // If called to enable QUIC connection migration, no need to call setUseQuicPlatformPacketWriter()
   // separately.
-  EngineBuilder& enableConnectionMigration(bool connection_migration_on);
-  EngineBuilder& setMigrateIdleConnection(bool migrate_idle_connection);
+  EngineBuilder& enableQuicConnectionMigration(bool quic_connection_migration_on);
+  EngineBuilder& setMigrateIdleQuicConnection(bool migrate_idle_quic_connection);
   // 0 means using the Envoy default 30s.
-  EngineBuilder& setMaxIdleTimeBeforeMigrationSeconds(int max_idle_time_before_migration);
+  EngineBuilder& setMaxIdleTimeBeforeQuicMigrationSeconds(int max_idle_time_before_quic_migration);
   // 0 means using the Envoy default 128s.
   EngineBuilder& setMaxTimeOnNonDefaultNetworkSeconds(int max_time_on_non_default_network);
 
@@ -347,10 +347,10 @@ private:
   int max_concurrent_streams_ = 0;
   bool use_quic_platform_packet_writer_ = false;
 
-  // QUIC connection migration.
-  bool enable_connection_migration_ = false;
-  bool migrate_idle_connection_ = false;
-  int max_idle_time_before_migration_seconds_ = 0;
+  // QUIC connection migration (renamed for clarity).
+  bool enable_quic_connection_migration_ = false;
+  bool migrate_idle_quic_connection_ = false;
+  int max_idle_time_before_quic_migration_seconds_ = 0;
   int max_time_on_non_default_network_seconds_ = 0;
 
   std::string node_id_;

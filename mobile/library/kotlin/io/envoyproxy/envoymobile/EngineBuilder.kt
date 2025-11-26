@@ -17,10 +17,10 @@ open class EngineBuilder() {
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
   protected var useQuicPlatformPacketWriter = false
-  protected var enableConnectionMigration = false
-  protected var migrateIdleConnection = false
-  protected var maxIdleTimeBeforeMigrationSeconds: Long = 0
-  protected var maxTimeOnNonDefaultNetworkSeconds: Long = 0
+  protected var enableQuicConnectionMigration = false
+  protected var migrateIdleQuicConnection = false
+  protected var maxIdleTimeBeforeQuicMigrationSeconds: Long = 0
+  protected var maxTimeOnNonDefaultQuicNetworkSeconds: Long = 0
 
   private var runtimeGuards = mutableMapOf<String, Boolean>()
   private var engineType: () -> EnvoyEngine = {
@@ -576,10 +576,10 @@ open class EngineBuilder() {
         upstreamTlsSni,
         h3ConnectionKeepaliveInitialIntervalMilliseconds,
         useQuicPlatformPacketWriter,
-        enableConnectionMigration,
-        migrateIdleConnection,
-        maxIdleTimeBeforeMigrationSeconds,
-        maxTimeOnNonDefaultNetworkSeconds
+        enableQuicConnectionMigration,
+        migrateIdleQuicConnection,
+        maxIdleTimeBeforeQuicMigrationSeconds,
+        maxTimeOnNonDefaultQuicNetworkSeconds
       )
 
     return EngineImpl(engineType(), engineConfiguration, logLevel)
@@ -608,4 +608,37 @@ open class EngineBuilder() {
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation
     return this
   }
+
+  /** Enable QUIC connection migration across different network interfaces. */
+  fun setEnableQuicConnectionMigration(enable: Boolean): EngineBuilder {
+    this.enableQuicConnectionMigration = enable
+    return this
+  }
+
+  /** Enable migration of idle QUIC connections to a different network upon network events. */
+  fun setMigrateIdleQuicConnection(migrate: Boolean): EngineBuilder {
+    this.migrateIdleQuicConnection = migrate
+    return this
+  }
+
+  /** Set the maximum idle time allowed for a QUIC connection before migration. */
+  fun setMaxIdleTimeBeforeQuicMigrationSeconds(seconds: Long): EngineBuilder {
+    this.maxIdleTimeBeforeQuicMigrationSeconds = seconds
+    return this
+  }
+
+  /**
+   * Set the maximum time a QUIC connection can remain on a non-default network before switching to
+   * the default one.
+   */
+  fun setMaxTimeOnNonDefaultQuicNetworkSeconds(seconds: Long): EngineBuilder {
+    this.maxTimeOnNonDefaultQuicNetworkSeconds = seconds
+    return this
+  }
+
+  // Example call sites (update these as needed in your codebase):
+  // builder.setEnableQuicConnectionMigration(true)
+  // builder.setMigrateIdleQuicConnection(true)
+  // builder.setMaxIdleTimeBeforeQuicMigrationSeconds(30)
+  // builder.setMaxTimeOnNonDefaultQuicNetworkSeconds(60)
 }

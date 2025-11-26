@@ -64,10 +64,10 @@ public class EnvoyConfiguration {
   public final String upstreamTlsSni;
   public final int h3ConnectionKeepaliveInitialIntervalMilliseconds;
   public final boolean useQuicPlatformPacketWriter;
-  public final boolean enableConnectionMigration;
-  public final boolean migrateIdleConnection;
-  public final long maxIdleTimeBeforeMigrationSeconds;
-  public final long maxTimeOnNonDefaultNetworkSeconds;
+  public final boolean enableQuicConnectionMigration;
+  public final boolean migrateIdleQuicConnection;
+  public final long maxIdleTimeBeforeQuicMigrationSeconds;
+  public final long maxTimeOnNonDefaultQuicNetworkSeconds;
 
   /**
    * Create a new instance of the configuration.
@@ -135,10 +135,14 @@ public class EnvoyConfiguration {
    * @param h3ConnectionKeepaliveInitialIntervalMilliseconds the initial keepalive ping timeout for
    * HTTP/3.
    * @param useQuicPlatformPacketWriter                 whether to use the platform packet writer.
-   * @param enableConnectionMigration                   whether to enable connection migration.
-   * @param migrateIdleConnection                       whether to migrate idle connections.
-   * @param maxIdleTimeBeforeMigrationSeconds           the maximum idle time before migration.
-   * @param maxTimeOnNonDefaultNetworkSeconds           the maximum time on non-default network.
+   * @param enableQuicConnectionMigration                   whether to enable QUIC connection
+   *     migration.
+   * @param migrateIdleQuicConnection                       whether to migrate idle QUIC
+   *     connections.
+   * @param maxIdleTimeBeforeQuicMigrationSeconds           the maximum idle time before QUIC
+   *     migration.
+   * @param maxTimeOnNonDefaultQuicNetworkSeconds           the maximum time on non-default QUIC
+   *     network.
    */
   public EnvoyConfiguration(
       int connectTimeoutSeconds, boolean disableDnsRefreshOnFailure,
@@ -160,8 +164,8 @@ public class EnvoyConfiguration {
       Map<String, EnvoyKeyValueStore> keyValueStores, Map<String, Boolean> runtimeGuards,
       boolean enablePlatformCertificatesValidation, String upstreamTlsSni,
       int h3ConnectionKeepaliveInitialIntervalMilliseconds, boolean useQuicPlatformPacketWriter,
-      boolean enableConnectionMigration, boolean migrateIdleConnection,
-      long maxIdleTimeBeforeMigrationSeconds, long maxTimeOnNonDefaultNetworkSeconds) {
+      boolean enableQuicConnectionMigration, boolean migrateIdleQuicConnection,
+      long maxIdleTimeBeforeQuicMigrationSeconds, long maxTimeOnNonDefaultQuicNetworkSeconds) {
     JniLibrary.load();
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.disableDnsRefreshOnFailure = disableDnsRefreshOnFailure;
@@ -221,10 +225,10 @@ public class EnvoyConfiguration {
     this.h3ConnectionKeepaliveInitialIntervalMilliseconds =
         h3ConnectionKeepaliveInitialIntervalMilliseconds;
     this.useQuicPlatformPacketWriter = useQuicPlatformPacketWriter;
-    this.enableConnectionMigration = enableConnectionMigration;
-    this.migrateIdleConnection = migrateIdleConnection;
-    this.maxIdleTimeBeforeMigrationSeconds = maxIdleTimeBeforeMigrationSeconds;
-    this.maxTimeOnNonDefaultNetworkSeconds = maxTimeOnNonDefaultNetworkSeconds;
+    this.enableQuicConnectionMigration = enableQuicConnectionMigration;
+    this.migrateIdleQuicConnection = migrateIdleQuicConnection;
+    this.maxIdleTimeBeforeQuicMigrationSeconds = maxIdleTimeBeforeQuicMigrationSeconds;
+    this.maxTimeOnNonDefaultQuicNetworkSeconds = maxTimeOnNonDefaultQuicNetworkSeconds;
   }
 
   public long createBootstrap() {
@@ -251,7 +255,7 @@ public class EnvoyConfiguration {
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
         enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards,
         h3ConnectionKeepaliveInitialIntervalMilliseconds, useQuicPlatformPacketWriter,
-        enableConnectionMigration, migrateIdleConnection, maxIdleTimeBeforeMigrationSeconds,
-        maxTimeOnNonDefaultNetworkSeconds);
+        enableQuicConnectionMigration, migrateIdleQuicConnection,
+        maxIdleTimeBeforeQuicMigrationSeconds, maxTimeOnNonDefaultQuicNetworkSeconds);
   }
 }

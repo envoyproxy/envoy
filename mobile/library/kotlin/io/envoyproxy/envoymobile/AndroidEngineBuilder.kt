@@ -17,27 +17,29 @@ class AndroidEngineBuilder(context: Context) : EngineBuilder() {
     return this
   }
 
-  fun setEnableConnectionMigration(enableConnectionMigration: Boolean): AndroidEngineBuilder {
-    this.enableConnectionMigration = enableConnectionMigration
-    return this
-  }
-
-  fun setMigrateIdleConnection(migrateIdleConnection: Boolean): AndroidEngineBuilder {
-    this.migrateIdleConnection = migrateIdleConnection
-    return this
-  }
-
-  fun setMaxIdleTimeBeforeMigrationSeconds(
-    maxIdleTimeBeforeMigrationSeconds: Long
+  fun setEnableQuicConnectionMigration(
+    enableQuicConnectionMigration: Boolean
   ): AndroidEngineBuilder {
-    this.maxIdleTimeBeforeMigrationSeconds = maxIdleTimeBeforeMigrationSeconds
+    this.enableQuicConnectionMigration = enableQuicConnectionMigration
     return this
   }
 
-  fun setMaxTimeOnNonDefaultNetworkSeconds(
-    maxTimeOnNonDefaultNetworkSeconds: Long
+  fun setMigrateIdleQuicConnection(migrateIdleQuicConnection: Boolean): AndroidEngineBuilder {
+    this.migrateIdleQuicConnection = migrateIdleQuicConnection
+    return this
+  }
+
+  fun setMaxIdleTimeBeforeQuicMigrationSeconds(
+    maxIdleTimeBeforeQuicMigrationSeconds: Long
   ): AndroidEngineBuilder {
-    this.maxTimeOnNonDefaultNetworkSeconds = maxTimeOnNonDefaultNetworkSeconds
+    this.maxIdleTimeBeforeQuicMigrationSeconds = maxIdleTimeBeforeQuicMigrationSeconds
+    return this
+  }
+
+  fun setMaxTimeOnNonDefaultQuicNetworkSeconds(
+    maxTimeOnNonDefaultQuicNetworkSeconds: Long
+  ): AndroidEngineBuilder {
+    this.maxTimeOnNonDefaultQuicNetworkSeconds = maxTimeOnNonDefaultQuicNetworkSeconds
     return this
   }
 

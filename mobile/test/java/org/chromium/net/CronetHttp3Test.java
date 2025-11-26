@@ -78,7 +78,7 @@ public class CronetHttp3Test {
   private boolean resetBrokennessOnNetworkChange = false;
   private boolean disableDnsRefreshOnNetworkChange = false;
   private boolean useAndroidNetworkMonitorV2 = false;
-  private boolean enableConnectionMigration = false;
+  private boolean enableQuicConnectionMigration = false;
   private ConnectivityManager connectivityManager;
 
   @BeforeClass
@@ -128,8 +128,8 @@ public class CronetHttp3Test {
     if (useAndroidNetworkMonitorV2) {
       nativeCronetEngineBuilder.setUseV2NetworkMonitor(useAndroidNetworkMonitorV2);
       nativeCronetEngineBuilder.setUseQuicPlatformPacketWriter(true);
-      nativeCronetEngineBuilder.setEnableConnectionMigration(enableConnectionMigration);
-      nativeCronetEngineBuilder.setMigrateIdleConnection(true);
+      nativeCronetEngineBuilder.setEnableQuicConnectionMigration(enableQuicConnectionMigration);
+      nativeCronetEngineBuilder.setMigrateIdleQuicConnection(true);
     }
     // Make sure the handshake will work despite lack of real certs.
     nativeCronetEngineBuilder.setMockCertVerifierForTesting();
@@ -514,7 +514,7 @@ public class CronetHttp3Test {
     }
     drainOnNetworkChange = true;
     useAndroidNetworkMonitorV2 = true;
-    enableConnectionMigration = true;
+    enableQuicConnectionMigration = true;
     setUp(true);
 
     // Do the initial handshake dance
