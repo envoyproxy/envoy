@@ -48,7 +48,7 @@ public:
 
     const std::string yaml = fmt::format(R"EOF(
   text_format_source:
-    inline_string: "%{}({}:metadata.test:test_key)%"
+    inline_string: "%{}({}:metadata.test:test_key){}%"
   formatters:
     - name: envoy.formatter.metadata
       typed_config:
