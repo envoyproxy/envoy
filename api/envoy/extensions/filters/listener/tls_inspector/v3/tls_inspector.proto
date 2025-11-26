@@ -54,5 +54,5 @@ message TlsInspector {
   // will stop processing and indicate failure. If not defined, defaults to
   // 16KiB.
   google.protobuf.UInt32Value max_client_hello_size = 5
-      [(validate.rules).uint32 = { lt: 16385 gt: 255 }];
+      [(validate.rules).uint32 = { lte: 16384 gt: 255 }];
 }
