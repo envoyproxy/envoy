@@ -7,7 +7,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "google/protobuf/struct.pb.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/formatter/http_specific_formatter.h"
@@ -37,6 +36,7 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "google/protobuf/struct.pb.h"
 #include "gtest/gtest.h"
 
 using testing::Const;
@@ -2789,7 +2789,8 @@ TEST(SubstitutionFormatterTest, TraceIDFormatter) {
 
 /**
  * Populate a metadata object with the following test data:
- * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"},"test_lst":["item0",4.2]}
+ * "com.test":
+ * {"test_key":"test_value","test_obj":{"inner_key":"inner_value"},"test_lst":["item0",4.2]}
  */
 void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata) {
   Protobuf::Struct struct_obj;
@@ -2882,7 +2883,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
         ValueUtil::stringValue("inner_value");
     EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(expected_val));
   }
-  
+
   // size limit on list
   {
     DynamicMetadataFormatter formatter("com.test", {"test_lst"}, absl::optional<size_t>(5));

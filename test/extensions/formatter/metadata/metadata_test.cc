@@ -38,12 +38,12 @@ public:
         Envoy::Formatter::FormatterPtr);
   }
 
-  ::Envoy::Formatter::FormatterPtr getTestMetadataFormatterLegacy(std::string type,
-                                                                  std::string tag = "METADATA",
-                                                                  absl::optional<size_t> max_length = absl::nullopt) {
+  ::Envoy::Formatter::FormatterPtr
+  getTestMetadataFormatterLegacy(std::string type, std::string tag = "METADATA",
+                                 absl::optional<size_t> max_length = absl::nullopt) {
     std::string max_length_fmt{};
     if (max_length.has_value()) {
-      max_length_fmt = fmt::format(":{}", *max_length) ;
+      max_length_fmt = fmt::format(":{}", *max_length);
     }
 
     const std::string yaml = fmt::format(R"EOF(
@@ -112,8 +112,8 @@ TEST_F(MetadataFormatterTest, DynamicMetadataWithLegacyConfigurationAndLength) {
   EXPECT_CALL(testing::Const(stream_info_), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(*metadata_));
 
-  EXPECT_EQ("test_val",
-            getTestMetadataFormatterLegacy("DYNAMIC", "METADATA", 8)->format(formatter_context_, stream_info_));
+  EXPECT_EQ("test_val", getTestMetadataFormatterLegacy("DYNAMIC", "METADATA", 8)
+                            ->format(formatter_context_, stream_info_));
 }
 
 // Extensive testing of Cluster Metadata formatter is in

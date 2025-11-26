@@ -80,9 +80,8 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
     return SubstitutionFormatUtils::unspecifiedValue();
   }
 
-  if (max_length_.has_value() &&
-      val.kind_case() != Protobuf::Value::kStructValue &&
-      val.kind_case() != Protobuf::Value::kListValue ) {
+  if (max_length_.has_value() && val.kind_case() != Protobuf::Value::kStructValue &&
+      val.kind_case() != Protobuf::Value::kListValue) {
     std::string str;
     if (val.kind_case() == Protobuf::Value::kStringValue) {
       str = val.string_value();
