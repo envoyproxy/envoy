@@ -608,37 +608,4 @@ open class EngineBuilder() {
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation
     return this
   }
-
-  /** Enable QUIC connection migration across different network interfaces. */
-  fun setEnableQuicConnectionMigration(enable: Boolean): EngineBuilder {
-    this.enableQuicConnectionMigration = enable
-    return this
-  }
-
-  /** Enable migration of idle QUIC connections to a different network upon network events. */
-  fun setMigrateIdleQuicConnection(migrate: Boolean): EngineBuilder {
-    this.migrateIdleQuicConnection = migrate
-    return this
-  }
-
-  /** Set the maximum idle time allowed for a QUIC connection before migration. */
-  fun setMaxIdleTimeBeforeQuicMigrationSeconds(seconds: Long): EngineBuilder {
-    this.maxIdleTimeBeforeQuicMigrationSeconds = seconds
-    return this
-  }
-
-  /**
-   * Set the maximum time a QUIC connection can remain on a non-default network before switching to
-   * the default one.
-   */
-  fun setMaxTimeOnNonDefaultNetworkSeconds(seconds: Long): EngineBuilder {
-    this.maxTimeOnNonDefaultNetworkSeconds = seconds
-    return this
-  }
-
-  // Example call sites (update these as needed in your codebase):
-  // builder.setEnableQuicConnectionMigration(true)
-  // builder.setMigrateIdleQuicConnection(true)
-  // builder.setMaxIdleTimeBeforeQuicMigrationSeconds(30)
-  // builder.setMaxTimeOnNonDefaultQuicNetworkSeconds(60)
 }
