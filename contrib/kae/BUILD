@@ -21,7 +21,7 @@ configure_make(
     configure_options = [
         "--enable-static",
     ],
-    lib_source = "@com_github_huawei_uadk//:all",
+    lib_source = "@uadk//:all",
     out_static_libs = [
         "libwd.a",
     ],
