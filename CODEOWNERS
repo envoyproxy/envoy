@@ -454,3 +454,4 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/tap_sinks/ @coolg92003 @yiyibaoguo
 /contrib/peak_ewma/filters/http/ @rroblak @UNOWNED
 /contrib/peak_ewma/load_balancing_policies/ @rroblak @UNOWNED
+/contrib/kae/ @Misakokoro @UNOWNED

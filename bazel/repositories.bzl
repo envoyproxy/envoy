@@ -388,6 +388,14 @@ def _numactl():
         build_file = "@envoy//bazel/external:numactl.BUILD",
     )
 
+def _com_github_huawei_uadk():
+    external_http_archive(
+        name = "uadk",
+        patches = ["@envoy//bazel/foreign_cc:uadk.patch"],
+        patch_args = ["-p1"],
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
 def _com_github_intel_qatlib():
     external_http_archive(
         name = "com_github_intel_qatlib",
