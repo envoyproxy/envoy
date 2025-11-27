@@ -11,11 +11,7 @@ fi
 if [[ -n "$BAZEL_BUILD_EXTRA_OPTIONS" ]]; then
     read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS}"
 else
-    if [[ -n "$ENVOY_RBE" ]]; then
-        BAZEL_BUILD_EXTRA_OPTIONS=(--config=mobile-remote-clang)
-    else
-        BAZEL_BUILD_EXTRA_OPTIONS=(--config=mobile-clang)
-    fi
+    BAZEL_BUILD_EXTRA_OPTIONS=(--config=mobile-clang)
 fi
 
 echo "${BAZEL_BUILD_EXTRA_OPTIONS[*]}"
