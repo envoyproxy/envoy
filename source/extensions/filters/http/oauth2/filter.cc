@@ -129,9 +129,6 @@ std::string cookieNameWithSuffix(absl::string_view base_name, absl::string_view 
 }
 
 bool cookieNameMatchesBase(absl::string_view cookie_name, absl::string_view base_name) {
-  if (cookie_name == base_name) {
-    return true;
-  }
   if (cookie_name.size() <= base_name.size() + CookieSuffixDelimiter.size()) {
     return false;
   }
@@ -216,7 +213,7 @@ std::string encodeHmacHexBase64(const std::vector<uint8_t>& secret, absl::string
 
 // Generates a SHA256 HMAC from a secret and a message and returns the result as a base64 encoded
 // string.
-std::string generateHmacBase64(const std::vector<uint8_t>& secret, std::string& message) {
+std::string generateHmacBase64(const std::vector<uint8_t>& secret, absl::string_view message) {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, message);
   std::string hmac_string(hmac_result.begin(), hmac_result.end());
@@ -240,21 +237,14 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
   return encodeHmacBase64(secret, domain, expires, token, id_token, refresh_token);
 }
 
-struct GeneratedCsrfToken {
-  std::string token;
-  std::string flow_id;
-};
-
 // Generates a CSRF token that can be used to prevent CSRF attacks.
 // The token is in the format of <nonce>.<hmac(nonce)> recommended by
 // https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#signed-double-submit-cookie-recommended
-GeneratedCsrfToken generateCsrfToken(const std::string& hmac_secret,
-                                     Random::RandomGenerator& random) {
+std::string generateCsrfToken(absl::string_view hmac_secret, absl::string_view random_string) {
   std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
-  std::string random_string = Hex::uint64ToHex(random.random());
   std::string hmac = generateHmacBase64(hmac_secret_vec, random_string);
   std::string csrf_token = fmt::format("{}.{}", random_string, hmac);
-  return {csrf_token, random_string};
+  return csrf_token;
 }
 
 // validate the csrf token hmac to prevent csrf token forgery
@@ -299,7 +289,7 @@ std::string generateCodeChallenge(const std::string& code_verifier) {
  * The state parameter is a base64Url encoded JSON object containing the original request URL, a
  * CSRF token for CSRF protection, and the flow id used to store flow-specific cookies.
  */
-std::string encodeState(const std::string& original_request_url, const std::string& csrf_token,
+std::string encodeState(absl::string_view original_request_url, const absl::string_view csrf_token,
                         absl::string_view flow_id) {
   std::string buffer;
   absl::string_view sanitized_url = Json::sanitize(buffer, original_request_url);
@@ -898,9 +888,12 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 
   const CookieNames& cookie_names = config_->cookieNames();
 
+  // Generate a random string to use as the unique id for this OAuth flow.
+  const std::string random_string = Hex::uint64ToHex(random_.random());
+  absl::string_view flow_id = random_string;
+
   // Generate a CSRF token to prevent CSRF attacks.
-  const GeneratedCsrfToken csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
-  const std::string& flow_id = csrf_token.flow_id;
+  const std::string csrf_token = generateCsrfToken(config_->hmacSecret(), random_string);
   const std::chrono::seconds csrf_token_expires_in = config_->getCsrfTokenExpiresIn();
   std::string csrf_expires = std::to_string(csrf_token_expires_in.count());
 
@@ -916,9 +909,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   const std::string csrf_cookie_name = cookieNameWithSuffix(cookie_names.oauth_nonce_, flow_id);
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat(csrf_cookie_name, "=", csrf_token.token, csrf_cookie_tail));
+      absl::StrCat(csrf_cookie_name, "=", csrf_token, csrf_cookie_tail));
 
-  const std::string state = encodeState(original_url, csrf_token.token, flow_id);
+  const std::string state = encodeState(original_url, csrf_token, flow_id);
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
 
@@ -981,8 +974,10 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 
   const CookieNames& cookie_names = config_->cookieNames();
   const std::vector<absl::string_view> base_cookie_names{
-      cookie_names.oauth_hmac_,    cookie_names.bearer_token_, cookie_names.id_token_,
-      cookie_names.refresh_token_, cookie_names.oauth_nonce_,  cookie_names.code_verifier_,
+      cookie_names.oauth_hmac_,
+      cookie_names.bearer_token_,
+      cookie_names.id_token_,
+      cookie_names.refresh_token_,
   };
 
   absl::flat_hash_map<std::string, std::string> request_cookies =
@@ -1000,6 +995,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
     addCookieName(base_name);
   }
 
+  // Delete any flow-specific cookies that may exist.
   for (const auto& cookie : request_cookies) {
     if (cookieNameMatchesBase(cookie.first, cookie_names.oauth_nonce_) ||
         cookieNameMatchesBase(cookie.first, cookie_names.code_verifier_)) {
@@ -1436,6 +1432,7 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   if (flow_id.empty()) {
     return {false, "", "", "", "", fmt::format("Flow id in state is empty: {}", state)};
   }
+
   if (!validateCsrfToken(headers, csrf_token, flow_id)) {
     return {false, "", "", csrf_token, flow_id, "CSRF token validation failed"};
   }
