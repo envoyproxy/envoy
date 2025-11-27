@@ -14,13 +14,13 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
-common_env = {
+COMMON_ENV = {
     "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd/lib",
     "QAT_INCLUDE_PATH": "$$EXT_BUILD_DEPS/qatlib/include/qat",
     "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/numactl/lib",
 }
 
-common_cflags = "-I$$EXT_BUILD_ROOT/external/numactl"
+COMMON_CFLAGS = "-I$$EXT_BUILD_ROOT/external/numactl"
 
 make(
     name = "qat-zstd",
@@ -31,11 +31,11 @@ make(
         "@numactl//:numa_archive",
     ],
     env = select({
-        "//bazel:clang_build": common_env | {
-            "CFLAGS": common_cflags + " -Wno-error=unused-parameter -Wno-error=unused-command-line-argument",
+        "//bazel:clang_build": COMMON_ENV | {
+            "CFLAGS": COMMON_CFLAGS + " -Wno-error=unused-parameter -Wno-error=unused-command-line-argument",
         },
-        "//conditions:default": common_env | {
-            "CFLAGS": common_cflags,
+        "//conditions:default": COMMON_ENV | {
+            "CFLAGS": COMMON_CFLAGS,
         },
     }),
     includes = [],

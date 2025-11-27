@@ -14,7 +14,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
-common_env = {
+COMMON_ENV = {
     "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/numactl/lib",
 }
 
@@ -35,10 +35,10 @@ configure_make(
     # numa_archive genrule. The cc_library doesn't produce a file that can be
     # found with -lnuma, so we need to use the genrule output.
     env = select({
-        "//bazel:clang_build": common_env | {
+        "//bazel:clang_build": COMMON_ENV | {
             "CFLAGS": "-Wno-error=newline-eof -Wno-error=strict-prototypes -Wno-error=unused-but-set-variable",
         },
-        "//conditions:default": common_env,
+        "//conditions:default": COMMON_ENV,
     }),
     lib_source = "@com_github_intel_qatzip//:all",
     out_static_libs = [
