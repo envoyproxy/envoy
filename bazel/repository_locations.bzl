@@ -496,7 +496,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "LGPL-2.1",
         license_url = "https://github.com/numactl/numactl/blob/{version}/LICENSE.LGPL2.1",
     ),
-    com_github_huawei_uadk = dict(
+    uadk = dict(
         project_name = "uadk",
         project_desc = "User space Accelerator Development Kit",
         project_url = "https://github.com/Linaro/uadk",
