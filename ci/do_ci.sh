@@ -35,9 +35,6 @@ setup_clang_toolchain() {
     # We only support clang with libc++ now
     BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}" "--config=${config}")
     BAZEL_QUERY_OPTION_LIST="${BAZEL_QUERY_OPTIONS[*]}"
-    if [[ -n "${ENVOY_RBE}" ]]; then
-        config="remote-${config}"
-    fi
     BAZEL_BUILD_OPTIONS+=("--config=${config}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
@@ -671,12 +668,8 @@ case $CI_TARGET in
         ;;
 
     gcc)
-        if [[ -n "${ENVOY_RBE}" ]]; then
-            CONFIG_PREFIX="remote-"
-        fi
-        CONFIG="${CONFIG_PREFIX}gcc"
-        BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
-        echo "gcc toolchain configured: ${CONFIG}"
+        BAZEL_BUILD_OPTIONS+=("--config=gcc")
+        echo "gcc toolchain configured: gcc"
         echo "bazel fastbuild build with gcc..."
         bazel_envoy_binary_build fastbuild
         echo "Testing ${TEST_TARGETS[*]}"

@@ -54,9 +54,6 @@ jobs:
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
-      diskspace-hack-paths: |
-        /opt/hostedtoolcache
-        /usr/local/.ghcup
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: true
       request: ${{ inputs.request }}
@@ -117,9 +114,6 @@ jobs:
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
-      diskspace-hack-paths: |
-        /opt/hostedtoolcache
-        /usr/local/.ghcup
       docker-ci: false
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       import-gpg: true
