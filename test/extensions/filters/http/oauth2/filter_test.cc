@@ -1333,6 +1333,39 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
 
 /**
  * Scenario: The OAuth filter receives a callback request from the OAuth server that has
+ * an invalid url.
+ *
+ * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
+ */
+TEST_F(OAuth2Test, OAuthCallbackWithInvalidOriginalURL) {
+  // {"url":"htps:/traffic.example.com/original_path?var1=1&var2=2,"csrf_token":"${extracted}",
+  // "flow_id":"${extracted}"}
+  static const std::string state_without_csrf_token =
+      "eyJ1cmwiOiJodHBzOi90cmFmZmljLmV4YW1wbGUuY29tL29yaWdpbmFsX3BhdGg_"
+      "dmFyMT0xJnZhcjI9MiIsImNzcmZfdG9rZW4iOiIwMDAwMDAwMDA3NWJjZDE1Lm5hNmtydTR4MXBIZ29jU0llVS9tZHRI"
+      "WW41OEdoMWJxd2VTNFhYb2lxVmc9IiwiZmxvd19pZCI6IjAwMDAwMDAwMDc1YmNkMTUifQ";
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_without_csrf_token},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  // Deliberately fail the HMAC Validation check.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: The OAuth filter receives a callback request from the OAuth server that has
  * an invalid CodeVerifier cookie.
  *
  * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
