@@ -87,6 +87,17 @@ jobs:
         --config=mobile-rbe
         --config=mobile-android-release
         //examples/kotlin/hello_world:hello_envoy_kt
+      bind-mounts: |
+        default: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/runner
+            target: RUNNER_TEMP/container/bazel_root
+            chown: "runner:runner"
+          - src: /mnt/runner-home
+            target: /home/runner/.cache/bazel
+            chown: "runner:runner"
       request: ${{ needs.load.outputs.request }}
       target: kotlin-hello-world
       runs-on: ubuntu-22.04
@@ -116,6 +127,17 @@ jobs:
       command: ./bazelw
       container-command:
       args: ${{ matrix.args }}
+      bind-mounts: |
+        default: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/runner
+            target: RUNNER_TEMP/container/bazel_root
+            chown: "runner:runner"
+          - src: /mnt/runner-home
+            target: /home/runner/.cache/bazel
+            chown: "runner:runner"
       diskspace-hack-paths: |
         /opt/hostedtoolcache
         /usr/local/.ghcup
