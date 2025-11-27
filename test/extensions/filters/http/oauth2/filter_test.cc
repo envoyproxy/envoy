@@ -1409,8 +1409,7 @@ TEST_F(OAuth2Test, OAuthCallbackWithoutCodeVerifierCookie) {
 TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoCsrfToken) {
   // {"url":"https://traffic.example.com/original_path?var1=1&var2=2,"flow_id":"${extracted}"}
   static const std::string state_without_csrf_token =
-      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwiZmxv"
-      "d19pZCI9IjAwMDAwMDAwMDc1YmNkMTUifQ";
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwiZmxvd19pZCI6IjAwMDAwMDAwMDc1YmNkMTUifQ";
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_without_csrf_token},
       {Http::Headers::get().Cookie.get(),
