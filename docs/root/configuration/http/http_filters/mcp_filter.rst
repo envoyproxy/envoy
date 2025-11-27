@@ -22,8 +22,8 @@ Envoy's primary role is a Policy Enforcement Point (PEP) for policies defined in
 * It supports Streamable-HTTP transport.
 * Service selection is handled via standard *virtual host (vhost) / route configuration* or through a *dynamic forwarding proxy*.
 
-Aggregating MCP Server
-~~~~~~~~~~~~~~~~~~~~~~
+Aggregating MCP mode
+~~~~~~~~~~~~~~~~~~~~
 
 .. attention::
 
@@ -35,7 +35,7 @@ Envoy functions as a unified aggregating MCP server.
 * It supports Streamable-HTTP transport.
 
 Key Capabilities
-----------------
+~~~~~~~~~~~~~~~~
 
 Within these patterns, the filter facilitates three essential functions:
 
@@ -44,7 +44,7 @@ Within these patterns, the filter facilitates three essential functions:
 * **MCP Multiplexing and Aggregation**: Acts as a unified endpoint that aggregates tools and resources originating from multiple backend services (Feature *Pending*).
 
 MCP Policy Enforcement Examples
--------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A common usage of the MCP filter is to enforce policies based on MCP payload attributes. The filter parses MCP JSON_RPC messages and populates
 the dynamic metadata, which subsequent filters in the chain can use for decision-making.
@@ -55,7 +55,7 @@ This enables scenarios such as:
 * **Egress Traffic Control**: Using the filter with a dynamic forward proxy to secure outbound traffic for AI agents.
 
 Integration with RBAC
-~~~~~~~~~~~~~~~~~~~~~
+---------------------
 
 To apply RBAC rules based on MCP attributes, place the MCP filter before the RBAC filter in the HTTP connection manager chain:
 
@@ -77,7 +77,7 @@ The RBAC filter is then configured with a per-route policy to match against the 
     :caption: :download:`mcp-filter.yaml <_include/mcp-filter.yaml>`
 
 Integration with External Authorization
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------------------
 
 The MCP filter can also function alongside the ``ext_authz`` filter. By default, the MCP filter exports metadata under the ``mcp_proxy`` namespace. An external authorization service can evaluate this metadata to approve or deny requests.
 
