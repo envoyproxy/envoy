@@ -1,26 +1,26 @@
 syntax = "proto3";
 
+package envoy.extensions.filters.http.connection_pool_cardinality.v3;
+
 import "udpa/annotations/status.proto";
 
-package envoy.extensions.filters.http.connection_pool_cardinality.v3;
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.connection_pool_cardinality.v3";
 option java_outer_classname = "ConnectionPoolCardinalityProto";
 option java_multiple_files = true;
-option go_package =
-"github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/connection_pool_cardinality/v3;connection_pool_cardinalityv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/connection_pool_cardinality/v3;connection_pool_cardinalityv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: ConnectionPoolCardiality]
+// [#protodoc-title: ConnectionPoolCardinality]
+
 // [#extension: envoy.filters.http.connection_pool_cardinality]
 
-// [#next-free-field: 2]
 // This filter bumps up the number of connection pools to create for the upstreams that the
 // downstream requests will be balanced across. This is particularly useful when running envoy
 // as a sidecar where you may want additional connections to be established for the hop between
 // the proxy and the application for ingress requests as it will reduce queueing during load spikes.
 //
 // To validate if this is useful for your scenario, configure the filter and see if the cluster
-// stat `upstream_rq_pending_total` decreases when compared to when the filter isn't used.
+// stat ``upstream_rq_pending_total`` decreases when compared to when the filter isn't used.
 message ConnectionPoolCardinalityConfig {
   // Number of connection pools to distribute the downstream requests across.
   // If unset or <= 1, this will be a NOP and no additional connection pools will be created.

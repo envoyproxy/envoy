@@ -21,6 +21,7 @@ HTTP filters
   compressor_filter
   composite_filter
   connect_grpc_bridge_filter
+  connection_pool_cardinality
   cors_filter
   credential_injector_filter
   csrf_filter
