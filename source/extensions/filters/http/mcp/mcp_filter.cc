@@ -10,6 +10,22 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
+namespace {
+McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+  const std::string final_prefix = absl::StrCat(prefix, "mcp.");
+  return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+}
+} // namespace
+
+McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
+                                 const std::string& stats_prefix, Stats::Scope& scope)
+    : traffic_mode_(proto_config.traffic_mode()),
+      clear_route_cache_(proto_config.clear_route_cache()),
+      max_request_body_size_(proto_config.has_max_request_body_size()
+                                 ? proto_config.max_request_body_size().value()
+                                 : 8192), // Default: 8KB
+      stats_(generateStats(stats_prefix, scope)) {}
+
 bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const {
   // Check if this is a GET request for SSE stream
   if (headers.getMethodValue() != Http::Headers::get().MethodValues.Get) {
@@ -111,6 +127,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
   ENVOY_LOG(debug, "after the post check");
   if (!is_mcp_request_ && shouldRejectRequest()) {
     ENVOY_LOG(debug, "rejecting non-MCP traffic");
+    config_->stats().requests_rejected_.inc();
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed",
                                        nullptr, absl::nullopt, "mcp_filter_reject_no_mcp");
     return Http::FilterHeadersStatus::StopIteration;
@@ -140,6 +157,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   size_t to_parse = buffer_size - bytes_parsed_;
   if (max_request_body_size_ > 0) {
     if (bytes_parsed_ >= max_request_body_size_) {
+      config_->stats().body_too_large_.inc();
       handleParseError("request body is too large.");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
@@ -175,6 +193,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   if (end_stream || size_limit_hit) {
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
+      config_->stats().body_too_large_.inc();
       handleParseError("reached end_stream or configured body size, don't get enough data.");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
