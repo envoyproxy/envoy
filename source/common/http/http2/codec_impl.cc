@@ -167,7 +167,13 @@ const char* codecStrError(int error_code) { return nghttp2_strerror(error_code);
 const char* codecStrError(int) { return "unknown_error"; }
 #endif
 
-int reasonToReset(StreamResetReason reason) {
+/**
+ * Convert StreamResetReason to HTTP/2 error code.
+ * @param reason the StreamResetReason to convert
+ * @param response_end_stream_sent whether END_STREAM has been sent for a server stream.
+ * True means the response has been fully sent.
+ */
+int reasonToReset(StreamResetReason reason, bool response_end_stream_sent) {
   switch (reason) {
   case StreamResetReason::LocalRefusedStreamReset:
     return OGHTTP2_REFUSED_STREAM;
@@ -182,7 +188,9 @@ int reasonToReset(StreamResetReason reason) {
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
       return OGHTTP2_NO_ERROR;
     }
-    return OGHTTP2_INTERNAL_ERROR;
+    // If the response has been fully sent then we reset with OGHTTP2_NO_ERROR to tell
+    // there is no transport level error.
+    return response_end_stream_sent ? OGHTTP2_NO_ERROR : OGHTTP2_INTERNAL_ERROR;
   }
 }
 
@@ -923,8 +931,11 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
       codec_callbacks_->onCodecLowLevelReset();
     }
   }
-  parent_.adapter_->SubmitRst(stream_id_,
-                              static_cast<http2::adapter::Http2ErrorCode>(reasonToReset(reason)));
+
+  const bool response_end_stream_sent =
+      parent_.adapter_->IsServerSession() ? local_end_stream_sent_ : false;
+  parent_.adapter_->SubmitRst(stream_id_, static_cast<http2::adapter::Http2ErrorCode>(
+                                              reasonToReset(reason, response_end_stream_sent)));
 }
 
 NewMetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {

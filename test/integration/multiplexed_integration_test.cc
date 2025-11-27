@@ -3570,20 +3570,16 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
   // But note, the onStreamClose() for the active closing side will also be called.
   // But the error code for active closing side will always be 0 if the Oghttp2 is used.
 
-  // The above context result in different number of log entries for different HTTP/2
-  // implementations.
-  size_t log_num = 0;
-  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-    // For oghttp2, there will be extra "closed: 0" log entries due to the connection
-    // termination when stream reset happens.
-    log_num = 2;
-  } else {
-    log_num = 4;
-  }
-
   initialize();
 
   {
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 2;
+    } else {
+      log_num = 4;
+    }
+
     // The ProtocolError will be translated to OGHTTP2_PROTOCOL_ERROR (1).
     EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 1", log_num, {
       codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -3603,6 +3599,18 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
   }
 
   {
+    // For reason LocalReset, it will be translated to default HTTP2 stream error code.
+    // At the downstream side, because a complete local reply will be send before resetting
+    // the stream, so the stream close code observed at downstream side will be NO_ERROR (0).
+    // So, we expect 1 log entry with "closed: 2" for Oghttp2 and 2 log entries with "closed: 2"
+    // for other implementations.
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 1;
+    } else {
+      log_num = 2;
+    }
+
     // The LocalReset will be translated to default code OGHTTP2_INTERNAL_ERROR (2).
     EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 2", log_num, {
       codec_client_ = makeHttpConnection(lookupPort("http"));
