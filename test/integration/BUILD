@@ -703,9 +703,9 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "cluster_shadow_policy_integration_test",
+    name = "cluster_http_protocol_options_integration_test",
     size = "large",
-    srcs = ["cluster_shadow_policy_integration_test.cc"],
+    srcs = ["cluster_http_protocol_options_integration_test.cc"],
     rbe_pool = "6gig",
     tags = [
         "cpu:3",
@@ -713,7 +713,10 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":integration_lib",
+        "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -735,6 +738,7 @@ envoy_cc_test(
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
         "//test/integration/filters:async_upstream_filter_lib",
+        "//test/integration/filters:encode_headers_return_stop_iteration_filter_config_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:repick_cluster_filter_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

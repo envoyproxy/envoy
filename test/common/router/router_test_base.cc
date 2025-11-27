@@ -198,8 +198,8 @@ void RouterTestBase::setIncludeAttemptCountInResponse(bool include) {
 void RouterTestBase::setUpstreamMaxStreamDuration(uint32_t seconds) {
   common_http_protocol_options_.mutable_max_stream_duration()->MergeFrom(
       ProtobufUtil::TimeUtil::MillisecondsToDuration(seconds));
-  ON_CALL(cm_.thread_local_cluster_.conn_pool_.host_->cluster_, commonHttpProtocolOptions())
-      .WillByDefault(ReturnRef(common_http_protocol_options_));
+  cm_.thread_local_cluster_.conn_pool_.host_->cluster_.common_http_protocol_options_ =
+      common_http_protocol_options_;
 }
 
 void RouterTestBase::enableHedgeOnPerTryTimeout() {

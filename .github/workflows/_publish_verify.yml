@@ -36,15 +36,12 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       bind-mounts: ${{ matrix.bind-mounts }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
-      diskspace-hack-paths: |
-        /opt/hostedtoolcache
-        /usr/local/.ghcup
       downloads: ${{ matrix.downloads }}
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
@@ -108,7 +105,7 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
@@ -157,14 +154,11 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       arch: ${{ matrix.arch }}
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ./ci/run_envoy_docker.sh
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
-      diskspace-hack-paths: |
-        /opt/hostedtoolcache
-        /usr/local/.ghcup
       downloads: |
         release.signed: container/release.signed
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
@@ -209,5 +203,5 @@ jobs:
           target: verify_distro
           arch: arm64
           bazel-extra: >-
-            --config=remote-cache-envoy-engflow
+            --config=remote-cache
           runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}

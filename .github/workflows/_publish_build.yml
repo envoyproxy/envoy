@@ -48,15 +48,12 @@ jobs:
     with:
       arch: ${{ inputs.arch }}
       bazel-extra: >-
-        --config=remote-envoy-engflow
+        --config=rbe
       target: release.server_only
       target-suffix: ${{ inputs.arch }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
-      diskspace-hack-paths: |
-        /opt/hostedtoolcache
-        /usr/local/.ghcup
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: true
       request: ${{ inputs.request }}
@@ -78,18 +75,6 @@ jobs:
       arch: ${{ inputs.arch }}
       target: docker
       target-suffix: ${{ inputs.arch }}
-      bind-mounts: |
-        - src: /mnt/workspace
-          target: GITHUB_WORKSPACE
-          chown: "runner:runner"
-        - src: /mnt/runner
-          target: RUNNER_TEMP/container/bazel_root
-          chown: "runner:runner"
-        - src: /mnt/docker
-          target: /var/lib/docker
-          rm: true
-          command-pre: sudo systemctl stop docker
-          command-post: sudo systemctl start docker
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
@@ -121,7 +106,7 @@ jobs:
     with:
       arch: ${{ inputs.arch }}
       bazel-extra: >-
-        --config=remote-cache-envoy-engflow
+        --config=remote-cache
       downloads: |
         release.${{ inputs.arch }}: container/release/${{ inputs.arch }}/bin/
       target: distribution
@@ -129,9 +114,6 @@ jobs:
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
-      diskspace-hack-paths: |
-        /opt/hostedtoolcache
-        /usr/local/.ghcup
       docker-ci: false
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       import-gpg: true

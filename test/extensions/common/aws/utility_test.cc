@@ -726,6 +726,59 @@ TEST(UtilityTest, XAmzHeadersCaseInsensitive) {
                                Pair("x-amz-security-token", "token123")));
 }
 
+TEST(UtilityTest, IsUriPathEncodedAlreadyEncoded) {
+  EXPECT_TRUE(Utility::isUriPathEncoded("/path/to/file"));
+  EXPECT_TRUE(Utility::isUriPathEncoded("/path%20with%20spaces"));
+  EXPECT_TRUE(Utility::isUriPathEncoded("/path%2Fwith%2Fencoded%2Fslashes"));
+  EXPECT_TRUE(Utility::isUriPathEncoded("/file-name_test.txt~"));
+  EXPECT_TRUE(Utility::isUriPathEncoded("/path/with%21special%40chars"));
+  EXPECT_TRUE(Utility::isUriPathEncoded("/path/with%singlepercent"));
+}
+
+TEST(UtilityTest, IsUriPathEncodedNotEncoded) {
+  EXPECT_FALSE(Utility::isUriPathEncoded("/path with spaces"));
+  EXPECT_FALSE(Utility::isUriPathEncoded("/path/with special!chars"));
+  EXPECT_FALSE(Utility::isUriPathEncoded("/file@name.txt"));
+}
+
+// A raw (unencoded) path for S3 should be percent-encoded once
+TEST(UtilityTest, CanonicalRequestS3UnencodedPath) {
+  std::map<std::string, std::string> headers;
+  const auto request = Utility::createCanonicalRequest("GET", "/test@test", headers, "content-hash",
+                                                       Utility::shouldNormalizeUriPath("s3"),
+                                                       Utility::useDoubleUriEncode("s3"));
+  EXPECT_EQ("GET\n/test%40test\n\n\n\ncontent-hash", request);
+}
+
+// An already encoded path for S3 should be not be double-encoded
+TEST(UtilityTest, CanonicalRequestS3AlreadyEncodedPath) {
+  std::map<std::string, std::string> headers;
+  const auto request = Utility::createCanonicalRequest(
+      "GET", "/test%40test", headers, "content-hash", Utility::shouldNormalizeUriPath("s3"),
+      Utility::useDoubleUriEncode("s3"));
+  EXPECT_EQ("GET\n/test%40test\n\n\n\ncontent-hash", request);
+}
+
+// A raw (unencoded) path for lattice should be percent-encoded once
+TEST(UtilityTest, CanonicalRequestVpcLatticeUnencodedPath) {
+  std::map<std::string, std::string> headers;
+  const auto request =
+      Utility::createCanonicalRequest("GET", "/test@test", headers, "content-hash",
+                                      Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
+                                      Utility::useDoubleUriEncode("vpc-lattice-svcs"));
+  EXPECT_EQ("GET\n/test%40test\n\n\n\ncontent-hash", request);
+}
+
+// An already encoded path for lattice should be percent-encoded twice
+TEST(UtilityTest, CanonicalRequestVpcLatticeAlreadyEncodedPath) {
+  std::map<std::string, std::string> headers;
+  const auto request =
+      Utility::createCanonicalRequest("GET", "/test%40test", headers, "content-hash",
+                                      Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
+                                      Utility::useDoubleUriEncode("vpc-lattice-svcs"));
+  EXPECT_EQ("GET\n/test%2540test\n\n\n\ncontent-hash", request);
+}
+
 } // namespace
 } // namespace Aws
 } // namespace Common

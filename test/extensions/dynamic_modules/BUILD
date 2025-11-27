@@ -86,7 +86,10 @@ rust_test(
 rust_doc_test(
     name = "rust_sdk_doc_test",
     crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
-    tags = ["nocoverage"],
+    tags = [
+        "no_san",
+        "nocoverage",
+    ],
 )
 
 # As per the discussion in https://github.com/envoyproxy/envoy/pull/35627,

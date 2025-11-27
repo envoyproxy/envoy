@@ -27,7 +27,7 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
   auto quic_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
       dispatcher, cluster.perConnectionBufferLimitBytes());
   const envoy::config::core::v3::QuicProtocolOptions& quic_config =
-      cluster.http3Options().quic_protocol_options();
+      cluster.httpProtocolOptions().http3Options().quic_protocol_options();
   Quic::convertQuicConfig(quic_config, quic_info->quic_config_);
   quic::QuicTime::Delta crypto_timeout =
       quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
