@@ -181,8 +181,7 @@ public:
       StreamInfo::FilterState::LifeSpan pre_set_life_span =
           StreamInfo::FilterState::LifeSpan::FilterChain) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
-        .WillByDefault(ReturnRef(dummy_option));
+    cm_.thread_local_cluster_.cluster_.info_->upstream_http_protocol_options_ = dummy_option;
     ON_CALL(callbacks_.stream_info_, filterState())
         .WillByDefault(ReturnRef(stream_info.filterState()));
     EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))

@@ -114,11 +114,9 @@ public:
   MOCK_METHOD(float, peekaheadRatio, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
   MOCK_METHOD(uint64_t, features, (), (const));
-  MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
-  MOCK_METHOD(const envoy::config::core::v3::Http2ProtocolOptions&, http2Options, (), (const));
-  MOCK_METHOD(const envoy::config::core::v3::Http3ProtocolOptions&, http3Options, (), (const));
-  MOCK_METHOD(const envoy::config::core::v3::HttpProtocolOptions&, commonHttpProtocolOptions, (),
-              (const));
+  const HttpProtocolOptionsConfig& httpProtocolOptions() const override {
+    return http_protocol_options_config_;
+  }
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
   MOCK_METHOD(OptRef<const LoadBalancerConfig>, loadBalancerConfig, (), (const));
@@ -156,10 +154,6 @@ public:
   MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const));
   MOCK_METHOD(bool, warmHosts, (), (const));
   MOCK_METHOD(bool, setLocalInterfaceNameOnUpstreamConnections, (), (const));
-  MOCK_METHOD(const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&,
-              upstreamHttpProtocolOptions, (), (const));
-  MOCK_METHOD(const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&,
-              alternateProtocolsCacheOptions, (), (const));
   MOCK_METHOD(const std::string&, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
@@ -178,9 +172,6 @@ public:
       OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
       happyEyeballsConfig, (), (const));
   MOCK_METHOD(OptRef<const std::vector<std::string>>, lrsReportMetricNames, (), (const));
-  MOCK_METHOD(const std::vector<Router::ShadowPolicyPtr>&, shadowPolicies, (), (const));
-  MOCK_METHOD(const Router::RetryPolicy*, retryPolicy, (), (const));
-  MOCK_METHOD(const Http::HashPolicy*, hashPolicy, (), (const));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -189,6 +180,38 @@ public:
   std::string name_{"fake_cluster"};
   std::string observability_name_{"observability_name"};
   absl::optional<std::string> eds_service_name_;
+  class MockHttpProtocolOptionsConfig : public HttpProtocolOptionsConfig {
+  public:
+    explicit MockHttpProtocolOptionsConfig(const MockClusterInfo& parent) : parent_(parent) {}
+
+    const Http::Http1Settings& http1Settings() const override { return parent_.http1_settings_; }
+    const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
+      return parent_.http2_options_;
+    }
+    const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const override {
+      return parent_.http3_options_;
+    }
+    const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
+      return parent_.common_http_protocol_options_;
+    }
+    const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
+    upstreamHttpProtocolOptions() const override {
+      return parent_.upstream_http_protocol_options_;
+    }
+    const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+    alternateProtocolsCacheOptions() const override {
+      return parent_.alternate_protocols_cache_options_;
+    }
+    const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override {
+      return parent_.shadow_policies_;
+    }
+    const Router::RetryPolicy* retryPolicy() const override { return parent_.retry_policy_; }
+    const Http::HashPolicy* hashPolicy() const override { return parent_.hash_policy_; }
+
+  private:
+    const MockClusterInfo& parent_;
+  };
+
   Http::Http1Settings http1_settings_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
@@ -249,6 +272,9 @@ public:
       happy_eyeballs_config_;
   const std::unique_ptr<Envoy::Orca::LrsReportMetricNames> lrs_report_metric_names_;
   std::vector<Router::ShadowPolicyPtr> shadow_policies_;
+  MockHttpProtocolOptionsConfig http_protocol_options_config_{*this};
+  const Router::RetryPolicy* retry_policy_{nullptr};
+  const Http::HashPolicy* hash_policy_{nullptr};
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {

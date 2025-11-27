@@ -1,21 +1,26 @@
 # `@envoy_repo` repository rule for managing the repo and querying its metadata.
 
 CONTAINERS = """
-PREFIX_MOBILE = "mobile"
 
 REPO = "{repo}"
 REPO_GCR = "{repo_gcr}"
 SHA = "{sha}"
+SHA_GCC = "{sha_gcc}"
 SHA_MOBILE = "{sha_mobile}"
+SHA_WORKER = "{sha_worker}"
 TAG = "{tag}"
 
+def image_gcc():
+    return "%s@sha256:%s" % (
+        REPO_GCR, SHA_GCC)
+
 def image_mobile():
-    return "%s:%s-%s@sha256:%s" % (
-        REPO, PREFIX_MOBILE, TAG, SHA_MOBILE)
+    return "%s@sha256:%s" % (
+        REPO, SHA_MOBILE)
 
 def image_worker():
     return "%s@sha256:%s" % (
-        REPO_GCR, SHA)
+        REPO_GCR, SHA_WORKER)
 
 """
 
@@ -74,7 +79,9 @@ def _envoy_repo_impl(repository_ctx):
         repo = config_data["build-image"]["repo"],
         repo_gcr = config_data["build-image"]["repo-gcr"],
         sha = config_data["build-image"]["sha"],
+        sha_gcc = config_data["build-image"]["sha-gcc"],
         sha_mobile = config_data["build-image"]["sha-mobile"],
+        sha_worker = config_data["build-image"]["sha-worker"],
         tag = config_data["build-image"]["tag"],
     ))
     repo_version_path = repository_ctx.path(repository_ctx.attr.envoy_version)

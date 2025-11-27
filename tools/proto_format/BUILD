@@ -108,6 +108,9 @@ genrule(
     && git -C $$TEMPDIR ls-files -s api/ > $@ \
     && rm -rf $$TEMPDIR
     """,
+    # Requires git - this avoids adding git to rbe workers
+    # this could be resolved by the addition of rules_git
+    tags = ["no-remote-exec"],
     tools = [":formatted_api"],
 )
 

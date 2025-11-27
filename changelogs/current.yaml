@@ -144,6 +144,11 @@ bug_fixes:
   change: |
     Fixed a bug where attributes based on request headers (e.g. ``request.host``) were not sent to
     the ext_proc server if ext_proc was configured to only run on the encode path.
+- area: http_11_proxy
+  change: |
+    Fixed a bug in http_11_proxy transport socket where bytes written to a connection after the
+    initial HTTP CONNECT request is sent, but before the response is received can be buffered
+    until connection timeout.
 - area: tcp_proxy
   change: |
     Fixed a connection leak in the TCP proxy when the ``receive_before_connect`` feature is enabled and the
@@ -158,6 +163,9 @@ bug_fixes:
   change: |
     Changes web identity token file watching behavior in the aws signing common components. This ensures that if the token file is rotated,
     the new token will be picked up.
+- area: dns_resolver
+  change: |
+    Removes unnecessary getifaddrs() system calls when ``filter_unroutable_families`` is disabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

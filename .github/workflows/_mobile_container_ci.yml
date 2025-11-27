@@ -53,8 +53,7 @@ on:
         default: false
       diskspace-hack-paths:
         type: string
-        default: |
-          /opt/hostedtoolcache
+        default:
       downloads:
         type: string
         default:

@@ -83,9 +83,8 @@ TEST_F(FilterTest, InvalidAltSvc) {
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
   auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   callbacks_.stream_info_.upstream_cluster_info_ = info;
-  absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> options =
-      proto_config.alternate_protocols_cache_options();
-  ON_CALL(*info, alternateProtocolsCacheOptions()).WillByDefault(ReturnRef(options));
+  info->alternate_protocols_cache_options_.emplace(
+      proto_config.alternate_protocols_cache_options());
   EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
       .Times(testing::AnyNumber())
       .WillOnce(Return(alternate_protocols_cache_));
@@ -118,9 +117,8 @@ TEST_F(FilterTest, ValidAltSvc) {
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
   auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   callbacks_.stream_info_.upstream_cluster_info_ = info;
-  absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> options =
-      proto_config.alternate_protocols_cache_options();
-  ON_CALL(*info, alternateProtocolsCacheOptions()).WillByDefault(ReturnRef(options));
+  info->alternate_protocols_cache_options_.emplace(
+      proto_config.alternate_protocols_cache_options());
   EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
       .Times(testing::AnyNumber())
       .WillOnce(Return(alternate_protocols_cache_));
@@ -173,9 +171,8 @@ TEST_F(FilterTest, ValidAltSvcMissingPort) {
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
   auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   callbacks_.stream_info_.upstream_cluster_info_ = info;
-  absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> options =
-      proto_config.alternate_protocols_cache_options();
-  ON_CALL(*info, alternateProtocolsCacheOptions()).WillByDefault(ReturnRef(options));
+  info->alternate_protocols_cache_options_.emplace(
+      proto_config.alternate_protocols_cache_options());
   EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
       .Times(testing::AnyNumber())
       .WillOnce(Return(alternate_protocols_cache_));
