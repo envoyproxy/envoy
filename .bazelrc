@@ -39,6 +39,7 @@ build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 build --copt=-Wno-deprecated-declarations
 build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
+build --experimental_cc_static_library
 build --enable_platform_specific_config
 build --incompatible_merge_fixed_and_default_shell_env
 # A workaround for slow ICU download.
