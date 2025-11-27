@@ -5,7 +5,6 @@ package envoy.extensions.filters.http.mcp_router.v3;
 import "envoy/config/core/v3/http_uri.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp_router.v3";
 option java_outer_classname = "McpRouterProto";
@@ -31,8 +30,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * :ref:`direct_response <envoy_v3_api_field_config.route.v3.Route.direct_response>`
 //
 message McpRouter {
+  // Specification of the MCP server.
+  message McpBackend {
+    // User visible name of the server for logging or error messages. If the name is empty the
+    // :ref:`URI <envoy_v3_api_field_config.core.v3.HttpUri.uri>` value is used.
+    string name = 1;
+
+    // Specification of the remote MCP server.
+    config.core.v3.HttpUri http_uri = 2;
+  }
+
   // A list of remote MCP servers. MCP router aggregates capabilities, tools and resources from remote MCP servers
   // and presents itself as single MCP server to the client. All remote MCP servers are sent the same capabilities
   // that the client presented to Envoy.
-  repeated config.core.v3.HttpUri mcp_server_uri = 1;
+  repeated McpBackend servers = 1;
 }
