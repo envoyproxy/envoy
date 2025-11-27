@@ -74,8 +74,8 @@ go_deps.module(
 )
 go_deps.module(
     path = "google.golang.org/protobuf",
-    sum = "h1:82DV7MYdb8anAVi3qge1wSnMDrnKK7ebr+I0hHRN1BU=",
-    version = "v1.36.3",
+    sum = "h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=",
+    version = "v1.36.10",
 )
 go_deps.module(
     path = "google.golang.org/genproto/googleapis/rpc",
