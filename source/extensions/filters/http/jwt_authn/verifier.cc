@@ -384,8 +384,7 @@ public:
     // The key difference is we're telling the authenticator to extract claims
     // even when signature validation would fail
     auto auth = auth_factory_.create(nullptr, absl::nullopt,
-                                     true
-                                     /*=allow failed*/ true
+                                     /*=allow failed*/ true,
                                      /*=allow missing*/ true);
 
     extractor_->sanitizeHeaders(ctximpl.headers());
