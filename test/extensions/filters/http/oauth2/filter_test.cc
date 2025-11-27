@@ -1409,11 +1409,59 @@ TEST_F(OAuth2Test, OAuthCallbackWithoutCodeVerifierCookie) {
 TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoCsrfToken) {
   // {"url":"https://traffic.example.com/original_path?var1=1&var2=2,"flow_id":"${extracted}"}
   static const std::string state_without_csrf_token =
-      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwiZmxvd19pZCI6IjAwMDAwMDAwMDc1YmNkMTUifQ";
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwiZmxv"
+      "d19pZCI6IjAwMDAwMDAwMDc1YmNkMTUifQ";
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_without_csrf_token},
       {Http::Headers::get().Cookie.get(),
        "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  // Deliberately fail the HMAC Validation check.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoCsrfCookie) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  // Deliberately fail the HMAC Validation check.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationUnmatchCsrfToken) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(),
+       "OauthNonce.00000000075bcd15=not_match_state;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1446,6 +1494,9 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationEmptyFlowId) {
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_without_flow_id},
       {Http::Headers::get().Cookie.get(),
        "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1481,6 +1532,9 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidCsrfTokenWithoutDot) 
       {Http::Headers::get().Cookie.get(),
        "OauthNonce.00000000075bcd15=" + invalid_csrf_token_cookie +
            ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1514,6 +1568,9 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidCsrfTokenInvalidHmac)
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_with_invalid_csrf_token},
       {Http::Headers::get().Cookie.get(),
        "OauthNonce=" + invalid_csrf_token_cookie + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1550,6 +1607,9 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationMalformedState) {
        "/_oauth?code=123&state=" + state_with_invalid_csrf_token_json},
       {Http::Headers::get().Cookie.get(),
        "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1579,6 +1639,9 @@ TEST_F(OAuth2Test, RedirectToOAuthServerWithInvalidCSRFToken) {
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + invalid_csrf_token},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
   };
 
   // Explicitly fail the validation to trigger the OAuth flow.
