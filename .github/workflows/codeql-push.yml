@@ -61,9 +61,26 @@ jobs:
       env:
         GIT_EVENT: ${{ github.event_name }}
 
+    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.31
+      if: |
+        ! github.event.repository.private
+      with:
+        mounts: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/runner-home
+            target: /home/runner/.cache/bazel
+            chown: "runner:runner"
     - name: Free disk space
-      if: ${{ env.BUILD_TARGETS != '' }}
+      if: |
+        env.BUILD_TARGETS != ''
+        && github.event.repository.private
       uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.31
+      with:
+        to_remove: |
+          /usr/local/.ghcup
+          /usr/local/lib/android
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
