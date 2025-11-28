@@ -58,6 +58,7 @@ jobs:
         echo 'BUILD_TARGETS<<EOF' >> $GITHUB_ENV
         echo "$BUILD_TARGETS" >> $GITHUB_ENV
         echo 'EOF' >> $GITHUB_ENV
+        echo "BUILD_TARGETS=//source/common/common:assert_lib" > $GITHUB_ENV
       env:
         GIT_EVENT: ${{ github.event_name }}
 
