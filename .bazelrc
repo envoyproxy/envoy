@@ -122,7 +122,11 @@ common:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
 # Clang with libc++ (default)
 common:clang --config=clang-common
 common:clang --config=libc++
-# common:clang --host_platform=@clang_platform
+common:clang --host_platform=@clang_platform
+
+# Clang installed to non-standard location (ie not /opt/llvm/)
+common:clang --config=clang-common
+common:clang --config=libc++
 
 # Use gold linker for gcc compiler.
 build:gcc --config=libstdc++
