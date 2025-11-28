@@ -10,10 +10,11 @@ namespace HttpFilters {
 namespace Mcp {
 
 Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config, const std::string&,
-    Server::Configuration::FactoryContext&) {
+    const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
-  auto config = std::make_shared<McpFilterConfig>(proto_config);
+  auto config = std::make_shared<McpFilterConfig>(proto_config, stats_prefix,
+                                                  context.serverFactoryContext().scope());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<McpFilter>(config));

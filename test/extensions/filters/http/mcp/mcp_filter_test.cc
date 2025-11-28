@@ -23,7 +23,7 @@ public:
     // Default config with PASS_THROUGH mode
     envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
     proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
-    config_ = std::make_shared<McpFilterConfig>(proto_config);
+    config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
     filter_ = std::make_unique<McpFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -32,7 +32,7 @@ public:
   void setupRejectMode() {
     envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
     proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
-    config_ = std::make_shared<McpFilterConfig>(proto_config);
+    config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
     filter_ = std::make_unique<McpFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -42,13 +42,14 @@ public:
     envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
     proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
     proto_config.set_clear_route_cache(clear_route_cache);
-    config_ = std::make_shared<McpFilterConfig>(proto_config);
+    config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
     filter_ = std::make_unique<McpFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
 protected:
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   McpFilterConfigSharedPtr config_;
@@ -286,7 +287,7 @@ TEST_F(McpFilterTest, PostWithWrongContentType) {
 TEST_F(McpFilterTest, DefaultMaxBodySizeIsEightKB) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   // Don't set max_request_body_size, should default to 8KB
-  auto config = std::make_shared<McpFilterConfig>(proto_config);
+  auto config = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   EXPECT_EQ(8192u, config->maxRequestBodySize());
 }
 
@@ -294,7 +295,7 @@ TEST_F(McpFilterTest, DefaultMaxBodySizeIsEightKB) {
 TEST_F(McpFilterTest, CustomMaxBodySizeConfiguration) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(16384);
-  auto config = std::make_shared<McpFilterConfig>(proto_config);
+  auto config = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   EXPECT_EQ(16384u, config->maxRequestBodySize());
 }
 
@@ -302,7 +303,7 @@ TEST_F(McpFilterTest, CustomMaxBodySizeConfiguration) {
 TEST_F(McpFilterTest, DisabledMaxBodySizeConfiguration) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(0);
-  auto config = std::make_shared<McpFilterConfig>(proto_config);
+  auto config = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   EXPECT_EQ(0u, config->maxRequestBodySize());
 }
 
@@ -310,7 +311,7 @@ TEST_F(McpFilterTest, DisabledMaxBodySizeConfiguration) {
 TEST_F(McpFilterTest, RequestBodyUnderLimitSucceeds) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(1024); // 1KB limit
-  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -339,7 +340,7 @@ TEST_F(McpFilterTest, RequestBodyUnderLimitSucceeds) {
 TEST_F(McpFilterTest, RequestBodyExceedingLimitRejected) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(100); // Very small limit
-  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -373,7 +374,7 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejected) {
 TEST_F(McpFilterTest, RequestBodyWithDisabledLimitAllowsLargeBodies) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(0); // Disable limit
-  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -406,7 +407,7 @@ TEST_F(McpFilterTest, RequestBodyWithDisabledLimitAllowsLargeBodies) {
 TEST_F(McpFilterTest, RequestBodyExactlyAtLimitSucceeds) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(100); // 100 byte limit
-  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -446,7 +447,7 @@ TEST_F(McpFilterTest, RequestBodyExactlyAtLimitSucceeds) {
 TEST_F(McpFilterTest, BufferLimitSetForValidMcpPostRequest) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(8192);
-  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -463,7 +464,7 @@ TEST_F(McpFilterTest, BufferLimitSetForValidMcpPostRequest) {
 TEST_F(McpFilterTest, BufferLimitNotSetWhenDisabled) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(0); // Disabled
-  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -481,7 +482,7 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
   proto_config.mutable_max_request_body_size()->set_value(50); // Small limit
-  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 

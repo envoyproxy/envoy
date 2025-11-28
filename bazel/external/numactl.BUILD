@@ -1,12 +1,14 @@
 # Copied from https://github.com/bazelbuild/bazel-central-registry/blob/main/modules/numactl/2.0.19/overlay/BUILD.bazel
 
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
-load(
-    "@envoy//contrib:all_contrib_extensions.bzl",
-    "envoy_contrib_linux_x86_64_constraints",
-)
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_static_library.bzl", "cc_static_library")
+
+LINUX_ONLY = select({
+    "@platforms//os:linux": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
 
 # Generate config.h
 write_file(
@@ -82,7 +84,7 @@ cc_library(
     copts = COMMON_COPTS,
     includes = ["."],
     linkstatic = True,
-    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    target_compatible_with = LINUX_ONLY,
     visibility = ["//visibility:public"],
     alwayslink = True,
 )
@@ -98,7 +100,7 @@ cc_library(
     copts = COMMON_COPTS,
     includes = ["."],
     linkstatic = True,
-    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    target_compatible_with = LINUX_ONLY,
     visibility = ["//visibility:public"],
     deps = [":numa"],
     alwayslink = True,
@@ -115,7 +117,7 @@ cc_binary(
     ],
     copts = COMMON_COPTS + ["-DVERSION=\\\"2.0.19\\\""],
     linkstatic = True,
-    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    target_compatible_with = LINUX_ONLY,
     visibility = ["//visibility:public"],
     deps = [
         ":numa",
@@ -134,7 +136,7 @@ cc_binary(
         "-std=gnu99",
         "-DVERSION=\\\"2.0.19\\\"",
     ],
-    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    target_compatible_with = LINUX_ONLY,
     visibility = ["//visibility:public"],
 )
 
@@ -161,7 +163,7 @@ cc_binary(
     ],
     linkopts = ["-lm"],
     linkstatic = True,
-    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    target_compatible_with = LINUX_ONLY,
     visibility = ["//visibility:public"],
     deps = [
         ":numa",
@@ -178,7 +180,7 @@ cc_binary(
     ],
     copts = COMMON_COPTS,
     linkstatic = True,
-    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    target_compatible_with = LINUX_ONLY,
     visibility = ["//visibility:public"],
     deps = [
         ":numa",
@@ -195,7 +197,7 @@ cc_binary(
     ],
     copts = COMMON_COPTS,
     linkstatic = True,
-    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    target_compatible_with = LINUX_ONLY,
     visibility = ["//visibility:public"],
     deps = [
         ":numa",
@@ -212,7 +214,7 @@ cc_binary(
     ],
     copts = COMMON_COPTS,
     linkstatic = True,
-    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    target_compatible_with = LINUX_ONLY,
     visibility = ["//visibility:public"],
     deps = [
         ":numa",
@@ -224,5 +226,25 @@ cc_binary(
 alias(
     name = "libnuma",
     actual = ":numa",
+    visibility = ["//visibility:public"],
+)
+
+# Create a proper static library archive from the cc_library.
+cc_static_library(
+    name = "numa_static",
+    target_compatible_with = LINUX_ONLY,
+    deps = [":numa"],
+)
+
+# Create a properly named libnuma.a archive for foreign_cc dependencies.
+# The cc_library above produces Bazel-internal archives, but foreign_cc
+# configure_make rules (like qatlib) expect a traditional libnuma.a file
+# that can be found with -lnuma.
+genrule(
+    name = "numa_archive",
+    srcs = [":numa_static"],
+    outs = ["lib/libnuma.a"],
+    cmd = "mkdir -p $$(dirname $@) && cp $< $@",
+    target_compatible_with = LINUX_ONLY,
     visibility = ["//visibility:public"],
 )

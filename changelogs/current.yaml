@@ -65,6 +65,15 @@ minor_behavior_changes:
     mutations and send a local reply if not.
 - area: ext_authz
   change: |
+    Fixed HTTP ext_authz client to correctly respect user-configured ``retry_on`` configuration in the
+    :ref:`retry_policy <envoy_v3_api_field_config.core.v3.RetryPolicy.retry_on>`. Previously, the
+    configured ``retry_on`` value was being overridden with hardcoded defaults
+    ``5xx,gateway-error,connect-failure,reset``, causing user-specified retry conditions to be ignored.
+    This behavior is controlled by the runtime flag
+    ``envoy.reloadable_features.ext_authz_http_client_retries_respect_user_retry_on`` which defaults to
+    ``true``. To preserve the old behavior, set this flag to ``false``.
+- area: ext_authz
+  change: |
     Fixed HTTP ext_authz service to properly propagate headers (such as ``set-cookie``) back to clients. The
     filter now correctly uses ``allowed_client_headers`` for denied responses and ``allowed_client_headers_on_success``
     for successful authorization responses.
@@ -81,6 +90,11 @@ minor_behavior_changes:
   change: |
     Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.mobile_use_network_observer_registry``.
+- area: access_log
+  change: |
+    Fixed a bug where the truncation-length specifier for ``DYNAMIC_METADATA():Z`` was rejected in access log format strings.
+    The length parameter is now accepted and truncates strings and other value types to the specified length. Structured
+    data types are not truncated.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
