@@ -95,7 +95,7 @@ jobs:
           target: RUNNER_TEMP/container/bazel_root
           chown: "runner:runner"
         - src: /mnt/runner-home
-          target: /home/runner/.cache/bazel
+          target: /home/runner/.cache
           chown: "runner:runner"
       request: ${{ needs.load.outputs.request }}
       target: kotlin-hello-world
