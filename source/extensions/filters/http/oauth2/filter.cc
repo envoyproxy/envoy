@@ -291,10 +291,12 @@ std::string generateCodeChallenge(const std::string& code_verifier) {
  */
 std::string encodeState(absl::string_view original_request_url, const absl::string_view csrf_token,
                         absl::string_view flow_id) {
-  std::string buffer;
-  absl::string_view sanitized_url = Json::sanitize(buffer, original_request_url);
-  absl::string_view sanitized_csrf_token = Json::sanitize(buffer, csrf_token);
-  absl::string_view sanitized_flow_id = Json::sanitize(buffer, flow_id);
+  std::string url_buffer;
+  std::string csrf_buffer;
+  std::string flow_id_buffer;
+  absl::string_view sanitized_url = Json::sanitize(url_buffer, original_request_url);
+  absl::string_view sanitized_csrf_token = Json::sanitize(csrf_buffer, csrf_token);
+  absl::string_view sanitized_flow_id = Json::sanitize(flow_id_buffer, flow_id);
   std::string json = fmt::format(R"({{"url":"{}","csrf_token":"{}","flow_id":"{}"}})",
                                  sanitized_url, sanitized_csrf_token, sanitized_flow_id);
   return Base64Url::encode(json.data(), json.size());
