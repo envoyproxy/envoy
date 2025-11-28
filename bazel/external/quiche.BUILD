@@ -2467,7 +2467,7 @@ envoy_quic_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform",
         ":quiche_common_wire_serialization",
-        "@envoy//bazel/foreign_cc:zlib",
+        "@zlib",
     ],
 )
 
@@ -2489,7 +2489,7 @@ envoy_quic_cc_library(
         ":quic_core_crypto_client_proof_source_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quiche_common_platform_client_stats",
-        "@envoy//bazel/foreign_cc:zlib",
+        "@zlib",
     ],
 )
 
@@ -2510,7 +2510,7 @@ envoy_quic_cc_library(
         ":quic_core_proto_crypto_server_config_proto_header",
         ":quic_core_server_id_lib",
         ":quic_server_crypto_tls_handshake_lib",
-        "@envoy//bazel/foreign_cc:zlib",
+        "@zlib",
     ],
 )
 
@@ -4708,7 +4708,7 @@ envoy_quiche_platform_impl_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_googleurl_impl.h",
     ],
     deps = [
-        "@com_googlesource_googleurl//url",
+        "@googleurl//url",
     ],
 )
 

@@ -36,7 +36,8 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
+      bind-mounts: ${{ matrix.bind-mounts }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
@@ -57,6 +58,19 @@ jobs:
           downloads: |
             oci.arm64: container/build_images
             oci.x64: container/build_images
+          bind-mounts: |
+            - src: /mnt/workspace
+              target: GITHUB_WORKSPACE
+              chown: "runner:runner"
+            - src: /mnt/runner
+              target: RUNNER_TEMP/container/bazel_root
+              chown: "runner:runner"
+            - src: /mnt/docker
+              target: /var/lib/docker
+              rm: true
+              command-pre: sudo systemctl stop docker
+              command-post: sudo systemctl start docker
+
           rbe: false
           source: |
             export NO_BUILD_SETUP=1
@@ -91,7 +105,7 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
@@ -140,7 +154,7 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       arch: ${{ matrix.arch }}
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ./ci/run_envoy_docker.sh
@@ -189,5 +203,5 @@ jobs:
           target: verify_distro
           arch: arm64
           bazel-extra: >-
-            --config=remote-cache-envoy-engflow
+            --config=remote-cache
           runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}

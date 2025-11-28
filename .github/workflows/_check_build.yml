@@ -35,9 +35,10 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name ||matrix.target }}
     with:
-      bazel-extra: '--config=remote-envoy-engflow'
+      bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
+      docker-ci: ${{ matrix.docker-ci || false }}
       error-match: |
         ERROR
         error:
@@ -56,5 +57,6 @@ jobs:
           name: API
         - target: compile_time_options
           name: Compile time options
+          docker-ci: true
         - target: gcc
           name: GCC

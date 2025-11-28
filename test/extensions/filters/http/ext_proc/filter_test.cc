@@ -3672,6 +3672,45 @@ TEST_F(OverrideTest, GrpcMetadataOverride) {
               ProtoEq(cfg2.overrides().grpc_initial_metadata()[1]));
 }
 
+// When merging two ExtProcPerRoute configurations, metadata_options in more_specific overrides
+// the one in less_specific for the cluster metadata namespaces.
+TEST_F(OverrideTest, ClusterMetadataNamespacesOverride) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_typed()
+      ->Add("less_specific_typed_ns_1");
+  cfg1.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_untyped()
+      ->Add("less_specific_untyped_ns_1");
+
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_typed()
+      ->Add("more_specific_typed_ns_2");
+  cfg2.mutable_overrides()
+      ->mutable_metadata_options()
+      ->mutable_cluster_metadata_forwarding_namespaces()
+      ->mutable_untyped()
+      ->Add("more_specific_untyped_ns_2");
+
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
+  FilterConfigPerRoute merged_route(route1, route2);
+
+  ASSERT_TRUE(merged_route.typedClusterMetadataForwardingNamespaces().has_value());
+  EXPECT_THAT(*merged_route.typedClusterMetadataForwardingNamespaces(),
+              testing::ElementsAre("more_specific_typed_ns_2"));
+  ASSERT_TRUE(merged_route.untypedClusterMetadataForwardingNamespaces().has_value());
+  EXPECT_THAT(*merged_route.untypedClusterMetadataForwardingNamespaces(),
+              testing::ElementsAre("more_specific_untyped_ns_2"));
+}
+
 // Verify that attempts to change headers that are not allowed to be changed
 // are ignored and a counter is incremented.
 TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
@@ -4392,6 +4431,11 @@ TEST_F(HttpFilterTest, HeaderRespReceivedBeforeBody) {
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  auto& grpc_calls = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
+  checkGrpcCallBody(*grpc_calls.body_stats_, 6, Grpc::Status::Ok, std::chrono::microseconds(160),
+                    std::chrono::microseconds(50), std::chrono::microseconds(10));
   filter_->onDestroy();
 }
 
@@ -4443,6 +4487,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
   // Header response arrives after some amount of body data sent.
   auto response = std::make_unique<ProcessingResponse>();
   (void)response->mutable_response_headers();
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
   stream_callbacks_->onReceiveMessage(std::move(response));
 
   // Three body responses follows the header response.
@@ -4485,6 +4530,11 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  auto& grpc_calls = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
+  checkGrpcCallBody(*grpc_calls.body_stats_, 11, Grpc::Status::Ok, std::chrono::microseconds(420),
+                    std::chrono::microseconds(80), std::chrono::microseconds(10));
   filter_->onDestroy();
 }
 
@@ -5594,6 +5644,108 @@ TEST_F(HttpFilterTest, CloseStreamOnRequestHeaders) {
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, ClusterMetadataOptionsOverride) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+  metadata_options:
+    cluster_metadata_forwarding_namespaces:
+      untyped:
+      - untyped_ns_1
+      typed:
+      - typed_ns_1
+  )EOF");
+  ExtProcPerRoute override_cfg;
+  const std::string override_yaml = R"EOF(
+  overrides:
+    metadata_options:
+      cluster_metadata_forwarding_namespaces:
+        untyped:
+        - untyped_ns_2
+        typed:
+        - typed_ns_2
+  )EOF";
+  TestUtility::loadFromYaml(override_yaml, override_cfg);
+
+  FilterConfigPerRoute route_config(override_cfg, builder_, factory_context_);
+
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillOnce(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "3");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  ASSERT_EQ(filter_->encodingState().untypedClusterMetadataForwardingNamespaces().size(), 1);
+  EXPECT_EQ(filter_->encodingState().untypedClusterMetadataForwardingNamespaces()[0],
+            "untyped_ns_2");
+  ASSERT_EQ(filter_->decodingState().typedClusterMetadataForwardingNamespaces().size(), 1);
+  EXPECT_EQ(filter_->decodingState().typedClusterMetadataForwardingNamespaces()[0], "typed_ns_2");
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  filter_->onDestroy();
+}
+
+// Verify that filter metadata is prioritized over cluster metadata when there
+// is a namespace collision
+TEST_F(HttpFilterTest, FilterMetadataOverridesClusterMetadata) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+  metadata_options:
+    forwarding_namespaces:
+      untyped:
+      - collision_ns
+    cluster_metadata_forwarding_namespaces:
+      untyped:
+      - collision_ns
+  )EOF");
+
+  // Set filter metadata on request
+  const std::string request_metadata_yaml = R"EOF(
+  filter_metadata:
+    collision_ns:
+      data: from_filter
+  )EOF";
+  TestUtility::loadFromYaml(request_metadata_yaml, dynamic_metadata_);
+
+  // Set cluster metadata
+  auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  stream_info_.upstream_cluster_info_ = cluster_info;
+  const std::string cluster_metadata_yaml = R"EOF(
+  filter_metadata:
+    collision_ns:
+      data: from_cluster
+  )EOF";
+  TestUtility::loadFromYaml(cluster_metadata_yaml, cluster_info->metadata_);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  // The filter metadata should override cluster metadata.
+  EXPECT_EQ("from_filter", last_request_.metadata_context()
+                               .filter_metadata()
+                               .at("collision_ns")
+                               .fields()
+                               .at("data")
+                               .string_value());
+
+  processResponseHeaders(false, absl::nullopt);
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
 }
 

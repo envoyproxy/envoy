@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package envoy.extensions.access_loggers.stats.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.stats.v3";
+option java_outer_classname = "StatsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/stats/v3;statsv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Stats logger]
+// Configuration for an access logger that emits custom Envoy stats according to its
+// configuration. The stats can have tags and values derived from
+// :ref:`command operators <config_access_log_command_operators>`.
+// [#extension: envoy.access_loggers.stats]
+//
+// .. warning::
+//   It is easy to configure and use this extension in ways that create very
+//   large numbers of stats in Envoy, which can cause excessive memory or CPU use
+//   leading to a denial of service in Envoy, or can overwhelm any configured
+//   stat sinks by sending too many unique metrics.
+
+message Config {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+
+  // Defines a tag on a stat.
+  message Tag {
+    // The name of the tag.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    // The value of the tag, using :ref:`command operators <config_access_log_command_operators>`.
+    string value_format = 2 [(validate.rules).string = {min_len: 1}];
+  }
+
+  // Defines the name and tags of a stat.
+  message Stat {
+    // The name of the stat.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    // The tags for the stat.
+    repeated Tag tags = 2;
+  }
+
+  // Configuration for a histogram stat.
+  message Histogram {
+    // The histogram units. The units are needed for some stat sinks.
+    enum Unit {
+      Unspecified = 0;
+
+      Bytes = 1;
+
+      Microseconds = 2;
+
+      Milliseconds = 3;
+
+      // Values are scaled to range 0-1.0, indicating 0%-100%. Values can be outside this range,
+      // but must be positive. Values extremely far out of this range may overflow.
+      Percent = 4;
+    }
+
+    // The name and tags of this histogram.
+    Stat stat = 1 [(validate.rules).message = {required: true}];
+
+    // The units for this histogram.
+    Unit unit = 2 [(validate.rules).enum = {defined_only: true}];
+
+    // The format string for the value of this histogram, using :ref:`command operators <config_access_log_command_operators>`.
+    // This must evaluate to a positive number.
+    string value_format = 3 [(validate.rules).string = {min_len: 1 prefix: "%" suffix: "%"}];
+  }
+
+  // Configuration for a counter stat.
+  message Counter {
+    // The name and tags of this counter.
+    Stat stat = 1 [(validate.rules).message = {required: true}];
+
+    // The format string for the value to add to this counter, using :ref:`command operators <config_access_log_command_operators>`.
+    // One of ``value_format`` or ``value_fixed`` must be configured.
+    string value_format = 2
+        [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
+
+    // A fixed value to add to this counter.
+    // One of ``value_format`` or ``value_fixed`` must be configured.
+    google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
+  }
+
+  // The stat prefix for the generated stats.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The histograms this logger will emit.
+  repeated Histogram histograms = 3;
+
+  // The counters this logger will emit.
+  repeated Counter counters = 4;
+}

@@ -39,6 +39,7 @@
 #include "gtest/gtest.h"
 
 using testing::Const;
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -2788,7 +2789,8 @@ TEST(SubstitutionFormatterTest, TraceIDFormatter) {
 
 /**
  * Populate a metadata object with the following test data:
- * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"}}
+ * "com.test":
+ * {"test_key":"test_value","test_obj":{"inner_key":"inner_value"},"test_list":["item0",4.2]}
  */
 void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata) {
   Protobuf::Struct struct_obj;
@@ -2796,9 +2798,15 @@ void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata) {
   fields_map["test_key"] = ValueUtil::stringValue("test_value");
   Protobuf::Struct struct_inner;
   (*struct_inner.mutable_fields())["inner_key"] = ValueUtil::stringValue("inner_value");
-  Protobuf::Value val;
-  *val.mutable_struct_value() = struct_inner;
-  fields_map["test_obj"] = val;
+  Protobuf::Value obj_value;
+  *obj_value.mutable_struct_value() = struct_inner;
+  fields_map["test_obj"] = obj_value;
+  Protobuf::ListValue list_inner;
+  *list_inner.add_values() = ValueUtil::stringValue("item0");
+  *list_inner.add_values() = ValueUtil::numberValue(4.2);
+  Protobuf::Value list_value;
+  *list_value.mutable_list_value() = list_inner;
+  fields_map["test_list"] = list_value;
   (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
 }
 
@@ -2812,8 +2820,9 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
   {
     DynamicMetadataFormatter formatter("com.test", {}, absl::optional<size_t>());
     std::string val = formatter.format(stream_info).value();
-    EXPECT_TRUE(val.find("\"test_key\":\"test_value\"") != std::string::npos);
-    EXPECT_TRUE(val.find("\"test_obj\":{\"inner_key\":\"inner_value\"}") != std::string::npos);
+    EXPECT_THAT(val, HasSubstr(R"("test_key":"test_value")"));
+    EXPECT_THAT(val, HasSubstr(R"("test_obj":{"inner_key":"inner_value"})"));
+    EXPECT_THAT(val, HasSubstr(R"("test_list":["item0",4.2])"));
 
     Protobuf::Value expected_val;
     expected_val.mutable_struct_value()->CopyFrom(metadata.filter_metadata().at("com.test"));
@@ -2862,9 +2871,27 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
   {
     DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>(5));
     EXPECT_EQ("test_", formatter.format(stream_info));
+    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_")));
+  }
 
+  // size limit on struct
+  {
+    DynamicMetadataFormatter formatter("com.test", {"test_obj"}, absl::optional<size_t>(5));
     // N.B. Does not truncate.
-    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
+    Protobuf::Value expected_val;
+    (*expected_val.mutable_struct_value()->mutable_fields())["inner_key"] =
+        ValueUtil::stringValue("inner_value");
+    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(expected_val));
+  }
+
+  // size limit on list
+  {
+    DynamicMetadataFormatter formatter("com.test", {"test_list"}, absl::optional<size_t>(5));
+    // N.B. Does not truncate.
+    Protobuf::Value expected_val;
+    expected_val.mutable_list_value()->add_values()->set_string_value("item0");
+    expected_val.mutable_list_value()->add_values()->set_number_value(4.2);
+    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(expected_val));
   }
 
   {
@@ -3804,7 +3831,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   const std::string expected_json_map = R"EOF({
-    "test_key": "test_value",
+    "test_key": "test_val",
+    "test_key2": "test_test_val",
     "test_obj": {
       "inner_key": "inner_value"
     },
@@ -3813,7 +3841,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
 
   Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
-    test_key: '%DYNAMIC_METADATA(com.test:test_key)%'
+    test_key: '%DYNAMIC_METADATA(com.test:test_key):8%'
+    test_key2: '%DYNAMIC_METADATA(com.test:test_key):5%%DYNAMIC_METADATA(com.test:test_key):8%'
     test_obj: '%DYNAMIC_METADATA(com.test:test_obj)%'
     test_obj.inner_key: '%DYNAMIC_METADATA(com.test:test_obj:inner_key)%'
   )EOF",

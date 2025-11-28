@@ -593,7 +593,7 @@ ClusterFactory::createClusterWithConfig(
       context.serverFactoryContext().singletonManager());
   cluster_store_factory.get()->save(new_cluster->info()->name(), new_cluster);
 
-  auto& options = new_cluster->info()->upstreamHttpProtocolOptions();
+  const auto& options = new_cluster->info()->httpProtocolOptions().upstreamHttpProtocolOptions();
 
   if (!proto_config.allow_insecure_cluster_options()) {
     if (!options.has_value() ||

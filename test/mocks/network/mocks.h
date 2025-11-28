@@ -448,10 +448,12 @@ public:
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(StreamInfo::FilterState&, filterState, (), ());
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), ());
   MOCK_METHOD(void, useOriginalDst, (bool));
 
   StreamInfo::FilterStateImpl filter_state_;
   NiceMock<MockConnectionSocket> socket_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 class MockListenSocketFactory : public ListenSocketFactory {

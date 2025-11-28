@@ -1,9 +1,14 @@
 #include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
 
+#include "source/common/grpc/common.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
 
 namespace Envoy {
@@ -11,11 +16,56 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 
-FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
+absl::StatusOr<absl::string_view>
+FieldChecker::resolveEnumName(absl::string_view value_str, const Protobuf::Field* field) const {
+  int enum_number;
+  if (!absl::SimpleAtoi(value_str, &enum_number)) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Enum value '", value_str, "' is not a valid integer."));
+  }
+
+  // Extract Type Name from URL "type.googleapis.com/package.Name"
+  absl::string_view type_name = Envoy::TypeUtil::typeUrlToDescriptorFullName(field->type_url());
+
+  // Return the corresponding enum name.
+  return filter_config_ptr_->getEnumName(type_name, enum_number);
+}
+
+std::string FieldChecker::constructFieldMask(const std::vector<std::string>& path,
+                                             const Protobuf::Field* field) const {
+  if (path.empty()) {
+    return "";
+  }
+
+  // Translate the last segment of the `path` wherever required.
+  absl::string_view last_segment = path.back();
+  switch (field->kind()) {
+  case Protobuf::Field::TYPE_ENUM: {
+    if (auto name_or_status = resolveEnumName(last_segment, field);
+        name_or_status.ok() && !name_or_status.value().empty()) {
+      last_segment = name_or_status.value();
+    } else {
+      ENVOY_LOG(warn, "Enum translation skipped for value '{}': {}", last_segment,
+                name_or_status.status().ToString());
+    }
+  } break;
+
+  default:
+    break;
+  }
+
+  // If path has only 1 segment, just return it (translated or original).
+  if (path.size() == 1) {
+    return std::string(last_segment);
+  }
+
+  // Join all segments except the last one, then append the (potentially translated) last segment.
+  return absl::StrCat(absl::StrJoin(path.begin(), path.end() - 1, "."), ".", last_segment);
+}
+
+FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
                                            const Protobuf::Field* field) const {
-  // Currently, this method only checks the top level request/response fields and hence, the field
-  // name itself represents the field_mask.
-  const std::string field_mask = field->name();
+  const std::string field_mask = constructFieldMask(path, field);
 
   MatchTreeHttpMatchingDataSharedPtr match_tree;
 
@@ -38,13 +88,28 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
     return FieldCheckResults::kInclude;
   }
 
-  // Preserve the field (i.e., kInclude) if there is no match tree configured for it.
-  if (match_tree == nullptr) {
-    return FieldCheckResults::kInclude;
+  // If there's a match tree configured for the field, evaluate the match, convert the match result
+  // to FieldCheckResults and return it.
+  if (match_tree != nullptr) {
+    absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(match_tree);
+    return matchResultStatusToFieldCheckResult(match_result, field_mask);
   }
 
-  absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(match_tree);
+  // If there's no match tree configured for the field, check the field type to see if it needs to
+  // traversed further. All non-primitive field types e.g., message, enums, maps, etc., if not
+  // excluded above via match tree need to be traversed further. Returning `kPartial` makes sure
+  // that the `proto_scrubber` library traverses the child fields of this field. Currently, only
+  // message type is supported by FieldChecker. Support for other non-primitive types will be added
+  // in the future.
+  if (field->kind() == Protobuf::Field_Kind_TYPE_MESSAGE) {
+    return FieldCheckResults::kPartial;
+  }
 
+  return FieldCheckResults::kInclude;
+}
+
+FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
+    absl::StatusOr<Matcher::MatchResult>& match_result, absl::string_view field_mask) const {
   // Preserve the field (i.e., kInclude) if there's any error in evaluating the match.
   // This can happen in two cases:
   // 1. The match tree is corrupt.
@@ -69,12 +134,15 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>&,
 
   // Remove the field (i.e., kExclude) if there's a match and the matched action is
   // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`.
-  if (match_result->action()->typeUrl() ==
-      "envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction") {
+  if (match_result->action() != nullptr &&
+      match_result->action()->typeUrl() ==
+          "envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction") {
     return FieldCheckResults::kExclude;
+  } else {
+    // Preserve the field (i.e., kInclude) if there's a match and the matched action is not
+    // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`.
+    return FieldCheckResults::kInclude;
   }
-
-  return FieldCheckResults::kInclude;
 }
 
 absl::StatusOr<Matcher::MatchResult>

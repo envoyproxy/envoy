@@ -43,7 +43,9 @@ envoy_sh_test(
     name = "pie_test",
     srcs = ["pie_test.sh"],
     coverage = False,
-    data = ["//source/exe:envoy-static"],
+    data = [
+        "//source/exe:envoy-static",
+    ],
     # Since VS2015 or even earlier, link.exe defaults to PIE generation
     tags = [
         "nofips",
@@ -155,6 +157,12 @@ envoy_cc_test(
         "fips_check.sh",
         "//source/extensions:extensions_metadata.yaml",
     ],
+    env = select({
+        "//bazel:clang_build": {
+            "OBJDUMP": "${LLVM_DIRECTORY}/bin/llvm-objdump",
+        },
+        "//conditions:default": {},
+    }),
     rbe_pool = "6gig",
     deps = [
         "//source/common/version:version_lib",
