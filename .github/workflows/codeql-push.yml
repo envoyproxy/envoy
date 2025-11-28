@@ -59,6 +59,9 @@ jobs:
         ls -alh /home/runner/.cache/bazel
         ls -alh /mnt/runner-home
 
+        whoami
+        touch /home/runner/.cache/bazel/TEST
+
         exit 1
 
     - name: Checkout repository
