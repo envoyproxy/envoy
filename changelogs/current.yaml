@@ -174,6 +174,10 @@ bug_fixes:
 - area: dns_resolver
   change: |
     Removes unnecessary getifaddrs() system calls when ``filter_unroutable_families`` is disabled.
+- area: oauth2
+  change: |
+    Fixed a bug in the OAuth2 filter that caused multiple concurrent login flows to interfere with each other. This could
+    lead to incorrect behavior when multiple requests initiated seperate OAuth2 logins at the same time.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
