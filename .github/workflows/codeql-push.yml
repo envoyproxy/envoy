@@ -110,18 +110,21 @@ jobs:
     - name: Build
       if: ${{ env.BUILD_TARGETS != '' }}
       run: |
-       bazel/setup_clang.sh "$(realpath bin/clang18.1.8)"
-       bazel shutdown
-       bazel build \
-           -c fastbuild \
-           --spawn_strategy=local \
-           --discard_analysis_cache \
-           --nouse_action_cache \
-           --features="-layering_check" \
-           --config=clang \
-           --config=ci \
-           $BUILD_TARGETS
-       echo -e "Built targets...\n$BUILD_TARGETS"
+        pwd
+        ls -alh bazel/setup_clang.sh
+
+        bazel/setup_clang.sh "$(realpath bin/clang18.1.8)"
+        bazel shutdown
+        bazel build \
+            -c fastbuild \
+            --spawn_strategy=local \
+            --discard_analysis_cache \
+            --nouse_action_cache \
+            --features="-layering_check" \
+            --config=clang \
+            --config=ci \
+            $BUILD_TARGETS
+        echo -e "Built targets...\n$BUILD_TARGETS"
 
     - name: Clean Artifacts
       if: ${{ env.BUILD_TARGETS != '' }}
