@@ -41,8 +41,8 @@ jobs:
           - src: /mnt/workspace
             target: GITHUB_WORKSPACE
             chown: "runner:runner"
-          - src: /mnt/runner-home
-            target: /home/runner/.cache/bazel
+          - src: /mnt/runner-cache
+            target: /home/runner/.cache
             chown: "runner:runner"
     - name: Free disk space
       if: |
@@ -53,16 +53,6 @@ jobs:
         to_remove: |
           /usr/local/.ghcup
           /usr/local/lib/android
-
-    - run: |
-        mount
-        ls -alh /home/runner/.cache/bazel
-        ls -alh /mnt/runner-home
-
-        whoami
-        touch /home/runner/.cache/bazel/TEST
-
-        exit 1
 
     - name: Checkout repository
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
