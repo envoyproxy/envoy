@@ -1370,17 +1370,29 @@ void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
 // Validates the OAuth callback request.
 // * Does the query parameters contain an error response?
 // * Does the query parameters contain the code and state?
-// * Does the state contain the original request URL and the CSRF token?
-// * Does the CSRF token in the state match the one in the cookie?
+// * Does the state parameter contain the original request URL, CSRF token, and flow id?
 CallbackValidationResult
 OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                     const absl::string_view path_str) const {
   // Return 401 unauthorized if the query parameters contain an error response.
   const auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(path_str);
   if (query_parameters.getFirstValue(queryParamsError).has_value()) {
-    return {false, "",
-            "",    "",
-            "",    fmt::format("OAuth server returned an error: {}", query_parameters.toString())};
+    // Attempt to extract the flow_id from the state parameter so that we can delete the
+    // corresponding flow cookies when sending the unauthorized response.
+    //
+    // According to OAuth 2.0 spec, the state parameter must be present in an error response if it
+    // was sent in the authorization request.
+    // Reference: https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1
+    std::string flow_id;
+    auto stateVal = query_parameters.getFirstValue(queryParamsState);
+    if (stateVal.has_value()) {
+      CallbackValidationResult result = validateState(headers, stateVal.value());
+      flow_id = result.flow_id_;
+    }
+    return {
+        false,   "",
+        "",      "",
+        flow_id, fmt::format("OAuth server returned an error: {}", query_parameters.toString())};
   }
 
   // Return 401 unauthorized if the query parameters do not contain the code and state.
@@ -1399,7 +1411,18 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   // Return 401 unauthorized if the state query parameter does not contain the original request URL
   // or the CSRF token.
   // Decode the state parameter to get the original request URL and the CSRF token.
-  const std::string state = Base64Url::decode(stateVal.value());
+  CallbackValidationResult result = validateState(headers, stateVal.value());
+  result.auth_code_ = codeVal.value();
+  return result;
+}
+
+// Validates the state parameter in the OAuth callback request.
+CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMap& headers,
+                                                     const absl::string_view state_str) const {
+  // Return 401 unauthorized if the state query parameter does not contain the original request URL
+  // or the CSRF token.
+  // Decode the state parameter to get the original request URL and the CSRF token.
+  const std::string state = Base64Url::decode(state_str);
   bool has_unknown_field;
   Protobuf::Struct message;
 
@@ -1433,19 +1456,21 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
     return {false, "", "", "", "", fmt::format("Flow id in state is empty: {}", state)};
   }
 
+  // We can't trust the flow_id from the state parameter without validating the CSRF token first.
   if (!validateCsrfToken(headers, csrf_token, flow_id)) {
-    return {false, "", "", csrf_token, flow_id, "CSRF token validation failed"};
+    return {false, "", "", "", "", "CSRF token validation failed"};
   }
-  const std::string original_request_url = filed_value_pair.at(stateParamsUrl).string_value();
 
   // Return 401 unauthorized if the URL in the state is not valid.
+  const std::string original_request_url = filed_value_pair.at(stateParamsUrl).string_value();
   Http::Utility::Url url;
   if (!url.initialize(original_request_url, false)) {
-    return {false, "", "",
-            "",    "", fmt::format("State url can not be initialized: {}", original_request_url)};
+    return {false,   "",
+            "",      "",
+            flow_id, fmt::format("State url can not be initialized: {}", original_request_url)};
   }
 
-  return {true, codeVal.value(), original_request_url, csrf_token, flow_id, ""};
+  return {true, "", original_request_url, csrf_token, flow_id, ""};
 }
 
 // Validates the csrf_token in the state parameter against the one in the cookie.

@@ -1278,7 +1278,10 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
  */
 TEST_F(OAuth2Test, OAuthErrorQueryString) {
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/_oauth?error=someerrorcode"},
+      {Http::Headers::get().Path.get(), "/_oauth?error=someerrorcode&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
   };
@@ -1287,6 +1290,10 @@ TEST_F(OAuth2Test, OAuthErrorQueryString) {
       {Http::Headers::get().Status.get(), "401"},
       {Http::Headers::get().ContentLength.get(), "18"}, // unauthorizedBodyMessage()
       {Http::Headers::get().ContentType.get(), "text/plain"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
   };
 
   EXPECT_CALL(*validator_, setParams(_, _));
@@ -1333,7 +1340,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
 
 /**
  * Scenario: The OAuth filter receives a callback request from the OAuth server that has
- * an invalid url.
+ * an invalid CodeVerifier cookie.
  *
  * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
  */

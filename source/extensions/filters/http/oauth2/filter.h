@@ -389,6 +389,8 @@ private:
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                  const absl::string_view path_str) const;
+  CallbackValidationResult validateState(const Http::RequestHeaderMap& headers,
+                                         const absl::string_view state) const;
   bool validateCsrfToken(const Http::RequestHeaderMap& headers, const std::string& csrf_token,
                          absl::string_view flow_id) const;
   void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
