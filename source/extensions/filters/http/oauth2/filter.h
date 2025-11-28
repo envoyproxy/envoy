@@ -302,7 +302,6 @@ struct CallbackValidationResult {
   bool is_valid_;
   std::string auth_code_;
   std::string original_request_url_;
-  std::string csrf_token_;
   std::string flow_id_;
   std::string error_details_;
 };

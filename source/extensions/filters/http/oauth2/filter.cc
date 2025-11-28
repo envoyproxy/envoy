@@ -1391,10 +1391,8 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
       CallbackValidationResult result = validateState(headers, stateVal.value());
       flow_id = result.flow_id_;
     }
-    return {
-        false,   "",
-        "",      "",
-        flow_id, fmt::format("OAuth server returned an error: {}", query_parameters.toString())};
+    return {false, "", "", flow_id,
+            fmt::format("OAuth server returned an error: {}", query_parameters.toString())};
   }
 
   // Return 401 unauthorized if the query parameters do not contain the code and state.
@@ -1402,11 +1400,7 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   auto stateVal = query_parameters.getFirstValue(queryParamsState);
   if (!codeVal.has_value() || !stateVal.has_value()) {
     return {
-        false,
-        "",
-        "",
-        "",
-        "",
+        false, "", "", "",
         fmt::format("Code or state query param does not exist: {}", query_parameters.toString())};
   }
 
@@ -1430,7 +1424,7 @@ CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMa
 
   auto status = MessageUtil::loadFromJsonNoThrow(state, message, has_unknown_field);
   if (!status.ok()) {
-    return {false, "", "", "", "", fmt::format("State query param is not a valid JSON: {}", state)};
+    return {false, "", "", "", fmt::format("State query param is not a valid JSON: {}", state)};
   }
 
   const auto& filed_value_pair = message.fields();
@@ -1438,11 +1432,7 @@ CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMa
       !filed_value_pair.contains(stateParamsCsrfToken) ||
       !filed_value_pair.contains(stateParamsFlowId)) {
     return {
-        false,
-        "",
-        "",
-        "",
-        "",
+        false, "", "", "",
         fmt::format("State query param does not contain url, CSRF token, or flow id: {}", state)};
   }
 
@@ -1455,24 +1445,23 @@ CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMa
   std::string csrf_token = filed_value_pair.at(stateParamsCsrfToken).string_value();
   std::string flow_id = filed_value_pair.at(stateParamsFlowId).string_value();
   if (flow_id.empty()) {
-    return {false, "", "", "", "", fmt::format("Flow id in state is empty: {}", state)};
+    return {false, "", "", "", fmt::format("Flow id in state is empty: {}", state)};
   }
 
   // We can't trust the flow_id from the state parameter without validating the CSRF token first.
   if (!validateCsrfToken(headers, csrf_token, flow_id)) {
-    return {false, "", "", "", "", "CSRF token validation failed"};
+    return {false, "", "", "", "CSRF token validation failed"};
   }
 
   // Return 401 unauthorized if the URL in the state is not valid.
   const std::string original_request_url = filed_value_pair.at(stateParamsUrl).string_value();
   Http::Utility::Url url;
   if (!url.initialize(original_request_url, false)) {
-    return {false,   "",
-            "",      "",
-            flow_id, fmt::format("State url can not be initialized: {}", original_request_url)};
+    return {false, "", "", flow_id,
+            fmt::format("State url can not be initialized: {}", original_request_url)};
   }
 
-  return {true, "", original_request_url, csrf_token, flow_id, ""};
+  return {true, "", original_request_url, flow_id, ""};
 }
 
 // Validates the csrf_token in the state parameter against the one in the cookie.
