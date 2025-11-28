@@ -85,6 +85,7 @@ private:
   std::unique_ptr<OAuth2Client> oauth2_client_;
   std::string client_id_;
   const std::string oauth_scopes_;
+  const std::map<std::string, std::string> endpoint_params_;
   Event::Dispatcher* dispatcher_;
   Event::TimerPtr timer_;
   TokenProviderStats stats_;

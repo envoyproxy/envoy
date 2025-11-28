@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -31,9 +32,10 @@ public:
     NotDispatchedAlreadyInFlight,
     DispatchedRequest,
   };
-  virtual GetTokenResult asyncGetAccessToken(const std::string& client_id,
-                                             const std::string& secret,
-                                             const std::string& scopes) PURE;
+  virtual GetTokenResult
+  asyncGetAccessToken(const std::string& client_id, const std::string& secret,
+                      const std::string& scopes,
+                      const std::map<std::string, std::string>& endpoint_params) PURE;
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
 
   // Http::AsyncClient::Callbacks
@@ -58,8 +60,10 @@ public:
   /**
    * Request the access token from the OAuth server. Calls the `onSuccess` on `onFailure` callbacks.
    */
-  GetTokenResult asyncGetAccessToken(const std::string& client_id, const std::string& secret,
-                                     const std::string& scopes) override;
+  GetTokenResult
+  asyncGetAccessToken(const std::string& client_id, const std::string& secret,
+                      const std::string& scopes,
+                      const std::map<std::string, std::string>& endpoint_params) override;
 
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
 
@@ -89,6 +93,7 @@ private:
     request->headers().setReferenceMethod(Envoy::Http::Headers::get().MethodValues.Post);
     request->headers().setReferenceContentType(
         Envoy::Http::Headers::get().ContentTypeValues.FormUrlEncoded);
+    request->headers().setReferenceUserAgent(Envoy::Http::Headers::get().UserAgentValues.GoBrowser);
     // Use the Accept header to ensure the Access Token Response is returned as JSON.
     // Some authorization servers return other encodings (e.g. FormUrlEncoded) in the absence of the
     // Accept header. RFC 6749 Section 5.1 defines the media type to be JSON, so this is safe.

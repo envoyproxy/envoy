@@ -47,6 +47,37 @@ TEST(Config, NullClientSecret) {
                           EnvoyException, "Invalid oauth2 client secret configuration");
 }
 
+TEST(Config, ValidConfigWithEndpointParams) {
+  const std::string yaml_string = R"EOF(
+      token_fetch_retry_interval: 1s
+      token_endpoint:
+        cluster: non-existing-cluster
+        timeout: 0.5s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: "client-id"
+        client_secret:
+          name: test-client-secret
+      scopes:
+        - "api://default/scope"
+      endpoint_params:
+        - name: test-param
+          value: test-value
+        - name: another-param
+          value: another-value
+  )EOF";
+
+  envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2 proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  // Verify that endpoint_params are properly parsed
+  EXPECT_EQ(proto_config.endpoint_params_size(), 2);
+  EXPECT_EQ(proto_config.endpoint_params(0).name(), "test-param");
+  EXPECT_EQ(proto_config.endpoint_params(0).value(), "test-value");
+  EXPECT_EQ(proto_config.endpoint_params(1).name(), "another-param");
+  EXPECT_EQ(proto_config.endpoint_params(1).value(), "another-value");
+}
+
 } // namespace OAuth2
 } // namespace InjectedCredentials
 } // namespace Http

@@ -29,9 +29,10 @@ constexpr const char* GetAccessTokenBodyFormatStringWithScopes =
 
 } // namespace
 
-OAuth2Client::GetTokenResult OAuth2ClientImpl::asyncGetAccessToken(const std::string& client_id,
-                                                                   const std::string& secret,
-                                                                   const std::string& scopes) {
+OAuth2Client::GetTokenResult
+OAuth2ClientImpl::asyncGetAccessToken(const std::string& client_id, const std::string& secret,
+                                      const std::string& scopes,
+                                      const std::map<std::string, std::string>& endpoint_params) {
   if (in_flight_request_ != nullptr) {
     return GetTokenResult::NotDispatchedAlreadyInFlight;
   }
@@ -47,6 +48,13 @@ OAuth2Client::GetTokenResult OAuth2ClientImpl::asyncGetAccessToken(const std::st
     body = fmt::format(GetAccessTokenBodyFormatStringWithScopes, encoded_client_id, encoded_secret,
                        encoded_scopes);
   }
+
+  for (const auto& [param_name, param_value] : endpoint_params) {
+    const auto encoded_name = Envoy::Http::Utility::PercentEncoding::encode(param_name, ":/=&?");
+    const auto encoded_value = Envoy::Http::Utility::PercentEncoding::encode(param_value, ":/=&?");
+    body += fmt::format("&{}={}", encoded_name, encoded_value);
+  }
+
   request->body().add(body);
   request->headers().setContentLength(body.length());
   return dispatchRequest(std::move(request));
