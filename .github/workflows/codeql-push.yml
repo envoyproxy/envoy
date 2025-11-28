@@ -33,6 +33,27 @@ jobs:
     runs-on: ubuntu-22.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
+    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.31
+      if: |
+        ! github.event.repository.private
+      with:
+        mounts: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/runner-home
+            target: /home/runner/.cache/bazel
+            chown: "runner:runner"
+    - name: Free disk space
+      if: |
+        env.BUILD_TARGETS != ''
+        && github.event.repository.private
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.31
+      with:
+        to_remove: |
+          /usr/local/.ghcup
+          /usr/local/lib/android
+
     - name: Checkout repository
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
       with:
@@ -62,27 +83,6 @@ jobs:
       env:
         GIT_EVENT: ${{ github.event_name }}
 
-    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.31
-      if: |
-        ! github.event.repository.private
-      with:
-        mounts: |
-          - src: /mnt/workspace
-            target: GITHUB_WORKSPACE
-            chown: "runner:runner"
-          - src: /mnt/runner-home
-            target: /home/runner/.cache/bazel
-            chown: "runner:runner"
-    - name: Free disk space
-      if: |
-        env.BUILD_TARGETS != ''
-        && github.event.repository.private
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.31
-      with:
-        to_remove: |
-          /usr/local/.ghcup
-          /usr/local/lib/android
-
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
       uses: github/codeql-action/init@e12f0178983d466f2f6028f5cc7a6d786fd97f4b  # codeql-bundle-v4.31.4
@@ -110,9 +110,6 @@ jobs:
     - name: Build
       if: ${{ env.BUILD_TARGETS != '' }}
       run: |
-        pwd
-        ls -alh bazel/setup_clang.sh
-
         bazel/setup_clang.sh "$(realpath bin/clang18.1.8)"
         bazel shutdown
         bazel build \
