@@ -109,7 +109,7 @@ public class CronetHttp3Test {
       logger = new CronvoyLogger() {
         @Override
         public void log(int logLevel, String message) {
-          System.err.print(message);
+          System.out.print(message);
         }
       };
     }
