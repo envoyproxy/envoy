@@ -118,7 +118,7 @@ jobs:
             --discard_analysis_cache \
             --nouse_action_cache \
             --features="-layering_check" \
-            --config=clang \
+            --config=clang-local \
             --config=ci \
             $BUILD_TARGETS
         echo -e "Built targets...\n$BUILD_TARGETS"
