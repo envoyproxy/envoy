@@ -10,7 +10,6 @@ on:
       app-key:
       dockerhub-password:
       gcp-key:
-      gcs-cache-key:
       gpg-key:
       gpg-key-password:
       rbe-key:
@@ -21,6 +20,9 @@ on:
         type: string
       arch:
         type: string
+      bazel-cache:
+        type: boolean
+        default: false
       bazel-extra:
         type: string
       bazel-rbe-jobs:
@@ -89,8 +91,6 @@ on:
           error:
           Error:
       fail-match:
-        type: string
-      gcs-cache-bucket:
         type: string
       import-gpg:
         type: boolean
@@ -196,6 +196,7 @@ env:
 jobs:
   ci:
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ ! inputs.skip }}
@@ -267,20 +268,20 @@ jobs:
       if: ${{ inputs.docker-ipv6 }}
 
     # Caches
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.33
-      name: Setup GCP (cache)
-      if: ${{ inputs.gcs-cache-bucket }}
-      with:
-        key: ${{ secrets.gcs-cache-key }}
-        force-install: ${{ contains(fromJSON('["envoy-arm64-medium", "github-arm64-2c-8gb"]'), inputs.runs-on) }}
     - uses: envoyproxy/toolshed/gh-actions/cache/restore@actions-v0.3.33
-      if: ${{ inputs.gcs-cache-bucket }}
+      if: >-
+        inputs.bazel-cache
       name: >-
         Restore Bazel cache
-        (${{ fromJSON(inputs.request).config.ci.cache.bazel }})
+        (${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }})
       with:
-        gcs-bucket: ${{ inputs.gcs-cache-bucket }}
-        key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch || 'x64' }}
+        artifact-id: >-
+          ${{ inputs.arch == 'arm64'
+              && fromJSON(inputs.request).config.ci.cache.bazel.arm64
+              || fromJSON(inputs.request).config.ci.cache.bazel.x64 }}
+        artifact-name: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch || 'x64' }}
+        artifact-wf-path: .github/workflows/request.yml
+        key: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch || 'x64' }}
         path: ${{ runner.temp }}/container/bazel_root
 
     # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
