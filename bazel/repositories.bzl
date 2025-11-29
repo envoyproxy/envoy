@@ -388,7 +388,7 @@ def _numactl():
         build_file = "@envoy//bazel/external:numactl.BUILD",
     )
 
-def _com_github_huawei_uadk():
+def _uadk():
     external_http_archive(
         name = "uadk",
         patches = ["@envoy//bazel/foreign_cc:uadk.patch"],

@@ -16,18 +16,24 @@ envoy_contrib_package()
 configure_make(
     name = "uadklib",
     autogen = True,
-    configure_command = "conf.sh",
     configure_in_place = True,
     configure_options = [
         "--enable-static",
+        "--disable-shared",
+        "--host aarch64-linux-gnu ",
+        "--target aarch64-linux-gnu",
     ],
+    env = select({
+        "//bazel:clang_build": {
+            "CFLAGS": "-Wno-unused-command-line-argument -Wno-incompatible-pointer-types",
+        },
+        "//conditions:default": {},
+    }),
     lib_source = "@uadk//:all",
     out_static_libs = [
         "libwd.a",
     ],
     target_compatible_with = envoy_contrib_linux_aarch64_constraints(),
     visibility = ["//visibility:public"],
-    # Use boringssl alias to select fips vs non-fips version.
-    deps = ["//bazel:boringssl"],
     alwayslink = True,
 )
