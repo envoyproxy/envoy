@@ -286,6 +286,14 @@ new_features:
     Added new :ref:`value <envoy_v3_api_field_type.tracing.v3.CustomTag.value>` field and
     the :ref:`substitution format specifier <config_access_log_format>` could be used to
     extract values from various parts of the request/response for custom tags.
+- area: tracing
+  change: |
+    Added new :ref:`tracing operation
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.operation>`
+    and :ref:`upstream tracing operation
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.upstream_operation>`
+    fields in the tracing configuration to set custom operation names for spans with the
+    substitution format specifier.
 - area: generic_proxy
   change: |
     Added custom substitution format specifiers support in the tracing custom tags of the

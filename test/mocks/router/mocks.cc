@@ -149,6 +149,19 @@ MockRouteTracing::MockRouteTracing() {
   ON_CALL(*this, getClientSampling()).WillByDefault(ReturnRef(client_sampling_));
   ON_CALL(*this, getRandomSampling()).WillByDefault(ReturnRef(random_sampling_));
   ON_CALL(*this, getOverallSampling()).WillByDefault(ReturnRef(overall_sampling_));
+  ON_CALL(*this, operation()).WillByDefault(Invoke([this]() {
+    if (operation_ != nullptr) {
+      return makeOptRef<const Formatter::Formatter>(*operation_);
+    }
+    return OptRef<const Formatter::Formatter>();
+  }));
+
+  ON_CALL(*this, upstreamOperation()).WillByDefault(Invoke([this]() {
+    if (upstream_operation_ != nullptr) {
+      return makeOptRef<const Formatter::Formatter>(*upstream_operation_);
+    }
+    return OptRef<const Formatter::Formatter>();
+  }));
 }
 MockRouteTracing::~MockRouteTracing() = default;
 
