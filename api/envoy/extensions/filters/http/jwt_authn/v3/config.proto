@@ -598,10 +598,13 @@ message JwtRequirement {
     // configured (via claim_to_headers, forward_payload_header, etc.) but
     // will NOT verify the JWT signature against JWKS.
     //
-    // WARNING: This mode does not verify JWT authenticity. Use only in scenarios where:
-    // - JWTs come from a trusted source (e.g., internal service mesh)
-    // - Signature verification is performed elsewhere in the request path
-    // - You are in a testing period and the token issuer doesn't support JWKS yet
+    // .. warning::
+    //
+    //    This mode does not verify JWT authenticity. Use only in scenarios where:
+    //
+    //    - JWTs come from a trusted source (e.g., internal service mesh)
+    //    - Signature verification is performed elsewhere in the request path
+    //    - You are in a testing period and the token issuer doesn't support JWKS yet
     //
     // This mode will:
     // - Decode the JWT header and payload
