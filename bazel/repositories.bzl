@@ -158,6 +158,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _numactl()
+    _uadk()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
