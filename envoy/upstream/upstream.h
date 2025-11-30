@@ -877,6 +877,74 @@ public:
 using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOptionsConfig>;
 
 /**
+ * Interface describing HTTP protocol options exposed by a cluster.
+ */
+class HttpProtocolOptionsConfig : public ProtocolOptionsConfig {
+public:
+  ~HttpProtocolOptionsConfig() override = default;
+
+  /**
+   * @return const Http::Http1Settings& the HTTP/1.1 settings for upstream connections.
+   */
+  virtual const Http::Http1Settings& http1Settings() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Http2ProtocolOptions& the HTTP/2 protocol options for
+   *         upstream connections.
+   */
+  virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Http3ProtocolOptions& the HTTP/3 protocol options for
+   *         upstream connections.
+   */
+  virtual const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::HttpProtocolOptions& the common HTTP protocol options
+   *         that apply to all HTTP versions for upstream connections.
+   */
+  virtual const envoy::config::core::v3::HttpProtocolOptions&
+  commonHttpProtocolOptions() const PURE;
+
+  /**
+   * @return const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>& the
+   *         optional upstream-specific HTTP protocol options. Returns absl::nullopt if not
+   *         configured.
+   */
+  virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
+  upstreamHttpProtocolOptions() const PURE;
+
+  /**
+   * @return const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+   *         the optional alternate protocols cache options for upstream connections. Returns
+   *         absl::nullopt if not configured.
+   */
+  virtual const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  alternateProtocolsCacheOptions() const PURE;
+
+  /**
+   * @return const std::vector<Router::ShadowPolicyPtr>& the shadow policies configured for this
+   *         cluster. The vector is empty if no shadowing takes place.
+   */
+  virtual const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const PURE;
+
+  /**
+   * @return const Router::RetryPolicy* the retry policy configured for this cluster. Returns
+   *         nullptr if no cluster-level retry policy is configured.
+   */
+  virtual const Router::RetryPolicy* retryPolicy() const PURE;
+
+  /**
+   * @return const Http::HashPolicy* the optional hash policy for load balancing. Returns nullptr
+   *         if no hash policy is configured.
+   */
+  virtual const Http::HashPolicy* hashPolicy() const PURE;
+};
+
+using HttpProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const HttpProtocolOptionsConfig>;
+
+/**
  *  Base class for all cluster typed metadata factory.
  */
 class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
@@ -962,29 +1030,9 @@ public:
   virtual uint64_t features() const PURE;
 
   /**
-   * @return const Http::Http1Settings& for HTTP/1.1 connections created on behalf of this cluster.
-   *         @see Http::Http1Settings.
+   * @return const HttpProtocolOptionsConfig& HTTP protocol options for this cluster.
    */
-  virtual const Http::Http1Settings& http1Settings() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Http2ProtocolOptions& for HTTP/2 connections
-   * created on behalf of this cluster.
-   *         @see envoy::config::core::v3::Http2ProtocolOptions.
-   */
-  virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Http3ProtocolOptions& for HTTP/3 connections
-   * created on behalf of this cluster. @see envoy::config::core::v3::Http3ProtocolOptions.
-   */
-  virtual const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::HttpProtocolOptions for all of HTTP versions.
-   */
-  virtual const envoy::config::core::v3::HttpProtocolOptions&
-  commonHttpProtocolOptions() const PURE;
+  virtual const HttpProtocolOptionsConfig& httpProtocolOptions() const PURE;
 
   /**
    * @param name std::string containing the well-known name of the extension for which protocol
@@ -1195,18 +1243,6 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
   /**
-   * @return http protocol options for upstream connection
-   */
-  virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
-  upstreamHttpProtocolOptions() const PURE;
-
-  /**
-   * @return alternate protocols cache options for upstream connections.
-   */
-  virtual const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
-  alternateProtocolsCacheOptions() const PURE;
-
-  /**
    * @return the Http1 Codec Stats.
    */
   virtual Http::Http1::CodecStats& http1CodecStats() const PURE;
@@ -1238,24 +1274,6 @@ public:
    * @return Reference to the optional config for LRS endpoint metric reporting.
    */
   virtual OptRef<const std::vector<std::string>> lrsReportMetricNames() const PURE;
-
-  /**
-   * @return const std::vector<Router::ShadowPolicyPtr>& the shadow policies configured for this
-   * cluster.
-   */
-  virtual const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const PURE;
-
-  /**
-   * @return const Router::RetryPolicy* the retry policy configured for this cluster. Returns
-   * nullptr if no cluster-level retry policy is configured.
-   */
-  virtual const Router::RetryPolicy* retryPolicy() const PURE;
-
-  /**
-   * @return const Http::HashPolicy* the hash policy configured for this cluster. Returns nullptr
-   * if no cluster-level hash policy is configured.
-   */
-  virtual const Http::HashPolicy* hashPolicy() const PURE;
 
 protected:
   /**

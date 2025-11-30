@@ -107,6 +107,17 @@ public:
   virtual MatchTreeHttpMatchingDataSharedPtr
   getMessageMatcher(const std::string& message_name) const;
 
+  /**
+   * Resolves the human-readable name of a specific enum value.
+   *
+   * @param enum_type_name The fully qualified name of the enum type (e.g., "package.Status").
+   * @param enum_value The integer value of the enum (e.g., 99).
+   * @return The string name of the enum value (e.g., "DEBUG_MODE").
+   * Returns empty string if the type or value is not found.
+   */
+  virtual absl::StatusOr<absl::string_view> getEnumName(absl::string_view enum_type_name,
+                                                        int enum_value) const;
+
   // Returns a constant reference to the type finder which resolves type URL string to the
   // corresponding `Protobuf::Type*`.
   const TypeFinder& getTypeFinder() const { return *type_finder_; };

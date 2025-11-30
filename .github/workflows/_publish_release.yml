@@ -58,7 +58,6 @@ jobs:
         --//distribution:x64-release=//distribution:custom/x64/bin/release.tar.zst
         --//distribution:arm64-release=//distribution:custom/arm64/bin/release.tar.zst
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      diskspace-hack-paths:
       downloads: |
         packages.arm64: container/envoy/arm64/
         packages.x64: container/envoy/x64/
@@ -145,12 +144,12 @@ jobs:
     needs:
     - release
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.30
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.31
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.30
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.31
       with:
         ref: main
         repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}

@@ -18,7 +18,8 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
     Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
     absl::optional<HttpServerPropertiesCache::Origin>& origin,
     Upstream::HostDescriptionConstSharedPtr host) {
-  uint32_t initial_streams = host->cluster().http2Options().max_concurrent_streams().value();
+  uint32_t initial_streams =
+      host->cluster().httpProtocolOptions().http2Options().max_concurrent_streams().value();
   if (http_server_properties_cache && origin.has_value()) {
     uint32_t cached_concurrency =
         http_server_properties_cache->getConcurrentStreams(origin.value());
@@ -41,7 +42,12 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
                            OptRef<Upstream::Host::CreateConnectionData> data)
     : MultiplexedActiveClientBase(
           parent, calculateInitialStreamsLimit(parent.cache(), parent.origin(), parent.host()),
-          parent.host()->cluster().http2Options().max_concurrent_streams().value(),
+          parent.host()
+              ->cluster()
+              .httpProtocolOptions()
+              .http2Options()
+              .max_concurrent_streams()
+              .value(),
           parent.host()->cluster().trafficStats()->upstream_cx_http2_total_, data) {}
 
 ConnectionPool::InstancePtr

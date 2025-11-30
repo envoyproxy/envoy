@@ -38,7 +38,6 @@ jobs:
       bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths }}
       docker-ci: ${{ matrix.docker-ci || false }}
       error-match: |
         ERROR
