@@ -270,8 +270,17 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
              StreamInfo::CoreResponseFlag::UpstreamConnectionTermination))) {
       stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
     } else {
-      if (stream.filter_manager_.streamInfo().hasResponseFlag(
-              StreamInfo::CoreResponseFlag::UpstreamProtocolError)) {
+      const bool reset_with_error =
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error");
+      // We should not propagate UpstreamProtocolError to downstream as that indicates
+      // an error on the upstream connection and may have nothing to do with the downstream.
+      // But we do need to handle DownstreamProtocolError which indicates a protocol error
+      // on the downstream connection.
+      if (!reset_with_error && stream.filter_manager_.streamInfo().hasResponseFlag(
+                                   StreamInfo::CoreResponseFlag::UpstreamProtocolError)) {
+        stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
+      } else if (reset_with_error && stream.filter_manager_.streamInfo().hasResponseFlag(
+                                         StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
       } else {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
@@ -1219,6 +1228,9 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
       }
 
+      filter_manager_.streamInfo().setResponseFlag(
+          StreamInfo::CoreResponseFlag::DownstreamProtocolError);
+
       // H/2 codec was resetting requests that were rejected due to headers with underscores,
       // instead of sending 400. Preserving this behavior for now.
       // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
@@ -1260,6 +1272,9 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
   if (Grpc::Common::hasGrpcContentType(*request_headers_)) {
     grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
   }
+
+  filter_manager_.streamInfo().setResponseFlag(
+      StreamInfo::CoreResponseFlag::DownstreamProtocolError);
 
   // H/2 codec was resetting requests that were rejected due to headers with underscores,
   // instead of sending 400. Preserving this behavior for now.

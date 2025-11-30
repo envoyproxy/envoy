@@ -3558,11 +3558,6 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClos
 }
 
 TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
-  std::vector<Http::StreamResetReason> reasons = {Http::StreamResetReason::ProtocolError,
-                                                  Http::StreamResetReason::LocalReset};
-  std::vector<Http::StreamResetReason> result_reasons = {Http::StreamResetReason::ProtocolError,
-                                                         Http::StreamResetReason::RemoteReset};
-
   // There are four streams created in total, client stream, Envoy server stream,
   // Envoy client stream and upstream server stream.
   // When we close a stream actively with a specific reset reason, we expect the peer
@@ -3575,9 +3570,9 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
   {
     size_t log_num = 0;
     if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-      log_num = 2;
+      log_num = 1;
     } else {
-      log_num = 4;
+      log_num = 2;
     }
 
     // The ProtocolError will be translated to OGHTTP2_PROTOCOL_ERROR (1).
@@ -3589,10 +3584,11 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
       ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
       // This will result in the router to send a local reply. And because the downstream request
-      // is not complete yet, it will finally result in resetting of the stream.
-      upstream_request_->encodeResetStream(reasons[0]);
+      // is not complete yet, it will finally result in resetting of the downstream stream.
+      upstream_request_->encodeResetStream(Http::StreamResetReason::ProtocolError);
       ASSERT_TRUE(response->waitForReset());
-      EXPECT_EQ(result_reasons[0], response->resetReason());
+      // The upstream protocol error will not be translated at downstream side.
+      EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
 
       cleanupUpstreamAndDownstream();
     });
@@ -3621,9 +3617,9 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
 
       // This will result in the router to send a local reply. And because the downstream request
       // is not complete yet, it will finally result in resetting of the stream.
-      upstream_request_->encodeResetStream(reasons[1]);
+      upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
       ASSERT_TRUE(response->waitForReset());
-      EXPECT_EQ(result_reasons[1], response->resetReason());
+      EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
 
       cleanupUpstreamAndDownstream();
     });
