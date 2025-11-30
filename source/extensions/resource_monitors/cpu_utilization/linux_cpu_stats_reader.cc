@@ -20,10 +20,7 @@ namespace CpuUtilizationMonitor {
 constexpr uint64_t NUMBER_OF_CPU_TIMES_TO_PARSE =
     4; // we are interested in user, nice, system and idle times.
 
-// ================================================================================
-// LinuxCpuStatsReader (Host-level CPU monitoring) - ORIGINAL IMPLEMENTATION
-// ================================================================================
-
+// LinuxCpuStatsReader (Host-level CPU monitoring)
 LinuxCpuStatsReader::LinuxCpuStatsReader(const std::string& cpu_stats_filename)
     : cpu_stats_filename_(cpu_stats_filename) {}
 
@@ -60,10 +57,7 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
   return {true, false, static_cast<double>(work_time), total_time, 0};
 }
 
-// ================================================================================
-// Factory Method for Container CPU Stats Reader
-// ================================================================================
-
+// Container CPU Stats Reader
 LinuxContainerCpuStatsReader::ContainerStatsReaderPtr
 LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_source) {
   // Check if host supports cgroup v2
@@ -78,10 +72,6 @@ LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_
 
   throw EnvoyException("No supported cgroup CPU implementation found");
 }
-
-// ================================================================================
-// CgroupV1CpuStatsReader Implementation
-// ================================================================================
 
 CgroupV1CpuStatsReader::CgroupV1CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)
     : LinuxContainerCpuStatsReader(fs, time_source), shares_path_(CpuPaths::V1::getSharesPath()),

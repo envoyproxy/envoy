@@ -30,7 +30,7 @@ private:
 };
 
 /**
- * Base class for container CPU stats readers which supports 
+ * Base class for container CPU stats readers which supports
  * both cgroup v1 and v2 implementations.
  */
 class LinuxContainerCpuStatsReader : public CpuStatsReader {
@@ -56,7 +56,6 @@ protected:
   TimeSource& time_source_;
 };
 
-
 class CgroupV1CpuStatsReader : public LinuxContainerCpuStatsReader,
                                private Logger::Loggable<Logger::Id::main> {
 public:
@@ -73,7 +72,6 @@ private:
   std::string shares_path_;
   std::string usage_path_;
 };
-
 
 class CgroupV2CpuStatsReader : public LinuxContainerCpuStatsReader,
                                private Logger::Loggable<Logger::Id::main> {
