@@ -21,6 +21,8 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/type/matcher/v3/matcher.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
@@ -796,6 +798,7 @@ message HttpConnectionManager {
   SetCurrentClientCertDetails set_current_client_cert_details = 17;
 
   // The matcher for forwarding client cert details.
+  // [#not-implemented-hide:]
   xds.type.matcher.v3.Matcher forward_client_cert_matcher = 60;
 
   // If proxy_100_continue is true, Envoy will proxy incoming "Expect:
