@@ -24,34 +24,24 @@ namespace {
 
 using MetadataProto = ::envoy::config::core::v3::Metadata;
 
-void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadata,
+void fillMetadataContext(const MetadataProto& source_metadata,
                          const std::vector<std::string>& metadata_context_namespaces,
                          const std::vector<std::string>& typed_metadata_context_namespaces,
                          MetadataProto& metadata_context) {
   for (const auto& context_key : metadata_context_namespaces) {
-    for (const MetadataProto* metadata : source_metadata) {
-      if (metadata == nullptr)
-        continue;
-      const auto& filter_metadata = metadata->filter_metadata();
-      if (const auto metadata_it = filter_metadata.find(context_key);
-          metadata_it != filter_metadata.end()) {
-        (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-        break;
-      }
+    const auto& filter_metadata = source_metadata.filter_metadata();
+    if (const auto metadata_it = filter_metadata.find(context_key);
+        metadata_it != filter_metadata.end()) {
+      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
 
   for (const auto& context_key : typed_metadata_context_namespaces) {
-    for (const MetadataProto* metadata : source_metadata) {
-      if (metadata == nullptr)
-        continue;
-      const auto& typed_filter_metadata = metadata->typed_filter_metadata();
-      if (const auto metadata_it = typed_filter_metadata.find(context_key);
-          metadata_it != typed_filter_metadata.end()) {
-        (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] =
-            metadata_it->second;
-        break;
-      }
+    const auto& typed_filter_metadata = source_metadata.typed_filter_metadata();
+    if (const auto metadata_it = typed_filter_metadata.find(context_key);
+        metadata_it != typed_filter_metadata.end()) {
+      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] =
+          metadata_it->second;
     }
   }
 }
@@ -68,7 +58,7 @@ void Filter::callCheck() {
   // If metadata_context_namespaces or typed_metadata_context_namespaces is specified,
   // pass matching filter metadata to the ext_authz service.
   envoy::config::core::v3::Metadata metadata_context;
-  fillMetadataContext({&filter_callbacks_->connection().streamInfo().dynamicMetadata()},
+  fillMetadataContext(filter_callbacks_->connection().streamInfo().dynamicMetadata(),
                       config_->metadataContextNamespaces(),
                       config_->typedMetadataContextNamespaces(), metadata_context);
 
