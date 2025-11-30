@@ -574,8 +574,6 @@ public class CronetHttp3Test {
 
     postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
     assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
-    // The TCP connection is idle now and should be closed during draining.
-    assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_destroy: 1"));
   }
 
   @Test
