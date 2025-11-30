@@ -85,6 +85,7 @@ envoy_cc_library(
         "//source/common/network:connection_socket_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:filter_lib",
+        "//source/common/tls:ssl_handshaker_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
     ],

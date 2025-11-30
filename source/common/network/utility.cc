@@ -535,7 +535,7 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
 Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
                                               const Address::Instance& local_address,
                                               UdpPacketProcessor& udp_packet_processor,
-                                              MonotonicTime receive_time, uint32_t* packets_dropped,
+                                              TimeSource& time_source, uint32_t* packets_dropped,
                                               uint32_t* num_packets_read) {
   ASSERT(Api::OsSysCallsSingleton::get().supportsUdpGro(),
          "cannot use GRO when the platform doesn't support it.");
@@ -562,6 +562,8 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
 
   const uint64_t gso_size = output.msg_[0].gso_size_;
   ENVOY_LOG_MISC(trace, "gro recvmsg bytes {} with gso_size as {}", result.return_value_, gso_size);
+
+  const MonotonicTime receive_time = time_source.monotonicTime();
 
   // Skip gso segmentation and proceed as a single payload.
   if (gso_size == 0u) {
@@ -593,10 +595,11 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
   return result;
 }
 
-Api::IoCallUint64Result
-readFromSocketRecvMmsg(IoHandle& handle, const Address::Instance& local_address,
-                       UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time,
-                       uint32_t* packets_dropped, uint32_t* num_packets_read) {
+Api::IoCallUint64Result readFromSocketRecvMmsg(IoHandle& handle,
+                                               const Address::Instance& local_address,
+                                               UdpPacketProcessor& udp_packet_processor,
+                                               TimeSource& time_source, uint32_t* packets_dropped,
+                                               uint32_t* num_packets_read) {
   ASSERT(Api::OsSysCallsSingleton::get().supportsMmsg(),
          "cannot use recvmmsg when the platform doesn't support it.");
   const auto max_rx_datagram_size = udp_packet_processor.maxDatagramSize();
@@ -635,6 +638,7 @@ readFromSocketRecvMmsg(IoHandle& handle, const Address::Instance& local_address,
 
   uint64_t packets_read = result.return_value_;
   ENVOY_LOG_MISC(trace, "recvmmsg read {} packets", packets_read);
+  const MonotonicTime receive_time = time_source.monotonicTime();
   for (uint64_t i = 0; i < packets_read; ++i) {
     if (output.msg_[i].truncated_and_dropped_) {
       continue;
@@ -661,7 +665,7 @@ readFromSocketRecvMmsg(IoHandle& handle, const Address::Instance& local_address,
 Api::IoCallUint64Result readFromSocketRecvMsg(IoHandle& handle,
                                               const Address::Instance& local_address,
                                               UdpPacketProcessor& udp_packet_processor,
-                                              MonotonicTime receive_time, uint32_t* packets_dropped,
+                                              TimeSource& time_source, uint32_t* packets_dropped,
                                               uint32_t* num_packets_read) {
   if (num_packets_read != nullptr) {
     *num_packets_read = 0;
@@ -683,10 +687,10 @@ Api::IoCallUint64Result readFromSocketRecvMsg(IoHandle& handle,
   if (num_packets_read != nullptr) {
     *num_packets_read = 1;
   }
-  passPayloadToProcessor(result.return_value_, std::move(buffer),
-                         std::move(output.msg_[0].peer_address_),
-                         std::move(output.msg_[0].local_address_), udp_packet_processor,
-                         receive_time, output.msg_[0].tos_, std::move(output.msg_[0].saved_cmsg_));
+  passPayloadToProcessor(
+      result.return_value_, std::move(buffer), std::move(output.msg_[0].peer_address_),
+      std::move(output.msg_[0].local_address_), udp_packet_processor, time_source.monotonicTime(),
+      output.msg_[0].tos_, std::move(output.msg_[0].saved_cmsg_));
   return result;
 }
 
@@ -694,17 +698,17 @@ Api::IoCallUint64Result readFromSocketRecvMsg(IoHandle& handle,
 
 Api::IoCallUint64Result
 Utility::readFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                        UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time,
+                        UdpPacketProcessor& udp_packet_processor, TimeSource& time_source,
                         UdpRecvMsgMethod recv_msg_method, uint32_t* packets_dropped,
                         uint32_t* num_packets_read) {
   if (recv_msg_method == UdpRecvMsgMethod::RecvMsgWithGro) {
-    return readFromSocketRecvGro(handle, local_address, udp_packet_processor, receive_time,
+    return readFromSocketRecvGro(handle, local_address, udp_packet_processor, time_source,
                                  packets_dropped, num_packets_read);
   } else if (recv_msg_method == UdpRecvMsgMethod::RecvMmsg) {
-    return readFromSocketRecvMmsg(handle, local_address, udp_packet_processor, receive_time,
+    return readFromSocketRecvMmsg(handle, local_address, udp_packet_processor, time_source,
                                   packets_dropped, num_packets_read);
   }
-  return readFromSocketRecvMsg(handle, local_address, udp_packet_processor, receive_time,
+  return readFromSocketRecvMsg(handle, local_address, udp_packet_processor, time_source,
                                packets_dropped, num_packets_read);
 }
 
@@ -730,9 +734,8 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     uint32_t num_packets_processed = 0;
-    const MonotonicTime receive_time = time_source.monotonicTime();
     Api::IoCallUint64Result result =
-        Utility::readFromSocket(handle, local_address, udp_packet_processor, receive_time,
+        Utility::readFromSocket(handle, local_address, udp_packet_processor, time_source,
                                 recv_msg_method, &packets_dropped, &num_packets_processed);
 
     if (!result.ok()) {

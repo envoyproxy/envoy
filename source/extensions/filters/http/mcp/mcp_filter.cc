@@ -10,6 +10,22 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
+namespace {
+McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+  const std::string final_prefix = absl::StrCat(prefix, "mcp.");
+  return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+}
+} // namespace
+
+McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
+                                 const std::string& stats_prefix, Stats::Scope& scope)
+    : traffic_mode_(proto_config.traffic_mode()),
+      clear_route_cache_(proto_config.clear_route_cache()),
+      max_request_body_size_(proto_config.has_max_request_body_size()
+                                 ? proto_config.max_request_body_size().value()
+                                 : 8192), // Default: 8KB
+      stats_(generateStats(stats_prefix, scope)) {}
+
 bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const {
   // Check if this is a GET request for SSE stream
   if (headers.getMethodValue() != Http::Headers::get().MethodValues.Get) {
@@ -97,12 +113,21 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
     } else {
       // Need to buffer the body to check for JSON-RPC 2.0
       is_mcp_request_ = true;
+
+      // Set the buffer limit - Envoy will automatically send 413 if exceeded
+      const uint32_t max_size = config_->maxRequestBodySize();
+      if (max_size > 0) {
+        decoder_callbacks_->setDecoderBufferLimit(max_size);
+        ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
+      }
+
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
 
   if (!is_mcp_request_ && shouldRejectRequest()) {
     ENVOY_LOG(debug, "rejecting non-MCP traffic");
+    config_->stats().requests_rejected_.inc();
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed",
                                        nullptr, absl::nullopt, "mcp_filter_reject_no_mcp");
     return Http::FilterHeadersStatus::StopIteration;
@@ -118,7 +143,25 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   }
 
   if (end_stream) {
-    decoder_callbacks_->addDecodedData(data, true);
+    // Check if the complete request body exceeds the limit
+    const uint32_t max_size = config_->maxRequestBodySize();
+    if (max_size > 0) {
+      decoder_callbacks_->addDecodedData(data, false);
+      const uint64_t total_size = decoder_callbacks_->decodingBuffer()->length();
+
+      if (total_size > max_size) {
+        ENVOY_LOG(debug, "request body size {} exceeds maximum {}", total_size, max_size);
+        config_->stats().body_too_large_.inc();
+        decoder_callbacks_->sendLocalReply(
+            Http::Code::PayloadTooLarge,
+            absl::StrCat("Request body size exceeds maximum allowed size of ", max_size, " bytes"),
+            nullptr, absl::nullopt, "mcp_filter_body_too_large");
+        return Http::FilterDataStatus::StopIterationNoBuffer;
+      }
+    } else {
+      decoder_callbacks_->addDecodedData(data, false);
+    }
+
     std::string json = decoder_callbacks_->decodingBuffer()->toString();
     if (metadata_ == nullptr) {
       metadata_ = std::make_unique<Protobuf::Struct>();
@@ -130,6 +173,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     if (!status.ok()) {
       is_mcp_request_ = false;
       ENVOY_LOG(debug, "failed to parse the JSON");
+      config_->stats().invalid_json_.inc();
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::BadRequest,
                                          "Request body is not a valid JSON.", nullptr,
                                          absl::nullopt, "");
@@ -148,6 +192,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
       is_mcp_request_ = false;
       ENVOY_LOG(debug, "non-JSON-RPC 2.0 request is detected");
       if (shouldRejectRequest()) {
+        config_->stats().requests_rejected_.inc();
         decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                            "request must be a valid JSON-RPC 2.0 message for MCP",
                                            nullptr, absl::nullopt, "mcp_filter_not_jsonrpc");
@@ -165,6 +210,14 @@ void McpFilter::finalizeDynamicMetadata() {
     decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
                                                         *metadata_);
     ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata_->DebugString());
+
+    // Clear route cache to allow route re-selection based on dynamic metadata
+    if (config_->clearRouteCache()) {
+      if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {
+        cb->clearRouteCache();
+        ENVOY_LOG(debug, "MCP filter cleared route cache for metadata-based routing");
+      }
+    }
   }
 }
 

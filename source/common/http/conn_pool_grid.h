@@ -178,6 +178,7 @@ public:
     const Instance::StreamOptions stream_options_{};
     absl::optional<ConnectionPool::PoolFailureReason> prev_pool_failure_reason_;
     std::string prev_pool_transport_failure_reason_;
+    bool delete_started_ = false;
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 

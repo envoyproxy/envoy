@@ -456,6 +456,7 @@ The following command operators are supported:
     * ``US_TX_BEG``: The time point of the upstream request sending begin.
     * ``US_TX_END``: The time point of the upstream request sending end.
     * ``US_RX_BEG``: The time point of the upstream response receiving begin.
+    * ``US_RX_BODY_BEG``: The time point of the upstream response body receiving begin.
     * ``US_RX_END``: The time point of the upstream response receiving end.
     * ``DS_TX_BEG``: The time point of the downstream response sending begin.
     * ``DS_TX_END``: The time point of the downstream response sending end.
@@ -878,9 +879,9 @@ UDP
   HTTP
     :ref:`Dynamic Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
     where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
-    lookup key in the namespace with the option of specifying nested keys separated by ':',
-    and Z is an optional parameter denoting string truncation up to Z characters long. Dynamic Metadata
-    can be set by filters using the :repo:`StreamInfo <envoy/stream_info/stream_info.h>` API:
+    lookup key in the namespace with the option of specifying nested keys separated by ':', and Z is an
+    optional parameter denoting string (and other non-structured value) truncation up to Z characters long.
+    Dynamic Metadata can be set by filters using the :repo:`StreamInfo <envoy/stream_info/stream_info.h>` API:
     *setDynamicMetadata*. The data will be logged as a JSON string. For example, for the following dynamic metadata:
 
     ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
@@ -891,7 +892,8 @@ UDP
     * %DYNAMIC_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``bar``
     * %DYNAMIC_METADATA(com.unknown_filter)% will log: ``-``
     * %DYNAMIC_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
-    * %DYNAMIC_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
+    * %DYNAMIC_METADATA(com.test.my_filter:test_object):2% will log (no truncation for struct): ``{"inner_key": "bar"}``
+    * %DYNAMIC_METADATA(com.test.my_filter:test_key):2% will log (truncation at 2 characters): ``fo``
 
   TCP
     Not implemented ("-").

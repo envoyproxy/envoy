@@ -29,7 +29,7 @@ void UdpConnPool::newStream(Router::GenericConnectionPoolCallbacks* callbacks) {
   Envoy::Network::SocketPtr socket = createSocket(host_);
   auto source_address_selector = host_->cluster().getUpstreamLocalAddressSelector();
   auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(
-      host_->address(), /*socket_options=*/nullptr);
+      host_->address(), /*socket_options=*/nullptr, /*transport_socket_options=*/{});
   if (!Envoy::Network::Socket::applyOptions(upstream_local_address.socket_options_, *socket,
                                             envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
     callbacks->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,

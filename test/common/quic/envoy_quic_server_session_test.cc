@@ -19,6 +19,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/global.h"
 #include "test/test_common/logging.h"
@@ -121,20 +122,14 @@ public:
   std::string name() const override { return "quic.test_crypto_server_stream"; }
 
   std::unique_ptr<quic::QuicCryptoServerStreamBase> createEnvoyQuicCryptoServerStream(
-      const quic::QuicCryptoServerConfig* crypto_config,
-      quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
-      quic::QuicCryptoServerStreamBase::Helper* helper,
+      const quic::QuicCryptoServerConfig* crypto_config, quic::QuicCompressedCertsCache*,
+      quic::QuicSession* session, quic::QuicCryptoServerStreamBase::Helper*,
       OptRef<const Network::DownstreamTransportSocketFactory> /*transport_socket_factory*/,
       Event::Dispatcher& /*dispatcher*/) override {
-    switch (session->connection()->version().handshake_protocol) {
-    case quic::PROTOCOL_QUIC_CRYPTO:
-      return std::make_unique<TestQuicCryptoServerStream>(crypto_config, compressed_certs_cache,
-                                                          session, helper);
-    case quic::PROTOCOL_TLS1_3:
+    if (session->connection()->version().transport_version > quic::QUIC_VERSION_46) {
       return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config);
-    case quic::PROTOCOL_UNSUPPORTED:
-      ASSERT(false, "Unknown handshake protocol");
     }
+    ASSERT(false, "Unknown QUIC version");
     return nullptr;
   }
 };
@@ -218,7 +213,7 @@ public:
       // Create ServerConnection instance and setup callbacks for it.
       http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(
           envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024, 100,
-          envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+          envoy::config::core::v3::HttpProtocolOptions::ALLOW, overload_manager_);
       EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
       // Stop iteration to avoid calling getRead/WriteBuffer().
       return Network::FilterStatus::StopIteration;
@@ -291,6 +286,7 @@ protected:
   Http::ServerConnectionPtr http_connection_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 };
 
 TEST_F(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
@@ -921,12 +917,8 @@ TEST_F(EnvoyQuicServerSessionTest, GoAway) {
 TEST_F(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
   installReadFilter();
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
-  if (!quic_version_[0].UsesTls()) {
-    envoy_quic_session_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
-  } else {
-    EXPECT_CALL(*quic_connection_, SendControlFrame(_));
-    envoy_quic_session_.OnTlsHandshakeComplete();
-  }
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  envoy_quic_session_.OnTlsHandshakeComplete();
   EXPECT_EQ(nullptr, envoy_quic_session_.socketOptions());
   EXPECT_TRUE(quic_connection_->connectionSocket()->ioHandle().isOpen());
   EXPECT_TRUE(quic_connection_->connectionSocket()->ioHandle().close().ok());

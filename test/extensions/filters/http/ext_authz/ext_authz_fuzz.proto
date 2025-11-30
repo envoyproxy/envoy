@@ -13,6 +13,8 @@ message ExtAuthzTestCaseBase {
       [(validate.rules).message = {required: true}];
   // HTTP request data.
   test.fuzz.HttpData request_data = 2 [(validate.rules).message = {required: true}];
+  // HTTP response data.
+  test.fuzz.HttpData response_data = 5 [(validate.rules).message = {required: true}];
   // Filter metadata.
   envoy.config.core.v3.Metadata filter_metadata = 4;
 }
