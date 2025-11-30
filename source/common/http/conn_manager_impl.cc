@@ -2101,7 +2101,7 @@ void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
 void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
   ASSERT(!state_.codec_encode_complete_);
   state_.on_reset_stream_called_ = true;
-  ENVOY_STREAM_LOG(debug, "Codec timed out flushing stream", *this);
+  ENVOY_STREAM_LOG(debug, "Codec low level reset", *this);
 
   // TODO(kbaichoo): Update streamInfo to account for the reset.
 
