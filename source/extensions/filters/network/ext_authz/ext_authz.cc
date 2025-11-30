@@ -40,8 +40,7 @@ void fillMetadataContext(const MetadataProto& source_metadata,
     const auto& typed_filter_metadata = source_metadata.typed_filter_metadata();
     if (const auto metadata_it = typed_filter_metadata.find(context_key);
         metadata_it != typed_filter_metadata.end()) {
-      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] =
-          metadata_it->second;
+      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
 }
