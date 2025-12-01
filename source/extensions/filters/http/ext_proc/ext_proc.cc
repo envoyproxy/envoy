@@ -74,7 +74,6 @@ constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_c
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
 constexpr absl::string_view FailedOpenField = "failed_open";
-constexpr absl::string_view ServerHalfClosedField = "server_half_closed";
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -419,7 +418,6 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
   (*struct_msg->mutable_fields())[FailedOpenField].set_bool_value(failed_open_);
-  (*struct_msg->mutable_fields())[ServerHalfClosedField].set_bool_value(server_half_closed_);
   return struct_msg;
 }
 
@@ -526,9 +524,6 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   }
   if (field_name == FailedOpenField) {
     return bool(failed_open_);
-  }
-  if (field_name == ServerHalfClosedField) {
-    return bool(server_half_closed_);
   }
   return {};
 }
@@ -1899,7 +1894,7 @@ void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
 
   processing_complete_ = true;
   stats_.streams_closed_.inc();
-  logging_info_->setServerHalfClose();
+  stats_.server_half_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();

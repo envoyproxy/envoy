@@ -5032,53 +5032,6 @@ TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
   EXPECT_THAT(log_content, testing::HasSubstr("response_header_latency_us"));
 }
 
-TEST_P(ExtProcIntegrationTest, ExtProcLoggingServerHalfCloseTest) {
-  // Configure ext_proc to send both headers and body
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    auto* access_log = cm.add_access_log();
-    access_log->set_name("accesslog");
-    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-    access_log_config.set_path(access_log_path);
-    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
-
-    // Test field extraction for coverage.
-    (*json_format->mutable_fields())["server_half_closed_field"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:server_half_closed)%");
-
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-  });
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
-        // The response does not really matter, it just needs to be non-empty.
-        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
-        auto* mut1 = response_header_mutation->add_set_headers();
-        mut1->mutable_append()->set_value(false);
-        mut1->mutable_header()->set_key("x-new-header");
-        mut1->mutable_header()->set_raw_value("new");
-        return true;
-      });
-
-  // However right after processing headers, half-close the stream indicating that server
-  // is not interested in the request body.
-  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
-  processor_stream_->encodeResetStream();
-  handleUpstreamRequest();
-  verifyDownstreamResponse(*response, 200);
-
-  std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  auto json_log = Json::Factory::loadFromString(log_result).value();
-  auto field_server_half_closed = json_log->getString("server_half_closed_field");
-  EXPECT_EQ(*field_server_half_closed, "1");
-  cleanupUpstreamAndDownstream();
-}
-
 TEST_P(ExtProcIntegrationTest, ExtProcLoggingFailedOpen) {
   auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
   proto_config_.set_failure_mode_allow(true);

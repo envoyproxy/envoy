@@ -52,7 +52,8 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_disabled)                                                              \
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
   COUNTER(http_not_ok_resp_received)                                                               \
-  COUNTER(immediate_responses_sent)
+  COUNTER(immediate_responses_sent)                                                                \
+  COUNTER(server_half_closed)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -98,7 +99,6 @@ public:
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
   void setFailedOpen() { failed_open_ = true; }
-  void setServerHalfClose() { server_half_closed_ = true; }
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
@@ -149,8 +149,6 @@ private:
   std::string http_response_code_details_;
   // True if the stream failed open.
   bool failed_open_{false};
-  // True if the external processing server closed the stream before the client.
-  bool server_half_closed_{false};
 };
 
 class ThreadLocalStreamManager;
