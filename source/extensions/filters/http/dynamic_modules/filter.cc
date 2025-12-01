@@ -298,14 +298,14 @@ envoy_dynamic_module_type_http_callout_init_result DynamicModuleHttpFilter::star
   Http::AsyncClient::StreamOptions options;
   options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
 
-  auto stream = cluster->httpAsyncClient().start(callback_ref, options);
-  if (!stream) {
+  Http::AsyncClient::Stream* async_stream = cluster->httpAsyncClient().start(callback_ref, options);
+  if (!async_stream) {
     // Failed to create the stream, clean up.
     http_stream_callouts_.erase(callback_ref.this_as_void_ptr_);
     return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
   }
 
-  callback_ref.stream_ = stream;
+  callback_ref.stream_ = async_stream;
   callback_ref.request_message_ = std::move(message);
   *stream_ptr_out = callback_ref.this_as_void_ptr_;
 
@@ -314,11 +314,24 @@ envoy_dynamic_module_type_http_callout_init_result DynamicModuleHttpFilter::star
   bool has_initial_body = callback_ref.request_message_->body().length() > 0;
   if (has_initial_body) {
     // Send headers without end_stream, then send body with the end_stream flag.
-    stream->sendHeaders(callback_ref.request_message_->headers(), false /* end_stream */);
-    stream->sendData(callback_ref.request_message_->body(), end_stream);
+    callback_ref.stream_->sendHeaders(callback_ref.request_message_->headers(),
+                                      false /* end_stream */);
+
+    // The stream might reset inline while sending headers. Bail out if that happened.
+    if (callback_ref.stream_ == nullptr) {
+      return envoy_dynamic_module_type_http_callout_init_result_Success;
+    }
+
+    callback_ref.stream_->sendData(callback_ref.request_message_->body(), end_stream);
+    if (callback_ref.stream_ == nullptr) {
+      return envoy_dynamic_module_type_http_callout_init_result_Success;
+    }
   } else {
     // No body, so end_stream applies to headers.
-    stream->sendHeaders(callback_ref.request_message_->headers(), end_stream);
+    callback_ref.stream_->sendHeaders(callback_ref.request_message_->headers(), end_stream);
+    if (callback_ref.stream_ == nullptr) {
+      return envoy_dynamic_module_type_http_callout_init_result_Success;
+    }
   }
 
   return envoy_dynamic_module_type_http_callout_init_result_Success;
@@ -448,6 +461,10 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onComplete() {
   filter->config_->on_http_filter_http_stream_complete_(filter->thisAsVoidPtr(),
                                                         filter->in_module_filter_, stream_ptr);
 
+  stream_ = nullptr;
+  request_message_.reset();
+  request_trailers_.reset();
+
   // Schedule deferred deletion of this callback to avoid deleting 'this' while we're still in it.
   // The stream may call other callbacks like onReset() after onComplete().
   auto it = filter->http_stream_callouts_.find(stream_ptr);
@@ -489,6 +506,10 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onReset() {
         filter->thisAsVoidPtr(), filter->in_module_filter_, stream_ptr,
         envoy_dynamic_module_type_http_stream_reset_reason_LocalReset);
   }
+
+  stream_ = nullptr;
+  request_message_.reset();
+  request_trailers_.reset();
 
   // Schedule deferred deletion of this callback to avoid deleting 'this' while we're still in it.
   auto it = filter->http_stream_callouts_.find(stream_ptr);

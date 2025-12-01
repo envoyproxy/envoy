@@ -1616,7 +1616,6 @@ envoy_dynamic_module_callback_http_filter_start_http_stream(
   }
   if (body_size > 0) {
     message->body().add(absl::string_view(static_cast<const char*>(body), body_size));
-    message->headers().setContentLength(body_size);
   }
   return filter->startHttpStream(stream_ptr_out, cluster_name_view, std::move(message), end_stream,
                                  timeout_milliseconds);
