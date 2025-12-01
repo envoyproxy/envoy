@@ -82,11 +82,12 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
                                absl::optional<int> thread_priority,
+                               absl::optional<size_t> high_watermark,
                                bool disable_dns_refresh_on_network_change,
                                Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger)
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
       logger_(std::move(logger)), event_tracker_(std::move(event_tracker)),
-      thread_priority_(thread_priority),
+      thread_priority_(thread_priority), high_watermark_(high_watermark),
       dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
       disable_dns_refresh_on_network_change_(disable_dns_refresh_on_network_change),
       enable_logger_(enable_logger) {
@@ -99,9 +100,10 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
                                absl::optional<int> thread_priority,
+                               absl::optional<size_t> high_watermark,
                                bool disable_dns_refresh_on_network_change, bool enable_logger)
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
-                     thread_priority, disable_dns_refresh_on_network_change,
+                     thread_priority, high_watermark, disable_dns_refresh_on_network_change,
                      Thread::PosixThreadFactory::create(), enable_logger) {}
 
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
@@ -262,9 +264,9 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
           auto api_listener = server_->listenerManager().apiListener()->get().createHttpApiListener(
               server_->dispatcher());
           ASSERT(api_listener != nullptr);
-          http_client_ = std::make_unique<Http::Client>(std::move(api_listener), *dispatcher_,
-                                                        server_->serverFactoryContext().scope(),
-                                                        server_->api().randomGenerator());
+          http_client_ = std::make_unique<Http::Client>(
+              std::move(api_listener), *dispatcher_, server_->serverFactoryContext().scope(),
+              server_->api().randomGenerator(), high_watermark_);
           dispatcher_->drain(server_->dispatcher());
           engine_running_.Notify();
           callbacks_->on_engine_running_();

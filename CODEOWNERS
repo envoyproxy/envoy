@@ -46,7 +46,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # proto_message_extraction http filter extension
 /*/extensions/filters/http/proto_message_extraction @dchakarwarti @taoxuy @shuoyang2016 @yanavlasov
 # proto_api_scrubber http filter extension
-/*/extensions/filters/http/proto_api_scrubber @sumitkmr2 @adisuissa
+/*/extensions/filters/http/proto_api_scrubber @sumitkmr2 @adisuissa @pranavrautgoogle
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
 # alts transport socket extension

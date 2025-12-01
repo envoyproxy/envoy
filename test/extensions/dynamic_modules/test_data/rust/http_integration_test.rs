@@ -543,9 +543,9 @@ struct SendResponseHttpFilterConfig {
 impl SendResponseHttpFilterConfig {
   fn new(config: &[u8]) -> Self {
     let f = match config {
-      b"on_request_headers" => SendResponseHttpFilter::OnRequestHeader,
-      b"on_request_body" => SendResponseHttpFilter::OnRequestBody,
-      b"on_response_headers" => SendResponseHttpFilter::OnResponseHeader,
+      b"on_request_headers" => SendResponseHttpFilter::RequestHeader,
+      b"on_request_body" => SendResponseHttpFilter::RequestBody,
+      b"on_response_headers" => SendResponseHttpFilter::ResponseHeader,
       _ => panic!("Unknown filter name: {:?}", config),
     };
     Self { f }
@@ -554,15 +554,15 @@ impl SendResponseHttpFilterConfig {
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SendResponseHttpFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(self.f.clone())
+    Box::new(self.f)
   }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum SendResponseHttpFilter {
-  OnRequestHeader,
-  OnRequestBody,
-  OnResponseHeader,
+  RequestHeader,
+  RequestBody,
+  ResponseHeader,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
@@ -571,7 +571,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    if self == &SendResponseHttpFilter::OnRequestHeader {
+    if self == &SendResponseHttpFilter::RequestHeader {
       envoy_filter.send_response(
         200,
         vec![("some_header", b"some_value")],
@@ -589,7 +589,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
-    if self == &SendResponseHttpFilter::OnRequestBody {
+    if self == &SendResponseHttpFilter::RequestBody {
       envoy_filter.send_response(
         200,
         vec![("some_header", b"some_value")],
@@ -607,7 +607,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    if self == &SendResponseHttpFilter::OnResponseHeader {
+    if self == &SendResponseHttpFilter::ResponseHeader {
       envoy_filter.send_response(
         500,
         vec![("some_header", b"some_value")],
@@ -1108,7 +1108,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.new_scheduler().commit(EVENT_ID_START_RESPONSE);
-    return envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue;
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
   fn on_request_body(
@@ -1120,7 +1120,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
       self.request_closed = true;
     }
     envoy_filter.new_scheduler().commit(EVENT_ID_READ_REQUEST);
-    return envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer;
+    envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer
   }
 
   fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {

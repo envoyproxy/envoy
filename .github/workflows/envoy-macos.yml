@@ -80,7 +80,7 @@ jobs:
             _BAZEL_BUILD_EXTRA_OPTIONS=(
               --remote_download_toplevel
               --flaky_test_attempts=2
-              --config=remote-cache-envoy-engflow
+              --config=remote-cache
               --config=ci)
             export BAZEL_BUILD_EXTRA_OPTIONS=${_BAZEL_BUILD_EXTRA_OPTIONS[*]}
 

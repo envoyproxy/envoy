@@ -32,6 +32,12 @@ minor_behavior_changes:
     <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite>` to
     :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` to support substitution
     formatting for path header rewriting.
+- area: overload_manager
+  change: |
+    Fixed :ref:`downstream connections monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`
+    to correctly trigger configured actions, and create a ``pressure`` metric like other resource monitors.
+    Previously, this extension would never trigger an action.
 - area: tracing
   change: |
     The :ref:`request header custom tag <envoy_v3_api_field_type.tracing.v3.CustomTag.request_header>`
@@ -59,6 +65,15 @@ minor_behavior_changes:
     mutations and send a local reply if not.
 - area: ext_authz
   change: |
+    Fixed HTTP ext_authz client to correctly respect user-configured ``retry_on`` configuration in the
+    :ref:`retry_policy <envoy_v3_api_field_config.core.v3.RetryPolicy.retry_on>`. Previously, the
+    configured ``retry_on`` value was being overridden with hardcoded defaults
+    ``5xx,gateway-error,connect-failure,reset``, causing user-specified retry conditions to be ignored.
+    This behavior is controlled by the runtime flag
+    ``envoy.reloadable_features.ext_authz_http_client_retries_respect_user_retry_on`` which defaults to
+    ``true``. To preserve the old behavior, set this flag to ``false``.
+- area: ext_authz
+  change: |
     Fixed HTTP ext_authz service to properly propagate headers (such as ``set-cookie``) back to clients. The
     filter now correctly uses ``allowed_client_headers`` for denied responses and ``allowed_client_headers_on_success``
     for successful authorization responses.
@@ -75,6 +90,11 @@ minor_behavior_changes:
   change: |
     Use mobile specific network observer registries to propagate network change signals. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.mobile_use_network_observer_registry``.
+- area: access_log
+  change: |
+    Fixed a bug where the truncation-length specifier for ``DYNAMIC_METADATA():Z`` was rejected in access log format strings.
+    The length parameter is now accepted and truncates strings and other value types to the specified length. Structured
+    data types are not truncated.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -124,10 +144,19 @@ bug_fixes:
     were not accessible in ``request_headers_to_add`` configuration on the initial request. Headers configured via
     ``request_headers_to_add`` can now reference router-set headers using formatters like
     ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
+- area: router
+  change: |
+    Fixed an upstream HTTP filter issue if route retries on 5xx and the filter returns
+    FilterHeadersStatus::StopIteration in its encodeHeaders() method.
 - area: ext_proc
   change: |
     Fixed a bug where attributes based on request headers (e.g. ``request.host``) were not sent to
     the ext_proc server if ext_proc was configured to only run on the encode path.
+- area: http_11_proxy
+  change: |
+    Fixed a bug in http_11_proxy transport socket where bytes written to a connection after the
+    initial HTTP CONNECT request is sent, but before the response is received can be buffered
+    until connection timeout.
 - area: tcp_proxy
   change: |
     Fixed a connection leak in the TCP proxy when the ``receive_before_connect`` feature is enabled and the
@@ -142,6 +171,9 @@ bug_fixes:
   change: |
     Changes web identity token file watching behavior in the aws signing common components. This ensures that if the token file is rotated,
     the new token will be picked up.
+- area: dns_resolver
+  change: |
+    Removes unnecessary getifaddrs() system calls when ``filter_unroutable_families`` is disabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -206,6 +238,15 @@ new_features:
     Added support for dropping stats via
     :ref:`DropAction <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during
     custom metric conversion.
+- area: tcp_proxy
+  change: |
+    Added :ref:`upstream_connect_mode
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`
+    and :ref:`max_early_data_bytes
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>`
+    to control when upstream connections are established and early data buffering behavior.
+    This enables use cases like extracting TLS certificate information or SNI before establishing
+    upstream connections.
 - area: http
   change: |
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to
@@ -315,11 +356,27 @@ new_features:
   change: |
     Added runtime guard ``envoy.reloadable_features.report_load_when_rq_active_is_non_zero``.
     When enabled, LRS continues to send locality_stats reoprt to config server when there is no request_issued in the poll cycle.
+- area: on_demand
+  change: |
+    Added runtime guard ``envoy.reloadable_features.on_demand_track_end_stream``.
+    When enabled, the on_demand filter tracks downstream end_stream state to support stream recreation with fully read request bodies.
+    Previously, the filter rejected all requests with bodies by checking for the presence of a decoding buffer,
+    even when the body was complete.
 - area: router
   change: |
     Added :ref:`request_mirror_policies <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
     to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
     cluster-level request mirroring. Cluster-level policies override route-level policies when both are configured.
+- area: router
+  change: |
+    Added :ref:`retry_policy <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.retry_policy>`
+    to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
+    cluster-level retry policies.
+- area: router
+  change: |
+    Added :ref:`hash_policy <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.hash_policy>`
+    to :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` to support
+    cluster-level hash policies.
 - area: network
   change: |
     Add logging info for network ext_proc to filter state.

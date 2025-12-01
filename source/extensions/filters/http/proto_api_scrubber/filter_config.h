@@ -1,12 +1,24 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
+#include "envoy/matcher/matcher.h"
+#include "envoy/server/factory_context.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
 #include "source/common/matcher/matcher.h"
+#include "source/common/protobuf/utility.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "grpc_transcoding/type_helper.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
 
@@ -15,11 +27,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
+using envoy::extensions::filters::http::proto_api_scrubber::v3::MessageRestrictions;
+using envoy::extensions::filters::http::proto_api_scrubber::v3::MethodRestrictions;
 using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionConfig;
 using google::grpc::transcoding::TypeHelper;
 using Http::HttpMatchingData;
 using Protobuf::Map;
+using Protobuf::MethodDescriptor;
 using xds::type::matcher::v3::HttpAttributesCelMatchInput;
 using ProtoApiScrubberRemoveFieldAction =
     envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction;
@@ -75,12 +90,43 @@ public:
   virtual MatchTreeHttpMatchingDataSharedPtr
   getResponseFieldMatcher(const std::string& method_name, const std::string& field_mask) const;
 
+  /**
+   * Returns the match tree associated with an entire method.
+   * @param method_name The full gRPC method name (e.g., "/package.service.Method").
+   * @return A MatchTreeHttpMatchingDataSharedPtr if a method-level matcher is configured.
+   * Returns `nullptr` otherwise.
+   */
+  virtual MatchTreeHttpMatchingDataSharedPtr getMethodMatcher(const std::string& method_name) const;
+
+  /**
+   * Returns the match tree associated with a specific message type.
+   * @param message_name The fully qualified message name (e.g., "package.MyMessage").
+   * @return A MatchTreeHttpMatchingDataSharedPtr if a message-level matcher is configured.
+   * Returns `nullptr` otherwise.
+   */
+  virtual MatchTreeHttpMatchingDataSharedPtr
+  getMessageMatcher(const std::string& message_name) const;
+
+  /**
+   * Resolves the human-readable name of a specific enum value.
+   *
+   * @param enum_type_name The fully qualified name of the enum type (e.g., "package.Status").
+   * @param enum_value The integer value of the enum (e.g., 99).
+   * @return The string name of the enum value (e.g., "DEBUG_MODE").
+   * Returns empty string if the type or value is not found.
+   */
+  virtual absl::StatusOr<absl::string_view> getEnumName(absl::string_view enum_type_name,
+                                                        int enum_value) const;
+
   // Returns a constant reference to the type finder which resolves type URL string to the
   // corresponding `Protobuf::Type*`.
   const TypeFinder& getTypeFinder() const { return *type_finder_; };
 
   // Returns the request type of the method.
   absl::StatusOr<const Protobuf::Type*> getRequestType(const std::string& method_name) const;
+
+  // Returns the response type of the method.
+  absl::StatusOr<const Protobuf::Type*> getResponseType(const std::string& method_name) const;
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
@@ -99,6 +145,9 @@ private:
   // For any invalid method name, it returns absl::InvalidArgument with an appropriate error
   // message.
   absl::Status validateMethodName(absl::string_view);
+
+  // Validates the fully qualified message name.
+  absl::Status validateMessageName(absl::string_view message_name);
 
   // Validates the field mask in the filter config.
   // The currently supported field mask is of format 'a.b.c'
@@ -119,10 +168,26 @@ private:
 
   // Initializes the method's request and response restrictions using the restrictions configured
   // in the proto config.
-  absl::Status initializeMethodRestrictions(absl::string_view method_name,
-                                            StringPairToMatchTreeMap& field_restrictions,
-                                            const Map<std::string, RestrictionConfig>& restrictions,
-                                            Server::Configuration::FactoryContext& context);
+  absl::Status
+  initializeMethodFieldRestrictions(absl::string_view method_name,
+                                    StringPairToMatchTreeMap& field_restrictions,
+                                    const Map<std::string, RestrictionConfig>& restrictions,
+                                    Server::Configuration::FactoryContext& context);
+
+  // Initializes the method-level restrictions.
+  absl::Status
+  initializeMethodLevelRestrictions(absl::string_view method_name,
+                                    const MethodRestrictions& method_config,
+                                    Envoy::Server::Configuration::FactoryContext& context);
+
+  // Initializes the message-level restrictions.
+  absl::Status
+  initializeMessageRestrictions(const Map<std::string, MessageRestrictions>& message_configs,
+                                Envoy::Server::Configuration::FactoryContext& context);
+
+  // Returns method descriptor by looking up the `descriptor_pool_`.
+  // If the method doesn't exist in the `descriptor_pool`, it returns absl::InvalidArgument error.
+  absl::StatusOr<const MethodDescriptor*> getMethodDescriptor(const std::string& method_name) const;
 
   FilteringMode filtering_mode_;
 
@@ -133,6 +198,12 @@ private:
 
   // A map from {method_name, field_mask} to the respective match tree for response fields.
   StringPairToMatchTreeMap response_field_restrictions_;
+
+  // A map from method_name to the respective match tree for method-level restrictions.
+  absl::flat_hash_map<std::string, MatchTreeHttpMatchingDataSharedPtr> method_level_restrictions_;
+
+  // A map from message_name to the respective match tree for message-level restrictions.
+  absl::flat_hash_map<std::string, MatchTreeHttpMatchingDataSharedPtr> message_level_restrictions_;
 
   // An instance of `google::grpc::transcoding::TypeHelper` which can be used for type resolution.
   std::unique_ptr<const TypeHelper> type_helper_;
