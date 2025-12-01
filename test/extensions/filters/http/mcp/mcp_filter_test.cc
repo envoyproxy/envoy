@@ -606,6 +606,132 @@ TEST_F(McpFilterTest, ClearRouteCacheConfigGetter) {
   EXPECT_TRUE(config_->clearRouteCache());
 }
 
+// Test per-route max body size override with smaller limit
+TEST_F(McpFilterTest, PerRouteMaxBodySizeSmallerLimit) {
+  // Global config with 1024 bytes
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_max_request_body_size()->set_value(1024);
+  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  // Per-route config with smaller limit (100 bytes)
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  override_config.mutable_max_request_body_size()->set_value(100);
+  auto route_config = std::make_shared<McpOverrideConfig>(override_config);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  // Should use per-route limit of 100 bytes, not global 1024
+  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(100));
+  filter_->decodeHeaders(headers, false);
+
+  // Create a body that exceeds per-route limit (100) but under global (1024)
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "extra": "data to exceed 100 bytes"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+  Buffer::OwnedImpl decoding_buffer;
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
+      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+
+  // Should be rejected based on per-route limit
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::PayloadTooLarge,
+                             testing::HasSubstr("Request body size exceeds maximum allowed size"),
+                             _, _, "mcp_filter_body_too_large"));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
+// Test per-route max body size override with larger limit
+TEST_F(McpFilterTest, PerRouteMaxBodySizeLargerLimit) {
+  // Global config with 100 bytes
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_max_request_body_size()->set_value(100);
+  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  // Per-route config with larger limit (2048 bytes)
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  override_config.mutable_max_request_body_size()->set_value(2048);
+  auto route_config = std::make_shared<McpOverrideConfig>(override_config);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  // Should use per-route limit of 2048 bytes, not global 100
+  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(2048));
+  filter_->decodeHeaders(headers, false);
+
+  // Create a body that exceeds global limit (100) but under per-route (2048)
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "extra": "data to exceed 100 bytes limit"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+  Buffer::OwnedImpl decoding_buffer;
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
+      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+
+  // Should succeed based on per-route limit
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test fallback to global max body size when no per-route override
+TEST_F(McpFilterTest, PerRouteMaxBodySizeFallbackToGlobal) {
+  // Global config with 512 bytes
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_max_request_body_size()->set_value(512);
+  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  // Per-route config WITHOUT max_request_body_size override (only traffic mode)
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  override_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  auto route_config = std::make_shared<McpOverrideConfig>(override_config);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  // Should fallback to global limit of 512 bytes
+  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(512));
+  filter_->decodeHeaders(headers, false);
+
+  // Create a valid JSON-RPC body under 512 bytes
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+  Buffer::OwnedImpl decoding_buffer;
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
+      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+
+  // Should succeed based on global limit
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters
