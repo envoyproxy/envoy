@@ -1864,6 +1864,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     return;
   }
 
+  stats_.server_half_closed_.inc();
   if (failureModeAllow()) {
     onGrpcCloseWithStatus(status);
     stats_.failure_mode_allowed_.inc();
