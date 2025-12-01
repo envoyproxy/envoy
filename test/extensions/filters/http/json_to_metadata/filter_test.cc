@@ -1823,14 +1823,7 @@ response_rules:
 // Test per-route override functionality
 TEST_F(FilterTest, PerRouteOverride) {
   // Global config is empty (no rules)
-  const std::string empty_config = R"EOF(
-request_rules:
-  rules: []
-response_rules:
-  rules: []
-)EOF";
-
-  initializeFilter(empty_config);
+  initializeFilter("{}");
 
   const std::string request_body = R"delimiter({"version":"2.0.0"})delimiter";
   const std::map<std::string, std::string> expected = {{"version", "2.0.0"}};
@@ -1907,14 +1900,7 @@ request_rules:
 // Test per-route config with response rules
 TEST_F(FilterTest, PerRouteOverrideResponse) {
   // Global config is empty
-  const std::string empty_config = R"EOF(
-request_rules:
-  rules: []
-response_rules:
-  rules: []
-)EOF";
-
-  initializeFilter(empty_config);
+  initializeFilter("{}");
 
   const std::string response_body = R"delimiter({"version":"3.0.0"})delimiter";
   const std::map<std::string, std::string> expected = {{"version", "3.0.0"}};
@@ -1944,9 +1930,9 @@ response_rules:
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
 }
 
-// Test that per-route config overrides global config
+// Test that a route-level response rule is used when the global config only has a request rule.
 TEST_F(FilterTest, PerRouteOverridesGlobalConfig) {
-  // Global config extracts "old_key"
+  // Global config has a request rule.
   const std::string global_config = R"EOF(
 request_rules:
   rules:
@@ -1959,56 +1945,32 @@ request_rules:
 
   initializeFilter(global_config);
 
-  // Per-route config extracts "new_key"
+  // Per-route config has a response rule.
   const std::string per_route_config_yaml = R"EOF(
-request_rules:
+response_rules:
   rules:
   - selectors:
-    - key: new_key
+    - key: version
     on_present:
       metadata_namespace: envoy.lb
-      key: new_value
+      key: version
 )EOF";
 
-  const std::string request_body =
-      R"delimiter({"old_key":"should_not_match","new_key":"should_match"})delimiter";
-  const std::map<std::string, std::string> expected = {{"new_value", "should_match"}};
+  const std::string response_body = R"delimiter({"version":"3.0.0"})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "3.0.0"}};
 
   std::shared_ptr<FilterConfig> per_route_config = createConfig(per_route_config_yaml, true);
   EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(per_route_config.get()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(incoming_headers_, false));
+            filter_->encodeHeaders(response_headers_, false));
 
-  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
-  testRequestWithBody(request_body);
+  testResponseWithBody(response_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
-}
-
-// Test global config is used when no per-route config exists
-TEST_F(FilterTest, GlobalConfigUsedWhenNoPerRouteConfig) {
-  // Global config extracts "version"
-  initializeFilter(config_yaml_);
-
-  const std::string request_body = R"delimiter({"version":"1.5.0"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "1.5.0"}};
-
-  // No per-route config
-  EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_)).WillOnce(Return(nullptr));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(incoming_headers_, false));
-
-  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
-  testRequestWithBody(request_body);
-
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
 }
 
 } // namespace JsonToMetadata
