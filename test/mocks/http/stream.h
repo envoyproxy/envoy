@@ -55,6 +55,8 @@ public:
 
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
+  int32_t streamId() const override { return -1; }
+
   CodecEventCallbacks* codec_callbacks_{nullptr};
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
   std::string details_;

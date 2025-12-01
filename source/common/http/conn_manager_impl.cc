@@ -438,6 +438,8 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
     new_stream->response_encoder_->getStream().setFlushTimeout(config_->streamIdleTimeout());
   }
   new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());
+  new_stream->streamInfo().setStreamId(response_encoder.getStream().streamId());
+
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||

@@ -408,6 +408,7 @@ protected:
     }
 
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
+    int32_t streamId() const override { return stream_id_; }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
