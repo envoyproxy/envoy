@@ -63,22 +63,28 @@ ConnPoolImplBase::ConnPoolImplBase(
   ENVOY_LOG_ONCE_IF(trace, create_new_connection_load_shed_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.connection_pool_new_connection is not "
                     "found. Is it configured?");
-  const auto metadata = host_->metadata();
-  
+  const auto metadata = host_->metadata(); 
   if (metadata && metadata->filter_metadata().contains("connection_pool_options")) {
     const auto& options = metadata->filter_metadata().at("connection_pool_options").fields();
-    if (options.contains("round_robin")) {
-      endpoint_options_.use_round_robin = options.at("round_robin").bool_value();
+    if (options.contains("max_concurrent_streams")) {
+      endpoint_limits_.max_concurrent_streams = options.at("max_concurrent_streams").number_value();
     }
-    if (options.contains("preconnect_ratio")) {
-      endpoint_options_.preconnect_ratio = static_cast<float>(options.at("preconnect_ratio").number_value());
+    if (options.contains("max_requests_per_connection")) {
+      endpoint_limits_.max_requests_per_connection = options.at("max_requests_per_connection").number_value();
     }
-
-    ENVOY_LOG(info, "endpoint {} has specific options: rr={}, preconnect_ratio={}", host_->address() ? host_->address()->asString() : "without address", endpoint_options_.use_round_robin, endpoint_options_.preconnect_ratio);
-  } else {
-    ENVOY_LOG(info, "endpoint {} has no specific options",  host_->address() ? host_->address()->asString() : "without address");
+    if (options.contains("connection_idle_timeout")) {
+      endpoint_limits_.connection_idle_timeout = options.at("connection_idle_timeout").number_value();
+    }
+    if (options.contains("propagate_negotiated_stream_limits")) {
+      endpoint_limits_.propagate_negotiated_stream_limits = options.at("propagate_negotiated_stream_limits").bool_value();
+    }
+    ENVOY_LOG(debug, "endpoint {} has specific options: max_concurrent_streams={}, max_requests_per_connection={}, connection_idle_timeout={}, propagate_negotiated_stream_limits={}", 
+      host_->address() ? host_->address()->asString() : "without address", 
+      endpoint_limits_.max_concurrent_streams, 
+      endpoint_limits_.max_requests_per_connection,
+      endpoint_limits_.connection_idle_timeout,
+      endpoint_limits_.propagate_negotiated_stream_limits);
   }
-
 }
 
 ConnPoolImplBase::~ConnPoolImplBase() {
@@ -136,19 +142,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
     return pending_streams_.size() > connecting_stream_capacity_;
   }
 
-  if (endpoint_options_.preconnect_ratio != 0) {
-    bool result =
-        shouldConnect(pending_streams_.size(), num_active_streams_,
-                      connecting_and_connected_stream_capacity_, endpoint_options_.preconnect_ratio);
-    ENVOY_LOG(trace,
-              "endpoint-specific shouldCreateNewConnection returns {} for pending {} active {} "
-              "connecting_and_connected_capacity {} connecting_capacity {} ratio {}",
-              result, pending_streams_.size(), num_active_streams_,
-              connecting_and_connected_stream_capacity_, connecting_stream_capacity_,
-              global_preconnect_ratio);
-    return result;
-  // Determine if we are trying to prefetch for global preconnect or local preconnect.
-  } else if (global_preconnect_ratio != 0) {
+  if (global_preconnect_ratio != 0) {
     // If global preconnecting is on, and this connection is within the global
     // preconnect limit, preconnect.
     // For global preconnect, we anticipate an incoming stream to this pool, since it is
@@ -329,14 +323,6 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
     }
   }
 
-  // // Here if the endpoint contains metadata, we kill the stream.
-  // if (host_->metadata()) {
-  //   ENVOY_CONN_LOG(debug, "endpoint contains metadta, destroying client as stream just closed",
-  //                  client);
-  //   client.close();
-  //   return;
-  // }
-
   if (client.state() == ActiveClient::State::Draining && client.numActiveStreams() == 0) {
     // Close out the draining client if we no longer have active streams.
     client.close();
@@ -362,7 +348,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
   assertCapacityCountsAreCorrect();
 
   if (!ready_clients_.empty()) {
-    ActiveClient& client = endpoint_options_.use_round_robin ? *ready_clients_.back() : *ready_clients_.front();
+    ActiveClient& client = *ready_clients_.front();
     ENVOY_CONN_LOG(debug, "using existing fully connected connection", client);
     attachStreamToClient(client, context);
     // Even if there's a ready client, we may want to preconnect to handle the next incoming stream.
@@ -866,7 +852,8 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
 namespace {
 // Translate zero to UINT32_MAX so that the zero/unlimited case doesn't
 // have to be handled specially.
-uint32_t translateZeroToUnlimited(uint32_t limit) {
+uint32_t translateZeroToUnlimited(uint32_t cluster_limit, uint32_t endpoint_limit = 0) {
+  const auto limit = endpoint_limit != 0 ? endpoint_limit : cluster_limit;
   return (limit != 0) ? limit : std::numeric_limits<uint32_t>::max();
 }
 } // namespace
@@ -878,9 +865,9 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
 
 ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
                            uint32_t effective_concurrent_streams, uint32_t concurrent_stream_limit)
-    : parent_(parent), remaining_streams_(translateZeroToUnlimited(lifetime_stream_limit)),
-      configured_stream_limit_(translateZeroToUnlimited(effective_concurrent_streams)),
-      concurrent_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
+    : parent_(parent), remaining_streams_(translateZeroToUnlimited(lifetime_stream_limit, parent.endpointLimits().max_requests_per_connection)),
+      configured_stream_limit_(translateZeroToUnlimited(effective_concurrent_streams, std::min(parent.endpointLimits().max_concurrent_streams, effective_concurrent_streams))),
+      concurrent_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit, parent.endpointLimits().max_concurrent_streams)),
       connect_timer_(parent_.dispatcher().createTimer([this]() { onConnectTimeout(); })) {
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host()->cluster().trafficStats()->upstream_cx_connect_ms_,
