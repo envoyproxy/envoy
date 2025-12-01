@@ -16,7 +16,7 @@ void McpParserConfig::addMethodConfig(absl::string_view method,
                                       std::vector<AttributeExtractionRule> fields) {
   method_fields_[std::string(method)] = std::move(fields);
 }
-// McpParserConfig implementation
+
 void McpParserConfig::initializeDefaults() {
   // Always extract core JSON-RPC fields
   always_extract_.insert("jsonrpc");
@@ -61,7 +61,6 @@ McpParserConfig
 McpParserConfig::fromProto(const envoy::extensions::filters::http::mcp::v3::ParserConfig& proto) {
   McpParserConfig config;
 
-  // Set core fields to always extract
   config.always_extract_.insert("jsonrpc");
   config.always_extract_.insert("method");
   config.initializeDefaults();
@@ -103,11 +102,12 @@ McpFieldExtractor::McpFieldExtractor(Protobuf::Struct& metadata, const McpParser
 
 McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
   if (can_stop_parsing_) {
-    return this; // Early stop
+    return this;
   }
 
+  // Skip arrays
   if (array_depth_ > 0) {
-    return this; // Skip arrays
+    return this;
   }
 
   depth_++;
@@ -366,7 +366,7 @@ void McpFieldExtractor::checkEarlyStop() {
   const auto& required_fields = config_.getFieldsForMethod(method_);
   for (const auto& field : required_fields) {
     if (collected_fields_.count(field.path) == 0) {
-      return; // Still missing this field
+      return;
     }
   }
 

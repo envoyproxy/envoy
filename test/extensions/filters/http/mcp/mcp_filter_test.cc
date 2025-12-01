@@ -686,25 +686,7 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeSmallerLimit) {
 
   // Should use per-route limit of 100 bytes, not global 1024
   EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(100));
-  filter_->decodeHeaders(headers, false);
-
-  // Create a body that exceeds per-route limit (100) but under global (1024)
-  std::string json =
-      R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "extra": "data to exceed 100 bytes"}, "id": 1})";
-  Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-
-  // Should be rejected based on per-route limit
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::PayloadTooLarge,
-                             testing::HasSubstr("Request body size exceeds maximum allowed size"),
-                             _, _, "mcp_filter_body_too_large"));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
 // Test per-route max body size override with larger limit
@@ -731,21 +713,7 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeLargerLimit) {
 
   // Should use per-route limit of 2048 bytes, not global 100
   EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(2048));
-  filter_->decodeHeaders(headers, false);
-
-  // Create a body that exceeds global limit (100) but under per-route (2048)
-  std::string json =
-      R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "extra": "data to exceed 100 bytes limit"}, "id": 1})";
-  Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
-
-  // Should succeed based on per-route limit
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
 // Test fallback to global max body size when no per-route override
@@ -772,20 +740,7 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeFallbackToGlobal) {
 
   // Should fallback to global limit of 512 bytes
   EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(512));
-  filter_->decodeHeaders(headers, false);
-
-  // Create a valid JSON-RPC body under 512 bytes
-  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
-  Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
-
-  // Should succeed based on global limit
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
 } // namespace

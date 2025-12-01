@@ -101,8 +101,7 @@ using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;
  */
 class McpFilter : public Http::PassThroughFilter, public Logger::Loggable<Logger::Id::mcp> {
 public:
-  explicit McpFilter(McpFilterConfigSharedPtr config)
-      : max_request_body_size_(config->maxRequestBodySize()), config_(config) {}
+  explicit McpFilter(McpFilterConfigSharedPtr config) : config_(config) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -131,7 +130,6 @@ private:
   Http::FilterDataStatus completeParsing();
   const ParserConfig& getParserConfig() const;
 
-  const uint32_t max_request_body_size_{0};
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   uint32_t bytes_parsed_{0};

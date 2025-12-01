@@ -168,14 +168,15 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
 
   ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}", buffer_size, bytes_parsed_);
 
+  const uint32_t max_size = getMaxRequestBodySize();
   size_t to_parse = buffer_size - bytes_parsed_;
-  if (max_request_body_size_ > 0) {
-    if (bytes_parsed_ >= max_request_body_size_) {
+  if (max_size > 0) {
+    if (bytes_parsed_ >= max_size) {
       config_->stats().body_too_large_.inc();
       handleParseError("request body is too large.");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
-    size_t remaining_limit = max_request_body_size_ - bytes_parsed_;
+    size_t remaining_limit = max_size - bytes_parsed_;
     to_parse = std::min(to_parse, remaining_limit);
   }
 
@@ -203,7 +204,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   }
 
   // If we are here, we haven't collected all fields yet.
-  bool size_limit_hit = (max_request_body_size_ > 0 && bytes_parsed_ >= max_request_body_size_);
+  bool size_limit_hit = (max_size > 0 && bytes_parsed_ >= max_size);
   if (end_stream || size_limit_hit) {
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
