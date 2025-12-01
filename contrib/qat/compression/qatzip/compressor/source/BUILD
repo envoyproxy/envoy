@@ -48,7 +48,8 @@ configure_make(
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:public"],
     deps = [
-        "//bazel/foreign_cc:lz4",
+        "@lz4",
+        "@lz4//:lz4_frame",
         "@zlib",
         "//contrib/qat:qatlib",
         # Use boringssl alias to select fips vs non-fips version.

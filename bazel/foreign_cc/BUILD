@@ -1,7 +1,6 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
-load("@rules_foreign_cc//foreign_cc:make.bzl", "make")
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cmake", "envoy_package")
 
 licenses(["notice"])  # Apache 2
@@ -56,25 +55,6 @@ envoy_cc_library(
     }),
 )
 
-make(
-    name = "lz4",
-    args = [
-        "MOREFLAGS='-fPIC'",
-        "BUILD_SHARED=no",
-    ],
-    lib_source = "@com_github_lz4_lz4//:all",
-    out_static_libs = [
-        "liblz4.a",
-    ],
-    tags = ["skip_on_windows"],
-    targets = [
-        "lib",
-        "install",
-    ],
-    visibility = ["//visibility:public"],
-    alwayslink = False,
-)
-
 # Kafka client dependency used by Kafka-mesh filter.
 # librdkafka build generates extra headers that need to be copied into source to get it to compile.
 configure_make(
@@ -93,7 +73,7 @@ configure_make(
     targets = [
         "ARFLAGS='' WITH_LDS='n' libs install-subdirs",
     ],
-    deps = [":lz4"],
+    deps = ["@lz4"],
     alwayslink = True,
 )
 
