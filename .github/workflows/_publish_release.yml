@@ -144,12 +144,12 @@ jobs:
     needs:
     - release
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.32
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.33
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.32
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.33
       with:
         ref: main
         repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
