@@ -2106,3 +2106,10 @@ envoy.filters.http.dynamic_modules:
   status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+envoy.filters.http.connection_pool_cardinality:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.connection_pool_cardinality.v3.ConnectionPoolCardinalityConfig
