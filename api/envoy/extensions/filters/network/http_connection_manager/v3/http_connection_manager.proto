@@ -265,14 +265,13 @@ message HttpConnectionManager {
     bool uri = 5;
   }
 
-  // [#next-free-field: 3]
   // The configuration for forwarding client cert details.
   message ForwardClientCertConfig {
-      // How to handle the XFCC header.
-      ForwardClientCertDetails forward_client_cert_details = 1;
+    // How to handle the XFCC header.
+    ForwardClientCertDetails forward_client_cert_details = 1;
 
-      // How to set the current client cert details.
-      SetCurrentClientCertDetails set_current_client_cert_details = 2;
+    // How to set the current client cert details.
+    SetCurrentClientCertDetails set_current_client_cert_details = 2;
   }
 
   // The configuration for HTTP upgrades.
