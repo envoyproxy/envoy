@@ -124,9 +124,10 @@ message Config {
   //
   // .. warning::
   //   Gauges have to be kept in memory for their lifetime because
-  //   ADD/SUBTRACT/SET operations depend on the previous status. Please have an
+  //   ADD/SUBTRACT operations depend on the previous status. Please have an
   //   estimate on the cardinality of dynamic gauges introduced and keep in mind
   //   on the memory overhead.
+  // [#next-free-field: 6]
   message Gauge {
     // The operation to perform on the gauge.
     enum OperationType {
