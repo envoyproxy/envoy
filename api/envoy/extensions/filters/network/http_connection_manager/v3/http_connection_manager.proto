@@ -15,7 +15,6 @@ import "envoy/config/trace/v3/http_tracer.proto";
 import "envoy/type/http/v3/path_transformation.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
-import "envoy/extensions/transport_sockets/tls/v3/common.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
