@@ -134,6 +134,18 @@ vhds:
           cluster_name: xds_cluster
 )EOF";
 
+const char RdsConfigWithSingletonVhds[] = R"EOF(
+name: my_route
+vhds:
+  use_singleton_subscription: true
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+)EOF";
+
 class VhdsIntegrationTest : public HttpIntegrationTest,
                             public Grpc::UnifiedOrLegacyMuxIntegrationParamTest {
 public:
@@ -210,10 +222,16 @@ public:
     RELEASE_ASSERT(result, result.message());
     vhds_stream_->startGrpcStream();
 
-    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
-                                             vhds_stream_.get()));
+    if (use_singleton_vhds) {
+      EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {"my_route"},
+                                               {}, vhds_stream_.get()));
+    } else {
+      EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                               vhds_stream_.get()));
+    }
     sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
         Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_.get());
+
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                              vhds_stream_.get()));
 
@@ -224,9 +242,11 @@ public:
   }
 
   void useRdsWithVhosts() { use_rds_with_vhosts = true; }
+  void useSingletonVhds() { use_singleton_vhds = true; }
   const envoy::config::route::v3::RouteConfiguration rdsConfig() const {
     return TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
-        use_rds_with_vhosts ? RdsConfigWithVhosts : RdsConfig);
+        use_rds_with_vhosts ? RdsConfigWithVhosts
+                            : (use_singleton_vhds ? RdsConfigWithSingletonVhds : RdsConfig));
   }
 
   void notifyAboutAliasResolutionFailure(const std::string& version, FakeStreamPtr& stream,
@@ -282,6 +302,7 @@ public:
 
   FakeStreamPtr vhds_stream_;
   bool use_rds_with_vhosts{false};
+  bool use_singleton_vhds{false};
 };
 
 } // namespace Envoy
