@@ -2100,7 +2100,12 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+    // TODO(wbpcode): We should standardize the reset reason for HTTP/2 and HTTP/3.
+    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
+                   ? Http::StreamResetReason::ProtocolError
+               : GetParam().use_universal_header_validator ? Http::StreamResetReason::ProtocolError
+                                                           : Http::StreamResetReason::RemoteReset),
+              response->resetReason());
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
 }
@@ -2138,7 +2143,12 @@ TEST_P(DownstreamProtocolIntegrationTest, TrailerWithUnderscoresCauseRequestReje
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+    // TODO(wbpcode): We should standardize the reset reason for HTTP/2 and HTTP/3.
+    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
+                   ? Http::StreamResetReason::ProtocolError
+               : GetParam().use_universal_header_validator ? Http::StreamResetReason::ProtocolError
+                                                           : Http::StreamResetReason::RemoteReset),
+              response->resetReason());
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
 }
