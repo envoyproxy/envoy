@@ -325,6 +325,7 @@ proto_library(
         "//envoy/extensions/load_balancing_policies/round_robin/v3:pkg",
         "//envoy/extensions/load_balancing_policies/subset/v3:pkg",
         "//envoy/extensions/load_balancing_policies/wrr_locality/v3:pkg",
+        "//envoy/extensions/local_address_selectors/filter_state_override/v3:pkg",
         "//envoy/extensions/matching/common_inputs/environment_variable/v3:pkg",
         "//envoy/extensions/matching/common_inputs/network/v3:pkg",
         "//envoy/extensions/matching/common_inputs/ssl/v3:pkg",
