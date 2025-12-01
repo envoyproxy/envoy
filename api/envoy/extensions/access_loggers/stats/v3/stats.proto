@@ -114,7 +114,7 @@ message Config {
     string value_format = 2
         [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
 
-    // A fixed value to add to this counter.
+    // A fixed value to add/subtract/set to this gauge.
     // One of ``value_format`` or ``value_fixed`` must be configured.
     google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
 
