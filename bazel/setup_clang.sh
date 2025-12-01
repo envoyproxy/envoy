@@ -15,13 +15,16 @@ fi
 LLVM_VERSION="$("${LLVM_CONFIG}" --version)"
 LLVM_LIBDIR="$("${LLVM_CONFIG}" --libdir)"
 LLVM_TARGET="$("${LLVM_CONFIG}" --host-target)"
-PATH="$("${LLVM_CONFIG}" --bindir):${PATH}"
+LLVM_BINDIR=$("${LLVM_CONFIG}" --bindir)
+PATH="$LLVM_BINDIR:${PATH}"
 
 RT_LIBRARY_PATH="${LLVM_LIBDIR}/clang/${LLVM_VERSION}/lib/${LLVM_TARGET}"
 
 cat <<EOF > "${BAZELRC_FILE}"
 # Generated file, do not edit. If you want to disable clang, just delete this file.
 build:clang --host_action_env=PATH=${PATH} --action_env=PATH=${PATH}
+build:clang --host_action_env=CC="${LLVM_BINDIR}/clang" --action_env=CC="${LLVM_BINDIR}/clang"
+build:clang --host_action_env=CXX="${LLVM_BINDIR}/clang++" --action_env=CC="${LLVM_BINDIR}/clang++"
 build:clang --define="LLVM_DIRECTORY=${LLVM_PREFIX}"
 build:clang --action_env="LLVM_DIRECTORY=${LLVM_PREFIX}"
 

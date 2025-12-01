@@ -748,6 +748,9 @@ message Cluster {
     // If both this and preconnect_ratio are set, Envoy will make sure both predicted needs are met,
     // basically preconnecting max(predictive-preconnect, per-upstream-preconnect), for each
     // upstream.
+    //
+    // This is limited somewhat arbitrarily to 3 because preconnecting too aggressively can
+    // harm latency more than the preconnecting helps.
     google.protobuf.DoubleValue predictive_preconnect_ratio = 2
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
