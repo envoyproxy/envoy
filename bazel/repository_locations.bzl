@@ -561,7 +561,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "MIT",
         license_url = "https://github.com/LuaJIT/LuaJIT/blob/{version}/COPYRIGHT",
     ),
-    com_github_nghttp2_nghttp2 = dict(
+    nghttp2 = dict(
         project_name = "Nghttp2",
         project_desc = "Implementation of HTTP/2 and its header compression algorithm HPACK in C",
         project_url = "https://nghttp2.org",
