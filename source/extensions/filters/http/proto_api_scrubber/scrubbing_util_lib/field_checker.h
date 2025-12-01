@@ -32,10 +32,28 @@ using proto_processing_lib::proto_scrubber::ScrubberContext;
 class FieldChecker : public FieldCheckerInterface, public Logger::Loggable<Logger::Id::filter> {
 public:
   FieldChecker(const ScrubberContext scrubber_context,
-               const Envoy::StreamInfo::StreamInfo* stream_info, const std::string& method_name,
+               const Envoy::StreamInfo::StreamInfo* stream_info,
+               const Http::RequestHeaderMap* request_headers,
+               const Http::ResponseHeaderMap* response_headers,
+               const Http::RequestTrailerMap* request_trailers,
+               const Http::ResponseTrailerMap* response_trailers, const std::string& method_name,
                const ProtoApiScrubberFilterConfig* filter_config)
       : scrubber_context_(scrubber_context), matching_data_(*stream_info),
-        method_name_(method_name), filter_config_ptr_(filter_config) {}
+        method_name_(method_name), filter_config_ptr_(filter_config) {
+    // Populate matching data with whatever is available.
+    if (request_headers != nullptr) {
+      matching_data_.onRequestHeaders(*request_headers);
+    }
+    if (response_headers != nullptr) {
+      matching_data_.onResponseHeaders(*response_headers);
+    }
+    if (request_trailers != nullptr) {
+      matching_data_.onRequestTrailers(*request_trailers);
+    }
+    if (response_trailers != nullptr) {
+      matching_data_.onResponseTrailers(*response_trailers);
+    }
+  }
 
   // This type is neither copyable nor movable.
   FieldChecker(const FieldChecker&) = delete;
