@@ -269,14 +269,13 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.json_to_metadata.v3.JsonToMetadata
 )EOF");
 
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
-        route->mutable_match()->set_path("/route/override");
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+    route->mutable_match()->set_path("/route/override");
 
-        // Per-route configuration that overrides the global config
-        const std::string per_route_config = R"EOF(
+    // Per-route configuration that overrides the global config
+    const std::string per_route_config = R"EOF(
 request_rules:
   rules:
   - selectors:
@@ -292,15 +291,14 @@ response_rules:
       metadata_namespace: envoy.lb
       key: route_field
 )EOF";
-        envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata
-            route_json_to_metadata;
-        TestUtility::loadFromYaml(per_route_config, route_json_to_metadata);
-        
-        Protobuf::Any per_route_any;
-        per_route_any.PackFrom(route_json_to_metadata);
-        route->mutable_typed_per_filter_config()->insert(
-            {"envoy.filters.http.json_to_metadata", per_route_any});
-      });
+    envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata route_json_to_metadata;
+    TestUtility::loadFromYaml(per_route_config, route_json_to_metadata);
+
+    Protobuf::Any per_route_any;
+    per_route_any.PackFrom(route_json_to_metadata);
+    route->mutable_typed_per_filter_config()->insert(
+        {"envoy.filters.http.json_to_metadata", per_route_any});
+  });
 
   initialize();
 
