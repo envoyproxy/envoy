@@ -5036,19 +5036,7 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingFailedOpen) {
   auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
   proto_config_.set_failure_mode_allow(true);
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
-  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    auto* access_log = cm.add_access_log();
-    access_log->set_name("accesslog");
-    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-    access_log_config.set_path(access_log_path);
-    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
-
-    // Test field extraction for coverage.
-    (*json_format->mutable_fields())["failed_open_field"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:failed_open)%");
-
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-  });
+  initializeLogConfig(access_log_path);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);

@@ -933,6 +933,8 @@ void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_sent)%");
     (*json_format->mutable_fields())["field_bytes_received"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_received)%");
+    (*json_format->mutable_fields())["failed_open_field"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:failed_open)%");
 
     // Test non-existent field for coverage
     (*json_format->mutable_fields())["field_non_existent"].set_string_value(
