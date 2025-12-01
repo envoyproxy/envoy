@@ -124,6 +124,10 @@ common:clang --config=clang-common
 common:clang --config=libc++
 common:clang --host_platform=@clang_platform
 
+# Clang installed to non-standard location (ie not /opt/llvm/)
+common:clang-local --config=clang-common
+common:clang-local --config=libc++
+
 # Use gold linker for gcc compiler.
 build:gcc --config=libstdc++
 build:gcc --test_env=HEAPCHECK=
