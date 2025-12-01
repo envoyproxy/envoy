@@ -380,6 +380,11 @@ new_features:
 - area: network
   change: |
     Add logging info for network ext_proc to filter state.
+- area: upstream
+  change: |
+    Added an extension to override the :ref:`upstream bind address Linux network namespace
+    <extension_envoy.upstream.local_address_selector.filter_state_override>` using a shared filter
+    state object.
 - area: formatter
   change: |
     Added new ``US_RX_BODY_BEG`` time point to the ``%COMMON_DURATION%`` to indicate
