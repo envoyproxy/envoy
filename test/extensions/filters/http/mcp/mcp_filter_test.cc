@@ -184,11 +184,30 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
 
   filter_->decodeHeaders(headers, false);
 
-  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
 
-  // Expect dynamic metadata to be set
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+
+        auto jsonrpc_it = fields.find("jsonrpc");
+        ASSERT_NE(jsonrpc_it, fields.end());
+        EXPECT_EQ(jsonrpc_it->second.string_value(), "2.0");
+
+        auto method_it = fields.find("method");
+        ASSERT_NE(method_it, fields.end());
+        EXPECT_EQ(method_it->second.string_value(), "tools/call");
+
+        auto params_it = fields.find("params");
+        ASSERT_NE(params_it, fields.end());
+        const auto& params = params_it->second.struct_value().fields();
+
+        auto name_it = params.find("name");
+        ASSERT_NE(name_it, params.end());
+        EXPECT_EQ(name_it->second.string_value(), "test");
+      });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
