@@ -17,6 +17,7 @@
 #include "envoy/router/router.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/message_validator_impl.h"
@@ -27,7 +28,7 @@ namespace Extensions {
 namespace Upstreams {
 namespace Http {
 
-class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
+class ProtocolOptionsConfigImpl : public Upstream::HttpProtocolOptionsConfig {
 public:
   static absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>> createProtocolOptionsConfig(
       const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
@@ -45,6 +46,30 @@ public:
   // returns a unit64_t representing the enabled Upstream::ClusterInfo::Features.
   static uint64_t parseFeatures(const envoy::config::cluster::v3::Cluster& config,
                                 const ProtocolOptionsConfigImpl& options);
+
+  const Envoy::Http::Http1Settings& http1Settings() const override { return http1_settings_; }
+  const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
+    return http2_options_;
+  }
+  const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const override {
+    return http3_options_;
+  }
+  const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
+    return common_http_protocol_options_;
+  }
+  const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
+  upstreamHttpProtocolOptions() const override {
+    return upstream_http_protocol_options_;
+  }
+  const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  alternateProtocolsCacheOptions() const override {
+    return alternate_protocol_cache_options_;
+  }
+  const std::vector<Envoy::Router::ShadowPolicyPtr>& shadowPolicies() const override {
+    return shadow_policies_;
+  }
+  const Envoy::Router::RetryPolicy* retryPolicy() const override { return retry_policy_.get(); }
+  const Envoy::Http::HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
   const Envoy::Http::Http1Settings http1_settings_;
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;

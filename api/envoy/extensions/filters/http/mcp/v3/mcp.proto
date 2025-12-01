@@ -53,8 +53,13 @@ message Mcp {
   google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {lte: 10485760}];
 }
 
-// McpOverride for MCP filter
+// Per-route override configuration for MCP filter
 message McpOverride {
   // Optional per-route traffic mode override
   Mcp.TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // Optional per-route max request body size override.
+  // When set, this overrides the global max_request_body_size for this route.
+  // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
+  google.protobuf.UInt32Value max_request_body_size = 2 [(validate.rules).uint32 = {lte: 10485760}];
 }
