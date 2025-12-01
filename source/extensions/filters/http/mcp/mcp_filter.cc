@@ -24,6 +24,9 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
       max_request_body_size_(proto_config.has_max_request_body_size()
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB
+      parser_config_(proto_config.has_parser_config()
+                         ? McpParserConfig::fromProto(proto_config.parser_config())
+                         : McpParserConfig::createDefault()),
       stats_(generateStats(stats_prefix, scope)) {}
 
 bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const {

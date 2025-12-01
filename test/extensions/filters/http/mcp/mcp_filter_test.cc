@@ -344,7 +344,7 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitContinues) {
 TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(20); // Very small limit
-  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -580,7 +580,7 @@ TEST_F(McpFilterTest, FilterWithCustomParserConfig) {
   method_rule->set_method("custom/method");
   method_rule->add_extraction_rules()->set_path("params.custom_field");
 
-  config_ = std::make_shared<McpFilterConfig>(proto_config);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
