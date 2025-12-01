@@ -17,6 +17,8 @@ namespace {
 
 using ::apikeys::ApiKey;
 using ::apikeys::CreateApiKeyRequest;
+using ::apikeys::ListApiKeysRequest;
+using ::apikeys::ListApiKeysResponse;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::checkSerializedData;
 
 void compareJson(const std::string& actual, const std::string& expected) {
@@ -76,6 +78,9 @@ typed_config:
         parent: EXTRACT
       response_extraction_by_field:
         name: EXTRACT
+    apikeys.ApiKeys.ListApiKeys:
+      response_extraction_by_field:
+        keys: EXTRACT_REPEATED_CARDINALITY
 )EOF",
         TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
   }
@@ -261,6 +266,48 @@ TEST_P(IntegrationTest, Streaming) {
     "first": {
       "@type": "type.googleapis.com/apikeys.CreateApiKeyRequest",
       "parent": "from-req1"
+    }
+  }
+})");
+}
+
+TEST_P(IntegrationTest, ExtractRepeatedCardinality) {
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  ListApiKeysRequest request;
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  auto request_headers = Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                        {":path", "/apikeys.ApiKeys/ListApiKeys"},
+                                                        {"content-type", "application/grpc"},
+                                                        {":authority", "host"},
+                                                        {":scheme", "http"}};
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, request_data->toString());
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was properly propagated (with no modification).
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(upstream_request_->receivedData());
+  EXPECT_EQ(upstream_request_->body().toString(), request_data->toString());
+
+  // Send response.
+  ListApiKeysResponse list_response;
+  list_response.add_keys();
+  list_response.add_keys();
+  Envoy::Buffer::InstancePtr response_data =
+      Envoy::Grpc::Common::serializeToGrpcFrame(list_response);
+  sendResponse(response.get(), response_data.get());
+
+  compareJson(waitForAccessLog(access_log_name_), R"(
+{
+  "requests": {
+    "first": {
+      "@type": "type.googleapis.com/apikeys.ListApiKeysRequest"
+    }
+  },
+  "responses": {
+    "first": {
+      "@type": "type.googleapis.com/apikeys.ListApiKeysResponse",
+      "numResponseItems": "2"
     }
   }
 })");

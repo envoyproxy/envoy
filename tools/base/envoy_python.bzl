@@ -4,46 +4,11 @@ load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 
-ENVOY_PYTOOL_NAMESPACE = [
-    ":py-init",
-    "@envoy//:py-init",
-    "@envoy//tools:py-init",
-]
-
-def envoy_pytool_binary(
-        name,
-        data = None,
-        init_data = ENVOY_PYTOOL_NAMESPACE,
-        **kwargs):
-    """Wraps py_binary with envoy namespaced __init__.py files.
-
-    If used outside of tools/${toolname}/BUILD you must specify the init_data."""
-    py_binary(
-        name = name,
-        data = init_data + (data or []),
-        **kwargs
-    )
-
-def envoy_pytool_library(
-        name,
-        data = None,
-        init_data = ENVOY_PYTOOL_NAMESPACE,
-        **kwargs):
-    """Wraps py_library with envoy namespaced __init__.py files.
-
-    If used outside of tools/${toolname}/BUILD you must specify the init_data."""
-    py_library(
-        name = name,
-        data = init_data + (data or []),
-        **kwargs
-    )
-
 def envoy_jinja_env(
         name,
         templates,
         filters = {},
         env_kwargs = {},
-        init_data = ENVOY_PYTOOL_NAMESPACE,
         data = [],
         deps = []):
     """This provides a prebuilt jinja environment that can be imported as a module.
@@ -164,10 +129,9 @@ def envoy_jinja_env(
         tools = [name_templates],
     )
 
-    envoy_pytool_library(
+    py_library(
         name = name,
         srcs = [name_env_py],
-        init_data = init_data,
         data = [name_templates],
         deps = [name_entry_point],
     )
@@ -237,7 +201,6 @@ def envoy_genjson(
 def envoy_py_data(
         name,
         src,
-        init_data = ENVOY_PYTOOL_NAMESPACE,
         format = None):
     """Preload JSON/YAML data as a python lib.
 
@@ -292,7 +255,6 @@ def envoy_py_data(
         name = name_entry_point,
         pkg = "@base_pip3//envoy_base_utils",
         script = "envoy.data_env",
-        data = init_data,
     )
 
     native.genrule(
@@ -319,10 +281,9 @@ def envoy_py_data(
         tools = [name_pickle],
     )
 
-    envoy_pytool_library(
+    py_library(
         name = name,
         srcs = [name_env_py],
-        init_data = init_data,
         data = [name_pickle],
         deps = [name_entry_point, requirement("envoy.base.utils")],
     )
@@ -333,7 +294,6 @@ def envoy_gencontent(
         output,
         srcs = [],
         yaml_srcs = [],
-        init_data = ENVOY_PYTOOL_NAMESPACE,
         json_kwargs = {},
         template_name = None,
         template_filters = {},
@@ -380,11 +340,9 @@ def envoy_gencontent(
     envoy_py_data(
         name = "%s_data" % name,
         src = ":%s_json" % name,
-        init_data = init_data,
     )
     envoy_jinja_env(
         name = name_tpl,
-        init_data = init_data,
         env_kwargs = template_kwargs,
         templates = [template],
         filters = template_filters,
@@ -404,11 +362,10 @@ def envoy_gencontent(
         outs = ["%s_generate_content.py" % name],
         tools = [":%s" % name_data, name_tpl, template],
     )
-    envoy_pytool_binary(
+    py_binary(
         name = "%s_generate_content" % name,
         main = ":%s_generate_content.py" % name,
         srcs = [":%s_generate_content.py" % name],
-        init_data = init_data,
         deps = [
             ":%s" % name_data,
             name_tpl,

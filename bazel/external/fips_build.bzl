@@ -5,14 +5,14 @@ BUILD_COMMAND = """
 set -eo pipefail
 
 # c++
-export CC=$(CC)
+export CC="$$(realpath $(CC))"
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
     export CXXFLAGS="-stdlib=libc++"
-    export LDFLAGS="-stdlib=libc++ -lc++ -lc++abi -lm -pthread"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -lc++ -lc++abi -lm -pthread"
 else
     export CXXFLAGS=""
-    export LDFLAGS="-lstdc++ -lm -pthread"
+    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread"
 fi
 
 # ninja
@@ -56,15 +56,15 @@ set -eo pipefail
 SRC_DIR=$$(dirname $(location @fips_ninja//:configure.py))
 OUT_FILE=$$(realpath $@)
 PYTHON_BIN=$$(realpath $(PYTHON3))
-export CC=$(CC)
-export CXX=$(CC)
+export CC="$$(realpath $(CC))"
+export CXX="$$(realpath $(CC))"
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
     export CXXFLAGS="-stdlib=libc++"
-    export LDFLAGS="-stdlib=libc++ -lc++ -lc++abi -lm -pthread"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -lc++ -lc++abi -lm -pthread"
 else
     export CXXFLAGS=""
-    export LDFLAGS="-lstdc++ -lm -pthread"
+    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread"
 fi
 cd $$SRC_DIR
 OUTPUT=$$(mktemp)

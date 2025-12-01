@@ -636,6 +636,7 @@ public:
               - '*'
               name: local_proxy_route
           stat_prefix: ingress_http
+    per_connection_buffer_limit_bytes: 1024
       )EOF");
   }
 
@@ -662,9 +663,18 @@ TEST_P(DynamicModulesTerminalIntegrationTest, StreamingTerminalFilter) {
   EXPECT_EQ("Who are you?", response->body());
   response->clearBody();
 
+  auto large_response_chunk = std::string(1024, 'a');
   codec_client_->sendData(request_encoder, "Envoy", false);
-  response->waitForBodyData(24);
-  EXPECT_EQ("Hi Envoy. Anything else?", response->body());
+  // Have the client read only a chunk at a time to ensure watermarks are
+  // triggered.
+  for (int i = 0; i < 8; i++) {
+    response->waitForBodyData(1024 * (i + 1));
+  }
+  auto large_response = std::string("");
+  for (int i = 0; i < 8; i++) {
+    large_response += large_response_chunk;
+  }
+  EXPECT_EQ(large_response, response->body());
   response->clearBody();
 
   codec_client_->sendData(request_encoder, "Nope", true);
@@ -675,6 +685,30 @@ TEST_P(DynamicModulesTerminalIntegrationTest, StreamingTerminalFilter) {
                             ->get(Http::LowerCaseString("x-status"))[0]
                             ->value()
                             .getStringView());
+  unsigned int above_watermark_count;
+  unsigned int below_watermark_count;
+  EXPECT_TRUE(absl::SimpleAtoi(response->trailers()
+                                   .get()
+                                   ->get(Http::LowerCaseString("x-above-watermark-count"))[0]
+                                   ->value()
+                                   .getStringView(),
+                               &above_watermark_count));
+  EXPECT_TRUE(absl::SimpleAtoi(response->trailers()
+                                   .get()
+                                   ->get(Http::LowerCaseString("x-below-watermark-count"))[0]
+                                   ->value()
+                                   .getStringView(),
+                               &below_watermark_count));
+  // The filter goes over the watermark count on large response body chunk. With 8 writes, we
+  // expect the counts to generally be 8. However, the response flow is executed to completion
+  // as soon as the 8th chunk is received by the client. In practice, it is extremely likely
+  // for the filter to get 8 above watermark callbacks, and highly likely to get the 8 corresponding
+  // below watermark callbacks, but it is conceivable timing issues can cause either to be one
+  // lower. Checking 7 or 8 should be a good test while also having no chance of flakiness.
+  EXPECT_GE(above_watermark_count, 7);
+  EXPECT_LE(above_watermark_count, 8);
+  EXPECT_GE(below_watermark_count, 7);
+  EXPECT_EQ(below_watermark_count, 8);
 }
 
 } // namespace Envoy

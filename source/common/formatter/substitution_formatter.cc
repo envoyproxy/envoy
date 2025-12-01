@@ -363,13 +363,13 @@ FormatterImpl::create(absl::string_view format, bool omit_empty_values,
   return ret;
 }
 
-std::string FormatterImpl::formatWithContext(const Context& context,
-                                             const StreamInfo::StreamInfo& stream_info) const {
+std::string FormatterImpl::format(const Context& context,
+                                  const StreamInfo::StreamInfo& stream_info) const {
   std::string log_line;
   log_line.reserve(256);
 
   for (const auto& provider : providers_) {
-    const absl::optional<std::string> bit = provider->formatWithContext(context, stream_info);
+    const absl::optional<std::string> bit = provider->format(context, stream_info);
     // Add the formatted value if there is one. Otherwise add a default value
     // of "-" if omit_empty_values_ is not set.
     if (bit.has_value()) {
@@ -387,7 +387,7 @@ void stringValueToLogLine(const JsonFormatterImpl::Formatters& formatters, const
                           std::string& sanitize, bool omit_empty_values) {
   log_line.push_back('"'); // Start the JSON string.
   for (const JsonFormatterImpl::Formatter& formatter : formatters) {
-    const absl::optional<std::string> value = formatter->formatWithContext(context, info);
+    const absl::optional<std::string> value = formatter->format(context, info);
     if (!value.has_value()) {
       // Add the empty value. This needn't be sanitized.
       log_line.append(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueStringView);
@@ -414,8 +414,8 @@ JsonFormatterImpl::JsonFormatterImpl(const Protobuf::Struct& struct_format, bool
   }
 }
 
-std::string JsonFormatterImpl::formatWithContext(const Context& context,
-                                                 const StreamInfo::StreamInfo& info) const {
+std::string JsonFormatterImpl::format(const Context& context,
+                                      const StreamInfo::StreamInfo& info) const {
   std::string log_line;
   log_line.reserve(2048);
   std::string sanitize; // Helper to serialize the value to log line.
@@ -439,7 +439,7 @@ std::string JsonFormatterImpl::formatWithContext(const Context& context,
     } else {
       // 3. Handle the formatter element with a single provider and value
       //    type needs to be kept.
-      const auto value = formatters[0]->formatValueWithContext(context, info);
+      const auto value = formatters[0]->formatValue(context, info);
       Json::Utility::appendValueToString(value, log_line);
     }
   }

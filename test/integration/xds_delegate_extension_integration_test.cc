@@ -184,7 +184,7 @@ public:
   }
 
   void waitforOnConfigUpdatedCount(const int expected_count) {
-    absl::MutexLock l(&lock_);
+    absl::MutexLock l(lock_);
     const auto reached_expected_count = [expected_count]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
       return TestXdsResourcesDelegate::OnConfigUpdatedCount == expected_count;
     };

@@ -4,12 +4,9 @@ load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
-load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_pytool_binary")
-load("//tools/python:namespace.bzl", "envoy_py_namespace")
+load("//tools/base:envoy_python.bzl", "envoy_genjson")
 
 licenses(["notice"])  # Apache 2
-
-envoy_py_namespace()
 
 # Currently we are unable to check for the libdrdkafka dep
 # this is a workaround to just exclude it from checks for now
@@ -67,7 +64,7 @@ py_console_script_binary(
     script = "dependatool",
 )
 
-envoy_pytool_binary(
+py_binary(
     name = "validate",
     srcs = ["validate.py"],
     args = [

@@ -485,8 +485,7 @@ public:
 class MockFluentdFormatter : public FluentdFormatter {
 public:
   MOCK_METHOD(std::vector<uint8_t>, format,
-              (const Formatter::HttpFormatterContext& context,
-               const StreamInfo::StreamInfo& stream_info),
+              (const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info),
               (const));
 };
 

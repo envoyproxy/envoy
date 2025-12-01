@@ -32,7 +32,7 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
     return;
   }
 
-  Formatter::HttpFormatterContext formatter_context;
+  Formatter::Context formatter_context;
   formatter_context.setRequestHeaders(*request_headers)
       .setResponseHeaders(*response_headers)
       .setResponseTrailers(*response_trailers);
@@ -54,7 +54,7 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
     }
 
     // This should never throw.
-    formatter->formatWithContext(formatter_context, *stream_info);
+    formatter->format(formatter_context, *stream_info);
     ENVOY_LOG_MISC(trace, "TEXT formatter Success");
   }
 
@@ -108,9 +108,9 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
 
     // This should never throw.
     const std::string keep_empty_result =
-        formatter_keep_empty->formatWithContext(formatter_context, *stream_info);
+        formatter_keep_empty->format(formatter_context, *stream_info);
     const std::string omit_empty_result =
-        formatter_omit_empty->formatWithContext(formatter_context, *stream_info);
+        formatter_omit_empty->format(formatter_context, *stream_info);
 
     // Ensure the result is legal JSON.
     Protobuf::Struct proto_struct;

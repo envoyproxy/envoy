@@ -1,0 +1,24 @@
+module(
+    name = "envoy_mobile",
+    version = "1.37.0-dev",
+)
+
+# Core Envoy dependencies - inherited from parent module
+bazel_dep(name = "envoy", version = "1.37.0-dev")
+bazel_dep(name = "envoy_api", version = "1.37.0-dev")
+bazel_dep(name = "envoy_build_config", version = "1.37.0-dev")
+
+local_path_override(
+    module_name = "envoy",
+    path = "..",
+)
+
+local_path_override(
+    module_name = "envoy_api",
+    path = "../api",
+)
+
+local_path_override(
+    module_name = "envoy_build_config",
+    path = "envoy_build_config",
+)

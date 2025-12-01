@@ -32,8 +32,13 @@ envoy_cmake(
         "CMAKE_INSTALL_LIBDIR": "lib",
         "FAT_RUNTIME": "on",
         "RAGEL": "$$EXT_BUILD_DEPS/ragel/bin/ragel",
+        "PYTHON_EXECUTABLE": "$(PYTHON3)",
     },
     default_cache_entries = {},
+    env = {
+        "NM": "$(NM)",
+        "OBJCOPY": "$(OBJCOPY)",
+    },
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {
             "Pool": "linux_x64_xlarge",
@@ -48,6 +53,7 @@ envoy_cmake(
     out_static_libs = ["libhs.a"],
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    toolchains = ["@rules_python//python:current_py_toolchain"],
     deps = [
         "//bazel/foreign_cc:ragel",
     ],

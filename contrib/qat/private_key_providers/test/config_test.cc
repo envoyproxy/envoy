@@ -13,6 +13,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/node_hash_map.h"
 #include "contrib/qat/private_key_providers/source/qat_private_key_provider.h"
 #include "fake_factory.h"
 #include "gtest/gtest.h"
@@ -35,13 +36,20 @@ parsePrivateKeyProviderFromV3Yaml(const std::string& yaml_string) {
 class FakeSingletonManager : public Singleton::Manager {
 public:
   FakeSingletonManager(LibQatCryptoSharedPtr libqat) : libqat_(libqat) {}
-  Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb,
+  Singleton::InstanceSharedPtr get(const std::string& name, Singleton::SingletonFactoryCb,
                                    bool) override {
-    return std::make_shared<QatManager>(libqat_);
+    auto existing = singletons_[name].lock();
+    if (existing == nullptr) {
+      auto singleton = std::make_shared<QatManager>(libqat_);
+      singletons_[name] = singleton;
+      return singleton;
+    }
+    return existing;
   }
 
 private:
   LibQatCryptoSharedPtr libqat_;
+  absl::node_hash_map<std::string, std::weak_ptr<Singleton::Instance>> singletons_;
 };
 
 class QatConfigTest : public Event::TestUsingSimulatedTime, public testing::Test {

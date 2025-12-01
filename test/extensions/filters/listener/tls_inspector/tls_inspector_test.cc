@@ -463,6 +463,9 @@ TEST_P(TlsInspectorTest, NotSsl) {
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
   EXPECT_EQ(5, bytes_processed[0]);
+  EXPECT_EQ(
+      "TLS_error|error:100000f7:SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER:TLS_error_end",
+      cb_.streamInfo().downstreamTransportFailureReason());
 }
 
 // Verify that a plain text connection with a single I/O read of more than

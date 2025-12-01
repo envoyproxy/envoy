@@ -21,10 +21,6 @@ on:
       arch:
         type: string
         default: x64
-      bazel-extra:
-        type: string
-        default: >-
-          --config=remote-envoy-engflow
       caches:
         type: string
         required: true
@@ -51,7 +47,23 @@ jobs:
     name: "[${{ inputs.arch }}] Prime Bazel cache"
     if: ${{ ! fromJSON(inputs.caches).bazel[inputs.arch] }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.32
+      with:
+        mounts: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/workspace
+            target: /source
+            chown: "runner:docker"
+          # Simulate container build directory
+          - src: /mnt/build
+            target: /build
+            chown: "runner:docker"
+    - name: Free diskspace
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.32
+      if: inputs.arch == 'x64' && github.event.repository.private
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.32
       id: checkout-target
       name: Checkout Envoy repository (target branch)
       with:
@@ -59,24 +71,19 @@ jobs:
         config: |
           fetch-depth: 1
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.32
       id: appauth
       name: Appauth (mutex lock)
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
 
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.32
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cache-key }}
         force-install: ${{ contains(fromJSON('["envoy-arm64-medium", "github-arm64-2c-8gb"]'), inputs.runs-on) }}
-    - run: |
-        # Simulate container build directory
-        sudo mkdir /build
-        sudo chown runner:docker /build
-        echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV
-    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.26
+    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.32
       id: bazel-cache
       name: Prime Bazel cache
       with:
@@ -84,12 +91,8 @@ jobs:
         # TODO(phlax): add loop for multiple targets
         command: |
           # Simulate container source directory
-          sudo mkdir /source
-          sudo chown runner:docker /source
           cd /source
-          git clone "$GITHUB_WORKSPACE" .
-
-          export BAZEL_BUILD_EXTRA_OPTIONS="--config=ci ${{ inputs.bazel-extra }}"
+          export BAZEL_BUILD_EXTRA_OPTIONS="--config=ci --config=rbe"
           export ENVOY_CACHE_ROOT=/build/bazel_root
           export ENVOY_CACHE_TARGETS=$(echo "${{ inputs.targets }}" | sed 's/ / + /g')
           # ironically the repository_cache is just about the only thing you dont want to cache
@@ -102,3 +105,5 @@ jobs:
         mount-tmpfs: false
         path: /build/bazel_root
         run-as-sudo: false
+      env:
+        GITHUB_TOKEN: ${{ github.token }}

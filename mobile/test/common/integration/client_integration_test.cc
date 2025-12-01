@@ -80,6 +80,8 @@ public:
   }
 
   void initialize() override {
+    // Integration test starts upstreams before Envoy which can cause a data race.
+    builder_.enableLogger(false);
     builder_.setLogLevel(Logger::Logger::trace);
     builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
     builder_.addRuntimeGuard("quic_no_tcp_delay", true);
@@ -246,7 +248,7 @@ void ClientIntegrationTest::basicTest() {
     ASSERT_EQ(2, last_stream_final_intel_.upstream_protocol);
   } else {
     // This verifies the H3 attempt was made due to the quic hints.
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     std::string stats = engine_->dumpStats();
     EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;
     // Make sure the client reported protocol was also HTTP/3.
@@ -267,14 +269,13 @@ TEST_P(ClientIntegrationTest, Basic) {
 #if not defined(__APPLE__)
 TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   std::atomic<bool> found_cache_miss{false};
-  auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
-    if (msg.find("ignoring failed address cache hit for miss for host 'doesnotexist") !=
-        std::string::npos) {
-      found_cache_miss = true;
-    }
-  };
-  builder_.setLogger(std::move(logger));
+  LogExpectation log_expect(
+      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
+        if (msg.find("ignoring failed address cache hit for miss for host 'doesnotexist") !=
+            std::string::npos) {
+          found_cache_miss = true;
+        }
+      });
   builder_.setDisableDnsRefreshOnFailure(true);
   initialize();
 
@@ -295,13 +296,12 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
 
 TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
   std::atomic<bool> found_force_dns_refresh{false};
-  auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
-    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
-      found_force_dns_refresh = true;
-    }
-  };
-  builder_.setLogger(std::move(logger));
+  LogExpectation log_expect(
+      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
+        if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+          found_force_dns_refresh = true;
+        }
+      });
   builder_.setDisableDnsRefreshOnNetworkChange(true);
   initialize();
 
@@ -314,15 +314,14 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
   std::atomic<bool> found_force_dns_refresh{false};
   std::vector<absl::Notification> handled_network_changes(5);
   std::atomic<int> current_change_event{0};
-  auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
-    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
-      found_force_dns_refresh = true;
-    } else if (msg.find("Finished the network changed callback") != std::string::npos) {
-      handled_network_changes[current_change_event].Notify();
-    }
-  };
-  builder_.setLogger(std::move(logger));
+  LogExpectation log_expect(
+      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
+        if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+          found_force_dns_refresh = true;
+        } else if (msg.find("Finished the network changed callback") != std::string::npos) {
+          handled_network_changes[current_change_event].Notify();
+        }
+      });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
   initialize();
 
@@ -373,17 +372,16 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
 TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
   absl::Notification found_force_dns_refresh;
   std::atomic<bool> handled_network_change{false};
-  auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
-    if (msg.find("Default network state has been changed. Current net configuration key") !=
-        std::string::npos) {
-      handled_network_change = true;
-    }
-    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
-      found_force_dns_refresh.Notify();
-    }
-  };
-  builder_.setLogger(std::move(logger));
+  LogExpectation log_expect(
+      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
+        if (msg.find("Default network state has been changed. Current net configuration key") !=
+            std::string::npos) {
+          handled_network_change = true;
+        }
+        if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+          found_force_dns_refresh.Notify();
+        }
+      });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
 
   initialize();
@@ -531,7 +529,7 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
   for (uint32_t i = 0; i < num_requests; ++i) {
     Platform::StreamPrototypeSharedPtr stream_prototype;
     {
-      absl::MutexLock l(&engine_lock_);
+      absl::MutexLock l(engine_lock_);
       stream_prototype = engine_->streamClient()->newStreamPrototype();
     }
 
@@ -583,7 +581,7 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
   for (uint32_t i = 0; i < num_requests; ++i) {
     Platform::StreamPrototypeSharedPtr stream_prototype;
     {
-      absl::MutexLock l(&engine_lock_);
+      absl::MutexLock l(engine_lock_);
       stream_prototype = engine_->streamClient()->newStreamPrototype();
     }
 
@@ -622,7 +620,7 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
     }
 
     if (terminate_engine && request_for_engine_termination == i) {
-      absl::MutexLock l(&engine_lock_);
+      absl::MutexLock l(engine_lock_);
       ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
       engine_.reset();
       break;
@@ -879,7 +877,7 @@ TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
   // Reset connectivity state. This should force a resolve but we will not
   // unblock it.
   {
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     engine_->engine()->resetConnectivityState();
   }
 
@@ -1416,7 +1414,7 @@ TEST_P(ClientIntegrationTest, Proxying) {
   }
   initialize();
   {
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     engine_->engine()->setProxySettings(fake_upstreams_[0]->localAddress()->asString().c_str(),
                                         fake_upstreams_[0]->localAddress()->ip()->port());
   }
@@ -1453,7 +1451,7 @@ TEST_P(ClientIntegrationTest, TestStats) {
   initialize();
 
   {
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     std::string stats = engine_->dumpStats();
     EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
   }

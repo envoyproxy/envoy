@@ -7,20 +7,6 @@ index 0000000000..b66101a39a
 @@ -0,0 +1 @@
 +exports_files(["six.BUILD", "zlib.BUILD"])
 
-# patching for zlib binding
-diff --git a/BUILD b/BUILD
-index efc3d8e7f..746ad4851 100644
---- a/BUILD
-+++ b/BUILD
-@@ -24,4 +24,4 @@ config_setting(
- # ZLIB configuration
- ################################################################################
-
--ZLIB_DEPS = ["@zlib//:zlib"]
-+ZLIB_DEPS = ["@envoy//bazel/foreign_cc:zlib"]
-
- ################################################################################
- # Protobuf Runtime Library
 diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
 index 97ac28028..8b7585d9d 100644
 --- a/python/google/protobuf/__init__.py

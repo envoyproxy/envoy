@@ -11,8 +11,8 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 absl::optional<std::string>
-StringValueFormatterProvider::formatWithContext(const FormatterContext& context,
-                                                const StreamInfo::StreamInfo& stream_info) const {
+StringValueFormatterProvider::format(const FormatterContext& context,
+                                     const StreamInfo::StreamInfo& stream_info) const {
   auto optional_str = value_extractor_(context, stream_info);
   if (!optional_str) {
     return absl::nullopt;
@@ -24,22 +24,23 @@ StringValueFormatterProvider::formatWithContext(const FormatterContext& context,
   }
   return optional_str;
 }
-Protobuf::Value StringValueFormatterProvider::formatValueWithContext(
-    const FormatterContext& context, const StreamInfo::StreamInfo& stream_info) const {
-  return ValueUtil::optionalStringValue(formatWithContext(context, stream_info));
+Protobuf::Value
+StringValueFormatterProvider::formatValue(const FormatterContext& context,
+                                          const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(format(context, stream_info));
 }
 
 absl::optional<std::string>
-GenericStatusCodeFormatterProvider::formatWithContext(const FormatterContext& context,
-                                                      const StreamInfo::StreamInfo&) const {
+GenericStatusCodeFormatterProvider::format(const FormatterContext& context,
+                                           const StreamInfo::StreamInfo&) const {
   CHECK_DATA_OR_RETURN(context, response_, absl::nullopt);
   const int code = checked_data->response_->status().code();
   return std::to_string(code);
 }
 
 Protobuf::Value
-GenericStatusCodeFormatterProvider::formatValueWithContext(const FormatterContext& context,
-                                                           const StreamInfo::StreamInfo&) const {
+GenericStatusCodeFormatterProvider::formatValue(const FormatterContext& context,
+                                                const StreamInfo::StreamInfo&) const {
   CHECK_DATA_OR_RETURN(context, response_, ValueUtil::nullValue());
   const int code = checked_data->response_->status().code();
   return ValueUtil::numberValue(code);

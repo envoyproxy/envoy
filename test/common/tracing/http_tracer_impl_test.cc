@@ -69,7 +69,7 @@ protected:
 
     EXPECT_CALL(config, modifySpan(_)).WillOnce(Invoke([this](Span& span) {
       HttpTraceContext trace_context{request_headers_};
-      const CustomTagContext ctx{trace_context, stream_info};
+      const CustomTagContext ctx{trace_context, stream_info, {&request_headers_}};
       for (const auto& [_, custom_tag] : custom_tags_) {
         custom_tag->applySpan(span, ctx);
       }
@@ -419,79 +419,83 @@ ree:
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
 
-  expectSetCustomTags(
-      {{"{ tag: aa, literal: { value: a } }", true, "a"},
-       {"{ tag: bb-1, request_header: { name: X-Bb, default_value: _b } }", true, "b"},
-       {"{ tag: bb-2, request_header: { name: X-Bb-Not-Found, default_value: b2 } }", true, "b2"},
-       {"{ tag: bb-3, request_header: { name: X-Bb-Not-Found } }", false, ""},
-       {"{ tag: cc-1, environment: { name: E_CC } }", true, "c"},
-       {"{ tag: cc-1-a, environment: { name: E_CC, default_value: _c } }", true, "c"},
-       {"{ tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }", true, "c2"},
-       {"{ tag: cc-3, environment: { name: E_CC_NOT_FOUND} }", false, ""},
-       {R"EOF(
+  expectSetCustomTags({
+      {"{ tag: aa, literal: { value: a } }", true, "a"},
+      {"{ tag: bb-1, request_header: { name: X-Bb, default_value: _b } }", true, "b"},
+      {"{ tag: bb-2, request_header: { name: X-Bb-Not-Found, default_value: b2 } }", true, "b2"},
+      {"{ tag: bb-3, request_header: { name: X-Bb-Not-Found } }", false, ""},
+      {"{ tag: cc-1, environment: { name: E_CC } }", true, "c"},
+      {"{ tag: cc-1-a, environment: { name: E_CC, default_value: _c } }", true, "c"},
+      {"{ tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }", true, "c2"},
+      {"{ tag: cc-3, environment: { name: E_CC_NOT_FOUND} }", false, ""},
+      {R"EOF(
 tag: dd-1,
 metadata:
   kind: { request: {} }
   metadata_key: { key: m.req, path: [ { key: ree }, { key: foo } ] })EOF",
-        true, "bar"},
-       {R"EOF(
+       true, "bar"},
+      {R"EOF(
 tag: dd-2,
 metadata:
   kind: { request: {} }
   metadata_key: { key: m.req, path: [ { key: not-found } ] }
   default_value: d2)EOF",
-        true, "d2"},
-       {R"EOF(
+       true, "d2"},
+      {R"EOF(
 tag: dd-3,
 metadata:
   kind: { request: {} }
   metadata_key: { key: m.req, path: [ { key: not-found } ] })EOF",
-        false, ""},
-       {R"EOF(
+       false, ""},
+      {R"EOF(
 tag: dd-4,
 metadata:
   kind: { request: {} }
   metadata_key: { key: m.req, path: [ { key: ree }, { key: nuu } ] }
   default_value: _d)EOF",
-        true, "1"},
-       {R"EOF(
+       true, "1"},
+      {R"EOF(
 tag: dd-5,
 metadata:
   kind: { route: {} }
   metadata_key: { key: m.rot, path: [ { key: ree }, { key: boo } ] })EOF",
-        true, "true"},
-       {R"EOF(
+       true, "true"},
+      {R"EOF(
 tag: dd-6,
 metadata:
   kind: { route: {} }
   metadata_key: { key: m.rot, path: [ { key: ree }, { key: poo } ] })EOF",
-        true, "false"},
-       {R"EOF(
+       true, "false"},
+      {R"EOF(
 tag: dd-7,
 metadata:
   kind: { cluster: {} }
   metadata_key: { key: m.cluster, path: [ { key: ree }, { key: emp } ] }
   default_value: _d)EOF",
-        true, ""},
-       {R"EOF(
+       true, ""},
+      {R"EOF(
 tag: dd-8,
 metadata:
   kind: { cluster: {} }
   metadata_key: { key: m.cluster, path: [ { key: ree }, { key: lii } ] }
   default_value: _d)EOF",
-        true, "[\"something\"]"},
-       {R"EOF(
+       true, "[\"something\"]"},
+      {R"EOF(
 tag: dd-9,
 metadata:
   kind: { host: {} }
   metadata_key: { key: m.host, path: [ { key: ree }, { key: stt } ] })EOF",
-        true, R"({"some":"thing"})"},
-       {R"EOF(
+       true, R"({"some":"thing"})"},
+      {R"EOF(
 tag: dd-10,
 metadata:
   kind: { host: {} }
   metadata_key: { key: m.host, path: [ { key: not-found } ] })EOF",
-        false, ""}});
+       false, ""},
+      {"{ tag: ee-1, value: '%REQ(x-bb)%' }", true, "b"},
+      {"{ tag: ee-2, value: '%REQ(x-bb-not-found)%_ee' }", true, "_ee"},
+      {"{ tag: ee-3, value: '%REQ(x-bb-not-found)%' }", false, ""},
+  });
 
   ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers_));
 

@@ -12,6 +12,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/config/remote_data_fetcher.h"
+#include "source/common/config/watched_directory.h"
 #include "source/common/init/target_impl.h"
 
 #include "absl/types/optional.h"
@@ -67,7 +68,7 @@ public:
 
   DynamicData(DynamicData&&) = default;
   DynamicData(Event::Dispatcher& main_dispatcher, ThreadLocal::TypedSlotPtr<ThreadLocalData> slot,
-              Filesystem::WatcherPtr watcher);
+              WatchedDirectoryPtr watcher);
   ~DynamicData();
 
   const std::string& data() const;
@@ -75,7 +76,7 @@ public:
 private:
   Event::Dispatcher& dispatcher_;
   ThreadLocal::TypedSlotPtr<ThreadLocalData> slot_;
-  Filesystem::WatcherPtr watcher_;
+  WatchedDirectoryPtr watcher_;
 };
 
 /**

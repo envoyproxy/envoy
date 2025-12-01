@@ -68,7 +68,7 @@ class GrpcMetricsStreamerImpl
       public Logger::Loggable<Logger::Id::stats_sinks> {
 public:
   GrpcMetricsStreamerImpl(Grpc::RawAsyncClientSharedPtr raw_async_client,
-                          const LocalInfo::LocalInfo& local_info);
+                          const LocalInfo::LocalInfo& local_info, uint32_t batch_size);
 
   // GrpcMetricsStreamer
   void send(MetricsPtr&& metrics) override;
@@ -81,8 +81,13 @@ public:
   }
 
 private:
+  void
+  sendBatch(const Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>& metrics,
+            int start_idx, int end_idx, bool send_identifier);
+
   const LocalInfo::LocalInfo& local_info_;
   const Protobuf::MethodDescriptor& service_method_;
+  const uint32_t batch_size_;
 };
 
 using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;

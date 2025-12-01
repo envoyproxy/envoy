@@ -102,8 +102,7 @@ public:
   void onMatchCallback(const Matcher::Action& action) override;
 
   // AccessLog::Instance
-  void log(const Formatter::HttpFormatterContext& log_context,
-           const StreamInfo::StreamInfo& info) override {
+  void log(const Formatter::Context& log_context, const StreamInfo::StreamInfo& info) override {
     for (const auto& log : access_loggers_) {
       log->log(log_context, info);
     }

@@ -129,8 +129,10 @@ message RouteConfiguration {
 
   // By default, port in :authority header (if any) is used in host matching.
   // With this option enabled, Envoy will ignore the port number in the :authority header (if any) when picking VirtualHost.
-  // NOTE: this option will not strip the port number (if any) contained in route config
-  // :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost`.domains field.
+  //
+  // .. note::
+  //     This option will not strip the port number (if any) contained in route config
+  //     :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost`.domains field.
   bool ignore_port_in_host_matching = 14;
 
   // Normally, virtual host matching is done using the :authority (or

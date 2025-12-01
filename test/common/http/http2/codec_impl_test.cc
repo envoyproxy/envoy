@@ -2724,6 +2724,65 @@ TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   }
 }
 
+// Verify that well-known header names use references to static strings and not copies.
+TEST(Http2CodecUtility, staticHeaderNameOptimization) {
+  // Test common HTTP/2 pseudo-headers.
+  {
+    HeaderString method_header(Headers::get().Method);
+    HeaderString path_header(Headers::get().Path);
+    HeaderString status_header(Headers::get().Status);
+    HeaderString authority_header(Headers::get().Host);
+    HeaderString scheme_header(Headers::get().Scheme);
+
+    // Verify these are references (not copies).
+    EXPECT_TRUE(method_header.isReference());
+    EXPECT_TRUE(path_header.isReference());
+    EXPECT_TRUE(status_header.isReference());
+    EXPECT_TRUE(authority_header.isReference());
+    EXPECT_TRUE(scheme_header.isReference());
+
+    // Verify the string values are correct.
+    EXPECT_EQ(method_header.getStringView(), ":method");
+    EXPECT_EQ(path_header.getStringView(), ":path");
+    EXPECT_EQ(status_header.getStringView(), ":status");
+    EXPECT_EQ(authority_header.getStringView(), ":authority");
+    EXPECT_EQ(scheme_header.getStringView(), ":scheme");
+  }
+
+  // Test common request headers.
+  {
+    HeaderString content_type_header(Headers::get().ContentType);
+    HeaderString content_length_header(Headers::get().ContentLength);
+    HeaderString user_agent_header(Headers::get().UserAgent);
+
+    EXPECT_TRUE(content_type_header.isReference());
+    EXPECT_TRUE(content_length_header.isReference());
+    EXPECT_TRUE(user_agent_header.isReference());
+
+    EXPECT_EQ(content_type_header.getStringView(), "content-type");
+    EXPECT_EQ(content_length_header.getStringView(), "content-length");
+    EXPECT_EQ(user_agent_header.getStringView(), "user-agent");
+  }
+
+  // Test that custom headers without static mappings are copied.
+  {
+    HeaderString custom_header;
+    custom_header.setCopy("x-custom-header", 15);
+
+    EXPECT_FALSE(custom_header.isReference());
+    EXPECT_EQ(custom_header.getStringView(), "x-custom-header");
+  }
+
+  // Test that when using setReference directly with a static string, it works correctly.
+  {
+    HeaderString ref_header;
+    ref_header.setReference(Headers::get().UserAgent.get());
+
+    EXPECT_TRUE(ref_header.isReference());
+    EXPECT_EQ(ref_header.getStringView(), "user-agent");
+  }
+}
+
 MATCHER_P(HasValue, m, "") {
   if (!arg.has_value()) {
     *result_listener << "does not contain a value";

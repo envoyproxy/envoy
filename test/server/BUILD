@@ -303,7 +303,7 @@ envoy_cc_test(
     tags = [
         # This test requires Docker with CPU limits (--cpus=2) to properly test 'cgroup' detection.
         # Run locally with `ENVOY_DOCKER_CPUS=2 ./ci/run_envoy_docker.sh ./ci/do_ci.sh cpu-detection
-        "runtime-cpu",
+        "manual",
         "no-remote",
     ],
     deps = [

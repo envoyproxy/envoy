@@ -135,6 +135,74 @@ xds_matcher:
   EXPECT_TRUE(route_config.get());
 }
 
+TEST(MatchWrapper, PerRouteConfigResponseHeaders) {
+  TestFactory test_factory;
+  Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+      inject_factory(test_factory);
+
+  const auto yaml = (R"EOF(
+xds_matcher:
+  matcher_tree:
+    input:
+      name: response-headers
+      typed_config:
+        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput
+        header_name: match-response-header
+    exact_match_map:
+        map:
+            match:
+                action:
+                    name: skip
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  MatchDelegateConfig factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute config;
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+      factory
+          .createRouteSpecificFilterConfig(config, server_factory_context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
+  EXPECT_TRUE(route_config.get());
+}
+
+TEST(MatchWrapper, PerRouteConfigResponseTrailers) {
+  TestFactory test_factory;
+  Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+      inject_factory(test_factory);
+
+  const auto yaml = (R"EOF(
+xds_matcher:
+  matcher_tree:
+    input:
+      name: response-trailers
+      typed_config:
+        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseTrailerMatchInput
+        header_name: match-response-trailer
+    exact_match_map:
+        map:
+            match:
+                action:
+                    name: skip
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  MatchDelegateConfig factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute config;
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+      factory
+          .createRouteSpecificFilterConfig(config, server_factory_context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
+  EXPECT_TRUE(route_config.get());
+}
+
 TEST(MatchWrapper, DEPRECATED_FEATURE_TEST(WithDeprecatedMatcher)) {
   TestFactory test_factory;
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>

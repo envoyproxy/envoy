@@ -170,11 +170,11 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::
     return;
   }
 
-  absl::InlinedVector<envoy_dynamic_module_type_http_header, 16> headers_vector;
+  absl::InlinedVector<envoy_dynamic_module_type_envoy_http_header, 16> headers_vector;
   headers_vector.reserve(response->headers().size());
   response->headers().iterate([&headers_vector](
                                   const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    headers_vector.emplace_back(envoy_dynamic_module_type_http_header{
+    headers_vector.emplace_back(envoy_dynamic_module_type_envoy_http_header{
         const_cast<char*>(header.key().getStringView().data()), header.key().getStringView().size(),
         const_cast<char*>(header.value().getStringView().data()),
         header.value().getStringView().size()});
@@ -243,6 +243,16 @@ void DynamicModuleHttpFilter::continueEncoding() {
     encoder_callbacks_->continueEncoding();
     in_continue_ = true;
   }
+}
+
+void DynamicModuleHttpFilter::onAboveWriteBufferHighWatermark() {
+  config_->on_http_filter_downstream_above_write_buffer_high_watermark_(thisAsVoidPtr(),
+                                                                        in_module_filter_);
+}
+
+void DynamicModuleHttpFilter::onBelowWriteBufferLowWatermark() {
+  config_->on_http_filter_downstream_below_write_buffer_low_watermark_(thisAsVoidPtr(),
+                                                                       in_module_filter_);
 }
 
 } // namespace HttpFilters

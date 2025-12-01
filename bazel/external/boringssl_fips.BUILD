@@ -1,5 +1,5 @@
 load("@envoy//bazel/external:fips_build.bzl", "boringssl_fips_build_command", "ninja_build_command")
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 
 licenses(["notice"])  # Apache 2
 
