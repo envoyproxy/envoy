@@ -94,8 +94,39 @@ message Config {
     google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
   }
 
-  // Configuration for a gauge stat.
-  // [#next-free-field: 6]
+  // Configuration for a gauge stat. Gauges can be used to add, subtract, or set
+  // values, and are useful for tracking concurrency or other mutable values
+  // over time.
+  //
+  // For example, to track active HTTP requests per method, we can set such
+  // config under HCM access logger:
+  //
+  // .. code-block:: yaml
+  //
+  //   stat_prefix: my_company
+  //   gauges:
+  //   - stat:
+  //       name: "http_active_requests"
+  //       tags:
+  //       - name: http_method
+  //         value_format: "%REQ(:METHOD)%"
+  //     value_fixed: 1
+  //     operation_type: Add
+  //     access_log_type: DownstreamStart
+  //   - stat:
+  //       name: "http_active_requests"
+  //       tags:
+  //       - name: http_method
+  //         value_format: "%REQ(:METHOD)%"
+  //     value_fixed: 1
+  //     operation_type: Subtract
+  //     access_log_type: DownstreamEnd
+  //
+  // .. warning::
+  //   Gauges have to be kept in memory for their lifetime because
+  //   ADD/SUBTRACT/SET operations depend on the previous status. Please have an
+  //   estimate on the cardinality of dynamic gauges introduced and keep in mind
+  //   on the memory overhead.
   message Gauge {
     // The operation to perform on the gauge.
     enum OperationType {
