@@ -11,7 +11,11 @@
 #include <string>
 #include <thread>
 
+#include "envoy/common/exception.h"
+
+#include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
 
 #include "absl/strings/str_split.h"
 
@@ -40,34 +44,33 @@ void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks&
     callbacks.onFailure(error);
     return;
   }
-  const double work_over_period = cpu_times.work_time - previous_cpu_times_.work_time;
-  const int64_t total_over_period = cpu_times.total_time - previous_cpu_times_.total_time;
-  if (work_over_period < 0 || total_over_period <= 0) {
-    const auto& error = EnvoyException(
-        fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
-                    "be a negative number and total_over_period='{}' must be a positive number.",
-                    work_over_period, total_over_period));
-    callbacks.onFailure(error);
+
+  // Calculate utilization (encapsulates cgroup v1 vs v2 differences and validation)
+  double current_utilization;
+  TRY_ASSERT_MAIN_THREAD {
+    current_utilization = cpu_times.calculateUtilization(previous_cpu_times_);
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
+    callbacks.onFailure(e);
     return;
   }
-  double current_utilization = 0.0;
+
+  // Debug logging
   if (cpu_times.is_cgroup_v2) {
-    const double total_over_period_seconds = total_over_period / 1000000000.0;
-    current_utilization =
-        ((work_over_period / 1000000.0) /
-         (total_over_period_seconds * cpu_times.effective_cores)); // Produces fraction 0.0-1.0
-    current_utilization = std::clamp(current_utilization, 0.0, 1.0);
+    const double work_over_period = cpu_times.work_time - previous_cpu_times_.work_time;
+    const int64_t total_over_period = cpu_times.total_time - previous_cpu_times_.total_time;
     ENVOY_LOG_MISC(trace, "cgroupsv2 current_utilization: {}", current_utilization);
     ENVOY_LOG_MISC(trace, "cgroupsv2 work_over_period: {}", work_over_period);
     ENVOY_LOG_MISC(trace, "cgroupsv2 total_over_period: {}", total_over_period);
     ENVOY_LOG_MISC(trace, "cgroupsv2 effective_cores: {}", cpu_times.effective_cores);
-  } else { // cgroup v1
-    ENVOY_LOG_MISC(trace, "cgroupsv1 using old formula");
-    current_utilization = work_over_period / total_over_period;
+  } else {
+    ENVOY_LOG_MISC(trace, "cgroupsv1 current_utilization: {}", current_utilization);
   }
   ENVOY_LOG_MISC(trace, "Prev work={}, Cur work={}, Prev Total={}, Cur Total={}",
                  previous_cpu_times_.work_time, cpu_times.work_time, previous_cpu_times_.total_time,
                  cpu_times.total_time);
+
   // The new utilization is calculated/smoothed using EWMA
   utilization_ = current_utilization * DAMPENING_ALPHA + (1 - DAMPENING_ALPHA) * utilization_;
 
