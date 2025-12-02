@@ -39,7 +39,7 @@ on:
           docker run
           --volume=${PWD}:/source
           --volume=${TMP_ENTRYPOINT}:/tmp/mobile-entrypoint.sh
-          --volume=/tmp/cache:/root/.cache
+          --volume=/tmp/mobile-cache:/root/.cache
           --volume=/tmp/container-output:/tmp/container-output
           --workdir=/source/mobile
           --entrypoint=/tmp/mobile-entrypoint.sh
@@ -146,7 +146,7 @@ jobs:
       bind-mount: ${{ inputs.bind-mount }}
       bind-mounts: |
         - src: /mnt/container-cache
-          target: /tmp/cache
+          target: /tmp/mobile-cache
           chown: "runner:runner"
       # This always just caches the main build image, the mobile one is layered on top
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
