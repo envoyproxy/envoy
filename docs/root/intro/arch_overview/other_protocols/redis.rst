@@ -143,10 +143,10 @@ original Redis command except possibly in failure scenarios.
 
 INFO command
 ^^^^^^^^^^^^
-INFO command is handled by envoy differently it aggregates metrics across all shards and returns consolidated cluster-wide statistics. 
-An optional section parameter can be provided to filter the output (e.g., INFO memory). 
-INFO.SHARD is an Envoy-specific command introduced for debugging purposes that queries a specific shard by index 
-and returns that shard's complete INFO response (e.g., INFO.SHARD 0 memory). 
+INFO command is handled by envoy differently it aggregates metrics across all shards and returns consolidated cluster-wide statistics.
+An optional section parameter can be provided to filter the output (e.g., INFO memory).
+INFO.SHARD is an Envoy-specific command introduced for debugging purposes that queries a specific shard by index
+and returns that shard's complete INFO response (e.g., INFO.SHARD 0 memory).
 Shard numbering starts from 0 and shards are ordered from lowest to highest slot assignment.
 when using INFO.SHARD command, if the provided shard index is invalid, Envoy will return an error.
 when using INFO.SHARD command, via redis-cli, make sure to use --raw flag to get the proper output format.
