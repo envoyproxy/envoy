@@ -1096,7 +1096,7 @@ TEST(DynamicModulesTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
   ASSERT_NE(captured_callbacks, nullptr);
 
-  EXPECT_CALL(dispatcher, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(dispatcher, deferredDelete_(_));
   filter->onDestroy();
 
   // Upstream callbacks may still run after destroy; ensure they safely return.
