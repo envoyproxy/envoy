@@ -31,6 +31,7 @@ envoy_cc_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -50,6 +51,7 @@ envoy_cc_test(
         "//test/proto:apikeys_proto_cc_proto",
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/strings",
     ],
