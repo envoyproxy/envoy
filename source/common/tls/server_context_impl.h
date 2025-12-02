@@ -74,7 +74,7 @@ protected:
   ServerContextImpl(
       Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
       const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
-      bool skip_selector, Server::Configuration::CommonFactoryContext& factory_context,
+      bool add_selector, Server::Configuration::CommonFactoryContext& factory_context,
       Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
 
 private:

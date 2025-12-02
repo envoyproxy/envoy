@@ -15,7 +15,7 @@ namespace Extensions {
 namespace CertificateSelectors {
 namespace OnDemand {
 
-#define ALL_CERT_SELECTION_STATS(COUNTER, GAUGE, HISTOGRAM) COUNTER(certificate_added)
+#define ALL_CERT_SELECTION_STATS(COUNTER, GAUGE, HISTOGRAM) COUNTER(cert_requested)
 
 struct CertSelectionStats {
   ALL_CERT_SELECTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
@@ -53,7 +53,7 @@ public:
                const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
       : ServerContextImpl(
             scope, tls_config,
-            std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config}, true,
+            std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config}, false,
             factory_context, nullptr, creation_status) {}
 
   // @returns the low-level TLS context stored in this context.
@@ -78,7 +78,8 @@ using HandleSharedPtr = std::shared_ptr<Handle>;
 
 // Maintains dynamic subscriptions to SDS secrets and converts them from the xDS form to the
 // boringssl TLS contexts, while applying the parent TLS configuration.
-class SecretManager : public std::enable_shared_from_this<SecretManager> {
+class SecretManager : public std::enable_shared_from_this<SecretManager>,
+                      protected Logger::Loggable<Logger::Id::secret> {
 public:
   SecretManager(const ConfigProto& config,
                 Server::Configuration::GenericFactoryContext& factory_context,

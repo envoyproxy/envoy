@@ -79,11 +79,11 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
 
   // Should be last to trigger the callback since constructor can fire the update event.
   if (entry.cert_config_ == nullptr) {
-    stats_.certificate_added_.inc();
     entry.cert_config_ = std::make_unique<AsyncContextConfig>(
         secret_name, factory_context_, config_source_, init_manager,
         [this](absl::string_view secret_name, const Ssl::TlsCertificateConfig& cert_config)
             -> absl::Status { return updateCertificate(secret_name, cert_config); });
+    stats_.cert_requested_.inc();
   }
 }
 
@@ -99,11 +99,14 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
   setContext(secret_name, cert_context);
   CacheEntry& entry = cache_[secret_name];
   entry.cert_context_ = cert_context;
+  size_t count = 0;
   for (auto fetch_handle : entry.callbacks_) {
     if (auto handle = fetch_handle.lock(); handle) {
       handle->notify(cert_context);
+      count++;
     }
   }
+  ENVOY_LOG(trace, "Notified {} pending connections about certificate {}, queued {}", count, secret_name, entry.callbacks_.size());
   entry.callbacks_.clear();
   return absl::OkStatus();
 }

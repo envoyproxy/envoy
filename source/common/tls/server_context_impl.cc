@@ -88,7 +88,7 @@ ServerContextImpl::create(Stats::Scope& scope, const Envoy::Ssl::ServerContextCo
                           Ssl::ContextAdditionalInitFunc additional_init) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<ServerContextImpl>(
-      new ServerContextImpl(scope, config, config.tlsCertificates(), false, factory_context,
+      new ServerContextImpl(scope, config, config.tlsCertificates(), true, factory_context,
                             additional_init, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
@@ -97,7 +97,7 @@ ServerContextImpl::create(Stats::Scope& scope, const Envoy::Ssl::ServerContextCo
 ServerContextImpl::ServerContextImpl(
     Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
     const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
-    bool skip_selector, Server::Configuration::CommonFactoryContext& factory_context,
+    bool add_selector, Server::Configuration::CommonFactoryContext& factory_context,
     Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status)
     : ContextImpl(scope, config, tls_certificates, factory_context, additional_init,
                   creation_status),
@@ -107,7 +107,7 @@ ServerContextImpl::ServerContextImpl(
     return;
   }
   // If creation failed, do not create the selector.
-  if (!skip_selector) {
+  if (add_selector) {
     tls_certificate_selector_ = config.tlsCertificateSelectorFactory()(*this);
   }
 
@@ -121,7 +121,7 @@ ServerContextImpl::ServerContextImpl(
   // First, configure the base context for ClientHello interception.
   // TODO(htuch): replace with SSL_IDENTITY when we have this as a means to do multi-cert in
   // BoringSSL.
-  if (!skip_selector && !config.capabilities().provides_certificates) {
+  if (add_selector && !config.capabilities().provides_certificates) {
     SSL_CTX_set_select_certificate_cb(
         tls_contexts_[0].ssl_ctx_.get(),
         [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
