@@ -1681,7 +1681,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/maxmind/libmaxminddb/blob/{version}/LICENSE",
     ),
-    com_github_lz4_lz4 = dict(
+    lz4 = dict(
         project_name = "LZ4",
         project_desc = "Extremely Fast Compression algorithm",
         project_url = "http://www.lz4.org/",
