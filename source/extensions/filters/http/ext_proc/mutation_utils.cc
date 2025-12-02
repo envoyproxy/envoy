@@ -258,8 +258,9 @@ ProcessingEffect::Effect MutationUtils::applyBodyMutations(const BodyMutation& m
     if (mutation.clear_body()) {
       ENVOY_LOG(trace, "Clearing HTTP body");
       buffer.drain(buffer.length());
+      return ProcessingEffect::Effect::MutationApplied;
     }
-    return ProcessingEffect::Effect::MutationApplied;
+    break;
   case BodyMutation::MutationCase::kBody:
     ENVOY_LOG(trace, "Replacing body of {} bytes with new body of {} bytes", buffer.length(),
               mutation.body().size());
