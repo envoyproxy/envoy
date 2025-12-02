@@ -13,3 +13,7 @@ ubuntu_focal:
 ubuntu_jammy:
   image: ubuntu:22.04
   ext: jammy.changes
+
+ubuntu_noble:
+  image: ubuntu:24.04
+  ext: noble.changes
