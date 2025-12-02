@@ -473,40 +473,23 @@ protected:
    */
   class OdCdsApiHandleImpl : public OdCdsApiHandle {
   public:
-    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds) {
-      return std::make_unique<OdCdsApiHandleImpl>(parent, std::move(odcds));
+    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, uint64_t subscription_key) {
+      return std::make_unique<OdCdsApiHandleImpl>(parent, subscription_key);
     }
 
-    OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds)
-        : parent_(parent), odcds_(std::move(odcds)) {
-      ASSERT(odcds_ != nullptr);
-    }
-
-    ~OdCdsApiHandleImpl() override {
-      // The OdCdsApiSharedPtr contains a subscription that must be destroyed on the main thread.
-      // If we're being destroyed on a worker thread, we need to dispatch the destruction to the
-      // main thread dispatcher. Otherwise, the subscription cleanup will trigger an assertion
-      // failure or SIGABRT.
-      if (!Thread::MainThread::isMainThread() && odcds_ != nullptr) {
-        // Move the shared_ptr into a lambda that will be executed on the main thread.
-        // This ensures the subscription is destroyed on the main thread where it was created.
-        parent_.dispatcher_.post([odcds = std::move(odcds_)]() {
-          // The shared_ptr will be destroyed here on the main thread, ensuring proper cleanup
-          // of the subscription.
-        });
-      }
-    }
+    OdCdsApiHandleImpl(ClusterManagerImpl& parent, uint64_t subscription_key)
+        : parent_(parent), subscription_key_(subscription_key) {}
 
     ClusterDiscoveryCallbackHandlePtr
     requestOnDemandClusterDiscovery(absl::string_view name, ClusterDiscoveryCallbackPtr callback,
                                     std::chrono::milliseconds timeout) override {
-      return parent_.requestOnDemandClusterDiscovery(odcds_, std::string(name), std::move(callback),
-                                                     timeout);
+      return parent_.requestOnDemandClusterDiscovery(subscription_key_, std::string(name),
+                                                     std::move(callback), timeout);
     }
 
   private:
     ClusterManagerImpl& parent_;
-    OdCdsApiSharedPtr odcds_;
+    uint64_t subscription_key_;
   };
 
   virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
@@ -912,7 +895,7 @@ private:
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std::string name,
+  requestOnDemandClusterDiscovery(uint64_t subscription_key, std::string name,
                                   ClusterDiscoveryCallbackPtr callback,
                                   std::chrono::milliseconds timeout);
 
@@ -920,6 +903,12 @@ private:
 
 protected:
   ClusterInitializationMap cluster_initialization_map_;
+  // Stores OdCDS API subscriptions keyed by config hash. Subscriptions are owned by
+  // ClusterManagerImpl (main thread) and handles only store the key to look them up.
+  // Subscriptions persist for the lifetime of ClusterManagerImpl and are cleaned up when
+  // ClusterManagerImpl is destroyed. This enables reuse of subscriptions with identical
+  // configurations across multiple handles.
+  absl::flat_hash_map<uint64_t, OdCdsApiSharedPtr> odcds_subscriptions_;
 
 private:
   /**

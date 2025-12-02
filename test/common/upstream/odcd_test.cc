@@ -280,53 +280,31 @@ TEST_F(ODCDTest, TestMainThreadDiscoveryInProgressDetection) {
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
 }
 
-// Test that destroying an OdCdsApiHandle from a worker thread properly dispatches cleanup
-// to the main thread, preventing SIGABRT. This simulates the scenario where a filter is
-// removed during VHDS updates, causing the handle to be destroyed on a worker thread.
+// Test that destroying an OdCdsApiHandle from a worker thread does not cause SIGABRT.
+// This simulates the scenario where a filter is removed during VHDS updates, causing
+// the handle to be destroyed on a worker thread. Handles can be safely destroyed from
+// any thread since they don't own subscriptions.
 TEST_F(ODCDTest, TestDestroyHandleFromWorkerThread) {
-  // Create a handle on the main thread (simulating filter creation)
   auto handle_to_destroy = cluster_manager_->createOdCdsApiHandle(odcds_);
 
-  // Override the MockDispatcher's post() behavior to allow cross-thread posting.
-  // The default mock behavior asserts that callbacks run on the same thread, but
-  // our fix intentionally posts from worker thread to main thread. Allow multiple
-  // calls since there may be other posts happening during destruction.
-  EXPECT_CALL(factory_.dispatcher_, post(_)).WillRepeatedly([]() {
-    // Allow the post to succeed without asserting - the callback will be
-    // executed later on the main thread.
-  });
-
-  // Create a worker thread to destroy the handle (simulating filter removal on worker thread)
   bool destruction_completed = false;
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr worker_dispatcher(api->allocateDispatcher("test_worker_thread"));
 
   Thread::ThreadPtr worker_thread = Thread::threadFactoryForTest().createThread(
       [&handle_to_destroy, &destruction_completed, &worker_dispatcher]() {
-        // Skip thread assertions since we're intentionally on worker thread
         Thread::SkipAsserts skip;
 
-        // Verify we're on a worker thread
         EXPECT_FALSE(Thread::MainThread::isMainThread());
 
-        // Destroy the handle from worker thread - this should dispatch cleanup to main thread
-        // via dispatcher.post() and not cause SIGABRT. The fix ensures the OdCdsApiSharedPtr
-        // destruction happens on the main thread where the subscription was created.
         handle_to_destroy.reset();
         destruction_completed = true;
 
-        // Run the dispatcher to process any posted callbacks
         worker_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
       });
 
-  // Wait for worker thread to complete
   worker_thread->join();
-
-  // Verify destruction completed without crash
   EXPECT_TRUE(destruction_completed);
-
-  // Run main dispatcher to process cleanup callbacks that were posted from worker thread
-  factory_.tls_.dispatcher().run(Event::Dispatcher::RunType::NonBlock);
 }
 
 } // namespace
