@@ -135,6 +135,7 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: ${{ inputs.target }}
     permissions:
+      actions: read
       contents: read
       packages: read
     secrets:

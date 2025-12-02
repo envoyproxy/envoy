@@ -40,6 +40,7 @@ jobs:
 
   build:
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-perf }}
@@ -85,6 +86,7 @@ jobs:
 
   compare:
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-perf }}
