@@ -380,6 +380,11 @@ new_features:
 - area: network
   change: |
     Add logging info for network ext_proc to filter state.
+- area: upstream
+  change: |
+    Added an extension to override the :ref:`upstream bind address Linux network namespace
+    <extension_envoy.upstream.local_address_selector.filter_state_override>` using a shared filter
+    state object.
 - area: formatter
   change: |
     Added new ``US_RX_BODY_BEG`` time point to the ``%COMMON_DURATION%`` to indicate
@@ -400,5 +405,13 @@ new_features:
   change: |
     Added new feature ``match_included_headers`` to the request signing extension, that allows for a positive header match and
     excludes all other non-SigV4-required headers.
+- area: ext_authz
+  change: |
+    Added support for :ref:`metadata_context_namespaces
+    <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.metadata_context_namespaces>` and
+    :ref:`typed_metadata_context_namespaces
+    <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces>` in the
+    ext-authz network filter. This allows passing connection metadata (such as proxy protocol TLV data) to the
+    external authorization server for making authorization decisions.
 
 deprecated:

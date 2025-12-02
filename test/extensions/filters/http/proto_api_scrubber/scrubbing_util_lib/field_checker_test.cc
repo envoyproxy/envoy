@@ -102,7 +102,7 @@ protected:
         .WillByDefault(testing::ReturnRef(server_factory_context_));
   }
 
-  // Helper to load descriptors (shared by all configs)
+  // Helper to load descriptors (shared by all configs).
   void loadDescriptors(ProtoApiScrubberConfig& config) {
     *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
@@ -110,7 +110,7 @@ protected:
             .value();
   }
 
-  // Helper to initialize the filter config from a specific Proto config
+  // Helper to initialize the filter config from a specific Proto config.
   void initializeFilterConfig(ProtoApiScrubberConfig& config) {
     loadDescriptors(config);
     absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config =
@@ -126,7 +126,7 @@ protected:
   void addRestriction(ProtoApiScrubberConfig& config, const std::string& method_name,
                       const std::string& field_path, FieldType field_type, bool match_result) {
 
-    // CEL Matcher Template
+    // CEL Matcher Template.
     static constexpr absl::string_view matcher_template = R"pb(
       matcher_list: {
         matchers: {
@@ -320,6 +320,7 @@ TEST_F(RequestFieldCheckerTest, PrimitiveAndMessageType) {
   addRestriction(config, method,
                  "filter_criteria.publication_details.original_release_info.region_code",
                  FieldType::Request, true);
+  addRestriction(config, method, "key.key.display_name", FieldType::Request, true);
 
   initializeFilterConfig(config);
 
@@ -373,11 +374,31 @@ TEST_F(RequestFieldCheckerTest, PrimitiveAndMessageType) {
     // The field `id` has a match tree configured which always evaluates to true and has a match
     // action configured of type
     // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`
-    // and hence, CheckField returns kInclude.
+    // and hence, CheckField returns kExclude.
     Protobuf::Field field;
     field.set_name("id");
     field.set_kind(Protobuf::Field_Kind_TYPE_INT64);
     EXPECT_EQ(field_checker.CheckField({"id"}, &field), FieldCheckResults::kExclude);
+  }
+
+  {
+    // The field `key.key.display_name` has a match tree configured which always evaluates to true
+    // and has a match action configured of type
+    // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`
+    // and hence, CheckField returns kExclude.
+    // While the field `key.key.internal_name` has a match tree configured which always evaluates
+    // to false and hence, CheckField returns kInclude.
+    Protobuf::Field field1;
+    field1.set_name("display_name");
+    field1.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    EXPECT_EQ(field_checker.CheckField({"key", "key", "display_name"}, &field1),
+              FieldCheckResults::kExclude);
+
+    Protobuf::Field field2;
+    field2.set_name("internal_name");
+    field2.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+    EXPECT_EQ(field_checker.CheckField({"key", "key", "internal_name"}, &field2),
+              FieldCheckResults::kInclude);
   }
 
   {
@@ -421,13 +442,13 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
   ProtoApiScrubberConfig config;
   std::string method = "/library.BookService/UpdateBook";
 
-  // Top-level repeated primitive: "tags" -> Remove
+  // Top-level repeated primitive: "tags" -> Remove.
   addRestriction(config, method, "tags", FieldType::Request, true);
 
-  // Nested repeated primitive: "metadata.history.edits" -> Remove
+  // Nested repeated primitive: "metadata.history.edits" -> Remove.
   addRestriction(config, method, "metadata.history.edits", FieldType::Request, true);
 
-  // Repeated Message: "chapters" -> No Rule (Should result in Partial to scrub children)
+  // Repeated Message: "chapters" -> No Rule (Should result in Partial to scrub children).
 
   initializeFilterConfig(config);
 
@@ -436,7 +457,7 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
                              filter_config_.get());
 
   {
-    // Case 1: Top-level repeated primitive (e.g., repeated string tags)
+    // Case 1: Top-level repeated primitive (e.g., repeated string tags).
     // Configured to be removed.
     Protobuf::Field field;
     field.set_name("tags");
@@ -447,8 +468,8 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
   }
 
   {
-    // Case 2: Deeply nested repeated primitive
-    // Path: metadata.history.edits
+    // Case 2: Deeply nested repeated primitive.
+    // Path: metadata.history.edits.
     // Configured to be removed.
     Protobuf::Field field;
     field.set_name("edits");
@@ -460,7 +481,7 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
   }
 
   {
-    // Case 3: Repeated Message (e.g., repeated Chapter chapters)
+    // Case 3: Repeated Message (e.g., repeated Chapter chapters).
     // No specific matcher on the list itself.
     // Should return kPartial so the scrubber iterates over the elements.
     Protobuf::Field field;
@@ -472,7 +493,7 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
   }
 
   {
-    // Case 4: Repeated Primitive with NO matcher
+    // Case 4: Repeated Primitive with NO matcher.
     // Should return kInclude (keep the whole list).
     Protobuf::Field field;
     field.set_name("flags");
@@ -485,13 +506,13 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
 
 // Tests CheckField() specifically for enum fields in the request.
 TEST_F(RequestFieldCheckerTest, EnumType) {
-  // Setup local mock config
+  // Setup local mock config.
   auto mock_config = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   const std::string method = "/pkg.Service/UpdateConfig";
 
-  // Field-Level Rule: Remove 'legacy_status' entirely
-  // Path passed to `CheckField()` method: "config.legacy_status" (No integer suffix yet)
+  // Field-Level Rule: Remove 'legacy_status' entirely.
+  // Path passed to `CheckField()` method: "config.legacy_status" (No integer suffix yet).
   auto exclude_tree = std::make_shared<NiceMock<MockMatchTree>>();
   auto remove_action = std::make_shared<NiceMock<MockAction>>();
   ON_CALL(*remove_action, typeUrl())
@@ -502,12 +523,12 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
   ON_CALL(*mock_config, getRequestFieldMatcher(method, "config.legacy_status"))
       .WillByDefault(testing::Return(exclude_tree));
 
-  // Value-Level Rules: 'status' field
-  // Rule 1: "config.status.DEBUG_MODE" (99) -> Remove
+  // Value-Level Rules: 'status' field.
+  // Rule 1: "config.status.DEBUG_MODE" (99) -> Remove.
   setupMockEnumRule(*mock_config, method, "config.status", "type.googleapis.com/pkg.Status", 99,
                     "DEBUG_MODE", true);
 
-  // Rule 2: "config.status.OK" (0) -> Keep
+  // Rule 2: "config.status.OK" (0) -> Keep.
   setupMockEnumRule(*mock_config, method, "config.status", "type.googleapis.com/pkg.Status", 0,
                     "OK", false);
 
@@ -515,7 +536,7 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
                              mock_config.get());
 
   {
-    // Scenario 1: Field-Level Scrubbing
+    // Scenario 1: Field-Level Scrubbing.
     // The scrubber checks the field definition before reading values.
     Protobuf::Field field;
     field.set_name("legacy_status");
@@ -526,7 +547,7 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
   }
 
   {
-    // Scenario 2: Value-Level Scrubbing (Specific Value matches Rule)
+    // Scenario 2: Value-Level Scrubbing (Specific Value matches Rule).
     // The scrubber reads value 99, translates to DEBUG_MODE.
     Protobuf::Field field;
     field.set_name("status");
@@ -538,7 +559,7 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
   }
 
   {
-    // Scenario 3: Value-Level Pass-through (Specific Value has no Rule/Keep)
+    // Scenario 3: Value-Level Pass-through (Specific Value has no Rule/Keep).
     // The scrubber reads value 0, translates to OK.
     Protobuf::Field field;
     field.set_name("status");
@@ -550,8 +571,8 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
   }
 
   {
-    // Scenario 4: Unknown Enum Value (Fallback)
-    // Input: Value 123
+    // Scenario 4: Unknown Enum Value (Fallback).
+    // Input: Value 123.
     // Logic: getEnumName returns error.
     // FieldChecker constructs mask "config.status.123".
     // No matcher for that mask -> kInclude.
@@ -676,13 +697,13 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
   ProtoApiScrubberConfig config;
   std::string method = "/library.BookService/GetBook";
 
-  // Top-level repeated primitive: "comments" -> Remove
+  // Top-level repeated primitive: "comments" -> Remove.
   addRestriction(config, method, "comments", FieldType::Response, true);
 
-  // Nested repeated primitive: "author.awards" -> Remove
+  // Nested repeated primitive: "author.awards" -> Remove.
   addRestriction(config, method, "author.awards", FieldType::Response, true);
 
-  // Repeated Message: "tags" -> No Rule (Should result in Partial to scrub children)
+  // Repeated Message: "tags" -> No Rule (Should result in Partial to scrub children).
 
   initializeFilterConfig(config);
 
@@ -691,7 +712,7 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
                              filter_config_.get());
 
   {
-    // Case 1: Top-level repeated primitive
+    // Case 1: Top-level repeated primitive.
     Protobuf::Field field;
     field.set_name("comments");
     field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
@@ -701,7 +722,7 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
   }
 
   {
-    // Case 2: Nested repeated primitive
+    // Case 2: Nested repeated primitive.
     Protobuf::Field field;
     field.set_name("awards");
     field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
@@ -711,7 +732,7 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
   }
 
   {
-    // Case 3: Repeated Message (e.g., repeated Book related_books)
+    // Case 3: Repeated Message (e.g., repeated Book related_books).
     // No restriction on the list itself.
     // Should return kPartial to allow scrubbing inside individual books.
     Protobuf::Field field;
@@ -723,7 +744,7 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
   }
 
   {
-    // Case 4: Repeated Primitive with NO matcher
+    // Case 4: Repeated Primitive with NO matcher.
     // Should return kInclude (keep the whole list).
     Protobuf::Field field;
     field.set_name("tags");
@@ -740,7 +761,7 @@ TEST_F(ResponseFieldCheckerTest, EnumType) {
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   const std::string method = "/pkg.Service/GetConfig";
 
-  // Field-Level Rule: Remove 'internal_flags' entirely
+  // Field-Level Rule: Remove 'internal_flags' entirely.
   auto exclude_tree = std::make_shared<NiceMock<MockMatchTree>>();
   auto remove_action = std::make_shared<NiceMock<MockAction>>();
   ON_CALL(*remove_action, typeUrl())
@@ -751,8 +772,8 @@ TEST_F(ResponseFieldCheckerTest, EnumType) {
   ON_CALL(*mock_config, getResponseFieldMatcher(method, "config.internal_flags"))
       .WillByDefault(testing::Return(exclude_tree));
 
-  // Value-Level Rules: 'state' field
-  // Rule: "config.state.DEPRECATED" (2) -> Remove
+  // Value-Level Rules: 'state' field.
+  // Rule: "config.state.DEPRECATED" (2) -> Remove.
   setupMockEnumRule(*mock_config, method, "config.state", "type.googleapis.com/pkg.State", 2,
                     "DEPRECATED", true);
 
@@ -760,7 +781,7 @@ TEST_F(ResponseFieldCheckerTest, EnumType) {
                              mock_config.get());
 
   {
-    // Scenario 1: Field-Level Scrubbing
+    // Scenario 1: Field-Level Scrubbing.
     Protobuf::Field field;
     field.set_name("internal_flags");
     field.set_kind(Protobuf::Field::TYPE_ENUM);
@@ -770,7 +791,7 @@ TEST_F(ResponseFieldCheckerTest, EnumType) {
   }
 
   {
-    // Scenario 2: Value-Level Scrubbing (Specific Value matches Rule)
+    // Scenario 2: Value-Level Scrubbing (Specific Value matches Rule).
     Protobuf::Field field;
     field.set_name("state");
     field.set_kind(Protobuf::Field::TYPE_ENUM);
@@ -781,8 +802,8 @@ TEST_F(ResponseFieldCheckerTest, EnumType) {
   }
 
   {
-    // Scenario 3: Value-Level Pass-through (No Rule for this value)
-    // Value 1 ("ACTIVE") -> No rule -> Include
+    // Scenario 3: Value-Level Pass-through (No Rule for this value).
+    // Value 1 ("ACTIVE") -> No rule -> Include.
     Protobuf::Field field;
     field.set_name("state");
     field.set_kind(Protobuf::Field::TYPE_ENUM);

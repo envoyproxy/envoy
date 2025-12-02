@@ -149,8 +149,8 @@ def envoy_dependency_imports(
     go_repository(
         name = "dev_cel_expr",
         importpath = "cel.dev/expr",
-        sum = "h1:56OvJKSH3hDGL0ml5uSxZmz3/3Pq4tJ+fb1unVLAFcY=",
-        version = "v0.24.0",
+        sum = "h1:1KrZg61W6TWSxuNZ37Xy49ps13NUovb66QLprthtwi4=",
+        version = "v0.25.1",
         build_external = "external",
     )
     go_repository(
