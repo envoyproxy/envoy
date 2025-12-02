@@ -79,6 +79,7 @@ jobs:
       with:
         artifact-name: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch }}
         artifact-wf-path: .github/workflows/request.yml
+        cache-type: artifact
         change-directory: false
         # TODO(phlax): add loop for multiple targets
         command: |

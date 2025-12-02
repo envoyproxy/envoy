@@ -281,6 +281,7 @@ jobs:
               || fromJSON(inputs.request).config.ci.cache.bazel.x64 }}
         artifact-name: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch || 'x64' }}
         artifact-wf-path: .github/workflows/request.yml
+        cache-type: artifact
         key: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch || 'x64' }}
         path: ${{ runner.temp }}/container/bazel_root
 
