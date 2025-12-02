@@ -117,6 +117,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/envoyproxy/toolshed/archive/bazel-v{version}.tar.gz"],
         use_category = ["build", "controlplane", "dataplane_core"],
         implied_untracked_deps = [
+            "sysroot_linux_amd64",
+            "sysroot_linux_arm64",
             "tsan_libs",
             "msan_libs",
         ],
@@ -1680,6 +1682,22 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         cpe = "cpe:2.3:a:maxmind:libmaxminddb:*",
         license = "Apache-2.0",
         license_url = "https://github.com/maxmind/libmaxminddb/blob/{version}/LICENSE",
+    ),
+    toolchains_llvm = dict(
+        project_name = "LLVM toolchain for Bazel",
+        project_desc = "LLVM toolchain for Bazel",
+        project_url = "https://github.com/bazel-contrib/toolchains_llvm",
+        version = "fb29f3d53757790dad17b90df0794cea41f1e183",
+        sha256 = "1a8bbb65dcb7decfe4513c1efc9f3e6b5b501608600af5c068e32724f724ea17",
+        strip_prefix = "toolchains_llvm-{version}",
+        # TODO: switch back to versions
+        # URLS = ["https://github.com/bazel-contrib/toolchains_llvm/releases/download/v{version}/toolchains_llvm-v{version}.tar.gz"],
+        urls = ["https://github.com/bazel-contrib/toolchains_llvm/archive/{version}.tar.gz"],
+        implied_untracked_deps = ["llvm_toolchain_llvm"],
+        release_date = "2025-11-26",
+        use_category = ["build", "dataplane_core", "controlplane"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazel-contrib/toolchains_llvm/blob/v{version}/LICENSE",
     ),
     com_github_lz4_lz4 = dict(
         project_name = "LZ4",

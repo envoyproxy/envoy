@@ -182,7 +182,10 @@ def envoy_cc_test(
     cc_test(
         name = name,
         srcs = srcs,
-        data = data,
+        data = data + select({
+            "%s//bazel:asan_build" % repository: ["@llvm_toolchain_llvm//:symbolizer"],
+            "//conditions:default": [],
+        }),
         copts = envoy_copts(repository, test = True) + copts + envoy_pch_copts(repository, "//test:test_pch"),
         additional_linker_inputs = envoy_exported_symbols_input(),
         linkopts = _envoy_test_linkopts() + linkopts,
@@ -201,7 +204,10 @@ def envoy_cc_test(
         shard_count = shard_count,
         size = size,
         flaky = flaky,
-        env = env,
+        env = env | select({
+            "%s//bazel:asan_build" % repository: {"ASAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
+            "//conditions:default": {},
+        }),
         exec_properties = exec_properties,
     )
 
