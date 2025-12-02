@@ -4431,6 +4431,11 @@ TEST_F(HttpFilterTest, HeaderRespReceivedBeforeBody) {
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  auto& grpc_calls = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
+  checkGrpcCallBody(*grpc_calls.body_stats_, 6, Grpc::Status::Ok, std::chrono::microseconds(160),
+                    std::chrono::microseconds(50), std::chrono::microseconds(10));
   filter_->onDestroy();
 }
 
@@ -4482,6 +4487,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
   // Header response arrives after some amount of body data sent.
   auto response = std::make_unique<ProcessingResponse>();
   (void)response->mutable_response_headers();
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
   stream_callbacks_->onReceiveMessage(std::move(response));
 
   // Three body responses follows the header response.
@@ -4524,6 +4530,11 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  auto& grpc_calls = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
+  checkGrpcCallBody(*grpc_calls.body_stats_, 11, Grpc::Status::Ok, std::chrono::microseconds(420),
+                    std::chrono::microseconds(80), std::chrono::microseconds(10));
   filter_->onDestroy();
 }
 

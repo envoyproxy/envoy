@@ -51,3 +51,4 @@ Extensions
   watchdog/watchdog
   load_balancing_policies/load_balancing_policies
   cluster_specifier/cluster_specifier
+  local_address_selectors/local_address_selectors

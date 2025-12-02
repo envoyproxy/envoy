@@ -1664,6 +1664,60 @@ public:
               .PackFrom(old_protocol_options);
     });
   }
+
+  void testRouterRetryWithExtProcUpstream(bool send_body) {
+    proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+    proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+    // Add retry policy to the HCM route config.
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* route = hcm.mutable_route_config()
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_route();
+          route->mutable_timeout()->set_seconds(60);
+          auto* retry_policy = route->mutable_retry_policy();
+          retry_policy->set_retry_on("5xx,connect-failure,refused-stream");
+          retry_policy->mutable_num_retries()->set_value(5);
+          retry_policy->mutable_per_try_timeout()->set_seconds(30);
+          retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_seconds(1);
+        });
+    initializeConfig();
+    HttpIntegrationTest::initialize();
+
+    auto response = sendDownstreamRequest(absl::nullopt);
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    // Upstream returns a 503 response, which should trigger a retry.
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+    if (send_body) {
+      upstream_request_->encodeData(100, true);
+    } else {
+      upstream_request_->encodeTrailers(
+          Http::TestResponseTrailerMapImpl{{"x-test-trailers", "Yes"}});
+    }
+    EXPECT_TRUE(upstream_request_->complete());
+    processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+    // Upstream receives a retry request and returns a 200 response, which should not trigger a
+    // retry.
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(100, true);
+    EXPECT_TRUE(upstream_request_->complete());
+
+    ProcessingRequest request;
+    ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+    processor_stream_->startGrpcStream();
+    ProcessingResponse resp;
+    resp.mutable_response_headers();
+    processor_stream_->sendGrpcMessage(resp);
+
+    verifyDownstreamResponse(*response, 200);
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTestUpstream,
@@ -1710,6 +1764,14 @@ TEST_P(ExtProcIntegrationTestUpstream, GetAndRespondImmediately_Upstream) {
   EXPECT_THAT(response->headers(), ContainsHeader("x-failure-reason", "testing"));
   EXPECT_THAT(response->headers(), ContainsHeader("content-type", "application/json"));
   EXPECT_EQ("{\"reason\": \"Internal Server Error\"}", response->body());
+}
+
+TEST_P(ExtProcIntegrationTestUpstream, RouterRetrySendBody) {
+  testRouterRetryWithExtProcUpstream(/*send_body*/ true);
+}
+
+TEST_P(ExtProcIntegrationTestUpstream, RouterRetrySendTrailers) {
+  testRouterRetryWithExtProcUpstream(/*send_body*/ false);
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulClose) {
@@ -4157,6 +4219,143 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
                 ->value()
                 .getStringView(),
             "bluh");
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test that retry stats are correctly incremented when retries occur.
+TEST_P(ExtProcIntegrationTest, RetryStatsVerification) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Retry is only supported for Envoy gRPC";
+  }
+  // Set envoy filter timeout to 5s to rule out noise.
+  proto_config_.mutable_message_timeout()->set_seconds(5);
+  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+
+  envoy::config::core::v3::RetryPolicy* retry_policy =
+      proto_config_.mutable_grpc_service()->mutable_retry_policy();
+  retry_policy->mutable_num_retries()->set_value(2);
+  retry_policy->set_retry_on(
+      "resource-exhausted,unavailable"); // resource-exhausted: 8, unavailable: 14
+  retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_seconds(0);
+  retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_nanos(10000000); // 10ms
+  retry_policy->mutable_retry_back_off()->mutable_max_interval()->set_seconds(0);
+  retry_policy->mutable_retry_back_off()->mutable_max_interval()->set_nanos(100000000); // 100ms
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+
+  // First failure - resource-exhausted.
+  processor_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "8"}}, true);
+  ASSERT_TRUE(processor_stream_->waitForReset());
+
+  // Retry happens in a new stream.
+  ProcessingRequest request_headers_msg2;
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg2));
+  EXPECT_TRUE(TestUtility::protoEqual(request_headers_msg2, request_headers_msg));
+
+  // Second failure - unavailable.
+  processor_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "14"}}, true);
+  ASSERT_TRUE(processor_stream_->waitForReset());
+
+  // Second retry happens in a new stream.
+  ProcessingRequest request_headers_msg3;
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg3));
+  EXPECT_TRUE(TestUtility::protoEqual(request_headers_msg3, request_headers_msg));
+
+  // Third attempt succeeds.
+  processor_stream_->startGrpcStream(false);
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ProcessingResponse processing_response;
+  auto* headers_response = processing_response.mutable_request_headers()->mutable_response();
+  auto* add_header = headers_response->mutable_header_mutation()->add_set_headers();
+  add_header->mutable_header()->set_key("x-retry-test");
+  add_header->mutable_header()->set_raw_value("success");
+  processor_stream_->sendGrpcMessage(processing_response);
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers()
+                .get(Envoy::Http::LowerCaseString("x-retry-test"))[0]
+                ->value()
+                .getStringView(),
+            "success");
+
+  // Verify retry stats are incremented correctly.
+  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_retry", 2);
+  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_total", 3);
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test that gRPC retry works for deadline-exceeded status.
+TEST_P(ExtProcIntegrationTest, RetryOnDeadlineExceeded) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Retry is only supported for Envoy gRPC";
+  }
+  // Set envoy filter timeout to 5s to rule out noise.
+  proto_config_.mutable_message_timeout()->set_seconds(5);
+  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+
+  envoy::config::core::v3::RetryPolicy* retry_policy =
+      proto_config_.mutable_grpc_service()->mutable_retry_policy();
+  retry_policy->mutable_num_retries()->set_value(1);
+  // Configure to retry on deadline-exceeded (gRPC status 4).
+  retry_policy->set_retry_on("deadline-exceeded");
+  retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_seconds(0);
+  retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_nanos(10000000); // 10ms
+  retry_policy->mutable_retry_back_off()->mutable_max_interval()->set_seconds(0);
+  retry_policy->mutable_retry_back_off()->mutable_max_interval()->set_nanos(100000000); // 100ms
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+
+  // First attempt, deadline-exceeded.
+  processor_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "4"}}, true);
+  ASSERT_TRUE(processor_stream_->waitForReset());
+
+  // Retry happens in a new stream.
+  ProcessingRequest request_headers_msg2;
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg2));
+  EXPECT_TRUE(TestUtility::protoEqual(request_headers_msg2, request_headers_msg));
+
+  // Second attempt succeeds.
+  processor_stream_->startGrpcStream(false);
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ProcessingResponse processing_response;
+  auto* headers_response = processing_response.mutable_request_headers()->mutable_response();
+  auto* add_header = headers_response->mutable_header_mutation()->add_set_headers();
+  add_header->mutable_header()->set_key("x-deadline-retry");
+  add_header->mutable_header()->set_raw_value("passed");
+  processor_stream_->sendGrpcMessage(processing_response);
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers()
+                .get(Envoy::Http::LowerCaseString("x-deadline-retry"))[0]
+                ->value()
+                .getStringView(),
+            "passed");
+
+  // Verify retry stats are incremented.
+  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_retry", 1);
+  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_total", 2);
+
   verifyDownstreamResponse(*response, 200);
 }
 

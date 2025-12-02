@@ -746,6 +746,7 @@ deflater
 deletable
 deleter
 delim
+demultiplexer
 denylist
 deque
 dep
@@ -1595,6 +1596,9 @@ vhosts
 infos
 ElastiCache
 pinterest
+callouts
+streamable
+extern
 NSS
 SSLKEYLOGFILE
 DLB

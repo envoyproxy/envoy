@@ -44,14 +44,13 @@ void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
 
   stopMessageTimer();
 
-  if (call_start_time_.has_value()) {
+  if (call_start_time_.has_value() && callback_state_ != CallbackState::Idle) {
     std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(
         filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
     ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
     if (logging_info != nullptr) {
       logging_info->recordGrpcCall(duration, call_status, callback_state_, trafficDirection());
     }
-    call_start_time_ = absl::nullopt;
   }
   callback_state_ = next_state;
   new_timeout_received_ = false;
@@ -498,6 +497,7 @@ void ProcessorState::finalizeBodyResponse(bool should_continue) {
 absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
   if (callback_state_ == CallbackState::TrailersCallback ||
       bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
+    callback_state_ = CallbackState::TrailersCallback;
     ENVOY_STREAM_LOG(debug, "Applying response to buffered trailers, body_mode_ {}",
                      *filter_callbacks_, ProcessingMode::BodySendMode_Name(body_mode_));
     if (response.has_header_mutation() && trailers_ != nullptr) {

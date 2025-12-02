@@ -40,12 +40,14 @@ directories:
   source/extensions/filters/common/lua: 95.6
   source/extensions/filters/http/cache: 95.9
   source/extensions/filters/http/dynamic_forward_proxy: 94.8
+  source/extensions/filters/http/dynamic_modules: 95.6
   source/extensions/filters/http/decompressor: 95.9
   source/extensions/filters/http/ext_proc: 96.4  # might be flaky: be careful adjusting
   source/extensions/filters/http/grpc_json_reverse_transcoder: 94.8
   source/extensions/filters/http/grpc_json_transcoder: 94.0  # TODO(#28232)
   source/extensions/filters/http/ip_tagging: 95.9
   source/extensions/filters/http/kill_request: 91.7  # Death tests don't report LCOV
+  source/extensions/filters/http/mcp_router: 25  # TODO(yanavlasov): adjust up. Overriden to just scheck-in boilerplate.
   source/extensions/filters/http/oauth2: 97.6
   source/extensions/filters/listener: 96.5
   source/extensions/filters/listener/original_src: 92.1
