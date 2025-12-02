@@ -187,15 +187,14 @@ jobs:
       id: build-images
       uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.3.34
       with:
-        # Until toolchains land, these all just point to the main image or the mobile one
         images: |
-           sha: docker.io/envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
-           sha-ci: docker.io/envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
-           sha-devtools: docker.io/envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
-           sha-docker: docker.io/envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
-           sha-gcc: docker.io/envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
-           sha-mobile: docker.io/envoyproxy/envoy-build-ubuntu:mobile-${{ steps.build-tools.outputs.tag }}
-           sha-worker: docker.io/envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
+           sha: docker.io/envoyproxy/envoy-build:devtools-${{ steps.build-tools.outputs.tag }}
+           sha-ci: docker.io/envoyproxy/envoy-build:ci-${{ steps.build-tools.outputs.tag }}
+           sha-devtools: docker.io/envoyproxy/envoy-build:devtools-${{ steps.build-tools.outputs.tag }}
+           sha-docker: docker.io/envoyproxy/envoy-build:docker-${{ steps.build-tools.outputs.tag }}
+           sha-gcc: docker.io/envoyproxy/envoy-build:gcc-${{ steps.build-tools.outputs.tag }}
+           sha-mobile: docker.io/envoyproxy/envoy-build:mobile-${{ steps.build-tools.outputs.tag }}
+           sha-worker: docker.io/envoyproxy/envoy-build:worker-${{ steps.build-tools.outputs.tag }}
 
     - run: |
         SHA_REPLACE=(

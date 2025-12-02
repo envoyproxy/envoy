@@ -36,8 +36,8 @@ envoy_cmake(
     },
     default_cache_entries = {},
     env = {
-        "NM": "$(NM)",
-        "OBJCOPY": "$(OBJCOPY)",
+        "NM": "$$EXT_BUILD_ROOT/$(NM)",
+        "OBJCOPY": "$$EXT_BUILD_ROOT/$(OBJCOPY)",
     },
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {
