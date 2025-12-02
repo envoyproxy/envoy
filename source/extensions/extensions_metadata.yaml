@@ -1537,6 +1537,13 @@ envoy.upstream.local_address_selector.default_local_address_selector:
   status: alpha
   type_urls:
   - envoy.config.upstream.local_address_selector.v3.DefaultLocalAddressSelector
+envoy.upstream.local_address_selector.filter_state_override:
+  categories:
+  - envoy.upstream.local_address_selector
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.local_address_selectors.filter_state_override.v3.Config
 envoy.wasm.runtime.null:
   categories:
   - envoy.wasm.runtime
