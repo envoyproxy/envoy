@@ -405,5 +405,8 @@ new_features:
   change: |
     Added new feature ``match_included_headers`` to the request signing extension, that allows for a positive header match and
     excludes all other non-SigV4-required headers.
+- area: stats
+  change: |
+    Added support to limit the number of stats stored in each stats scope in the stats libarary.
 
 deprecated:
