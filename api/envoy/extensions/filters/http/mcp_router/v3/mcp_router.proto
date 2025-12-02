@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.mcp_router.v3;
+
+import "envoy/config/core/v3/http_uri.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp_router.v3";
+option java_outer_classname = "McpRouterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/mcp_router/v3;mcp_routerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: MCP Multiplexer/Demultiplexer]
+// [#extension: envoy.filters.http.mcp_router]
+
+// Configuration for the MCP Multiplexer/Demultiplexer.
+//
+// This extension aggregates capabilities, tools and resources of remote MCP servers and presents Envoy
+// as a singe MCP server to the client. This allows a unified policy to be applied to multiple remote
+// servers and abstracts multiple MCP servers as a single one.
+//
+// This filter must be a terminal filter in the filter chain and replaces the HTTP router filter.
+//
+// Not all route level policies are applicable to this filter.
+// Specifically the following policies are ignored:
+// * :ref:`route <envoy_v3_api_field_config.route.v3.Route.route>`
+// * :ref:`redirect <envoy_v3_api_field_config.route.v3.Route.redirect>`
+// * :ref:`direct_response <envoy_v3_api_field_config.route.v3.Route.direct_response>`
+//
+message McpRouter {
+  // Specification of the MCP server.
+  message McpBackend {
+    // User visible name of the server for logging or error messages. If the name is empty the
+    // :ref:`URI <envoy_v3_api_field_config.core.v3.HttpUri.uri>` value is used.
+    string name = 1;
+
+    // Specification of the remote MCP server.
+    config.core.v3.HttpUri http_uri = 2;
+  }
+
+  // A list of remote MCP servers. MCP router aggregates capabilities, tools and resources from remote MCP servers
+  // and presents itself as single MCP server to the client. All remote MCP servers are sent the same capabilities
+  // that the client presented to Envoy.
+  repeated McpBackend servers = 1;
+}
