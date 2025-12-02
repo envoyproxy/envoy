@@ -3536,12 +3536,12 @@ TEST_F(ClusterScopeInfoTest, InfoBytesToHumanAllSizes) {
   // Shard 1: Test various size ranges covering all bytesToHuman branches
   std::string shard1_response =
       "# Memory\r\n"
-      "used_memory:512\r\n"                       // Bytes: 512B (Sum aggregation)
-      "used_memory_rss:2048\r\n"                  // KB: 2.00K (Sum aggregation)
-      "used_memory_peak:5242880\r\n"              // MB: 5.00M (Max aggregation)
-      "used_memory_lua:3221225472\r\n"            // GB: 3.00G (Sum, has _human)
-      "used_memory_scripts:5497558138880\r\n"     // TB: 5.00T (Sum, has _human)
-      "used_memory_vm_total:6755399441055744\r\n" // PB: 6.00P (Sum, has _human)
+      "used_memory:512\r\n"                        // Bytes: 512B (Sum aggregation)
+      "used_memory_rss:2048\r\n"                   // KB: 2.00K (Sum aggregation)
+      "used_memory_peak:5242880\r\n"               // MB: 5.00M (Max aggregation)
+      "used_memory_lua:3221225472\r\n"             // GB: 3.00G (Sum, has _human)
+      "used_memory_scripts:5497558138880\r\n"      // TB: 5.00T (Sum, has _human)
+      "used_memory_vm_total:6755399441055744\r\n"  // PB: 6.00P (Sum, has _human)
       "total_system_memory:576460752303423488\r\n" // EB: 0.50E (Sum, triggers else branch)
       "maxmemory:10485760\r\n";                    // Sum: total max memory
 
