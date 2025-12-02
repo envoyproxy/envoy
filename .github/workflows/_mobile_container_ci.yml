@@ -144,6 +144,10 @@ jobs:
       args: ${{ inputs.args }}
       rbe: ${{ inputs.rbe }}
       bind-mount: ${{ inputs.bind-mount }}
+      bind-mounts: |
+        - src: /mnt/container-cache
+          target: /tmp/cache
+          chown: "runner:runner"
       # This always just caches the main build image, the mobile one is layered on top
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       catch-errors: ${{ inputs.catch-errors }}
