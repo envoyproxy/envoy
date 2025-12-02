@@ -1028,11 +1028,10 @@ TEST(DynamicModulesTest, StartHttpStreamHandlesInlineResetDuringHeaders) {
         return &stream;
       }));
 
-  EXPECT_CALL(stream, sendHeaders(_, false))
-      .WillOnce(Invoke([&](Http::RequestHeaderMap&, bool) {
-        ASSERT_NE(captured_callbacks, nullptr);
-        captured_callbacks->onReset();
-      }));
+  EXPECT_CALL(stream, sendHeaders(_, false)).WillOnce(Invoke([&](Http::RequestHeaderMap&, bool) {
+    ASSERT_NE(captured_callbacks, nullptr);
+    captured_callbacks->onReset();
+  }));
   EXPECT_CALL(stream, sendData(_, _)).Times(0);
 
   envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr;
@@ -1042,9 +1041,8 @@ TEST(DynamicModulesTest, StartHttpStreamHandlesInlineResetDuringHeaders) {
   auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
   message->body().add(absl::string_view("payload"));
 
-  auto result =
-      filter->startHttpStream(&stream_ptr, "cluster", std::move(message), true /* end_stream */,
-                              1000);
+  auto result = filter->startHttpStream(&stream_ptr, "cluster", std::move(message),
+                                        true /* end_stream */, 1000);
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
   EXPECT_NE(captured_callbacks, nullptr);
 }
