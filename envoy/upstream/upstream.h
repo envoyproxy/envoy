@@ -70,10 +70,20 @@ public:
    * @return UpstreamLocalAddress which includes the selected upstream local address and socket
    * options.
    */
+  virtual UpstreamLocalAddress getUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      const Network::ConnectionSocket::OptionsSharedPtr& socket_options,
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const PURE;
+};
+
+class UpstreamLocalAddressSelectorBase : public UpstreamLocalAddressSelector {
+public:
+  ~UpstreamLocalAddressSelectorBase() override = default;
+
   UpstreamLocalAddress getUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& endpoint_address,
       const Network::ConnectionSocket::OptionsSharedPtr& socket_options,
-      OptRef<const Network::TransportSocketOptions> transport_socket_options) const {
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const override {
     UpstreamLocalAddress local_address =
         getUpstreamLocalAddressImpl(endpoint_address, transport_socket_options);
     Network::ConnectionSocket::OptionsSharedPtr connection_options =

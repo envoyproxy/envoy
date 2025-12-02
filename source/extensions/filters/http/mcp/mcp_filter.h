@@ -79,14 +79,21 @@ class McpOverrideConfig : public Router::RouteSpecificFilterConfig {
 public:
   explicit McpOverrideConfig(
       const envoy::extensions::filters::http::mcp::v3::McpOverride& proto_config)
-      : traffic_mode_(proto_config.traffic_mode()) {}
+      : traffic_mode_(proto_config.traffic_mode()),
+        max_request_body_size_(
+            proto_config.has_max_request_body_size()
+                ? absl::optional<uint32_t>(proto_config.max_request_body_size().value())
+                : absl::nullopt) {}
 
   envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode() const {
     return traffic_mode_;
   }
 
+  absl::optional<uint32_t> maxRequestBodySize() const { return max_request_body_size_; }
+
 private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
+  const absl::optional<uint32_t> max_request_body_size_;
 };
 
 using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;
@@ -119,6 +126,7 @@ private:
   bool isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const;
   bool isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const;
   bool shouldRejectRequest() const;
+  uint32_t getMaxRequestBodySize() const;
 
   void finalizeDynamicMetadata();
   McpFilterConfigSharedPtr config_;

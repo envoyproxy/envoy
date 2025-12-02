@@ -79,6 +79,9 @@ public:
   // to. the address.
   absl::string_view addressType() const override { return "default"; }
   absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
+    return nullptr;
+  }
 
   // Override socketInterface to use the ReverseTunnelAcceptor.
   const Network::SocketInterface& socketInterface() const override {

@@ -96,6 +96,17 @@ bool McpFilter::shouldRejectRequest() const {
   return config_->shouldRejectNonMcp();
 }
 
+uint32_t McpFilter::getMaxRequestBodySize() const {
+  const auto* override_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<McpOverrideConfig>(decoder_callbacks_);
+
+  if (override_config && override_config->maxRequestBodySize().has_value()) {
+    return override_config->maxRequestBodySize().value();
+  }
+
+  return config_->maxRequestBodySize();
+}
+
 Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
 
@@ -115,7 +126,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       is_mcp_request_ = true;
 
       // Set the buffer limit - Envoy will automatically send 413 if exceeded
-      const uint32_t max_size = config_->maxRequestBodySize();
+      const uint32_t max_size = getMaxRequestBodySize();
       if (max_size > 0) {
         decoder_callbacks_->setDecoderBufferLimit(max_size);
         ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
@@ -144,7 +155,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
 
   if (end_stream) {
     // Check if the complete request body exceeds the limit
-    const uint32_t max_size = config_->maxRequestBodySize();
+    const uint32_t max_size = getMaxRequestBodySize();
     if (max_size > 0) {
       decoder_callbacks_->addDecodedData(data, false);
       const uint64_t total_size = decoder_callbacks_->decodingBuffer()->length();
