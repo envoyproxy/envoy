@@ -234,6 +234,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/api_key_auth @wbpcode @sanposhiho
 # HTTP MCP filter
 /*/extensions/filters/http/mcp @botengyao @yanavlasov
+# MCP router filter
+/*/extensions/filters/http/mcp_router @botengyao @yanavlasov @wdauchy
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @ryantheoptimist @mattklein123
 /*/extensions/http/original_ip_detection/xff @yanavlasov @mattklein123

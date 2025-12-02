@@ -746,6 +746,7 @@ deflater
 deletable
 deleter
 delim
+demultiplexer
 denylist
 deque
 dep

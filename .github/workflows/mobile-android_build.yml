@@ -40,6 +40,7 @@ jobs:
 
   build:
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-android }}
@@ -63,6 +64,7 @@ jobs:
 
   kotlin-hello-world:
     permissions:
+      actions: read
       contents: read
       packages: read
     name: kotlin-hello-world
@@ -114,6 +116,7 @@ jobs:
 
   apps:
     permissions:
+      actions: read
       contents: read
       packages: read
     name: Android apps
