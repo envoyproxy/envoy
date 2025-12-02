@@ -30,10 +30,6 @@ enum class StartStatus {
 
 /**
  * ODCDS API implementation that fetches via Subscription.
- *
- * Note: The destructor of this class must be called on the main thread, as it contains
- * a Subscription that requires main-thread cleanup. OdCdsApiHandleImpl ensures this by
- * dispatching destruction to the main thread dispatcher when destroyed on a worker thread.
  */
 class OdCdsApiImpl : public OdCdsApi,
                      Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>,
