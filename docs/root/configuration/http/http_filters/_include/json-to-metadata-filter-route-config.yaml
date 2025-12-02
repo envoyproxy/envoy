@@ -26,8 +26,9 @@ static_resources:
                   envoy.filters.http.json_to_metadata:
                     "@type": type.googleapis.com/envoy.extensions.filters.http.json_to_metadata.v3.JsonToMetadata
                     request_rules:
+                      rules:
                       - selectors:
-                          - key: version
+                        - key: version
                         on_present:
                           metadata_namespace: envoy.lb
                           key: version
@@ -40,8 +41,9 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.json_to_metadata.v3.JsonToMetadata
               request_rules:
+                rules:
                 - selectors:
-                    - key: version
+                  - key: version
                   on_present:
                     metadata_namespace: envoy.lb
                     key: version
