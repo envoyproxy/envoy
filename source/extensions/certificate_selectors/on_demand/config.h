@@ -53,8 +53,8 @@ public:
                const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
       : ServerContextImpl(
             scope, tls_config,
-            std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config}, false,
-            factory_context, nullptr, creation_status) {}
+            std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
+            false, factory_context, nullptr, creation_status) {}
 
   // @returns the low-level TLS context stored in this context.
   const Ssl::TlsContext& tlsContext() const;

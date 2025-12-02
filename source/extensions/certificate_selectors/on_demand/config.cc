@@ -106,7 +106,8 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
       count++;
     }
   }
-  ENVOY_LOG(trace, "Notified {} pending connections about certificate {}, queued {}", count, secret_name, entry.callbacks_.size());
+  ENVOY_LOG(trace, "Notified {} pending connections about certificate {}, queued {}", count,
+            secret_name, entry.callbacks_.size());
   entry.callbacks_.clear();
   return absl::OkStatus();
 }

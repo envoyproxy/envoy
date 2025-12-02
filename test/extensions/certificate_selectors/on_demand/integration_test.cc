@@ -34,8 +34,7 @@ public:
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       config_helper_.configDownstreamTransportSocketWithTls(
           bootstrap,
-          [&](
-              envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+          [&](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
             configToUseSds(common_tls_context, on_demand_config);
           });
       bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
@@ -86,8 +85,7 @@ public:
   FakeUpstream* dataStream() override { return fake_upstreams_.back().get(); }
 
 protected:
-  envoy::extensions::transport_sockets::tls::v3::Secret
-  getServerSecretRsa(absl::string_view cert) {
+  envoy::extensions::transport_sockets::tls::v3::Secret getServerSecretRsa(absl::string_view cert) {
     envoy::extensions::transport_sockets::tls::v3::Secret secret;
     secret.set_name(cert);
     auto* tls_certificate = secret.mutable_tls_certificate();
@@ -107,8 +105,10 @@ protected:
     envoy::service::discovery::v3::DeltaDiscoveryRequest delta_discovery_request;
     AssertionResult result2 = xds_stream->waitForGrpcMessage(*dispatcher_, delta_discovery_request);
     RELEASE_ASSERT(result2, result2.message());
-    EXPECT_EQ(1, delta_discovery_request.resource_names_subscribe().size()) << "Should be 1 resource in DELTA_GRPC";
-    EXPECT_EQ(cert, delta_discovery_request.resource_names_subscribe().at(0)) << "Secret name doesn't match in the request";
+    EXPECT_EQ(1, delta_discovery_request.resource_names_subscribe().size())
+        << "Should be 1 resource in DELTA_GRPC";
+    EXPECT_EQ(cert, delta_discovery_request.resource_names_subscribe().at(0))
+        << "Secret name doesn't match in the request";
     envoy::service::discovery::v3::DeltaDiscoveryResponse discovery_response;
     discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
     auto* resource = discovery_response.add_resources();
@@ -126,7 +126,8 @@ protected:
   }
 
   void waitCertsRequested(uint32_t count) {
-    test_server_->waitForCounterEq(listenerStatPrefix("on_demand_secret.cert_requested"), count, TestUtility::DefaultTimeout, dispatcher_.get());
+    test_server_->waitForCounterEq(listenerStatPrefix("on_demand_secret.cert_requested"), count,
+                                   TestUtility::DefaultTimeout, dispatcher_.get());
   }
 };
 
@@ -151,8 +152,8 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
   conn.reset();
   EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
-  EXPECT_EQ(
-      1, test_server_->counter(listenerStatPrefix("on_demand_secret.cert_requested"))->value());
+  EXPECT_EQ(1,
+            test_server_->counter(listenerStatPrefix("on_demand_secret.cert_requested"))->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
@@ -257,7 +258,9 @@ TEST_P(OnDemandIntegrationTest, ConnectTimeout) {
       name: server
   )EOF");
   auto conn = std::make_unique<ClientSslConnection>(*this);
-  test_server_->waitForCounterEq(listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"), 1, TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounterEq(
+      listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"), 1,
+      TestUtility::DefaultTimeout, dispatcher_.get());
   // SDS request is still outstanding, so we can respond to it, and it will be used later.
   createXdsConnection();
   auto server_sds = waitSendSdsResponse("server");
