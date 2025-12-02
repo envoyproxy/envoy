@@ -218,6 +218,12 @@ new_features:
   change: |
     Enhanced dynamic module ABIs to support headers addition and body size retrieval.
     See the latest ABI header file for more details.
+- area: dynamic modules
+  change: |
+    Added support for streamable HTTP callouts in dynamic modules. Modules can now create
+    streaming HTTP connections to upstream clusters using ``start_http_stream``, send request
+    data and trailers incrementally, and receive streaming response headers, data, and trailers
+    through dedicated callbacks.
 - area: udp_sink
   change: |
     Enhanced the UDP sink to support tapped messages larger than 64 KB.
