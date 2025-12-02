@@ -6,6 +6,7 @@
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
@@ -143,12 +144,12 @@ TEST(DynamicModulesTest, StatsCallbacks) {
                                         false),
             (std::vector<uint64_t>{1}));
 
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
   filter->setEncoderFilterCallbacks(encoder_callbacks);
 
   std::initializer_list<std::pair<std::string, std::string>> headers = {{"header", "header_value"}};
@@ -223,7 +224,7 @@ TEST(DynamicModulesTest, HeaderCallbacks) {
                                                           stats_store.symbolTable());
   filter->initializeInModuleFilter();
 
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
@@ -232,7 +233,7 @@ TEST(DynamicModulesTest, HeaderCallbacks) {
       .WillOnce(testing::Return(OptRef(downstream_callbacks)));
   filter->setDecoderFilterCallbacks(decoder_callbacks);
 
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
   filter->setEncoderFilterCallbacks(encoder_callbacks);
 
   NiceMock<StreamInfo::MockStreamInfo> info;
@@ -287,7 +288,7 @@ TEST(DynamicModulesTest, DynamicMetadataCallbacks) {
   filter->initializeInModuleFilter();
 
   auto route = std::make_shared<NiceMock<Router::MockRoute>>();
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
@@ -370,7 +371,7 @@ TEST(DynamicModulesTest, FilterStateCallbacks) {
                                                           stats_scope->symbolTable());
   filter->initializeInModuleFilter();
 
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
@@ -448,8 +449,8 @@ TEST(DynamicModulesTest, BodyCallbacks) {
                                                           stats_scope->symbolTable());
   filter->initializeInModuleFilter();
 
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
   filter->setEncoderFilterCallbacks(encoder_callbacks);
   Buffer::OwnedImpl request_body;
@@ -522,7 +523,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
           context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
                                                           stats_scope->symbolTable());
   filter->initializeInModuleFilter();
@@ -576,7 +577,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
             return nullptr;
           }));
 
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
                                                           stats_scope->symbolTable());
   filter->initializeInModuleFilter();
@@ -634,7 +635,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
             return &request;
           }));
 
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
                                                           stats_scope->symbolTable());
   filter->initializeInModuleFilter();
@@ -1045,6 +1046,63 @@ TEST(DynamicModulesTest, StartHttpStreamHandlesInlineResetDuringHeaders) {
                                         true /* end_stream */, 1000);
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
   EXPECT_NE(captured_callbacks, nullptr);
+}
+
+TEST(DynamicModulesTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_TRUE(dynamic_module.ok());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable());
+  filter->initializeInModuleFilter();
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  EXPECT_CALL(decoder_callbacks, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+  // Mock AsyncClient
+  NiceMock<Http::MockAsyncClientStream> stream;
+  Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_callbacks = &callbacks;
+        return &stream;
+      }));
+
+  envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  auto result = filter->startHttpStream(&stream_ptr, "cluster", std::move(message), false, 1000);
+  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(captured_callbacks, nullptr);
+
+  EXPECT_CALL(dispatcher, deferredDelete_(_)).Times(1);
+  filter->onDestroy();
+
+  // Upstream callbacks may still run after destroy; ensure they safely return.
+  captured_callbacks->onComplete();
+
+  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnReset) {

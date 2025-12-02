@@ -28,18 +28,24 @@ void DynamicModuleHttpFilter::destroy() {
   if (in_module_filter_ == nullptr) {
     return;
   }
+
+  Event::Dispatcher* dispatcher = nullptr;
+  if (!http_stream_callouts_.empty()) {
+    if (decoder_callbacks_ != nullptr) {
+      dispatcher = &decoder_callbacks_->dispatcher();
+    } else if (encoder_callbacks_ != nullptr) {
+      dispatcher = &encoder_callbacks_->dispatcher();
+    }
+  }
+
   config_->on_http_filter_destroy_(in_module_filter_);
   in_module_filter_ = nullptr;
-  decoder_callbacks_ = nullptr;
-  encoder_callbacks_ = nullptr;
+
   while (!http_callouts_.empty()) {
     auto it = http_callouts_.begin();
     if (it->second->request_) {
       it->second->request_->cancel();
     }
-    // If the callback removed itself, the iterator is invalid, but begin() will return the next
-    // element (or end). If the callback did NOT remove itself, we must remove it to avoid infinite
-    // loop.
     if (!http_callouts_.empty() && http_callouts_.begin() == it) {
       http_callouts_.erase(it);
     }
@@ -50,11 +56,20 @@ void DynamicModuleHttpFilter::destroy() {
     if (it->second->stream_) {
       it->second->stream_->reset();
     }
-    // Same logic as above.
+    // Do not delete the callback inline because AsyncClient may invoke it synchronously from reset.
+    if (dispatcher != nullptr) {
+      std::unique_ptr<Event::DeferredDeletable> deletable(it->second.release());
+      dispatcher->deferredDelete(std::move(deletable));
+    } else {
+      it->second.reset();
+    }
     if (!http_stream_callouts_.empty() && http_stream_callouts_.begin() == it) {
       http_stream_callouts_.erase(it);
     }
   }
+
+  decoder_callbacks_ = nullptr;
+  encoder_callbacks_ = nullptr;
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bool end_of_stream) {
