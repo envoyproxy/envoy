@@ -45,7 +45,7 @@ enum HistogramEmitMode {
 //           "@type": type.googleapis.com/envoy.config.metrics.v3.MetricsServiceConfig
 //
 // [#extension: envoy.stat_sinks.metrics_service]
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message MetricsServiceConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.metrics.v2.MetricsServiceConfig";
@@ -70,4 +70,11 @@ message MetricsServiceConfig {
 
   // Specify which metrics types to emit for histograms. Defaults to SUMMARY_AND_HISTOGRAM.
   HistogramEmitMode histogram_emit_mode = 5 [(validate.rules).enum = {defined_only: true}];
+
+  // The maximum number of metrics to send in a single gRPC message. If not set or set to 0,
+  // all metrics will be sent in a single message (current behavior). When set to a positive value,
+  // metrics will be batched into multiple messages, with each message containing at most batch_size
+  // metric families. This helps avoid hitting gRPC message size limits (typically 4MB) when sending
+  // large numbers of metrics.
+  uint32 batch_size = 6 [(validate.rules).uint32 = {gte: 0}];
 }

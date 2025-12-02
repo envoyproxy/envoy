@@ -3,6 +3,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load(":envoy_binary.bzl", "envoy_cc_binary")
 load(
     ":envoy_internal.bzl",
@@ -181,7 +182,10 @@ def envoy_cc_test(
     cc_test(
         name = name,
         srcs = srcs,
-        data = data,
+        data = data + select({
+            "%s//bazel:asan_build" % repository: ["@llvm_toolchain_llvm//:symbolizer"],
+            "//conditions:default": [],
+        }),
         copts = envoy_copts(repository, test = True) + copts + envoy_pch_copts(repository, "//test:test_pch"),
         additional_linker_inputs = envoy_exported_symbols_input(),
         linkopts = _envoy_test_linkopts() + linkopts,
@@ -200,7 +204,10 @@ def envoy_cc_test(
         shard_count = shard_count,
         size = size,
         flaky = flaky,
-        env = env,
+        env = env | select({
+            "%s//bazel:asan_build" % repository: {"ASAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
+            "//conditions:default": {},
+        }),
         exec_properties = exec_properties,
     )
 
@@ -295,7 +302,7 @@ def envoy_benchmark_test(
         repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
-    native.sh_test(
+    sh_test(
         name = name,
         srcs = [repository + "//bazel:test_for_benchmark_wrapper.sh"],
         data = [":" + benchmark_binary] + data,
@@ -363,7 +370,7 @@ def envoy_sh_test(
         )
 
     else:
-        native.sh_test(
+        sh_test(
             name = name,
             srcs = ["//bazel:sh_test_wrapper.sh"],
             data = srcs + data + cc_binary,

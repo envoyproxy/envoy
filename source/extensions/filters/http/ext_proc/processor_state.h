@@ -46,6 +46,7 @@ public:
   QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
+  const std::deque<QueuedChunkPtr>& queue() const { return queue_; }
 
 private:
   std::deque<QueuedChunkPtr> queue_;
@@ -76,15 +77,21 @@ public:
     TrailersCallback,
   };
 
-  explicit ProcessorState(Filter& filter,
-                          envoy::config::core::v3::TrafficDirection traffic_direction,
-                          const std::vector<std::string>& untyped_forwarding_namespaces,
-                          const std::vector<std::string>& typed_forwarding_namespaces,
-                          const std::vector<std::string>& untyped_receiving_namespaces)
+  explicit ProcessorState(
+      Filter& filter, envoy::config::core::v3::TrafficDirection traffic_direction,
+      const std::vector<std::string>& untyped_forwarding_namespaces,
+      const std::vector<std::string>& typed_forwarding_namespaces,
+      const std::vector<std::string>& untyped_receiving_namespaces,
+      const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
+      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
       : filter_(filter), traffic_direction_(traffic_direction),
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
         typed_forwarding_namespaces_(&typed_forwarding_namespaces),
-        untyped_receiving_namespaces_(&untyped_receiving_namespaces) {}
+        untyped_receiving_namespaces_(&untyped_receiving_namespaces),
+        untyped_cluster_metadata_forwarding_namespaces_(
+            &untyped_cluster_metadata_forwarding_namespaces),
+        typed_cluster_metadata_forwarding_namespaces_(
+            &typed_cluster_metadata_forwarding_namespaces) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -101,6 +108,7 @@ public:
 
   bool completeBodyAvailable() const { return complete_body_available_; }
   void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
+  bool hasNoBody() const { return no_body_; }
   void setHasNoBody(bool b) { no_body_ = b; }
   bool bodyReplaced() const { return body_replaced_; }
   bool bodyReceived() const { return body_received_; }
@@ -130,6 +138,18 @@ public:
   void setUntypedReceivingMetadataNamespaces(const std::vector<std::string>& ns) {
     untyped_receiving_namespaces_ = &ns;
   };
+  const std::vector<std::string>& untypedClusterMetadataForwardingNamespaces() const {
+    return *untyped_cluster_metadata_forwarding_namespaces_;
+  }
+  void setUntypedClusterMetadataForwardingNamespaces(const std::vector<std::string>& ns) {
+    untyped_cluster_metadata_forwarding_namespaces_ = &ns;
+  }
+  const std::vector<std::string>& typedClusterMetadataForwardingNamespaces() const {
+    return *typed_cluster_metadata_forwarding_namespaces_;
+  }
+  void setTypedClusterMetadataForwardingNamespaces(const std::vector<std::string>& ns) {
+    typed_cluster_metadata_forwarding_namespaces_ = &ns;
+  }
 
   bool sendHeaders() const { return send_headers_; }
   bool sendTrailers() const { return send_trailers_; }
@@ -284,7 +304,8 @@ protected:
   const std::vector<std::string>* untyped_forwarding_namespaces_{};
   const std::vector<std::string>* typed_forwarding_namespaces_{};
   const std::vector<std::string>* untyped_receiving_namespaces_{};
-
+  const std::vector<std::string>* untyped_cluster_metadata_forwarding_namespaces_{};
+  const std::vector<std::string>* typed_cluster_metadata_forwarding_namespaces_{};
   // If true, the attributes for this processing state have already been sent.
   bool attributes_sent_{};
 
@@ -431,10 +452,13 @@ public:
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode,
       const std::vector<std::string>& untyped_forwarding_namespaces,
       const std::vector<std::string>& typed_forwarding_namespaces,
-      const std::vector<std::string>& untyped_receiving_namespaces)
+      const std::vector<std::string>& untyped_receiving_namespaces,
+      const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
+      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
-                       untyped_receiving_namespaces) {
+                       untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
+                       typed_cluster_metadata_forwarding_namespaces) {
     setProcessingModeInternal(mode);
   }
   DecodingProcessorState(const DecodingProcessorState&) = delete;
@@ -522,10 +546,13 @@ public:
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode,
       const std::vector<std::string>& untyped_forwarding_namespaces,
       const std::vector<std::string>& typed_forwarding_namespaces,
-      const std::vector<std::string>& untyped_receiving_namespaces)
+      const std::vector<std::string>& untyped_receiving_namespaces,
+      const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
+      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
-                       untyped_receiving_namespaces) {
+                       untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
+                       typed_cluster_metadata_forwarding_namespaces) {
     setProcessingModeInternal(mode);
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;
@@ -596,6 +623,12 @@ public:
   evaluateAttributes(const ExpressionManager& mgr,
                      const Filters::Common::Expr::Activation& activation) const override {
     return mgr.evaluateResponseAttributes(activation);
+  }
+
+  // Check whether external processing is configured in the encoding path.
+  bool noExternalProcess() const {
+    return (!send_headers_ && !send_trailers_ &&
+            body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
   }
 
 private:

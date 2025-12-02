@@ -87,6 +87,5 @@ message ClientSideWeightedRoundRobin {
 
   // Configuration for slow start mode.
   // If this configuration is not set, slow start will not be not enabled.
-  // [#not-implemented-hide:]
   common.v3.SlowStartConfig slow_start_config = 8;
 }

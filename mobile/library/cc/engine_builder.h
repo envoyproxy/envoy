@@ -203,6 +203,9 @@ public:
   // The value must be an integer between -20 (highest priority) and 19 (lowest priority). Values
   // outside of this range will be ignored.
   EngineBuilder& setNetworkThreadPriority(int thread_priority);
+  // Sets the high watermark for the response buffer. The low watermark is set to half of this
+  // value. Defaults to 2MB if not set.
+  EngineBuilder& setBufferHighWatermark(size_t high_watermark);
 
   // Sets the QUIC connection idle timeout in seconds.
   EngineBuilder& setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds);
@@ -288,6 +291,7 @@ private:
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
   absl::optional<int> network_thread_priority_ = absl::nullopt;
+  absl::optional<size_t> high_watermark_ = absl::nullopt;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 

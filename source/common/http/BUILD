@@ -599,7 +599,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_features_lib",
         "@com_google_absl//absl/types:optional",
-        "@com_googlesource_googleurl//url",
+        "@googleurl//url",
     ],
 )
 

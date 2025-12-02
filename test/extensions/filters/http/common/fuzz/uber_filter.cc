@@ -142,7 +142,7 @@ void UberFilterFuzzer::reset() {
 
   access_logger_.reset();
   custom_stat_namespaces_ = Stats::CustomStatNamespacesImpl();
-  decoding_buffer_ = nullptr;
+  decoding_buffer_.reset();
   HttpFilterFuzzer::reset();
 }
 

@@ -256,13 +256,13 @@ public:
     }
   }
 
-  ABSL_MUST_USE_RESULT AssertionResult
-  waitForLoadStatsRequest(const std::vector<envoy::config::endpoint::v3::UpstreamLocalityStats>&
-                              expected_locality_stats,
-                          uint64_t dropped = 0, bool drop_overload_test = false) {
+  ABSL_MUST_USE_RESULT AssertionResult waitForLoadStatsRequest(
+      const std::vector<envoy::config::endpoint::v3::UpstreamLocalityStats>&
+          expected_locality_stats,
+      uint64_t dropped = 0, bool drop_overload_test = false, bool expect_cluster_stats = false) {
     Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
     Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats;
-    if (!expected_locality_stats.empty() || dropped != 0) {
+    if (!expected_locality_stats.empty() || dropped != 0 || expect_cluster_stats) {
       auto* cluster_stats = expected_cluster_stats.Add();
       cluster_stats->set_cluster_name("cluster_0");
       // Verify the eds service_name is passed back.
@@ -686,6 +686,63 @@ TEST_P(LoadStatsIntegrationTest, InProgress) {
   EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
+  cleanupLoadStatsConnection();
+}
+
+// Validate load report before and after successful request
+TEST_P(LoadStatsIntegrationTest, InProgressThenSuccess) {
+  initialize();
+  waitForLoadStatsStream();
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  loadstats_stream_->startGrpcStream();
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+  requestLoadStatsResponse({"cluster_0"});
+
+  initiateClientConnection();
+
+  // First window: stats should be sent because rq_issued=1, rq_active=1.
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 1, 1)}));
+
+  waitForUpstreamResponse(0, 200);
+
+  // Second window:
+  // rq_issued=0, rq_active=0. Stats NOT sent for the locality.
+  // We expect cluster stats to be present but with empty locality stats.
+  ASSERT_TRUE(waitForLoadStatsRequest({}, 0, false, true));
+
+  cleanupUpstreamAndDownstream();
+  cleanupLoadStatsConnection();
+}
+
+// Validate that stats are reported when a request spans multiple windows.
+TEST_P(LoadStatsIntegrationTest, RequestActiveForMultipleWindows) {
+  initialize();
+  waitForLoadStatsStream();
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  loadstats_stream_->startGrpcStream();
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+  requestLoadStatsResponse({"cluster_0"});
+
+  initiateClientConnection();
+  // First window: stats should be sent because rq_issued=1, rq_active=1.
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 1, 1)}));
+
+  // Second window: request is still active.
+  // Stats ARE sent because rq_active=1 and the runtime feature
+  // "envoy.reloadable_features.report_load_when_rq_active_is_non_zero" is
+  // enabled by default.
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 1, 0)}));
+
+  // Finish the request now
+  waitForUpstreamResponse(0, 200);
+
+  // Third window: Stats are NOT sent because rq_issued=0 and rq_active=0.
+  // Even though rq_success=1, it is not checked by the current logic.
+  // This demonstrates that success/error stats are lost if no new requests are
+  // issued in the window.
+  ASSERT_TRUE(waitForLoadStatsRequest({}, 0, false, true));
+
+  cleanupUpstreamAndDownstream();
   cleanupLoadStatsConnection();
 }
 

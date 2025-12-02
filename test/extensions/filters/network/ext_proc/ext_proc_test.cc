@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/ext_proc/ext_proc.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -1124,6 +1125,155 @@ TEST_F(NetworkExtProcFilterTest, ZeroTimeoutDisabled) {
 
   // No timeout should occur with zero timeout
   EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
+}
+
+// Test NetworkExtProcLoggingInfo basic operations.
+TEST(NetworkExtProcLoggingInfoTest, BasicOperations) {
+  NetworkExtProcLoggingInfo logging_info;
+
+  // Test recording gRPC calls for read direction
+  logging_info.recordGrpcCall(std::chrono::microseconds(100), Grpc::Status::WellKnownGrpcStatus::Ok,
+                              true);
+  logging_info.recordGrpcCall(std::chrono::microseconds(200),
+                              Grpc::Status::WellKnownGrpcStatus::Unavailable, true);
+
+  const auto& read_stats = logging_info.readStats();
+  EXPECT_EQ(read_stats.grpc_calls_, 2);
+  EXPECT_EQ(read_stats.grpc_errors_, 1);
+  EXPECT_EQ(read_stats.total_latency_.count(), 300);
+  EXPECT_EQ(read_stats.max_latency_.count(), 200);
+  EXPECT_EQ(read_stats.min_latency_.count(), 100);
+  EXPECT_EQ(logging_info.lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::Unavailable);
+
+  // Test recording gRPC calls for write direction
+  logging_info.recordGrpcCall(std::chrono::microseconds(50), Grpc::Status::WellKnownGrpcStatus::Ok,
+                              false);
+
+  const auto& write_stats = logging_info.writeStats();
+  EXPECT_EQ(write_stats.grpc_calls_, 1);
+  EXPECT_EQ(write_stats.grpc_errors_, 0);
+  EXPECT_EQ(write_stats.total_latency_.count(), 50);
+  EXPECT_EQ(write_stats.max_latency_.count(), 50);
+  EXPECT_EQ(write_stats.min_latency_.count(), 50);
+}
+
+// Test NetworkExtProcLoggingInfo bytes processing count.
+TEST(NetworkExtProcLoggingInfoTest, BytesProcessing) {
+  NetworkExtProcLoggingInfo logging_info;
+
+  // Add bytes for read direction
+  logging_info.addBytesProcessed(100, true);
+  logging_info.addBytesProcessed(200, true);
+  logging_info.addBytesProcessed(50, true);
+
+  // Add bytes for write direction
+  logging_info.addBytesProcessed(150, false);
+  logging_info.addBytesProcessed(250, false);
+
+  EXPECT_EQ(logging_info.readStats().bytes_processed_, 350);
+  EXPECT_EQ(logging_info.readStats().message_count_, 3);
+  EXPECT_EQ(logging_info.writeStats().bytes_processed_, 400);
+  EXPECT_EQ(logging_info.writeStats().message_count_, 2);
+  EXPECT_EQ(logging_info.totalBytesProcessed(), 750);
+}
+
+// Test logging info for connection info.
+TEST(NetworkExtProcLoggingInfoTest, ConnectionInfoSetup) {
+  NetworkExtProcLoggingInfo logging_info;
+
+  NiceMock<Network::MockConnection> connection;
+  Network::ConnectionInfoSetterImpl connection_info(nullptr, nullptr);
+
+  auto local_address = Network::Utility::parseInternetAddressNoThrow("192.168.1.1", 9090);
+  auto remote_address = Network::Utility::parseInternetAddressNoThrow("10.0.0.5", 54321);
+  connection_info.setLocalAddress(local_address);
+  connection_info.setRemoteAddress(remote_address);
+
+  EXPECT_CALL(connection, connectionInfoProvider()).WillRepeatedly(ReturnRef(connection_info));
+  logging_info.setConnectionInfo(&connection);
+
+  EXPECT_EQ(logging_info.peerAddress(), "10.0.0.5:54321");
+  EXPECT_EQ(logging_info.localAddress(), "192.168.1.1:9090");
+}
+
+// Test gRPC call latency recording
+TEST_F(NetworkExtProcFilterTest, LoggingInfoLatencyTracking) {
+  recreateFilterWithConfig(false);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false)).Times(3);
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  // Start processing
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  response->mutable_read_data()->set_data("modified");
+  connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+  filter_->onReceiveMessage(std::move(response));
+
+  Buffer::OwnedImpl data_second("test_second");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_second, false));
+  auto response_second =
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  response_second->mutable_read_data()->set_data("modified");
+  connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  filter_->onReceiveMessage(std::move(response_second));
+
+  Buffer::OwnedImpl write_data("write");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(write_data, false));
+  auto write_response =
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  write_response->mutable_write_data()->set_data("write");
+  connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(50));
+  filter_->onReceiveMessage(std::move(write_response));
+
+  auto& filter_state = read_callbacks_.connection().streamInfo().filterState();
+  auto logging_info =
+      filter_state->getDataReadOnly<NetworkExtProcLoggingInfo>("envoy.filters.network.ext_proc");
+
+  EXPECT_EQ(logging_info->readStats().grpc_calls_, 2);
+  EXPECT_EQ(logging_info->readStats().total_latency_.count(), 300000);
+  EXPECT_EQ(logging_info->readStats().max_latency_.count(), 200000);
+  EXPECT_EQ(logging_info->readStats().min_latency_.count(), 100000);
+  EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::Ok);
+
+  EXPECT_EQ(logging_info->writeStats().grpc_calls_, 1);
+  EXPECT_EQ(logging_info->writeStats().total_latency_.count(), 50000);
+}
+
+// Test gRPC call onGrpcError recording
+TEST_F(NetworkExtProcFilterTest, LoggingInfoOnError) {
+  recreateFilterWithConfig(true);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+  filter_->onGrpcError(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted, "test error");
+
+  auto& filter_state = read_callbacks_.connection().streamInfo().filterState();
+  auto logging_info =
+      filter_state->getDataReadOnly<NetworkExtProcLoggingInfo>("envoy.filters.network.ext_proc");
+
+  EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
 }
 
 } // namespace
