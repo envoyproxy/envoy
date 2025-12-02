@@ -278,6 +278,7 @@ Isode
 Iters
 JSON
 JSONs
+jsonrpc
 JWKS
 JWKs
 JWS
