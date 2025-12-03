@@ -35,6 +35,7 @@ envoy_cc_library(
         "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

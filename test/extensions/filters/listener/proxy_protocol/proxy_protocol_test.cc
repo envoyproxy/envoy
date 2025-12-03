@@ -20,6 +20,7 @@
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include "test/mocks/api/mocks.h"
@@ -2030,6 +2031,58 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeTlV) {
   EXPECT_EQ(0x02, proxy_proto_data.tlv_vector_[0].type);
   EXPECT_EQ("foo.com", std::string(proxy_proto_data.tlv_vector_[0].value.begin(),
                                    proxy_proto_data.tlv_vector_[0].value.end()));
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateAsStringAccessor) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x27, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t tlv_vpce[] = {0xea, 0x00, 0x0a, 0x21, 0x76, 0x70, 0x63,
+                                  0x65, 0x2d, 0x30, 0x78, 0x78, 0x78};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule1 = proto_config.add_rules();
+  rule1->set_tlv_type(0x02);
+  rule1->mutable_on_tlv_present()->set_key("PP2 type authority");
+  auto rule2 = proto_config.add_rules();
+  rule2->set_tlv_type(0xea);
+  rule2->mutable_on_tlv_present()->set_key("aws_vpce_id");
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(tlv_vpce, sizeof(tlv_vpce));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+
+  std::string filter_state_key1 = "envoy.network.proxy_protocol.tlv.PP2 type authority";
+  EXPECT_TRUE(filter_state->hasDataWithName(filter_state_key1));
+  const auto* tlv_value1 = filter_state->getDataReadOnly<Router::StringAccessor>(filter_state_key1);
+  ASSERT_NE(nullptr, tlv_value1);
+  EXPECT_EQ("foo.com", tlv_value1->serializeAsString().value());
+
+  std::string filter_state_key2 = "envoy.network.proxy_protocol.tlv.aws_vpce_id";
+  EXPECT_TRUE(filter_state->hasDataWithName(filter_state_key2));
+  const auto* tlv_value2 = filter_state->getDataReadOnly<Router::StringAccessor>(filter_state_key2);
+  ASSERT_NE(nullptr, tlv_value2);
+  absl::optional<std::string> vpce_value = tlv_value2->serializeAsString();
+  ASSERT_TRUE(vpce_value.has_value());
+  EXPECT_EQ("!vpce-0xxx", vpce_value.value());
+
+  EXPECT_TRUE(
+      filter_state->hasDataAtOrAboveLifeSpan(StreamInfo::FilterState::LifeSpan::Connection));
+
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
