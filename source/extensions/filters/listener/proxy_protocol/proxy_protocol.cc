@@ -27,6 +27,7 @@
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
@@ -583,6 +584,18 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
       Protobuf::Struct metadata((*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
       metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
       cb_->setDynamicMetadata(metadata_key, metadata);
+
+      std::string filter_state_key =
+          absl::StrCat("envoy.network.proxy_protocol.tlv.", key_value_pair->key());
+      if (!cb_->filterState().hasDataWithName(filter_state_key)) {
+        std::string sanitised_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
+        cb_->filterState().setData(filter_state_key,
+                                   std::make_unique<Router::StringAccessorImpl>(sanitised_value),
+                                   StreamInfo::FilterState::StateType::ReadOnly,
+                                   StreamInfo::FilterState::LifeSpan::Connection);
+        ENVOY_LOG(trace, "proxy_protocol: Stored TLV type {} value in FilterState with key {}",
+                  tlv_type, filter_state_key);
+      }
     } else {
       ENVOY_LOG(trace,
                 "proxy_protocol: Skip TLV of type {} since it's not needed for dynamic metadata",
