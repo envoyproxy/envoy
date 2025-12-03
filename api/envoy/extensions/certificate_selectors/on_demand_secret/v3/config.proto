@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.certificate_selectors.on_demand_secret.v3;
 
-import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -27,7 +27,8 @@ message Config {
   // Extension point to specify a function to compute the secret name. The extension is called
   // during the TLS handshake after receiving the "CLIENT HELLO" message from the client.
   // [#extension-category: envoy.tls.certificate_mappers]
-  config.core.v3.TypedExtensionConfig certificate_mapper = 2 [(validate.rules).message = {required: true}];
+  config.core.v3.TypedExtensionConfig certificate_mapper = 2
+      [(validate.rules).message = {required: true}];
 
   // A list of secret resource names to start fetching on configuration load (prior to receiving any
   // requests). The parent resource initializes immediately without waiting for the fetch to
