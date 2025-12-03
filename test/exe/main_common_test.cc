@@ -26,6 +26,7 @@
 using testing::HasSubstr;
 using testing::IsEmpty;
 using testing::NiceMock;
+using testing::Not;
 using testing::Return;
 
 namespace Envoy {
@@ -274,6 +275,13 @@ TEST_P(AdminRequestTest, AdminRequestGetNotAllowedPath) {
   startEnvoy();
   started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/status", "GET"), HasSubstr("request to path /status not allowed"));
+  quitAndWait();
+}
+
+TEST_P(AdminRequestTest, AdminRequestGetAllowedPrefixPath) {
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/healthcheck/ready", "GET"), Not(HasSubstr("not allowed")));
   quitAndWait();
 }
 
