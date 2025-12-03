@@ -339,6 +339,9 @@ new_features:
 - area: dns_filter
   change: |
     Added :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.access_log>` for DNS filter.
+- area: redis
+  change: |
+    Added support for ``redis_proxy`` filter to use separate credentials for each upstream Redis cluster.
 - area: quic
   change: |
     Added QUIC protocol option :ref:`max_sessions_per_event_loop
