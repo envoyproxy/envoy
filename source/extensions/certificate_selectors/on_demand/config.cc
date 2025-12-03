@@ -13,10 +13,10 @@ namespace OnDemand {
 AsyncContextConfig::AsyncContextConfig(absl::string_view cert_name,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        const envoy::config::core::v3::ConfigSource& config_source,
-                                       UpdateCb update_cb)
+                                       OptRef<Init::Manager> init_manager, UpdateCb update_cb)
     : factory_context_(factory_context), cert_name_(cert_name), update_cb_(update_cb),
       cert_provider_(factory_context_.secretManager().findOrCreateTlsCertificateProvider(
-          config_source, cert_name_, factory_context_, {})),
+          config_source, cert_name_, factory_context_, init_manager, false)),
       cert_callback_handle_(cert_provider_->addUpdateCallback([this]() { return loadCert(); })) {}
 
 absl::Status AsyncContextConfig::loadCert() {
@@ -61,11 +61,12 @@ SecretManager::SecretManager(const ConfigProto& config,
       cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
   for (const auto& name : config.prefetch_secret_names()) {
-    addCertificateConfig(name, nullptr);
+    addCertificateConfig(name, nullptr, factory_context.initManager());
   }
 }
 
-void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle) {
+void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
+                                         OptRef<Init::Manager> init_manager) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   CacheEntry& entry = cache_[secret_name];
   if (handle) {
@@ -79,7 +80,7 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
   // Should be last to trigger the callback since constructor can fire the update event.
   if (entry.cert_config_ == nullptr) {
     entry.cert_config_ = std::make_unique<AsyncContextConfig>(
-        secret_name, factory_context_, config_source_,
+        secret_name, factory_context_, config_source_, init_manager,
         [this](absl::string_view secret_name, const Ssl::TlsCertificateConfig& cert_config)
             -> absl::Status { return updateCertificate(secret_name, cert_config); });
     stats_.cert_requested_.inc();
@@ -124,7 +125,7 @@ HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
         auto that = weak_this.lock();
         auto handle = weak_handle.lock();
         if (that && handle) {
-          that->addCertificateConfig(name, handle);
+          that->addCertificateConfig(name, handle, {});
         }
       });
   return handle;

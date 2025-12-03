@@ -105,13 +105,15 @@ public:
    * secret provider.
    * @param init_manager if supplied, register to the initialization sequence; otherwise, start
    * immediately
+   * @param warm if true, wait for the update to complete initialization; otherwise, unblock
+   * immediately.
    * @return TlsCertificateConfigProviderSharedPtr the dynamic TLS secret provider.
    */
   virtual TlsCertificateConfigProviderSharedPtr
   findOrCreateTlsCertificateProvider(const envoy::config::core::v3::ConfigSource& config_source,
                                      const std::string& config_name,
                                      Server::Configuration::ServerFactoryContext& server_context,
-                                     OptRef<Init::Manager> init_manager) PURE;
+                                     OptRef<Init::Manager> init_manager, bool warm) PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create

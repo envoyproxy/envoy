@@ -32,7 +32,7 @@ public:
   AsyncContextConfig(absl::string_view cert_name,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const envoy::config::core::v3::ConfigSource& config_source,
-                     UpdateCb update_cb);
+                     OptRef<Init::Manager> init_manager, UpdateCb update_cb);
 
 private:
   absl::Status loadCert();
@@ -85,7 +85,8 @@ public:
                 Server::Configuration::GenericFactoryContext& factory_context,
                 const Ssl::ServerContextConfig& tls_config);
 
-  void addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle);
+  void addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
+                            OptRef<Init::Manager> init_manager);
   absl::Status updateCertificate(absl::string_view secret_name,
                                  const Ssl::TlsCertificateConfig& cert_config);
 

@@ -58,7 +58,8 @@ public:
   SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_view sds_config_name,
          Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-         std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api);
+         std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api,
+         bool warm);
 
   SecretData secretData();
 
@@ -92,7 +93,7 @@ protected:
   Api::Api& api_;
 
 protected:
-  void initialize();
+  void initialize(bool warm);
 
 private:
   absl::Status validateUpdateSize(uint32_t added_resources_num,
@@ -144,9 +145,9 @@ public:
                        Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                        std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
-                       Api::Api& api)
+                       Api::Api& api, bool warm)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api) {}
+               stats, std::move(destructor_cb), dispatcher, api, warm) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::TlsCertificate* secret() const override {
@@ -160,7 +161,7 @@ public:
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addUpdateCallback(std::function<absl::Status()> callback) override;
   const Init::Target* initTarget() override { return &init_target_; }
-  void start() override { initialize(); }
+  void start() override { initialize(false); }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
@@ -196,9 +197,9 @@ public:
                                      TimeSource& time_source,
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
                                      Stats::Store& stats, std::function<void()> destructor_cb,
-                                     Event::Dispatcher& dispatcher, Api::Api& api)
+                                     Event::Dispatcher& dispatcher, Api::Api& api, bool warm)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api) {}
+               stats, std::move(destructor_cb), dispatcher, api, warm) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext*
@@ -214,7 +215,7 @@ public:
     return validation_callback_manager_.add(callback);
   }
   const Init::Target* initTarget() override { return &init_target_; }
-  void start() override { initialize(); }
+  void start() override { initialize(false); }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
@@ -255,9 +256,9 @@ public:
                              TimeSource& time_source,
                              ProtobufMessage::ValidationVisitor& validation_visitor,
                              Stats::Store& stats, std::function<void()> destructor_cb,
-                             Event::Dispatcher& dispatcher, Api::Api& api)
+                             Event::Dispatcher& dispatcher, Api::Api& api, bool warm)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api) {}
+               stats, std::move(destructor_cb), dispatcher, api, warm) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys*
@@ -272,7 +273,7 @@ public:
           absl::Status(const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>
           callback) override;
   const Init::Target* initTarget() override { return &init_target_; }
-  void start() override { initialize(); }
+  void start() override { initialize(false); }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
@@ -307,9 +308,9 @@ public:
                       Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                       std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
-                      Api::Api& api)
+                      Api::Api& api, bool warm)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api) {}
+               stats, std::move(destructor_cb), dispatcher, api, warm) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret() const override {
@@ -326,7 +327,7 @@ public:
     return validation_callback_manager_.add(callback);
   }
   const Init::Target* initTarget() override { return &init_target_; }
-  void start() override { initialize(); }
+  void start() override { initialize(false); }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {

@@ -51,7 +51,7 @@ public:
   virtual const Init::Target* initTarget() { return nullptr; }
 
   /**
-   * Start initializating the provider.
+   * Start initializating the provider (when not using the init manager).
    */
   virtual void start() PURE;
 };
