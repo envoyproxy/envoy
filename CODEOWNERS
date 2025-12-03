@@ -395,6 +395,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry
 # On demand secret provider
 /*/extensions/certificate_selectors/on_demand @kyessenov @tonya11en
+/*/extensions/certificate_mappers/static_name @kyessenov @tonya11en
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 

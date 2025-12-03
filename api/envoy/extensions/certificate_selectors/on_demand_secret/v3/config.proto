@@ -19,20 +19,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Fetches the secret on-demand while allowing the parent cluster or listener to accept connections
 // without warming. The certificate secret is validated against the outer common TLS context, e.g.
-// by setting FIPS compliance policy on the loaded secret material.
+// by setting the FIPS compliance policy on the loaded secret material.
 message Config {
-  // Defines the source of the secrets.
+  // Defines the configuration source of the secrets.
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
-  // Extension to specify a mapping to the secret name.
+  // Extension point to specify a function to compute the secret name. The extension is called
+  // during the TLS handshake after receiving the "CLIENT HELLO" message from the client.
   // [#extension-category: envoy.tls.certificate_mappers]
-  config.core.v3.TypedExtensionConfig secret_name = 2 [(validate.rules).message = {required: true}];
+  config.core.v3.TypedExtensionConfig certificate_mapper = 2 [(validate.rules).message = {required: true}];
 
-  // A list of secret resource names to start fetching on configuration load.
-  repeated string prefetch_names = 3;
-}
-
-// A mapping to a fixed certificate name.
-message StaticName {
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  // A list of secret resource names to start fetching on configuration load (prior to receiving any
+  // requests). The parent resource initializes immediately without waiting for the fetch to
+  // complete.
+  repeated string prefetch_secret_names = 3;
 }

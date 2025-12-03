@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/certificate_selectors/on_demand_secret/v3/config.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
@@ -82,6 +83,7 @@ public:
     addFakeUpstream(Http::CodecType::HTTP1);
     xds_upstream_ = fake_upstreams_.front().get();
   }
+  
   FakeUpstream* dataStream() override { return fake_upstreams_.back().get(); }
 
 protected:
@@ -118,11 +120,11 @@ protected:
     return xds_stream;
   }
 
-  void removeSecret(FakeStream* xds_stream, absl::string_view cert) {
+  void removeSecret(FakeStream& xds_stream, absl::string_view cert) {
     envoy::service::discovery::v3::DeltaDiscoveryResponse discovery_response;
     discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
     discovery_response.add_removed_resources(cert);
-    xds_stream->sendGrpcMessage(discovery_response);
+    xds_stream.sendGrpcMessage(discovery_response);
   }
 
   void waitCertsRequested(uint32_t count) {
@@ -261,9 +263,29 @@ TEST_P(OnDemandIntegrationTest, ConnectTimeout) {
   test_server_->waitForCounterEq(
       listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"), 1,
       TestUtility::DefaultTimeout, dispatcher_.get());
+  conn->ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+  conn.reset();
   // SDS request is still outstanding, so we can respond to it, and it will be used later.
   createXdsConnection();
   auto server_sds = waitSendSdsResponse("server");
+}
+
+TEST_P(OnDemandIntegrationTest, SecretRemoved) {
+  setup(R"EOF(
+  secret_name:
+    name: static-name
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      name: server
+  )EOF");
+  auto conn = std::make_unique<ClientSslConnection>(*this);
+  waitCertsRequested(1);
+  createXdsConnection();
+  auto server_sds = waitSendSdsResponse("server");
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+  removeSecret(*server_sds, "server");
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, OnDemandIntegrationTest,
