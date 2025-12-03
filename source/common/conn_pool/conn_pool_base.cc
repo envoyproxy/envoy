@@ -134,6 +134,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
     return pending_streams_.size() > connecting_stream_capacity_;
   }
 
+  // Determine if we are trying to prefetch for global preconnect or local preconnect.
   if (global_preconnect_ratio != 0) {
     // If global preconnecting is on, and this connection is within the global
     // preconnect limit, preconnect.
@@ -314,7 +315,6 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
       incrConnectingAndConnectedStreamCapacity(1, client);
     }
   }
-
   if (client.state() == ActiveClient::State::Draining && client.numActiveStreams() == 0) {
     // Close out the draining client if we no longer have active streams.
     client.close();

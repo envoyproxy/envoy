@@ -41,8 +41,6 @@ static_resources:
     type: STATIC
     dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
-    # preconnect_policy:
-    #   per_upstream_preconnect_ratio: 3
     load_assignment:
       cluster_name: cluster_0
       endpoints:
@@ -55,10 +53,5 @@ static_resources:
           metadata:
             filter_metadata:
               connection_pool_options:
-                round_robin: true
-                preconnect_ratio: 3
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 9085
+                max_concurrent_streams: 3
+                max_requests_per_connection: 100
