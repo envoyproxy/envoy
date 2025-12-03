@@ -12,7 +12,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/cer
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Static secret certificate mapper]
-// [#extension: envoy.certificate_mappers.static_name]
+// [#extension: envoy.tls.certificate_mappers.static_name]
 
 // A mapping to a fixed secret name for all certificates.
 message StaticName {

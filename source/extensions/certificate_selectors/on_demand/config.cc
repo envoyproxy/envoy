@@ -13,10 +13,10 @@ namespace OnDemand {
 AsyncContextConfig::AsyncContextConfig(absl::string_view cert_name,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        const envoy::config::core::v3::ConfigSource& config_source,
-                                       OptRef<Init::Manager> init_manager, UpdateCb update_cb)
+                                       UpdateCb update_cb)
     : factory_context_(factory_context), cert_name_(cert_name), update_cb_(update_cb),
       cert_provider_(factory_context_.secretManager().findOrCreateTlsCertificateProvider(
-          config_source, cert_name_, factory_context_, init_manager)),
+          config_source, cert_name_, factory_context_, {})),
       cert_callback_handle_(cert_provider_->addUpdateCallback([this]() { return loadCert(); })) {}
 
 absl::Status AsyncContextConfig::loadCert() {
@@ -60,13 +60,12 @@ SecretManager::SecretManager(const ConfigProto& config,
       config_source_(config.config_source()), tls_config_(tls_config),
       cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
-  for (const auto& name : config.prefetch_names()) {
-    addCertificateConfig(name, nullptr, factory_context.initManager());
+  for (const auto& name : config.prefetch_secret_names()) {
+    addCertificateConfig(name, nullptr);
   }
 }
 
-void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
-                                         OptRef<Init::Manager> init_manager) {
+void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   CacheEntry& entry = cache_[secret_name];
   if (handle) {
@@ -80,7 +79,7 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
   // Should be last to trigger the callback since constructor can fire the update event.
   if (entry.cert_config_ == nullptr) {
     entry.cert_config_ = std::make_unique<AsyncContextConfig>(
-        secret_name, factory_context_, config_source_, init_manager,
+        secret_name, factory_context_, config_source_,
         [this](absl::string_view secret_name, const Ssl::TlsCertificateConfig& cert_config)
             -> absl::Status { return updateCertificate(secret_name, cert_config); });
     stats_.cert_requested_.inc();
@@ -106,8 +105,8 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
       count++;
     }
   }
-  ENVOY_LOG(trace, "Notified {} pending connections about certificate {}, queued {}", count,
-            secret_name, entry.callbacks_.size());
+  ENVOY_LOG(trace, "Notified {} pending connections about certificate '{}', out of queued {}",
+            count, secret_name, entry.callbacks_.size());
   entry.callbacks_.clear();
   return absl::OkStatus();
 }
@@ -125,7 +124,7 @@ HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
         auto that = weak_this.lock();
         auto handle = weak_handle.lock();
         if (that && handle) {
-          that->addCertificateConfig(name, handle, {});
+          that->addCertificateConfig(name, handle);
         }
       });
   return handle;
@@ -183,9 +182,9 @@ OnDemandTlsCertificateSelectorFactory::createTlsCertificateSelectorFactory(
       proto_config, factory_context.messageValidationVisitor());
   Ssl::TlsCertificateMapperConfigFactory& mapper_config =
       Config::Utility::getAndCheckFactory<Ssl::TlsCertificateMapperConfigFactory>(
-          config.secret_name());
+          config.certificate_mapper());
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-      config.secret_name().typed_config(), factory_context.messageValidationVisitor(),
+      config.certificate_mapper().typed_config(), factory_context.messageValidationVisitor(),
       mapper_config);
   auto mapper_factory = mapper_config.createTlsCertificateMapperFactory(*message, factory_context);
   RETURN_IF_NOT_OK(mapper_factory.status());
@@ -202,18 +201,6 @@ OnDemandTlsCertificateSelectorFactory::createTlsCertificateSelectorFactory(
 }
 
 REGISTER_FACTORY(OnDemandTlsCertificateSelectorFactory, Ssl::TlsCertificateSelectorConfigFactory);
-
-absl::StatusOr<Ssl::TlsCertificateMapperFactory>
-StaticNameMapperFactory::createTlsCertificateMapperFactory(
-    const Protobuf::Message& proto_config,
-    Server::Configuration::GenericFactoryContext& factory_context) {
-  const StaticNameConfigProto& config =
-      MessageUtil::downcastAndValidate<const StaticNameConfigProto&>(
-          proto_config, factory_context.messageValidationVisitor());
-  return [name = config.name()]() { return [=](const SSL_CLIENT_HELLO&) { return name; }; };
-}
-
-REGISTER_FACTORY(StaticNameMapperFactory, Ssl::TlsCertificateMapperConfigFactory);
 
 } // namespace OnDemand
 } // namespace CertificateSelectors

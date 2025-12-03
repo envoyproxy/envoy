@@ -26,6 +26,7 @@ envoy_extension_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/certificate_mappers/static_name:config",
         "//source/extensions/certificate_selectors/on_demand:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/tls:config",
@@ -36,6 +37,7 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/certificate_mappers/static_name/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/certificate_selectors/on_demand_secret/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",

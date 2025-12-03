@@ -15,7 +15,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/cer
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: On-demand secret certificate selector]
-// [#extension: envoy.certificate_selectors.on_demand_secret]
+// [#extension: envoy.tls.certificate_selectors.on_demand_secret]
 
 // Fetches the secret on-demand while allowing the parent cluster or listener to accept connections
 // without warming. The certificate secret is validated against the outer common TLS context, e.g.

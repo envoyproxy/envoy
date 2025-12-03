@@ -3,6 +3,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/extensions/certificate_mappers/static_name/v3/config.pb.h"
 #include "envoy/extensions/certificate_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
@@ -83,7 +84,7 @@ public:
     addFakeUpstream(Http::CodecType::HTTP1);
     xds_upstream_ = fake_upstreams_.front().get();
   }
-  
+
   FakeUpstream* dataStream() override { return fake_upstreams_.back().get(); }
 
 protected:
@@ -140,12 +141,12 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
     server_sds = waitSendSdsResponse("server");
   };
   setup(R"EOF(
-  secret_name:
+  certificate_mapper:
     name: static-name
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      "@type": type.googleapis.com/envoy.extensions.certificate_mappers.static_name.v3.StaticName
       name: server
-  prefetch_names:
+  prefetch_secret_names:
   - server
   )EOF");
   auto conn = std::make_unique<ClientSslConnection>(*this);
@@ -160,10 +161,10 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
   setup(R"EOF(
-  secret_name:
+  certificate_mapper:
     name: static-name
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      "@type": type.googleapis.com/envoy.extensions.certificate_mappers.static_name.v3.StaticName
       name: server
   )EOF");
   auto conn = std::make_unique<ClientSslConnection>(*this);
@@ -178,21 +179,18 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
-  FakeStreamPtr server2_sds;
-  on_server_init_function_ = [&]() {
-    createXdsConnection();
-    server2_sds = waitSendSdsResponse("server2");
-  };
   setup(R"EOF(
-  secret_name:
+  certificate_mapper:
     name: static-name
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      "@type": type.googleapis.com/envoy.extensions.certificate_mappers.static_name.v3.StaticName
       name: server
-  prefetch_names:
+  prefetch_secret_names:
   - server2
   )EOF");
 
+  createXdsConnection();
+  auto server2_sds = waitSendSdsResponse("server2");
   auto conn = std::make_unique<ClientSslConnection>(*this);
   waitCertsRequested(2);
   auto server_sds = waitSendSdsResponse("server");
@@ -205,10 +203,10 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
 
 TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
   setup(R"EOF(
-  secret_name:
+  certificate_mapper:
     name: static-name
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      "@type": type.googleapis.com/envoy.extensions.certificate_mappers.static_name.v3.StaticName
       name: server
   )EOF");
   // Queue two connections in pending state.
@@ -228,10 +226,10 @@ TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
 
 TEST_P(OnDemandIntegrationTest, ClientInterruptedHandshake) {
   setup(R"EOF(
-  secret_name:
+  certificate_mapper:
     name: static-name
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      "@type": type.googleapis.com/envoy.extensions.certificate_mappers.static_name.v3.StaticName
       name: server
   )EOF");
   auto conn1 = std::make_unique<ClientSslConnection>(*this);
@@ -253,10 +251,10 @@ TEST_P(OnDemandIntegrationTest, ConnectTimeout) {
     connect_timeout->set_nanos(0);
   });
   setup(R"EOF(
-  secret_name:
+  certificate_mapper:
     name: static-name
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      "@type": type.googleapis.com/envoy.extensions.certificate_mappers.static_name.v3.StaticName
       name: server
   )EOF");
   auto conn = std::make_unique<ClientSslConnection>(*this);
@@ -272,10 +270,10 @@ TEST_P(OnDemandIntegrationTest, ConnectTimeout) {
 
 TEST_P(OnDemandIntegrationTest, SecretRemoved) {
   setup(R"EOF(
-  secret_name:
+  certificate_mapper:
     name: static-name
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.certificate_selectors.on_demand_secret.v3.StaticName
+      "@type": type.googleapis.com/envoy.extensions.certificate_mappers.static_name.v3.StaticName
       name: server
   )EOF");
   auto conn = std::make_unique<ClientSslConnection>(*this);

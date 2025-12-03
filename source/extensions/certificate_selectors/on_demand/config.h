@@ -32,7 +32,7 @@ public:
   AsyncContextConfig(absl::string_view cert_name,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const envoy::config::core::v3::ConfigSource& config_source,
-                     OptRef<Init::Manager> init_manager, UpdateCb update_cb);
+                     UpdateCb update_cb);
 
 private:
   absl::Status loadCert();
@@ -85,8 +85,7 @@ public:
                 Server::Configuration::GenericFactoryContext& factory_context,
                 const Ssl::ServerContextConfig& tls_config);
 
-  void addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
-                            OptRef<Init::Manager> init_manager);
+  void addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle);
   absl::Status updateCertificate(absl::string_view secret_name,
                                  const Ssl::TlsCertificateConfig& cert_config);
 
@@ -156,23 +155,6 @@ public:
 };
 
 DECLARE_FACTORY(OnDemandTlsCertificateSelectorFactory);
-
-using StaticNameConfigProto =
-    envoy::extensions::certificate_selectors::on_demand_secret::v3::StaticName;
-class StaticNameMapperFactory : public Ssl::TlsCertificateMapperConfigFactory {
-public:
-  absl::StatusOr<Ssl::TlsCertificateMapperFactory> createTlsCertificateMapperFactory(
-      const Protobuf::Message& proto_config,
-      Server::Configuration::GenericFactoryContext& factory_context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<StaticNameConfigProto>();
-  }
-
-  std::string name() const override { return "envoy.tls.certificate_mappers.static_name"; }
-};
-
-DECLARE_FACTORY(StaticNameMapperFactory);
 
 } // namespace OnDemand
 } // namespace CertificateSelectors
