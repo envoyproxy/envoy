@@ -653,11 +653,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   auto admin_impl = std::make_shared<AdminImpl>(initial_config.admin().profilePath(), *this,
                                                 initial_config.admin().ignoreGlobalConnLimit());
 
-  if (!bootstrap_.admin().allow_paths().empty()) {
-    for (const auto& allowlisted_path : bootstrap_.admin().allow_paths()) {
-      admin_impl->addAllowlistedPath(
-          std::make_unique<Matchers::StringMatcherImpl>(allowlisted_path, server_contexts_));
-    }
+  for (const auto& allowlisted_path : bootstrap_.admin().allow_paths()) {
+    admin_impl->addAllowlistedPath(
+        std::make_unique<Matchers::StringMatcherImpl>(allowlisted_path, server_contexts_));
   }
 
   admin_ = admin_impl;
