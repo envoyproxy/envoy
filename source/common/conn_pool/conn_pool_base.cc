@@ -72,18 +72,10 @@ ConnPoolImplBase::ConnPoolImplBase(
     if (options.contains("max_requests_per_connection")) {
       endpoint_limits_.max_requests_per_connection = options.at("max_requests_per_connection").number_value();
     }
-    if (options.contains("connection_idle_timeout")) {
-      endpoint_limits_.connection_idle_timeout = options.at("connection_idle_timeout").number_value();
-    }
-    if (options.contains("propagate_negotiated_stream_limits")) {
-      endpoint_limits_.propagate_negotiated_stream_limits = options.at("propagate_negotiated_stream_limits").bool_value();
-    }
-    ENVOY_LOG(debug, "endpoint {} has specific options: max_concurrent_streams={}, max_requests_per_connection={}, connection_idle_timeout={}, propagate_negotiated_stream_limits={}", 
+    ENVOY_LOG(debug, "endpoint {} has specific options: max_concurrent_streams={}, max_requests_per_connection={}", 
       host_->address() ? host_->address()->asString() : "without address", 
       endpoint_limits_.max_concurrent_streams, 
-      endpoint_limits_.max_requests_per_connection,
-      endpoint_limits_.connection_idle_timeout,
-      endpoint_limits_.propagate_negotiated_stream_limits);
+      endpoint_limits_.max_requests_per_connection);
   }
 }
 

@@ -316,11 +316,8 @@ public:
   void onUpstreamReadyForEarlyData(ActiveClient& client);
 
   struct EndpointLimitOptions {
-    bool propagate_negotiated_stream_limits{true};
-    // TODO: check these defaults
     uint32_t max_concurrent_streams{0};
     uint32_t max_requests_per_connection{0};
-    uint32_t connection_idle_timeout{0};
   };
 
   const EndpointLimitOptions& endpointLimits() {
