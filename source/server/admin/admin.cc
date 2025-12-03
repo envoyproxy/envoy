@@ -401,8 +401,7 @@ Admin::RequestPtr AdminImpl::makeRequest(AdminStream& admin_stream) const {
     query_index = path_and_query.size();
   }
   if (!allowlisted_paths_.empty() && !acceptTargetPath(path_and_query)) {
-    ENVOY_LOG(info,
-+             fmt::format("Request to admin interface path {} is not allowed", path_and_query));
+    ENVOY_LOG(info, "Request to admin interface path {} is not allowed", path_and_query);
     Buffer::OwnedImpl error_response;
     error_response.add(fmt::format("request to path {} not allowed", path_and_query));
     return Admin::makeStaticTextRequest(error_response, Http::Code::Forbidden);
