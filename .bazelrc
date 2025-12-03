@@ -588,6 +588,12 @@ common:debug --config=debug-sandbox
 common:debug --config=debug-coverage
 common:debug --config=debug-tests
 
+#############################################################################
+# compat: Compatibility with main branch repo settings
+#############################################################################
+common:bes --config=bes-envoy-engflow
+common:rbe --config=remote-envoy-engflow
+
 try-import %workspace%/repo.bazelrc
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
