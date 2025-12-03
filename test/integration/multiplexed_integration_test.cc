@@ -3570,9 +3570,9 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
   {
     size_t log_num = 0;
     if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-      log_num = 1;
-    } else {
       log_num = 2;
+    } else {
+      log_num = 4;
     }
 
     // The ProtocolError will be translated to OGHTTP2_PROTOCOL_ERROR (1).
@@ -3587,8 +3587,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
       // is not complete yet, it will finally result in resetting of the downstream stream.
       upstream_request_->encodeResetStream(Http::StreamResetReason::ProtocolError);
       ASSERT_TRUE(response->waitForReset());
-      // The upstream protocol error will not be translated at downstream side.
-      EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+      EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
 
       cleanupUpstreamAndDownstream();
     });
