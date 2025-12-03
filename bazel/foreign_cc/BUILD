@@ -372,44 +372,6 @@ envoy_cmake(
 )
 
 envoy_cmake(
-    name = "nghttp2",
-    build_args = select({
-        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
-        "//conditions:default": ["-j1"],
-    }),
-    cache_entries = {
-        "ENABLE_LIB_ONLY": "on",
-        "BUILD_SHARED_LIBS": "off",
-        "BUILD_STATIC_LIBS": "on",
-        "CMAKE_INSTALL_LIBDIR": "lib",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-    },
-    cmake_files_dir = "$BUILD_TMPDIR/lib/CMakeFiles",
-    debug_cache_entries = {"ENABLE_DEBUG": "on"},
-    defines = ["NGHTTP2_STATICLIB"],
-    exec_properties = select({
-        "//bazel:engflow_rbe_x86_64": {
-            "Pool": "linux_x64_large",
-        },
-        "//bazel:engflow_rbe_aarch64": {
-            "Pool": "linux_arm64_small",
-        },
-        "//conditions:default": {},
-    }),
-    generate_args = [
-        "-G",
-        "Ninja",
-    ],
-    lib_source = "@com_github_nghttp2_nghttp2//:all",
-    out_static_libs = select({
-        "//bazel:windows_x86_64": ["nghttp2.lib"],
-        "//conditions:default": ["libnghttp2.a"],
-    }),
-)
-
-envoy_cmake(
     name = "wamr",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],

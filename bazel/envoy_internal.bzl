@@ -145,7 +145,7 @@ EXTERNAL_DEPS_MAP = {
     "api_httpbody_protos": "@com_google_googleapis//google/api:httpbody_cc_proto",
     "http_api_protos": "@com_google_googleapis//google/api:annotations_cc_proto",
     # nghttp2
-    "nghttp2": "@envoy//bazel/foreign_cc:nghttp2",
+    "nghttp2": "@nghttp2",
     # gRPC
     "grpc": "@com_github_grpc_grpc//:grpc++",
     "grpc_health_proto": "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_cc_proto",
