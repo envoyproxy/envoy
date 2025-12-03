@@ -53,6 +53,7 @@ envoy_cc_test(
         "//source/extensions/matching/input_matchers/cel_matcher:config",
         "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/proto:bookstore_proto_cc_proto",
