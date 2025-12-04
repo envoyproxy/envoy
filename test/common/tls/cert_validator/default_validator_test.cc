@@ -824,8 +824,8 @@ TEST(DefaultCertValidatorTest, TestCertificateValidationErrorDetailsForSanFailur
   SslStats stats = generateSslStats(*test_store.rootScope());
 
   // Load a certificate with DNS SANs
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
 
   // Create SAN matchers that won't match the certificate (using regex as DNS requires it)
   envoy::type::matcher::v3::StringMatcher matcher;

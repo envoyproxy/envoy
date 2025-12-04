@@ -51,7 +51,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
   ssl_ctx_ = *ctx_or_error;
   config_->setSecretUpdateCallback([this]() { return onAddOrUpdateSecret(); });
 }
-  
+
 ServerSslSocketFactory::~ServerSslSocketFactory() { manager_.removeContext(ssl_ctx_); }
 
 Network::TransportSocketPtr ServerSslSocketFactory::createDownstreamTransportSocket() const {

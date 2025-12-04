@@ -255,8 +255,8 @@ TEST_F(HandshakerTest, SslExtendedSocketInfoCertValidationError) {
   SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
 
   // Get the extended socket info through the SSL ex_data mechanism
-  auto* extended_info = reinterpret_cast<Ssl::SslExtendedSocketInfo*>(
-      SSL_get_ex_data(handshaker.ssl(), 0));
+  auto* extended_info =
+      reinterpret_cast<Ssl::SslExtendedSocketInfo*>(SSL_get_ex_data(handshaker.ssl(), 0));
   ASSERT_NE(extended_info, nullptr);
 
   // Initially, the certificate validation error should be empty.
@@ -288,8 +288,8 @@ TEST_F(HandshakerTest, ValidateResultCallbackStoresErrorDetails) {
   SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
 
   // Get the extended socket info
-  auto* extended_info = reinterpret_cast<Ssl::SslExtendedSocketInfo*>(
-      SSL_get_ex_data(handshaker.ssl(), 0));
+  auto* extended_info =
+      reinterpret_cast<Ssl::SslExtendedSocketInfo*>(SSL_get_ex_data(handshaker.ssl(), 0));
   ASSERT_NE(extended_info, nullptr);
 
   // Create a validation callback (simulating async validation)
