@@ -10,6 +10,16 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "cpu_paths",
+    hdrs = ["cpu_paths.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/filesystem:filesystem_interface",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "cpu_utilization_monitor",
     srcs = ["cpu_utilization_monitor.cc"],
     hdrs = [
@@ -29,13 +39,13 @@ envoy_cc_library(
     name = "linux_cpu_stats_reader",
     srcs = ["linux_cpu_stats_reader.cc"],
     hdrs = [
-        "cpu_paths.h",
         "cpu_stats_reader.h",
         "cpu_utilization_monitor.h",
         "linux_cpu_stats_reader.h",
     ],
     tags = ["skip_on_windows"],
     deps = [
+        ":cpu_paths",
         "//envoy/common:exception_lib",
         "//envoy/filesystem:filesystem_interface",
         "//source/common/common:assert_lib",
