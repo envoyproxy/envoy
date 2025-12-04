@@ -584,5 +584,10 @@ new_features:
     Added :ref:`outlier_detection<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.outlier_detection>`
     to cluster's http protocol options to allow defining via an http matcher whether a response should be treated
     as error or as success by outlier detection.
+- area: json_to_metadata
+  change: |
+    Added support for per-route configuration override in the ``json_to_metadata`` http filter. Routes can now
+    specify different JSON to metadata conversion rules via per-route configuration, allowing different routes
+    to extract different metadata from request or response bodies while maintaining the same base filter configuration.
 
 deprecated:

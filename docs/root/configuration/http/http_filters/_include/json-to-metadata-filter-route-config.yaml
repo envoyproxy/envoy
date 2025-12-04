@@ -51,6 +51,9 @@ static_resources:
                     metadata_namespace: envoy.lb
                     key: default
                     value: 'true'
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: service
     type: STATIC
