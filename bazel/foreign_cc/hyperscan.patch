@@ -119,7 +119,7 @@ index 895610c..73b7b56 100755
  PREFIX=$1
  shift
  
-@@ -15,14 +37,13 @@ SYMSFILE=$(mktemp -p /tmp ${PREFIX}_rename.syms.XXXXX)
+@@ -15,14 +37,14 @@ SYMSFILE=$(mktemp -p /tmp ${PREFIX}_rename.syms.XXXXX)
  KEEPSYMS=$(mktemp -p /tmp keep.syms.XXXXX)
  # find the libc used by gcc
  LIBC_SO=$("$@" --print-file-name=libc.so.6)
@@ -132,6 +132,7 @@ index 895610c..73b7b56 100755
  # rename the symbols in the object
 -nm -f p -g ${OUT} | cut -f1 -d' ' | grep -v -f ${KEEPSYMS} | sed -e "s/\(.*\)/\1\ ${PREFIX}_\1/" >> ${SYMSFILE}
 +${NM} -f posix -g ${OUT} | cut -f1 -d' ' | grep -v -f ${KEEPSYMS} | sed -e "s/\(.*\)/\1\ ${PREFIX}_\1/" >> ${SYMSFILE}
++
  if test -s ${SYMSFILE}
  then
 -    objcopy --redefine-syms=${SYMSFILE} ${OUT}
