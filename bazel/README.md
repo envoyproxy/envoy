@@ -934,14 +934,17 @@ tools/gen_compilation_database.py --exclude_contrib
 # Running format linting without docker
 
 Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
+Prefer to run it via bazel as the environment will contain the dictionary used.
 
 You can run clang-format directly, without docker:
 
 ```shell
 bazel run //tools/code_format:check_format -- check
-./tools/spelling/check_spelling_pedantic.py check
+# Target root needs to be an absolute path to your envoy repository to run on
+# the entire codebase by default.
+bazel run //tools/spelling:check_spelling_pedantic -- check --target_root=$(pwd)
 bazel run //tools/code_format:check_format -- fix
-./tools/spelling/check_spelling_pedantic.py fix
+bazel run //tools/spelling:check_spelling_pedantic -- fix --target_root=$(pwd)
 ```
 
 # Advanced caching setup

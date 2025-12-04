@@ -284,6 +284,14 @@ public:
    * @return filepath of the network namespace for the address.
    */
   virtual absl::optional<std::string> networkNamespace() const PURE;
+
+  /**
+   * @return a copy of the address with the linux network namespace overridden for IPv4/v6
+   * addresses, or nullptr if the address does not support network namespaces. An empty string
+   * argument clears the network namespace.
+   */
+  virtual InstanceConstSharedPtr
+  withNetworkNamespace(absl::string_view network_namespace) const PURE;
 };
 
 /*

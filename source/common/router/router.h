@@ -635,6 +635,7 @@ private:
   // Process Orca Load Report if necessary (e.g. cluster has lrsReportMetricNames).
   void maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or_trailers,
                                   UpstreamRequest& upstream_request);
+  bool isEarlyConnectData();
 
   RetryStatePtr retry_state_;
   const FilterConfigSharedPtr config_;

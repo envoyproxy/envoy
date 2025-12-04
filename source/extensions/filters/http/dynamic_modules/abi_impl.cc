@@ -618,6 +618,9 @@ void envoy_dynamic_module_callback_http_send_response(
     envoy_dynamic_module_type_buffer_module_ptr body_ptr, size_t body_length,
     envoy_dynamic_module_type_buffer_module_ptr details, size_t details_length) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->isDestroyed()) {
+    return;
+  }
 
   std::function<void(ResponseHeaderMap & headers)> modify_headers = nullptr;
   if (headers_vector != nullptr && headers_vector_size != 0) {
@@ -650,6 +653,9 @@ void envoy_dynamic_module_callback_http_send_response_headers(
     envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
     bool end_stream) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->isDestroyed()) {
+    return;
+  }
 
   std::unique_ptr<ResponseHeaderMapImpl> headers = ResponseHeaderMapImpl::create();
   for (size_t i = 0; i < headers_vector_size; i++) {
@@ -667,6 +673,9 @@ void envoy_dynamic_module_callback_http_send_response_data(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->isDestroyed()) {
+    return;
+  }
 
   Buffer::OwnedImpl buffer(static_cast<const char*>(data), length);
   filter->decoder_callbacks_->encodeData(buffer, end_stream);
@@ -676,6 +685,9 @@ void envoy_dynamic_module_callback_http_send_response_trailers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_http_header* trailers_vector, size_t trailers_vector_size) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->isDestroyed()) {
+    return;
+  }
 
   std::unique_ptr<ResponseTrailerMapImpl> trailers = ResponseTrailerMapImpl::create();
   for (size_t i = 0; i < trailers_vector_size; i++) {
@@ -1572,6 +1584,81 @@ envoy_dynamic_module_callback_http_filter_http_callout(
   }
   return filter->sendHttpCallout(callout_id, cluster_name_view, std::move(message),
                                  timeout_milliseconds);
+}
+
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_start_http_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr* stream_ptr_out,
+    envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size, bool end_stream,
+    uint64_t timeout_milliseconds) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+
+  // Try to get the cluster from the cluster manager for the given cluster name.
+  absl::string_view cluster_name_view(cluster_name, cluster_name_length);
+
+  // Construct the request message, starting with the headers, checking for required headers, and
+  // adding the body if present.
+  std::unique_ptr<RequestHeaderMapImpl> hdrs = Http::RequestHeaderMapImpl::create();
+  for (size_t i = 0; i < headers_size; i++) {
+    const auto& header = &headers[i];
+    const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
+    const absl::string_view value(static_cast<const char*>(header->value_ptr),
+                                  header->value_length);
+    hdrs->addCopy(Http::LowerCaseString(key), value);
+  }
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(hdrs)));
+  if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
+      message->headers().Host() == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+  if (body_size > 0) {
+    message->body().add(absl::string_view(static_cast<const char*>(body), body_size));
+  }
+  return filter->startHttpStream(stream_ptr_out, cluster_name_view, std::move(message), end_stream,
+                                 timeout_milliseconds);
+}
+
+void envoy_dynamic_module_callback_http_filter_reset_http_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  filter->resetHttpStream(stream_ptr);
+}
+
+bool envoy_dynamic_module_callback_http_stream_send_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length, bool end_stream) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+
+  // Create a buffer and send the data.
+  Buffer::OwnedImpl buffer;
+  if (data_length > 0) {
+    buffer.add(absl::string_view(static_cast<const char*>(data), data_length));
+  }
+  return filter->sendStreamData(stream_ptr, buffer, end_stream);
+}
+
+bool envoy_dynamic_module_callback_http_stream_send_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_module_http_header* trailers, size_t trailers_size) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+
+  // Construct the trailers.
+  std::unique_ptr<RequestTrailerMapImpl> trailer_map = Http::RequestTrailerMapImpl::create();
+  for (size_t i = 0; i < trailers_size; i++) {
+    const auto& trailer = &trailers[i];
+    const absl::string_view key(static_cast<const char*>(trailer->key_ptr), trailer->key_length);
+    const absl::string_view value(static_cast<const char*>(trailer->value_ptr),
+                                  trailer->value_length);
+    trailer_map->addCopy(Http::LowerCaseString(key), value);
+  }
+
+  return filter->sendStreamTrailers(stream_ptr, std::move(trailer_map));
 }
 
 envoy_dynamic_module_type_http_filter_scheduler_module_ptr
