@@ -1,9 +1,13 @@
+#include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <tuple>
 
 #include "envoy/extensions/tracers/opentelemetry/samplers/v3/dynatrace_sampler.pb.h"
 
 #include "source/extensions/tracers/opentelemetry/samplers/dynatrace/dynatrace_sampler.h"
+#include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
 
 #include "test/mocks/server/tracer_factory_context.h"
@@ -39,15 +43,9 @@ public:
   MOCK_METHOD(const SamplerConfig&, getSamplerConfig, (), (const override));
 };
 
-class DynatraceSamplerTest : public testing::Test {
-
-  const std::string yaml_string_ = R"EOF(
-          tenant: "abc12345"
-          cluster_id: -1743916452
-  )EOF";
-
+class DynatraceSamplerTestBase {
 public:
-  DynatraceSamplerTest() {
+  DynatraceSamplerTestBase() {
     TestUtility::loadFromYaml(yaml_string_, proto_config_);
     auto scf = std::make_unique<NiceMock<MockSamplerConfigProvider>>();
     ON_CALL(*scf, getSamplerConfig()).WillByDefault(testing::ReturnRef(sampler_config_));
@@ -61,6 +59,10 @@ public:
   }
 
 protected:
+  const std::string yaml_string_ = R"EOF(
+          tenant: "abc12345"
+          cluster_id: -1743916452
+  )EOF";
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> tracer_factory_context_;
   envoy::extensions::tracers::opentelemetry::samplers::v3::DynatraceSamplerConfig proto_config_;
@@ -68,6 +70,8 @@ protected:
   NiceMock<Event::MockTimer>* timer_;
   std::unique_ptr<DynatraceSampler> sampler_;
 };
+
+class DynatraceSamplerTest : public DynatraceSamplerTestBase, public testing::Test {};
 
 // Verify getDescription
 TEST_F(DynatraceSamplerTest, TestGetDescription) {
@@ -80,11 +84,19 @@ TEST_F(DynatraceSamplerTest, TestWithoutParentContext) {
       sampler_->shouldSample(stream_info_, absl::nullopt, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
-  EXPECT_EQ(sampling_result.attributes->size(), 1);
+  EXPECT_EQ(sampling_result.attributes->size(), 2);
   EXPECT_EQ(opentelemetry::nostd::get<uint32_t>(
                 sampling_result.attributes->find("supportability.atm_sampling_ratio")->second),
             1);
-  EXPECT_STREQ(sampling_result.tracestate.c_str(), "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95");
+
+  auto tcr = sampling_result.attributes->find("trace.capture.reasons");
+  ASSERT_NE(tcr, sampling_result.attributes->end());
+  auto tcr_values = opentelemetry::nostd::get<std::vector<absl::string_view>>(tcr->second);
+  ASSERT_EQ(tcr_values.size(), 1);
+  EXPECT_EQ(tcr_values[0], "atm");
+
+  EXPECT_STREQ(sampling_result.tracestate.c_str(),
+               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101");
   EXPECT_TRUE(sampling_result.isRecording());
   EXPECT_TRUE(sampling_result.isSampled());
 }
@@ -97,13 +109,13 @@ TEST_F(DynatraceSamplerTest, TestWithUnknownParentContext) {
       sampler_->shouldSample(stream_info_, parent_context, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
-  EXPECT_EQ(sampling_result.attributes->size(), 1);
+  EXPECT_EQ(sampling_result.attributes->size(), 2);
   EXPECT_EQ(opentelemetry::nostd::get<uint32_t>(
                 sampling_result.attributes->find("supportability.atm_sampling_ratio")->second),
             1);
   // Dynatrace tracestate should be prepended
   EXPECT_STREQ(sampling_result.tracestate.c_str(),
-               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95,some_vendor=some_value");
+               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,some_vendor=some_value");
   EXPECT_TRUE(sampling_result.isRecording());
   EXPECT_TRUE(sampling_result.isSampled());
 }
@@ -137,7 +149,7 @@ TEST_F(DynatraceSamplerTest, TestWithInvalidDynatraceParentContext) {
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_STREQ(sampling_result.tracestate.c_str(),
-               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95,5b3f9fed-980df25c@dt=fw4;4");
+               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,5b3f9fed-980df25c@dt=fw4;4");
   EXPECT_TRUE(sampling_result.isRecording());
   EXPECT_TRUE(sampling_result.isSampled());
 }
@@ -152,9 +164,9 @@ TEST_F(DynatraceSamplerTest, TestWithInvalidDynatraceParentContext1) {
       sampler_->shouldSample(stream_info_, parent_context, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
-  EXPECT_STREQ(
-      sampling_result.tracestate.c_str(),
-      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95,5b3f9fed-980df25c@dt=fw4;4;4af38366;0;0;0;X;123");
+  EXPECT_STREQ(sampling_result.tracestate.c_str(),
+               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,5b3f9fed-980df25c@dt=fw4;4;4af38366;"
+               "0;0;0;X;123");
   EXPECT_TRUE(sampling_result.isRecording());
   EXPECT_TRUE(sampling_result.isSampled());
 }
@@ -172,7 +184,8 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextOtherVersion) {
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_STREQ(
       sampling_result.tracestate.c_str(),
-      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95,5b3f9fed-980df25c@dt=fw3;4;4af38366;0;0;0;0;123;"
+      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,5b3f9fed-980df25c@dt=fw3;4;4af38366;0;0;0;0;"
+      "123;"
       "8eae;2h01;3h4af38366;4h00;5h01;6h67a9a23155e1741b5b35368e08e6ece5;7h9d83def9a4939b7b");
   EXPECT_TRUE(sampling_result.isRecording());
   EXPECT_TRUE(sampling_result.isSampled());
@@ -211,13 +224,14 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextFromDifferentTenant) 
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   // sampling decision on tracestate should be ignored because it is from a different tenant.
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
-  EXPECT_EQ(sampling_result.attributes->size(), 1);
+  EXPECT_EQ(sampling_result.attributes->size(), 2);
   EXPECT_EQ(opentelemetry::nostd::get<uint32_t>(
                 sampling_result.attributes->find("supportability.atm_sampling_ratio")->second),
             1);
   // new Dynatrace tag should be prepended, already existing tag should be kept
   const char* exptected =
-      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95,6666ad40-980df25c@dt=fw4;4;4af38366;0;0;1;2;123;"
+      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,6666ad40-980df25c@dt=fw4;4;4af38366;0;0;1;2;"
+      "123;"
       "8eae;2h01;3h4af38366;4h00;5h01;6h67a9a23155e1741b5b35368e08e6ece5;7h9d83def9a4939b7b";
   EXPECT_STREQ(sampling_result.tracestate.c_str(), exptected);
   EXPECT_TRUE(sampling_result.isRecording());
@@ -338,6 +352,83 @@ TEST_F(DynatraceSamplerTest, TestSampling) {
   }
 }
 
+struct SamplingResultTestData {
+  std::vector<std::string> tcr_values;
+  std::string tracestate;
+
+  SamplingResultTestData(std::vector<std::string> tcr, std::string t)
+      : tcr_values(std::move(tcr)), tracestate(std::move(t)) {}
+};
+
+class DynatraceSamplerTraceCaptureReasonTest
+    : public DynatraceSamplerTestBase,
+      public ::testing::TestWithParam<std::tuple<std::string, SamplingResultTestData>> {};
+
+// Verify sampler behavior depending on which trace capture reason was received
+TEST_P(DynatraceSamplerTraceCaptureReasonTest, TraceCaptureReasonScenarios) {
+  std::string incomingTraceState = std::get<0>(GetParam());
+  SamplingResultTestData expected = std::get<1>(GetParam());
+
+  SpanContext parent_context("00", trace_id, parent_span_id, true, incomingTraceState);
+
+  auto actual =
+      sampler_->shouldSample(stream_info_, parent_context, trace_id, "operation_name",
+                             ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
+
+  // Check that the sampling result contains the expected trace capture reason attributes
+  if (!expected.tcr_values.empty()) {
+    auto actual_tcr_values = opentelemetry::nostd::get<std::vector<absl::string_view>>(
+        actual.attributes->find("trace.capture.reasons")->second);
+    ASSERT_EQ(actual_tcr_values.size(), expected.tcr_values.size());
+
+    std::vector<std::string> actual_sorted;
+    actual_sorted.reserve(actual_tcr_values.size());
+    for (const auto& v : actual_tcr_values) {
+      actual_sorted.push_back(std::string(v));
+    }
+
+    std::sort(actual_sorted.begin(), actual_sorted.end());
+    std::sort(expected.tcr_values.begin(), expected.tcr_values.end());
+    EXPECT_EQ(actual_sorted, expected.tcr_values);
+  } else {
+    // verify that there's no trace.capture.reasons attribute in the map
+    EXPECT_EQ(actual.attributes->find("trace.capture.reasons"), actual.attributes->end());
+  }
+
+  EXPECT_STREQ(actual.tracestate.c_str(), expected.tracestate.c_str());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    TraceCaptureReasonTestCase, DynatraceSamplerTraceCaptureReasonTest,
+    // tracestate with Dynatrace tag but no trace capture reason extension
+    ::testing::Values(
+        // No trace capture reason present in the tracestate
+        std::make_tuple(
+            "5b3f9fed-980df25c@dt=fw4;4;4af38366;0;0;1;2;123;8eae;2h01;3h4af38366;4h00;5h01;",
+            SamplingResultTestData(
+                {},
+                "5b3f9fed-980df25c@dt=fw4;4;4af38366;0;0;1;2;123;8eae;2h01;3h4af38366;4h00;5h01;")),
+
+        // Valid trace capture reason present in the tracestate
+        std::make_tuple("5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101",
+                        SamplingResultTestData({"atm"},
+                                               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101")),
+
+        // trace capture reason present in the tracestate with an unsupported version
+        std::make_tuple("5b3f9fed-980df25c@dt=fw3;0;0;0;0;0;0;95;8h0101",
+                        SamplingResultTestData({"atm"},
+                                               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,"
+                                               "5b3f9fed-980df25c@dt=fw3;0;0;0;0;0;0;95;8h0101")),
+
+        // Multiple, valid trace capture reasons present in the tracestate
+        std::make_tuple("5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0107",
+                        SamplingResultTestData({"atm", "fixed", "custom"},
+                                               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0107")),
+
+        // Root trace started by Envoy - sampler should use the correct reason
+        std::make_tuple("",
+                        SamplingResultTestData({"atm"},
+                                               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101"))));
 } // namespace OpenTelemetry
 } // namespace Tracers
 } // namespace Extensions

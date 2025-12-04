@@ -35,6 +35,7 @@ envoy_extension_cc_test(
         "sampling_controller_test.cc",
         "stream_summary_test.cc",
         "tenant_id_test.cc",
+        "trace_capture_reason_test.cc",
     ],
     extension_names = ["envoy.tracers.opentelemetry.samplers.dynatrace"],
     rbe_pool = "6gig",
