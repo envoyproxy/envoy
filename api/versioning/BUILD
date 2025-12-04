@@ -85,6 +85,7 @@ proto_library(
         "//envoy/extensions/clusters/aggregate/v3:pkg",
         "//envoy/extensions/clusters/common/dns/v3:pkg",
         "//envoy/extensions/clusters/dns/v3:pkg",
+        "//envoy/extensions/clusters/dynamic_modules/v3:pkg",
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/clusters/redis/v3:pkg",
         "//envoy/extensions/clusters/reverse_connection/v3:pkg",
