@@ -62,8 +62,8 @@ public:
   create(const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
          Stats::Scope& scope, Regex::Engine& regex_engine, bool per_route = false);
 
-  JsonToMetadataStats& rqstats() const { return rqstats_; }
-  JsonToMetadataStats& respstats() const { return respstats_; }
+  JsonToMetadataStats& rqstats() { return rqstats_; }
+  JsonToMetadataStats& respstats() { return respstats_; }
   // True if we have rules for requests
   bool doRequest() const { return !request_rules_.empty(); }
   bool doResponse() const { return !response_rules_.empty(); }
@@ -80,8 +80,8 @@ private:
 
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
   Rules generateRules(const ProtobufRepeatedRule& proto_rule) const;
-  mutable JsonToMetadataStats rqstats_;
-  mutable JsonToMetadataStats respstats_;
+  JsonToMetadataStats rqstats_;
+  JsonToMetadataStats respstats_;
   const Rules request_rules_;
   const Rules response_rules_;
   const absl::flat_hash_set<std::string> request_allow_content_types_;
@@ -150,10 +150,10 @@ private:
                                bool should_clear_route_cache, const StructMap& struct_map,
                                bool& processing_finished_flag);
 
-  const FilterConfig* getConfig() const;
+  FilterConfig* getConfig() const;
 
   std::shared_ptr<FilterConfig> config_;
-  mutable const FilterConfig* effective_config_{nullptr};
+  mutable FilterConfig* effective_config_{nullptr};
   bool request_processing_finished_{false};
   bool response_processing_finished_{false};
 };

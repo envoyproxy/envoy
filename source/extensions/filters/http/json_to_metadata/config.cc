@@ -28,10 +28,7 @@ absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 JsonToMetadataConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  absl::StatusOr<std::shared_ptr<FilterConfig>> config_or =
-      FilterConfig::create(config, context.scope(), context.regexEngine(), true);
-  RETURN_IF_ERROR(config_or.status());
-  return std::move(config_or.value());
+  return FilterConfig::create(config, context.scope(), context.regexEngine(), true);
 }
 
 /**

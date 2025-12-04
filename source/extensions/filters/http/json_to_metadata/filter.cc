@@ -404,19 +404,19 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
 }
 
 void Filter::processRequestBody() {
-  const auto* config = getConfig();
+  auto* config = getConfig();
   processBody(decoder_callbacks_->decodingBuffer(), config->requestRules(), true, config->rqstats(),
               *decoder_callbacks_, request_processing_finished_);
 }
 
 void Filter::processResponseBody() {
-  const auto* config = getConfig();
+  auto* config = getConfig();
   processBody(encoder_callbacks_->encodingBuffer(), config->responseRules(), false,
               config->respstats(), *encoder_callbacks_, response_processing_finished_);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  const auto* config = getConfig();
+  auto* config = getConfig();
   if (!config->doRequest()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -437,7 +437,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
-  const auto* config = getConfig();
+  auto* config = getConfig();
   if (!config->doResponse()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -458,7 +458,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  const auto* config = getConfig();
+  auto* config = getConfig();
   if (!config->doRequest()) {
     return Http::FilterDataStatus::Continue;
   }
@@ -484,7 +484,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
-  const auto* config = getConfig();
+  auto* config = getConfig();
   if (!config->doResponse()) {
     return Http::FilterDataStatus::Continue;
   }
@@ -510,7 +510,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
-  const auto* config = getConfig();
+  auto* config = getConfig();
   if (!config->doRequest()) {
     return Http::FilterTrailersStatus::Continue;
   }
@@ -521,7 +521,7 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
-  const auto* config = getConfig();
+  auto* config = getConfig();
   if (!config->doResponse()) {
     return Http::FilterTrailersStatus::Continue;
   }
@@ -531,14 +531,14 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 
-const FilterConfig* Filter::getConfig() const {
+FilterConfig* Filter::getConfig() const {
   // Cached config pointer.
   if (effective_config_) {
     return effective_config_;
   }
 
-  effective_config_ =
-      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
+  effective_config_ = const_cast<FilterConfig*>(
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_));
   if (effective_config_) {
     return effective_config_;
   }
