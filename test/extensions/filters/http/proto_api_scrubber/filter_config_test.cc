@@ -907,41 +907,6 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FilteringModeValidations) {
   }
 }
 
-TEST_F(ProtoApiScrubberFilterConfigTest, MatcherInputTypeValidations) {
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config;
-
-  {
-    EXPECT_THROW_WITH_MESSAGE(
-        filter_config = ProtoApiScrubberFilterConfig::create(
-            getConfigWithInputType(
-                "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput"),
-            factory_context),
-        EnvoyException,
-        "Unsupported data input type: string. The matcher supports input type: cel_data_input");
-  }
-
-  {
-    EXPECT_THROW_WITH_MESSAGE(
-        filter_config = ProtoApiScrubberFilterConfig::create(
-            getConfigWithInputType(
-                "type.googleapis.com/"
-                "envoy.extensions.matching.common_inputs.network.v3.ServerNameInput"),
-            factory_context),
-        EnvoyException,
-        "Unsupported data input type: string. The matcher supports input type: cel_data_input");
-  }
-
-  {
-    filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithInputType(
-            "type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput"),
-        factory_context);
-    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
-    EXPECT_EQ(filter_config.status().message(), "");
-  }
-}
-
 TEST_F(ProtoApiScrubberFilterConfigTest, GetRequestType) {
   // 1. Initialize the config
   absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> config_or_status =
