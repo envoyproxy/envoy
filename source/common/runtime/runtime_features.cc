@@ -74,6 +74,7 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_for_read);
 RUNTIME_GUARD(envoy_reloadable_features_reject_empty_trusted_ca_file);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_when_rq_active_is_non_zero);
+RUNTIME_GUARD(envoy_reloadable_features_reset_with_error);
 RUNTIME_GUARD(envoy_reloadable_features_router_filter_resetall_on_local_reply);
 RUNTIME_GUARD(envoy_reloadable_features_safe_http2_options);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
@@ -194,6 +195,9 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_use_cached_grpc_client_for_xds);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_11_proxy_connect_legacy_format);
 // TODO(tsaarni): Flip to true after prod testing or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
+// TODO(yavlasov): Enabling by default will be hugely disruptive to existing traffic.
+// Replace with a config option (default off) post CVE release.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reject_early_connect_data);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

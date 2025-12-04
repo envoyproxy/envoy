@@ -19,6 +19,15 @@ behavior_changes:
     The dynamic module ABI has been updated to support streaming body manipulation. This change also
     fixed potential incorrect behavior when access or modify the request or response body. See
     https://github.com/envoyproxy/envoy/issues/40918 for more details.
+- area: http
+  change: |
+    Changing the default reset code from NO_ERROR to INTERNAL_ERROR. This behavioral change can be reverted by setting runtime
+    guard ``envoy.reloadable_features.reset_with_error`` to false.
+- area: http
+  change: |
+    Added runtime flag ``envoy.reloadable_features.reject_early_connect_data`` to reject ``CONNECT`` requests
+    that receive data before Envoy sent a ``200`` response to the client. While this is not a strictly compliant behavior
+    it is very common as a latency reducing measure. As such the option is disabled by default.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -178,6 +187,13 @@ bug_fixes:
 - area: dns_resolver
   change: |
     Removes unnecessary getifaddrs() system calls when ``filter_unroutable_families`` is disabled.
+- area: tls
+  change: |
+    Fixed an issue where SANs of type ``OTHERNAME`` in a TLS cert were truncated if there was
+    an embedded null octet, leading to incorrect SAN validation.
+- area: http
+  change: |
+    Fixed a remote ``jwt_auth`` token fetch crash with two or more auth headers when ``allow_missing_or_failed`` is set.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -218,6 +234,10 @@ new_features:
   change: |
     Support process-level rate limiting on access log emission by
     :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: listener_filters
+  change: |
+    Added :ref:`Postgres Inspector <config_listener_filters_postgres_inspector>` listener filter for detecting
+    PostgreSQL connections, extracting metadata and supporting SNI-based routing for PostgreSQL traffic.
 - area: dynamic modules
   change: |
     Enhanced dynamic module ABIs to support headers addition and body size retrieval.
@@ -431,5 +451,8 @@ new_features:
     Added :ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>` to admin
     interface to restrict access to specific admin endpoints. When configured, only paths matching
     the specified string matchers will be accessible. All other paths will return 403 Forbidden.
+- area: attributes
+  change: |
+    added :ref:`attributes <arch_overview_attributes>` for looking up request or response headers bytes.
 
 deprecated:
