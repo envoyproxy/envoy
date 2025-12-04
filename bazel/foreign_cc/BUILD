@@ -28,11 +28,10 @@ config_setting(
 configure_make(
     name = "liburing",
     configure_in_place = True,
-    env = select({
+    env = {"ENABLE_SHARED": "0"} | select({
         "//bazel:clang_build": {
-            "AR": "$$EXT_BUILD_ROOT/$(AR)",
-            "LD": "$$EXT_BUILD_ROOT/$(LD)",
-            "RANLIB": "$$EXT_BUILD_ROOT/$(AR) -s",
+            "AR": "$(AR)",
+            "RANLIB": "$(AR) -s",
         },
         "//conditions:default": {},
     }),
@@ -41,10 +40,7 @@ configure_make(
         "nocompdb",
         "skip_on_windows",
     ],
-    targets = [
-        "library",
-        "install",
-    ],
+    targets = ["install"],
 )
 
 envoy_cc_library(
