@@ -444,5 +444,10 @@ new_features:
 - area: attributes
   change: |
     added :ref:`attributes <arch_overview_attributes>` for looking up request or response headers bytes.
+- area: geoip
+  change: |
+    Added :ref:`ip_address_header <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.ip_address_header>`
+    to allow extracting the client IP address from a custom request header instead of using the
+    ``x-forwarded-for`` header or downstream connection source address.
 
 deprecated:

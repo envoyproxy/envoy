@@ -11,9 +11,27 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Geoip {
 
-Http::FilterFactoryCb GeoipFilterFactory::createFilterFactoryFromProtoTyped(
+namespace {
+// Validates the GeoIP filter configuration.
+absl::Status validateConfig(const envoy::extensions::filters::http::geoip::v3::Geoip& config) {
+  // xff_config and ip_address_header are mutually exclusive.
+  if (config.has_xff_config() && !config.ip_address_header().empty()) {
+    return absl::InvalidArgumentError(
+        "Only one of xff_config or ip_address_header can be set in the geoip filter configuration");
+  }
+  return absl::OkStatus();
+}
+} // namespace
+
+absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
+  // Validate configuration before creating the filter.
+  auto status = validateConfig(proto_config);
+  if (!status.ok()) {
+    return status;
+  }
+
   GeoipFilterConfigSharedPtr filter_config(
       std::make_shared<GeoipFilterConfig>(proto_config, stat_prefix, context.scope()));
 
