@@ -3915,85 +3915,6 @@ TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
   run_test_with_prefix("", false);
 }
 
-// Verify that cookies are set with the correct path attribute when custom cookie
-// paths are configured.
-TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
-  // Initialize with custom cookie paths. Set all cookies to /app1 path.
-  init(getConfig(true, true,
-                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-                     OAuth2Config_AuthType_URL_ENCODED_BODY,
-                 0, false, false, false, false, false,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 0, 0, false, "/app1", "/app1", "/app1", "/app1", "/app1", "/app1", "/app1"));
-
-  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/test"},
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "https"},
-  };
-
-  // Explicitly fail the validation.
-  EXPECT_CALL(*validator_, setParams(_, _));
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
-
-  // Catch the redirect to the OAuth server and verify the cookie paths.
-  Http::TestResponseHeaderMapImpl response_headers;
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
-        response_headers = Http::TestResponseHeaderMapImpl(headers);
-      }));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers, false));
-
-  // Verify that the CSRF token cookie (OauthNonce) has the correct path.
-  std::vector<std::string> set_cookie_headers_str;
-  response_headers.iterate(
-      [&set_cookie_headers_str](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        if (header.key().getStringView() == Http::Headers::get().SetCookie.get()) {
-          set_cookie_headers_str.push_back(std::string(header.value().getStringView()));
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      });
-
-  bool found_nonce_cookie = false;
-  bool found_code_verifier_cookie = false;
-
-  for (const auto& cookie_str : set_cookie_headers_str) {
-    if (cookie_str.find("OauthNonce=") != std::string::npos) {
-      EXPECT_NE(cookie_str.find(";path=/app1;"), std::string::npos)
-          << "OauthNonce cookie should have path=/app1, got: " << cookie_str;
-      found_nonce_cookie = true;
-    }
-    if (cookie_str.find("CodeVerifier=") != std::string::npos) {
-      EXPECT_NE(cookie_str.find(";path=/app1;"), std::string::npos)
-          << "CodeVerifier cookie should have path=/app1, got: " << cookie_str;
-      found_code_verifier_cookie = true;
-    }
-  }
-
-  EXPECT_TRUE(found_nonce_cookie) << "OauthNonce cookie not found in response headers.";
-  EXPECT_TRUE(found_code_verifier_cookie) << "CodeVerifier cookie not found in response headers.";
-}
-
 // Test OAuth filter to verify that OAuth cookies are set with custom paths.
 TEST_F(OAuth2Test, OAuthTestFullFlowWithCustomCookiePaths) {
   // Initialize with custom cookie paths. Set all cookies to /api/v1 path.
@@ -4175,52 +4096,6 @@ TEST_F(OAuth2Test, OAuthTestSignoutWithCustomCookiePaths) {
 
   EXPECT_TRUE(found_hmac_delete) << "OauthHMAC deletion cookie not found.";
   EXPECT_TRUE(found_bearer_delete) << "BearerToken deletion cookie not found.";
-}
-
-// Test default cookie path behavior. We should default to /.
-TEST_F(OAuth2Test, OAuthTestDefaultCookiePath) {
-  // Initialize without specifying cookie paths (should default to /). But use_refresh_token
-  // must be set to false.
-  init(getConfig(false));
-
-  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/test"},
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "https"},
-  };
-
-  // Explicitly fail the validation.
-  EXPECT_CALL(*validator_, setParams(_, _));
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-
-  // Catch the redirect to the OAuth server.
-  Http::TestResponseHeaderMapImpl response_headers;
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
-        response_headers = Http::TestResponseHeaderMapImpl(headers);
-      }));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers, false));
-
-  // Verify that cookies have the default path (/).
-  std::vector<std::string> set_cookie_headers_str;
-  response_headers.iterate(
-      [&set_cookie_headers_str](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        if (header.key().getStringView() == Http::Headers::get().SetCookie.get()) {
-          set_cookie_headers_str.push_back(std::string(header.value().getStringView()));
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      });
-
-  for (const auto& cookie_str : set_cookie_headers_str) {
-    EXPECT_NE(cookie_str.find(";path=/;"), std::string::npos)
-        << "Cookie should have default path=/, got: " << cookie_str;
-  }
 }
 
 // Test that CSRF/nonce and code verifier cookies can have different paths from session cookies.

@@ -950,7 +950,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   }
 
   // Map cookie names to their respective paths from configuration.
-  const std::vector<std::pair<absl::string_view, std::string>> cookie_names_with_paths{
+  const std::vector<std::pair<absl::string_view, absl::string_view>> cookie_names_with_paths{
       {config_->cookieNames().oauth_hmac_, config_->hmacCookieSettings().path_},
       {config_->cookieNames().bearer_token_, config_->bearerTokenCookieSettings().path_},
       {config_->cookieNames().id_token_, config_->idTokenCookieSettings().path_},
@@ -959,9 +959,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       {config_->cookieNames().code_verifier_, config_->codeVerifierCookieSettings().path_},
   };
 
-  for (const auto& cookie_name_with_path : cookie_names_with_paths) {
-    const auto& cookie_name = cookie_name_with_path.first;
-    const auto& cookie_path = cookie_name_with_path.second;
+  for (const auto& [cookie_name, cookie_path] : cookie_names_with_paths) {
     // Cookie names prefixed with "__Secure-" or "__Host-" are special. They MUST be set with the
     // Secure attribute so that the browser handles their deletion properly.
     const bool add_secure_attr =
