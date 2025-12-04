@@ -1,5 +1,7 @@
 #include "contrib/postgres_proxy/filters/network/test/postgres_test_utils.h"
 
+#include "contrib/postgres/protocol/postgres_protocol.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -24,8 +26,8 @@ void createInitialPostgresRequest(Buffer::Instance& data) {
   // version (4 bytes)
   // Attributes: key/value pairs separated by '\0'
   data.writeBEInt<uint32_t>(37);
-  // Add version code
-  data.writeBEInt<uint32_t>(0x00030000);
+  // Add version code.
+  data.writeBEInt<uint32_t>(Postgres::Protocol::POSTGRES_PROTOCOL_VERSION_30);
   // user-postgres key-pair
   data.add("user"); // 4 bytes
   data.writeBEInt<uint8_t>(0);

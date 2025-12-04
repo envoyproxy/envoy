@@ -644,3 +644,24 @@ envoy_cc_library(
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "muxdemux_lib",
+    srcs = ["muxdemux.cc"],
+    hdrs = ["muxdemux.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:async_client_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//envoy/upstream:thread_local_cluster_interface",
+        "//source/common/common:assert_lib",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:string_view",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
+    ],
+)

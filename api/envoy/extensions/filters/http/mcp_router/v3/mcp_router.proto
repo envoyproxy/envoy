@@ -4,6 +4,8 @@ package envoy.extensions.filters.http.mcp_router.v3;
 
 import "envoy/config/core/v3/http_uri.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp_router.v3";
@@ -11,6 +13,7 @@ option java_outer_classname = "McpRouterProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/mcp_router/v3;mcp_routerv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: MCP Multiplexer/Demultiplexer]
 // [#extension: envoy.filters.http.mcp_router]

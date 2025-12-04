@@ -19,6 +19,15 @@ behavior_changes:
     The dynamic module ABI has been updated to support streaming body manipulation. This change also
     fixed potential incorrect behavior when access or modify the request or response body. See
     https://github.com/envoyproxy/envoy/issues/40918 for more details.
+- area: http
+  change: |
+    Changing the default reset code from NO_ERROR to INTERNAL_ERROR. This behavioral change can be reverted by setting runtime
+    guard ``envoy.reloadable_features.reset_with_error`` to false.
+- area: http
+  change: |
+    Added runtime flag ``envoy.reloadable_features.reject_early_connect_data`` to reject ``CONNECT`` requests
+    that receive data before Envoy sent a ``200`` response to the client. While this is not a strictly compliant behavior
+    it is very common as a latency reducing measure. As such the option is disabled by default.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -77,11 +86,6 @@ minor_behavior_changes:
     Fixed HTTP ext_authz service to properly propagate headers (such as ``set-cookie``) back to clients. The
     filter now correctly uses ``allowed_client_headers`` for denied responses and ``allowed_client_headers_on_success``
     for successful authorization responses.
-- area: ext_authz
-  change: |
-    Fixed a bug where ``filter_enabled_metadata`` was not honored when the filter was marked with ``disabled: true``.
-    The filter is now instantiated when ``filter_enabled_metadata`` is configured, allowing it to check dynamic metadata
-    at runtime and enable itself conditionally.
 - area: quic
   change: |
     Switch to use QUICHE provided migration logic to handle port migration upon path degrading and migration to Server
@@ -178,6 +182,13 @@ bug_fixes:
 - area: dns_resolver
   change: |
     Removes unnecessary getifaddrs() system calls when ``filter_unroutable_families`` is disabled.
+- area: tls
+  change: |
+    Fixed an issue where SANs of type ``OTHERNAME`` in a TLS cert were truncated if there was
+    an embedded null octet, leading to incorrect SAN validation.
+- area: http
+  change: |
+    Fixed a remote ``jwt_auth`` token fetch crash with two or more auth headers when ``allow_missing_or_failed`` is set.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -218,6 +229,10 @@ new_features:
   change: |
     Support process-level rate limiting on access log emission by
     :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: listener_filters
+  change: |
+    Added :ref:`Postgres Inspector <config_listener_filters_postgres_inspector>` listener filter for detecting
+    PostgreSQL connections, extracting metadata and supporting SNI-based routing for PostgreSQL traffic.
 - area: dynamic modules
   change: |
     Enhanced dynamic module ABIs to support headers addition and body size retrieval.
@@ -339,6 +354,9 @@ new_features:
 - area: dns_filter
   change: |
     Added :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.access_log>` for DNS filter.
+- area: redis
+  change: |
+    Added support for ``redis_proxy`` filter to use separate credentials for each upstream Redis cluster.
 - area: quic
   change: |
     Added QUIC protocol option :ref:`max_sessions_per_event_loop
@@ -423,6 +441,9 @@ new_features:
     <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces>` in the
     ext-authz network filter. This allows passing connection metadata (such as proxy protocol TLV data) to the
     external authorization server for making authorization decisions.
+- area: attributes
+  change: |
+    added :ref:`attributes <arch_overview_attributes>` for looking up request or response headers bytes.
 - area: ext_proc
   change: |
     Added new method processingEffects within Filter State. This mehtod returns the per HTTP event procesing_effects that occurred
