@@ -123,7 +123,7 @@ FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
     ENVOY_LOG(warn,
               "Error encountered while matching the field `{}`. This field would be preserved. "
               "Error details: {}",
-              field_mask, match_result.status().message());
+              field_mask, match_result.status().ToString());
     return FieldCheckResults::kInclude;
   }
 
@@ -141,6 +141,10 @@ FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
   } else {
     // Preserve the field (i.e., kInclude) if there's a match and the matched action is not
     // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`.
+    ENVOY_LOG(warn,
+              "Field `{}` matched a rule, but the action type '{}' is not supported for "
+              "field-level scrubbing. Field will be included.",
+              field_mask, match_result->action() ? match_result->action()->typeUrl() : "null");
     return FieldCheckResults::kInclude;
   }
 }
@@ -155,7 +159,42 @@ FieldChecker::tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const {
   return match_result;
 }
 
-FieldCheckResults FieldChecker::CheckType(const Protobuf::Type*) const {
+FieldCheckResults FieldChecker::CheckType(const Protobuf::Type* type) const {
+  if (type == nullptr) {
+    return FieldCheckResults::kInclude;
+  }
+
+  const std::string& message_name = type->name();
+  MatchTreeHttpMatchingDataSharedPtr message_matcher =
+      filter_config_ptr_->getMessageMatcher(message_name);
+
+  if (message_matcher != nullptr) {
+    absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(message_matcher);
+
+    if (!match_result.ok()) {
+      ENVOY_LOG(warn,
+                "Error encountered while matching message type `{}`: {}. Message will be included.",
+                message_name, match_result.status().ToString());
+      return FieldCheckResults::kInclude;
+    }
+
+    if (match_result->isMatch()) {
+      // Use RemoveFieldAction to indicate that the entire message content should be scrubbed.
+      if (match_result->action() != nullptr &&
+          match_result->action()->typeUrl() ==
+              "envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction") {
+        ENVOY_LOG(debug, "Message type {} is excluded by message-level restriction.", message_name);
+        return FieldCheckResults::kExclude; // Scrub the entire message content.
+      } else {
+        ENVOY_LOG(warn,
+                  "Message type {} matched a rule, but the action type '{}' is not supported for "
+                  "message-level scrubbing. Message will be included.",
+                  message_name,
+                  match_result->action() ? match_result->action()->typeUrl() : "null");
+      }
+    }
+  }
+  // No matching exclusion rule, so continue to process fields within the message.
   return FieldCheckResults::kInclude;
 }
 

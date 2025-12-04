@@ -17,6 +17,7 @@
 
 using proto_processing_lib::proto_scrubber::FieldCheckResults;
 using proto_processing_lib::proto_scrubber::FieldFilters;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -32,6 +33,9 @@ public:
 
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
               (const std::string& method_name, const std::string& field_mask), (const, override));
+
+  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getMessageMatcher,
+              (const std::string& message_name), (const, override));
 
   MOCK_METHOD(absl::StatusOr<absl::string_view>, getEnumName,
               (absl::string_view enum_type_name, int enum_value), (const, override));
@@ -224,7 +228,7 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
     EXPECT_LOG_CONTAINS(
         "warn",
         "Error encountered while matching the field `user`. This field would be preserved. Error "
-        "details: Matching couldn't complete due to insufficient data.",
+        "details: INTERNAL: Matching couldn't complete due to insufficient data.",
         {
           FieldCheckResults result = request_field_checker.CheckField({"user"}, &field);
           EXPECT_EQ(result, FieldCheckResults::kInclude);
@@ -241,7 +245,7 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
     EXPECT_LOG_CONTAINS(
         "warn",
         "Error encountered while matching the field `user`. This field would be preserved. Error "
-        "details: Matching couldn't complete due to insufficient data.",
+        "details: INTERNAL: Matching couldn't complete due to insufficient data.",
         {
           FieldCheckResults result = response_field_checker.CheckField({"user"}, &field);
           EXPECT_EQ(result, FieldCheckResults::kInclude);
@@ -836,17 +840,110 @@ TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
   });
 }
 
-TEST_F(FieldCheckerTest, IncludesType) {
-  ProtoApiScrubberConfig config;
-  initializeFilterConfig(config);
+// Tests for FieldChecker::CheckType for Message-Level Restrictions
+using CheckTypeTest = FieldCheckerTest;
 
+TEST_F(CheckTypeTest, NoMessageRule) {
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+                             "/pkg.Service/Method", &mock_filter_config);
 
   Protobuf::Type type;
-  type.set_name("type");
+  type.set_name("my.package.MyMessage");
+
+  EXPECT_CALL(mock_filter_config, getMessageMatcher("my.package.MyMessage"))
+      .WillOnce(Return(nullptr));
+
   EXPECT_EQ(field_checker.CheckType(&type), FieldCheckResults::kInclude);
+}
+
+TEST_F(CheckTypeTest, MessageRuleNoMatch) {
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
+                             "/pkg.Service/Method", &mock_filter_config);
+
+  Protobuf::Type type;
+  type.set_name("my.package.MyMessage");
+
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  EXPECT_CALL(mock_filter_config, getMessageMatcher("my.package.MyMessage"))
+      .WillOnce(Return(mock_match_tree));
+
+  EXPECT_CALL(*mock_match_tree, match(testing::_, testing::_))
+      .WillOnce(Return(Matcher::MatchResult::noMatch()));
+
+  EXPECT_EQ(field_checker.CheckType(&type), FieldCheckResults::kInclude);
+}
+
+TEST_F(CheckTypeTest, MessageRuleMatchWithRemoveAction) {
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
+                             "/pkg.Service/Method", &mock_filter_config);
+
+  Protobuf::Type type;
+  type.set_name("my.package.SensitiveMessage");
+
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  EXPECT_CALL(mock_filter_config, getMessageMatcher("my.package.SensitiveMessage"))
+      .WillOnce(Return(mock_match_tree));
+
+  auto remove_action = std::make_shared<NiceMock<MockAction>>();
+  ON_CALL(*remove_action, typeUrl()).WillByDefault(Return(kRemoveFieldActionTypeWithoutPrefix));
+  EXPECT_CALL(*mock_match_tree, match(testing::_, testing::_))
+      .WillOnce(Return(Matcher::MatchResult(remove_action)));
+
+  EXPECT_EQ(field_checker.CheckType(&type), FieldCheckResults::kExclude);
+}
+
+TEST_F(CheckTypeTest, MessageRuleMatchWithOtherAction) {
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
+                             "/pkg.Service/Method", &mock_filter_config);
+
+  Protobuf::Type type;
+  type.set_name("my.package.MyMessage");
+
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  EXPECT_CALL(mock_filter_config, getMessageMatcher("my.package.MyMessage"))
+      .WillOnce(Return(mock_match_tree));
+
+  auto other_action = std::make_shared<NiceMock<MockAction>>();
+  ON_CALL(*other_action, typeUrl())
+      .WillByDefault(Return("type.googleapis.com/google.protobuf.Empty"));
+  EXPECT_CALL(*mock_match_tree, match(testing::_, testing::_))
+      .WillOnce(Return(Matcher::MatchResult(other_action)));
+
+  EXPECT_LOG_CONTAINS("warn",
+                      "action type 'type.googleapis.com/google.protobuf.Empty' is not supported "
+                      "for message-level scrubbing",
+                      { EXPECT_EQ(field_checker.CheckType(&type), FieldCheckResults::kInclude); });
+}
+
+TEST_F(CheckTypeTest, MatcherError) {
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
+                             "/pkg.Service/Method", &mock_filter_config);
+
+  Protobuf::Type type;
+  type.set_name("my.package.MyMessage");
+
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  EXPECT_CALL(mock_filter_config, getMessageMatcher("my.package.MyMessage"))
+      .WillOnce(Return(mock_match_tree));
+
+  EXPECT_CALL(*mock_match_tree, match(testing::_, testing::_))
+      .WillOnce(Return(Matcher::MatchResult::insufficientData()));
+
+  EXPECT_LOG_CONTAINS(
+      "warn",
+      "Error encountered while matching message type `my.package.MyMessage`: INTERNAL: Matching "
+      "couldn't complete due to insufficient data.. Message will be included.",
+      { EXPECT_EQ(field_checker.CheckType(&type), FieldCheckResults::kInclude); });
 }
 
 TEST_F(FieldCheckerTest, SupportAny) {
