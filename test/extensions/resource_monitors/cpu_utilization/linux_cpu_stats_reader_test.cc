@@ -6,6 +6,7 @@
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 
@@ -18,6 +19,8 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
 namespace {
+
+using testing::Return;
 
 TEST(LinuxCpuStatsReader, ReadsCpuStats) {
   const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats");
@@ -742,6 +745,268 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, CpuStatWithAdditionalFields) {
   EXPECT_TRUE(envoy_container_stats.is_valid);
   EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
   EXPECT_EQ(envoy_container_stats.work_time, 450000);
+}
+
+// =============================================================================
+// Factory Method Tests - LinuxContainerCpuStatsReader::create()
+// =============================================================================
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV2ReaderWhenV2FilesExist) {
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  // Create mock filesystem with V2 files
+  Filesystem::MockInstance mock_fs;
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective")).WillOnce(Return(true));
+
+  // Factory should create V2 reader
+  auto reader = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+  EXPECT_NE(reader, nullptr);
+
+  // Verify it's V2 by checking the returned CpuTimes
+  // (V2 readers set is_cgroup_v2 = true)
+  // We can't easily verify the type without RTTI, but we can test behavior
+}
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV1ReaderWhenOnlyV1FilesExist) {
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  // Create mock filesystem with only V1 files
+  Filesystem::MockInstance mock_fs;
+
+  // V2 files don't exist
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+
+  // V1 files exist
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuacct/cpuacct.usage")).WillOnce(Return(true));
+
+  // Factory should create V1 reader
+  auto reader = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+  EXPECT_NE(reader, nullptr);
+}
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, PrefersV2OverV1WhenBothExist) {
+  // In mixed environments, V2 should be preferred
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  Filesystem::MockInstance mock_fs;
+
+  // Both V2 and V1 files exist
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective")).WillOnce(Return(true));
+
+  // V1 checks should not be called due to short-circuit
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).Times(0);
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuacct/cpuacct.usage")).Times(0);
+
+  // Factory should create V2 reader (preferred over V1)
+  auto reader = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+  EXPECT_NE(reader, nullptr);
+}
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, ThrowsWhenNoCgroupFilesExist) {
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  Filesystem::MockInstance mock_fs;
+
+  // No V2 files
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+
+  // No V1 files
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuacct/cpuacct.usage"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+
+  // Factory should throw exception
+  EXPECT_THROW(
+      {
+        try {
+          LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+        } catch (const EnvoyException& e) {
+          EXPECT_NE(std::string(e.what()).find("No supported cgroup CPU implementation"),
+                    std::string::npos);
+          throw;
+        }
+      },
+      EnvoyException);
+}
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, ThrowsWhenOnlyPartialV2FilesExist) {
+  // Only some V2 files exist - should not be detected as V2
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  Filesystem::MockInstance mock_fs;
+
+  // Only 2 out of 3 V2 files exist
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective")).WillOnce(Return(false));
+
+  // No V1 files
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuacct/cpuacct.usage"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+
+  // Factory should throw exception
+  EXPECT_THROW(LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource()),
+               EnvoyException);
+}
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, ThrowsWhenOnlyPartialV1FilesExist) {
+  // Only some V1 files exist - should not be detected as V1
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  Filesystem::MockInstance mock_fs;
+
+  // No V2 files
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+
+  // Only shares file exists for V1
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuacct/cpuacct.usage")).WillOnce(Return(false));
+
+  // Factory should throw exception
+  EXPECT_THROW(LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource()),
+               EnvoyException);
+}
+
+// =============================================================================
+// Additional Edge Case Tests for CgroupV1
+// =============================================================================
+
+TEST_F(LinuxContainerCpuStatsReaderTest, ZeroCpuAllocatedValue) {
+  // Test handling of zero cpu.shares value (invalid)
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("0\n"); // Invalid: zero shares
+  setCpuTimes("1000\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, NegativeCpuAllocatedValue) {
+  // Test handling of negative cpu.shares value (invalid)
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("-1024\n"); // Invalid: negative shares
+  setCpuTimes("1000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, EmptyCpuAllocatedFile) {
+  // Test handling of empty cpu.shares file
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated(""); // Empty file
+  setCpuTimes("1000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, EmptyCpuTimesFile) {
+  // Test handling of empty cpuacct.usage file
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("2000\n");
+  setCpuTimes(""); // Empty file
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, WhitespaceOnlyCpuAllocatedFile) {
+  // Test handling of whitespace-only cpu.shares file
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("   \n\n  "); // Only whitespace
+  setCpuTimes("1000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, VerySmallCpuAllocatedValue) {
+  // Test with very small cpu.shares value (0.001 millicores)
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("0.001\n");
+  setCpuTimes("1000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  // work_time = (1000 * 1000.0) / 0.001 = 1000000000
+  EXPECT_NEAR(envoy_container_stats.work_time, 1000000000.0, 1.0);
 }
 
 } // namespace

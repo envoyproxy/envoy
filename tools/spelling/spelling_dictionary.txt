@@ -1617,3 +1617,4 @@ nsec
 millicores
 cpuacct
 cpuacct.usage
+effective_cpus
