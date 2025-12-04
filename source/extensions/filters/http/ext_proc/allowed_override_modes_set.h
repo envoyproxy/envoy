@@ -21,11 +21,12 @@ public:
    *
    * Each ProcessingMode in the input container is converted to an integer key
    * and stored in an internal hash set for efficient lookup.
+   * The use of a template is to simplify passing any container that has
+   * envoy::extensions::filters::http::ext_proc::v3::ProcessingMode elements.
    *
    * @param modes The collection of ProcessingMode protos to initialize the set with.
    */
-  explicit AllowedOverrideModesSet(
-      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& modes) {
+  template <typename Container> explicit AllowedOverrideModesSet(const Container& modes) {
     for (const auto& mode : modes) {
       allowed_modes_.insert(processingModeToInt(mode));
     }
@@ -33,6 +34,7 @@ public:
 
   /**
    * Checks if a specific ProcessingMode is supported (i.e., present in the set).
+   * Note that the ``request_header_mode`` in the given mode will be ignored.
    *
    * @param mode The ProcessingMode object to check for support.
    * @return True if the mode is supported, false otherwise.
@@ -74,8 +76,8 @@ private:
    */
   static uint32_t
   processingModeToInt(const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) {
-    // Field 1: request_header_mode (Index 1 -> 10^0).
-    uint32_t key = static_cast<uint32_t>(mode.request_header_mode());
+    uint32_t key = 0;
+    // Field 1: request_header_mode (Index 1 -> 10^0). This is ignored!
     // Field 2: response_header_mode (Index 2 -> 10^1)
     key += static_cast<uint32_t>(mode.response_header_mode()) * 10;
     // Field 3: request_body_mode (Index 3 -> 10^2)
