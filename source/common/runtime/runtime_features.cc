@@ -196,7 +196,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
 // TODO(yavlasov): Enabling by default will be hugely disruptive to existing traffic.
 // Replace with a config option (default off) post CVE release.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reject_early_connect_data);
-// TODO: Flip back to true once performance aligns with nghttp2 and
+// Flip back to true once performance aligns with nghttp2 and
 // https://github.com/envoyproxy/envoy/issues/40070 is resolved.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 
