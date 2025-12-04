@@ -370,31 +370,13 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
 }
 
 // Handles the potential cases on when to update the effect field.
-// This is needed for body_send_mode = Buffered.
 ProcessingEffect::Effect updateProcessingEffect(ProcessingEffect::Effect current_effect,
                                                 ProcessingEffect::Effect new_effect) {
-  if (new_effect == ProcessingEffect::Effect::None) {
+  if (new_effect != ProcessingEffect::Effect::None) {
     // Do nothing. Default value is None and we want to log the most recent effect that is not none.
-    return current_effect;
-  }
-  switch (current_effect) {
-  case ProcessingEffect::Effect::None:
     return new_effect;
-  case ProcessingEffect::Effect::PartialMutationsApplied:
-    // Do not update as partial mutation and rejection is already set.
-    return current_effect;
-  case ProcessingEffect::Effect::MutationApplied:
-    if (new_effect != ProcessingEffect::Effect::MutationApplied) {
-      return ProcessingEffect::Effect::PartialMutationsApplied;
-    }
-    return current_effect;
-  default:
-    // Fall through for all failures.
-    if (new_effect == ProcessingEffect::Effect::MutationApplied) {
-      return ProcessingEffect::Effect::PartialMutationsApplied;
-    }
-    return current_effect;
   }
+  return current_effect;
 }
 
 void ExtProcLoggingInfo::recordProcessingEffect(

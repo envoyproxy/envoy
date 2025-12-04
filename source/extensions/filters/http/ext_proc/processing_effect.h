@@ -12,8 +12,9 @@ class ProcessingEffect {
 public:
   // The processing effect that was applied by the external processor.
   enum class Effect : char {
-    // No processing effect. This is the default value except when body processing mode is
-    // FULL_DUPLEX_STREAMED.
+    // No processing effect. This is the default value except for body request/responses with body
+    // processing mode
+    // FULL_DUPLEX_STREAMED. In this case MutationApplied if the default.
     None,
     // The processor response sent a mutation that successfully modified the body or headers.
     // This is the default value for body requests/responses using
@@ -28,10 +29,6 @@ public:
     // The processor response sent a mutation that was attempted to modify the headers or trailers
     // but was not applied due to failure.
     MutationFailed,
-    // Some mutations were applied while other mutations were rejected.
-    // This can arise when multiple GRPC messages attempt to mutate the same part of the HTTP
-    // request/response.
-    PartialMutationsApplied,
   };
 };
 } // namespace ExternalProcessing

@@ -5515,7 +5515,7 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoPartialMutationApplied) {
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Invalid mutation request
-  EXPECT_EQ(*field_request_header_effect, "5");
+  EXPECT_EQ(*field_request_header_effect, "2");
 
   cleanupUpstreamAndDownstream();
 }
