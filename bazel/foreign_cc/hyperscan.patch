@@ -90,22 +90,50 @@ diff --git a/cmake/build_wrapper.sh b/cmake/build_wrapper.sh
 index 895610c..73b7b56 100755
 --- a/cmake/build_wrapper.sh
 +++ b/cmake/build_wrapper.sh
-@@ -15,14 +15,15 @@ SYMSFILE=$(mktemp -p /tmp ${PREFIX}_rename.syms.XXXXX)
+@@ -1,5 +1,27 @@
+ #!/bin/bash
+ 
++# Conditionally prefix NM and OBJCOPY with EXT_BUILD_ROOT if they are relative paths
++if [ -n "$EXT_BUILD_ROOT" ]; then
++    if [ -n "$NM" ]; then
++        case "$NM" in
++            /*) ;;  # Already absolute, don't prefix
++            */*) NM="$EXT_BUILD_ROOT/$NM" ;;  # Relative path with /, add prefix
++        esac
++    fi
++    if [ -n "$OBJCOPY" ]; then
++        case "$OBJCOPY" in
++            /*) ;;  # Already absolute, don't prefix
++            */*) OBJCOPY="$EXT_BUILD_ROOT/$OBJCOPY" ;;  # Relative path with /, add prefix
++        esac
++    fi
++fi
++
++# Set defaults if not set
++: ${NM:=nm}
++: ${OBJCOPY:=objcopy}
++
++export NM
++export OBJCOPY
++
+ PREFIX=$1
+ shift
+ 
+@@ -15,14 +37,13 @@ SYMSFILE=$(mktemp -p /tmp ${PREFIX}_rename.syms.XXXXX)
  KEEPSYMS=$(mktemp -p /tmp keep.syms.XXXXX)
  # find the libc used by gcc
  LIBC_SO=$("$@" --print-file-name=libc.so.6)
  cp ${KEEPSYMS_IN} ${KEEPSYMS}
  # get all symbols from libc and turn them into patterns
 -nm -f p -g -D ${LIBC_SO} | sed -s 's/\([^ @]*\).*/^\1$/' >> ${KEEPSYMS}
-+${NM:-nm} -f posix -g -D ${LIBC_SO} | sed -s 's/\([^ @]*\).*/^\1$/' >> ${KEEPSYMS}
++${NM} -f posix -g -D ${LIBC_SO} | sed -s 's/\([^ @]*\).*/^\1$/' >> ${KEEPSYMS}
  # build the object
  "$@"
  # rename the symbols in the object
 -nm -f p -g ${OUT} | cut -f1 -d' ' | grep -v -f ${KEEPSYMS} | sed -e "s/\(.*\)/\1\ ${PREFIX}_\1/" >> ${SYMSFILE}
-+${NM:-nm} -f posix -g ${OUT} | cut -f1 -d' ' | grep -v -f ${KEEPSYMS} | sed -e "s/\(.*\)/\1\ ${PREFIX}_\1/" >> ${SYMSFILE}
-+
++${NM} -f posix -g ${OUT} | cut -f1 -d' ' | grep -v -f ${KEEPSYMS} | sed -e "s/\(.*\)/\1\ ${PREFIX}_\1/" >> ${SYMSFILE}
  if test -s ${SYMSFILE}
  then
 -    objcopy --redefine-syms=${SYMSFILE} ${OUT}
-+    ${OBJCOPY:-objcopy} --redefine-syms=${SYMSFILE} ${OUT}
++    ${OBJCOPY} --redefine-syms=${SYMSFILE} ${OUT}
  fi
