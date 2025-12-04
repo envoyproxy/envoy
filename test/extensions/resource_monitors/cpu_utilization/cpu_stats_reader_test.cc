@@ -339,6 +339,141 @@ TEST(CpuTimesErrorTest, BothNegativeDeltas) {
       EnvoyException);
 }
 
+TEST(CpuTimesErrorTest, NegativeWorkWithPositiveTotal) {
+  // Test specifically: work_over_period < 0 AND total_over_period > 0
+  // This ensures the first branch of the OR condition is covered independently
+  CpuTimes previous{true, false, 1000.0, 1000, 1.0};
+  CpuTimes current{true, false, 500.0, 2000, 1.0}; // work decreased, total increased
+
+  EXPECT_THROW(
+      {
+        try {
+          current.calculateUtilization(previous);
+        } catch (const EnvoyException& e) {
+          EXPECT_NE(std::string(e.what()).find("Work_over_period"), std::string::npos);
+          EXPECT_NE(std::string(e.what()).find("negative"), std::string::npos);
+          throw;
+        }
+      },
+      EnvoyException);
+}
+
+TEST(CpuTimesErrorTest, PositiveWorkWithNonPositiveTotal) {
+  // Test specifically: work_over_period >= 0 AND total_over_period <= 0
+  // This ensures the second branch of the OR condition is covered independently
+  CpuTimes previous{true, false, 100.0, 2000, 1.0};
+  CpuTimes current{true, false, 200.0, 1000, 1.0}; // work increased, total decreased
+
+  EXPECT_THROW(
+      {
+        try {
+          current.calculateUtilization(previous);
+        } catch (const EnvoyException& e) {
+          EXPECT_NE(std::string(e.what()).find("total_over_period"), std::string::npos);
+          throw;
+        }
+      },
+      EnvoyException);
+}
+
+TEST(CpuTimesErrorTest, PositiveWorkWithZeroTotal) {
+  // Test specifically: work_over_period > 0 AND total_over_period == 0
+  // Ensures zero total is caught even when work is positive
+  CpuTimes previous{true, false, 100.0, 1000, 1.0};
+  CpuTimes current{true, false, 200.0, 1000, 1.0}; // work increased, total same (delta=0)
+
+  EXPECT_THROW(
+      {
+        try {
+          current.calculateUtilization(previous);
+        } catch (const EnvoyException& e) {
+          EXPECT_NE(std::string(e.what()).find("total_over_period"), std::string::npos);
+          EXPECT_NE(std::string(e.what()).find("positive"), std::string::npos);
+          throw;
+        }
+      },
+      EnvoyException);
+}
+
+// =============================================================================
+// Boundary Value Tests for Clamping
+// =============================================================================
+
+TEST(CpuTimesV2Test, ValueExactlyAtLowerBound) {
+  // Test value exactly at 0.0 (no clamping needed at lower bound)
+  CpuTimes previous{true, true, 0.0, 0, 1.0};
+  CpuTimes current{true, true, 0.0, 1000000000, 1.0};
+
+  double utilization = current.calculateUtilization(previous);
+  EXPECT_DOUBLE_EQ(utilization, 0.0);
+}
+
+TEST(CpuTimesV2Test, ValueExactlyAtUpperBound) {
+  // Test value exactly at 1.0 (no clamping needed at upper bound)
+  CpuTimes previous{true, true, 0.0, 0, 1.0};
+  CpuTimes current{true, true, 1000000.0, 1000000000, 1.0};
+
+  double utilization = current.calculateUtilization(previous);
+  EXPECT_DOUBLE_EQ(utilization, 1.0);
+}
+
+TEST(CpuTimesV2Test, ValueJustBelowUpperBound) {
+  // Test value just below 1.0 (0.999999)
+  CpuTimes previous{true, true, 0.0, 0, 1.0};
+  CpuTimes current{true, true, 999999.0, 1000000000, 1.0};
+
+  double utilization = current.calculateUtilization(previous);
+  EXPECT_NEAR(utilization, 0.999999, 0.000001);
+  EXPECT_LT(utilization, 1.0);
+}
+
+TEST(CpuTimesV2Test, ValueJustAboveZero) {
+  // Test very small positive value (just above 0.0)
+  CpuTimes previous{true, true, 0.0, 0, 1.0};
+  CpuTimes current{true, true, 0.001, 1000000000, 1.0};
+
+  double utilization = current.calculateUtilization(previous);
+  EXPECT_GT(utilization, 0.0);
+  EXPECT_LT(utilization, 0.000001);
+}
+
+TEST(CpuTimesV2Test, ValueWellAboveUpperBound) {
+  // Test value well above 1.0 (should clamp to 1.0)
+  CpuTimes previous{true, true, 0.0, 0, 1.0};
+  CpuTimes current{true, true, 10000000.0, 1000000000, 1.0}; // Would be 10.0 without clamping
+
+  double utilization = current.calculateUtilization(previous);
+  EXPECT_DOUBLE_EQ(utilization, 1.0);
+}
+
+TEST(CpuTimesV1Test, BoundaryValueZero) {
+  // Test V1 with zero utilization (boundary)
+  CpuTimes previous{true, false, 1000.0, 2000, 1.0};
+  CpuTimes current{true, false, 1000.0, 3000, 1.0}; // No work done
+
+  double utilization = current.calculateUtilization(previous);
+  EXPECT_DOUBLE_EQ(utilization, 0.0);
+}
+
+TEST(CpuTimesV1Test, BoundaryValueOne) {
+  // Test V1 with 100% utilization (boundary)
+  CpuTimes previous{true, false, 0.0, 0, 1.0};
+  CpuTimes current{true, false, 1000.0, 1000, 1.0}; // All time is work
+
+  double utilization = current.calculateUtilization(previous);
+  EXPECT_DOUBLE_EQ(utilization, 1.0);
+}
+
+TEST(CpuTimesV1Test, ValueAboveOne) {
+  // Test V1 with value > 1.0 (V1 doesn't clamp, so this is valid)
+  CpuTimes previous{true, false, 0.0, 0, 1.0};
+  CpuTimes current{true, false, 2000.0, 1000,
+                   1.0}; // Work exceeds total (shouldn't happen in practice)
+
+  double utilization = current.calculateUtilization(previous);
+  EXPECT_DOUBLE_EQ(utilization, 2.0);
+}
+
 // =============================================================================
 // Edge Case Tests
 // =============================================================================
