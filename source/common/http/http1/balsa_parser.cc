@@ -33,15 +33,6 @@ constexpr absl::string_view kValidCharacters =
 constexpr absl::string_view::iterator kValidCharactersBegin = kValidCharacters.begin();
 constexpr absl::string_view::iterator kValidCharactersEnd = kValidCharacters.end();
 
-bool isFirstCharacterOfValidMethod(char c) {
-  static constexpr char kValidFirstCharacters[] = {'A', 'B', 'C', 'D', 'G', 'H', 'L', 'M',
-                                                   'N', 'O', 'P', 'R', 'S', 'T', 'U'};
-
-  const auto* begin = &kValidFirstCharacters[0];
-  const auto* end = &kValidFirstCharacters[ABSL_ARRAYSIZE(kValidFirstCharacters) - 1] + 1;
-  return std::binary_search(begin, end, c);
-}
-
 // TODO(#21245): Skip method validation altogether when UHV method validation is
 // enabled.
 bool isMethodValid(absl::string_view method, bool allow_custom_methods) {
@@ -190,15 +181,6 @@ size_t BalsaParser::execute(const char* slice, int len) {
         first_message_ = false;
       } else {
         framer_.Reset();
-      }
-    }
-
-    if (!allow_newlines_between_requests_) {
-      if (message_type_ == MessageType::Request && !allow_custom_methods_ &&
-          !isFirstCharacterOfValidMethod(*slice)) {
-        status_ = ParserStatus::Error;
-        error_message_ = "HPE_INVALID_METHOD";
-        return 0;
       }
     }
 

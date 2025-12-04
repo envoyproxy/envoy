@@ -87,6 +87,11 @@ bool IAMRolesAnywhereX509CredentialsProvider::needsRefresh() {
   const auto expired = (now - last_updated_ > REFRESH_INTERVAL);
 
   if (expiration_time_.has_value()) {
+    // If already expired, definitely need refresh
+    if (expiration_time_.value() <= now) {
+      return true;
+    }
+    // Otherwise check if within grace period
     return expired || (expiration_time_.value() - now < REFRESH_GRACE_PERIOD);
   } else {
     return expired;

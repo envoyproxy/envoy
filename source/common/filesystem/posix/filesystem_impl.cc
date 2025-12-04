@@ -334,6 +334,19 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
     return false;
   }
 
+  // Allow access to cgroup-related /proc and /sys files for container-aware CPU detection.
+  // These are read-only system files that provide resource limit information.
+  // Whitelisted paths:
+  //   - /proc/self/'mountinfo': Discovers cgroup filesystem mount points
+  //   - /proc/self/cgroup: Determines process cgroup assignments
+  //   - /sys/fs/cgroup/*: Reads cgroup v1 and v2 CPU limit files
+  //     - v2: /sys/fs/cgroup/*/cpu.max
+  //     - v1: /sys/fs/cgroup/cpu/*/cpu.'cfs'_quota_us and cpu.'cfs'_period_us
+  if (path == "/proc/self/mountinfo" || path == "/proc/self/cgroup" ||
+      absl::StartsWith(path, "/sys/fs/cgroup/")) {
+    return false;
+  }
+
   const Api::SysCallStringResult canonical_path = canonicalPath(path);
   if (canonical_path.return_value_.empty()) {
     ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path,

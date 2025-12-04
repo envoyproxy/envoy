@@ -143,7 +143,7 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
   // Populate hits_addend if set.
   if (hits_addend_provider_ != nullptr) {
     const Protobuf::Value hits_addend_value =
-        hits_addend_provider_->formatValueWithContext({&headers}, stream_info);
+        hits_addend_provider_->formatValue({&headers}, stream_info);
 
     double hits_addend = 0;
     bool success = true;

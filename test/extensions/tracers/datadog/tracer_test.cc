@@ -18,7 +18,6 @@
 #include "datadog/optional.h"
 #include "datadog/propagation_style.h"
 #include "datadog/sampling_priority.h"
-#include "datadog/tags.h"
 #include "datadog/trace_segment.h"
 #include "datadog/tracer_config.h"
 #include "gtest/gtest.h"
@@ -75,7 +74,7 @@ TEST_F(DatadogTracerTest, Breathing) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
   config.report_traces = false;
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
                 thread_local_slot_allocator_, time_);
@@ -87,7 +86,7 @@ TEST_F(DatadogTracerTest, NoOpMode) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
   config.report_traces = false;
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
   datadog::tracing::TraceSamplerConfig::Rule invalid_rule;
   // The `sample_rate`, below, is invalid (should be between 0.0 and 1.0).
   // As a result, the constructor of `Tracer` will fail to initialize the
@@ -122,7 +121,7 @@ TEST_F(DatadogTracerTest, SpanProperties) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
   config.report_traces = false;
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
   // Configure the tracer to keep all spans. We then override that
   // configuration in the `Tracing::Decision`, below.
   config.trace_sampler.sample_rate = 1.0; // 100%
@@ -173,7 +172,7 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
   config.report_traces = false;
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
                 thread_local_slot_allocator_, time_);
@@ -263,7 +262,7 @@ TEST_F(DatadogTracerTest, ExtractionFailure) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
   config.report_traces = false;
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
                 thread_local_slot_allocator_, time_);
@@ -372,7 +371,7 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
     datadog::tracing::TracerConfig config;
     config.service = "envoy";
     config.report_traces = false;
-    config.report_telemetry = false;
+    config.telemetry.enabled = false;
     Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
                   thread_local_slot_allocator_, time_);
 

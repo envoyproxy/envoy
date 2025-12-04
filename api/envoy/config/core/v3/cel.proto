@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v3";
+option java_outer_classname = "CelProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/core/v3;corev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: CEL Expression Configuration]
+
+// CEL expression evaluation configuration.
+// These options control the behavior of the Common Expression Language runtime for
+// individual CEL expressions.
+message CelExpressionConfig {
+  // Enable string conversion functions for CEL expressions. When enabled, CEL expressions
+  // can convert values to strings using the ``string()`` function.
+  //
+  // .. attention::
+  //
+  //   This option is disabled by default to avoid unbounded memory allocation.
+  //   CEL evaluation cost is typically bounded by the expression size, but converting
+  //   arbitrary values (e.g., large messages, lists, or maps) to strings may allocate
+  //   memory proportional to input data size, which can be unbounded and lead to
+  //   memory exhaustion.
+  bool enable_string_conversion = 1;
+
+  // Enable string concatenation for CEL expressions. When enabled, CEL expressions
+  // can concatenate strings using the ``+`` operator.
+  //
+  // .. attention::
+  //
+  //   This option is disabled by default to avoid unbounded memory allocation.
+  //   While CEL normally bounds evaluation by expression size, enabling string
+  //   concatenation allows building outputs whose size depends on input data,
+  //   potentially causing large intermediate allocations and memory exhaustion.
+  bool enable_string_concat = 2;
+
+  // Enable string manipulation functions for CEL expressions. When enabled, CEL
+  // expressions can use additional string functions:
+  //
+  // * ``replace(old, new)`` - Replaces all occurrences of ``old`` with ``new``.
+  // * ``split(separator)`` - Splits a string into a list of substrings.
+  // * ``lowerAscii()`` - Converts ASCII characters to lowercase.
+  // * ``upperAscii()`` - Converts ASCII characters to uppercase.
+  //
+  // .. note::
+  //
+  //   Standard CEL string functions like ``contains()``, ``startsWith()``, and
+  //   ``endsWith()`` are always available regardless of this setting.
+  //
+  // .. attention::
+  //
+  //   This option is disabled by default to avoid unbounded memory allocation.
+  //   Although CEL generally bounds evaluation by expression size, functions such as
+  //   ``replace``, ``split``, ``lowerAscii()``, and ``upperAscii()`` can allocate memory
+  //   proportional to input data size. Under adversarial inputs this can lead to
+  //   unbounded allocations and memory exhaustion.
+  bool enable_string_functions = 3;
+}

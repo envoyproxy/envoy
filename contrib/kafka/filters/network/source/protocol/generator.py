@@ -233,9 +233,9 @@ class StatefulProcessor:
                 fields.append(child)
 
         # Some structures share the same name, use request/response as prefix.
-        if cpp_name in ['Cursor', 'DirectoryData', 'EntityData', 'EntryData', 'PartitionData',
-                        'PartitionSnapshot', 'SnapshotId', 'TopicData', 'TopicPartitions',
-                        'TopicSnapshot']:
+        if cpp_name in ['Cursor', 'DirectoryData', 'EntityData', 'EntryData', 'Listener',
+                        'PartitionData', 'PartitionSnapshot', 'SnapshotId', 'StateBatch',
+                        'TopicData', 'TopicPartitions', 'TopicSnapshot']:
             cpp_name = self.type.capitalize() + type_name
 
         # Some of the types repeat multiple times (e.g. AlterableConfig).

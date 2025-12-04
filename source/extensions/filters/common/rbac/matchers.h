@@ -199,13 +199,22 @@ private:
 class PolicyMatcher : public Matcher, NonCopyable {
 public:
   PolicyMatcher(const envoy::config::rbac::v3::Policy& policy,
-                Expr::BuilderInstanceSharedPtr& builder,
                 ProtobufMessage::ValidationVisitor& validation_visitor,
-                Server::Configuration::CommonFactoryContext& context)
+                Server::Configuration::CommonFactoryContext& context,
+                Expr::BuilderInstanceSharedConstPtr arena_builder)
       : permissions_(policy.permissions(), validation_visitor, context),
         principals_(policy.principals(), context),
         expr_([&]() -> absl::optional<Expr::CompiledExpression> {
           if (policy.has_condition()) {
+            // Use arena-based builder if provided, otherwise use cached builder.
+            auto builder =
+                arena_builder != nullptr
+                    ? arena_builder
+                    : Expr::getBuilder(
+                          context,
+                          policy.has_cel_config()
+                              ? Envoy::makeOptRef(policy.cel_config())
+                              : OptRef<const envoy::config::core::v3::CelExpressionConfig>{});
             auto compiled = Expr::CompiledExpression::Create(builder, policy.condition());
             if (!compiled.ok()) {
               throw Expr::CelException(

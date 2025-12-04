@@ -10,6 +10,7 @@ Common messages
   ../service/discovery/v3/discovery.proto
   ../extensions/filters/common/fault/v3/fault.proto
   ../config/core/v3/base.proto
+  ../config/core/v3/cel.proto
   ../extensions/filters/common/matcher/action/v3/skip_action.proto
   ../extensions/matching/common_inputs/network/v3/network_inputs.proto
   ../extensions/common/ratelimit/v3/ratelimit.proto

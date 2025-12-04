@@ -7,10 +7,16 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
 
-Network::FilterFactoryCb ReverseTunnelFilterConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Network::FilterFactoryCb>
+ReverseTunnelFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
     Server::Configuration::FactoryContext& context) {
-  auto config = std::make_shared<ReverseTunnelFilterConfig>(proto_config, context);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config, context);
+  if (!config_or_error.ok()) {
+    return config_or_error.status();
+  }
+  auto config = config_or_error.value();
+
   // Capture scope and overload manager pointers to avoid dangling references.
   Stats::Scope* scope = &context.scope();
   Server::OverloadManager* overload_manager = &context.serverFactoryContext().overloadManager();

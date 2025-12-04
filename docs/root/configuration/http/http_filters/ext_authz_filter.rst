@@ -151,6 +151,12 @@ The HTTP filter outputs statistics in the ``cluster.<route target cluster>.ext_a
   failure_mode_allowed, Counter, "Total error responses that were allowed through because :ref:`failure_mode_allow
   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>` is set to ``true``."
   invalid, Counter, Total responses rejected due to invalid header or query parameter mutations.
+  omitted_response_headers, Counter, "Total responses for which ext_authz rejected any number of
+  headers due to the header map constraints."
+  request_header_limits_reached, Counter, "Total requests for which ext_authz sent a local reply
+  because it couldn't apply all header mutations"
+  response_header_limits_reached, Counter, "Total responses for which ext_authz sent a local reply
+  because it couldn't apply all header mutations"
 
 Dynamic Metadata
 ----------------

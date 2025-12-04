@@ -1,12 +1,9 @@
 load("@base_pip3//:requirements.bzl", "requirement")
-load("//tools/base:envoy_python.bzl", "envoy_pytool_binary")
-load("//tools/python:namespace.bzl", "envoy_py_namespace")
+load("@rules_python//python:defs.bzl", "py_binary")
 
 licenses(["notice"])  # Apache 2
 
-envoy_py_namespace()
-
-envoy_pytool_binary(
+py_binary(
     name = "notify",
     srcs = ["notify.py"],
     args = ["$(location //:reviewers.yaml)"],
@@ -21,7 +18,7 @@ envoy_pytool_binary(
     ],
 )
 
-envoy_pytool_binary(
+py_binary(
     name = "security_notify",
     srcs = ["security_notify.py"],
     visibility = ["//visibility:public"],

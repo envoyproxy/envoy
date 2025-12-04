@@ -30,14 +30,14 @@ Buffer::InstancePtr
 TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_watermark,
                                             std::function<void()> above_high_watermark,
                                             std::function<void()> above_overflow_watermark) {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   uint64_t idx = next_idx_++;
   ++active_buffer_count_;
   BufferInfo& buffer_info = buffer_infos_[idx];
   return std::make_unique<TrackedWatermarkBuffer>(
       // update_size
       [this, &buffer_info](uint64_t current_size) {
-        absl::MutexLock lock(&mutex_);
+        absl::MutexLock lock(mutex_);
         total_buffer_size_ = total_buffer_size_ + current_size - buffer_info.current_size_;
         if (buffer_info.max_size_ < current_size) {
           buffer_info.max_size_ = current_size;
@@ -48,12 +48,12 @@ TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_wate
       },
       // update_high_watermark
       [this, &buffer_info](uint32_t watermark) {
-        absl::MutexLock lock(&mutex_);
+        absl::MutexLock lock(mutex_);
         buffer_info.watermark_ = watermark;
       },
       // on_delete
       [this, &buffer_info](TrackedWatermarkBuffer* buffer) {
-        absl::MutexLock lock(&mutex_);
+        absl::MutexLock lock(mutex_);
         ASSERT(active_buffer_count_ > 0);
         --active_buffer_count_;
         total_buffer_size_ -= buffer_info.current_size_;
@@ -81,7 +81,7 @@ TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_wate
       },
       // on_bind
       [this](BufferMemoryAccountSharedPtr& account, TrackedWatermarkBuffer* buffer) {
-        absl::MutexLock lock(&mutex_);
+        absl::MutexLock lock(mutex_);
         // Only track non-null accounts.
         if (account) {
           account_infos_[account].emplace(buffer);
@@ -95,7 +95,7 @@ BufferMemoryAccountSharedPtr
 TrackedWatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_handler) {
   auto account = WatermarkBufferFactory::createAccount(reset_handler);
   if (account != nullptr) {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     ++total_accounts_created_;
   }
   return account;
@@ -104,27 +104,27 @@ TrackedWatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_han
 void TrackedWatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account,
                                                       absl::optional<uint32_t> current_class) {
   WatermarkBufferFactory::unregisterAccount(account, current_class);
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   ++total_accounts_unregistered_;
 }
 
 uint64_t TrackedWatermarkBufferFactory::numBuffersCreated() const {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   return buffer_infos_.size();
 }
 
 uint64_t TrackedWatermarkBufferFactory::numBuffersActive() const {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   return active_buffer_count_;
 }
 
 uint64_t TrackedWatermarkBufferFactory::totalBufferSize() const {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   return total_buffer_size_;
 }
 
 uint64_t TrackedWatermarkBufferFactory::maxBufferSize() const {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   uint64_t val = 0;
   for (auto& item : buffer_infos_) {
     val = std::max(val, item.second.max_size_);
@@ -133,7 +133,7 @@ uint64_t TrackedWatermarkBufferFactory::maxBufferSize() const {
 }
 
 uint64_t TrackedWatermarkBufferFactory::sumMaxBufferSizes() const {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   uint64_t val = 0;
   for (auto& item : buffer_infos_) {
     val += item.second.max_size_;
@@ -142,7 +142,7 @@ uint64_t TrackedWatermarkBufferFactory::sumMaxBufferSizes() const {
 }
 
 std::pair<uint64_t, uint64_t> TrackedWatermarkBufferFactory::highWatermarkRange() const {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   uint64_t min_watermark = 0;
   uint64_t max_watermark = 0;
   bool watermarks_set = false;
@@ -174,13 +174,13 @@ std::pair<uint64_t, uint64_t> TrackedWatermarkBufferFactory::highWatermarkRange(
 }
 
 uint64_t TrackedWatermarkBufferFactory::numAccountsCreated() const {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   return total_accounts_created_;
 }
 
 bool TrackedWatermarkBufferFactory::waitForExpectedAccountUnregistered(
     uint64_t expected_accounts_unregistered, std::chrono::milliseconds timeout) {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   auto predicate = [this, expected_accounts_unregistered]() ABSL_SHARED_LOCKS_REQUIRED(mutex_) {
     mutex_.AssertHeld();
     return expected_accounts_unregistered == total_accounts_unregistered_;
@@ -190,7 +190,7 @@ bool TrackedWatermarkBufferFactory::waitForExpectedAccountUnregistered(
 
 bool TrackedWatermarkBufferFactory::waitUntilTotalBufferedExceeds(
     uint64_t byte_size, std::chrono::milliseconds timeout) {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   auto predicate = [this, byte_size]() ABSL_SHARED_LOCKS_REQUIRED(mutex_) {
     mutex_.AssertHeld();
     return total_buffer_size_ >= byte_size;
@@ -232,7 +232,7 @@ void TrackedWatermarkBufferFactory::inspectAccounts(
         [main_tid, &server, &func, this](OptRef<ThreadLocal::ThreadLocalObject>) {
           // Run on the worker thread.
           if (server.api().threadFactory().currentThreadId() != main_tid) {
-            absl::MutexLock lock(&(this->mutex_));
+            absl::MutexLock lock(this->mutex_);
             func(this->account_infos_);
           }
         },
@@ -252,7 +252,7 @@ void TrackedWatermarkBufferFactory::inspectMemoryClasses(
 
 void TrackedWatermarkBufferFactory::setExpectedAccountBalance(uint64_t byte_size_per_account,
                                                               uint32_t num_accounts) {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   ASSERT(!expected_balances_.has_value());
   expected_balances_.emplace(byte_size_per_account, num_accounts);
 }
@@ -264,7 +264,7 @@ bool TrackedWatermarkBufferFactory::waitForExpectedAccountBalanceWithTimeout(
 
 bool TrackedWatermarkBufferFactory::waitUntilExpectedNumberOfAccountsAndBoundBuffers(
     uint32_t num_accounts, uint32_t num_bound_buffers, std::chrono::milliseconds timeout) {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   auto predicate = [this, num_accounts, num_bound_buffers]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     mutex_.AssertHeld();
     removeDanglingAccounts();

@@ -130,17 +130,17 @@ protected:
     return Http::Code::InternalServerError;
   }
   const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-  absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
+  std::string currentUrlPathAfterRewrite(const Http::RequestHeaderMap&, const Formatter::Context&,
+                                         const StreamInfo::StreamInfo&) const override {
     return {};
   }
-  void finalizeRequestHeaders(Http::RequestHeaderMap&, const Formatter::HttpFormatterContext&,
+  void finalizeRequestHeaders(Http::RequestHeaderMap&, const Formatter::Context&,
                               const StreamInfo::StreamInfo&, bool) const override {}
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo&,
                                                  bool) const override {
     return {};
   }
-  void finalizeResponseHeaders(Http::ResponseHeaderMap&, const Formatter::HttpFormatterContext&,
+  void finalizeResponseHeaders(Http::ResponseHeaderMap&, const Formatter::Context&,
                                const StreamInfo::StreamInfo&) const override {}
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
                                                   bool) const override {

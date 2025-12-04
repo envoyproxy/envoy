@@ -14,7 +14,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace RingHash {
 namespace {
 
@@ -145,6 +145,6 @@ TEST_P(RingHashIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
 
 } // namespace
 } // namespace RingHash
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

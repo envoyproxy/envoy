@@ -17,6 +17,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
+#include "envoy/http/header_evaluator.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/router/path_matcher.h"
@@ -57,7 +58,7 @@ public:
    * @param stream_info holds additional information about the request.
    */
   virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
-                                       const Formatter::HttpFormatterContext& context,
+                                       const Formatter::Context& context,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
@@ -95,11 +96,21 @@ public:
   virtual std::string newUri(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
-   * Returns the response body to send with direct responses.
-   * @return std::string& the response body specified in the route configuration,
-   *         or an empty string if no response body is specified.
+   * Format the response body for direct responses. Users should pass
+   * a string reference to populate, `body`, and the return value may
+   * or may not be the same reference based on if a formatter is applied.
+   * If a formatter is applied, the return value will be the same reference.
+   * If no formatter is applied, the return value will be the configured body.
+   * @param request_headers supplies the request headers.
+   * @param response_headers supplies the response headers.
+   * @param stream_info holds additional information about the request.
+   * @param body_out a string in which a formatted body may be stored.
+   * @return std::string& the response body.
    */
-  virtual const std::string& responseBody() const PURE;
+  virtual absl::string_view formatBody(const Http::RequestHeaderMap& request_headers,
+                                       const Http::ResponseHeaderMap& response_headers,
+                                       const StreamInfo::StreamInfo& stream_info,
+                                       std::string& body_out) const PURE;
 
   /**
    * Do potentially destructive header transforms on Path header prior to redirection. For
@@ -548,6 +559,16 @@ public:
    * @return true if host name should be suffixed with "-shadow".
    */
   virtual bool disableShadowHostSuffixAppend() const PURE;
+
+  /**
+   * @return the header evaluator for manipulating headers in mirrored requests.
+   */
+  virtual const Http::HeaderEvaluator& headerEvaluator() const PURE;
+
+  /**
+   * @return the literal value to rewrite the host header with, or empty if no rewrite.
+   */
+  virtual absl::string_view hostRewriteLiteral() const PURE;
 };
 
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
@@ -929,11 +950,15 @@ public:
    * using current values of headers. Note that final path may be different if
    * headers change before finalization.
    * @param headers supplies the request headers.
-   * @return absl::optional<std::string> the value of the URL path after rewrite or absl::nullopt
-   *         if rewrite is not configured.
+   * @param context supplies the formatter context for path generation.
+   * @param stream_info holds additional information about the request.
+   * @return std::string the value of the URL path after rewrite or empty string
+   *         if rewrite is not configured or rewrite failed.
    */
-  virtual absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const PURE;
+  virtual std::string
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                             const Formatter::Context& context,
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For
@@ -945,7 +970,7 @@ public:
    *        or x-envoy-original-host header if host rewritten.
    */
   virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
-                                      const Formatter::HttpFormatterContext& context,
+                                      const Formatter::Context& context,
                                       const StreamInfo::StreamInfo& stream_info,
                                       bool keep_original_host_or_path) const PURE;
 

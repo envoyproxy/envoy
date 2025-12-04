@@ -220,7 +220,7 @@ public:
   MockAsyncClientWithReset* async_client_ = nullptr;
   Grpc::MockAsyncStream stream_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-  Grpc::RawAsyncStreamCallbacks* stream_callbacks_;
+  Grpc::RawAsyncStreamCallbacks* stream_callbacks_ = nullptr;
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   int fail_starts_ = 0;
   std::string domain_ = "cloud_12345_67890_rlqs";

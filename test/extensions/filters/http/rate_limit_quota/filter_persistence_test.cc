@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
@@ -15,6 +17,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/synchronization/notification.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
@@ -153,6 +156,8 @@ protected:
         rlqs_upstream_refs.rlqs_cluster_->set_name(absl::StrCat("rlqs_upstream_", i));
       }
     });
+    tls_store_emptied_ = std::make_unique<absl::Notification>();
+    GlobalTlsStores::registerEmptiedCb([&]() { tls_store_emptied_->Notify(); });
   }
 
   void updateConfigInPlace(std::function<void(envoy::config::bootstrap::v3::Bootstrap&)> modifier) {
@@ -173,6 +178,14 @@ protected:
     config_updates_++;
   }
 
+  bool waitForAllTlsStoreDeletions() {
+    if (tls_store_emptied_ == nullptr) {
+      // Never initialized the TLS Store.
+      return true;
+    }
+    return tls_store_emptied_->WaitForNotificationWithTimeout(absl::Seconds(3));
+  }
+
   void wipeFilters() {
     updateConfigInPlace([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -182,8 +195,8 @@ protected:
       hcm_config.clear_http_filters();
       hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
     });
-    absl::SleepFor(absl::Seconds(1));
-    EXPECT_EQ(GlobalTlsStores::size(), 0);
+    // Wait for all TLS stores to be deleted now that the filter factories are gone.
+    ASSERT_TRUE(waitForAllTlsStoreDeletions());
   }
 
   void cleanUp() {
@@ -284,6 +297,8 @@ protected:
   Cluster* traffic_cluster_ = nullptr;
 
   int config_updates_ = 0;
+
+  std::unique_ptr<absl::Notification> tls_store_emptied_ = nullptr;
 };
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, FilterPersistenceTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS,

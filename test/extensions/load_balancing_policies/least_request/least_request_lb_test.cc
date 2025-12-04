@@ -566,8 +566,8 @@ TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
     envoy::config::cluster::v3::Cluster::CommonLbConfig common;
     envoy::config::cluster::v3::Cluster::LeastRequestLbConfig legacy;
 
-    Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
-                                                                                           legacy);
+    Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
+                                                                                            legacy);
 
     EXPECT_FALSE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_FALSE(typed_config.lb_config_.has_slow_start_config());
@@ -591,8 +591,8 @@ TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
 
     common.mutable_locality_weighted_lb_config();
 
-    Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
-                                                                                           legacy);
+    Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
+                                                                                            legacy);
 
     EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_TRUE(typed_config.lb_config_.has_slow_start_config());
@@ -621,8 +621,8 @@ TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
     common.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(23.0);
     common.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
 
-    Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
-                                                                                           legacy);
+    Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
+                                                                                            legacy);
 
     EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_FALSE(typed_config.lb_config_.has_slow_start_config());

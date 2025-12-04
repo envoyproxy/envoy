@@ -29,6 +29,8 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//source/common/config:datasource_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -57,8 +59,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "command_splitter_lib",
-    srcs = ["command_splitter_impl.cc"],
-    hdrs = ["command_splitter_impl.h"],
+    srcs = [
+        "cluster_response_handler.cc",
+        "command_splitter_impl.cc",
+    ],
+    hdrs = [
+        "cluster_response_handler.h",
+        "command_splitter_impl.h",
+    ],
     deps = [
         ":command_splitter_interface",
         ":conn_pool_lib",
@@ -73,6 +81,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
 

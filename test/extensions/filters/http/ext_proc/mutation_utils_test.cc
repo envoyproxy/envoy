@@ -6,6 +6,7 @@
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -21,9 +22,29 @@ using envoy::service::ext_proc::v3::BodyMutation;
 
 using Filters::Common::MutationRules::Checker;
 using Http::LowerCaseString;
+using StatusHelpers::HasStatus;
 
 class MutationUtilsTest : public ::testing::Test {
 public:
+  // A TestHeaderMap that adds helpers to override count and byte limits.
+  class TestHeaderMapImplWithOverrides : public Http::TestRequestHeaderMapImpl {
+  public:
+    TestHeaderMapImplWithOverrides() = default;
+    TestHeaderMapImplWithOverrides(
+        std::initializer_list<std::pair<std::string, std::string>> header_list)
+        : Http::TestRequestHeaderMapImpl(header_list) {}
+
+    uint32_t maxHeadersCount() const override { return max_headers_count_; }
+    void setMaxHeadersCount(uint32_t count) { max_headers_count_ = count; }
+
+    uint32_t maxHeadersKb() const override { return max_headers_kb_; }
+    void setMaxHeadersKb(uint32_t kb) { max_headers_kb_ = kb; }
+
+  private:
+    uint32_t max_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
+    uint32_t max_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  };
+
   Regex::GoogleReEngine regex_engine_;
 };
 
@@ -220,8 +241,9 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithInvalidCharacter) {
   s->mutable_header()->set_key("x-append-this\n");
   s->mutable_header()->set_raw_value("value");
   EXPECT_CALL(rejections, inc());
-  EXPECT_FALSE(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+  EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "header_mutation_set_contains_invalid_character"));
 
   mutation.Clear();
   s = mutation.add_set_headers();
@@ -230,8 +252,9 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithInvalidCharacter) {
   s->mutable_header()->set_key("x-append-this");
   s->mutable_header()->set_raw_value("value\r");
   EXPECT_CALL(rejections, inc());
-  EXPECT_FALSE(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+  EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "header_mutation_set_contains_invalid_character"));
 }
 
 TEST_F(MutationUtilsTest, TestSetHeaderWithContentLength) {
@@ -274,8 +297,9 @@ TEST_F(MutationUtilsTest, TestRemoveHeaderWithInvalidCharacter) {
   Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
   Envoy::Stats::MockCounter rejections;
   EXPECT_CALL(rejections, inc());
-  EXPECT_FALSE(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+  EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "header_mutation_remove_contains_invalid_character"));
 }
 
 // Ensure that we actually replace the body
@@ -439,6 +463,161 @@ TEST_F(MutationUtilsTest, TestDisallowHeaderSetNotAllowHeader) {
   Http::TestRequestHeaderMapImpl expected{{"content-type", "text/plain; encoding=UTF8"},
                                           {"x-something-else", "yes"}};
   EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST_F(MutationUtilsTest, TestHeaderMutationSetOperationExceedsMaxCount) {
+  TestHeaderMapImplWithOverrides headers;
+  headers.setMaxHeadersCount(1);
+
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  s->mutable_header()->set_key("h5");
+  s->mutable_header()->set_raw_value("v5");
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("h6");
+  s->mutable_header()->set_raw_value("v6");
+
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+
+  EXPECT_CALL(rejections, inc());
+  EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "header_mutation_operation_count_exceeds_limit"));
+  EXPECT_TRUE(headers.empty());
+}
+
+TEST_F(MutationUtilsTest, TestHeaderMutationSetResultExceedsMaxCount) {
+  TestHeaderMapImplWithOverrides headers{
+      {"h1", "v1"},
+      {"h2", "v2"},
+      {"h3", "v3"},
+      {"h4", "v4"},
+  };
+  headers.setMaxHeadersCount(5);
+  // We're now at 4 headers. One more mutation will put us at the limit,
+  // and a second will put us over.
+
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  s->mutable_header()->set_key("h5");
+  s->mutable_header()->set_raw_value("v5");
+
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+
+  auto status = MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections);
+  EXPECT_TRUE(status.ok());
+
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("h6");
+  s->mutable_header()->set_raw_value("v6");
+  EXPECT_CALL(rejections, inc());
+  EXPECT_THAT(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+      HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_result_exceeds_limit"));
+  // Surprise: While we return an error, the headers actually DO get mutated.
+  // (Filter must detect the error status and discard the mutation.)
+  EXPECT_EQ(headers.size(), 6);
+}
+
+TEST_F(MutationUtilsTest, TestHeaderMutationRemoveOperationExceedsMaxCount) {
+  TestHeaderMapImplWithOverrides headers{
+      {"h1", "v1"},
+      {"h2", "v2"},
+  };
+  headers.setMaxHeadersCount(1);
+
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  mutation.add_remove_headers("h1");
+  mutation.add_remove_headers("h2");
+
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc());
+  EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "header_mutation_operation_count_exceeds_limit"));
+  EXPECT_EQ(headers.size(), 2);
+}
+
+TEST_F(MutationUtilsTest, TestHeaderMutationExceedsMaxKb) {
+  TestHeaderMapImplWithOverrides headers;
+  headers.setMaxHeadersKb(1);
+  // Fill up the headers part of the way to the 1kb limit
+  headers.addCopy(LowerCaseString("header1"), std::string(1002, 'a'));
+  ASSERT_EQ(headers.byteSize(), 1009);
+
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  // This next header should bring us almost to the limit.
+  s->mutable_header()->set_key("header2");
+  s->mutable_header()->set_raw_value("b");
+
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+
+  auto status = MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections);
+  EXPECT_TRUE(status.ok());
+  ASSERT_EQ(headers.byteSize(), 1017);
+
+  // This last header should push us over the limit.
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("header3");
+  s->mutable_header()->set_raw_value("c");
+  EXPECT_CALL(rejections, inc());
+  EXPECT_THAT(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+      HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_result_exceeds_limit"));
+  // Surprise: While we return an error, the headers actually DO get mutated.
+  // (Filter must detect the error status and discard the mutation.)
+  EXPECT_EQ(headers.byteSize(), 1025);
+}
+
+TEST_F(MutationUtilsTest, TestHeaderMutationRemoveResultExceedsMaxCount) {
+  TestHeaderMapImplWithOverrides headers{
+      {"h1", "v1"},
+      {"h2", "v2"},
+      {"h3", "v3"},
+  };
+  headers.setMaxHeadersCount(1);
+
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  mutation.add_remove_headers("h3");
+
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc());
+  EXPECT_THAT(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+      HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_result_exceeds_limit"));
+  // Surprise: h3 was removed despite the error!
+  // (Filter must detect the error status and discard the mutation.)
+  EXPECT_EQ(headers.size(), 2);
+}
+
+TEST_F(MutationUtilsTest, TestHeaderMutationExceedsMaxCountAndSize) {
+  TestHeaderMapImplWithOverrides headers{
+      {"h0", "v0"},
+  };
+  headers.setMaxHeadersCount(1);
+  headers.setMaxHeadersKb(1);
+  // Fill up the headers to the 1kb limit
+  headers.addCopy(LowerCaseString("h1"), std::string(1018, 'v'));
+  ASSERT_EQ(headers.byteSize(), 1024);
+
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  s->mutable_header()->set_key("h0");
+  s->mutable_header()->set_raw_value("v00");
+
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc());
+  EXPECT_THAT(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+      HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_result_exceeds_limit"));
+  EXPECT_EQ(headers.size(), 2);
 }
 
 } // namespace

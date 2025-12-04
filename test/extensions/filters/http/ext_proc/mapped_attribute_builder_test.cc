@@ -24,6 +24,12 @@ using testing::ReturnRef;
 
 class MappedAttributeBuilderTest : public testing::Test {
 protected:
+  void SetUp() override {
+    auto builder_ptr = Filters::Common::Expr::createBuilder({});
+    expr_builder_ =
+        std::make_shared<Filters::Common::Expr::BuilderInstance>(std::move(builder_ptr));
+  }
+
   void initialize(const std::string& yaml) {
     TestUtility::loadFromYaml(yaml, proto_config_);
     builder_ =
@@ -34,13 +40,14 @@ protected:
 
   MappedAttributeBuilderProto proto_config_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
-  Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder_ =
-      Filters::Common::Expr::createBuilder(nullptr);
+  Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder_;
   std::unique_ptr<ProcessingRequestModifier> builder_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   testing::NiceMock<::Envoy::Http::MockStreamEncoderFilterCallbacks> callbacks_;
   envoy::config::core::v3::Metadata metadata_;
 };
+
+#if defined(USE_CEL_PARSER)
 
 TEST_F(MappedAttributeBuilderTest, TwoKeysWithSameValue) {
   initialize(R"EOF(
@@ -200,6 +207,8 @@ TEST_F(MappedAttributeBuilderTest, CelEvalFailure) {
   const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
   EXPECT_EQ(0, attributes.fields_size());
 }
+
+#endif
 
 } // namespace
 } // namespace ExternalProcessing

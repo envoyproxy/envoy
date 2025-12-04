@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.network.dns_resolver.cares]
 
 // Configuration for c-ares DNS resolver.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message CaresDnsResolverConfig {
   // A list of DNS resolver addresses.
   // :ref:`use_resolvers_as_fallback <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.use_resolvers_as_fallback>`
@@ -99,4 +99,18 @@ message CaresDnsResolverConfig {
   //
   // If not specified, no periodic refresh will be performed.
   google.protobuf.Duration max_udp_channel_duration = 10 [(validate.rules).duration = {gte {}}];
+
+  // If true, reinitialize the c-ares channel when a DNS query fails with ``ARES_ETIMEOUT``.
+  //
+  // This can help recover from rare cases where the UDP sockets held by the c-ares
+  // channel become unusable after timeouts, causing subsequent queries to fail or
+  // Envoy to keep serving stale DNS results. When enabled, a timeout-triggered
+  // reinitialization attempts to restore healthy state quickly. In environments
+  // where timeouts are caused by intermittent network issues, enabling this may
+  // increase channel churn; consider using
+  // :ref:`max_udp_channel_duration <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
+  // for periodic refresh instead.
+  //
+  // Default is false.
+  bool reinit_channel_on_timeout = 11;
 }

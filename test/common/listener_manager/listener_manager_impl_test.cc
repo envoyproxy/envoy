@@ -8237,7 +8237,8 @@ address:
           .udpListenerConfig()
           ->packetWriterFactory()
           .createUdpPacketWriter(listen_socket->ioHandle(),
-                                 manager_->listeners()[0].get().listenerScope());
+                                 manager_->listeners()[0].get().listenerScope(),
+                                 server_.dispatcher_, []() {});
   EXPECT_FALSE(udp_packet_writer->isBatchMode());
 }
 
@@ -8430,6 +8431,9 @@ public:
     return nullptr;
   }
   absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
+    return nullptr;
+  }
   const sockaddr* sockAddr() const override { return ipv4_instance_->sockAddr(); }
   socklen_t sockAddrLen() const override { return ipv4_instance_->sockAddrLen(); }
   absl::string_view addressType() const override { return "test_custom"; }
@@ -8463,6 +8467,9 @@ public:
     return nullptr;
   }
   absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
+    return nullptr;
+  }
   const sockaddr* sockAddr() const override { return ipv4_instance_->sockAddr(); }
   socklen_t sockAddrLen() const override { return ipv4_instance_->sockAddrLen(); }
   absl::string_view addressType() const override { return "test_default"; }
@@ -8544,6 +8551,8 @@ TEST_P(ListenerManagerImplTest, CustomSocketInterfaceFailureIsHandledGracefully)
   // Create a failing custom socket interface
   class FailingCustomSocketInterface : public TestCustomSocketInterface {
   public:
+    // Don't hide the other overload.
+    using TestCustomSocketInterface::socket;
     Network::IoHandlePtr socket(Network::Socket::Type socket_type,
                                 const Network::Address::InstanceConstSharedPtr addr,
                                 const Network::SocketCreationOptions& options) const override {

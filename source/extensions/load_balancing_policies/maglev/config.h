@@ -12,7 +12,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Maglev {
 
 using MaglevLbProto = envoy::extensions::load_balancing_policies::maglev::v3::Maglev;
@@ -49,6 +49,6 @@ public:
 };
 
 } // namespace Maglev
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

@@ -48,6 +48,8 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
     return lhs == value;
   case envoy::config::accesslog::v3::ComparisonFilter::LE:
     return lhs <= value;
+  case envoy::config::accesslog::v3::ComparisonFilter::NE:
+    return lhs != value;
   }
   IS_ENVOY_BUG("unexpected comparison op enum");
   return false;
@@ -99,13 +101,13 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
   return nullptr;
 }
 
-bool TraceableRequestFilter::evaluate(const Formatter::HttpFormatterContext&,
+bool TraceableRequestFilter::evaluate(const Formatter::Context&,
                                       const StreamInfo::StreamInfo& info) const {
   const Tracing::Decision decision = Tracing::TracerUtility::shouldTraceRequest(info);
   return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
-bool StatusCodeFilter::evaluate(const Formatter::HttpFormatterContext&,
+bool StatusCodeFilter::evaluate(const Formatter::Context&,
                                 const StreamInfo::StreamInfo& info) const {
   if (!info.responseCode()) {
     return compareAgainstValue(0ULL);
@@ -114,8 +116,7 @@ bool StatusCodeFilter::evaluate(const Formatter::HttpFormatterContext&,
   return compareAgainstValue(info.responseCode().value());
 }
 
-bool DurationFilter::evaluate(const Formatter::HttpFormatterContext&,
-                              const StreamInfo::StreamInfo& info) const {
+bool DurationFilter::evaluate(const Formatter::Context&, const StreamInfo::StreamInfo& info) const {
   absl::optional<std::chrono::nanoseconds> duration = info.currentDuration();
   if (!duration.has_value()) {
     return false;
@@ -131,7 +132,7 @@ RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& 
       percent_(config.percent_sampled()),
       use_independent_randomness_(config.use_independent_randomness()) {}
 
-bool RuntimeFilter::evaluate(const Formatter::HttpFormatterContext&,
+bool RuntimeFilter::evaluate(const Formatter::Context&,
                              const StreamInfo::StreamInfo& stream_info) const {
   // This code is verbose to avoid preallocating a random number that is not needed.
   uint64_t random_value;
@@ -174,7 +175,7 @@ AndFilter::AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
                      Server::Configuration::GenericFactoryContext& context)
     : OperatorFilter(config.filters(), context) {}
 
-bool OrFilter::evaluate(const Formatter::HttpFormatterContext& context,
+bool OrFilter::evaluate(const Formatter::Context& context,
                         const StreamInfo::StreamInfo& info) const {
   bool result = false;
   for (auto& filter : filters_) {
@@ -188,7 +189,7 @@ bool OrFilter::evaluate(const Formatter::HttpFormatterContext& context,
   return result;
 }
 
-bool AndFilter::evaluate(const Formatter::HttpFormatterContext& context,
+bool AndFilter::evaluate(const Formatter::Context& context,
                          const StreamInfo::StreamInfo& info) const {
   bool result = true;
   for (auto& filter : filters_) {
@@ -202,7 +203,7 @@ bool AndFilter::evaluate(const Formatter::HttpFormatterContext& context,
   return result;
 }
 
-bool NotHealthCheckFilter::evaluate(const Formatter::HttpFormatterContext&,
+bool NotHealthCheckFilter::evaluate(const Formatter::Context&,
                                     const StreamInfo::StreamInfo& info) const {
   return !info.healthCheck();
 }
@@ -211,9 +212,10 @@ HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& con
                            Server::Configuration::CommonFactoryContext& context)
     : header_data_(Http::HeaderUtility::createHeaderData(config.header(), context)) {}
 
-bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
+bool HeaderFilter::evaluate(const Formatter::Context& context,
                             const StreamInfo::StreamInfo&) const {
-  return header_data_->matchesHeaders(context.requestHeaders());
+  return header_data_->matchesHeaders(
+      context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers));
 }
 
 ResponseFlagFilter::ResponseFlagFilter(
@@ -235,7 +237,7 @@ ResponseFlagFilter::ResponseFlagFilter(
   }
 }
 
-bool ResponseFlagFilter::evaluate(const Formatter::HttpFormatterContext&,
+bool ResponseFlagFilter::evaluate(const Formatter::Context&,
                                   const StreamInfo::StreamInfo& info) const {
   if (!configured_flags_.empty()) {
     for (const auto flag : info.responseFlags()) {
@@ -257,12 +259,13 @@ GrpcStatusFilter::GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatu
   exclude_ = config.exclude();
 }
 
-bool GrpcStatusFilter::evaluate(const Formatter::HttpFormatterContext& context,
+bool GrpcStatusFilter::evaluate(const Formatter::Context& context,
                                 const StreamInfo::StreamInfo& info) const {
 
   Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
-  const auto& optional_status =
-      Grpc::Common::getGrpcStatus(context.responseTrailers(), context.responseHeaders(), info);
+  const auto optional_status = Grpc::Common::getGrpcStatus(
+      context.responseTrailers().value_or(*Http::StaticEmptyHeaders::get().response_trailers),
+      context.responseHeaders().value_or(*Http::StaticEmptyHeaders::get().response_headers), info);
   if (optional_status.has_value()) {
     status = optional_status.value();
   }
@@ -284,7 +287,7 @@ LogTypeFilter::LogTypeFilter(const envoy::config::accesslog::v3::LogTypeFilter& 
   exclude_ = config.exclude();
 }
 
-bool LogTypeFilter::evaluate(const Formatter::HttpFormatterContext& context,
+bool LogTypeFilter::evaluate(const Formatter::Context& context,
                              const StreamInfo::StreamInfo&) const {
   const bool found = types_.contains(context.accessLogType());
   return exclude_ ? !found : found;
@@ -309,8 +312,7 @@ MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilte
   }
 }
 
-bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
-                              const StreamInfo::StreamInfo& info) const {
+bool MetadataFilter::evaluate(const Formatter::Context&, const StreamInfo::StreamInfo& info) const {
   const auto& value =
       Envoy::Config::Metadata::metadataValue(&info.dynamicMetadata(), filter_, path_);
   // If the key corresponds to a set value in dynamic metadata, return true if the value matches the

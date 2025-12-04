@@ -973,6 +973,10 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
 }
 
 void EdfLoadBalancerBase::refresh(uint32_t priority) {
+  // Ensure that priority is within hostSetsPerPriority.
+  if (priority >= priority_set_.hostSetsPerPriority().size()) {
+    return;
+  }
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
     // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};

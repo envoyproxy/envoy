@@ -46,15 +46,32 @@ fn test_header_callbacks_filter_on_request_headers() {
     .once();
 
   envoy_filter
+    .expect_get_request_header_value()
+    .withf(|name| name == "new")
+    .returning(|_| Some(EnvoyBuffer::new("value")))
+    .once();
+
+  envoy_filter
     .expect_remove_request_header()
     .withf(|name| name == "to-be-deleted")
     .return_const(true)
     .once();
 
   envoy_filter
-    .expect_get_request_header_value()
-    .withf(|name| name == "new")
-    .returning(|_| Some(EnvoyBuffer::new("value")))
+    .expect_add_request_header()
+    .withf(|name, value| name == "multi" && value == b"value3")
+    .return_const(true)
+    .once();
+
+  envoy_filter
+    .expect_get_request_header_values()
+    .withf(|name| name == "multi")
+    .returning(|_| {
+      let value1 = EnvoyBuffer::new("value1");
+      let value2 = EnvoyBuffer::new("value2");
+      let value3 = EnvoyBuffer::new("value3");
+      vec![value1, value2, value3]
+    })
     .once();
 
   envoy_filter
@@ -64,7 +81,8 @@ fn test_header_callbacks_filter_on_request_headers() {
       let multi1 = (EnvoyBuffer::new("multi"), EnvoyBuffer::new("value1"));
       let multi2 = (EnvoyBuffer::new("multi"), EnvoyBuffer::new("value2"));
       let new = (EnvoyBuffer::new("new"), EnvoyBuffer::new("value"));
-      vec![single, multi1, multi2, new]
+      let multi3 = (EnvoyBuffer::new("multi"), EnvoyBuffer::new("value3"));
+      vec![single, multi1, multi2, new, multi3]
     })
     .once();
 
@@ -93,7 +111,7 @@ fn test_send_response_filter() {
 
   envoy_filter
     .expect_send_response()
-    .withf(|status_code, headers, body| {
+    .withf(|status_code, headers, body, details| {
       *status_code == 200
         && *headers
           == vec![
@@ -101,6 +119,7 @@ fn test_send_response_filter() {
             ("header2", "value2".as_bytes()),
           ]
         && *body == Some(b"Hello, World!")
+        && details.is_none()
     })
     .once()
     .return_const(());
@@ -117,7 +136,7 @@ fn test_body_callbacks_filter_on_bodies() {
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   envoy_filter
-    .expect_get_request_body()
+    .expect_get_received_request_body()
     .returning(|| {
       static mut BUF: [[u8; 4]; 3] = [*b"nice", *b"nice", *b"nice"];
       Some(vec![
@@ -128,18 +147,44 @@ fn test_body_callbacks_filter_on_bodies() {
     })
     .times(2);
   envoy_filter
-    .expect_drain_request_body()
+    .expect_get_buffered_request_body()
+    .returning(|| {
+      static mut BUF: [[u8; 4]; 3] = [*b"nice", *b"nice", *b"nice"];
+      Some(vec![
+        EnvoyMutBuffer::new(unsafe { &mut BUF[0] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF[1] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF[2] }),
+      ])
+    })
+    .times(2);
+
+  envoy_filter
+    .expect_drain_received_request_body()
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_drain_buffered_request_body()
     .return_const(true)
     .once();
 
   envoy_filter
-    .expect_append_request_body()
+    .expect_append_received_request_body()
     .return_const(true)
     .times(2);
+  envoy_filter
+    .expect_append_buffered_request_body()
+    .return_const(true)
+    .times(2);
+
   f.on_request_body(&mut envoy_filter, true);
 
+  assert_eq!(
+    std::str::from_utf8(&f.get_final_read_request_body()).unwrap(),
+    "nicenicenicenicenicenice"
+  );
+
   envoy_filter
-    .expect_get_response_body()
+    .expect_get_received_response_body()
     .returning(|| {
       static mut BUF2: [[u8; 4]; 3] = [*b"cool", *b"cool", *b"cool"];
       Some(vec![
@@ -150,13 +195,39 @@ fn test_body_callbacks_filter_on_bodies() {
     })
     .times(2);
   envoy_filter
-    .expect_drain_response_body()
+    .expect_get_buffered_response_body()
+    .returning(|| {
+      static mut BUF2: [[u8; 4]; 3] = [*b"cool", *b"cool", *b"cool"];
+      Some(vec![
+        EnvoyMutBuffer::new(unsafe { &mut BUF2[0] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF2[1] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF2[2] }),
+      ])
+    })
+    .times(2);
+
+  envoy_filter
+    .expect_drain_received_response_body()
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_drain_buffered_response_body()
     .return_const(true)
     .once();
 
   envoy_filter
-    .expect_append_response_body()
+    .expect_append_received_response_body()
     .return_const(true)
     .times(2);
+  envoy_filter
+    .expect_append_buffered_response_body()
+    .return_const(true)
+    .times(2);
+
   f.on_response_body(&mut envoy_filter, true);
+
+  assert_eq!(
+    std::str::from_utf8(&f.get_final_read_response_body()).unwrap(),
+    "coolcoolcoolcoolcoolcool"
+  );
 }

@@ -54,7 +54,6 @@ The following statistics are supported:
   clear_route_cache_ignored, Counter, The number of clear cache request that were ignored
   clear_route_cache_disabled, Counter, The number of clear cache requests that were rejected from being disabled
   clear_route_cache_upstream_ignored, Counter, The number of clear cache request that were ignored if the filter is in upstream
-  send_immediate_resp_upstream_ignored, Counter, The number of send immediate response messages that were ignored if the filter is in upstream
 
 Access Log Fields
 ------------------

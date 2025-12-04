@@ -10,7 +10,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace RoundRobin {
 namespace {
 
@@ -46,6 +46,6 @@ TEST(RoundRobinConfigTest, ValidateFail) {
 
 } // namespace
 } // namespace RoundRobin
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

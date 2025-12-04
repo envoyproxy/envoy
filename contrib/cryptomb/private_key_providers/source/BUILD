@@ -18,13 +18,14 @@ envoy_cmake(
     name = "ipp-crypto",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
         "BORINGSSL": "on",
         "DYNAMIC_LIB": "off",
         "MB_STANDALONE": "on",
+        "Python_EXECUTABLE": "$$EXT_BUILD_ROOT/$(PYTHON3)",
+        "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto_internal.a",
     },
     defines = [
         "OPENSSL_USE_STATIC_LIBS=TRUE",
@@ -43,6 +44,7 @@ envoy_cmake(
     out_static_libs = ["libcrypto_mb.a"],
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    toolchains = ["@rules_python//python:current_py_toolchain"],
     visibility = ["//visibility:private"],
     working_directory = "sources/ippcp/crypto_mb",
     # Use boringssl alias to select fips vs non-fips version.

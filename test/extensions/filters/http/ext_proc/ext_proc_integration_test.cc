@@ -445,15 +445,16 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersServerHalfClosesFirst) {
         mut1->mutable_header()->set_raw_value("new");
         return true;
       });
-  // ext_proc is configured to only send request headers. In this case, server indicates that it is
-  // not expecting any more messages from ext_proc filter and half-closes the stream.
-  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
-  // ext_proc will immediately close side stream in this case, because by default Envoy gRPC client
-  // will reset the stream if the server half-closes before the client. Note that the ext_proc
-  // filter has not yet half-closed the sidestream, since it is doing it during its destruction.
-  // This is expected behavior for gRPC protocol.
-  EXPECT_TRUE(processor_stream_->waitForReset());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+    // Envoy closes the side stream in this case.
+    EXPECT_TRUE(processor_stream_->waitForReset());
+  }
+
+  // ext_proc server indicates that it is not expecting any more messages
+  // from ext_proc filter and half-closes the stream.
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -501,6 +502,55 @@ TEST_P(ExtProcIntegrationTest, ServerHalfClosesAfterHeaders) {
 
   handleUpstreamRequest();
   EXPECT_EQ(upstream_request_->bodyLength(), 10);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ServerHalfClosesDuringBodyStream) {
+  // Configure ext_proc to send both headers and body
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_failure_mode_allow(true);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [](const HttpHeaders& headers, HeadersResponse&) {
+                                 EXPECT_FALSE(headers.end_of_stream());
+                                 return true;
+                               });
+
+  // Client sends 7 chunks.
+  for (int i = 0; i < 7; ++i) {
+    if (i == 6) {
+      codec_client_->sendData(*request_encoder_, 1, true);
+    } else {
+      codec_client_->sendData(*request_encoder_, 1, false);
+    }
+    if (i < 4) {
+      processRequestBodyMessage(*grpc_upstreams_[0], false,
+                                [](const HttpBody& body, BodyResponse&) {
+                                  EXPECT_FALSE(body.end_of_stream());
+                                  return true;
+                                });
+    }
+  }
+
+  processor_stream_->finishGrpcStream(Grpc::Status::Internal);
+
+  // Even if the gRPC server half-closed, processing of the main request still continues.
+  // Verify that data made it to upstream.
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->bodyLength(), 7);
   verifyDownstreamResponse(*response, 200);
 }
 
@@ -1575,6 +1625,153 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_THAT(response->headers(), ContainsHeader("x-failure-reason", "testing"));
   EXPECT_THAT(response->headers(), ContainsHeader("content-type", "application/json"));
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+// Same as ExtProcIntegrationTest but with the helper function to configure ext_proc
+// as an upstream filter shared in this integration test file.
+class ExtProcIntegrationTestUpstream : public ExtProcIntegrationTest {
+public:
+  void initializeConfig() {
+    ExtProcIntegrationTest::initializeConfig(
+        ConfigOptions{.filter_setup = ConfigOptions::FilterSetup::kNone});
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* static_resources = bootstrap.mutable_static_resources();
+      // Retrieve cluster_0.
+      auto* cluster = static_resources->mutable_clusters(0);
+      ConfigHelper::HttpProtocolOptions old_protocol_options;
+      if (cluster->typed_extension_protocol_options().contains(
+              "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+        old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+            (*cluster->mutable_typed_extension_protocol_options())
+                ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+      }
+      if (old_protocol_options.http_filters().empty()) {
+        auto* http_filter = old_protocol_options.add_http_filters();
+        http_filter->set_name("envoy.filters.http.upstream_codec");
+        http_filter->mutable_typed_config()->PackFrom(
+            envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::
+                default_instance());
+      }
+      auto* ext_proc_filter = old_protocol_options.add_http_filters();
+      ext_proc_filter->set_name("envoy.filters.http.ext_proc");
+      ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
+      for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
+        old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
+      }
+      (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(old_protocol_options);
+    });
+  }
+
+  void testRouterRetryWithExtProcUpstream(bool send_body) {
+    proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+    proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+    // Add retry policy to the HCM route config.
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* route = hcm.mutable_route_config()
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_route();
+          route->mutable_timeout()->set_seconds(60);
+          auto* retry_policy = route->mutable_retry_policy();
+          retry_policy->set_retry_on("5xx,connect-failure,refused-stream");
+          retry_policy->mutable_num_retries()->set_value(5);
+          retry_policy->mutable_per_try_timeout()->set_seconds(30);
+          retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_seconds(1);
+        });
+    initializeConfig();
+    HttpIntegrationTest::initialize();
+
+    auto response = sendDownstreamRequest(absl::nullopt);
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    // Upstream returns a 503 response, which should trigger a retry.
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+    if (send_body) {
+      upstream_request_->encodeData(100, true);
+    } else {
+      upstream_request_->encodeTrailers(
+          Http::TestResponseTrailerMapImpl{{"x-test-trailers", "Yes"}});
+    }
+    EXPECT_TRUE(upstream_request_->complete());
+    processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+    // Upstream receives a retry request and returns a 200 response, which should not trigger a
+    // retry.
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(100, true);
+    EXPECT_TRUE(upstream_request_->complete());
+
+    ProcessingRequest request;
+    ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+    processor_stream_->startGrpcStream();
+    ProcessingResponse resp;
+    resp.mutable_response_headers();
+    processor_stream_->sendGrpcMessage(resp);
+
+    verifyDownstreamResponse(*response, 200);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTestUpstream,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// This is almost the same as GetAndRespondImmediately but the filter is
+// configured as an upstream filter.
+TEST_P(ExtProcIntegrationTestUpstream, GetAndRespondImmediately_Upstream) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest([](Http::RequestHeaderMap& headers) {
+    // We want to ensure that the immediate response from an upstream ext_proc filter won't trigger
+    // a retry, which is a requirement of the upstream filter implementations.
+    //
+    // Setting this header normally triggers a retry on 5xx from the upstream servers.
+    // If the immediate response from an upstream ext_proc filter triggers a retry, the test will
+    // fail.
+    headers.addCopy(Http::LowerCaseString("x-envoy-retry-on"), "5xx");
+  });
+
+  bool called = false;
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [&called](ImmediateResponse& immediate) {
+    // Ensure that this lambda is called only once, meaning retry is not attempted.
+    EXPECT_FALSE(called);
+    called = true;
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
+    immediate.set_body("{\"reason\": \"Internal Server Error\"}");
+    immediate.set_details("Failed because of Internal Server Error");
+    auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_append()->set_value(false);
+    hdr1->mutable_header()->set_key("x-failure-reason");
+    hdr1->mutable_header()->set_raw_value("testing");
+    auto* hdr2 = immediate.mutable_headers()->add_set_headers();
+    hdr2->mutable_append()->set_value(false);
+    hdr2->mutable_header()->set_key("content-type");
+    hdr2->mutable_header()->set_raw_value("application/json");
+  });
+
+  // ext_proc will immediately close side stream in this case, which causes it to be reset,
+  // since side stream codec had not yet observed server trailers.
+  EXPECT_TRUE(processor_stream_->waitForReset());
+
+  verifyDownstreamResponse(*response, 500);
+  EXPECT_THAT(response->headers(), ContainsHeader("x-failure-reason", "testing"));
+  EXPECT_THAT(response->headers(), ContainsHeader("content-type", "application/json"));
+  EXPECT_EQ("{\"reason\": \"Internal Server Error\"}", response->body());
+}
+
+TEST_P(ExtProcIntegrationTestUpstream, RouterRetrySendBody) {
+  testRouterRetryWithExtProcUpstream(/*send_body*/ true);
+}
+
+TEST_P(ExtProcIntegrationTestUpstream, RouterRetrySendTrailers) {
+  testRouterRetryWithExtProcUpstream(/*send_body*/ false);
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulClose) {
@@ -3557,6 +3754,60 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, SendClusterMetadata) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  auto* md_opts = proto_config_.mutable_metadata_options();
+  md_opts->mutable_cluster_metadata_forwarding_namespaces()->add_untyped("cluster_ns_untyped");
+  md_opts->mutable_cluster_metadata_forwarding_namespaces()->add_typed("cluster_ns_typed");
+
+  ConfigOptions config_option = {};
+  config_option.add_metadata = true;
+  initializeConfig(config_option);
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add some metadata to cluster_0
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* metadata = cluster->mutable_metadata();
+    Protobuf::Struct struct_val;
+    (*struct_val.mutable_fields())["some_string"].set_string_value("some_value");
+    (*metadata->mutable_filter_metadata())["cluster_ns_untyped"] = struct_val;
+
+    Protobuf::Any any_val;
+    any_val.PackFrom(struct_val);
+    (*metadata->mutable_typed_filter_metadata())["cluster_ns_typed"] = any_val;
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  EXPECT_TRUE(request_headers_msg.has_metadata_context());
+  const auto& received_metadata = request_headers_msg.metadata_context();
+
+  const auto& filter_metadata = received_metadata.filter_metadata();
+  EXPECT_EQ(filter_metadata.at("cluster_ns_untyped").fields().at("some_string").string_value(),
+            "some_value");
+
+  const auto& typed_filter_metadata = received_metadata.typed_filter_metadata();
+  EXPECT_TRUE(typed_filter_metadata.contains("cluster_ns_typed"));
+
+  processor_stream_->startGrpcStream();
+  ProcessingResponse resp1;
+  resp1.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp1);
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  handleUpstreamRequest();
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  verifyDownstreamResponse(*response, 200);
+}
+
 #if defined(USE_CEL_PARSER)
 TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
@@ -3637,6 +3888,54 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
                           EXPECT_TRUE(req.attributes().empty());
                           return true;
                         });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, RequestAttributesInResponseOnlyProcessing) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_response_attributes()->Add("request.path");
+  proto_config_.mutable_response_attributes()->Add("request.method");
+  proto_config_.mutable_response_attributes()->Add("request.scheme");
+  proto_config_.mutable_response_attributes()->Add("request.size");
+
+  initializeConfig(
+      ConfigOptions{// Causes filter to only be invoked in response path
+                    .filter_setup = ConfigOptions::FilterSetup::kCompositeMatchOnResponseHeaders});
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  // No request headers message expected, since composite filter doesn't match
+  // until response headers are seen.
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"match-header", "match"}},
+      /*end_stream=*/false);
+  upstream_request_->encodeData("body", /*end_stream=*/true);
+
+  // Handle response headers message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Add something to the response so the message isn't seen as spurious
+        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
+        *(resp.mutable_response_headers()) = headers_resp;
+
+        EXPECT_TRUE(req.has_response_headers());
+        EXPECT_EQ(req.attributes().size(), 1);
+        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
+        EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
+        EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
+        EXPECT_EQ(proto_struct.fields().at("request.size").number_value(), 0);
+
+        // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
+        EXPECT_TRUE(req.response_headers().attributes().empty());
+        return true;
+      });
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -3750,39 +4049,8 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilderOverrides) {
 }
 #endif
 
-TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
-  ConfigOptions config_option = {};
-  config_option.downstream_filter = false;
-
-  initializeConfig(config_option);
-  // Add ext_proc as upstream filter.
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    // Retrieve cluster_0.
-    auto* cluster = static_resources->mutable_clusters(0);
-    ConfigHelper::HttpProtocolOptions old_protocol_options;
-    if (cluster->typed_extension_protocol_options().contains(
-            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
-      old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
-          (*cluster->mutable_typed_extension_protocol_options())
-              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    }
-    if (old_protocol_options.http_filters().empty()) {
-      auto* upstream_codec = old_protocol_options.add_http_filters();
-      upstream_codec->set_name("envoy.filters.http.upstream_codec");
-      upstream_codec->mutable_typed_config()->PackFrom(
-          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
-    }
-    auto* ext_proc_filter = old_protocol_options.add_http_filters();
-    ext_proc_filter->set_name("envoy.filters.http.ext_proc");
-    ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
-    for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
-      old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
-    }
-    (*cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(old_protocol_options);
-  });
+TEST_P(ExtProcIntegrationTestUpstream, GetAndSetHeadersUpstream) {
+  initializeConfig();
   HttpIntegrationTest::initialize();
 
   auto response = sendDownstreamRequest(
@@ -3951,6 +4219,143 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
                 ->value()
                 .getStringView(),
             "bluh");
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test that retry stats are correctly incremented when retries occur.
+TEST_P(ExtProcIntegrationTest, RetryStatsVerification) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Retry is only supported for Envoy gRPC";
+  }
+  // Set envoy filter timeout to 5s to rule out noise.
+  proto_config_.mutable_message_timeout()->set_seconds(5);
+  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+
+  envoy::config::core::v3::RetryPolicy* retry_policy =
+      proto_config_.mutable_grpc_service()->mutable_retry_policy();
+  retry_policy->mutable_num_retries()->set_value(2);
+  retry_policy->set_retry_on(
+      "resource-exhausted,unavailable"); // resource-exhausted: 8, unavailable: 14
+  retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_seconds(0);
+  retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_nanos(10000000); // 10ms
+  retry_policy->mutable_retry_back_off()->mutable_max_interval()->set_seconds(0);
+  retry_policy->mutable_retry_back_off()->mutable_max_interval()->set_nanos(100000000); // 100ms
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+
+  // First failure - resource-exhausted.
+  processor_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "8"}}, true);
+  ASSERT_TRUE(processor_stream_->waitForReset());
+
+  // Retry happens in a new stream.
+  ProcessingRequest request_headers_msg2;
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg2));
+  EXPECT_TRUE(TestUtility::protoEqual(request_headers_msg2, request_headers_msg));
+
+  // Second failure - unavailable.
+  processor_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "14"}}, true);
+  ASSERT_TRUE(processor_stream_->waitForReset());
+
+  // Second retry happens in a new stream.
+  ProcessingRequest request_headers_msg3;
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg3));
+  EXPECT_TRUE(TestUtility::protoEqual(request_headers_msg3, request_headers_msg));
+
+  // Third attempt succeeds.
+  processor_stream_->startGrpcStream(false);
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ProcessingResponse processing_response;
+  auto* headers_response = processing_response.mutable_request_headers()->mutable_response();
+  auto* add_header = headers_response->mutable_header_mutation()->add_set_headers();
+  add_header->mutable_header()->set_key("x-retry-test");
+  add_header->mutable_header()->set_raw_value("success");
+  processor_stream_->sendGrpcMessage(processing_response);
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers()
+                .get(Envoy::Http::LowerCaseString("x-retry-test"))[0]
+                ->value()
+                .getStringView(),
+            "success");
+
+  // Verify retry stats are incremented correctly.
+  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_retry", 2);
+  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_total", 3);
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test that gRPC retry works for deadline-exceeded status.
+TEST_P(ExtProcIntegrationTest, RetryOnDeadlineExceeded) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Retry is only supported for Envoy gRPC";
+  }
+  // Set envoy filter timeout to 5s to rule out noise.
+  proto_config_.mutable_message_timeout()->set_seconds(5);
+  proto_config_.mutable_max_message_timeout()->set_seconds(10);
+
+  envoy::config::core::v3::RetryPolicy* retry_policy =
+      proto_config_.mutable_grpc_service()->mutable_retry_policy();
+  retry_policy->mutable_num_retries()->set_value(1);
+  // Configure to retry on deadline-exceeded (gRPC status 4).
+  retry_policy->set_retry_on("deadline-exceeded");
+  retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_seconds(0);
+  retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_nanos(10000000); // 10ms
+  retry_policy->mutable_retry_back_off()->mutable_max_interval()->set_seconds(0);
+  retry_policy->mutable_retry_back_off()->mutable_max_interval()->set_nanos(100000000); // 100ms
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+
+  // First attempt, deadline-exceeded.
+  processor_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "4"}}, true);
+  ASSERT_TRUE(processor_stream_->waitForReset());
+
+  // Retry happens in a new stream.
+  ProcessingRequest request_headers_msg2;
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg2));
+  EXPECT_TRUE(TestUtility::protoEqual(request_headers_msg2, request_headers_msg));
+
+  // Second attempt succeeds.
+  processor_stream_->startGrpcStream(false);
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ProcessingResponse processing_response;
+  auto* headers_response = processing_response.mutable_request_headers()->mutable_response();
+  auto* add_header = headers_response->mutable_header_mutation()->add_set_headers();
+  add_header->mutable_header()->set_key("x-deadline-retry");
+  add_header->mutable_header()->set_raw_value("passed");
+  processor_stream_->sendGrpcMessage(processing_response);
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers()
+                .get(Envoy::Http::LowerCaseString("x-deadline-retry"))[0]
+                ->value()
+                .getStringView(),
+            "passed");
+
+  // Verify retry stats are incremented.
+  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_retry", 1);
+  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_total", 2);
+
   verifyDownstreamResponse(*response, 200);
 }
 
@@ -4633,6 +5038,68 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
   auto field_request_header_status = json_log->getString("field_request_header_call_status");
   // Should be 4:DEADLINE_EXCEEDED instead of 10:ABORTED
   EXPECT_EQ(*field_request_header_status, "4");
+}
+
+// Test when ext_proc filter is nested inside a composite filter, the access_log filter
+// uses the composite filter name to retrieve the ext_proc filter state values.
+TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
+  std::string tunnel_access_log_path_;
+  initializeConfig(
+      ConfigOptions{// Use composite/ext_proc filter configuration.
+                    .filter_setup = ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders});
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* access_log = hcm.add_access_log();
+        access_log->set_name("envoy.access_loggers.file");
+        envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+        tunnel_access_log_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+        access_log_config.set_path(tunnel_access_log_path_);
+        // "composite" is the composite filter name.
+        access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+            "%FILTER_STATE(composite:TYPED)%\n");
+        access_log->mutable_typed_config()->PackFrom(access_log_config);
+      });
+  HttpIntegrationTest::initialize();
+  // Adding the match-header so the HTTP request hits the ext_proc filter path.
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("match-header"), "match"); });
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{
+            {":scheme", "http"}, {":method", "GET"},        {"host", "host"},
+            {":path", "/"},      {"match-header", "match"}, {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        response_header_mutation->add_remove_headers("match-header");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader("match-header", _)));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+
+  const std::string log_content = waitForAccessLog(tunnel_access_log_path_);
+  EXPECT_FALSE(log_content.empty());
+  EXPECT_THAT(log_content, testing::HasSubstr("request_header_call_status"));
+  EXPECT_THAT(log_content, testing::HasSubstr("request_header_latency_us"));
+  EXPECT_THAT(log_content, testing::HasSubstr("response_header_call_status"));
+  EXPECT_THAT(log_content, testing::HasSubstr("response_header_latency_us"));
 }
 
 } // namespace ExternalProcessing

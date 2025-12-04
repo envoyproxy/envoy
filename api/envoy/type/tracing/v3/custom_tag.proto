@@ -17,7 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Custom Tag]
 
 // Describes custom tags for the active span.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message CustomTag {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.tracing.v2.CustomTag";
 
@@ -98,5 +98,12 @@ message CustomTag {
 
     // A custom tag to obtain tag value from the metadata.
     Metadata metadata = 5;
+
+    // Custom tag value.
+    //
+    // The same :ref:`format specifier <config_access_log_format>` as used for
+    // :ref:`HTTP access logging <config_access_log>` applies here, however
+    // unknown specifier values are replaced with the empty string instead of ``-``.
+    string value = 6;
   }
 }

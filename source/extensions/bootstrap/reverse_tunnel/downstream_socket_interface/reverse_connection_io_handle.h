@@ -409,7 +409,7 @@ private:
   int trigger_pipe_read_fd_{-1};
   int trigger_pipe_write_fd_{-1};
 
-  // Connection management : We store the established connections in a queue
+  // Connection management : We store the established connections in a queue.
   // and pop the last established connection when data is read on trigger_pipe_read_fd_
   // to determine the connection that got established last.
   std::queue<Envoy::Network::ClientConnectionPtr> established_connections_;

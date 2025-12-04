@@ -52,12 +52,13 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
   envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
 
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
   // Handle the global client's creation by expecting the underlying async grpc
   // client creation. getOrThrow fails otherwise.
   auto mock_stream_client = std::make_unique<RateLimitTestClient>();
   mock_stream_client->expectClientCreationWithFactory();
+
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
 
   RateLimitQuotaFilterFactory factory;
   std::string stats_prefix = "test";

@@ -1,0 +1,36 @@
+diff --git a/src/Makefile b/src/Makefile
+index 8f89701a..65439c2f 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -44,6 +44,22 @@ else
+ endif
+ LINK_FLAGS+=$(LDFLAGS)
+ 
++AR ?= ar
++RANLIB ?= ranlib
++
++ifdef EXT_BUILD_ROOT
++    ifneq ($(findstring /,$(AR)),)
++        ifeq ($(filter /%,$(AR)),)
++            AR := $(EXT_BUILD_ROOT)/$(AR)
++        endif
++    endif
++    ifneq ($(findstring /,$(RANLIB)),)
++        ifeq ($(filter /%,$(RANLIB)),)
++            RANLIB := $(EXT_BUILD_ROOT)/$(RANLIB)
++        endif
++    endif
++endif
++
+ all: $(all_targets)
+ 
+ liburing_srcs := setup.c queue.c register.c syscall.c version.c
+@@ -78,8 +94,6 @@ liburing_ffi_sobjs := ffi.os
+ -include $(liburing_objs:%=%.d)
+ -include $(liburing_sobjs:%=%.d)
+ 
+-AR ?= ar
+-RANLIB ?= ranlib
+ liburing.a: $(liburing_objs)
+ 	@rm -f liburing.a
+ 	$(QUIET_AR)$(AR) r liburing.a $^

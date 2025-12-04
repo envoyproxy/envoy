@@ -356,6 +356,37 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestIdStoredInDynamicMetadataWhenEnabl
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
+TEST_P(HttpUpstreamRequestEncoderTest, RequestIdHeaderOverrideAndMetadataKeyOverride) {
+  envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
+  envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
+  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  auto* tunneling = this->tcp_proxy_.mutable_tunneling_config();
+  *tunneling->mutable_request_id_extension() = reqid_ext;
+  tunneling->set_request_id_header("x-rid");
+  tunneling->set_request_id_metadata_key("rid");
+  this->setupUpstream();
+
+  EXPECT_CALL(this->encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+        // The default x-request-id should be removed if a custom header is configured.
+        EXPECT_EQ(nullptr, headers.RequestId());
+        const auto custom = headers.get(Http::LowerCaseString("x-rid"));
+        EXPECT_EQ(1, custom.size());
+        EXPECT_FALSE(custom[0]->value().empty());
+        return Http::okStatus();
+      }));
+
+  EXPECT_CALL(this->downstream_stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](absl::string_view ns, const Protobuf::Struct& st) {
+        EXPECT_EQ(ns, "envoy.filters.network.tcp_proxy");
+        const auto& fields = st.fields();
+        auto it = fields.find("rid");
+        EXPECT_TRUE(it != fields.end());
+      }));
+
+  this->upstream_->setRequestEncoder(this->encoder_, false);
+}
+
 TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderConnectWithCustomPath) {
   this->tcp_proxy_.mutable_tunneling_config()->set_use_post(false);
   this->tcp_proxy_.mutable_tunneling_config()->set_post_path("/test");

@@ -27,6 +27,7 @@ envoy_cc_library(
     hdrs = ["reverse_tunnel_filter.h"],
     deps = [
         "//envoy/buffer:buffer_interface",
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:codec_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
@@ -34,6 +35,8 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
+        "//source/common/formatter:substitution_format_string_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -51,7 +54,9 @@ envoy_cc_library(
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_includes",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
+        "//source/server:generic_factory_context_lib",
         "//source/server:null_overload_manager_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/reverse_tunnel/v3:pkg_cc_proto",
     ],
 )

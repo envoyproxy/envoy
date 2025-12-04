@@ -232,6 +232,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cgroup_cpu_util_lib",
+    srcs = ["cgroup_cpu_util.cc"],
+    hdrs = ["cgroup_cpu_util.h"],
+    deps = [
+        "//envoy/filesystem:filesystem_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/filesystem:filesystem_lib",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+    ],
+)
+
+envoy_cc_library(
     name = "options_base",
     srcs = ["options_impl_base.cc"] + select({
         "//bazel:linux_x86_64": ["options_impl_platform_linux.cc"],
@@ -253,6 +266,7 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
     deps = [
+        ":cgroup_cpu_util_lib",
         "//envoy/network:address_interface",
         "//envoy/registry",
         "//envoy/server:options_interface",
@@ -260,6 +274,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stats:tag_utility_lib",

@@ -338,6 +338,36 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EmptyMessageStreamedHttpBodyPost) {
   }
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, EmptyMessageStreamedGrpcPostShouldRespondBadRequest) {
+  HttpIntegrationTest::initialize();
+  // Can't use testTranscoding for this case because we want to send an empty data,
+  // as distinct from not sending data. The difference being
+  // decodeHeaders(end_stream=false), decodeData(emptyBuffer, end_stream=true)
+  // vs. decodeHeaders(end_stream=true)
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/bulk/shelves"},
+                                                 {":authority", "host"},
+                                                 {"content-type", "application/json"}};
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  IntegrationStreamDecoderPtr response;
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  request_encoder_ = &encoder_decoder.first;
+  response = std::move(encoder_decoder.second);
+  Buffer::OwnedImpl body; // Empty body.
+  codec_client_->sendData(*request_encoder_, body, true);
+  // We should get a response without making an upstream connection,
+  // for this case.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  // The response body currently contains the unhelpful message
+  // "Expected an array instead of an object", presumably from the
+  // json parser. We won't validate that here because it doesn't seem
+  // particularly desirable that that's the response body.
+  // A 400 Bad Request is a good thing to verify though.
+  EXPECT_THAT(response->headers(), ContainsHeader(":status", "400"));
+  codec_client_->close();
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(

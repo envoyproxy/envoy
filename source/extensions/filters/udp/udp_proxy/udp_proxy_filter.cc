@@ -90,6 +90,7 @@ Network::FilterStatus StickySessionUdpProxyFilter::onDataInternal(Network::UdpRe
     if (active_session == nullptr) {
       return Network::FilterStatus::StopIteration;
     }
+    data.addresses_ = active_session->addresses();
   } else {
     active_session = active_session_it->get();
     // We defer the socket creation when the session includes filters, so the filters can be
@@ -112,6 +113,10 @@ Network::FilterStatus StickySessionUdpProxyFilter::onDataInternal(Network::UdpRe
         ENVOY_LOG(debug, "upstream session unhealthy, recreating the session");
         removeSession(active_session);
         active_session = createSession(std::move(data.addresses_), host, false);
+        if (active_session == nullptr) {
+          return Network::FilterStatus::StopIteration;
+        }
+        data.addresses_ = active_session->addresses();
       } else {
         // In this case we could not get a better host, so just keep using the current session.
         ENVOY_LOG(trace, "upstream session unhealthy, but unable to get a better host");
@@ -149,6 +154,7 @@ PerPacketLoadBalancingUdpProxyFilter::onDataInternal(Network::UdpRecvData& data)
     if (active_session == nullptr) {
       return Network::FilterStatus::StopIteration;
     }
+    data.addresses_ = active_session->addresses();
   } else {
     active_session = active_session_it->get();
     ENVOY_LOG(trace, "found already existing session on host {}.",
@@ -366,7 +372,7 @@ void UdpProxyFilter::ActiveSession::onSessionComplete() {
 
   if (!filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
-    const Formatter::HttpFormatterContext log_context{
+    const Formatter::Context log_context{
         nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpSessionEnd};
     for (const auto& access_log : filter_.config_->sessionAccessLogs()) {
       access_log->log(log_context, udp_session_info_);
@@ -766,7 +772,7 @@ void UdpProxyFilter::ActiveSession::writeDownstream(Network::UdpRecvData& recv_d
 
 void UdpProxyFilter::ActiveSession::onAccessLogFlushInterval() {
   fillSessionStreamInfo();
-  const Formatter::HttpFormatterContext log_context{
+  const Formatter::Context log_context{
       nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpPeriodic};
   for (const auto& access_log : filter_.config_->sessionAccessLogs()) {
     access_log->log(log_context, udp_session_info_);
@@ -1105,7 +1111,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamReady(StreamInfo::StreamInf
 
   if (filter_.config_->flushAccessLogOnTunnelConnected()) {
     fillSessionStreamInfo();
-    const Formatter::HttpFormatterContext log_context{
+    const Formatter::Context log_context{
         nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpTunnelUpstreamConnected};
     for (const auto& access_log : filter_.config_->sessionAccessLogs()) {
       access_log->log(log_context, udp_session_info_);

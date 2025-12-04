@@ -3,7 +3,15 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
+Allshard
+FLUSHALL
+NUMPAT
+PUBSUB
+RANDOMKEY
+SLOWLOG
 addrlen
+evictable
+flushdb
 itr
 STREQ
 htonl
@@ -210,6 +218,7 @@ FUZZER
 FUZZERS
 delims
 dereferencing
+deprioritized
 differentially
 dnsresolvers
 endpos
@@ -269,6 +278,7 @@ Isode
 Iters
 JSON
 JSONs
+jsonrpc
 JWKS
 JWKs
 JWS
@@ -379,7 +389,12 @@ PERF
 PGV
 PID
 PKCE
+PKCS
 PKCS12
+PKCS1
+PKCS8
+PKCS#1
+PKCS#8
 PKTINFO
 PNG
 Pointwise
@@ -732,6 +747,8 @@ deflater
 deletable
 deleter
 delim
+demultiplexer
+demux
 denylist
 deque
 dep
@@ -976,6 +993,7 @@ linux
 livelock
 liveness
 llvm
+ln
 loc
 localhost
 lockless
@@ -1210,6 +1228,7 @@ readded
 readonly
 readv
 realloc
+rebalance
 rebalanced
 rebalancer
 rebalancing
@@ -1377,6 +1396,7 @@ struct
 structs
 subclassed
 subclasses
+subcommands
 subcomponent
 subdirectories
 subdirectory
@@ -1578,6 +1598,9 @@ vhosts
 infos
 ElastiCache
 pinterest
+callouts
+streamable
+extern
 NSS
 SSLKEYLOGFILE
 DLB

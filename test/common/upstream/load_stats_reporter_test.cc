@@ -271,9 +271,7 @@ HostSharedPtr makeTestHost(const std::string& hostname,
 }
 
 void addStats(const HostSharedPtr& host, double a, double b = 0, double c = 0, double d = 0) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_load_with_rq_issued")) {
-    host->stats().rq_total_.inc();
-  }
+  host->stats().rq_total_.inc();
   host->stats().rq_success_.inc();
   host->loadMetricStats().add("metric_a", a);
   if (b != 0) {
@@ -426,22 +424,8 @@ TEST_F(LoadStatsReporterTest, EndpointLevelLoadStatsReportingNoUpdate) {
   response_timer_cb_();
 }
 
-class LoadStatsReporterTestWithRqTotal : public LoadStatsReporterTest,
-                                         public testing::WithParamInterface<bool> {
-public:
-  LoadStatsReporterTestWithRqTotal() {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.report_load_with_rq_issued", GetParam() ? "true" : "false"}});
-  }
-  TestScopedRuntime scoped_runtime_;
-};
-
-INSTANTIATE_TEST_SUITE_P(LoadStatsReporterTestWithRqTotal, LoadStatsReporterTestWithRqTotal,
-                         ::testing::Bool());
-
 // Validate that per-locality metrics are aggregated across hosts and included in the load report.
-TEST_P(LoadStatsReporterTestWithRqTotal, UpstreamLocalityStats) {
-  bool expects_rq_total = GetParam();
+TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
@@ -479,9 +463,7 @@ TEST_P(LoadStatsReporterTestWithRqTotal, UpstreamLocalityStats) {
     auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality0_stats->mutable_locality()->set_region("mars");
     expected_locality0_stats->set_total_successful_requests(3);
-    if (expects_rq_total) {
-      expected_locality0_stats->set_total_issued_requests(3);
-    }
+    expected_locality0_stats->set_total_issued_requests(3);
     addStatExpectation(expected_locality0_stats, "metric_a", 3, 0.88888);
     addStatExpectation(expected_locality0_stats, "metric_b", 2, 1.12345);
     addStatExpectation(expected_locality0_stats, "metric_c", 1, 3.14159);
@@ -489,9 +471,7 @@ TEST_P(LoadStatsReporterTestWithRqTotal, UpstreamLocalityStats) {
     auto expected_locality1_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality1_stats->mutable_locality()->set_region("jupiter");
     expected_locality1_stats->set_total_successful_requests(1);
-    if (expects_rq_total) {
-      expected_locality1_stats->set_total_issued_requests(1);
-    }
+    expected_locality1_stats->set_total_issued_requests(1);
     addStatExpectation(expected_locality1_stats, "metric_a", 1, 10.01);
     addStatExpectation(expected_locality1_stats, "metric_c", 1, 20.02);
     addStatExpectation(expected_locality1_stats, "metric_d", 1, 30.03);
@@ -504,9 +484,7 @@ TEST_P(LoadStatsReporterTestWithRqTotal, UpstreamLocalityStats) {
   // Traffic between previous request and next response. Previous latched metrics are cleared.
   host1->stats().rq_success_.inc();
 
-  if (expects_rq_total) {
-    host1->stats().rq_total_.inc();
-  }
+  host1->stats().rq_total_.inc();
   host1->loadMetricStats().add("metric_a", 1.41421);
   host1->loadMetricStats().add("metric_e", 2.71828);
 
@@ -524,9 +502,7 @@ TEST_P(LoadStatsReporterTestWithRqTotal, UpstreamLocalityStats) {
     auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality0_stats->mutable_locality()->set_region("mars");
     expected_locality0_stats->set_total_successful_requests(1);
-    if (expects_rq_total) {
-      expected_locality0_stats->set_total_issued_requests(1);
-    }
+    expected_locality0_stats->set_total_issued_requests(1);
     addStatExpectation(expected_locality0_stats, "metric_a", 1, 1.41421);
     addStatExpectation(expected_locality0_stats, "metric_e", 1, 2.71828);
 
@@ -566,6 +542,62 @@ TEST_F(LoadStatsReporterTest, RemoteStreamGracefulClose) {
   EXPECT_EQ(load_stats_reporter_->getStats().errors_.value(), 0);
   EXPECT_EQ(load_stats_reporter_->getStats().retries_.value(), 1);
 }
+
+// Validate that when rq_active is non-zero, a load report is sent even if rq_issued is 0.
+TEST_F(LoadStatsReporterTest, ReportLoadWhenRqActiveIsNonZero) {
+  // Keep this test when deprecating the runtime flag.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "true"}});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+
+  NiceMock<MockClusterMockPrioritySet> cluster;
+  MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
+  ::envoy::config::core::v3::Locality locality;
+  locality.set_region("test_region");
+
+  HostSharedPtr host1 = makeTestHost("host1", locality);
+  host_set.hosts_per_locality_ = makeHostsPerLocality({{host1}});
+
+  // Set rq_active to non-zero, rq_issued to zero.
+  host1->stats().rq_active_.set(5);
+  // Do not call addStats to ensure rq_issued and rq_success remain 0.
+
+  cluster.info_->eds_service_name_ = "eds_service_for_foo";
+
+  ON_CALL(cm_, getActiveCluster("foo"))
+      .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
+  deliverLoadStatsResponse({"foo"});
+  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  {
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_cluster_service_name("eds_service_for_foo");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
+
+    auto* expected_locality_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality_stats->mutable_locality()->MergeFrom(locality);
+    expected_locality_stats->set_priority(0);
+    expected_locality_stats->set_total_successful_requests(0);
+    // Load report send when there is 0 QPS in this poll cycle.
+    expected_locality_stats->set_total_issued_requests(0);
+    expected_locality_stats->set_total_requests_in_progress(5);
+
+    std::vector<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats_vector = {
+        expected_cluster_stats};
+
+    expectSendMessage(expected_cluster_stats_vector);
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

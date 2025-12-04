@@ -42,12 +42,19 @@ using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFacto
 using test::integration::filters::LoggingTestFilterConfig;
 
 struct ConfigOptions {
+  enum class FilterSetup {
+    kNone,
+    kDownstream,
+    kCompositeMatchOnRequestHeaders,
+    kCompositeMatchOnResponseHeaders,
+  };
+
+  FilterSetup filter_setup = FilterSetup::kDownstream;
   bool valid_grpc_server = true;
   bool add_logging_filter = false;
   absl::optional<LoggingTestFilterConfig> logging_filter_config = absl::nullopt;
   bool http1_codec = false;
   bool add_metadata = false;
-  bool downstream_filter = true;
   bool add_response_processor = false;
 };
 
@@ -177,6 +184,7 @@ protected:
   void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true,
                                         bool response = false, absl::string_view body_sent = "");
   void serverSendTrailerRespDuplexStreamed();
+  void prependExtProcCompositeFilter(const Protobuf::Message& match_input);
 
   std::unique_ptr<SimpleFilterConfig<DynamicMetadataToHeadersFilter>> simple_filter_config_;
   std::unique_ptr<

@@ -26,7 +26,7 @@ public:
   /**
    * Log a completed request if the underlying AccessLog `filter_` allows it.
    */
-  void log(const Formatter::HttpFormatterContext& log_context,
+  void log(const Formatter::Context& log_context,
            const StreamInfo::StreamInfo& stream_info) override;
 
 private:
@@ -36,7 +36,7 @@ private:
    * @param stream_info supplies additional information about the request not
    * contained in the request headers.
    */
-  virtual void emitLog(const Formatter::HttpFormatterContext& context,
+  virtual void emitLog(const Formatter::Context& context,
                        const StreamInfo::StreamInfo& stream_info) PURE;
 
   AccessLog::FilterPtr filter_;

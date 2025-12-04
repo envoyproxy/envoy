@@ -32,6 +32,7 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/tracing:tracing_mocks",
+        "//test/proto:helloworld_proto_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",
     ],
 )
@@ -71,5 +72,28 @@ envoy_cc_fuzz_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ext_authz_integration_test",
+    srcs = ["ext_authz_integration_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    extension_names = ["envoy.filters.network.ext_authz"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/tls:context_config_lib",
+        "//source/common/tls:context_lib",
+        "//source/extensions/filters/network/ext_authz",
+        "//source/extensions/filters/network/ext_authz:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration:integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )

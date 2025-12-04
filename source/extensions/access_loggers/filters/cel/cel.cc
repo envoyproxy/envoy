@@ -22,12 +22,12 @@ CELAccessLogExtensionFilter::CELAccessLogExtensionFilter(
         return std::move(compiled_expr.value());
       }()) {}
 
-bool CELAccessLogExtensionFilter::evaluate(const Formatter::HttpFormatterContext& log_context,
+bool CELAccessLogExtensionFilter::evaluate(const Formatter::Context& log_context,
                                            const StreamInfo::StreamInfo& stream_info) const {
   Protobuf::Arena arena;
   const auto result =
-      expr_.evaluate(arena, &local_info_, stream_info, &log_context.requestHeaders(),
-                     &log_context.responseHeaders(), &log_context.responseTrailers());
+      expr_.evaluate(arena, &local_info_, stream_info, log_context.requestHeaders().ptr(),
+                     log_context.responseHeaders().ptr(), log_context.responseTrailers().ptr());
   if (!result.has_value() || result.value().IsError()) {
     return false;
   }

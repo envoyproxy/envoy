@@ -5,16 +5,10 @@ permissions:
 
 on:
   workflow_call:
-    secrets:
-      gcs-cache-key:
-        required: true
     inputs:
       dependency-review:
         type: boolean
         default: false
-      gcs-cache-bucket:
-        type: string
-        required: true
       request:
         type: string
         required: true
@@ -29,32 +23,29 @@ concurrency:
 
 jobs:
   deps:
-    secrets:
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
+      actions: read
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.target }}
     with:
-      bazel-extra: '--config=remote-envoy-engflow'
+      bazel-cache: true
+      bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      diskspace-hack: true
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       request: ${{ inputs.request }}
       error-match: |
         ERROR
         error:
         Error:
-      rbe: ${{ matrix.rbe }}
+      rbe: true
       target: ${{ matrix.target }}
       trusted: ${{ inputs.trusted }}
     strategy:
       matrix:
         include:
         - target: deps
-          rbe: false
 
   dependency-review:
     runs-on: ubuntu-24.04
@@ -66,4 +57,4 @@ jobs:
         ref: ${{ fromJSON(inputs.request).request.sha }}
         persist-credentials: false
     - name: Dependency Review
-      uses: actions/dependency-review-action@56339e523c0409420f6c2c9a2f4292bbb3c07dd3  # v4.8.0
+      uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261  # v4.8.2

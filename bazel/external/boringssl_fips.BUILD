@@ -1,16 +1,10 @@
 load("@envoy//bazel/external:fips_build.bzl", "boringssl_fips_build_command", "ninja_build_command")
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 
 licenses(["notice"])  # Apache 2
 
 # BoringSSL build as described in the Security Policy for BoringCrypto module "update stream":
 # https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md#update-stream
-
-FIPS_GO_VERSION = "go1.24.4"
-
-FIPS_NINJA_VERSION = "1.13.1"
-
-FIPS_CMAKE_VERSION = "cmake version 4.1.2"
 
 SUPPORTED_ARCHES = {
     "x86_64": "amd64",
@@ -56,7 +50,10 @@ genrule(
         "@fips_ninja//:configure.py",
     ],
     outs = ["ninja"],
-    cmd = select(ninja_build_command()),
+    cmd = select(ninja_build_command(
+        SUPPORTED_ARCHES,
+        STDLIBS,
+    )),
     toolchains = [
         "@rules_python//python:current_py_toolchain",
         "@bazel_tools//tools/cpp:current_cc_toolchain",
@@ -64,7 +61,17 @@ genrule(
     tools = [
         "@bazel_tools//tools/cpp:current_cc_toolchain",
         "@rules_python//python:current_py_toolchain",
-    ],
+    ] + select({
+        "@platforms//cpu:x86_64": [
+            "@sysroot_linux_amd64//:WORKSPACE",
+            "@sysroot_linux_amd64//:sysroot",
+        ],
+        "@platforms//cpu:aarch64": [
+            "@sysroot_linux_arm64//:WORKSPACE",
+            "@sysroot_linux_arm64//:sysroot",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 genrule(
@@ -77,9 +84,6 @@ genrule(
     cmd = select(boringssl_fips_build_command(
         SUPPORTED_ARCHES,
         STDLIBS,
-        FIPS_GO_VERSION,
-        FIPS_NINJA_VERSION,
-        FIPS_CMAKE_VERSION,
     )),
     exec_properties = select({
         "@envoy//bazel:engflow_rbe_x86_64": {
@@ -101,12 +105,16 @@ genrule(
             "@fips_cmake_linux_x86_64//:bin/cmake",
             "@fips_go_linux_amd64//:all",
             "@fips_go_linux_amd64//:bin/go",
+            "@sysroot_linux_amd64//:WORKSPACE",
+            "@sysroot_linux_amd64//:sysroot",
         ],
         "@platforms//cpu:aarch64": [
             "@fips_cmake_linux_aarch64//:all",
             "@fips_cmake_linux_aarch64//:bin/cmake",
             "@fips_go_linux_arm64//:all",
             "@fips_go_linux_arm64//:bin/go",
+            "@sysroot_linux_arm64//:WORKSPACE",
+            "@sysroot_linux_arm64//:sysroot",
         ],
         "//conditions:default": [],
     }),

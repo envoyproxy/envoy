@@ -267,7 +267,8 @@ public:
    * conversion(ignore unknown field) fails.
    */
   static absl::Status loadFromJsonNoThrow(absl::string_view json, Protobuf::Message& message,
-                                          bool& has_unknown_fileld);
+                                          bool& has_unknown_field);
+  static absl::Status loadFromJsonNoThrow(absl::string_view json, Protobuf::Struct& message);
   static void loadFromJson(absl::string_view json, Protobuf::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);

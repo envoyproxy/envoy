@@ -62,6 +62,7 @@ message Compressor {
   }
 
   // Configuration for filter behavior on the response direction.
+  // [#next-free-field: 6]
   message ResponseDirectionConfig {
     CommonDirectionConfig common_config = 1;
 
@@ -85,6 +86,16 @@ message Compressor {
       unique: true
       items {uint32 {lt: 600 gte: 200}}
     }];
+
+    // If true, the filter adds the ``x-envoy-compression-status`` response
+    // header to indicate whether the compression occurred and, if not, provide
+    // the reason why. The header's value format is
+    // ``<encoder-type>;<status>[;<additional-params>]``, where ``<status>`` is
+    // ``Compressed`` or the reason compression was skipped (e.g.,
+    // ``ContentLengthTooSmall``). When this field is enabled, the compressor
+    // filter alters the order of the compression eligibility checks to report
+    // the most valid reason for skipping the compression.
+    bool status_header_enabled = 5;
   }
 
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.

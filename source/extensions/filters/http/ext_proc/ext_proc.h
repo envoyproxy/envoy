@@ -51,7 +51,6 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_ignored)                                                               \
   COUNTER(clear_route_cache_disabled)                                                              \
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
-  COUNTER(send_immediate_resp_upstream_ignored)                                                    \
   COUNTER(http_not_ok_resp_received)
 
 struct ExtProcFilterStats {
@@ -145,27 +144,6 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
   std::string http_response_code_details_;
-};
-
-// Changes to headers are normally tested against the MutationRules supplied
-// with configuration. When writing an immediate response message, however,
-// we want to support a more liberal set of rules so that filters can create
-// custom error messages, and we want to prevent the MutationRules in the
-// configuration from making that impossible. This is a fixed, permissive
-// set of rules for that purpose.
-class ImmediateMutationChecker {
-public:
-  ImmediateMutationChecker(Regex::Engine& regex_engine) {
-    envoy::config::common::mutation_rules::v3::HeaderMutationRules rules;
-    rules.mutable_allow_all_routing()->set_value(true);
-    rules.mutable_allow_envoy()->set_value(true);
-    rule_checker_ = std::make_unique<Filters::Common::MutationRules::Checker>(rules, regex_engine);
-  }
-
-  const Filters::Common::MutationRules::Checker& checker() const { return *rule_checker_; }
-
-private:
-  std::unique_ptr<Filters::Common::MutationRules::Checker> rule_checker_;
 };
 
 class ThreadLocalStreamManager;
@@ -284,8 +262,12 @@ public:
     return untyped_receiving_namespaces_;
   }
 
-  const ImmediateMutationChecker& immediateMutationChecker() const {
-    return immediate_mutation_checker_;
+  const std::vector<std::string>& untypedClusterMetadataForwardingNamespaces() const {
+    return untyped_cluster_metadata_forwarding_namespaces_;
+  }
+
+  const std::vector<std::string>& typedClusterMetadataForwardingNamespaces() const {
+    return typed_cluster_metadata_forwarding_namespaces_;
   }
 
   const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
@@ -362,10 +344,11 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const std::vector<std::string> untyped_receiving_namespaces_;
+  const std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_;
+  const std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_;
   const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       allowed_override_modes_;
   const ExpressionManager expression_manager_;
-  const ImmediateMutationChecker immediate_mutation_checker_;
 
   const std::function<std::unique_ptr<ProcessingRequestModifier>()>
       processing_request_modifier_factory_cb_;
@@ -413,6 +396,14 @@ public:
   const absl::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
+  const absl::optional<const std::vector<std::string>>&
+  untypedClusterMetadataForwardingNamespaces() const {
+    return untyped_cluster_metadata_forwarding_namespaces_;
+  }
+  const absl::optional<const std::vector<std::string>>&
+  typedClusterMetadataForwardingNamespaces() const {
+    return typed_cluster_metadata_forwarding_namespaces_;
+  }
   const absl::optional<bool>& failureModeAllow() const { return failure_mode_allow_; }
 
   bool hasProcessingRequestModifierConfig() const {
@@ -436,6 +427,10 @@ private:
   const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
+  const absl::optional<const std::vector<std::string>>
+      untyped_cluster_metadata_forwarding_namespaces_;
+  const absl::optional<const std::vector<std::string>>
+      typed_cluster_metadata_forwarding_namespaces_;
   const absl::optional<bool> failure_mode_allow_;
 
   const std::function<std::unique_ptr<ProcessingRequestModifier>()>
@@ -466,11 +461,15 @@ public:
         decoding_state_(*this, config->processingMode(),
                         config->untypedForwardingMetadataNamespaces(),
                         config->typedForwardingMetadataNamespaces(),
-                        config->untypedReceivingMetadataNamespaces()),
+                        config->untypedReceivingMetadataNamespaces(),
+                        config->untypedClusterMetadataForwardingNamespaces(),
+                        config->typedClusterMetadataForwardingNamespaces()),
         encoding_state_(*this, config->processingMode(),
                         config->untypedForwardingMetadataNamespaces(),
                         config->typedForwardingMetadataNamespaces(),
-                        config->untypedReceivingMetadataNamespaces()),
+                        config->untypedReceivingMetadataNamespaces(),
+                        config->untypedClusterMetadataForwardingNamespaces(),
+                        config->typedClusterMetadataForwardingNamespaces()),
         processing_request_modifier_(config->createProcessingRequestModifier()),
         on_processing_response_(config->createOnProcessingResponse()),
         failure_mode_allow_(config->failureModeAllow()) {}
@@ -543,18 +542,6 @@ public:
                              absl::Status status,
                              envoy::config::core::v3::TrafficDirection traffic_direction);
 
-  Envoy::Http::LocalErrorStatus
-  onLocalReply(const Envoy::Http::StreamFilterBase::LocalReplyData&) override {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_ext_proc_on_local_reply")) {
-      ENVOY_STREAM_LOG(debug,
-                       "When onLocalReply() is called, set processing_complete_ to true to skip "
-                       "external processing",
-                       *decoder_callbacks_);
-      processing_complete_ = true;
-    }
-    return ::Envoy::Http::LocalErrorStatus::Continue;
-  }
-
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
@@ -617,6 +604,15 @@ private:
       Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
       Server::Configuration::CommonFactoryContext& context);
 
+  // Gracefully close the gRPC stream based on configuration.
+  void closeStreamMaybeGraceful();
+
+  // Closing the gRPC stream if the last ProcessingResponse is received.
+  // This stream closing optimization only applies to STREAMED or FULL_DUPLEX_STREAMED body modes.
+  // For other body modes like BUFFERED or BUFFERED_PARTIAL, it is ignored.
+  void closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
+                                         const bool is_last_body_resp);
+
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
   const ExtProcFilterStats& stats_;
@@ -631,6 +627,8 @@ private:
   std::vector<std::string> untyped_forwarding_namespaces_{};
   std::vector<std::string> typed_forwarding_namespaces_{};
   std::vector<std::string> untyped_receiving_namespaces_{};
+  std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_{};
+  std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_{};
   Http::StreamFilterCallbacks* filter_callbacks_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
 

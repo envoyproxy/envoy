@@ -1,0 +1,10 @@
+# Enable bzlmod for modern dependency management with MODULE.bazel
+common --enable_bzlmod
+
+# Java runtime configuration for bzlmod
+# Use remote JDK to avoid dependency on local Java installation
+build --java_runtime_version=remotejdk_11
+build --tool_java_runtime_version=remotejdk_11
+
+# Build settings
+build --incompatible_strict_action_env

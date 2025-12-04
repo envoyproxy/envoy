@@ -175,6 +175,16 @@ For details on each command's usage see the official
   RENAMENX, Generic
   SORT, Generic
   SORT_RO, Generic
+  SCRIPT, Generic
+  FLUSHALL, Generic
+  FLUSHDB, Generic
+  SLOWLOG, Generic
+  CONFIG, Generic
+  CLUSTER INFO, Generic
+  CLUSTER SLOTS, Generic
+  CLUSTER KEYSLOT, Generic
+  CLUSTER NODES, Generic
+  RANDOMKEY, Generic
   GEOADD, Geo
   GEODIST, Geo
   GEOHASH, Geo

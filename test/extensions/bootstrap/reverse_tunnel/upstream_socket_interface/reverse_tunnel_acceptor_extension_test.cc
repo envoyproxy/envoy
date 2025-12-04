@@ -31,7 +31,9 @@ protected:
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
     EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
-    config_.set_stat_prefix("test_prefix");
+    config_.set_stat_prefix("reverse_connections");
+    // Enable detailed stats for tests that need per-node/cluster stats.
+    config_.set_enable_detailed_stats(true);
     socket_interface_ = std::make_unique<ReverseTunnelAcceptor>(context_);
     extension_ =
         std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config_);
@@ -88,11 +90,11 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, InitializeWithDefaultStatPrefix) {
   auto extension_with_default =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, empty_config);
 
-  EXPECT_EQ(extension_with_default->statPrefix(), "upstream_reverse_connection");
+  EXPECT_EQ(extension_with_default->statPrefix(), "reverse_tunnel_acceptor");
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, InitializeWithCustomStatPrefix) {
-  EXPECT_EQ(extension_->statPrefix(), "test_prefix");
+  EXPECT_EQ(extension_->statPrefix(), "reverse_connections");
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, GetStatsScope) {
@@ -133,9 +135,9 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetLocalRegistryAfterInitialization) 
 TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   setupThreadLocalSlot();
 
-  extension_->updatePerWorkerConnectionStats("node1", "cluster1", true);
-  extension_->updatePerWorkerConnectionStats("node2", "cluster2", true);
-  extension_->updatePerWorkerConnectionStats("node2", "cluster2", true);
+  extension_->updateConnectionStats("node1", "cluster1", true);
+  extension_->updateConnectionStats("node2", "cluster2", true);
+  extension_->updateConnectionStats("node2", "cluster2", true);
 
   auto stat_map = extension_->getPerWorkerStatMap();
 
@@ -158,9 +160,9 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node2"], 2);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 2);
 
-  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false);
-  extension_->updatePerWorkerConnectionStats("node2", "cluster2", false);
-  extension_->updatePerWorkerConnectionStats("node2", "cluster2", false);
+  extension_->updateConnectionStats("node1", "cluster1", false);
+  extension_->updateConnectionStats("node2", "cluster2", false);
+  extension_->updateConnectionStats("node2", "cluster2", false);
 
   stat_map = extension_->getPerWorkerStatMap();
 
@@ -168,6 +170,50 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster1"], 2);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node2"], 0);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 0);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStatsDisabled) {
+  // Create an extension with detailed stats disabled.
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface no_stats_config;
+  no_stats_config.set_stat_prefix("reverse_connections");
+  no_stats_config.set_enable_detailed_stats(false);
+
+  auto no_stats_extension = std::make_unique<ReverseTunnelAcceptorExtension>(
+      *socket_interface_, context_, no_stats_config);
+
+  // Update connection stats - should not create any stats.
+  no_stats_extension->updateConnectionStats("node1", "cluster1", true);
+  no_stats_extension->updateConnectionStats("node2", "cluster2", true);
+  no_stats_extension->updateConnectionStats("node3", "cluster3", true);
+
+  // Verify no stats were created by checking cross-worker stat map.
+  auto cross_worker_stat_map = no_stats_extension->getCrossWorkerStatMap();
+  EXPECT_TRUE(cross_worker_stat_map.empty());
+
+  // Verify no per-worker stats were created by checking per-worker stat map.
+  auto per_worker_stat_map = no_stats_extension->getPerWorkerStatMap();
+  EXPECT_TRUE(per_worker_stat_map.empty());
+
+  // Verify that the stats store doesn't have any gauges with our stat prefix
+  // (except potentially the aggregate that we removed).
+  auto& stats_store = no_stats_extension->getStatsScope();
+  bool found_detailed_stats = false;
+  Stats::IterateFn<Stats::Gauge> gauge_callback =
+      [&found_detailed_stats](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
+    const std::string& gauge_name = gauge->name();
+    // Check if any detailed stats were created (nodes. or clusters. or worker_).
+    if ((gauge_name.find(".nodes.") != std::string::npos ||
+         gauge_name.find(".clusters.") != std::string::npos ||
+         gauge_name.find(".worker_") != std::string::npos) &&
+        gauge->used()) {
+      found_detailed_stats = true;
+      return false; // Stop iteration
+    }
+    return true;
+  };
+  stats_store.iterate(gauge_callback);
+  EXPECT_FALSE(found_detailed_stats);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
@@ -208,7 +254,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.nodes.node3"], 1);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster3"], 1);
 
-  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false);
+  extension_->updateConnectionStats("node1", "cluster1", false);
 
   auto per_worker_stat_map = extension_->getPerWorkerStatMap();
 
@@ -228,8 +274,8 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
 
   thread_local_registry_ = another_thread_local_registry_;
 
-  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false);
-  extension_->updatePerWorkerConnectionStats("node3", "cluster3", false);
+  extension_->updateConnectionStats("node1", "cluster1", false);
+  extension_->updateConnectionStats("node3", "cluster3", false);
 
   auto worker1_stat_map = extension_->getPerWorkerStatMap();
 

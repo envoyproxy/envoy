@@ -10,11 +10,12 @@
 
 #include "test/integration/http_integration.h"
 
+#include "absl/strings/numbers.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace ClientSideWeightedRoundRobin {
 namespace {
 
@@ -38,6 +39,20 @@ void configureClusterLoadBalancingPolicy(envoy::config::cluster::v3::Cluster& cl
       )EOF";
 
   TestUtility::loadFromYaml(policy_yaml, *policy);
+}
+
+Http::TestResponseHeaderMapImpl
+responseHeadersWithLoadReport(int backend_index, double application_utilization, double qps) {
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_application_utilization(application_utilization);
+  orca_load_report.mutable_named_metrics()->insert({"backend_index", backend_index});
+  orca_load_report.set_rps_fractional(qps);
+  std::string proto_string = TestUtility::getProtobufBinaryStringFromMessage(orca_load_report);
+  std::string orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_headers.addCopy("endpoint-load-metrics-bin", orca_load_report_header_bin);
+  return response_headers;
 }
 
 class ClientSideWeightedRoundRobinIntegrationTest
@@ -405,8 +420,350 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersions, ClientSideWeightedRoundRobinXdsIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()));
 
+// Tests to verify the behavior of load balancing policy when endpoints are
+// updated.
+class ClientSideWeightedRoundRobinEdsIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  ClientSideWeightedRoundRobinEdsIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam(), config()) {
+    use_lds_ = false;
+    // xds_upstream_ will be used for the ADS upstream.
+    create_xds_upstream_ = true;
+    // Not testing TLS in this case.
+    tls_xds_upstream_ = false;
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
+
+  void TearDown() override { cleanUpXdsConnection(); }
+
+  void initialize() override {
+    // Other than the ADS server, this sets up 4 autonomous upstreams. These
+    // will be sent back by the EDS update.
+    autonomous_upstream_ = true;
+    setUpstreamCount(0);
+
+    // Wait for the Envoy server to stabilize, before continuing with the xDS
+    // connection establishment. This avoids a race where the Envoy's
+    // connection creation races with the xDS upstream thread, the initial connection
+    // is dropped, and the test fails.
+    absl::Notification server_initialized;
+    on_server_ready_function_ = [&server_initialized](IntegrationTestServer&) -> void {
+      server_initialized.Notify();
+    };
+
+    // Deferring listener initialization as the listener is static, but the
+    // integration test should proceed to fetch the clusters and endpoints.
+    defer_listener_finalization_ = true;
+    HttpIntegrationTest::initialize();
+
+    // Wait for the server initialization to be done.
+    server_initialized.WaitForNotification();
+    // Let Envoy establish its connection to the ADS server.
+    if (xds_stream_ == nullptr) {
+      createXdsConnection();
+      AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+    }
+
+    // Create 4 autonomous upstream servers that will be used as endpoints.
+    // While typically this is invoked prior to initialize(), it is ok to
+    // invoke it here as it will create the autonomous upstreams next.
+    fake_upstreams_count_ = 4;
+    createUpstreams();
+
+    // Create an EDS cluster.
+    cluster1_ = ConfigHelper::buildCluster(FirstClusterName);
+    configureClusterLoadBalancingPolicy(cluster1_);
+    cluster1_.mutable_common_lb_config()->mutable_update_merge_window()->set_seconds(0);
+
+    // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for
+    // cluster1.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                               {cluster1_}, {cluster1_}, {}, "55");
+
+    // Wait for EDS request.
+    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+    test_server_->waitForGaugeEq("cluster.cluster_1.warming_state", 1);
+    EXPECT_TRUE(compareDiscoveryRequest(
+        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(), "",
+        {FirstClusterName}, {FirstClusterName}, {}));
+
+    // The fake-upstreams should have the ADS server, and 4 backends.
+    ASSERT(fake_upstreams_.size() == 5);
+    // Send EDS response for cluster1 that contains 2 localities with 2
+    // endpoints each. First locality includes fake_upstreams_[1] and
+    // fake_upstreams_[2].
+    cluster1_endpoints_ = ConfigHelper::buildClusterLoadAssignment(
+        FirstClusterName, Network::Test::getLoopbackAddressString(version_),
+        fake_upstreams_[1]->localAddress()->ip()->port());
+    cluster1_endpoints_.mutable_endpoints(0)->set_priority(0);
+    cluster1_endpoints_.mutable_endpoints(0)->mutable_locality()->set_sub_zone("zone_0");
+    auto* address = cluster1_endpoints_.mutable_endpoints(0)
+                        ->add_lb_endpoints()
+                        ->mutable_endpoint()
+                        ->mutable_address()
+                        ->mutable_socket_address();
+    address->set_address(Network::Test::getLoopbackAddressString(version_));
+    address->set_port_value(fake_upstreams_[2]->localAddress()->ip()->port());
+
+    // Second locality includes fake_upstreams_[3] and fake_upstreams_[4]
+    auto temp_endpoints = ConfigHelper::buildClusterLoadAssignment(
+        FirstClusterName, Network::Test::getLoopbackAddressString(version_),
+        fake_upstreams_[3]->localAddress()->ip()->port());
+    temp_endpoints.mutable_endpoints(0)->set_priority(0);
+    temp_endpoints.mutable_endpoints(0)->mutable_locality()->set_sub_zone("zone_1");
+    auto* address4 = temp_endpoints.mutable_endpoints(0)
+                         ->add_lb_endpoints()
+                         ->mutable_endpoint()
+                         ->mutable_address()
+                         ->mutable_socket_address();
+    address4->set_address(Network::Test::getLoopbackAddressString(version_));
+    address4->set_port_value(fake_upstreams_[4]->localAddress()->ip()->port());
+
+    cluster1_endpoints_.mutable_endpoints()->Add()->MergeFrom(temp_endpoints.endpoints(0));
+
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+        {cluster1_endpoints_}, {cluster1_endpoints_}, {}, "1");
+
+    // A CDS and EDS ack.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
+                                        {FirstClusterName}, {}, {}));
+
+    // Cluster should become active.
+    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+
+    // Wait for our statically specified listener to become ready, and register
+    // its port in the test framework's downstream listener port map.
+    test_server_->waitUntilListenersReady();
+    registerTestServerPorts({"http"});
+  }
+
+  void sendRequestsAndTrackUpstreamUsage(const std::vector<uint64_t>& upstream_qps,
+                                         uint64_t number_of_requests,
+                                         std::vector<uint64_t>& upstream_usage) {
+    static const Http::LowerCaseString myUpstreamIndexHeaderName("my_upstream_index");
+    auto number_of_upstreams = upstream_qps.size();
+    // Setup the backends response headers.
+    for (uint64_t i = 0; i < number_of_upstreams; ++i) {
+      auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+          responseHeadersWithLoadReport(i, 0.5, upstream_qps[i]));
+      // Each upstream will set the header "my_upstream_index" in the response,
+      // so the test can use it to know which upstream received the request.
+      response_headers->setCopy(myUpstreamIndexHeaderName, absl::StrCat(i));
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[FirstUpstreamIndex + i].get())
+          ->setResponseHeaders(std::move(response_headers));
+    }
+
+    // Expected number of upstreams.
+    upstream_usage.resize(number_of_upstreams);
+    ENVOY_LOG(trace, "Start sending {} requests.", number_of_requests);
+
+    for (uint64_t i = 0; i < number_of_requests; i++) {
+      ENVOY_LOG(trace, "Before request {}.", i);
+
+      // Send a request and parse the response.
+      BufferingStreamDecoderPtr response =
+          IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
+                                             downstream_protocol_, version_, "example.com");
+      ASSERT_TRUE(response->complete());
+      EXPECT_EQ("200", response->headers().getStatusValue());
+      uint32_t resp_upstream_index = 100; // Intentionally set out of bounds initially.
+      ASSERT_TRUE(absl::SimpleAtoi(
+          response->headers().get(myUpstreamIndexHeaderName)[0]->value().getStringView(),
+          &resp_upstream_index));
+      upstream_usage[resp_upstream_index]++;
+      cleanupUpstreamAndDownstream();
+
+      ENVOY_LOG(trace, "After request {}.", i);
+    }
+  }
+
+  const char* FirstClusterName = "cluster_1";
+  // Index in fake_upstreams_
+  const int FirstUpstreamIndex = 1;
+
+  const std::string& config() {
+    CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
+    admin:
+      access_log:
+      - name: envoy.access_loggers.file
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+          path: "{}"
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 0
+    dynamic_resources:
+      cds_config:
+        ads: {{}}
+      ads_config:
+        api_type: GRPC
+        grpc_services:
+          envoy_grpc:
+            cluster_name: my_ads_cluster
+        set_node_on_first_message_only: true
+    static_resources:
+      clusters:
+      - name: my_ads_cluster
+        typed_extension_protocol_options:
+          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+            explicit_http_config:
+              http2_protocol_options: {{}}
+        load_assignment:
+          cluster_name: my_ads_cluster
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+      listeners:
+      - name: http
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 0
+        filter_chains:
+          filters:
+            name: http
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              stat_prefix: config_test
+              http_filters:
+                name: envoy.filters.http.router
+              codec_type: HTTP1
+              route_config:
+                name: route_config_0
+                validate_clusters: false
+                virtual_hosts:
+                  name: integration
+                  routes:
+                  - route:
+                      cluster: cluster_1
+                      # Due to the flakiness of the integration test infrastrucutre some connections timeout. Retry them up to 3 times.
+                      retry_policy:
+                        per_try_timeout: 1s
+                        retry_on: connect-failure
+                        num_retries: 3
+                    match:
+                      prefix: "/cluster1"
+                  domains: "*"
+    )EOF",
+                                                    Platform::null_device_path));
+  }
+
+  bool locality_weighted_lb_enabled_;
+  envoy::config::cluster::v3::Cluster cluster1_;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster1_endpoints_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClientSideWeightedRoundRobinEdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, UpdateLocalityPriority) {
+  initialize();
+  for (uint32_t i = 0; i < 10; ++i) {
+    bool use_single_locality = (i % 2 != 0);
+    cluster1_endpoints_.mutable_endpoints(0)->mutable_load_balancing_weight()->set_value(i + 1);
+    cluster1_endpoints_.mutable_endpoints(1)->mutable_load_balancing_weight()->set_value(i * 3 + 1);
+    cluster1_endpoints_.mutable_endpoints(1)->set_priority(use_single_locality ? 1 : 0);
+
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+        {cluster1_endpoints_}, {}, {"cluster_1"}, absl::StrCat(i + 1));
+
+    // Wait for the EDS ack.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment,
+                                        absl::StrCat(i + 1), {FirstClusterName}, {}, {}));
+
+    // Upstream QPS for ORCA load reports. All hosts report the same QPS.
+    const std::vector<uint64_t> upstream_qps = {100, 100, 100, 100};
+    // Send 100 requests to cluster1 so host weights are updated.
+    std::vector<uint64_t> initial_usage;
+    sendRequestsAndTrackUpstreamUsage(upstream_qps, 10, initial_usage);
+    ENVOY_LOG(trace, "initial_usage {}", initial_usage);
+
+    test_server_->waitForCounterEq("cluster.cluster_1.membership_change", i * 2 + 1);
+
+    // Send another 100 requests to cluster1, expecting weights to be used.
+    std::vector<uint64_t> upstream_usage;
+    sendRequestsAndTrackUpstreamUsage(upstream_qps, 100, upstream_usage);
+    ENVOY_LOG(trace, "upstream_usage {}", upstream_usage);
+    // Expect the usage of first locality to be non-zero.
+    EXPECT_GT(upstream_usage[0], 0);
+    EXPECT_GT(upstream_usage[1], 0);
+    // Expect the usage of second locality to be non-zero if the priority is
+    // not set to 1.
+    if (use_single_locality) {
+      EXPECT_EQ(upstream_usage[2], 0);
+      EXPECT_EQ(upstream_usage[3], 0);
+    } else {
+      EXPECT_GT(upstream_usage[2], 0);
+      EXPECT_GT(upstream_usage[3], 0);
+    }
+  }
+}
+
+TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, AddRemoveLocality) {
+  initialize();
+  for (uint32_t i = 0; i < 10; ++i) {
+    bool use_single_locality = (i % 2 != 0);
+    cluster1_endpoints_.mutable_endpoints(0)->mutable_load_balancing_weight()->set_value(i + 1);
+    cluster1_endpoints_.mutable_endpoints(1)->mutable_load_balancing_weight()->set_value(i * 3 + 1);
+
+    envoy::config::endpoint::v3::ClusterLoadAssignment current_endpoints;
+    current_endpoints.CopyFrom(cluster1_endpoints_);
+    if (use_single_locality) {
+      current_endpoints.mutable_endpoints()->DeleteSubrange(1, 1);
+    }
+
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+        {current_endpoints}, {}, {"cluster_1"}, absl::StrCat(i + 1));
+
+    // Wait for the EDS ack.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment,
+                                        absl::StrCat(i + 1), {FirstClusterName}, {}, {}));
+
+    // Upstream QPS for ORCA load reports. All hosts report the same QPS.
+    const std::vector<uint64_t> upstream_qps = {100, 100, 100, 100};
+    // Send 100 requests to cluster1 so host weights are updated.
+    std::vector<uint64_t> initial_usage;
+    sendRequestsAndTrackUpstreamUsage(upstream_qps, 10, initial_usage);
+    ENVOY_LOG(trace, "initial_usage {}", initial_usage);
+
+    test_server_->waitForCounterEq("cluster.cluster_1.membership_change", i + 1);
+
+    // Send another 100 requests to cluster1, expecting weights to be used.
+    std::vector<uint64_t> upstream_usage;
+    sendRequestsAndTrackUpstreamUsage(upstream_qps, 100, upstream_usage);
+    ENVOY_LOG(trace, "upstream_usage {}", upstream_usage);
+    // Expect the usage of first locality to be non-zero.
+    EXPECT_GT(upstream_usage[0], 0);
+    EXPECT_GT(upstream_usage[1], 0);
+    // Expect the usage of second locality to be non-zero if the priority is
+    // not set to 1.
+    if (use_single_locality) {
+      EXPECT_EQ(upstream_usage[2], 0);
+      EXPECT_EQ(upstream_usage[3], 0);
+    } else {
+      EXPECT_GT(upstream_usage[2], 0);
+      EXPECT_GT(upstream_usage[3], 0);
+    }
+  }
+}
 } // namespace
 } // namespace ClientSideWeightedRoundRobin
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy
