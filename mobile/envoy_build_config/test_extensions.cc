@@ -11,6 +11,7 @@
 #include "test/common/http/filters/test_read/config.h"
 #include "test/common/http/filters/test_remote_response/config.h"
 #include "test/common/mocks/dns/mock_dns_resolver.h"
+
 #include "external/envoy_build_config/test_extensions.h"
 
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)

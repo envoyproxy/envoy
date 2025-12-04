@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/extension.pb.h"
+
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/quic/server_codec_impl.h"
 #include "source/common/tls/cert_validator/default_validator.h"
@@ -11,14 +13,12 @@
 #include "test/common/http/common.h"
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/common/mocks/common/mocks.h"
+#include "test/common/mocks/dns/mock_dns_resolver.h"
+#include "test/common/mocks/dns/mock_dns_resolver.pb.h"
 #include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_random_generator.h"
-#include "test/common/mocks/dns/mock_dns_resolver.pb.h"
-#include "test/common/mocks/dns/mock_dns_resolver.h"
-
-#include "envoy/config/core/v3/extension.pb.h"
 
 #include "absl/synchronization/notification.h"
 #include "extension_registry.h"
@@ -280,7 +280,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
           found_cache_miss = true;
         }
       });
-  
+
   // Configure MockDnsResolver with "doesnotexist" as a non-existent domain
   envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
   dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
@@ -288,7 +288,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   config.add_non_existent_domains("doesnotexist");
   dns_resolver_config.mutable_typed_config()->PackFrom(config);
   builder_.setDnsResolver(dns_resolver_config);
-  
+
   builder_.setDisableDnsRefreshOnFailure(true);
   initialize();
 
@@ -781,7 +781,7 @@ TEST_P(ClientIntegrationTest, InvalidDomain) {
   config.add_non_existent_domains("www.doesnotexist.com");
   dns_resolver_config.mutable_typed_config()->PackFrom(config);
   builder_.setDnsResolver(dns_resolver_config);
-  
+
   initialize();
 
   default_request_headers_.setHost("www.doesnotexist.com");
@@ -829,7 +829,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainFakeResolver) {
 
 TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
   builder_.addRuntimeGuard("reresolve_null_addresses", true);
-  
+
   // Configure MockDnsResolver with "www.doesnotexist.com" as a non-existent domain
   envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
   dns_resolver_config.set_name("envoy.test.mock_dns_resolver");

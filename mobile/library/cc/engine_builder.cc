@@ -148,7 +148,8 @@ EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::s
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setDnsResolver(const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) {
+EngineBuilder& EngineBuilder::setDnsResolver(
+    const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) {
   dns_resolver_config_ = dns_resolver_config;
   return *this;
 }

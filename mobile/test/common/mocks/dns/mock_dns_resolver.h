@@ -5,11 +5,10 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/dns_resolver.h"
-
-#include "envoy/config/core/v3/extension.pb.h"
 
 #include "test/common/mocks/dns/mock_dns_resolver.pb.h"
 
@@ -35,9 +34,10 @@ private:
 // Factory to create MockDnsResolver from a typed config.
 class MockDnsResolverFactory : public Envoy::Network::DnsResolverFactory {
 public:
-  absl::StatusOr<Envoy::Network::DnsResolverSharedPtr> createDnsResolver(
-      Envoy::Event::Dispatcher& /*dispatcher*/, Envoy::Api::Api& /*api*/,
-      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) const override;
+  absl::StatusOr<Envoy::Network::DnsResolverSharedPtr>
+  createDnsResolver(Envoy::Event::Dispatcher& /*dispatcher*/, Envoy::Api::Api& /*api*/,
+                    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config)
+      const override;
 
   std::string name() const override { return "envoy.test.mock_dns_resolver"; }
 

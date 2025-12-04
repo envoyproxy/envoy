@@ -1,6 +1,7 @@
 #include "test/common/mocks/dns/mock_dns_resolver.h"
 
 #include "envoy/network/address.h"
+
 #include "source/common/network/utility.h"
 
 #include "test/common/mocks/dns/mock_dns_resolver.pb.h"
@@ -38,14 +39,16 @@ Network::ActiveDnsQuery* MockDnsResolver::resolve(const std::string& dns_name,
     if (dns_lookup_family == Network::DnsLookupFamily::V6Only ||
         dns_lookup_family == Network::DnsLookupFamily::All ||
         dns_lookup_family == Network::DnsLookupFamily::Auto) {
-      auto address = Network::Utility::parseInternetAddressNoThrow("::1", /*port=*/0, /*v6only=*/true);
+      auto address =
+          Network::Utility::parseInternetAddressNoThrow("::1", /*port=*/0, /*v6only=*/true);
       responses.emplace_back(address, std::chrono::seconds(360));
     }
     if (dns_lookup_family == Network::DnsLookupFamily::V4Only ||
         dns_lookup_family == Network::DnsLookupFamily::All ||
         dns_lookup_family == Network::DnsLookupFamily::Auto ||
         dns_lookup_family == Network::DnsLookupFamily::V4Preferred) {
-      auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", /*port=*/0, /*v6only=*/true);
+      auto address =
+          Network::Utility::parseInternetAddressNoThrow("127.0.0.1", /*port=*/0, /*v6only=*/true);
       responses.emplace_back(address, std::chrono::seconds(360));
     }
 
