@@ -21,15 +21,6 @@ class ExtAuthzFilterConfig
 public:
   ExtAuthzFilterConfig() : FactoryBase("envoy.filters.http.ext_authz") {}
 
-  bool shouldIgnoreDisabledFlag(const Protobuf::Message& config,
-                                Server::Configuration::ServerFactoryContext&) override {
-    const auto& typed_config =
-        dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz&>(config);
-    // If filter_enabled_metadata is configured, the filter needs to be instantiated
-    // to check metadata at runtime, so ignore the disabled flag.
-    return typed_config.has_filter_enabled_metadata();
-  }
-
 private:
   static constexpr uint64_t DefaultTimeout = 200;
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

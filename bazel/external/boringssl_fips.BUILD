@@ -50,7 +50,10 @@ genrule(
         "@fips_ninja//:configure.py",
     ],
     outs = ["ninja"],
-    cmd = select(ninja_build_command()),
+    cmd = select(ninja_build_command(
+        SUPPORTED_ARCHES,
+        STDLIBS,
+    )),
     toolchains = [
         "@rules_python//python:current_py_toolchain",
         "@bazel_tools//tools/cpp:current_cc_toolchain",
@@ -58,7 +61,17 @@ genrule(
     tools = [
         "@bazel_tools//tools/cpp:current_cc_toolchain",
         "@rules_python//python:current_py_toolchain",
-    ],
+    ] + select({
+        "@platforms//cpu:x86_64": [
+            "@sysroot_linux_amd64//:WORKSPACE",
+            "@sysroot_linux_amd64//:sysroot",
+        ],
+        "@platforms//cpu:aarch64": [
+            "@sysroot_linux_arm64//:WORKSPACE",
+            "@sysroot_linux_arm64//:sysroot",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 genrule(
@@ -92,12 +105,16 @@ genrule(
             "@fips_cmake_linux_x86_64//:bin/cmake",
             "@fips_go_linux_amd64//:all",
             "@fips_go_linux_amd64//:bin/go",
+            "@sysroot_linux_amd64//:WORKSPACE",
+            "@sysroot_linux_amd64//:sysroot",
         ],
         "@platforms//cpu:aarch64": [
             "@fips_cmake_linux_aarch64//:all",
             "@fips_cmake_linux_aarch64//:bin/cmake",
             "@fips_go_linux_arm64//:all",
             "@fips_go_linux_arm64//:bin/go",
+            "@sysroot_linux_arm64//:WORKSPACE",
+            "@sysroot_linux_arm64//:sysroot",
         ],
         "//conditions:default": [],
     }),

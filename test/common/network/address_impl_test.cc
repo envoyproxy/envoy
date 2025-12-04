@@ -216,6 +216,30 @@ TEST(Ipv4InstanceTest, NetnsComparison) {
   EXPECT_NE(address1, address2);
 }
 
+TEST(Ipv4InstanceTest, WithNetworkNamespace) {
+  const auto ns1 = "/var/run/netns/11111";
+  Ipv4Instance address1("1.2.3.4", nullptr);
+  EXPECT_EQ(absl::nullopt, address1.networkNamespace());
+  Ipv4Instance address2("1.2.3.4", nullptr, ns1);
+  EXPECT_EQ(ns1, address2.networkNamespace());
+
+  const auto address3 = address1.withNetworkNamespace(ns1);
+  EXPECT_NE(nullptr, address3);
+  EXPECT_EQ(ns1, address3->networkNamespace());
+  EXPECT_EQ(*address3, address2);
+
+  const auto ns2 = "/var/run/netns/22222";
+  EXPECT_EQ(*address1.withNetworkNamespace(ns2), *address2.withNetworkNamespace(ns2));
+
+  // Override with empty string.
+  const auto address4 = address2.withNetworkNamespace("");
+  EXPECT_NE(nullptr, address4);
+  EXPECT_EQ(absl::nullopt, address4->networkNamespace());
+  EXPECT_EQ("1.2.3.4:0", address4->asString());
+  EXPECT_EQ("1.2.3.4", address4->ip()->addressAsString());
+  EXPECT_EQ(0U, address4->ip()->port());
+}
+
 TEST(Ipv4InstanceTest, Multicast) {
   Ipv4Instance address("230.0.0.1");
   EXPECT_EQ("230.0.0.1:0", address.asString());
@@ -354,6 +378,30 @@ TEST(Ipv6InstanceTest, NetnsCompare) {
   EXPECT_EQ(address1, address3);
 }
 
+TEST(Ipv6InstanceTest, WithNetworkNamespace) {
+  const auto ns1 = "/var/run/netns/11111";
+  Ipv6Instance address1("::0001", 80, nullptr, true);
+  EXPECT_EQ(absl::nullopt, address1.networkNamespace());
+  Ipv6Instance address2("::0001", 80, nullptr, true, ns1);
+  EXPECT_EQ(ns1, address2.networkNamespace());
+
+  const auto address3 = address1.withNetworkNamespace(ns1);
+  EXPECT_NE(nullptr, address3);
+  EXPECT_EQ(ns1, address3->networkNamespace());
+  EXPECT_EQ(*address3, address2);
+
+  const auto ns2 = "/var/run/netns/22222";
+  EXPECT_EQ(*address1.withNetworkNamespace(ns2), *address2.withNetworkNamespace(ns2));
+
+  // Override with empty string.
+  const auto address4 = address2.withNetworkNamespace("");
+  EXPECT_NE(nullptr, address4);
+  EXPECT_EQ(absl::nullopt, address4->networkNamespace());
+  EXPECT_EQ("[::1]:80", address4->asString());
+  EXPECT_EQ("::1", address4->ip()->addressAsString());
+  EXPECT_EQ(80U, address4->ip()->port());
+}
+
 TEST(Ipv6InstanceTest, PortOnly) {
   Ipv6Instance address(443);
   EXPECT_EQ("[::]:443", address.asString());
@@ -485,6 +533,8 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ(Type::Pipe, address->type());
   EXPECT_EQ(nullptr, address->ip());
   EXPECT_EQ(nullptr, address->envoyInternalAddress());
+  EXPECT_EQ(absl::nullopt, address->networkNamespace());
+  EXPECT_EQ(nullptr, address->withNetworkNamespace("/var/run/netns/1"));
 }
 
 TEST(InternalInstanceTest, Basic) {
@@ -496,6 +546,8 @@ TEST(InternalInstanceTest, Basic) {
   EXPECT_NE(nullptr, address.envoyInternalAddress());
   EXPECT_EQ(nullptr, address.sockAddr());
   EXPECT_EQ(static_cast<decltype(address.sockAddrLen())>(0), address.sockAddrLen());
+  EXPECT_EQ(absl::nullopt, address.networkNamespace());
+  EXPECT_EQ(nullptr, address.withNetworkNamespace("/var/run/netns/1"));
 }
 
 TEST(InternalInstanceTest, BasicWithId) {

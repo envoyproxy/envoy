@@ -167,14 +167,43 @@ const char* codecStrError(int error_code) { return nghttp2_strerror(error_code);
 const char* codecStrError(int) { return "unknown_error"; }
 #endif
 
-int reasonToReset(StreamResetReason reason) {
+/**
+ * Convert StreamResetReason to HTTP/2 error code.
+ * @param reason the StreamResetReason to convert
+ * @param response_end_stream_sent whether END_STREAM has been sent for a server stream.
+ * True means the response has been fully sent.
+ */
+int reasonToReset(StreamResetReason reason, bool response_end_stream_sent) {
   switch (reason) {
   case StreamResetReason::LocalRefusedStreamReset:
     return OGHTTP2_REFUSED_STREAM;
   case StreamResetReason::ConnectError:
     return OGHTTP2_CONNECT_ERROR;
+  case StreamResetReason::ProtocolError:
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+      return OGHTTP2_NO_ERROR;
+    }
+    return OGHTTP2_PROTOCOL_ERROR;
   default:
-    return OGHTTP2_NO_ERROR;
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+      return OGHTTP2_NO_ERROR;
+    }
+    // If the response has been fully sent then we reset with OGHTTP2_NO_ERROR to tell
+    // there is no transport level error.
+    return response_end_stream_sent ? OGHTTP2_NO_ERROR : OGHTTP2_INTERNAL_ERROR;
+  }
+}
+
+StreamResetReason errorCodeToResetReason(int error_code) {
+  switch (error_code) {
+  case OGHTTP2_REFUSED_STREAM:
+    return StreamResetReason::RemoteRefusedStreamReset;
+  case OGHTTP2_CONNECT_ERROR:
+    return StreamResetReason::ConnectError;
+  case OGHTTP2_PROTOCOL_ERROR:
+    return StreamResetReason::ProtocolError;
+  default:
+    return StreamResetReason::RemoteReset;
   }
 }
 
@@ -894,10 +923,19 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
     return;
   }
   if (codec_callbacks_) {
-    codec_callbacks_->onCodecLowLevelReset();
+    // TODO(wbpcode): this ensure that onCodecLowLevelReset is only called once. But
+    // we should replace this with a better design later.
+    // See https://github.com/envoyproxy/envoy/issues/42264 for why we need this.
+    if (!codec_low_level_reset_is_called_) {
+      codec_low_level_reset_is_called_ = true;
+      codec_callbacks_->onCodecLowLevelReset();
+    }
   }
-  parent_.adapter_->SubmitRst(stream_id_,
-                              static_cast<http2::adapter::Http2ErrorCode>(reasonToReset(reason)));
+
+  const bool response_end_stream_sent =
+      parent_.adapter_->IsServerSession() ? local_end_stream_sent_ : false;
+  parent_.adapter_->SubmitRst(stream_id_, static_cast<http2::adapter::Http2ErrorCode>(
+                                              reasonToReset(reason, response_end_stream_sent)));
 }
 
 NewMetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
@@ -1510,19 +1548,27 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
         // depending whether the connection is upstream or downstream.
         reason = getMessagingErrorResetReason();
       } else {
-        if (error_code == OGHTTP2_REFUSED_STREAM) {
-          reason = StreamResetReason::RemoteRefusedStreamReset;
-          stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-        } else {
-          if (error_code == OGHTTP2_CONNECT_ERROR) {
-            reason = StreamResetReason::ConnectError;
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+          reason = errorCodeToResetReason(error_code);
+          if (error_code == OGHTTP2_REFUSED_STREAM) {
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
           } else {
-            reason = StreamResetReason::RemoteReset;
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
           }
-          stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+        } else {
+          if (error_code == OGHTTP2_REFUSED_STREAM) {
+            reason = StreamResetReason::RemoteRefusedStreamReset;
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
+          } else {
+            if (error_code == OGHTTP2_CONNECT_ERROR) {
+              reason = StreamResetReason::ConnectError;
+            } else {
+              reason = StreamResetReason::RemoteReset;
+            }
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+          }
         }
       }
-
       stream->runResetCallbacks(reason, absl::string_view());
 
     } else if (!stream->reset_reason_.has_value() &&

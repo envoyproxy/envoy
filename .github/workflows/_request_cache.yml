@@ -10,17 +10,12 @@ on:
         required: true
       app-key:
         required: true
-      gcs-cache-key:
-        required: true
 
     inputs:
       env:
         type: string
         required: true
       caches:
-        type: string
-        required: true
-      gcs-cache-bucket:
         type: string
         required: true
 
@@ -51,18 +46,17 @@ jobs:
 
   bazel:
     permissions:
+      actions: write
       contents: read
       packages: read
     secrets:
       app-id: ${{ secrets.app-id }}
       app-key: ${{ secrets.app-key }}
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_request_cache_bazel.yml
     with:
       arch: ${{ matrix.arch || 'x64' }}
       caches: ${{ inputs.caches }}
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       request: ${{ inputs.env }}
       runs-on: ${{ matrix.runs-on }}
       targets: ${{ matrix.targets || '...' }}
