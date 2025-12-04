@@ -748,6 +748,132 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, CpuStatWithAdditionalFields) {
 }
 
 // =============================================================================
+// File Read Error Tests - Test !stat_result.ok(), !effective_result.ok(), !max_result.ok()
+// =============================================================================
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuStatFile) {
+  // Test: if (!stat_result.ok()) - cpu.stat file doesn't exist or can't be read
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  // Create reader with non-existent cpu.stat file path
+  const std::string nonexistent_stat = TestEnvironment::temporaryPath("nonexistent_cpu_stat");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, nonexistent_stat, v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  // Should return invalid CpuTimes
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+  EXPECT_EQ(envoy_container_stats.effective_cores, 0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadEffectiveCpusFile) {
+  // Test: if (!effective_result.ok()) - cpuset.cpus.effective file doesn't exist
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  // Create reader with non-existent cpuset.cpus.effective file path
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  const std::string nonexistent_effective = TestEnvironment::temporaryPath("nonexistent_effective");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), nonexistent_effective);
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  // Should return invalid CpuTimes
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+  EXPECT_EQ(envoy_container_stats.effective_cores, 0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuMaxFile) {
+  // Test: if (!max_result.ok()) - cpu.max file doesn't exist
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  // Create reader with non-existent cpu.max file path
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuEffective("0-3\n");
+  const std::string nonexistent_max = TestEnvironment::temporaryPath("nonexistent_max");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), nonexistent_max, v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  // Should return invalid CpuTimes
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+  EXPECT_EQ(envoy_container_stats.effective_cores, 0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, NegativeSingleCpuValue) {
+  // Test: if (single_cpu < 0) - Single CPU with negative value
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("-1\n"); // Negative single CPU value
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  // Should return invalid CpuTimes
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, EmptyRangeResultsInZeroN) {
+  // Test: if (N <= 0) - After parsing, N ends up being 0 or negative
+  // This is a tricky case - we need to force N to remain 0 after parsing
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  // Empty string after trimming - this will cause parsing to fail and N to remain 0
+  setV2CpuEffective("\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  // Should return invalid CpuTimes
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test for negative period value edge case
+TEST_F(LinuxContainerCpuStatsReaderV2Test, VeryLargeNegativePeriod) {
+  // Additional coverage for period validation
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuEffective("0-3\n");
+  setV2CpuMax("200000 -999999\n"); // Very large negative period
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// =============================================================================
 // Factory Method Tests - LinuxContainerCpuStatsReader::create()
 // =============================================================================
 

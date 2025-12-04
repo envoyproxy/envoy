@@ -38,7 +38,6 @@ struct CpuTimes {
     const double work_over_period = work_time - previous_cpu_times.work_time;
     const int64_t total_over_period = total_time - previous_cpu_times.total_time;
 
-    // Validate delta values
     if (work_over_period < 0 || total_over_period <= 0) {
       throw EnvoyException(
           fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
@@ -47,14 +46,11 @@ struct CpuTimes {
     }
 
     if (is_cgroup_v2) {
-      // cgroup v2: work_time is in microseconds, total_time is in nanoseconds
-      // Need to account for effective_cores
       const double total_over_period_seconds = total_over_period / 1000000000.0;
       const double utilization =
           ((work_over_period / 1000000.0) / (total_over_period_seconds * effective_cores));
       return std::clamp(utilization, 0.0, 1.0);
     } else {
-      // cgroup v1: simple ratio calculation
       return work_over_period / total_over_period;
     }
   }
