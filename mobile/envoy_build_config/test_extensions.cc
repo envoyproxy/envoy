@@ -10,7 +10,7 @@
 #include "test/common/http/filters/test_logger/config.h"
 #include "test/common/http/filters/test_read/config.h"
 #include "test/common/http/filters/test_remote_response/config.h"
-
+#include "test/common/mocks/dns/mock_dns_resolver.h"
 #include "external/envoy_build_config/test_extensions.h"
 
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)
@@ -25,6 +25,7 @@
 #include "test/common/http/filters/route_cache_reset/filter_descriptor.pb.h"
 #include "test/common/http/filters/test_kv_store/filter_descriptor.pb.h"
 #include "test/common/http/filters/test_logger/filter_descriptor.pb.h"
+#include "test/common/mocks/dns/mock_dns_resolver_descriptor.pb.h"
 #endif
 
 void register_test_extensions() {
@@ -40,6 +41,7 @@ void register_test_extensions() {
   Envoy::Extensions::LoadBalancingPolicies::RoundRobin::forceRegisterFactory();
   Envoy::HttpFilters::TestRead::forceRegisterTestReadFilterFactory();
   Envoy::Upstream::forceRegisterStaticClusterFactory();
+  Envoy::Test::forceRegisterMockDnsResolverFactory();
 
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)
   std::vector<Envoy::FileDescriptorInfo> file_descriptors = {
@@ -52,6 +54,7 @@ void register_test_extensions() {
       protobuf::reflection::test_common_http_filters_route_cache_reset_filter::kFileDescriptorInfo,
       protobuf::reflection::test_common_http_filters_test_kv_store_filter::kFileDescriptorInfo,
       protobuf::reflection::test_common_http_filters_test_logger_filter::kFileDescriptorInfo,
+      protobuf::reflection::test_common_mocks_dns_mock_dns_resolver::kFileDescriptorInfo,
   };
   for (const Envoy::FileDescriptorInfo& descriptor : file_descriptors) {
     Envoy::loadFileDescriptors(descriptor);
