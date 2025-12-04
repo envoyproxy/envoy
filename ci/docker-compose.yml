@@ -88,6 +88,7 @@ x-envoy-build-base: &envoy-build-base
         build_id="$(cat /.build-id)"
         echo "Envoy build image: $${build_id}"
     fi
+    chown envoybuild:envoybuild /build
     chown envoybuild /proc/self/fd/2 2>/dev/null || true
     [[ -e /entrypoint-extra.sh ]] && /entrypoint-extra.sh
     sudo -EHs -u envoybuild bash -c 'cd ${ENVOY_DOCKER_SOURCE_DIR:-/source} && exec ${DOCKER_COMMAND:-bash}'
