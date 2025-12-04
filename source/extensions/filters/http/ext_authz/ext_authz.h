@@ -435,8 +435,8 @@ private:
 
   // Validates error response headers and clears custom attributes if invalid headers are found.
   // Returns true if headers are valid or validation is disabled, false if headers are invalid.
-  bool validateAndClearInvalidErrorResponseAttributes(
-      Filters::Common::ExtAuthz::ResponsePtr& response);
+  bool
+  validateAndClearInvalidErrorResponseAttributes(Filters::Common::ExtAuthz::ResponsePtr& response);
 
   // Helper to check if we can add more headers to the response, respecting header limits.
   // Returns true if we can add more headers, false if the limit has been reached.
