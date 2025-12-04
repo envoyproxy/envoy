@@ -3915,195 +3915,9 @@ TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
   run_test_with_prefix("", false);
 }
 
-// Test OAuth filter to verify that OAuth cookies are set with custom paths.
-TEST_F(OAuth2Test, OAuthTestFullFlowWithCustomCookiePaths) {
-  // Initialize with custom cookie paths. Set all cookies to /api/v1 path.
-  init(getConfig(true, true,
-                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-                     OAuth2Config_AuthType_URL_ENCODED_BODY,
-                 0, false, false, false, false, false,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 0, 0, false, "/api/v1", "/api/v1", "/api/v1", "/api/v1", "/api/v1", "/api/v1",
-                 "/api/v1"));
-
-  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
-
-  // Simulate OAuth callback request with CSRF token and code verifier cookies.
-  Http::TestRequestHeaderMapImpl callback_headers{
-      {Http::Headers::get().Path.get(), "/_oauth?code=auth_code&state=" + TEST_ENCODED_STATE},
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "https"},
-      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_CSRF_TOKEN},
-      {Http::Headers::get().Cookie.get(), "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER},
-  };
-
-  // The filter will check if OAuth can be skipped first.
-  EXPECT_CALL(*validator_, setParams(_, _));
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-
-  // Mock the OAuth client to return a successful token response.
-  EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
-            filter_->decodeHeaders(callback_headers, false));
-
-  // Simulate successful token retrieval.
-  Http::TestResponseHeaderMapImpl response_headers{
-      {Http::Headers::get().Status.get(), "302"},
-      {Http::Headers::get().Location.get(), "https://traffic.example.com/test"},
-  };
-
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
-        response_headers = Http::TestResponseHeaderMapImpl(headers);
-      }));
-
-  filter_->onGetAccessTokenSuccess("access_token", "id_token", "refresh_token",
-                                   std::chrono::seconds(10));
-
-  // Verify that all OAuth cookies have the correct custom path.
-  std::vector<std::string> set_cookie_headers_str;
-  response_headers.iterate(
-      [&set_cookie_headers_str](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        if (header.key().getStringView() == Http::Headers::get().SetCookie.get()) {
-          set_cookie_headers_str.push_back(std::string(header.value().getStringView()));
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      });
-
-  bool found_hmac = false;
-  bool found_bearer = false;
-  bool found_id_token = false;
-  bool found_refresh_token = false;
-  bool found_expires = false;
-
-  for (const auto& cookie_str : set_cookie_headers_str) {
-    if (cookie_str.find("OauthHMAC=") != std::string::npos) {
-      EXPECT_NE(cookie_str.find(";path=/api/v1;"), std::string::npos)
-          << "OauthHMAC cookie should have path=/api/v1, got: " << cookie_str;
-      found_hmac = true;
-    }
-    if (cookie_str.find("BearerToken=") != std::string::npos) {
-      EXPECT_NE(cookie_str.find(";path=/api/v1;"), std::string::npos)
-          << "BearerToken cookie should have path=/api/v1, got: " << cookie_str;
-      found_bearer = true;
-    }
-    if (cookie_str.find("IdToken=") != std::string::npos) {
-      EXPECT_NE(cookie_str.find(";path=/api/v1;"), std::string::npos)
-          << "IdToken cookie should have path=/api/v1, got: " << cookie_str;
-      found_id_token = true;
-    }
-    if (cookie_str.find("RefreshToken=") != std::string::npos) {
-      EXPECT_NE(cookie_str.find(";path=/api/v1;"), std::string::npos)
-          << "RefreshToken cookie should have path=/api/v1, got: " << cookie_str;
-      found_refresh_token = true;
-    }
-    if (cookie_str.find("OauthExpires=") != std::string::npos) {
-      EXPECT_NE(cookie_str.find(";path=/api/v1;"), std::string::npos)
-          << "OauthExpires cookie should have path=/api/v1, got: " << cookie_str;
-      found_expires = true;
-    }
-  }
-
-  EXPECT_TRUE(found_hmac) << "OauthHMAC cookie not found.";
-  EXPECT_TRUE(found_bearer) << "BearerToken cookie not found.";
-  EXPECT_TRUE(found_id_token) << "IdToken cookie not found.";
-  EXPECT_TRUE(found_refresh_token) << "RefreshToken cookie not found.";
-  EXPECT_TRUE(found_expires) << "OauthExpires cookie not found.";
-}
-
-// Test the OAuth filter signout with custom cookie paths and verify that
-// cookie deletion uses the correct path attribute.
-TEST_F(OAuth2Test, OAuthTestSignoutWithCustomCookiePaths) {
-  // Initialize with custom cookie paths. Set all cookies to /secure path.
-  init(getConfig(true, true,
-                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-                     OAuth2Config_AuthType_URL_ENCODED_BODY,
-                 0, false, false, false, false, false,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                     CookieConfig_SameSite_DISABLED,
-                 0, 0, false, "/secure", "/secure", "/secure", "/secure", "/secure", "/secure",
-                 "/secure"));
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/_signout"},
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "https"},
-  };
-
-  Http::TestResponseHeaderMapImpl response_headers;
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
-        response_headers = Http::TestResponseHeaderMapImpl(headers);
-      }));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers, false));
-
-  // Verify that all deletion cookies have the correct custom path.
-  std::vector<std::string> set_cookie_headers_str;
-  response_headers.iterate(
-      [&set_cookie_headers_str](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        if (header.key().getStringView() == Http::Headers::get().SetCookie.get()) {
-          set_cookie_headers_str.push_back(std::string(header.value().getStringView()));
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      });
-
-  bool found_hmac_delete = false;
-  bool found_bearer_delete = false;
-
-  for (const auto& cookie_str : set_cookie_headers_str) {
-    if (cookie_str.find("OauthHMAC=deleted") != std::string::npos) {
-      EXPECT_NE(cookie_str.find("path=/secure"), std::string::npos)
-          << "OauthHMAC deletion should have path=/secure, got: " << cookie_str;
-      found_hmac_delete = true;
-    }
-    if (cookie_str.find("BearerToken=deleted") != std::string::npos) {
-      EXPECT_NE(cookie_str.find("path=/secure"), std::string::npos)
-          << "BearerToken deletion should have path=/secure, got: " << cookie_str;
-      found_bearer_delete = true;
-    }
-  }
-
-  EXPECT_TRUE(found_hmac_delete) << "OauthHMAC deletion cookie not found.";
-  EXPECT_TRUE(found_bearer_delete) << "BearerToken deletion cookie not found.";
-}
-
-// Test that CSRF/nonce and code verifier cookies can have different paths from session cookies.
-// This is the key use case: CSRF cookie might be scoped to the callback URL path while
-// session cookies are scoped to the application path.
-TEST_F(OAuth2Test, OAuthTestDifferentPathsForCsrfAndSessionCookies) {
-  // Initialize with CSRF/nonce and code verifier cookies on /auth/callback path,
-  // while session cookies (bearer, HMAC, expires, id_token, refresh_token) are on /app path.
+// Test that custom cookie paths work correctly.
+TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
+  // Initialize with different paths: CSRF cookies on /auth/callback, session cookies on /app.
   init(getConfig(true, true,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY,
@@ -4132,59 +3946,189 @@ TEST_F(OAuth2Test, OAuthTestDifferentPathsForCsrfAndSessionCookies) {
                  "/auth/callback"  // code_verifier_path
                  ));
 
-  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
 
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/test"},
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "https"},
+  // Helper lambda to extract Set-Cookie headers from response.
+  auto extract_cookies = [](const Http::TestResponseHeaderMapImpl& headers) {
+    std::vector<std::string> cookies;
+    headers.iterate([&cookies](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      if (header.key().getStringView() == Http::Headers::get().SetCookie.get()) {
+        cookies.push_back(std::string(header.value().getStringView()));
+      }
+      return Http::HeaderMap::Iterate::Continue;
+    });
+    return cookies;
   };
 
-  // Explicitly fail the validation.
-  EXPECT_CALL(*validator_, setParams(_, _));
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
+  // Phase 1: Test redirect phase.
+  // We make sure that nonce and code_verifier cookies should have /auth/callback path.
+  {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Path.get(), "/test"},
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+        {Http::Headers::get().Scheme.get(), "https"},
+    };
 
-  // Catch the redirect to the OAuth server and verify the cookie paths.
-  Http::TestResponseHeaderMapImpl response_headers;
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
-        response_headers = Http::TestResponseHeaderMapImpl(headers);
-      }));
+    EXPECT_CALL(*validator_, setParams(_, _));
+    EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+    EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers, false));
+    Http::TestResponseHeaderMapImpl response_headers;
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+        .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
+          response_headers = Http::TestResponseHeaderMapImpl(headers);
+        }));
 
-  // Verify that the CSRF token cookie (OauthNonce) and code verifier have /auth/callback path.
-  std::vector<std::string> set_cookie_headers_str;
-  response_headers.iterate(
-      [&set_cookie_headers_str](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        if (header.key().getStringView() == Http::Headers::get().SetCookie.get()) {
-          set_cookie_headers_str.push_back(std::string(header.value().getStringView()));
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      });
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, false));
 
-  bool found_nonce_cookie = false;
-  bool found_code_verifier_cookie = false;
-
-  for (const auto& cookie_str : set_cookie_headers_str) {
-    if (cookie_str.find("OauthNonce=") != std::string::npos) {
-      EXPECT_NE(cookie_str.find(";path=/auth/callback;"), std::string::npos)
-          << "OauthNonce cookie should have path=/auth/callback, got: " << cookie_str;
-      found_nonce_cookie = true;
+    auto cookies = extract_cookies(response_headers);
+    bool found_nonce = false, found_code_verifier = false;
+    for (const auto& cookie : cookies) {
+      if (cookie.find("OauthNonce=") != std::string::npos) {
+        EXPECT_NE(cookie.find(";path=/auth/callback;"), std::string::npos)
+            << "OauthNonce should have path=/auth/callback, got: " << cookie;
+        found_nonce = true;
+      }
+      if (cookie.find("CodeVerifier=") != std::string::npos) {
+        EXPECT_NE(cookie.find(";path=/auth/callback;"), std::string::npos)
+            << "CodeVerifier should have path=/auth/callback, got: " << cookie;
+        found_code_verifier = true;
+      }
     }
-    if (cookie_str.find("CodeVerifier=") != std::string::npos) {
-      EXPECT_NE(cookie_str.find(";path=/auth/callback;"), std::string::npos)
-          << "CodeVerifier cookie should have path=/auth/callback, got: " << cookie_str;
-      found_code_verifier_cookie = true;
-    }
+    EXPECT_TRUE(found_nonce) << "OauthNonce cookie not found.";
+    EXPECT_TRUE(found_code_verifier) << "CodeVerifier cookie not found.";
   }
 
-  EXPECT_TRUE(found_nonce_cookie) << "OauthNonce cookie not found in response headers.";
-  EXPECT_TRUE(found_code_verifier_cookie) << "CodeVerifier cookie not found in response headers.";
+  // Phase 2: Test token callback. Session cookies should have /app path.
+  // Reinitialize filter for the callback phase.
+  init(getConfig(true, true,
+                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, false, false, false,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 0, 0, false, "/app", "/app", "/app", "/app", "/app", "/auth/callback",
+                 "/auth/callback"));
+  {
+    Http::TestRequestHeaderMapImpl callback_headers{
+        {Http::Headers::get().Path.get(), "/_oauth?code=auth_code&state=" + TEST_ENCODED_STATE},
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+        {Http::Headers::get().Scheme.get(), "https"},
+        {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_CSRF_TOKEN},
+        {Http::Headers::get().Cookie.get(), "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER},
+    };
+
+    EXPECT_CALL(*validator_, setParams(_, _));
+    EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+    EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+              filter_->decodeHeaders(callback_headers, false));
+
+    Http::TestResponseHeaderMapImpl response_headers;
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+        .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
+          response_headers = Http::TestResponseHeaderMapImpl(headers);
+        }));
+
+    filter_->onGetAccessTokenSuccess("access_token", "id_token", "refresh_token",
+                                     std::chrono::seconds(10));
+
+    auto cookies = extract_cookies(response_headers);
+    bool found_hmac = false, found_bearer = false, found_expires = false;
+    for (const auto& cookie : cookies) {
+      if (cookie.find("OauthHMAC=") != std::string::npos) {
+        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+            << "OauthHMAC should have path=/app, got: " << cookie;
+        found_hmac = true;
+      }
+      if (cookie.find("BearerToken=") != std::string::npos) {
+        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+            << "BearerToken should have path=/app, got: " << cookie;
+        found_bearer = true;
+      }
+      if (cookie.find("OauthExpires=") != std::string::npos) {
+        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+            << "OauthExpires should have path=/app, got: " << cookie;
+        found_expires = true;
+      }
+    }
+    EXPECT_TRUE(found_hmac) << "OauthHMAC cookie not found.";
+    EXPECT_TRUE(found_bearer) << "BearerToken cookie not found.";
+    EXPECT_TRUE(found_expires) << "OauthExpires cookie not found.";
+  }
+
+  // Phase 3: Test signout. Cookie deletion should use the configured paths.
+  // Reinitialize filter for the signout phase.
+  init(getConfig(true, true,
+                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, false, false, false,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 0, 0, false, "/app", "/app", "/app", "/app", "/app", "/auth/callback",
+                 "/auth/callback"));
+  {
+    Http::TestRequestHeaderMapImpl signout_headers{
+        {Http::Headers::get().Path.get(), "/_signout"},
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+        {Http::Headers::get().Scheme.get(), "https"},
+    };
+
+    Http::TestResponseHeaderMapImpl response_headers;
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+        .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
+          response_headers = Http::TestResponseHeaderMapImpl(headers);
+        }));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(signout_headers, false));
+
+    auto cookies = extract_cookies(response_headers);
+    bool found_hmac_delete = false, found_nonce_delete = false;
+    for (const auto& cookie : cookies) {
+      if (cookie.find("OauthHMAC=deleted") != std::string::npos) {
+        EXPECT_NE(cookie.find("path=/app"), std::string::npos)
+            << "OauthHMAC deletion should have path=/app, got: " << cookie;
+        found_hmac_delete = true;
+      }
+      if (cookie.find("OauthNonce=deleted") != std::string::npos) {
+        EXPECT_NE(cookie.find("path=/auth/callback"), std::string::npos)
+            << "OauthNonce deletion should have path=/auth/callback, got: " << cookie;
+        found_nonce_delete = true;
+      }
+    }
+    EXPECT_TRUE(found_hmac_delete) << "OauthHMAC deletion cookie not found.";
+    EXPECT_TRUE(found_nonce_delete) << "OauthNonce deletion cookie not found.";
+  }
 }
 
 } // namespace Oauth2
