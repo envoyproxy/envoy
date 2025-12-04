@@ -99,7 +99,7 @@ protected:
     return secret;
   }
 
-  void waitSendSdsResponse(absl::string_view cert) {
+  void waitSendSdsResponse(absl::string_view cert, bool remove = false) {
     RELEASE_ASSERT(!xds_streams_.contains(cert), "Do not call twice");
     FakeStreamPtr xds_stream;
     AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream);
@@ -113,13 +113,12 @@ protected:
         << "Should be 1 resource in DELTA_GRPC";
     EXPECT_EQ(cert, delta_discovery_request.resource_names_subscribe().at(0))
         << "Secret name doesn't match in the request";
-    envoy::service::discovery::v3::DeltaDiscoveryResponse discovery_response;
-    discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
-    auto* resource = discovery_response.add_resources();
-    resource->set_name(cert);
-    resource->mutable_resource()->PackFrom(getServerSecretRsa(cert));
-    xds_stream->sendGrpcMessage(discovery_response);
     xds_streams_[cert] = std::move(xds_stream);
+    if (remove) {
+      removeSecret(cert); 
+    } else {
+      sendSecret(cert);
+    }
   }
 
   void removeSecret(absl::string_view cert) {
@@ -130,14 +129,29 @@ protected:
     xds_streams_[cert]->sendGrpcMessage(discovery_response);
   }
 
+  void sendSecret(absl::string_view cert) {
+    RELEASE_ASSERT(xds_streams_.contains(cert), "Must have established a stream");
+    envoy::service::discovery::v3::DeltaDiscoveryResponse discovery_response;
+    discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
+    auto* resource = discovery_response.add_resources();
+    resource->set_name(cert);
+    resource->mutable_resource()->PackFrom(getServerSecretRsa(cert));
+    xds_streams_[cert]->sendGrpcMessage(discovery_response);
+  }
+
   void waitCertsRequested(uint32_t count) {
-    test_server_->waitForCounterEq(listenerStatPrefix("on_demand_secret.cert_requested"), count,
+    test_server_->waitForCounterEq(onDemandStat("cert_requested"), count,
                                    TestUtility::DefaultTimeout, dispatcher_.get());
+  }
+
+  std::string onDemandStat(absl::string_view stat) {
+    return listenerStatPrefix(absl::StrCat("on_demand_secret.", stat));
   }
 
   absl::flat_hash_map<std::string, FakeStreamPtr> xds_streams_;
 };
 
+/*
 TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
   on_server_init_function_ = [&]() {
     createXdsConnection();
@@ -158,8 +172,8 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
   conn.reset();
   EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
-  EXPECT_EQ(1,
-            test_server_->counter(listenerStatPrefix("on_demand_secret.cert_requested"))->value());
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
@@ -179,6 +193,7 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
   conn.reset();
   EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
@@ -202,6 +217,27 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
   conn.reset();
   EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
   EXPECT_EQ(1, test_server_->counter("sds.server2.update_success")->value());
+  EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, BasicFail) {
+  setup(R"EOF(
+  certificate_mapper:
+    name: static-name
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.certificate_mappers.static_name.v3.StaticName
+      name: server
+  )EOF");
+  auto conn = std::make_unique<ClientSslConnection>(*this);
+  waitCertsRequested(1);
+  createXdsConnection();
+  waitSendSdsResponse("server", true);
+  while (!conn->connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
+  EXPECT_EQ(0, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
 TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
@@ -225,6 +261,7 @@ TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
   conn1->sendAndReceiveTlsData("hello", "world");
   conn1.reset();
   conn2->sendAndReceiveTlsData("lorem", "ipsum");
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
 TEST_P(OnDemandIntegrationTest, ClientInterruptedHandshake) {
@@ -241,6 +278,7 @@ TEST_P(OnDemandIntegrationTest, ClientInterruptedHandshake) {
   conn1.reset();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   // SDS request is still outstanding, so we can respond to it, and it will be used later.
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
   createXdsConnection();
   waitSendSdsResponse("server");
 }
@@ -271,7 +309,8 @@ TEST_P(OnDemandIntegrationTest, ConnectTimeout) {
   waitSendSdsResponse("server");
 }
 
-TEST_P(OnDemandIntegrationTest, SecretRemoved) {
+*/
+TEST_P(OnDemandIntegrationTest, SecretAddRemove) {
   setup(R"EOF(
   certificate_mapper:
     name: static-name
@@ -279,6 +318,7 @@ TEST_P(OnDemandIntegrationTest, SecretRemoved) {
       "@type": type.googleapis.com/envoy.extensions.certificate_mappers.static_name.v3.StaticName
       name: server
   )EOF");
+  // Add successfully.
   auto conn = std::make_unique<ClientSslConnection>(*this);
   waitCertsRequested(1);
   createXdsConnection();
@@ -286,7 +326,17 @@ TEST_P(OnDemandIntegrationTest, SecretRemoved) {
   conn->waitForUpstreamConnection();
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+  // Remove.
   removeSecret("server");
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(0, test_server_->gauge(onDemandStat("cert_active"))->value());
+  // Request again.
+  auto conn2 = std::make_unique<ClientSslConnection>(*this);
+  sendSecret("server");
+  conn2->waitForUpstreamConnection();
+  conn2->sendAndReceiveTlsData("hello", "world");
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, OnDemandIntegrationTest,

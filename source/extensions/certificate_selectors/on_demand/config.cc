@@ -42,18 +42,16 @@ const Ssl::TlsContext& AsyncContext::tlsContext() const { return tls_contexts_[0
 
 void Handle::notify(AsyncContextConstSharedPtr cert_ctx) {
   ASSERT(cb_);
-  OptRef<const Ssl::TlsContext> selected_ctx;
   bool staple = false;
   if (cert_ctx) {
-    active_context_ = std::move(cert_ctx);
-    selected_ctx = active_context_->tlsContext();
+    active_context_ = cert_ctx;
     staple = (TransportSockets::Tls::ocspStapleAction(
-      *selected_ctx, client_ocsp_capable_, active_context_->ocspStaplePolicy()) == Ssl::OcspStapleAction::Staple);
+      active_context_->tlsContext(), client_ocsp_capable_, active_context_->ocspStaplePolicy()) == Ssl::OcspStapleAction::Staple);
   }
   Event::Dispatcher& dispatcher = cb_->dispatcher();
   // TODO: This could benefit from batching events by the dispatcher.
-  dispatcher.post([cb = std::move(cb_), active_context_, selected_ctx, staple] {
-    cb->onCertificateSelectionResult(selected_ctx, staple);
+  dispatcher.post([cb = std::move(cb_), cert_ctx, staple] {
+    cb->onCertificateSelectionResult(makeOptRefFromPtr(cert_ctx ? &cert_ctx->tlsContext() : nullptr), staple);
   });
   cb_ = nullptr;
 }
@@ -128,10 +126,23 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
   return absl::OkStatus();
 }
 
-absl::Status SecretManager::removeCertificate(absl::string_view secret_name) {
+absl::Status SecretManager::removeCertificateConfig(absl::string_view secret_name) {
+  // We cannot remove the subscription caller directly because this is called during a callback
+  // which continues later. Instead, we post to the main as a completion.
+  factory_context_.mainThreadDispatcher().post(
+      [weak_this = std::weak_ptr<SecretManager>(shared_from_this()), name = std::string(secret_name)]{
+      if (auto that = weak_this.lock(); that) {
+        that->doRemoveCertificateConfig(name);
+      }
+      });
+  return absl::OkStatus();
+}
+
+void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   auto it = cache_.find(secret_name);
   if (it == cache_.end()) {
-    return absl::OkStatus();
+    return;
   }
   size_t notify_count = 0;
   for (auto fetch_handle : it->second.callbacks_) {
@@ -141,6 +152,7 @@ absl::Status SecretManager::removeCertificate(absl::string_view secret_name) {
     }
   }
   cache_.erase(it);
+  setContext(secret_name, nullptr);
   stats_.cert_active_.dec();
   ENVOY_LOG(trace, "Removed certificate subscription for '{}', notified {} pending connections", secret_name, notify_count);
 }
@@ -168,7 +180,11 @@ HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
 void SecretManager::setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx) {
   cert_contexts_.runOnAllThreads([name = std::string(secret_name),
                                   cert_ctx = std::move(cert_ctx)](OptRef<ThreadLocalCerts> certs) {
-    certs->ctx_by_name_[name] = cert_ctx;
+    if (cert_ctx) {
+      certs->ctx_by_name_[name] = cert_ctx;
+    } else {
+      certs->ctx_by_name_.erase(name);
+    }
   });
 }
 

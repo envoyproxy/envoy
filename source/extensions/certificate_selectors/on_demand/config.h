@@ -78,11 +78,13 @@ public:
    *context.
    */
   explicit Handle(AsyncContextConstSharedPtr cert_context) : active_context_(cert_context) {}
+
   /** 
    * Asynchronous handle constructor must also keep the callback for the secret manager.
    */
   Handle(Ssl::CertificateSelectionCallbackPtr&& cb, bool client_ocsp_capable)
       : cb_(std::move(cb)), client_ocsp_capable_(client_ocsp_capable) {}
+
   /**
    * Notify the pending connection that the context is available.
    * @param cert_ctx TLS context or nullptr is the secret is removed.
@@ -98,8 +100,10 @@ private:
 
 using HandleSharedPtr = std::shared_ptr<Handle>;
 
-// Maintains dynamic subscriptions to SDS secrets and converts them from the xDS form to the
-// boringssl TLS contexts, while applying the parent TLS configuration.
+/**
+ * Secret manager maintains dynamic subscriptions to SDS secrets and converts them from the xDS form to the
+ * boringssl TLS contexts, while applying the parent TLS configuration.
+ */
 class SecretManager : public std::enable_shared_from_this<SecretManager>,
                       protected Logger::Loggable<Logger::Id::secret> {
 public:
@@ -109,28 +113,42 @@ public:
 
   /**
    * Start a subscription to the secret and register a handle on updates.
+   * MUST be called on the main thread.
    */
   void addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
                             OptRef<Init::Manager> init_manager);
   /**
    * Handle an updated certificate config by notifying any pending connections.
+   * MUST be called on the main thread.
    */
   absl::Status updateCertificate(absl::string_view secret_name,
                                  const Ssl::TlsCertificateConfig& cert_config);
 
   /**
-   * Delete any cached state for the secret since it is removed by the xDS server.
+   * Delete any cached state for the secret including its active subscription.
    */
-  absl::Status removeCertificateConfig(absl::string_view) { return absl::OkStatus(); }
+  absl::Status removeCertificateConfig(absl::string_view);
 
-  // Below methods are thread-safe, unlike prior ones which are only safe on the main thread.
+  /**
+   * Update the thread local caches with the certificates.
+   * @param cert_ctx the new context or nullptr to remove the secret.
+   */
   void setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx);
+
+  /**
+   * Retrieve the thread local certificate.
+   */
   absl::optional<AsyncContextConstSharedPtr> getContext(absl::string_view secret_name) const;
+
+  /**
+   * Start fetching the certificate via a subscription.
+   */
   HandleSharedPtr fetchCertificate(absl::string_view secret_name,
                                    Ssl::CertificateSelectionCallbackPtr&& cb,
                                    bool client_ocsp_capable);
 
 private:
+  void doRemoveCertificateConfig(absl::string_view);
   const Stats::ScopeSharedPtr stats_scope_;
   CertSelectionStats stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;
@@ -143,7 +161,6 @@ private:
     AsyncContextConstSharedPtr cert_context_;
     std::vector<std::weak_ptr<Handle>> callbacks_;
   };
-  // TODO(kuat): Needs GC.
   absl::flat_hash_map<std::string, CacheEntry> cache_;
 
   // Lock-free map to retrieve ready TLS contexts by name.
@@ -153,7 +170,9 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCerts> cert_contexts_;
 };
 
-// An asynchronous certificate selector is created for each TLS socket on each worker.
+/**
+ * An asynchronous certificate selector is created for each TLS socket on each worker.
+ */
 class AsyncSelector : public Ssl::TlsCertificateSelector,
                       protected Logger::Loggable<Logger::Id::connection> {
 public:
