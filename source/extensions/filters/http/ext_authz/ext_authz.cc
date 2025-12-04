@@ -1020,10 +1020,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
     stats_.error_.inc();
 
-    // Check if error response has custom headers (validate them first).
-    bool has_custom_headers =
-        !response->headers_to_set.empty() || !response->headers_to_append.empty();
-    validateAndClearInvalidErrorResponseAttributes(response, has_custom_headers);
+    // Validate error response headers and clear custom attributes if invalid.
+    validateAndClearInvalidErrorResponseAttributes(response);
 
     // Apply max_denied_response_body_bytes limit to error response body as well.
     if (config_->maxDeniedResponseBodyBytes() > 0 &&
@@ -1141,8 +1139,8 @@ Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr
 }
 
 bool Filter::validateAndClearInvalidErrorResponseAttributes(
-    Filters::Common::ExtAuthz::ResponsePtr& response, bool& has_custom_headers) {
-  if (!has_custom_headers || !config_->validateMutations()) {
+    Filters::Common::ExtAuthz::ResponsePtr& response) {
+  if (!config_->validateMutations()) {
     return true;
   }
 
@@ -1161,7 +1159,6 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
       response->headers_to_append.clear();
       response->body.clear();
       response->status_code = static_cast<Http::Code>(0); // Clear custom status.
-      has_custom_headers = false;
       return false;
     }
   }
@@ -1181,7 +1178,6 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
       response->headers_to_append.clear();
       response->body.clear();
       response->status_code = static_cast<Http::Code>(0); // Clear custom status.
-      has_custom_headers = false;
       return false;
     }
   }
