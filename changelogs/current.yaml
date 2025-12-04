@@ -446,5 +446,8 @@ new_features:
     <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces>` in the
     ext-authz network filter. This allows passing connection metadata (such as proxy protocol TLV data) to the
     external authorization server for making authorization decisions.
+- area: attributes
+  change: |
+    added :ref:`attributes <arch_overview_attributes>` for looking up request or response headers bytes.
 
 deprecated:
