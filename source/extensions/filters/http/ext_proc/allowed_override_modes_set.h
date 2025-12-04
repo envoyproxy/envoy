@@ -11,7 +11,7 @@ namespace ExternalProcessing {
 
 /**
  * A data-structure that holds the Allowed Override Mode set.
- * Interally it converts each allowed-override-mode enums values to a single
+ * Internally it converts each allowed-override-mode enums values to a single
  * list. This saves some memory, and allows an O(1) lookup.
  */
 class AllowedOverrideModesSet {
