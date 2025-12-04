@@ -10,14 +10,8 @@ on:
         required: true
       app-key:
         required: true
-      gcs-cache-key:
-        required: true
 
     inputs:
-      gcs-cache-bucket:
-        type: string
-        required: true
-
       arch:
         type: string
         default: x64
@@ -41,13 +35,14 @@ on:
 jobs:
   bazel:
     permissions:
+      actions: write
       contents: read
       packages: read
     runs-on: ${{ inputs.runs-on || fromJSON(inputs.request).config.ci.agent-ubuntu }}
     name: "[${{ inputs.arch }}] Prime Bazel cache"
     if: ${{ ! fromJSON(inputs.caches).bazel[inputs.arch] }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.33
+    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.34
       with:
         mounts: |
           - src: /mnt/workspace
@@ -61,9 +56,9 @@ jobs:
             target: /build
             chown: "runner:docker"
     - name: Free diskspace
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.33
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.34
       if: inputs.arch == 'x64' && github.event.repository.private
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.33
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.34
       id: checkout-target
       name: Checkout Envoy repository (target branch)
       with:
@@ -71,22 +66,20 @@ jobs:
         config: |
           fetch-depth: 1
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.33
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.34
       id: appauth
       name: Appauth (mutex lock)
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
 
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.33
-      name: Setup GCP
-      with:
-        key: ${{ secrets.gcs-cache-key }}
-        force-install: ${{ contains(fromJSON('["envoy-arm64-medium", "github-arm64-2c-8gb"]'), inputs.runs-on) }}
-    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.33
+    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.34
       id: bazel-cache
       name: Prime Bazel cache
       with:
+        artifact-name: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch }}
+        artifact-wf-path: .github/workflows/request.yml
+        cache-type: artifact
         change-directory: false
         # TODO(phlax): add loop for multiple targets
         command: |
@@ -98,8 +91,7 @@ jobs:
           # ironically the repository_cache is just about the only thing you dont want to cache
           export ENVOY_REPOSITORY_CACHE=/tmp/cache
           ./ci/do_ci.sh cache-create
-        gcs-bucket: ${{ inputs.gcs-cache-bucket }}
-        key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch }}
+        key: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch }}
         lock-token: ${{ steps.appauth.outputs.token }}
         lock-repository: ${{ inputs.lock-repository }}
         mount-tmpfs: false

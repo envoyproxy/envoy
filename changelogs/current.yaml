@@ -23,6 +23,11 @@ behavior_changes:
   change: |
     Changing the default reset code from NO_ERROR to INTERNAL_ERROR. This behavioral change can be reverted by setting runtime
     guard ``envoy.reloadable_features.reset_with_error`` to false.
+- area: http
+  change: |
+    Added runtime flag ``envoy.reloadable_features.reject_early_connect_data`` to reject ``CONNECT`` requests
+    that receive data before Envoy sent a ``200`` response to the client. While this is not a strictly compliant behavior
+    it is very common as a latency reducing measure. As such the option is disabled by default.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -102,6 +107,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: adaptive concurrency
+  change: |
+    Fixed a race condition in the gradient controller which would allow more outstanding requests than the concurrency
+    limit, bounded by the number of worker threads.
 - area: http2
   change: |
     Fixed a bug where Envoy would leak memory if an HTTP/2 stream was reset before request headers were
@@ -178,6 +187,13 @@ bug_fixes:
 - area: dns_resolver
   change: |
     Removes unnecessary getifaddrs() system calls when ``filter_unroutable_families`` is disabled.
+- area: tls
+  change: |
+    Fixed an issue where SANs of type ``OTHERNAME`` in a TLS cert were truncated if there was
+    an embedded null octet, leading to incorrect SAN validation.
+- area: http
+  change: |
+    Fixed a remote ``jwt_auth`` token fetch crash with two or more auth headers when ``allow_missing_or_failed`` is set.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -218,10 +234,20 @@ new_features:
   change: |
     Support process-level rate limiting on access log emission by
     :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: listener_filters
+  change: |
+    Added :ref:`Postgres Inspector <config_listener_filters_postgres_inspector>` listener filter for detecting
+    PostgreSQL connections, extracting metadata and supporting SNI-based routing for PostgreSQL traffic.
 - area: dynamic modules
   change: |
     Enhanced dynamic module ABIs to support headers addition and body size retrieval.
     See the latest ABI header file for more details.
+- area: dynamic modules
+  change: |
+    Added support for streamable HTTP callouts in dynamic modules. Modules can now create
+    streaming HTTP connections to upstream clusters using ``start_http_stream``, send request
+    data and trailers incrementally, and receive streaming response headers, data, and trailers
+    through dedicated callbacks.
 - area: udp_sink
   change: |
     Enhanced the UDP sink to support tapped messages larger than 64 KB.
@@ -333,6 +359,9 @@ new_features:
 - area: dns_filter
   change: |
     Added :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.access_log>` for DNS filter.
+- area: redis
+  change: |
+    Added support for ``redis_proxy`` filter to use separate credentials for each upstream Redis cluster.
 - area: quic
   change: |
     Added QUIC protocol option :ref:`max_sessions_per_event_loop

@@ -40,6 +40,7 @@ jobs:
 
   build:
     permissions:
+      actions: read
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
@@ -100,7 +101,7 @@ jobs:
   #       source ./ci/mac_ci_setup.sh
   #       ./bazelw shutdown
   #     steps-post: |
-  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.33
+  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.34
   #         with:
   #           app: ${{ matrix.app }}
   #           args: ${{ matrix.args || '--config=mobile-ios' }}
@@ -145,7 +146,7 @@ jobs:
   #     source: |
   #       source ./ci/mac_ci_setup.sh
   #     steps-post: |
-  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.33
+  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.34
   #         with:
   #           app: ${{ matrix.app }}
   #           args: ${{ matrix.args || '--config=mobile-ios' }}

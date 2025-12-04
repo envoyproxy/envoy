@@ -40,6 +40,7 @@ jobs:
 
   cc-tests:
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-cc }}
@@ -59,6 +60,7 @@ jobs:
 
   cc-xds-integration-tests:
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-cc }}

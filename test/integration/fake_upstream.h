@@ -675,6 +675,11 @@ public:
     data_.clear();
   }
 
+  bool hasData() {
+    absl::MutexLock lock(lock_);
+    return !data_.empty();
+  }
+
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
     ReadFilter(FakeRawConnection& parent) : parent_(parent) {}

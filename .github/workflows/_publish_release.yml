@@ -12,16 +12,11 @@ on:
       ENVOY_CI_SYNC_APP_KEY:
       ENVOY_CI_PUBLISH_APP_ID:
       ENVOY_CI_PUBLISH_APP_KEY:
-      gcs-cache-key:
-        required: true
       gpg-key:
         required: true
       gpg-key-password:
         required: true
     inputs:
-      gcs-cache-bucket:
-        type: string
-        required: true
       request:
         type: string
         required: true
@@ -41,10 +36,10 @@ concurrency:
 jobs:
   sign:
     permissions:
+      actions: read
       contents: read
       packages: read
     secrets:
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
       gpg-key: ${{ secrets.gpg-key }}
       gpg-key-password: ${{ secrets.gpg-key-password }}
     if: ${{ vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy' }}
@@ -63,7 +58,6 @@ jobs:
         packages.x64: container/envoy/x64/
         release.arm64: container/envoy/arm64/bin/
         release.x64: container/envoy/x64/bin/
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       import-gpg: true
       request: ${{ inputs.request }}
       source: |
@@ -82,6 +76,7 @@ jobs:
       dockerhub-username: ${{ secrets.dockerhub-username }}
       dockerhub-password: ${{ secrets.dockerhub-password }}
     permissions:
+      actions: read
       contents: read
       packages: read
     name: Publish container images
@@ -100,8 +95,8 @@ jobs:
     secrets:
       app-id: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_ID || '' }}
       app-key: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_KEY || '' }}
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
+      actions: read
       contents: read
       packages: read
     needs:
@@ -111,11 +106,11 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       target: ${{ matrix.target }}
+      bazel-cache: true
       rbe: false
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       downloads: |
         release.signed: container/release.signed
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       source: ${{ matrix.source }}
       request: ${{ inputs.request }}
       steps-pre: ${{ matrix.steps-pre }}
@@ -144,12 +139,12 @@ jobs:
     needs:
     - release
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.33
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.34
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.33
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.34
       with:
         ref: main
         repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
