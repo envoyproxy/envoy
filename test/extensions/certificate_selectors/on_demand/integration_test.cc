@@ -99,7 +99,8 @@ protected:
     return secret;
   }
 
-  FakeStreamPtr waitSendSdsResponse(absl::string_view cert) {
+  void waitSendSdsResponse(absl::string_view cert) {
+    RELEASE_ASSERT(!xds_streams_.contains(cert), "Do not call twice");
     FakeStreamPtr xds_stream;
     AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream);
     RELEASE_ASSERT(result, result.message());
@@ -118,27 +119,29 @@ protected:
     resource->set_name(cert);
     resource->mutable_resource()->PackFrom(getServerSecretRsa(cert));
     xds_stream->sendGrpcMessage(discovery_response);
-    return xds_stream;
+    xds_streams_[cert] = std::move(xds_stream);
   }
 
-  void removeSecret(FakeStream& xds_stream, absl::string_view cert) {
+  void removeSecret(absl::string_view cert) {
+    RELEASE_ASSERT(xds_streams_.contains(cert), "Must have established a stream");
     envoy::service::discovery::v3::DeltaDiscoveryResponse discovery_response;
     discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
     discovery_response.add_removed_resources(cert);
-    xds_stream.sendGrpcMessage(discovery_response);
+    xds_streams_[cert]->sendGrpcMessage(discovery_response);
   }
 
   void waitCertsRequested(uint32_t count) {
     test_server_->waitForCounterEq(listenerStatPrefix("on_demand_secret.cert_requested"), count,
                                    TestUtility::DefaultTimeout, dispatcher_.get());
   }
+
+  absl::flat_hash_map<std::string, FakeStreamPtr> xds_streams_;
 };
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
-  FakeStreamPtr server_sds;
   on_server_init_function_ = [&]() {
     createXdsConnection();
-    server_sds = waitSendSdsResponse("server");
+    waitSendSdsResponse("server");
   };
   setup(R"EOF(
   certificate_mapper:
@@ -170,7 +173,7 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
   auto conn = std::make_unique<ClientSslConnection>(*this);
   waitCertsRequested(1);
   createXdsConnection();
-  auto server_sds = waitSendSdsResponse("server");
+  waitSendSdsResponse("server");
   conn->waitForUpstreamConnection();
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
@@ -190,10 +193,10 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
   )EOF");
 
   createXdsConnection();
-  auto server2_sds = waitSendSdsResponse("server2");
+  waitSendSdsResponse("server2");
   auto conn = std::make_unique<ClientSslConnection>(*this);
   waitCertsRequested(2);
-  auto server_sds = waitSendSdsResponse("server");
+  waitSendSdsResponse("server");
   conn->waitForUpstreamConnection();
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
@@ -216,7 +219,7 @@ TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   waitCertsRequested(1);
   createXdsConnection();
-  auto server_sds = waitSendSdsResponse("server");
+  waitSendSdsResponse("server");
   conn1->waitForUpstreamConnection();
   conn2->waitForUpstreamConnection();
   conn1->sendAndReceiveTlsData("hello", "world");
@@ -239,7 +242,7 @@ TEST_P(OnDemandIntegrationTest, ClientInterruptedHandshake) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   // SDS request is still outstanding, so we can respond to it, and it will be used later.
   createXdsConnection();
-  auto server_sds = waitSendSdsResponse("server");
+  waitSendSdsResponse("server");
 }
 
 TEST_P(OnDemandIntegrationTest, ConnectTimeout) {
@@ -265,7 +268,7 @@ TEST_P(OnDemandIntegrationTest, ConnectTimeout) {
   conn.reset();
   // SDS request is still outstanding, so we can respond to it, and it will be used later.
   createXdsConnection();
-  auto server_sds = waitSendSdsResponse("server");
+  waitSendSdsResponse("server");
 }
 
 TEST_P(OnDemandIntegrationTest, SecretRemoved) {
@@ -279,11 +282,11 @@ TEST_P(OnDemandIntegrationTest, SecretRemoved) {
   auto conn = std::make_unique<ClientSslConnection>(*this);
   waitCertsRequested(1);
   createXdsConnection();
-  auto server_sds = waitSendSdsResponse("server");
+  waitSendSdsResponse("server");
   conn->waitForUpstreamConnection();
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
-  removeSecret(*server_sds, "server");
+  removeSecret("server");
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, OnDemandIntegrationTest,

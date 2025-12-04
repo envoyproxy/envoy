@@ -158,10 +158,9 @@ SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_reso
     // SDS is a singleton (e.g. single-resource) resource subscription, so it should never be
     // removed except by the modification of the referenced cluster/listener. Therefore, since the
     // server indicates a removal, ignore it (via an ACK).
-    ENVOY_LOG_MISC(
-        trace,
-        "Server sent a delta SDS update attempting to remove a resource (name: {}). Ignoring.",
-        removed_resources[0]);
+    ENVOY_LOG_MISC(trace, "Server sent a delta SDS update removing a resource (name: {}).",
+                   removed_resources[0]);
+    THROW_IF_NOT_OK(remove_callback_manager_.runCallbacks());
 
     // Even if we ignore this resource, the owning resource (LDS/CDS) should still complete
     // warming.

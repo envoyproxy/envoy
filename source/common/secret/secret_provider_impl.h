@@ -32,6 +32,11 @@ public:
     return nullptr;
   }
 
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addRemoveCallback(std::function<absl::Status()>) override {
+    return nullptr;
+  }
+
   void start() override {}
 
 private:
@@ -59,6 +64,11 @@ public:
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addUpdateCallback(std::function<absl::Status()>) override {
+    return nullptr;
+  }
+
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addRemoveCallback(std::function<absl::Status()>) override {
     return nullptr;
   }
 
@@ -90,6 +100,11 @@ public:
     return nullptr;
   }
 
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addRemoveCallback(std::function<absl::Status()>) override {
+    return nullptr;
+  }
+
   void start() override {}
 
 private:
@@ -113,6 +128,11 @@ public:
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addUpdateCallback(std::function<absl::Status()>) override {
+    return nullptr;
+  }
+
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addRemoveCallback(std::function<absl::Status()>) override {
     return nullptr;
   }
 

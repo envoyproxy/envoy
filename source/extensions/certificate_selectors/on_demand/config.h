@@ -15,7 +15,9 @@ namespace Extensions {
 namespace CertificateSelectors {
 namespace OnDemand {
 
-#define ALL_CERT_SELECTION_STATS(COUNTER, GAUGE, HISTOGRAM) COUNTER(cert_requested)
+#define ALL_CERT_SELECTION_STATS(COUNTER, GAUGE, HISTOGRAM)                                        \
+  COUNTER(cert_requested)                                                                          \
+  GAUGE(cert_active, Accumulate)
 
 struct CertSelectionStats {
   ALL_CERT_SELECTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
@@ -26,23 +28,26 @@ class AsyncContext;
 using AsyncContextConstSharedPtr = std::shared_ptr<const AsyncContext>;
 using ConfigProto = envoy::extensions::certificate_selectors::on_demand_secret::v3::Config;
 using UpdateCb = std::function<absl::Status(absl::string_view, const Ssl::TlsCertificateConfig&)>;
+using RemoveCb = std::function<absl::Status(absl::string_view)>;
 
 class AsyncContextConfig {
 public:
   AsyncContextConfig(absl::string_view cert_name,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const envoy::config::core::v3::ConfigSource& config_source,
-                     OptRef<Init::Manager> init_manager, UpdateCb update_cb);
+                     OptRef<Init::Manager> init_manager, UpdateCb update_cb, RemoveCb remove_cb);
 
 private:
   absl::Status loadCert();
 
   Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string cert_name_;
-  UpdateCb update_cb_;
   absl::optional<Ssl::TlsCertificateConfigImpl> cert_config_;
   const Secret::TlsCertificateConfigProviderSharedPtr cert_provider_;
-  const Common::CallbackHandlePtr cert_callback_handle_;
+  UpdateCb update_cb_;
+  const Common::CallbackHandlePtr update_cb_handle_;
+  RemoveCb remove_cb_;
+  const Common::CallbackHandlePtr remove_cb_handle_;
 };
 using AsyncContextConfigConstPtr = std::unique_ptr<AsyncContextConfig>;
 
@@ -88,13 +93,23 @@ public:
                 Server::Configuration::GenericFactoryContext& factory_context,
                 const Ssl::ServerContextConfig& tls_config);
 
-  // Must be called on main thread.
+  /**
+   * Start a subscription to the secret and register a handle on updates.
+   */
   void addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
                             OptRef<Init::Manager> init_manager);
+  /**
+   * Handle an updated certificate config by notifying any pending connections.
+   */
   absl::Status updateCertificate(absl::string_view secret_name,
                                  const Ssl::TlsCertificateConfig& cert_config);
 
-  // Thread-safe.
+  /**
+   * Delete any cached state for the secret since it is removed by the xDS server.
+   */
+  absl::Status removeCertificateConfig(absl::string_view) { return absl::OkStatus(); }
+
+  // Below methods are thread-safe, unlike prior ones which are only safe on the main thread.
   void setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx);
   absl::optional<AsyncContextConstSharedPtr> getContext(absl::string_view secret_name) const;
   HandleSharedPtr fetchCertificate(absl::string_view secret_name,

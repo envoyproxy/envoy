@@ -13,11 +13,15 @@ namespace OnDemand {
 AsyncContextConfig::AsyncContextConfig(absl::string_view cert_name,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        const envoy::config::core::v3::ConfigSource& config_source,
-                                       OptRef<Init::Manager> init_manager, UpdateCb update_cb)
-    : factory_context_(factory_context), cert_name_(cert_name), update_cb_(update_cb),
+                                       OptRef<Init::Manager> init_manager, UpdateCb update_cb,
+                                       RemoveCb remove_cb)
+    : factory_context_(factory_context), cert_name_(cert_name),
       cert_provider_(factory_context_.secretManager().findOrCreateTlsCertificateProvider(
           config_source, cert_name_, factory_context_, init_manager, false)),
-      cert_callback_handle_(cert_provider_->addUpdateCallback([this]() { return loadCert(); })) {}
+      update_cb_(update_cb),
+      update_cb_handle_(cert_provider_->addUpdateCallback([this]() { return loadCert(); })),
+      remove_cb_(remove_cb), remove_cb_handle_(cert_provider_->addRemoveCallback(
+                                 [this]() { return remove_cb_(cert_name_); })) {}
 
 absl::Status AsyncContextConfig::loadCert() {
   // Called on main, possibly during the constructor.
@@ -81,12 +85,16 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
     }
   }
 
-  // Should be last to trigger the callback since constructor can fire the update event.
+  // Should be last to trigger the callback since constructor can fire the update event for an
+  // existing SDS subscription.
   if (entry.cert_config_ == nullptr) {
     entry.cert_config_ = std::make_unique<AsyncContextConfig>(
         secret_name, factory_context_, config_source_, init_manager,
         [this](absl::string_view secret_name, const Ssl::TlsCertificateConfig& cert_config)
-            -> absl::Status { return updateCertificate(secret_name, cert_config); });
+            -> absl::Status { return updateCertificate(secret_name, cert_config); },
+        [this](absl::string_view secret_name) -> absl::Status {
+          return removeCertificateConfig(secret_name);
+        });
     stats_.cert_requested_.inc();
   }
 }

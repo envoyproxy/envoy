@@ -73,6 +73,7 @@ protected:
   virtual void resolveSecret(const FileContentMap& /*files*/) {};
   virtual void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) PURE;
   Common::CallbackManager<absl::Status> update_callback_manager_;
+  Common::CallbackManager<absl::Status> remove_callback_manager_;
 
   // Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
@@ -160,6 +161,11 @@ public:
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addUpdateCallback(std::function<absl::Status()> callback) override;
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addRemoveCallback(std::function<absl::Status()> callback) override {
+    return remove_callback_manager_.add(callback);
+  }
+
   const Init::Target* initTarget() override { return &init_target_; }
   void start() override { initialize(false); }
 
@@ -208,6 +214,10 @@ public:
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addUpdateCallback(std::function<absl::Status()> callback) override;
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addRemoveCallback(std::function<absl::Status()> callback) override {
+    return remove_callback_manager_.add(callback);
+  }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
       std::function<absl::Status(
           const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>
@@ -268,6 +278,10 @@ public:
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addUpdateCallback(std::function<absl::Status()> callback) override;
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addRemoveCallback(std::function<absl::Status()> callback) override {
+    return remove_callback_manager_.add(callback);
+  }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
       std::function<
           absl::Status(const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>
@@ -319,6 +333,10 @@ public:
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addUpdateCallback(std::function<absl::Status()> callback) override {
     return update_callback_manager_.add(callback);
+  }
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addRemoveCallback(std::function<absl::Status()> callback) override {
+    return remove_callback_manager_.add(callback);
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addValidationCallback(std::function<absl::Status(
