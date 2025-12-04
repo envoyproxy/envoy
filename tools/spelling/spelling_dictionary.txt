@@ -748,6 +748,7 @@ deletable
 deleter
 delim
 demultiplexer
+demux
 denylist
 deque
 dep
