@@ -5,13 +5,7 @@ permissions:
 
 on:
   workflow_call:
-    secrets:
-      gcs-cache-key:
-        required: true
     inputs:
-      gcs-cache-bucket:
-        type: string
-        required: true
       request:
         type: string
         required: true
@@ -31,6 +25,7 @@ concurrency:
 jobs:
   examples:
     permissions:
+      actions: read
       contents: read
       packages: read
     name: ${{ matrix.name || matrix.target }}
@@ -100,6 +95,7 @@ jobs:
 
   distroless:
     permissions:
+      actions: read
       contents: read
       packages: read
     name: ${{ matrix.name || matrix.target }}
@@ -145,9 +141,8 @@ jobs:
               shell: bash
 
   distro:
-    secrets:
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
+      actions: read
       contents: read
       packages: read
     name: ${{ matrix.name || matrix.target }}
@@ -161,7 +156,6 @@ jobs:
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
       downloads: |
         release.signed: container/release.signed
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: ${{ matrix.rbe && matrix.rbe || false }}
       request: ${{ inputs.request }}
       runs-on: ${{ matrix.runs-on }}

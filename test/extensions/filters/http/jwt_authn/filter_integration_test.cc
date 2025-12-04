@@ -410,6 +410,19 @@ public:
     initialize();
   }
 
+  void initializeFilterWithAllowMissingOrFailed() {
+    config_helper_.prependFilter(
+        getAuthFilterConfig(AllowMissingExampleConfig, false, false, false));
+
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* jwks_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      jwks_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      jwks_cluster->set_name("pubkey_cluster");
+    });
+
+    initialize();
+  }
+
   void initializeAsyncFetchFilter(bool fast_listener) {
     config_helper_.prependFilter(getAsyncFetchFilterConfig(ExampleConfig, fast_listener, false));
 
@@ -567,6 +580,47 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedMissingCluster) {
   EXPECT_EQ(
       "Bearer realm=\"http://host/\", error=\"invalid_token\"",
       response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
+  cleanup();
+}
+
+// With remote Jwks, this test verifies a request is passed with two good JWTs
+// and allow_missing_or_failed but the jwks fetching fails.
+TEST_P(RemoteJwksIntegrationTest, WithTwoGoodTokensAllowMissing) {
+  initializeFilterWithAllowMissingOrFailed();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+  });
+
+  // Fails the jwks fetching.
+  waitForJwksResponse("500", "");
+
+  // Wait for the second fetching.
+  auto result = fake_jwks_connection_->waitForNewStream(*dispatcher_, jwks_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = jwks_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  jwks_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data1("");
+  jwks_request_->encodeData(response_data1, true);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
   cleanup();
 }
 

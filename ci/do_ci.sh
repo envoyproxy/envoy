@@ -183,7 +183,6 @@ function bazel_contrib_binary_build() {
 function bazel_envoy_api_build() {
     setup_clang_toolchain
     export CLANG_TOOLCHAIN_SETUP=1
-    export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
     echo "Run protoxform test"
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
         --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
@@ -326,8 +325,8 @@ case $CI_TARGET in
               --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
               "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" \
               > /dev/null
-          TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
-          echo "Generated cache: ${TOTAL_SIZE}"
+        TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
+        echo "Generated cache: ${TOTAL_SIZE}"
         ;;
 
     format-api|check_and_fix_proto_format)
