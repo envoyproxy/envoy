@@ -337,31 +337,111 @@ typed_config:
     ASSERT_GT(l->filter_chains_size(), 0);
     ASSERT_GT(l->filter_chains(0).filters_size(), 0);
 
-    // Save all original filters
+    // Save all original filters.
     std::vector<envoy::config::listener::v3::Filter> original_filters;
     for (int i = 0; i < l->filter_chains(0).filters_size(); i++) {
       original_filters.push_back(*l->mutable_filter_chains(0)->mutable_filters(i));
     }
 
-    // Clear the existing filters
+    // Clear the existing filters.
     l->mutable_filter_chains(0)->clear_filters();
 
-    // Add the Set State filter at position 0
+    // Add the Set State filter at position 0.
     envoy::config::listener::v3::Filter set_state_filter;
     TestUtility::loadFromYaml(FILTER_STATE_SETTER_CONFIG, set_state_filter);
     l->mutable_filter_chains(0)->add_filters()->Swap(&set_state_filter);
 
-    // Re-add all original filters after our new ones
+    // Re-add all original filters after our new ones.
     for (auto& original_filter : original_filters) {
       *l->mutable_filter_chains(0)->add_filters() = original_filter;
     }
 
-    // Swap the RBAC filter config at position 1
+    // Swap the RBAC filter config at position 1.
     l->mutable_filter_chains(0)->mutable_filters(1)->Swap(&filter);
   });
   BaseIntegrationTest::initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write("hello", false, false));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
+}
+
+// Test allowed connection with enforce_on_transport_ready enabled.
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, AllowedWithEnforceOnTransportReady) {
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  enforce_on_transport_ready: true
+  rules:
+    policies:
+      "allow_all":
+        permissions:
+          - any: true
+        principals:
+          - any: true
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(tcp_client->connected());
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("tcp.rbac.allowed", 1);
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.denied")->value());
+}
+
+// Test denied connection with enforce_on_transport_ready enabled.
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DeniedWithEnforceOnTransportReady) {
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  enforce_on_transport_ready: true
+  rules:
+    policies:
+      "deny_all":
+        permissions:
+          - any: true
+        principals:
+          - not_id:
+              any: true
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
+}
+
+// Test delay denied with enforce_on_transport_ready enabled.
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DelayDeniedWithEnforceOnTransportReady) {
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  enforce_on_transport_ready: true
+  rules:
+    policies:
+      "deny_all":
+        permissions:
+          - any: true
+        principals:
+          - not_id:
+              any: true
+  delay_deny: 5s
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->connected());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  ASSERT_TRUE(tcp_client->connected());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(6));
   tcp_client->waitForDisconnect();
 
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());

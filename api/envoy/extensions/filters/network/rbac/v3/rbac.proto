@@ -27,7 +27,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Header should not be used in rules/shadow_rules in RBAC network filter as
 // this information is only available in :ref:`RBAC http filter <config_http_filters_rbac>`.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message RBAC {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.rbac.v2.RBAC";
@@ -90,4 +90,64 @@ message RBAC {
   // This is useful to provide a better protection for Envoy against clients that retries
   // aggressively when the connection is rejected by the RBAC filter.
   google.protobuf.Duration delay_deny = 8;
+
+  // If set to ``true``, the RBAC filter will do the enforcement when the downstream transport
+  // socket is ready (e.g., after the TLS handshake completes for TLS connections). This ensures
+  // that connection information such as X509 certificates and negotiated TLS parameters are
+  // available for authorization decisions.
+  //
+  // When enabled, the filter pauses the filter chain initialization. After the transport socket
+  // raises a ``Connected`` event and authorization completes successfully, the filter resumes the
+  // filter chain. This prevents downstream filters (such as
+  // :ref:`tcp_proxy <config_network_filters_tcp_proxy>`) from establishing upstream connections
+  // before authorization completes.
+  //
+  // For raw TCP connections that do not raise a ``Connected`` event, the filter automatically
+  // falls back to enforcing authorization when the first data byte arrives.
+  //
+  // When using this option with the :ref:`tcp_proxy <config_network_filters_tcp_proxy>` filter,
+  // configure one of the following to ensure upstream connections are not established before
+  // authorization completes:
+  //
+  // * Set :ref:`upstream_connect_mode
+  //   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`
+  //   to ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``.
+  // * Set :ref:`max_early_data_bytes
+  //   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>`.
+  //
+  // Example configuration:
+  //
+  // .. code-block:: yaml
+  //
+  //    filter_chains:
+  //    - filters:
+  //      - name: envoy.filters.network.rbac
+  //        typed_config:
+  //          "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  //          stat_prefix: tcp.
+  //          enforce_on_transport_ready: true
+  //          rules:
+  //            policies:
+  //              "require-mtls-client":
+  //                permissions:
+  //                  - any: true
+  //                principals:
+  //                  - authenticated:
+  //                      principal_name:
+  //                        exact: "spiffe://cluster.local/ns/default/sa/frontend"
+  //      - name: envoy.filters.network.tcp_proxy
+  //        typed_config:
+  //          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+  //          stat_prefix: tcp
+  //          cluster: backend
+  //          upstream_connect_mode: ON_DOWNSTREAM_TLS_HANDSHAKE
+  //
+  // .. attention::
+  //
+  //    Server-first protocols (e.g., SMTP, MySQL, POP3) require immediate upstream connection
+  //    establishment. Do not use this option with server-first protocols as the upstream server
+  //    needs to send data before receiving any data from the client.
+  //
+  // Defaults to ``false``.
+  bool enforce_on_transport_ready = 9;
 }

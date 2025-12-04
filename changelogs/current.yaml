@@ -217,6 +217,12 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: rbac
+  change: |
+    Added :ref:`enforce_on_transport_ready
+    <envoy_v3_api_field_extensions.filters.network.rbac.v3.RBAC.enforce_on_transport_ready>`
+    option to the RBAC network filter. When enabled, authorization is performed when the transport
+    socket is ready. This prevents upstream connection establishment before authorization completes.
 - area: dynamic modules
   change: |
     Added support for loading dynamic modules globally by setting :ref:`load_globally

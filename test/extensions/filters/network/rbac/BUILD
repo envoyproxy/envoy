@@ -32,6 +32,8 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/stream_info:bool_accessor_lib",
+        "//source/common/tcp_proxy",
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/rbac:rbac_filter",

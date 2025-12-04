@@ -6,6 +6,8 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/extensions/filters/common/rbac/utility.h"
 #include "source/extensions/filters/network/rbac/rbac_filter.h"
 #include "source/extensions/filters/network/well_known_names.h"
@@ -16,6 +18,7 @@
 
 #include "xds/type/matcher/v3/matcher.pb.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -40,7 +43,7 @@ public:
   void
   setupPolicy(bool with_policy = true, bool continuous = false,
               envoy::config::rbac::v3::RBAC::Action action = envoy::config::rbac::v3::RBAC::ALLOW,
-              int64_t delay_deny_duration_ms = 0) {
+              int64_t delay_deny_duration_ms = 0, bool enforce_on_transport_ready = false) {
 
     envoy::extensions::filters::network::rbac::v3::RBAC config;
     config.set_stat_prefix("tcp.");
@@ -73,6 +76,8 @@ public:
       (*config.mutable_delay_deny()) =
           ProtobufUtil::TimeUtil::MillisecondsToDuration(delay_deny_duration_ms);
     }
+
+    config.set_enforce_on_transport_ready(enforce_on_transport_ready);
 
     config_ = std::make_shared<RoleBasedAccessControlFilterConfig>(
         config, *store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
@@ -710,10 +715,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, DebugLogLevel) {
   setDestinationPort(123);
   setRequestedServerName("www.cncf.io");
 
-  // Force debug level on
+  // Force debug level on.
   Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
-  // Mock SSL setup
+  // Mock SSL setup.
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::vector<std::string> uri_sans{"uri-san-value"};
   std::vector<std::string> dns_sans{"dns-san-value"};
@@ -723,13 +728,245 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, DebugLogLevel) {
   ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(subject_str));
   ON_CALL(callbacks_.connection_, ssl()).WillByDefault(Return(connection_info));
 
-  // Call onData to trigger the debug log code path
+  // Call onData to trigger the debug log code path.
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
-  // Explicitly verify any counters that would be affected by this code path
+  // Explicitly verify any counters that would be affected by this code path.
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().denied_.value());
+}
+
+// Test that filter state is set when enforce_on_transport_ready is enabled.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, EnforceOnTransportReadySetsFilterState) {
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              0 /* delay_deny_duration_ms */, true /* enforce_on_transport_ready */);
+
+  // Verify that the filter state is set.
+  const auto* filter_state = stream_info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>(
+      TcpProxy::ReceiveBeforeConnectKey);
+  ASSERT_NE(nullptr, filter_state);
+  EXPECT_TRUE(filter_state->value());
+}
+
+// Test that onNewConnection returns StopIteration when enforce_on_transport_ready is enabled.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, EnforceOnTransportReadyStopsOnNewConnection) {
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              0 /* delay_deny_duration_ms */, true /* enforce_on_transport_ready */);
+  setDestinationPort(123);
+
+  // onNewConnection should return StopIteration.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+  // No authorization should have happened yet.
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+}
+
+// Test allowed connection on Connected event with enforce_on_transport_ready.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedOnConnectedEvent) {
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              0 /* delay_deny_duration_ms */, true /* enforce_on_transport_ready */);
+  setDestinationPort(123);
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Simulate transport socket ready (e.g., TLS handshake complete).
+  EXPECT_CALL(callbacks_, continueReading());
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+
+  // Subsequent onData should continue without re-running authorization.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+}
+
+// Test denied connection on Connected event with enforce_on_transport_ready.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, DeniedOnConnectedEvent) {
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              0 /* delay_deny_duration_ms */, true /* enforce_on_transport_ready */);
+  setDestinationPort(456); // Port that doesn't match policy.
+  setMetadata();
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Simulate transport socket ready.
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+// Test fallback to onData when Connected event is not raised (raw TCP).
+TEST_F(RoleBasedAccessControlNetworkFilterTest, FallbackToOnDataWhenNoConnectedEvent) {
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              0 /* delay_deny_duration_ms */, true /* enforce_on_transport_ready */);
+  setDestinationPort(123);
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // No Connected event - simulate raw TCP where data arrives first.
+  EXPECT_CALL(callbacks_, continueReading());
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+}
+
+// Test denied on fallback to onData when Connected event is not raised.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, DeniedOnFallbackToOnData) {
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              0 /* delay_deny_duration_ms */, true /* enforce_on_transport_ready */);
+  setDestinationPort(456); // Port that doesn't match policy.
+  setMetadata();
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // No Connected event - fallback to onData.
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+// Test delay deny with enforce_on_transport_ready on Connected event.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, DelayDenyOnConnectedEvent) {
+  int64_t delay_deny_duration_ms = 500;
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              delay_deny_duration_ms, true /* enforce_on_transport_ready */);
+  setDestinationPort(456); // Port that doesn't match policy.
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Create mock timer before the event.
+  Event::MockTimer* delay_timer =
+      new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay_deny_duration_ms), _));
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+
+  // Simulate transport socket ready.
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+
+  // Connection closed when timer fires.
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  delay_timer->invokeCallback();
+}
+
+// Test continuous enforcement with enforce_on_transport_ready.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, ContinuousEnforcementWithTransportReady) {
+  setupPolicy(true /* with_policy */, true /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              0 /* delay_deny_duration_ms */, true /* enforce_on_transport_ready */);
+  setDestinationPort(123);
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Simulate transport socket ready.
+  EXPECT_CALL(callbacks_, continueReading());
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+
+  // CONTINUOUS enforcement should re-run authorization on each onData.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(2U, config_->stats().allowed_.value());
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(3U, config_->stats().allowed_.value());
+}
+
+// Test that Connected event before onNewConnection does not trigger authorization.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, ConnectedEventBeforeOnNewConnection) {
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              0 /* delay_deny_duration_ms */, true /* enforce_on_transport_ready */);
+  setDestinationPort(123);
+
+  // Connected event before onNewConnection - authorization_pending is false.
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+
+  // Now onNewConnection sets authorization_pending.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Authorization runs in onData as fallback.
+  EXPECT_CALL(callbacks_, continueReading());
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+}
+
+// Test legacy behavior when enforce_on_transport_ready is disabled (default).
+TEST_F(RoleBasedAccessControlNetworkFilterTest, LegacyBehaviorWithoutTransportReady) {
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              0 /* delay_deny_duration_ms */, false /* enforce_on_transport_ready */);
+  setDestinationPort(123);
+
+  // onNewConnection should continue.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Connected event should not trigger authorization.
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+
+  // Authorization runs in onData.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+}
+
+// Test filter state conflict detection.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, FilterStateConflictDetection) {
+  // Pre-set filter state to false (conflict).
+  stream_info_.filterState()->setData(
+      TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(false),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+
+  // Setting up policy with enforce_on_transport_ready should detect conflict.
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              0 /* delay_deny_duration_ms */, true /* enforce_on_transport_ready */);
+}
+
+// Test that filter state already set to true is accepted (no conflict).
+TEST_F(RoleBasedAccessControlNetworkFilterTest, FilterStateAlreadyTrueNoConflict) {
+  // Pre-set filter state to true (no conflict).
+  stream_info_.filterState()->setData(
+      TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Setting up policy with enforce_on_transport_ready should not close connection.
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              0 /* delay_deny_duration_ms */, true /* enforce_on_transport_ready */);
+
+  // Verify filter state is still true.
+  const auto* filter_state = stream_info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>(
+      TcpProxy::ReceiveBeforeConnectKey);
+  ASSERT_NE(nullptr, filter_state);
+  EXPECT_TRUE(filter_state->value());
+}
+
+// Test that connection close event resets timer state.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, CloseEventResetsTimerWithTransportReady) {
+  int64_t delay_deny_duration_ms = 500;
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              delay_deny_duration_ms, true /* enforce_on_transport_ready */);
+  setDestinationPort(456);
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  Event::MockTimer* delay_timer =
+      new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay_deny_duration_ms), _));
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+
+  // RemoteClose should reset timer.
+  EXPECT_CALL(*delay_timer, disableTimer());
+  filter_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 } // namespace RBACFilter

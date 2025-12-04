@@ -61,6 +61,8 @@ public:
 
   std::chrono::milliseconds delayDenyMs() const { return delay_deny_ms_; }
 
+  bool enforceOnTransportReady() const { return enforce_on_transport_ready_; }
+
 private:
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
   const std::string shadow_rules_stat_prefix_;
@@ -70,6 +72,7 @@ private:
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> shadow_engine_;
   const envoy::extensions::filters::network::rbac::v3::RBAC::EnforcementType enforcement_type_;
   std::chrono::milliseconds delay_deny_ms_;
+  const bool enforce_on_transport_ready_;
 };
 
 using RoleBasedAccessControlFilterConfigSharedPtr =
@@ -89,11 +92,8 @@ public:
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
-  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; };
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
-    callbacks_ = &callbacks;
-    callbacks_->connection().addConnectionCallbacks(*this);
-  }
+  Network::FilterStatus onNewConnection() override;
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -110,10 +110,19 @@ private:
   EngineResult shadow_engine_result_{Unknown};
 
   Result checkEngine(Filters::Common::RBAC::EnforcementMode mode) const;
+
+  // Runs authorization check and returns true if allowed, false if denied.
+  // On denial, connection is closed immediately or after delay.
+  bool runAuthorization();
+
   void closeConnection() const;
   void resetTimerState();
   Event::TimerPtr delay_timer_{nullptr};
   bool is_delay_denied_{false};
+
+  // When true, authorization would be pending and waiting for either the
+  // Connected event or onData fallback.
+  bool authorization_pending_{false};
 };
 
 } // namespace RBACFilter
