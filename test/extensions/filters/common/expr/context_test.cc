@@ -183,6 +183,14 @@ TEST(Context, RequestAttributes) {
   }
 
   {
+    auto value = request[CelValue::CreateStringView(HeadersBytes)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    // this equals to total_size-size
+    EXPECT_EQ(160, value.value().Int64OrDie());
+  }
+
+  {
     auto value = request[CelValue::CreateStringView(Headers)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMap());
@@ -383,6 +391,14 @@ TEST(Context, ResponseAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(code_details.value(), value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = response[CelValue::CreateStringView(HeadersBytes)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    // this equals to total_size-size
+    EXPECT_EQ(12, value.value().Int64OrDie());
   }
 
   {

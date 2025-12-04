@@ -3318,7 +3318,7 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
     EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
   } else if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), "http2.violation.of.messaging.rule");
   } else {
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
@@ -3555,6 +3555,112 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClos
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
   test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
   test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 0);
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
+  // There are four streams created in total, client stream, Envoy server stream,
+  // Envoy client stream and upstream server stream.
+  // When we close a stream actively with a specific reset reason, we expect the peer
+  // to receive the related error code in onStreamClose().
+  // But note, the onStreamClose() for the active closing side will also be called.
+  // But the error code for active closing side will always be 0 if the Oghttp2 is used.
+
+  initialize();
+
+  {
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 2;
+    } else {
+      log_num = 4;
+    }
+
+    // The ProtocolError will be translated to OGHTTP2_PROTOCOL_ERROR (1).
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 1", log_num, {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the downstream stream.
+      upstream_request_->encodeResetStream(Http::StreamResetReason::ProtocolError);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+
+      cleanupUpstreamAndDownstream();
+    });
+  }
+
+  {
+    // For reason LocalReset, it will be translated to default HTTP2 stream error code.
+    // At the downstream side, because a complete local reply will be send before resetting
+    // the stream, so the stream close code observed at downstream side will be NO_ERROR (0).
+    // So, we expect 1 log entry with "closed: 2" for Oghttp2 and 2 log entries with "closed: 2"
+    // for other implementations.
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 1;
+    } else {
+      log_num = 2;
+    }
+
+    // The LocalReset will be translated to default code OGHTTP2_INTERNAL_ERROR (2).
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 2", log_num, {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the stream.
+      upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+
+      cleanupUpstreamAndDownstream();
+    });
+  }
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationLegacy) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "false");
+
+  std::vector<Http::StreamResetReason> reasons = {Http::StreamResetReason::ProtocolError,
+                                                  Http::StreamResetReason::LocalReset};
+  std::vector<Http::StreamResetReason> result_reasons = {Http::StreamResetReason::RemoteReset,
+                                                         Http::StreamResetReason::RemoteReset};
+
+  // There are four streams created in total, client stream, Envoy server stream,
+  // Envoy client stream and upstream server stream.
+  // When we close a stream actively with a specific reset reason, we expect the peer
+  // to receive the related error code in onStreamClose().
+  // But note, the onStreamClose() for the active closing side will also be called.
+  // But the error code for active closing side will always be 0 if the Oghttp2 is used.
+
+  initialize();
+  for (size_t i = 0; i < reasons.size(); ++i) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    // In legacy code path, both the ProtocolError and LocalReset will be translated
+    // to OGHTTP2_NO_ERROR (0). So, we expect 4 log entries with "closed: 0" for both cases.
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 0", 4, {
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the stream.
+      upstream_request_->encodeResetStream(reasons[i]);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(result_reasons[i], response->resetReason());
+    });
+
+    cleanupUpstreamAndDownstream();
+  }
 }
 
 } // namespace Envoy

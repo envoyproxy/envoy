@@ -55,6 +55,7 @@ processing, which makes them suitable for RBAC policies.
    request.scheme, string, The scheme portion of the URL e.g. "http"
    request.method, string, Request method e.g. "GET"
    request.headers, "map<string, string>", All request headers indexed by the lower-cased header name
+   request.headers_bytes, int, Total size of request headers in bytes
    request.referer, string, Referer request header
    request.useragent, string, User agent request header
    request.time, timestamp, Time of the first byte received
@@ -90,6 +91,7 @@ Response attributes are only available after the request completes.
    response.flags, int, Additional details about the response beyond the standard response code encoded as a bit-vector
    response.grpc_status, int, Response gRPC status code
    response.headers, "map<string, string>", All response headers indexed by the lower-cased header name
+   response.headers_bytes, int, Total size of response headers in bytes
    response.trailers, "map<string, string>", All response trailers indexed by the lower-cased trailer name
    response.size, int, Size of the response body
    response.total_size, int, Total size of the response including the approximate uncompressed size of the headers and the trailers

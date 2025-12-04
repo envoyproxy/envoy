@@ -12,6 +12,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,11 +23,6 @@ namespace MetadataKeys {
 // Core MCP fields
 constexpr absl::string_view FilterName = "mcp_proxy";
 } // namespace MetadataKeys
-
-// MCP protocol constants
-namespace McpConstants {
-constexpr absl::string_view JsonRpcVersion = "2.0";
-} // namespace McpConstants
 
 /**
  * All MCP filter stats. @see stats_macros.h
@@ -62,6 +58,7 @@ public:
   bool clearRouteCache() const { return clear_route_cache_; }
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
+  const ParserConfig& parserConfig() const { return parser_config_; }
 
   McpFilterStats& stats() { return stats_; }
 
@@ -69,6 +66,7 @@ private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
   const bool clear_route_cache_;
   const uint32_t max_request_body_size_;
+  ParserConfig parser_config_;
   McpFilterStats stats_;
 };
 
@@ -128,9 +126,15 @@ private:
   bool shouldRejectRequest() const;
   uint32_t getMaxRequestBodySize() const;
 
-  void finalizeDynamicMetadata();
+  void handleParseError(absl::string_view error_msg);
+  Http::FilterDataStatus completeParsing();
+  const ParserConfig& getParserConfig() const;
+
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  uint32_t bytes_parsed_{0};
+  bool parsing_complete_{false};
+  std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
   std::unique_ptr<Protobuf::Struct> metadata_;
