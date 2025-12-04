@@ -30,9 +30,9 @@ configure_make(
     configure_in_place = True,
     env = select({
         "//bazel:clang_build": {
-            "AR": "$(AR)",
-            "LD": "$(LD)",
-            "RANLIB": "$(AR) -s",
+            "AR": "$$EXT_BUILD_ROOT/$(AR)",
+            "LD": "$$EXT_BUILD_ROOT/$(LD)",
+            "RANLIB": "$$EXT_BUILD_ROOT/$(AR) -s",
         },
         "//conditions:default": {},
     }),
@@ -82,7 +82,7 @@ configure_make(
     configure_in_place = True,
     configure_options = ["--disable-ssl --disable-gssapi --disable-zstd --disable-curl && cp Makefile.config src/.. && cp config.h src/.."],
     env = {
-        "AR": "$(AR)",
+        "AR": "$$EXT_BUILD_ROOT/$(AR)",
     },
     lib_source = "@confluentinc_librdkafka//:all",
     out_static_libs = [

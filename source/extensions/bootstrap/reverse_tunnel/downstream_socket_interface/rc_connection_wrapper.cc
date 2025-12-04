@@ -86,7 +86,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
             connection_->id());
 
   // Create HTTP/1 codec to parse the response.
-  Http::Http1Settings http1_settings = host_->cluster().http1Settings();
+  Http::Http1Settings http1_settings = host_->cluster().httpProtocolOptions().http1Settings();
   http1_client_codec_ = std::make_unique<Http::Http1::ClientConnectionImpl>(
       *connection_, host_->cluster().http1CodecStats(), *this, http1_settings,
       host_->cluster().maxResponseHeadersKb(), host_->cluster().maxResponseHeadersCount());

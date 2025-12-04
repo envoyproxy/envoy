@@ -118,6 +118,40 @@ The TLS alert is only sent when:
 
 For non-TLS connections, the connection is closed without sending an alert.
 
+Metadata Context
+----------------
+
+The network filter can be configured to pass specific metadata to the authorization service by
+using :ref:`metadata_context_namespaces <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.metadata_context_namespaces>`
+and :ref:`typed_metadata_context_namespaces <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces>`.
+
+When configured, the filter will collect metadata from the connection's dynamic metadata that matches
+the specified namespaces and include it in the :ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`
+sent to the authorization service. This is useful for passing information from other network-layer
+or listener filters to the authorization service for decision making.
+
+For example, if the proxy protocol listener filter extracts TLV metadata from PROXY protocol headers,
+you can pass that metadata to the authorization service:
+
+.. code-block:: yaml
+
+  filters:
+  - name: envoy.filters.network.ext_authz
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz
+      stat_prefix: ext_authz
+      grpc_service:
+        envoy_grpc:
+          cluster_name: ext-authz
+      metadata_context_namespaces:
+      - envoy.filters.listener.proxy_protocol
+      typed_metadata_context_namespaces:
+      - envoy.filters.listener.proxy_protocol
+
+The ``metadata_context_namespaces`` field passes untyped metadata as ``protobuf::Struct``, while
+``typed_metadata_context_namespaces`` passes typed metadata as ``protobuf::Any`` for type-safe
+unpacking when both Envoy and the authorization server share the protobuf message definition.
+
 Dynamic Metadata
 ----------------
 .. _config_network_filters_ext_authz_dynamic_metadata:

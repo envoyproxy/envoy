@@ -80,6 +80,21 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
     return SubstitutionFormatUtils::unspecifiedValue();
   }
 
+  if (max_length_.has_value() && val.kind_case() != Protobuf::Value::kStructValue &&
+      val.kind_case() != Protobuf::Value::kListValue) {
+    std::string str;
+    if (val.kind_case() == Protobuf::Value::kStringValue) {
+      str = val.string_value();
+    } else {
+      Json::Utility::appendValueToString(val, str);
+    }
+    if (SubstitutionFormatUtils::truncate(str, max_length_)) {
+      Protobuf::Value output;
+      output.set_string_value(str);
+      return output;
+    }
+  }
+
   return val;
 }
 
@@ -1870,7 +1885,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   true);
             }}},
           {"DYNAMIC_METADATA",
-           {CommandSyntaxChecker::PARAMS_REQUIRED,
+           {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
             [](absl::string_view format, absl::optional<size_t> max_length) {
               absl::string_view filter_namespace;
               std::vector<absl::string_view> path;

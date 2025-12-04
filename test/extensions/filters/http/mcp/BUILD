@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -15,6 +16,17 @@ envoy_cc_test(
         "//source/extensions/filters/http/mcp:mcp_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "mcp_json_parser_test",
+    srcs = ["mcp_json_parser_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/mcp:mcp_json_parser_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -35,6 +47,16 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/http/mcp:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "mcp_parser_fuzz_test",
+    srcs = ["mcp_parser_fuzz_test.cc"],
+    corpus = "mcp_parser_corpus",
+    deps = [
+        "//source/extensions/filters/http/mcp:mcp_json_parser_lib",
         "//test/test_common:utility_lib",
     ],
 )
