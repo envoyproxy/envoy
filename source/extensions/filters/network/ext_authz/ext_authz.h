@@ -57,6 +57,7 @@ public:
         include_peer_certificate_(config.include_peer_certificate()),
         include_tls_session_(config.include_tls_session()),
         send_tls_alert_on_denial_(config.send_tls_alert_on_denial()),
+        check_on_transport_ready_(config.check_on_transport_ready()),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
                 ? absl::optional<Matchers::MetadataMatcher>(
@@ -91,6 +92,7 @@ public:
   const std::vector<std::string>& typedMetadataContextNamespaces() const {
     return typed_metadata_context_namespaces_;
   }
+  bool checkOnTransportReady() const { return check_on_transport_ready_; }
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
@@ -100,6 +102,7 @@ private:
   const bool include_peer_certificate_;
   const bool include_tls_session_;
   const bool send_tls_alert_on_denial_;
+  const bool check_on_transport_ready_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
   const std::vector<std::string> metadata_context_namespaces_;
   const std::vector<std::string> typed_metadata_context_namespaces_;
@@ -126,10 +129,7 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
-    filter_callbacks_ = &callbacks;
-    filter_callbacks_->connection().addConnectionCallbacks(*this);
-  }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -163,6 +163,8 @@ private:
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool calling_check_{};
   envoy::service::auth::v3::CheckRequest check_request_{};
+  // When true, authorization is pending and waiting for Connected event or onData fallback.
+  bool check_pending_{false};
 };
 } // namespace ExtAuthz
 } // namespace NetworkFilters

@@ -9,6 +9,8 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tls/connection_info_impl_base.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
@@ -53,6 +55,30 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
                                   POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
+void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+  filter_callbacks_ = &callbacks;
+  filter_callbacks_->connection().addConnectionCallbacks(*this);
+
+  // Set filter state to prevent tcp_proxy from disabling reads.
+  if (config_->checkOnTransportReady()) {
+    const auto* existing =
+        filter_callbacks_->connection()
+            .streamInfo()
+            .filterState()
+            ->getDataReadOnly<StreamInfo::BoolAccessor>(TcpProxy::ReceiveBeforeConnectKey);
+
+    if (existing == nullptr) {
+      filter_callbacks_->connection().streamInfo().filterState()->setData(
+          TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
+          StreamInfo::FilterState::StateType::Mutable,
+          StreamInfo::FilterState::LifeSpan::Connection);
+    } else if (!existing->value()) {
+      filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                            "ext_authz_filter_state_conflict");
+    }
+  }
+}
+
 void Filter::callCheck() {
   // If metadata_context_namespaces or typed_metadata_context_namespaces is specified,
   // pass matching filter metadata to the ext_authz service.
@@ -82,9 +108,11 @@ Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
     return Network::FilterStatus::Continue;
   }
 
-  if (status_ == Status::NotStarted) {
-    // By waiting to invoke the check at onData() the call to authorization service will have
-    // sufficient information to fill out the checkRequest_.
+  // Fallback for raw TCP connections that don't raise Connected event.
+  if (check_pending_) {
+    check_pending_ = false;
+    callCheck();
+  } else if (status_ == Status::NotStarted) {
     callCheck();
   }
   return filter_return_ == FilterReturn::Stop ? Network::FilterStatus::StopIteration
@@ -92,7 +120,10 @@ Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
 }
 
 Network::FilterStatus Filter::onNewConnection() {
-  // Wait till onData() happens.
+  if (config_->checkOnTransportReady()) {
+    check_pending_ = true;
+    return Network::FilterStatus::StopIteration;
+  }
   return Network::FilterStatus::Continue;
 }
 
@@ -100,10 +131,14 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     if (status_ == Status::Calling) {
-      // Make sure that any pending request in the client is cancelled. This will be NOP if the
-      // request already completed.
+      // Make sure that any pending request in the client is cancelled.
       client_->cancel();
       config_->stats().active_.dec();
+    }
+  } else if (event == Network::ConnectionEvent::Connected) {
+    if (config_->checkOnTransportReady() && check_pending_) {
+      check_pending_ = false;
+      callCheck();
     }
   }
 }

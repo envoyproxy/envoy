@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC Authorization API defined by
 // :ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
 // A failed check will cause this filter to close the TCP connection.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.ext_authz.v2.ExtAuthz";
@@ -100,4 +100,58 @@ message ExtAuthz {
   // the protobuf message definition in order to perform safe parsing.
   //
   repeated string typed_metadata_context_namespaces = 11;
+
+  // If set to ``true``, the filter will invoke the authorization check when the downstream transport
+  // socket is ready (e.g., after the TLS handshake completes for TLS connections). This ensures
+  // that connection information such as X.509 certificates and negotiated TLS parameters are
+  // available for the authorization service.
+  //
+  // When enabled, the filter pauses the filter chain initialization. After the transport socket
+  // raises a ``Connected`` event and authorization completes successfully, the filter would resume
+  // the filter chain. This prevents downstream filters (such as
+  // :ref:`tcp_proxy <config_network_filters_tcp_proxy>`) from establishing upstream connections
+  // before authorization completes.
+  //
+  // For raw TCP connections that do not raise a ``Connected`` event, the filter automatically
+  // falls back to invoking the authorization check when the first data byte arrives.
+  //
+  // When using this option with the :ref:`tcp_proxy <config_network_filters_tcp_proxy>` filter,
+  // configure one of the following to ensure upstream connections are not established before
+  // authorization completes:
+  //
+  // * Set :ref:`upstream_connect_mode
+  //   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`
+  //   to ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``.
+  // * Set :ref:`max_early_data_bytes
+  //   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>`.
+  //
+  // Example configuration:
+  //
+  // .. code-block:: yaml
+  //
+  //    filter_chains:
+  //    - filters:
+  //      - name: envoy.filters.network.ext_authz
+  //        typed_config:
+  //          "@type": type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz
+  //          stat_prefix: ext_authz
+  //          check_on_transport_ready: true
+  //          grpc_service:
+  //            envoy_grpc:
+  //              cluster_name: ext_authz_server
+  //      - name: envoy.filters.network.tcp_proxy
+  //        typed_config:
+  //          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+  //          stat_prefix: tcp
+  //          cluster: backend
+  //          upstream_connect_mode: ON_DOWNSTREAM_TLS_HANDSHAKE
+  //
+  // .. attention::
+  //
+  //    Server-first protocols (e.g., SMTP, MySQL, POP3) require immediate upstream connection
+  //    establishment. Do not use this option with server-first protocols as the upstream server
+  //    needs to send data before receiving any data from the client.
+  //
+  // Defaults to ``false``.
+  bool check_on_transport_ready = 12;
 }
