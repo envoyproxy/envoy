@@ -53,7 +53,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_delay_reset);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_extension);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_propagate_reset_events);
-RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
@@ -197,6 +196,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
 // TODO(yavlasov): Enabling by default will be hugely disruptive to existing traffic.
 // Replace with a config option (default off) post CVE release.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reject_early_connect_data);
+// TODO: Flip back to true once performance aligns with nghttp2 and
+// https://github.com/envoyproxy/envoy/issues/40070 is resolved.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
