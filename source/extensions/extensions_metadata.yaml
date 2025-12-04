@@ -454,6 +454,13 @@ envoy.filters.http.gcp_authn:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig
+envoy.filters.http.grpc_decompressor:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.grpc_decompressor.v3.Decompressor
 envoy.filters.http.grpc_field_extraction:
   categories:
   - envoy.filters.http
