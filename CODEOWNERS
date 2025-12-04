@@ -441,6 +441,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui
 /contrib/mysql_proxy/ @rshriram @venilnoronha
+/contrib/postgres/protocol/ @agrawroh @cpakulski @jarupatj
+/contrib/postgres_inspector/ @agrawroh @cpakulski @jarupatj
 /contrib/postgres_proxy/ @fabriziomello @cpakulski
 /contrib/sxg/ @cpapazian @UNOWNED
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102

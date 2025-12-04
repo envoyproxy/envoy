@@ -51,6 +51,36 @@ message Mcp {
   //
   // Setting it to 0 would disable the limit. It is not recommended to do so in production.
   google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {lte: 10485760}];
+
+  // Parser configuration, this provide the attribute extraction override.
+  ParserConfig parser_config = 4;
+}
+
+// Parser configuration with method-specific rules.
+// This configuration allows overriding the default attribute extraction behavior for specific MCP methods.
+message ParserConfig {
+  // A single attribute extraction rule.
+  message AttributeExtractionRule {
+    // JSON path to extract (e.g., "params.name", "params.uri").
+    // The path is a dot-separated string representing the location of the field in the JSON payload.
+    // For example, "params.name" extracts the "name" field from the "params" object.
+    string path = 1 [(validate.rules).string = {min_len: 1}];
+  }
+
+  // Configuration for a specific MCP method.
+  message MethodConfig {
+    // Method name (e.g., "tools/call", "resources/read", "initialize").
+    // This matches the "method" field in the JSON-RPC request.
+    string method = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Attributes to extract for this method.
+    // If empty, no attributes will be extracted for this method beyond the default ones (jsonrpc, method).
+    repeated AttributeExtractionRule extraction_rules = 2;
+  }
+
+  // Method-specific configurations.
+  // These rules override or supplement the default extraction logic for the specified methods.
+  repeated MethodConfig methods = 1;
 }
 
 // Per-route override configuration for MCP filter

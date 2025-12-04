@@ -487,6 +487,31 @@ typedef enum envoy_dynamic_module_type_http_callout_result {
 } envoy_dynamic_module_type_http_callout_result;
 
 /**
+ * envoy_dynamic_module_type_http_stream_envoy_ptr is a handle to an HTTP stream for streamable
+ * callouts. This represents an ongoing HTTP stream initiated via
+ * envoy_dynamic_module_callback_http_filter_start_http_stream.
+ *
+ * OWNERSHIP: Envoy owns the stream. The module must not store this pointer beyond the lifetime of
+ * the stream callbacks.
+ */
+typedef void* envoy_dynamic_module_type_http_stream_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_http_stream_reset_reason represents the reason for a stream reset.
+ * This corresponds to `AsyncClient::StreamResetReason::*` in envoy/http/async_client.h.
+ */
+typedef enum envoy_dynamic_module_type_http_stream_reset_reason {
+  envoy_dynamic_module_type_http_stream_reset_reason_ConnectionFailure,
+  envoy_dynamic_module_type_http_stream_reset_reason_ConnectionTermination,
+  envoy_dynamic_module_type_http_stream_reset_reason_LocalReset,
+  envoy_dynamic_module_type_http_stream_reset_reason_LocalRefusedStreamReset,
+  envoy_dynamic_module_type_http_stream_reset_reason_Overflow,
+  envoy_dynamic_module_type_http_stream_reset_reason_RemoteReset,
+  envoy_dynamic_module_type_http_stream_reset_reason_RemoteRefusedStreamReset,
+  envoy_dynamic_module_type_http_stream_reset_reason_ProtocolError,
+} envoy_dynamic_module_type_http_stream_reset_reason;
+
+/**
  * envoy_dynamic_module_type_metrics_result represents the result of the metrics operation.
  * Success means the operation was successful.
  * MetricNotFound means the metric was not found. This is usually an indication that a handle was
@@ -749,6 +774,108 @@ void envoy_dynamic_module_on_http_filter_http_callout_done(
     envoy_dynamic_module_type_http_callout_result result,
     envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_stream_headers is called when response headers are
+ * received for a streamable HTTP callout stream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param stream_ptr is the handle to the HTTP stream.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param end_stream is true if this is the last data in the stream (no body or trailers will
+ * follow).
+ *
+ * headers are owned by Envoy and are guaranteed to be valid until the end of this event hook.
+ */
+void envoy_dynamic_module_on_http_filter_http_stream_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size, bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_stream_data is called when a chunk of response body is
+ * received for a streamable HTTP callout stream. This may be called multiple times for a single
+ * stream as body chunks arrive.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param stream_ptr is the handle to the HTTP stream.
+ * @param data is the pointer to the array of buffers containing the body chunk.
+ * @param data_count is the number of buffers.
+ * @param end_stream is true if this is the last data in the stream (no trailers will follow).
+ *
+ * data is owned by Envoy and is guaranteed to be valid until the end of this event hook.
+ */
+void envoy_dynamic_module_on_http_filter_http_stream_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    const envoy_dynamic_module_type_envoy_buffer* data, size_t data_count, bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_stream_trailers is called when response trailers are
+ * received for a streamable HTTP callout stream. This is called after headers and any data chunks.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param stream_ptr is the handle to the HTTP stream.
+ * @param trailers is the trailers of the response.
+ * @param trailers_size is the size of the trailers.
+ *
+ * trailers are owned by Envoy and are guaranteed to be valid until the end of this event hook.
+ */
+void envoy_dynamic_module_on_http_filter_http_stream_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_envoy_http_header* trailers, size_t trailers_size);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_stream_complete is called when a streamable HTTP
+ * callout stream completes successfully. This is called after all headers, data, and trailers have
+ * been received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param stream_ptr is the handle to the HTTP stream.
+ *
+ * After this callback, the stream is automatically cleaned up and stream_ptr becomes invalid.
+ */
+void envoy_dynamic_module_on_http_filter_http_stream_complete(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_stream_reset is called when a streamable HTTP callout
+ * stream is reset or fails. This may be called instead of the complete callback if the stream
+ * encounters an error.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param stream_ptr is the handle to the HTTP stream.
+ * @param reason is the reason for the stream reset.
+ *
+ * After this callback, the stream is automatically cleaned up and stream_ptr becomes invalid.
+ */
+void envoy_dynamic_module_on_http_filter_http_stream_reset(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_http_stream_reset_reason reason);
 
 /**
  * envoy_dynamic_module_on_http_filter_scheduled is called when the HTTP filter is scheduled
@@ -1981,6 +2108,107 @@ envoy_dynamic_module_callback_http_filter_http_callout(
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size,
     uint64_t timeout_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_start_http_stream is called by the module to start
+ * a streamable HTTP callout to a specified cluster. Unlike the one-shot HTTP callout, this allows
+ * the module to receive response headers, body chunks, and trailers through separate event hooks,
+ * enabling true streaming behavior.
+ *
+ * The stream will trigger the following event hooks in order:
+ * 1. envoy_dynamic_module_on_http_filter_http_stream_headers - when response headers arrive
+ * 2. envoy_dynamic_module_on_http_filter_http_stream_data - for each body chunk (may be called
+ *    multiple times or not at all)
+ * 3. envoy_dynamic_module_on_http_filter_http_stream_trailers - when trailers arrive (optional)
+ * 4. envoy_dynamic_module_on_http_filter_http_stream_complete - when stream completes successfully
+ *    OR
+ *    envoy_dynamic_module_on_http_filter_http_stream_reset - if stream fails
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param stream_ptr_out is a pointer to a variable where the stream handle will be stored. The
+ * module can use this handle to reset the stream via
+ * envoy_dynamic_module_callback_http_filter_reset_http_stream.
+ * @param cluster_name is the name of the cluster to which the stream is sent.
+ * @param cluster_name_length is the length of the cluster name.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the pointer to the buffer of the body of the request.
+ * @param body_size is the length of the body.
+ * @param end_stream is true if the request stream should be ended after sending headers and body.
+ * If true and body_size > 0, the body will be sent with end_stream=true.
+ * If true and body_size is 0, headers will be sent with end_stream=true.
+ * If false, the module can send additional data or trailers using send_http_stream_data() or
+ * send_http_stream_trailers().
+ * @param timeout_milliseconds is the timeout for the stream in milliseconds. If 0, no timeout is
+ * set.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the stream
+ * initialization.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_start_http_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr* stream_ptr_out,
+    envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size, bool end_stream,
+    uint64_t timeout_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_reset_http_stream is called by the module to reset
+ * or cancel an ongoing streamable HTTP callout. This causes the stream to be terminated and the
+ * envoy_dynamic_module_on_http_filter_http_stream_reset event hook to be called.
+ *
+ * This can be called at any point after the stream is started and before it completes. After
+ * calling this function, the stream handle becomes invalid.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param stream_ptr is the handle to the HTTP stream to reset.
+ */
+void envoy_dynamic_module_callback_http_filter_reset_http_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_stream_send_data is called by the module to send request
+ * body data on an active streamable HTTP callout. This can be called multiple times to stream
+ * the request body in chunks.
+ *
+ * This must be called after the stream is started and headers have been sent. It can be called
+ * multiple times until end_stream is set to true.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param stream_ptr is the handle to the HTTP stream.
+ * @param data is the pointer to the buffer of the data to send.
+ * @param data_length is the length of the data.
+ * @param end_stream is true if this is the last data (no trailers will follow).
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_stream_send_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length, bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_http_stream_send_trailers is called by the module to send
+ * request trailers on an active streamable HTTP callout. This implicitly ends the stream.
+ *
+ * This must be called after the stream is started and all request data has been sent.
+ * After calling this, no more data can be sent on the stream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param stream_ptr is the handle to the HTTP stream.
+ * @param trailers is the trailers to send.
+ * @param trailers_size is the size of the trailers.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_stream_send_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_module_http_header* trailers, size_t trailers_size);
 
 /**
  * envoy_dynamic_module_callback_http_filter_continue_decoding is called by the module to continue
