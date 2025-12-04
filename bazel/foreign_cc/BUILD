@@ -192,12 +192,6 @@ configure_make(
         "//bazel/foreign_cc:parallel_builds_enabled": {
             "MAKEFLAGS": "-j ARFLAGS=r",
         },
-        "//bazel:engflow_rbe_x86_64": {
-            "MAKEFLAGS": "-j ARFLAGS=r",
-        },
-        "//bazel:engflow_rbe_aarch64": {
-            "MAKEFLAGS": "-j ARFLAGS=r",
-        },
         "//conditions:default": {
             "MAKEFLAGS": "-j1 ARFLAGS=r",
         },
@@ -233,8 +227,6 @@ envoy_cmake(
     name = "libsxg",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -274,8 +266,6 @@ envoy_cmake(
     name = "ares",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -318,8 +308,6 @@ envoy_cmake(
     name = "event",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -375,8 +363,6 @@ envoy_cmake(
     name = "nghttp2",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -413,8 +399,6 @@ envoy_cmake(
     name = "wamr",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -470,8 +454,6 @@ envoy_cmake(
     name = "maxmind",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
