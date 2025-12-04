@@ -230,6 +230,10 @@ new_features:
   change: |
     Support process-level rate limiting on access log emission by
     :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: listener_filters
+  change: |
+    Added :ref:`Postgres Inspector <config_listener_filters_postgres_inspector>` listener filter for detecting
+    PostgreSQL connections, extracting metadata and supporting SNI-based routing for PostgreSQL traffic.
 - area: dynamic modules
   change: |
     Enhanced dynamic module ABIs to support headers addition and body size retrieval.
