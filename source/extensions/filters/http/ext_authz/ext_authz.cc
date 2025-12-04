@@ -1152,8 +1152,9 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
         !Http::HeaderUtility::headerValueIsValid(value)) {
       ENVOY_STREAM_LOG(trace, "Rejected invalid error header '{}':'{}'.", *decoder_callbacks_, key,
                        value);
-      ENVOY_STREAM_LOG(info, "Custom error response from ext_authz will be ignored due to invalid "
-                             "header. Falling back to generic error response.",
+      ENVOY_STREAM_LOG(info,
+                       "Custom error response from ext_authz will be ignored due to invalid "
+                       "header. Falling back to generic error response.",
                        *decoder_callbacks_);
       // Fall back to generic error by clearing all custom attributes.
       response->headers_to_set.clear();
@@ -1171,8 +1172,9 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
         !Http::HeaderUtility::headerValueIsValid(value)) {
       ENVOY_STREAM_LOG(trace, "Rejected invalid error header '{}':'{}'.", *decoder_callbacks_, key,
                        value);
-      ENVOY_STREAM_LOG(info, "Custom error response from ext_authz will be ignored due to invalid "
-                             "header. Falling back to generic error response.",
+      ENVOY_STREAM_LOG(info,
+                       "Custom error response from ext_authz will be ignored due to invalid "
+                       "header. Falling back to generic error response.",
                        *decoder_callbacks_);
       // Fall back to generic error by clearing all custom attributes.
       response->headers_to_set.clear();
