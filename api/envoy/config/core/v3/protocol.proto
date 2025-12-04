@@ -666,7 +666,7 @@ message Http2ProtocolOptions {
   // Disables encoding the headers using huffman encoding.
   // This can be useful in cases where the cpu spent encoding the headers isn't
   // worth the network bandwidth saved e.g. for localhost.
-  bool disable_huffman = 18;
+  bool disable_huffman_encoding = 18;
 }
 
 // [#not-implemented-hide:]

@@ -2037,11 +2037,11 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.max_header_field_size = max_headers_kb * 1024;
   og_options_.allow_extended_connect = http2_options.allow_connect();
   og_options_.allow_different_host_and_authority = true;
-  if (http2_options.disable_huffman()) {
+  if (http2_options.disable_huffman_encoding()) {
     if (http2_options.has_hpack_table_size() && http2_options.hpack_table_size().value() == 0) {
-      og_options_.compression_option = http2::adapter::OgHttp2Session::Options::DISABLE_HUFFMAN;
-    } else {
       og_options_.compression_option = http2::adapter::OgHttp2Session::Options::DISABLE_COMPRESSION;
+    } else {
+      og_options_.compression_option = http2::adapter::OgHttp2Session::Options::DISABLE_HUFFMAN;
     }
   }
 
@@ -2074,7 +2074,7 @@ ConnectionImpl::Http2Options::Http2Options(
                                                       http2_options.hpack_table_size().value());
   }
 
-  if (http2_options.disable_huffman()) {
+  if (http2_options.disable_huffman_encoding()) {
     nghttp2_option_set_disable_huffman_encoding(options_, 1);
   }
 

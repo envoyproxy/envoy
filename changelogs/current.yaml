@@ -238,7 +238,7 @@ new_features:
     Added new parameter to the ``sendGoAwayAndClose`` to support gracefully closing of HTTP/2 connection.
 - area: http2
   change: |
-    Added :ref:`disable_huffman <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.disable_huffman>` disable huffman
+    Added :ref:`disable_huffman_encoding <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.disable_huffman_encoding>` disable huffman
     encoding of headers from envoy to the receiver. This is useful in scenarios where the bandwidth saved from huffman
     encoding is not worth the cpu cost. e.g. for localhost, sidecar traffic.
 - area: logging
