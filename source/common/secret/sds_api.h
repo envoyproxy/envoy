@@ -138,7 +138,7 @@ public:
   static TlsCertificateSdsApiSharedPtr
   create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
-         const std::string& sds_config_name, std::function<void()> destructor_cb);
+         const std::string& sds_config_name, std::function<void()> destructor_cb, bool warm);
 
   TlsCertificateSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                        const std::string& sds_config_name,
@@ -190,7 +190,7 @@ public:
   static CertificateValidationContextSdsApiSharedPtr
   create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
-         const std::string& sds_config_name, std::function<void()> destructor_cb);
+         const std::string& sds_config_name, std::function<void()> destructor_cb, bool warm);
   CertificateValidationContextSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                                      const std::string& sds_config_name,
                                      Config::SubscriptionFactory& subscription_factory,
@@ -248,7 +248,7 @@ public:
   static TlsSessionTicketKeysSdsApiSharedPtr
   create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
-         const std::string& sds_config_name, std::function<void()> destructor_cb);
+         const std::string& sds_config_name, std::function<void()> destructor_cb, bool warm);
 
   TlsSessionTicketKeysSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                              const std::string& sds_config_name,
@@ -301,7 +301,7 @@ public:
   static GenericSecretSdsApiSharedPtr
   create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
-         const std::string& sds_config_name, std::function<void()> destructor_cb);
+         const std::string& sds_config_name, std::function<void()> destructor_cb, bool warm);
 
   GenericSecretSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                       const std::string& sds_config_name,

@@ -42,6 +42,7 @@ namespace TransportSockets {
 namespace Tls {
 
 Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs);
+bool isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello);
 
 class ServerContextImpl : public ContextImpl,
                           public Envoy::Ssl::ServerContext,
@@ -68,7 +69,6 @@ public:
                  bool client_ocsp_capable, bool* cert_matched_sni);
 
   Ssl::CurveNIDVector getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const;
-  bool isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const;
 
 protected:
   ServerContextImpl(

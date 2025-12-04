@@ -16,6 +16,10 @@ namespace Tls {
 // Defined in server_context_impl.h
 class ServerContextImpl;
 
+Ssl::OcspStapleAction
+ocspStapleAction(const Ssl::TlsContext& ctx, bool client_ocsp_capable,
+                 Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy);
+
 /**
  * The default TLS context provider, selecting certificate based on SNI.
  */
@@ -44,8 +48,6 @@ private:
   using ServerNamesMap = absl::flat_hash_map<std::string, PkeyTypesMap>;
 
   void populateServerNamesMap(const Ssl::TlsContext& ctx, const int pkey_id);
-
-  Ssl::OcspStapleAction ocspStapleAction(const Ssl::TlsContext& ctx, bool client_ocsp_capable);
 
   // ServerContext own this selector, it's safe to use itself here.
   ServerContextImpl& server_ctx_;

@@ -461,7 +461,7 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
   return Ssl::CurveNIDVector{};
 }
 
-bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const {
+bool isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) {
   const uint8_t* status_request_data;
   size_t status_request_len;
   if (SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_status_request,

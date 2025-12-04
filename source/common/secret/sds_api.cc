@@ -410,7 +410,7 @@ GenericSecretSdsApiSharedPtr
 GenericSecretSdsApi::create(Server::Configuration::ServerFactoryContext& server_context,
                             const envoy::config::core::v3::ConfigSource& sds_config,
                             const std::string& sds_config_name, std::function<void()> destructor_cb,
-                            warm) {
+                            bool warm) {
   // We need to do this early as we invoke the subscription factory during initialization, which
   // is too late to throw.
   THROW_IF_NOT_OK(

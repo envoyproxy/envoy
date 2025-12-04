@@ -66,13 +66,16 @@ public:
   // context.
   explicit Handle(AsyncContextConstSharedPtr cert_context) : active_context_(cert_context) {}
   // Asynchronous handle constructor must also keep the callback for the secret manager.
-  explicit Handle(Ssl::CertificateSelectionCallbackPtr&& cb) : cb_(std::move(cb)) {}
-  void notify(AsyncContextConstSharedPtr cert_ctx);
+  Handle(Ssl::CertificateSelectionCallbackPtr&& cb, bool client_ocsp_capable)
+      : cb_(std::move(cb)), client_ocsp_capable_(client_ocsp_capable) {}
+  void notify(AsyncContextConstSharedPtr cert_ctx,
+              Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy);
 
 private:
   // Captures the selected certificate data for the duration of the socket.
   AsyncContextConstSharedPtr active_context_;
   Ssl::CertificateSelectionCallbackPtr cb_;
+  bool client_ocsp_capable_{false};
 };
 using HandleSharedPtr = std::shared_ptr<Handle>;
 
@@ -85,6 +88,7 @@ public:
                 Server::Configuration::GenericFactoryContext& factory_context,
                 const Ssl::ServerContextConfig& tls_config);
 
+  // Must be called on main thread.
   void addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
                             OptRef<Init::Manager> init_manager);
   absl::Status updateCertificate(absl::string_view secret_name,
@@ -94,7 +98,9 @@ public:
   void setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx);
   absl::optional<AsyncContextConstSharedPtr> getContext(absl::string_view secret_name) const;
   HandleSharedPtr fetchCertificate(absl::string_view secret_name,
-                                   Ssl::CertificateSelectionCallbackPtr&& cb);
+                                   Ssl::CertificateSelectionCallbackPtr&& cb,
+                                   bool client_ocsp_capable);
+  Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const;
 
 private:
   const Stats::ScopeSharedPtr stats_scope_;
