@@ -226,6 +226,8 @@ def envoy_dependencies(skip_targets = []):
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
 
+    _toolchains_llvm()
+
     _cc_deps()
     _go_deps(skip_targets)
     _rust_deps()
@@ -803,6 +805,9 @@ def _com_github_wamr():
         name = "com_github_wamr",
         build_file_content = BUILD_ALL_CONTENT,
     )
+
+def _toolchains_llvm():
+    external_http_archive(name = "toolchains_llvm")
 
 def _com_github_wasmtime():
     external_http_archive(

@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-22.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.33
+    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.34
       if: |
         ! github.event.repository.private
       with:
@@ -48,7 +48,7 @@ jobs:
       if: |
         env.BUILD_TARGETS != ''
         && github.event.repository.private
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.33
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.34
       with:
         to_remove: |
           /usr/local/.ghcup
@@ -110,16 +110,15 @@ jobs:
 
     - name: Build
       run: |
-        bazel/setup_clang.sh "$(realpath bin/clang18.1.8)"
-        PATH=$(bin/clang18.1.8/bin/llvm-config --bindir):$local_clang:$PATH
         bazel shutdown
         bazel build \
             -c fastbuild \
+            --repo_env=BAZEL_LLVM_PATH="$(realpath bin/clang18.1.8)" \
             --spawn_strategy=local \
             --discard_analysis_cache \
             --nouse_action_cache \
             --features="-layering_check" \
-            --config=clang-local \
+            --config=clang \
             --config=ci \
             ${BUILD_TARGETS:-${MINIMAL_BUILD_TARGET}}
         echo -e "Built targets...\n${BUILD_TARGETS:-${MINIMAL_BUILD_TARGET}}"
