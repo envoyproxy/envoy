@@ -248,6 +248,8 @@ struct ResponseCodeDetailValues {
   const std::string FilterAddedInvalidRequestData = "filter_added_invalid_request_data";
   // A filter called addDecodedData at the wrong point in the filter chain.
   const std::string FilterAddedInvalidResponseData = "filter_added_invalid_response_data";
+  // Data was received for a CONNECT request before 200 response headers were sent.
+  const std::string EarlyConnectData = "early_connect_data";
   // Changes or additions to details should be reflected in
   // docs/root/configuration/http/http_conn_man/response_code_details.rst
 };
