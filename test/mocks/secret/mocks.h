@@ -77,6 +77,7 @@ public:
   MOCK_METHOD(Common::CallbackHandlePtr, addValidationCallback,
               (std::function<absl::Status(const SecretType&)>));
   MOCK_METHOD(Common::CallbackHandlePtr, addUpdateCallback, (std::function<absl::Status()>));
+  MOCK_METHOD(Common::CallbackHandlePtr, addRemoveCallback, (std::function<absl::Status()>));
   MOCK_METHOD(const Init::Target*, initTarget, ());
   void start() override {}
 };

@@ -40,17 +40,20 @@ absl::Status AsyncContextConfig::loadCert() {
 
 const Ssl::TlsContext& AsyncContext::tlsContext() const { return tls_contexts_[0]; }
 
-void Handle::notify(AsyncContextConstSharedPtr cert_ctx,
-                    Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy) {
+void Handle::notify(AsyncContextConstSharedPtr cert_ctx) {
   ASSERT(cb_);
-  active_context_ = cert_ctx;
-  const auto staple_action = TransportSockets::Tls::ocspStapleAction(
-      cert_ctx->tlsContext(), client_ocsp_capable_, ocsp_staple_policy);
+  OptRef<const Ssl::TlsContext> selected_ctx;
+  bool staple = false;
+  if (cert_ctx) {
+    active_context_ = std::move(cert_ctx);
+    selected_ctx = active_context_->tlsContext();
+    staple = (TransportSockets::Tls::ocspStapleAction(
+      *selected_ctx, client_ocsp_capable_, active_context_->ocspStaplePolicy()) == Ssl::OcspStapleAction::Staple);
+  }
   Event::Dispatcher& dispatcher = cb_->dispatcher();
   // TODO: This could benefit from batching events by the dispatcher.
-  dispatcher.post([cb = std::move(cb_), cert_ctx, staple_action] {
-    cb->onCertificateSelectionResult(cert_ctx->tlsContext(),
-                                     staple_action == Ssl::OcspStapleAction::Staple);
+  dispatcher.post([cb = std::move(cb_), active_context_, selected_ctx, staple] {
+    cb->onCertificateSelectionResult(selected_ctx, staple);
   });
   cb_ = nullptr;
 }
@@ -79,7 +82,7 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
   CacheEntry& entry = cache_[secret_name];
   if (handle) {
     if (entry.cert_context_) {
-      handle->notify(entry.cert_context_, ocspStaplePolicy());
+      handle->notify(entry.cert_context_);
     } else {
       entry.callbacks_.push_back(handle);
     }
@@ -96,6 +99,7 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
           return removeCertificateConfig(secret_name);
         });
     stats_.cert_requested_.inc();
+    stats_.cert_active_.inc();
   }
 }
 
@@ -111,17 +115,34 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
   setContext(secret_name, cert_context);
   CacheEntry& entry = cache_[secret_name];
   entry.cert_context_ = cert_context;
-  size_t count = 0;
+  size_t notify_count = 0;
   for (auto fetch_handle : entry.callbacks_) {
     if (auto handle = fetch_handle.lock(); handle) {
-      handle->notify(cert_context, ocspStaplePolicy());
-      count++;
+      handle->notify(cert_context);
+      notify_count++;
     }
   }
   ENVOY_LOG(trace, "Notified {} pending connections about certificate '{}', out of queued {}",
-            count, secret_name, entry.callbacks_.size());
+            notify_count, secret_name, entry.callbacks_.size());
   entry.callbacks_.clear();
   return absl::OkStatus();
+}
+
+absl::Status SecretManager::removeCertificate(absl::string_view secret_name) {
+  auto it = cache_.find(secret_name);
+  if (it == cache_.end()) {
+    return absl::OkStatus();
+  }
+  size_t notify_count = 0;
+  for (auto fetch_handle : it->second.callbacks_) {
+    if (auto handle = fetch_handle.lock(); handle) {
+      handle->notify(nullptr);
+      notify_count++;
+    }
+  }
+  cache_.erase(it);
+  stats_.cert_active_.dec();
+  ENVOY_LOG(trace, "Removed certificate subscription for '{}', notified {} pending connections", secret_name, notify_count);
 }
 
 HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
@@ -142,10 +163,6 @@ HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
         }
       });
   return handle;
-}
-
-Ssl::ServerContextConfig::OcspStaplePolicy SecretManager::ocspStaplePolicy() const {
-  return tls_config_.ocspStaplePolicy();
 }
 
 void SecretManager::setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx) {
@@ -176,7 +193,7 @@ Ssl::SelectionResult AsyncSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl
     ENVOY_LOG(trace, "Using an existing certificate '{}'", name);
     const Ssl::TlsContext* tls_context = &current_context.value()->tlsContext();
     const auto staple_action = TransportSockets::Tls::ocspStapleAction(
-        *tls_context, client_ocsp_capable, secret_manager_->ocspStaplePolicy());
+        *tls_context, client_ocsp_capable, current_context.value()->ocspStaplePolicy());
     auto handle = std::make_shared<Handle>(*std::move(current_context));
     return Ssl::SelectionResult{
         .status = Ssl::SelectionResult::SelectionStatus::Success,

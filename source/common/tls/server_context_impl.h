@@ -90,6 +90,7 @@ private:
 
   Ssl::TlsCertificateSelectorPtr tls_certificate_selector_;
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
+protected:
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
 };
 

@@ -61,20 +61,33 @@ public:
             std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
             false, factory_context, nullptr, creation_status) {}
 
-  // @returns the low-level TLS context stored in this context.
+  Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const {
+    return ocsp_staple_policy_;
+  }
+
+  /**
+   * @return the low-level TLS context stored in this context.
+   */
   const Ssl::TlsContext& tlsContext() const;
 };
 
 class Handle : public Ssl::SelectionHandle {
 public:
-  // Synchronous handle constructor must extend the context lifetime since it holds the low TLS
-  // context.
+  /**
+   * Synchronous handle constructor must extend the context lifetime since it holds the low TLS
+   *context.
+   */
   explicit Handle(AsyncContextConstSharedPtr cert_context) : active_context_(cert_context) {}
-  // Asynchronous handle constructor must also keep the callback for the secret manager.
+  /** 
+   * Asynchronous handle constructor must also keep the callback for the secret manager.
+   */
   Handle(Ssl::CertificateSelectionCallbackPtr&& cb, bool client_ocsp_capable)
       : cb_(std::move(cb)), client_ocsp_capable_(client_ocsp_capable) {}
-  void notify(AsyncContextConstSharedPtr cert_ctx,
-              Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy);
+  /**
+   * Notify the pending connection that the context is available.
+   * @param cert_ctx TLS context or nullptr is the secret is removed.
+   */
+  void notify(AsyncContextConstSharedPtr cert_ctx);
 
 private:
   // Captures the selected certificate data for the duration of the socket.
@@ -82,6 +95,7 @@ private:
   Ssl::CertificateSelectionCallbackPtr cb_;
   bool client_ocsp_capable_{false};
 };
+
 using HandleSharedPtr = std::shared_ptr<Handle>;
 
 // Maintains dynamic subscriptions to SDS secrets and converts them from the xDS form to the
@@ -115,7 +129,6 @@ public:
   HandleSharedPtr fetchCertificate(absl::string_view secret_name,
                                    Ssl::CertificateSelectionCallbackPtr&& cb,
                                    bool client_ocsp_capable);
-  Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const;
 
 private:
   const Stats::ScopeSharedPtr stats_scope_;
