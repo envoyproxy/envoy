@@ -180,7 +180,7 @@ MuxDemux::multicast(const AsyncClient::StreamOptions& options,
   }
 
   is_idle_ = false;
-  return std::move(multistream);
+  return multistream;
 }
 
 } // namespace Http
