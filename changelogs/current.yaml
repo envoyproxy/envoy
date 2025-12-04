@@ -423,5 +423,10 @@ new_features:
     <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces>` in the
     ext-authz network filter. This allows passing connection metadata (such as proxy protocol TLV data) to the
     external authorization server for making authorization decisions.
+- area: sds
+  change: |
+    Added support for fetching SDS secrets on-demand in the downstream TLS transport socket using
+    the extension :ref:`on-demand certificate selector
+    <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
 
 deprecated:
