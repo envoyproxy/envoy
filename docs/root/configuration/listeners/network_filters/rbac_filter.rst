@@ -37,6 +37,63 @@ can be used to add an extra prefix to output the statistics in the *<stat_prefix
   logged, Counter, Total requests that should be logged
   not_logged, Counter, Total requests that should not be logged
 
+.. _config_network_filters_rbac_tcp_proxy:
+
+Usage with TCP Proxy
+--------------------
+
+When using the RBAC network filter with the :ref:`TCP proxy <config_network_filters_tcp_proxy>` filter,
+the default behavior establishes upstream connections immediately when a downstream connection is accepted.
+This means the upstream connection may be established before RBAC enforcement completes.
+
+To ensure upstream connections are only established after RBAC allows the connection, configure the
+TCP proxy filter to delay upstream connection establishment using
+:ref:`upstream_connect_mode <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`.
+
+Example configuration:
+
+.. code-block:: yaml
+
+  filter_chains:
+  - filters:
+    - name: envoy.filters.network.rbac
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+        stat_prefix: tcp
+        rules:
+          policies:
+            "require-mtls":
+              permissions:
+              - any: true
+              principals:
+              - authenticated:
+                  principal_name:
+                    exact: "spiffe://cluster.local/ns/default/sa/frontend"
+    - name: envoy.filters.network.tcp_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+        stat_prefix: tcp
+        cluster: backend
+        upstream_connect_mode: ON_DOWNSTREAM_DATA
+        max_early_data_bytes: 8192
+
+In this configuration:
+
+* ``upstream_connect_mode: ON_DOWNSTREAM_DATA`` delays the upstream connection until data is received
+  from the downstream client.
+* RBAC enforcement happens when data arrives, before the TCP proxy establishes the upstream connection.
+* If RBAC denies the request, the connection is closed without ever connecting to the upstream.
+
+Alternatively, use ``ON_DOWNSTREAM_TLS_HANDSHAKE`` to wait for the TLS handshake to complete, which
+provides access to client certificates for RBAC policies that use :ref:`authenticated
+<envoy_v3_api_field_config.rbac.v3.Principal.authenticated>` principals.
+
+.. attention::
+
+  The ``ON_DOWNSTREAM_DATA`` mode is not suitable for server-first protocols where the server sends
+  the initial greeting (e.g., SMTP, MySQL, POP3). For such protocols, use the default ``IMMEDIATE``
+  mode and accept that upstream connections may be established before RBAC enforcement.
+
 .. _config_network_filters_rbac_dynamic_metadata:
 
 Dynamic Metadata
