@@ -85,7 +85,7 @@ jobs:
     - name: Set default build target
       if: ${{ env.BUILD_TARGETS == '' }}
       run: |
-        echo "MINIMAL_BUILD_TARGET=//source/common/common:assert_lib" > $GITHUB_ENV
+        echo "MINIMAL_BUILD_TARGET=//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk" > $GITHUB_ENV
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@cf1bb45a277cb3c205638b2cd5c984db1c46a412  # codeql-bundle-v4.31.7
@@ -108,9 +108,14 @@ jobs:
        wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz
        tar -xf clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
 
+       tree .
+
     - name: Build
       run: |
         bazel shutdown
+
+        bazel test --repo_env=BAZEL_LLVM_PATH="$(realpath bin/clang18.1.8)" --config=clang --config=asan //test/common/common:assert_test
+
         bazel build \
             -c fastbuild \
             --repo_env=BAZEL_LLVM_PATH="$(realpath bin/clang18.1.8)" \
@@ -118,6 +123,7 @@ jobs:
             --discard_analysis_cache \
             --nouse_action_cache \
             --features="-layering_check" \
+            --verbose_failures \
             --config=clang \
             --config=ci \
             ${BUILD_TARGETS:-${MINIMAL_BUILD_TARGET}}
