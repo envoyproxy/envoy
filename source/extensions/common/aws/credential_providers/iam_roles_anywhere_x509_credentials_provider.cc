@@ -42,7 +42,9 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
 
   auto provider_or_error = Config::DataSource::DataSourceProvider<std::string>::create(
       certificate_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
-      context_.api(), false, absl::nullopt, X509_CERTIFICATE_MAX_BYTES);
+      context_.api(), false,
+      [](absl::string_view data) { return std::make_shared<std::string>(data); },
+      X509_CERTIFICATE_MAX_BYTES);
   if (provider_or_error.ok()) {
     certificate_data_source_provider_ = std::move(provider_or_error.value());
   } else {
@@ -55,7 +57,8 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
   if (certificate_chain_data_source_.has_value()) {
     auto chain_provider_or_error_ = Config::DataSource::DataSourceProvider<std::string>::create(
         certificate_chain_data_source_.value(), context_.mainThreadDispatcher(),
-        context_.threadLocal(), context_.api(), false, absl::nullopt,
+        context_.threadLocal(), context_.api(), false,
+        [](absl::string_view data) { return std::make_shared<std::string>(data); },
         X509_CERTIFICATE_MAX_BYTES * 5);
     if (chain_provider_or_error_.ok()) {
       certificate_chain_data_source_provider_ = std::move(chain_provider_or_error_.value());
@@ -70,7 +73,9 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
 
   auto pkey_provider_or_error_ = Config::DataSource::DataSourceProvider<std::string>::create(
       private_key_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
-      context_.api(), false, absl::nullopt, X509_PRIVATE_KEY_MAX_BYTES);
+      context_.api(), false,
+      [](absl::string_view data) { return std::make_shared<std::string>(data); },
+      X509_PRIVATE_KEY_MAX_BYTES);
   if (pkey_provider_or_error_.ok()) {
     private_key_data_source_provider_ = std::move(pkey_provider_or_error_.value());
   } else {

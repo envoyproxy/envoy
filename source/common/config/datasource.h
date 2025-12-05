@@ -25,7 +25,7 @@ template <class DataType> class DataSourceProvider;
 
 using ProtoDataSource = envoy::config::core::v3::DataSource;
 using ProtoWatchedDirectory = envoy::config::core::v3::WatchedDirectory;
-template <class DataType = std::string>
+template <class DataType>
 using DataSourceProviderPtr = std::unique_ptr<DataSourceProvider<DataType>>;
 
 /**
@@ -60,7 +60,7 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
  */
 absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source);
 
-template <class DataType = std::string> class DynamicData {
+template <class DataType> class DynamicData {
 public:
   struct ThreadLocalData : public ThreadLocal::ThreadLocalObject {
     ThreadLocalData(std::shared_ptr<DataType> data) : data_(std::move(data)) {}
@@ -96,7 +96,7 @@ private:
  * NOTE: This should only be used when the envoy.config.core.v3.DataSource is necessary and
  * file watch is required.
  */
-template <class DataType = std::string> class DataSourceProvider {
+template <class DataType> class DataSourceProvider {
 public:
   /**
    * Create a DataSourceProvider from a DataSource.
@@ -105,7 +105,7 @@ public:
    * @param tls reference to the thread local slot allocator.
    * @param api reference to the Api.
    * @param allow_empty return an empty string if no DataSource case is specified.
-   * @param data_transform_cb if specified, transforms content of the DataSource (type std::string)
+   * @param data_transform_cb transforms content of the DataSource (type std::string)
    *        to the desired `DataType` type.
    * @param max_size max size limit of file to read, default 0 means no limit.
    * @return absl::StatusOr<DataSourceProvider> with DataSource contents. or an error
@@ -113,11 +113,11 @@ public:
    * NOTE: If file watch is enabled and the new file content does not meet the
    * requirements (allow_empty, max_size), the provider will keep the old content.
    */
-  static absl::StatusOr<DataSourceProviderPtr<DataType>>
-  create(const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
-         ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty,
-         absl::optional<std::function<DataType(const std::string&)>> data_transform_cb,
-         uint64_t max_size) {
+  static absl::StatusOr<DataSourceProviderPtr<DataType>> create(
+      const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
+      ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty,
+      std::function<absl::StatusOr<std::shared_ptr<DataType>>(absl::string_view)> data_transform_cb,
+      uint64_t max_size) {
     auto initial_data_or_error = read(source, allow_empty, api, max_size);
     RETURN_IF_NOT_OK_REF(initial_data_or_error.status());
 
@@ -129,46 +129,21 @@ public:
                                                     initial_data_or_error.value().length(),
                                                     max_size));
     }
+    auto transformed_data_or_error = data_transform_cb(initial_data_or_error.value());
+    RETURN_IF_NOT_OK_REF(transformed_data_or_error.status());
     if (!source.has_watched_directory() ||
         source.specifier_case() != envoy::config::core::v3::DataSource::kFilename) {
-      if (data_transform_cb.has_value()) {
-        auto transformed_data = data_transform_cb.value()(initial_data_or_error.value());
-        return std::unique_ptr<DataSourceProvider<DataType>>(
-            new DataSourceProvider<DataType>(std::move(transformed_data)));
-      } else {
-        if constexpr (std::is_same_v<DataType, std::string>) {
-          return std::unique_ptr<DataSourceProvider<DataType>>(
-              new DataSourceProvider<DataType>(std::move(initial_data_or_error).value()));
-        } else {
-          return absl::FailedPreconditionError(
-              "DataSourceProvider can only be parametrised with type `std::string` when "
-              "`data_transform_cb` is not provided as input param!");
-        }
-      }
+      return std::unique_ptr<DataSourceProvider<DataType>>(
+          new DataSourceProvider<DataType>(std::move(*transformed_data_or_error.value())));
     }
-    absl::Status status;
+
     auto slot =
         ThreadLocal::TypedSlot<typename DynamicData<DataType>::ThreadLocalData>::makeUnique(tls);
-    slot->set([initial_data =
-                   std::make_shared<std::string>(std::move(initial_data_or_error.value())),
-               data_transform_cb, &status](Event::Dispatcher&) {
-      status = absl::OkStatus();
-      if (data_transform_cb.has_value()) {
-        auto transformed_data =
-            std::make_shared<DataType>(data_transform_cb.value()(*initial_data));
-        return std::make_shared<typename DynamicData<DataType>::ThreadLocalData>(transformed_data);
-      } else {
-        if constexpr (std::is_same_v<DataType, std::string>) {
-          return std::make_shared<typename DynamicData<DataType>::ThreadLocalData>(initial_data);
-        } else {
-          status = absl::FailedPreconditionError(
-              "DataSourceProvider can only be parametrised with type `std::string` when "
-              "`data_transform_cb` is not provided as input param!");
-          return std::make_shared<typename DynamicData<DataType>::ThreadLocalData>(nullptr);
-        }
-      }
+
+    slot->set([initial_data = std::make_shared<DataType>(
+                   std::move(*transformed_data_or_error.value()))](Event::Dispatcher&) {
+      return std::make_shared<typename DynamicData<DataType>::ThreadLocalData>(initial_data);
     });
-    RETURN_IF_NOT_OK(status);
 
     const auto& filename = source.filename();
     auto directory_watcher_or_error =
@@ -185,27 +160,24 @@ public:
                             "Failed to read file: {}", new_data_or_error.status().message());
         return absl::OkStatus();
       }
-      absl::Status status;
-      slot_ptr->runOnAllThreads(
-          [new_data = std::make_shared<std::string>(std::move(new_data_or_error.value())),
-           &data_transform_cb,
-           &status](OptRef<typename DynamicData<DataType>::ThreadLocalData> obj) {
-            status = absl::OkStatus();
-            if (obj.has_value()) {
-              if (data_transform_cb.has_value()) {
-                obj->data_ = std::make_shared<DataType>(data_transform_cb.value()(*new_data));
-              } else {
-                if constexpr (std::is_same_v<DataType, std::string>) {
-                  obj->data_ = new_data;
-                } else {
-                  status = absl::FailedPreconditionError(
-                      "DataSourceProvider can only be parametrised with type `std::string` "
-                      "when `data_transform_cb` is not provided as input param!");
-                }
-              }
-            }
-          });
-      return status;
+      auto transformed_new_data_or_error = data_transform_cb(new_data_or_error.value());
+      if (!transformed_new_data_or_error.ok()) {
+        // Log an error but don't fail the watch to avoid throwing EnvoyException at runtime.
+        ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), error,
+                            "Failed to transform data from file: {}",
+                            transformed_new_data_or_error.status().message());
+        return absl::OkStatus();
+      }
+
+      slot_ptr->runOnAllThreads([new_data = std::make_shared<DataType>(
+                                     std::move(*transformed_new_data_or_error.value()))](
+                                    OptRef<typename DynamicData<DataType>::ThreadLocalData> obj) {
+        if (obj.has_value()) {
+          obj->data_ = std::make_shared<DataType>(*new_data);
+        }
+      });
+      return absl::OkStatus();
+      ;
     });
 
     return std::unique_ptr<DataSourceProvider>(
