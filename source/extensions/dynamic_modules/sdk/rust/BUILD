@@ -13,10 +13,29 @@ envoy_extension_package()
 cargo_build_script(
     name = "build_script",
     srcs = ["build.rs"],
+    build_script_env = select({
+        "@platforms//os:linux": {
+            "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
+            # Note: We construct the string here before passing it to select
+            "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
+                "-isystem $${pwd}/external/llvm_toolchain_llvm/lib/clang/18/include",
+                "-isystem $${pwd}/external/llvm_toolchain_llvm/include/x86_64-unknown-linux-gnu/c++/v1/",
+                "-isystem $${pwd}/external/llvm_toolchain_llvm/include/aarch64-unknown-linux-gnu/c++/v1/",
+            ]),
+        },
+        "//conditions:default": {},
+    }),
     data = [
         "//source/extensions/dynamic_modules:abi.h",
         "//source/extensions/dynamic_modules:abi_version.h",
-    ],
+    ] + select({
+        "@platforms//os:linux": [
+            "@llvm_toolchain_llvm//:include",
+            "@llvm_toolchain_llvm//:lib",
+            "@llvm_toolchain_llvm//:lib/libclang.so",
+        ],
+        "//conditions:default": [],
+    }),
     edition = "2021",
     deps = all_crate_deps(
         build = True,

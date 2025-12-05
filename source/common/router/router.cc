@@ -629,7 +629,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                        !config_->suppress_envoy_headers_);
 
   // Fetch a connection pool for the upstream cluster.
-  const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
+  const auto& upstream_http_protocol_options =
+      cluster_->httpProtocolOptions().upstreamHttpProtocolOptions();
   if (upstream_http_protocol_options && (upstream_http_protocol_options->auto_sni() ||
                                          upstream_http_protocol_options->auto_san_validation())) {
     // Default the header to Host/Authority header.
@@ -801,9 +802,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ = createRetryState(
-      *route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_context_,
-      config_->factory_context_, callbacks_->dispatcher(), route_entry_->priority());
+  retry_state_ = createRetryState(*getEffectiveRetryPolicy(), headers, *cluster_, request_vcluster_,
+                                  route_stats_context_, config_->factory_context_,
+                                  callbacks_->dispatcher(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys. Also the method CONNECT doesn't support shadowing.
@@ -811,9 +812,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   if (method != Http::Headers::get().MethodValues.Connect) {
     // Use cluster-level shadow policies if they are available (most specific wins).
     // If no cluster-level policies are configured, fall back to route-level policies.
-    const auto& policies_to_evaluate = !cluster_->shadowPolicies().empty()
-                                           ? cluster_->shadowPolicies()
-                                           : route_entry_->shadowPolicies();
+    const auto& cluster_shadow_policies = cluster_->httpProtocolOptions().shadowPolicies();
+    const auto& policies_to_evaluate =
+        !cluster_shadow_policies.empty() ? cluster_shadow_policies : route_entry_->shadowPolicies();
 
     for (const auto& shadow_policy : policies_to_evaluate) {
       const auto& policy_ref = *shadow_policy;
@@ -974,7 +975,19 @@ uint64_t Filter::calculateEffectiveBufferLimit() const {
   return std::numeric_limits<uint64_t>::max();
 }
 
+bool Filter::isEarlyConnectData() {
+  return downstream_headers_ != nullptr && Http::HeaderUtility::isConnect(*downstream_headers_) &&
+         !downstream_response_started_ &&
+         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_early_connect_data");
+}
+
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_STREAM_LOG(debug, "router decoding data: {}", *callbacks_, data.length());
+  if (data.length() > 0 && isEarlyConnectData()) {
+    callbacks_->sendLocalReply(Http::Code::BadRequest, "", nullptr, absl::nullopt,
+                               StreamInfo::ResponseCodeDetails::get().EarlyConnectData);
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
   // try timeout timer is not started until onRequestComplete(). It could be zero
@@ -2185,7 +2198,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(
 }
 
 void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
-  for (const auto& options_predicate : route_entry_->retryPolicy()->retryOptionsPredicates()) {
+  for (const auto& options_predicate : getEffectiveRetryPolicy()->retryOptionsPredicates()) {
     const Upstream::RetryOptionsPredicate::UpdateOptionsParameters parameters{
         retriable_request.streamInfo(), upstreamSocketOptions()};
     auto ret = options_predicate->updateOptions(parameters);
@@ -2406,15 +2419,26 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
         *cluster_->lrsReportMetricNames(), *orca_load_report, upstream_host->loadMetricStats());
   }
   if (host_lb_policy_data.has_value()) {
-    ENVOY_LOG(trace, "orca_load_report for {} report = {}", upstream_host->address()->asString(),
-              (*orca_load_report).DebugString());
+    ENVOY_STREAM_LOG(trace, "orca_load_report for {} report = {}", *callbacks_,
+                     upstream_host->address()->asString(), orca_load_report->DebugString());
     const absl::Status status =
         host_lb_policy_data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
     if (!status.ok()) {
-      ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
-                       status.message());
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                         "LB policy onOrcaLoadReport failed: {} for load report {}",
+                         status.message(), orca_load_report->DebugString());
     }
   }
+}
+
+const Router::RetryPolicy* Filter::getEffectiveRetryPolicy() const {
+  // Use cluster-level retry policy if available. The most specific policy wins.
+  // If no cluster-level policy is configured, fall back to route-level policy.
+  const Router::RetryPolicy* retry_policy = cluster_->httpProtocolOptions().retryPolicy();
+  if (retry_policy == nullptr) {
+    retry_policy = route_entry_->retryPolicy().get();
+  }
+  return retry_policy;
 }
 
 RetryStatePtr

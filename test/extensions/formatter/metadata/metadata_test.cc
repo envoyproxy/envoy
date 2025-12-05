@@ -38,17 +38,23 @@ public:
         Envoy::Formatter::FormatterPtr);
   }
 
-  ::Envoy::Formatter::FormatterPtr getTestMetadataFormatterLegacy(std::string type,
-                                                                  std::string tag = "METADATA") {
+  ::Envoy::Formatter::FormatterPtr
+  getTestMetadataFormatterLegacy(std::string type, std::string tag = "METADATA",
+                                 absl::optional<size_t> max_length = absl::nullopt) {
+    std::string max_length_fmt{};
+    if (max_length.has_value()) {
+      max_length_fmt = fmt::format(":{}", *max_length);
+    }
+
     const std::string yaml = fmt::format(R"EOF(
   text_format_source:
-    inline_string: "%{}({}:metadata.test:test_key)%"
+    inline_string: "%{}({}:metadata.test:test_key){}%"
   formatters:
     - name: envoy.formatter.metadata
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.formatter.metadata.v3.Metadata
 )EOF",
-                                         tag, type);
+                                         tag, type, max_length_fmt);
     TestUtility::loadFromYaml(yaml, config_);
     return THROW_OR_RETURN_VALUE(
         Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
@@ -99,6 +105,15 @@ TEST_F(MetadataFormatterTest, DynamicMetadataWithLegacyConfiguration) {
 
   EXPECT_EQ("test_value",
             getTestMetadataFormatterLegacy("DYNAMIC")->format(formatter_context_, stream_info_));
+}
+
+TEST_F(MetadataFormatterTest, DynamicMetadataWithLegacyConfigurationAndLength) {
+  // Make sure that formatter accesses dynamic metadata.
+  EXPECT_CALL(testing::Const(stream_info_), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(*metadata_));
+
+  EXPECT_EQ("test_val", getTestMetadataFormatterLegacy("DYNAMIC", "METADATA", 8)
+                            ->format(formatter_context_, stream_info_));
 }
 
 // Extensive testing of Cluster Metadata formatter is in

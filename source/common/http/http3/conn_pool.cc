@@ -40,8 +40,9 @@ getHostAddress(std::shared_ptr<const Upstream::HostDescription> host,
 }
 
 uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
-  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster.http3Options().quic_protocol_options(),
-                                         max_concurrent_streams, 100);
+  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      cluster.httpProtocolOptions().http3Options().quic_protocol_options(), max_concurrent_streams,
+      100);
 }
 
 const Envoy::Ssl::ClientContextConfig&
