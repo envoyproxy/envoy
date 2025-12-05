@@ -975,7 +975,19 @@ uint64_t Filter::calculateEffectiveBufferLimit() const {
   return std::numeric_limits<uint64_t>::max();
 }
 
+bool Filter::isEarlyConnectData() {
+  return downstream_headers_ != nullptr && Http::HeaderUtility::isConnect(*downstream_headers_) &&
+         !downstream_response_started_ &&
+         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_early_connect_data");
+}
+
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_STREAM_LOG(debug, "router decoding data: {}", *callbacks_, data.length());
+  if (data.length() > 0 && isEarlyConnectData()) {
+    callbacks_->sendLocalReply(Http::Code::BadRequest, "", nullptr, absl::nullopt,
+                               StreamInfo::ResponseCodeDetails::get().EarlyConnectData);
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
   // try timeout timer is not started until onRequestComplete(). It could be zero
@@ -2407,13 +2419,14 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
         *cluster_->lrsReportMetricNames(), *orca_load_report, upstream_host->loadMetricStats());
   }
   if (host_lb_policy_data.has_value()) {
-    ENVOY_LOG(trace, "orca_load_report for {} report = {}", upstream_host->address()->asString(),
-              (*orca_load_report).DebugString());
+    ENVOY_STREAM_LOG(trace, "orca_load_report for {} report = {}", *callbacks_,
+                     upstream_host->address()->asString(), orca_load_report->DebugString());
     const absl::Status status =
         host_lb_policy_data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
     if (!status.ok()) {
-      ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
-                       status.message());
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                         "LB policy onOrcaLoadReport failed: {} for load report {}",
+                         status.message(), orca_load_report->DebugString());
     }
   }
 }

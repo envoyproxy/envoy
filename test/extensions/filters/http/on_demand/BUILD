@@ -42,6 +42,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
+        "//test/integration:http_protocol_integration_lib",
         "//test/integration:scoped_rds_lib",
         "//test/integration:vhds_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

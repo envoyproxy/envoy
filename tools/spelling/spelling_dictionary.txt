@@ -278,6 +278,7 @@ Isode
 Iters
 JSON
 JSONs
+jsonrpc
 JWKS
 JWKs
 JWS
@@ -746,6 +747,8 @@ deflater
 deletable
 deleter
 delim
+demultiplexer
+demux
 denylist
 deque
 dep
@@ -1595,6 +1598,9 @@ vhosts
 infos
 ElastiCache
 pinterest
+callouts
+streamable
+extern
 NSS
 SSLKEYLOGFILE
 DLB

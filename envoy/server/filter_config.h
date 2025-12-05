@@ -305,16 +305,6 @@ public:
                                        Server::Configuration::ServerFactoryContext&) {
     return false;
   }
-
-  /**
-   * @return bool true if the filter should ignore the 'disabled' flag during filter chain creation.
-   * This allows filters to defer the enable/disable decision to runtime based on dynamic metadata
-   * or other runtime conditions. By default returns false.
-   */
-  virtual bool shouldIgnoreDisabledFlag(const Protobuf::Message&,
-                                        Server::Configuration::ServerFactoryContext&) {
-    return false;
-  }
 };
 
 class NamedHttpFilterConfigFactory : public virtual HttpFilterConfigFactoryBase {

@@ -52,6 +52,9 @@ public:
     return nullptr;
   }
   absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
+    return nullptr;
+  }
   const sockaddr* sockAddr() const override;
   socklen_t sockAddrLen() const override;
   absl::string_view addressType() const override { return "reverse_connection"; }
