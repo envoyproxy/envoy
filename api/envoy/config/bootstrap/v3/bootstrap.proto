@@ -754,4 +754,9 @@ message MemoryAllocatorManager {
   // interval Envoy will try to release ``bytes_to_release`` of free memory back to operating system for reuse.
   // Defaults to 1000 milliseconds.
   google.protobuf.Duration memory_release_interval = 2;
+
+  // Minimum unfreed memory bytes threshold that triggers memory release during XDS config updates
+  // and admin handler. If the unfreed memory bytes is less than this value, no memory release will occur.
+  // Defaults to 100 MB.
+  google.protobuf.UInt64Value minimum_unfreed_memory_bytes_threshold = 3;
 }

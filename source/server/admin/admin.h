@@ -14,6 +14,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/server/memory.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -71,7 +72,8 @@ class AdminImpl : public Admin,
                   Logger::Loggable<Logger::Id::admin> {
 public:
   AdminImpl(const std::string& profile_path, Server::Instance& server,
-            bool ignore_global_conn_limit);
+            bool ignore_global_conn_limit,
+            Envoy::Server::MemoryAllocatorManager& allocator_manager);
 
   Http::Code runCallback(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream& admin_stream);
@@ -510,6 +512,7 @@ private:
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  Envoy::Server::MemoryAllocatorManager& allocator_manager_;
 };
 
 } // namespace Server

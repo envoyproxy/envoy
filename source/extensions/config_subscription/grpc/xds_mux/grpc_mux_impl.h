@@ -243,6 +243,7 @@ private:
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   EdsResourcesCachePtr eds_resources_cache_;
   const std::string target_xds_authority_;
+  Server::MemoryAllocatorManager& allocator_manager_;
 
   // Used to track whether initial_resource_versions should be populated on the
   // next reconnection.

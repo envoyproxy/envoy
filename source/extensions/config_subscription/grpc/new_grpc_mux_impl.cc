@@ -8,7 +8,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
-#include "source/common/memory/utils.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/config_subscription/grpc/eds_resources_cache_impl.h"
@@ -51,7 +50,8 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
                 return absl::OkStatus();
               })),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
-      eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)) {
+      eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
+      allocator_manager_(grpc_mux_context.allocator_manager_) {
   AllMuxes::get().insert(this);
 }
 
@@ -184,7 +184,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     xds_config_tracker_->onConfigRejected(*message, ack.error_detail_.message());
   }
   kickOffAck(ack);
-  Memory::Utils::tryShrinkHeap();
+  allocator_manager_.maybeReleaseFreeMemory();
 }
 
 void NewGrpcMuxImpl::onStreamEstablished() {
@@ -461,7 +461,8 @@ public:
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
-         OptRef<XdsResourcesDelegate>, bool use_eds_resources_cache) override {
+         OptRef<XdsResourcesDelegate>, bool use_eds_resources_cache,
+         Server::MemoryAllocatorManager& allocator_manager) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -484,7 +485,8 @@ public:
         (use_eds_resources_cache &&
          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads"))
             ? std::make_unique<EdsResourcesCacheImpl>(dispatcher)
-            : nullptr};
+            : nullptr,
+        /*allocator_manager_=*/allocator_manager};
     return std::make_shared<Config::NewGrpcMuxImpl>(grpc_mux_context);
   }
 };

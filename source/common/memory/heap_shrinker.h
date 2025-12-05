@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/memory.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
@@ -15,7 +16,8 @@ namespace Memory {
 class HeapShrinker {
 public:
   HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManager& overload_manager,
-               Envoy::Stats::Scope& stats);
+               Envoy::Stats::Scope& stats,
+               Envoy::Server::MemoryAllocatorManager& allocator_manager);
 
 private:
   void shrinkHeap();
@@ -23,6 +25,7 @@ private:
   bool active_{false};
   Envoy::Stats::Counter* shrink_counter_;
   Envoy::Event::TimerPtr timer_;
+  Envoy::Server::MemoryAllocatorManager& allocator_manager_;
 };
 
 } // namespace Memory

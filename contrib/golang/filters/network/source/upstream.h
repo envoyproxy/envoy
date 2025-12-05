@@ -13,7 +13,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
-#include "source/common/memory/utils.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"

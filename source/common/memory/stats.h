@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/server/memory.h"
 #include "envoy/stats/store.h"
 
 #include "source/common/common/thread.h"
@@ -71,16 +72,27 @@ public:
   static absl::optional<std::string> dumpStats();
 };
 
-class AllocatorManager {
+class AllocatorManager : public Envoy::Server::MemoryAllocatorManager {
 public:
   AllocatorManager(Api::Api& api, Envoy::Stats::Scope& scope,
                    const envoy::config::bootstrap::v3::MemoryAllocatorManager& config);
 
   ~AllocatorManager();
 
+  /**
+   * Releases free memory if the memory is above the threshold.
+   */
+  void maybeReleaseFreeMemory() override;
+
+  /**
+   * Releases free memory immediately.
+   */
+  void releaseFreeMemory() override;
+
 private:
   const uint64_t bytes_to_release_;
   const std::chrono::milliseconds memory_release_interval_msec_;
+  const uint64_t minimum_unfreed_memory_bytes_threshold_;
   MemoryAllocatorManagerStats allocator_manager_stats_;
   Api::Api& api_;
   Thread::ThreadPtr tcmalloc_thread_;

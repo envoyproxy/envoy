@@ -26,6 +26,7 @@
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/server/memory.h"
 #include "envoy/server/options.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/ssl/context_manager.h"
@@ -155,6 +156,11 @@ public:
    * @return the server's null overload manager in case we want to skip overloading the server.
    */
   virtual OverloadManager& nullOverloadManager() PURE;
+
+  /**
+   * @return the server's memory allocator manager.
+   */
+  virtual MemoryAllocatorManager& memoryAllocatorManager() PURE;
 
   /**
    * @return the server's secret manager

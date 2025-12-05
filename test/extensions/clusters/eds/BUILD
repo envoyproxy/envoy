@@ -64,6 +64,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:memory_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:test_runtime_lib",

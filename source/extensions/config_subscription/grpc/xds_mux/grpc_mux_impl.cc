@@ -9,7 +9,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
-#include "source/common/memory/utils.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/config_subscription/grpc/eds_resources_cache_impl.h"
@@ -58,7 +57,8 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
-      target_xds_authority_(grpc_mux_context.target_xds_authority_) {
+      target_xds_authority_(grpc_mux_context.target_xds_authority_),
+      allocator_manager_(grpc_mux_context.allocator_manager_) {
   THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("ads", grpc_mux_context.local_info_));
   AllMuxes::get().insert(this);
 }
@@ -299,7 +299,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_ur
 
   pausable_ack_queue_.push(sub->second->handleResponse(response_proto));
   trySendDiscoveryRequests();
-  Memory::Utils::tryShrinkHeap();
+  allocator_manager_.maybeReleaseFreeMemory();
 }
 
 template <class S, class F, class RQ, class RS> void GrpcMuxImpl<S, F, RQ, RS>::start() {
@@ -496,7 +496,8 @@ public:
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
-         XdsResourcesDelegateOptRef, bool use_eds_resources_cache) override {
+         XdsResourcesDelegateOptRef, bool use_eds_resources_cache,
+         Server::MemoryAllocatorManager& allocator_manager) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -519,7 +520,8 @@ public:
         (use_eds_resources_cache &&
          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads"))
             ? std::make_unique<EdsResourcesCacheImpl>(dispatcher)
-            : nullptr};
+            : nullptr,
+        /*allocator_manager_=*/allocator_manager};
     return std::make_shared<GrpcMuxDelta>(grpc_mux_context,
                                           ads_config.set_node_on_first_message_only());
   }
@@ -536,7 +538,8 @@ public:
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
-         XdsResourcesDelegateOptRef, bool use_eds_resources_cache) override {
+         XdsResourcesDelegateOptRef, bool use_eds_resources_cache,
+         Server::MemoryAllocatorManager& allocator_manager) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -559,7 +562,8 @@ public:
         (use_eds_resources_cache &&
          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads"))
             ? std::make_unique<EdsResourcesCacheImpl>(dispatcher)
-            : nullptr};
+            : nullptr,
+        /*allocator_manager_=*/allocator_manager};
     return std::make_shared<GrpcMuxSotw>(grpc_mux_context,
                                          ads_config.set_node_on_first_message_only());
   }

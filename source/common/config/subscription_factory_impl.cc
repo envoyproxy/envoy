@@ -18,8 +18,8 @@ namespace Config {
 SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Api::Api& api, const Server::Instance& server,
-    XdsResourcesDelegateOptRef xds_resources_delegate, XdsConfigTrackerOptRef xds_config_tracker)
+    Api::Api& api, Server::Instance& server, XdsResourcesDelegateOptRef xds_resources_delegate,
+    XdsConfigTrackerOptRef xds_config_tracker)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
       validation_visitor_(validation_visitor), api_(api), server_(server),
       xds_resources_delegate_(xds_resources_delegate), xds_config_tracker_(xds_config_tracker) {}
@@ -47,7 +47,8 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
                                                    options,
                                                    absl::nullopt,
                                                    Utility::generateStats(scope),
-                                                   cm_.adsMux()};
+                                                   cm_.adsMux(),
+                                                   server_.memoryAllocatorManager()};
 
   switch (config.config_source_specifier_case()) {
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
@@ -151,7 +152,8 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpc
                                                    options,
                                                    absl::nullopt,
                                                    Utility::generateStats(scope),
-                                                   ads_grpc_mux};
+                                                   ads_grpc_mux,
+                                                   server_.memoryAllocatorManager()};
   static constexpr absl::string_view subscription_type = "envoy.config_subscription.ads";
   ConfigSubscriptionFactory* factory =
       Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
@@ -186,7 +188,8 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionF
                                                    options,
                                                    {collection_locator},
                                                    Utility::generateStats(scope),
-                                                   cm_.adsMux()};
+                                                   cm_.adsMux(),
+                                                   server_.memoryAllocatorManager()};
   switch (collection_locator.scheme()) {
   case xds::core::v3::ResourceLocator::FILE: {
     const std::string path = Http::Utility::localPathFromFilePath(collection_locator.id());

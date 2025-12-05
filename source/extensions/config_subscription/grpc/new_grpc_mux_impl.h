@@ -220,7 +220,7 @@ private:
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
   XdsConfigTrackerOptRef xds_config_tracker_;
   EdsResourcesCachePtr eds_resources_cache_;
-
+  Server::MemoryAllocatorManager& allocator_manager_;
   // Used to track whether initial_resource_versions should be populated on the
   // next reconnection.
   bool should_send_initial_resource_versions_{true};

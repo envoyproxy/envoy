@@ -21,6 +21,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/memory.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
@@ -72,7 +73,8 @@ public:
         /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/nullptr};
+        /*eds_resources_cache_=*/nullptr,
+        /*allocator_manager_=*/allocator_manager_};
 
     if (should_use_unified_) {
       mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
@@ -249,6 +251,7 @@ public:
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
   bool should_use_unified_;
+  NiceMock<Server::MockMemoryAllocatorManager> allocator_manager_;
 };
 
 // TODO(danielhochman): test with RDS and ensure version_info is same as what API returned

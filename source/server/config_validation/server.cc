@@ -10,6 +10,7 @@
 #include "source/common/event/real_time_system.h"
 #include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/local_info/local_info_impl.h"
+#include "source/common/memory/stats.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/tls/context_manager_impl.h"
@@ -102,6 +103,9 @@ void ValidationInstance::initialize(const Options& options,
   // Handle configuration that needs to take place prior to the main configuration load.
   THROW_IF_NOT_OK(InstanceUtil::loadBootstrapConfig(
       bootstrap_, options, messageValidationContext().staticValidationVisitor(), *api_));
+
+  memory_allocator_manager_ = std::make_unique<Memory::AllocatorManager>(
+      *api_, *stats_store_.rootScope(), bootstrap_.memory_allocator_manager());
 
   if (bootstrap_.has_application_log_config()) {
     THROW_IF_NOT_OK(

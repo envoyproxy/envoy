@@ -294,6 +294,7 @@ private:
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   EdsResourcesCachePtr eds_resources_cache_;
   const std::string target_xds_authority_;
+  Server::MemoryAllocatorManager& allocator_manager_;
   bool first_stream_request_{true};
 
   // Helper function for looking up and potentially allocating a new ApiState.

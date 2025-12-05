@@ -35,6 +35,7 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
 namespace Server {
 
 /**
@@ -106,6 +107,7 @@ public:
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   OverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
+  MemoryAllocatorManager& memoryAllocatorManager() override { return *memory_allocator_manager_; }
   bool healthCheckFailed() override { return false; }
   const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { PANIC("not implemented"); }
@@ -206,6 +208,7 @@ private:
   Server::DrainManagerPtr drain_manager_;
   HotRestartNopImpl nop_hot_restart_;
   Regex::EnginePtr regex_engine_;
+  std::unique_ptr<Memory::AllocatorManager> memory_allocator_manager_;
 };
 
 } // namespace Server
