@@ -17,7 +17,6 @@ directories:
   source/common/network: 94.3  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
   source/common/network/dns_resolver: 91.4   # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
   source/common/quic: 93.3
-  source/common/secret: 96.3
   source/common/signal: 87.4  # Death tests don't report LCOV
   source/common/thread: 0.0  # Death tests don't report LCOV
   source/common/tls: 94.5  # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
