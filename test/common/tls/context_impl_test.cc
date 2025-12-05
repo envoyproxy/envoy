@@ -2123,6 +2123,73 @@ TEST_F(ClientContextConfigImplTest, TestInvalidAlpnTooLong) {
             "Invalid ALPN protocol string");
 }
 
+// Verify that invalid signature algorithms are rejected.
+TEST_F(ClientContextConfigImplTest, TestInvalidSignatureAlgorithms) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      signature_algorithms: "invalid_sigalg"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *cfg).status().message(),
+            "Failed to initialize TLS signature algorithms invalid_sigalg");
+}
+
+// Verify that a corrupt certificate chain is rejected.
+TEST_F(ClientContextConfigImplTest, TestLoadCorruptCert) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        inline_string: "invalid_cert_data"
+      private_key:
+        inline_string: "invalid_key_data"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *cfg).status().message(),
+            "Failed to load certificate chain from <inline>");
+}
+
+// Verify that a corrupt private key is rejected.
+TEST_F(ClientContextConfigImplTest, TestLoadCorruptKey) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        inline_string: "invalid_key_data"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_THAT(manager_.createSslClientContext(*store_.rootScope(), *cfg).status().message(),
+              testing::HasSubstr("Failed to load private key from <inline>"));
+}
+
+// Verify that a corrupt PKCS12 file is rejected.
+TEST_F(ClientContextConfigImplTest, TestLoadCorruptPkcs12) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - pkcs12:
+        inline_string: "invalid_pkcs12_data"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *cfg).status().message(),
+            "Failed to load pkcs12 from <inline>");
+}
+
 class ServerContextConfigImplTest : public SslCertsTest {
 public:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
