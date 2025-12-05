@@ -97,6 +97,11 @@ static const std::string filter_config_name = "scooby.dooby.doo";
 
 class HttpFilterTest : public testing::Test {
 protected:
+  enum DoStartOption {
+    DEFAULT = 1,
+    ON_GRPC_ERROR = 2,
+    ON_GRPC_CLOSE = 3,
+  };
   void initialize(std::string&& yaml, bool is_upstream_filter = false) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.ext_proc_stream_close_optimization", "true"}});
@@ -190,6 +195,16 @@ protected:
                                      const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                      const Envoy::Http::AsyncClient::StreamOptions&,
                                      Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) {
+    if (do_start_option_ == ON_GRPC_ERROR) {
+      callbacks.onGrpcError(Grpc::Status::Internal, "foo");
+      return nullptr;
+    }
+
+    if (do_start_option_ == ON_GRPC_CLOSE) {
+      callbacks.onGrpcClose();
+      return nullptr;
+    }
+
     if (final_expected_grpc_service_.has_value()) {
       EXPECT_TRUE(TestUtility::protoEqual(final_expected_grpc_service_.value(),
                                           config_with_hash_key.config()));
@@ -460,17 +475,16 @@ protected:
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
+  const ExtProcLoggingInfo* getExtProcLoggingInfo() {
+    return stream_info_.filterState()
+        ->getDataReadOnly<Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
+            filter_config_name);
+  }
+
   // Get the gRPC call stats data from the filter state.
   const ExtProcLoggingInfo::GrpcCalls&
   getGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction) {
-    // The number of processor grpc calls made in the encoding and decoding path.
-    const ExtProcLoggingInfo::GrpcCalls& grpc_calls =
-        stream_info_.filterState()
-            ->getDataReadOnly<
-                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
-                filter_config_name)
-            ->grpcCalls(traffic_direction);
-    return grpc_calls;
+    return getExtProcLoggingInfo()->grpcCalls(traffic_direction);
   }
 
   // Check gRPC call stats for headers and trailers.
@@ -631,12 +645,7 @@ protected:
   // The metadata configured as part of ext_proc filter should be in the filter state.
   // In addition, bytes sent/received should also be stored.
   void expectFilterState(const Envoy::Protobuf::Struct& expected_metadata) {
-    const auto* filterState =
-        stream_info_.filterState()
-            ->getDataReadOnly<
-                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
-                filter_config_name);
-    const Envoy::Protobuf::Struct& loggedMetadata = filterState->filterMetadata();
+    const Envoy::Protobuf::Struct& loggedMetadata = getExtProcLoggingInfo()->filterMetadata();
     EXPECT_THAT(loggedMetadata, ProtoEq(expected_metadata));
   }
 
@@ -668,6 +677,7 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
   TestScopedRuntime scoped_runtime_;
+  DoStartOption do_start_option_ = DEFAULT;
 };
 
 // Using the default configuration, test the filter with a processor that
@@ -1773,6 +1783,7 @@ TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
                            Unused) { modify_headers(immediate_response_headers); }));
   server_closed_stream_ = true;
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error message");
+  EXPECT_EQ(Grpc::Status::Ok, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());
 
   // Sending another chunk of data. No more gRPC call.
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
@@ -5747,6 +5758,32 @@ TEST_F(HttpFilterTest, FilterMetadataOverridesClusterMetadata) {
   processResponseHeaders(false, absl::nullopt);
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, GrpcErrorOnOpenStream) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  do_start_option_ = ON_GRPC_ERROR;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  filter_->onDestroy();
+  EXPECT_EQ(Grpc::Status::Internal, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());
+}
+
+TEST_F(HttpFilterTest, GrpcCloseOnOpenStream) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  do_start_option_ = ON_GRPC_CLOSE;
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  filter_->onDestroy();
+  EXPECT_EQ(Grpc::Status::Aborted, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());
 }
 
 } // namespace
