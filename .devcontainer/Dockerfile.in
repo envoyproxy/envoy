@@ -6,7 +6,7 @@ ENV BUILD_DIR=/build
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update \
-  && apt-get -y install --no-install-recommends python3 clangd clang-format net-tools iputils-ping procps psmisc vim 2>&1 \
+  && apt-get -y install --no-install-recommends python3 net-tools iputils-ping procps psmisc vim 2>&1 \
   # [Optional] Add sudo support for non-root user
   && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
   && chmod 0440 /etc/sudoers.d/$USERNAME
