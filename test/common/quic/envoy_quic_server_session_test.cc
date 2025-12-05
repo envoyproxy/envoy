@@ -1244,7 +1244,7 @@ TEST_F(EnvoyQuicServerSessionTest, RealClientConnectionsStats) {
   Http::MockStreamCallbacks stream_callbacks;
   setupRequestDecoderMock(request_decoder);
   EXPECT_CALL(request_decoder, accessLogHandlers());
-  auto Stream =
+  auto stream =
       dynamic_cast<EnvoyQuicServerStream*>(createNewStream(request_decoder, stream_callbacks));
   EXPECT_EQ(1U, TestUtility::findGauge(listener_config_.listenerScope().store(),
                                        "http3.downstream.real_client_connections_total")
@@ -1254,7 +1254,7 @@ TEST_F(EnvoyQuicServerSessionTest, RealClientConnectionsStats) {
                     ->value());
 
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
-  stream1->resetStream(Http::StreamResetReason::LocalReset);
+  stream->resetStream(Http::StreamResetReason::LocalReset);
   EXPECT_EQ(1U, TestUtility::findGauge(listener_config_.listenerScope().store(),
                                        "http3.downstream.real_client_connections_total")
                     ->value());
