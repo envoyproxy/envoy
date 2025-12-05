@@ -55,4 +55,4 @@ jobs:
 
     - name: Get build targets
       run: |
-        bazel run --config=clang //:refresh_compile_commands
+        bazel run --config=clang //:refresh_compile_commands -- --config=clang
