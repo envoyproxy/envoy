@@ -27,6 +27,7 @@
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -4855,7 +4856,7 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
 
-  auto access_log_path = TestEnvironment::temporaryPath("ext_proc_filter_state_access.log");
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
 
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
     auto* access_log = cm.add_access_log();
@@ -4875,6 +4876,8 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_latency_us)%");
     (*json_format->mutable_fields())["field_request_header_status"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_call_status)%");
+    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
     (*json_format->mutable_fields())["field_request_body_calls"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_call_count)%");
     (*json_format->mutable_fields())["field_request_body_total_latency"].set_string_value(
@@ -4883,14 +4886,20 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_max_latency_us)%");
     (*json_format->mutable_fields())["field_request_body_last_status"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_last_call_status)%");
+    (*json_format->mutable_fields())["field_request_body_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_processing_effect)%");
     (*json_format->mutable_fields())["field_request_trailer_latency"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_latency_us)%");
     (*json_format->mutable_fields())["field_request_trailer_status"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_call_status)%");
+    (*json_format->mutable_fields())["field_request_trailer_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_processing_effect)%");
     (*json_format->mutable_fields())["field_response_header_latency"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_latency_us)%");
     (*json_format->mutable_fields())["field_response_header_status"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_call_status)%");
+    (*json_format->mutable_fields())["field_response_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_processing_effect)%");
     (*json_format->mutable_fields())["field_response_body_calls"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_call_count)%");
     (*json_format->mutable_fields())["field_response_body_total_latency"].set_string_value(
@@ -4899,10 +4908,14 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_max_latency_us)%");
     (*json_format->mutable_fields())["field_response_body_last_status"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_last_call_status)%");
+    (*json_format->mutable_fields())["field_response_body_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_processing_effect)%");
     (*json_format->mutable_fields())["field_response_trailer_latency"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_latency_us)%");
     (*json_format->mutable_fields())["field_response_trailer_status"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_call_status)%");
+    (*json_format->mutable_fields())["field_response_trailer_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_processing_effect)%");
     (*json_format->mutable_fields())["field_bytes_sent"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_sent)%");
     (*json_format->mutable_fields())["field_bytes_received"].set_string_value(
@@ -4957,20 +4970,26 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   auto typed_json_str = (*typed_obj)->asJsonString();
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_latency_us\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_processing_effect\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_call_count\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_total_latency_us\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_max_latency_us\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_last_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_processing_effect\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_latency_us\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_processing_effect\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_latency_us\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_processing_effect\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_call_count\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_total_latency_us\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_max_latency_us\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_last_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_processing_effect\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_latency_us\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_processing_effect\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"bytes_sent\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"bytes_received\""));
 
@@ -4987,20 +5006,26 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   // Validate all individual fields can be extracted.
   validateField("field_request_header_latency");
   validateField("field_request_header_status");
+  validateField("field_request_header_effect");
   validateField("field_request_body_calls");
   validateField("field_request_body_total_latency");
   validateField("field_request_body_max_latency");
   validateField("field_request_body_last_status");
+  validateField("field_request_body_effect");
   validateField("field_request_trailer_latency");
   validateField("field_request_trailer_status");
+  validateField("field_request_trailer_effect");
   validateField("field_response_header_latency");
   validateField("field_response_header_status");
+  validateField("field_response_header_effect");
   validateField("field_response_body_calls");
   validateField("field_response_body_total_latency");
   validateField("field_response_body_max_latency");
   validateField("field_response_body_last_status");
+  validateField("field_response_body_effect");
   validateField("field_response_trailer_latency");
   validateField("field_response_trailer_status");
+  validateField("field_response_trailer_effect");
   validateField("field_bytes_sent");
   validateField("field_bytes_received");
 
@@ -5031,10 +5056,11 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   ENVOY_LOG_MISC(info, "PLAIN: {}", *plain_value);
   ENVOY_LOG_MISC(info, "TYPED: {}", typed_json_str);
   ENVOY_LOG_MISC(info, "Sample FIELD: bytes_sent={}", *bytes_sent);
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
-  auto access_log_path = TestEnvironment::temporaryPath("ext_proc_filter_state_access.log");
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
 
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
     auto* access_log = cm.add_access_log();
@@ -5134,6 +5160,398 @@ TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
   EXPECT_THAT(log_content, testing::HasSubstr("request_header_latency_us"));
   EXPECT_THAT(log_content, testing::HasSubstr("response_header_call_status"));
   EXPECT_THAT(log_content, testing::HasSubstr("response_header_latency_us"));
+}
+
+// Test that the filter state is applied with mutations from the external processor. This test
+// covers all processing phases.
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsBufferedMode) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
+    (*json_format->mutable_fields())["field_request_body_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_processing_effect)%");
+    (*json_format->mutable_fields())["field_request_trailer_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_processing_effect)%");
+    (*json_format->mutable_fields())["field_response_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_processing_effect)%");
+    (*json_format->mutable_fields())["field_response_body_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_processing_effect)%");
+    (*json_format->mutable_fields())["field_response_trailer_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_processing_effect)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  // Send request with body and trailers to trigger all processing phases.
+  const std::string request_body = "Hello, World!";
+  auto response = sendDownstreamRequestWithBodyAndTrailer(request_body);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        return true;
+      });
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+  processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  handleUpstreamRequestWithTrailer();
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
+        auto* head_mut = body_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = head_mut->add_set_headers();
+        mut1->mutable_append()->set_value(false);
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Goodbye, World!");
+        return true;
+      });
+  processResponseTrailersMessage(
+      *grpc_upstreams_[0], false, [](const HttpTrailers&, TrailersResponse& trailers_resp) {
+        // The response does not really matter, it just needs to be non-empty.
+        auto response_trailer_mutation = trailers_resp.mutable_header_mutation();
+        auto* mut1 = response_trailer_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  std::cout << log_result << "\n";
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+
+  // 0: NONE, 1: MUTATION_APPLIED
+  auto field_request_header_effect = json_log->getString("field_request_header_effect");
+  EXPECT_EQ(*field_request_header_effect, "1");
+
+  auto field_request_body_effect = json_log->getString("field_request_body_effect");
+  EXPECT_EQ(*field_request_body_effect, "1");
+
+  auto field_request_trailer_effect = json_log->getString("field_request_trailer_effect");
+  EXPECT_EQ(*field_request_trailer_effect, "0");
+  // This should be 1 because the response body had header mutations.
+  auto field_response_header_effect = json_log->getString("field_response_header_effect");
+  EXPECT_EQ(*field_response_header_effect, "1");
+
+  auto field_response_body_effect = json_log->getString("field_response_body_effect");
+  EXPECT_EQ(*field_response_body_effect, "1");
+
+  auto field_response_trailer_effect = json_log->getString("field_response_trailer_effect");
+  EXPECT_EQ(*field_response_trailer_effect, "1");
+  cleanupUpstreamAndDownstream();
+}
+
+// Test that the filter state is applied with mutations from the external processor. This test
+// covers all processing phases.
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsStreamed) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.set_send_body_without_waiting_for_header_response(true);
+
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
+    (*json_format->mutable_fields())["field_request_body_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_processing_effect)%");
+    (*json_format->mutable_fields())["field_response_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_processing_effect)%");
+    (*json_format->mutable_fields())["field_response_body_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_processing_effect)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("hello world", [](Http::HeaderMap& headers) {
+    headers.addCopy(LowerCaseString("x-remove-this"), "yes");
+  });
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        return true;
+      });
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* head_mut = body_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = head_mut->add_set_headers();
+        mut1->mutable_append()->set_value(false);
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Goodbye, World!");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  std::cout << log_result << "\n";
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+
+  // 0: NONE, 1: MUTATION_APPLIED
+  auto field_request_header_effect = json_log->getString("field_request_header_effect");
+  EXPECT_EQ(*field_request_header_effect, "1");
+  auto field_request_body_effect = json_log->getString("field_request_body_effect");
+  EXPECT_EQ(*field_request_body_effect, "1");
+  // This should be 0 because body send mode is streamed. Header mutations cannot take effect from
+  // the body request.
+  auto field_response_header_effect = json_log->getString("field_response_header_effect");
+  EXPECT_EQ(*field_response_header_effect, "0");
+  auto field_response_body_effect = json_log->getString("field_response_body_effect");
+  EXPECT_EQ(*field_response_body_effect, "1");
+  cleanupUpstreamAndDownstream();
+}
+
+// Test the ability of the filter to completely replace a request message with a new
+// request message.
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoContinueAndReplace) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
+    (*json_format->mutable_fields())["field_request_body_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_processing_effect)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        headers_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, Server!");
+        // This special status tells us to replace the whole request
+        headers_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
+        return true;
+      });
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+
+  // Ensure that we replaced and did not append to the request.
+  EXPECT_EQ(upstream_request_->body().toString(), "Hello, Server!");
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  std::cout << log_result;
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  // No header mutations but a body replacement happened due to continue & replace.
+  // Test that the request_body_effect shows mutation applied
+  auto field_request_header_effect = json_log->getString("field_request_header_effect");
+  EXPECT_EQ(*field_request_header_effect, "0");
+  auto field_request_body_effect = json_log->getString("field_request_body_effect");
+  EXPECT_EQ(*field_request_body_effect, "1");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoFailedMutation) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("some_body", absl::nullopt);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // Attempt an invalid mutation
+        auto* mut = headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        mut->mutable_header()->set_key(":scheme");
+        mut->mutable_header()->set_raw_value("https");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 500);
+
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  std::cout << log_result;
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_request_header_effect = json_log->getString("field_request_header_effect");
+  // Failed mutation request
+  EXPECT_EQ(*field_request_header_effect, "4");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoInvalidMutation) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("some_body", absl::nullopt);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // Attempt an invalid mutation
+        auto* mut = headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        mut->mutable_header()->set_key(":");
+        mut->mutable_header()->set_raw_value("https");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 500);
+
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  std::cout << log_result;
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_request_header_effect = json_log->getString("field_request_header_effect");
+  // Invalid mutation request
+  EXPECT_EQ(*field_request_header_effect, "2");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoPartialMutationApplied) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("some_body", absl::nullopt);
+  // Successfully Apply
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // Attempt an invalid mutation
+        auto* mut = headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        mut->mutable_header()->set_key("x-new-header");
+        mut->mutable_header()->set_raw_value("new");
+        return true;
+      });
+
+  // Mutation Fail
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
+        auto* head_mut = body_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = head_mut->add_set_headers();
+        mut1->mutable_append()->set_value(false);
+        mut1->mutable_header()->set_key(":");
+        mut1->mutable_header()->set_raw_value("new");
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Goodbye, World!");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 500);
+
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  std::cout << log_result;
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_request_header_effect = json_log->getString("field_request_header_effect");
+  // Invalid mutation request
+  EXPECT_EQ(*field_request_header_effect, "2");
+
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace ExternalProcessing

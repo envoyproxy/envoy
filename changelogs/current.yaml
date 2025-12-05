@@ -458,5 +458,9 @@ new_features:
 - area: attributes
   change: |
     added :ref:`attributes <arch_overview_attributes>` for looking up request or response headers bytes.
+- area: ext_proc
+  change: |
+    Added new method processingEffects within Filter State. This mehtod returns the per HTTP event procesing_effects that occurred
+    during the filter processing. Introduced a new enum to track if a mutation was applied or why it was rejected.
 
 deprecated:
