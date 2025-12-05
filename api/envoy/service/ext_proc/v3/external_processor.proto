@@ -164,7 +164,7 @@ message ProcessingRequest {
 //   the server must send back exactly one ProcessingResponse message.
 // * If it is set to ``FULL_DUPLEX_STREAMED``, the server must follow the API defined
 //   for this mode to send the ProcessingResponse messages.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message ProcessingResponse {
   // The response type that is sent by the server.
   oneof response {
@@ -202,6 +202,16 @@ message ProcessingResponse {
     // this will either ship the reply directly to the downstream codec,
     // or reset the stream.
     ImmediateResponse immediate_response = 7;
+
+    // The server sends back this message to initiate or continue local response streaming.
+    // The server must initiate local response streaming with the ``headers_response`` in response to a ProcessingRequest
+    // with the ``request_headers`` only.
+    // The server may follow up with multiple messages containing ``body_response``. The server must indicate
+    // end of stream by setting ``end_of_stream`` to ``true`` in the ``headers_response``
+    // or ``body_response`` message or by sending a ``trailers_response`` message.
+    // The client may send a ``request_body`` or ``request_trailers`` to the server depending on configuration.
+    // Presently only the FULL_DUPLEX_STREAMED body mode is supported.
+    StreamedImmediateResponse streamed_immediate_response = 11;
   }
 
   // Optional metadata that will be emitted as dynamic metadata to be consumed by
@@ -307,6 +317,23 @@ message TrailersResponse {
   // Details the modifications (if any) to be made by the data plane to the current
   // request/response trailers.
   HeaderMutation header_mutation = 1;
+}
+
+// This message is sent by the external server to the data plane after ``HttpHeaders``
+// to initiate local response streaming. The server may follow up with multiple messages containing ``body_response``.
+// The server must indicate end of stream by setting ``end_of_stream`` to ``true`` in the ``headers_response``
+// or ``body_response`` message or by sending a ``trailers_response`` message.
+message StreamedImmediateResponse {
+  oneof response {
+    // Response headers to be sent downstream. The ":status" header must be set.
+    HttpHeaders headers_response = 1;
+
+    // Response body to be sent downstream.
+    StreamedBodyResponse body_response = 2;
+
+    // Response trailers to be sent downstream.
+    config.core.v3.HeaderMap trailers_response = 3;
+  }
 }
 
 // This message contains common fields between header and body responses.
