@@ -132,9 +132,51 @@ using TlsSessionTicketKeysSdsApiSharedPtr = std::shared_ptr<TlsSessionTicketKeys
 using GenericSecretSdsApiSharedPtr = std::shared_ptr<GenericSecretSdsApi>;
 
 /**
+ * Shared implementation of the subscription callbacks from SecretProvider.
+ */
+template <typename SecretType>
+class DynamicSecretProvider : public SdsApi, public SecretProvider<SecretType> {
+public:
+  DynamicSecretProvider(const envoy::config::core::v3::ConfigSource& sds_config,
+                        const std::string& sds_config_name,
+                        Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
+                        ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
+                        std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
+                        Api::Api& api, bool warm)
+      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+               stats, std::move(destructor_cb), dispatcher, api, warm) {}
+
+  virtual const SecretType* secret() const override PURE;
+
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addValidationCallback(std::function<absl::Status(const SecretType&)> callback) override {
+    return validation_callback_manager_.add(callback);
+  }
+
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addUpdateCallback(std::function<absl::Status()> callback) override {
+    if (secret()) {
+      THROW_IF_NOT_OK(callback());
+    }
+    return update_callback_manager_.add(callback);
+  }
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addRemoveCallback(std::function<absl::Status()> callback) override {
+    return remove_callback_manager_.add(callback);
+  }
+
+  const Init::Target* initTarget() override { return &init_target_; }
+  void start() override { initialize(false); }
+
+protected:
+  Common::CallbackManager<absl::Status, const SecretType&> validation_callback_manager_;
+};
+
+/**
  * TlsCertificateSdsApi implementation maintains and updates dynamic TLS certificate secrets.
  */
-class TlsCertificateSdsApi : public SdsApi, public TlsCertificateConfigProvider {
+class TlsCertificateSdsApi
+    : public DynamicSecretProvider<envoy::extensions::transport_sockets::tls::v3::TlsCertificate> {
 public:
   static TlsCertificateSdsApiSharedPtr
   create(Server::Configuration::ServerFactoryContext& server_context,
@@ -147,8 +189,9 @@ public:
                        ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                        std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
                        Api::Api& api, bool warm)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api, warm) {}
+      : DynamicSecretProvider(sds_config, sds_config_name, subscription_factory, time_source,
+                              validation_visitor, stats, std::move(destructor_cb), dispatcher, api,
+                              warm) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::TlsCertificate* secret() const override {
@@ -157,17 +200,9 @@ public:
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
       std::function<absl::Status(
           const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>) override {
+    // This is unnecessary but there is no callers to this function.
     return nullptr;
   }
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addUpdateCallback(std::function<absl::Status()> callback) override;
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addRemoveCallback(std::function<absl::Status()> callback) override {
-    return remove_callback_manager_.add(callback);
-  }
-
-  const Init::Target* initTarget() override { return &init_target_; }
-  void start() override { initialize(false); }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
@@ -190,8 +225,9 @@ private:
  * CertificateValidationContextSdsApi implementation maintains and updates dynamic certificate
  * validation context secrets.
  */
-class CertificateValidationContextSdsApi : public SdsApi,
-                                           public CertificateValidationContextConfigProvider {
+class CertificateValidationContextSdsApi
+    : public DynamicSecretProvider<
+          envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext> {
 public:
   static CertificateValidationContextSdsApiSharedPtr
   create(Server::Configuration::ServerFactoryContext& server_context,
@@ -204,28 +240,15 @@ public:
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
                                      Stats::Store& stats, std::function<void()> destructor_cb,
                                      Event::Dispatcher& dispatcher, Api::Api& api, bool warm)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api, warm) {}
+      : DynamicSecretProvider(sds_config, sds_config_name, subscription_factory, time_source,
+                              validation_visitor, stats, std::move(destructor_cb), dispatcher, api,
+                              warm) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext*
   secret() const override {
     return resolved_certificate_validation_context_secrets_.get();
   }
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addUpdateCallback(std::function<absl::Status()> callback) override;
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addRemoveCallback(std::function<absl::Status()> callback) override {
-    return remove_callback_manager_.add(callback);
-  }
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<absl::Status(
-          const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>
-          callback) override {
-    return validation_callback_manager_.add(callback);
-  }
-  const Init::Target* initTarget() override { return &init_target_; }
-  void start() override { initialize(false); }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
@@ -243,17 +266,15 @@ private:
   // CertificateValidationContext after resolving paths via watched_directory_.
   CertificateValidationContextPtr resolved_certificate_validation_context_secrets_;
   // Path based certificates are inlined for future read consistency.
-  Common::CallbackManager<
-      absl::Status,
-      const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&>
-      validation_callback_manager_;
 };
 
 /**
  * TlsSessionTicketKeysSdsApi implementation maintains and updates dynamic tls session ticket keys
  * secrets.
  */
-class TlsSessionTicketKeysSdsApi : public SdsApi, public TlsSessionTicketKeysConfigProvider {
+class TlsSessionTicketKeysSdsApi
+    : public DynamicSecretProvider<
+          envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys> {
 public:
   static TlsSessionTicketKeysSdsApiSharedPtr
   create(Server::Configuration::ServerFactoryContext& server_context,
@@ -267,27 +288,15 @@ public:
                              ProtobufMessage::ValidationVisitor& validation_visitor,
                              Stats::Store& stats, std::function<void()> destructor_cb,
                              Event::Dispatcher& dispatcher, Api::Api& api, bool warm)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api, warm) {}
+      : DynamicSecretProvider(sds_config, sds_config_name, subscription_factory, time_source,
+                              validation_visitor, stats, std::move(destructor_cb), dispatcher, api,
+                              warm) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys*
   secret() const override {
     return tls_session_ticket_keys_.get();
   }
-
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addUpdateCallback(std::function<absl::Status()> callback) override;
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addRemoveCallback(std::function<absl::Status()> callback) override {
-    return remove_callback_manager_.add(callback);
-  }
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<
-          absl::Status(const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>
-          callback) override;
-  const Init::Target* initTarget() override { return &init_target_; }
-  void start() override { initialize(false); }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
@@ -302,15 +311,13 @@ protected:
 
 private:
   Secret::TlsSessionTicketKeysPtr tls_session_ticket_keys_;
-  Common::CallbackManager<
-      absl::Status, const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&>
-      validation_callback_manager_;
 };
 
 /**
  * GenericSecretSdsApi implementation maintains and updates dynamic generic secret.
  */
-class GenericSecretSdsApi : public SdsApi, public GenericSecretConfigProvider {
+class GenericSecretSdsApi
+    : public DynamicSecretProvider<envoy::extensions::transport_sockets::tls::v3::GenericSecret> {
 public:
   static GenericSecretSdsApiSharedPtr
   create(Server::Configuration::ServerFactoryContext& server_context,
@@ -323,8 +330,9 @@ public:
                       ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                       std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
                       Api::Api& api, bool warm)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api, warm) {}
+      : DynamicSecretProvider(sds_config, sds_config_name, subscription_factory, time_source,
+                              validation_visitor, stats, std::move(destructor_cb), dispatcher, api,
+                              warm) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret() const override {
@@ -332,20 +340,9 @@ public:
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addUpdateCallback(std::function<absl::Status()> callback) override {
+    // This is unlike the other implementations - no immediate callback.
     return update_callback_manager_.add(callback);
   }
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addRemoveCallback(std::function<absl::Status()> callback) override {
-    return remove_callback_manager_.add(callback);
-  }
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addValidationCallback(std::function<absl::Status(
-                            const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>
-                            callback) override {
-    return validation_callback_manager_.add(callback);
-  }
-  const Init::Target* initTarget() override { return &init_target_; }
-  void start() override { initialize(false); }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
@@ -359,9 +356,6 @@ protected:
 
 private:
   GenericSecretPtr generic_secret_;
-  Common::CallbackManager<absl::Status,
-                          const envoy::extensions::transport_sockets::tls::v3::GenericSecret&>
-      validation_callback_manager_;
 };
 
 } // namespace Secret

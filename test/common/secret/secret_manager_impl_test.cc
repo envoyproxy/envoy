@@ -80,14 +80,21 @@ tls_certificate:
   EXPECT_TRUE(secret_manager->addStaticSecret(secret_config).ok());
 
   ASSERT_EQ(secret_manager->findStaticTlsCertificateProvider("undefined"), nullptr);
-  ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
+  const auto provider = secret_manager->findStaticTlsCertificateProvider("abc.com");
+  ASSERT_NE(provider, nullptr);
+  ASSERT_EQ(provider->addValidationCallback(
+                [](const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&) {
+                  return absl::OkStatus();
+                }),
+            nullptr);
+  ASSERT_EQ(provider->addUpdateCallback([]() { return absl::OkStatus(); }), nullptr);
+  ASSERT_EQ(provider->addRemoveCallback([]() { return absl::OkStatus(); }), nullptr);
+  // No-op, but safe.
+  provider->start();
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  Envoy::Ssl::TlsCertificateConfigImpl tls_config =
-      std::move(Ssl::TlsCertificateConfigImpl::create(
-                    *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), ctx,
-                    *api_, "cert_name")
-                    .value());
+  Envoy::Ssl::TlsCertificateConfigImpl tls_config = std::move(
+      Ssl::TlsCertificateConfigImpl::create(*provider->secret(), ctx, *api_, "cert_name").value());
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config.certificateChain());

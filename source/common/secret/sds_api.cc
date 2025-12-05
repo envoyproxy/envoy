@@ -242,14 +242,6 @@ TlsCertificateSdsApi::create(Server::Configuration::ServerFactoryContext& server
       server_context.api(), warm);
 }
 
-ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-TlsCertificateSdsApi::addUpdateCallback(std::function<absl::Status()> callback) {
-  if (secret()) {
-    THROW_IF_NOT_OK(callback());
-  }
-  return update_callback_manager_.add(callback);
-}
-
 std::vector<std::string> TlsCertificateSdsApi::getDataSourceFilenames() {
   std::vector<std::string> files;
   if (sds_tls_certificate_secrets_ && sds_tls_certificate_secrets_->has_certificate_chain() &&
@@ -304,14 +296,6 @@ CertificateValidationContextSdsApiSharedPtr CertificateValidationContextSdsApi::
       server_context.mainThreadDispatcher().timeSource(), server_context.messageValidationVisitor(),
       server_context.serverScope().store(), destructor_cb, server_context.mainThreadDispatcher(),
       server_context.api(), warm);
-}
-
-ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-CertificateValidationContextSdsApi::addUpdateCallback(std::function<absl::Status()> callback) {
-  if (secret()) {
-    THROW_IF_NOT_OK(callback());
-  }
-  return update_callback_manager_.add(callback);
 }
 
 void CertificateValidationContextSdsApi::validateConfig(
@@ -381,21 +365,6 @@ TlsSessionTicketKeysSdsApi::create(Server::Configuration::ServerFactoryContext& 
       server_context.mainThreadDispatcher().timeSource(), server_context.messageValidationVisitor(),
       server_context.serverScope().store(), destructor_cb, server_context.mainThreadDispatcher(),
       server_context.api(), warm);
-}
-
-ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-TlsSessionTicketKeysSdsApi::addUpdateCallback(std::function<absl::Status()> callback) {
-  if (secret()) {
-    THROW_IF_NOT_OK(callback());
-  }
-  return update_callback_manager_.add(callback);
-}
-
-ABSL_MUST_USE_RESULT Common::CallbackHandlePtr TlsSessionTicketKeysSdsApi::addValidationCallback(
-    std::function<
-        absl::Status(const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>
-        callback) {
-  return validation_callback_manager_.add(callback);
 }
 
 void TlsSessionTicketKeysSdsApi::validateConfig(

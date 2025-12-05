@@ -82,6 +82,34 @@ TEST_F(SdsApiTest, BasicTest) {
   initialize();
 }
 
+// Validate that target initializes when no warming is requested.
+TEST_F(SdsApiTest, BasicNoWarmTest) {
+  ::testing::InSequence s;
+  const envoy::service::secret::v3::SdsDummy dummy;
+
+  envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
+  TlsCertificateSdsApi sds_api(
+      config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
+      []() {}, *dispatcher_, *api_, false);
+  init_manager_.add(*sds_api.initTarget());
+  init_watcher_.expectReady();
+  initialize();
+}
+
+// Validate that start() initializes the target.
+TEST_F(SdsApiTest, BasicManualStart) {
+  ::testing::InSequence s;
+  const envoy::service::secret::v3::SdsDummy dummy;
+
+  envoy::config::core::v3::ConfigSource config_source;
+  TlsCertificateSdsApi sds_api(
+      config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
+      []() {}, *dispatcher_, *api_, false);
+  EXPECT_CALL(*subscription_factory_.subscription_, start(_));
+  sds_api.start();
+}
+
 // Validate that a noop init manager is used if the InitManger passed into the constructor
 // has been already initialized. This is a regression test for
 // https://github.com/envoyproxy/envoy/issues/12013
@@ -189,6 +217,23 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   const std::string key_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             tls_config.privateKey());
+}
+
+TEST_F(SdsApiTest, CertificateRemoval) {
+  envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
+  TlsCertificateSdsApi sds_api(
+      config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
+      []() {}, *dispatcher_, *api_, true);
+  init_manager_.add(*sds_api.initTarget());
+  initialize();
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  auto handle = sds_api.addRemoveCallback(
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
+  EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
+  Protobuf::RepeatedPtrField<std::string> removals;
+  *removals.Add() = "abc.com";
+  EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate({}, removals, "").ok());
 }
 
 class SdsRotationApiTest : public SdsApiTestBase {
