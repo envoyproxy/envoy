@@ -2056,6 +2056,73 @@ TEST_F(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
             "Unknown static certificate validation context: missing");
 }
 
+// Verify that an invalid validator factory is rejected.
+TEST_F(ClientContextConfigImplTest, TestCertValidatorFactoryNotFound) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    validation_context:
+      custom_validator_config:
+        name: "unknown_cert_validator"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *cfg).status().message(),
+            "Failed to get certificate validator factory for unknown_cert_validator");
+}
+
+// Verify that an invalid ECDH curves are rejected.
+TEST_F(ClientContextConfigImplTest, TestInvalidEcdhCurves) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      ecdh_curves: "invalid_curve"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *cfg).status().message(),
+            "Failed to initialize ECDH curves invalid_curve");
+}
+
+// Verify that an invalid key log path is rejected.
+TEST_F(ClientContextConfigImplTest, TestInvalidKeyLogPath) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    key_log:
+      path: "/non_existent_directory/key.log"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_CALL(factory_context_.server_context_.access_log_manager_, createAccessLog(_))
+      .WillOnce(Return(absl::InvalidArgumentError("Failed to create log file")));
+
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *cfg).status().message(),
+            "Failed to create log file");
+}
+
+// Verify that a long ALPN is rejected.
+TEST_F(ClientContextConfigImplTest, TestInvalidAlpnTooLong) {
+  const std::string long_protocol(65535, 'a'); // >= 65535 chars
+  const std::string yaml = fmt::format(R"EOF(
+  common_tls_context:
+    alpn_protocols: "{}"
+  )EOF",
+                                       long_protocol);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *cfg).status().message(),
+            "Invalid ALPN protocol string");
+}
+
 class ServerContextConfigImplTest : public SslCertsTest {
 public:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
