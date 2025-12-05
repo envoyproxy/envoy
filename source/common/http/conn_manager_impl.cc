@@ -270,8 +270,16 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
              StreamInfo::CoreResponseFlag::UpstreamConnectionTermination))) {
       stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
     } else {
+      const bool reset_with_error =
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error");
+      // TODO(wbpcode): We may should not propagate UpstreamProtocolError to downstream as that
+      // indicates an error on the upstream connection and may have nothing to do with the
+      // downstream.
       if (stream.filter_manager_.streamInfo().hasResponseFlag(
               StreamInfo::CoreResponseFlag::UpstreamProtocolError)) {
+        stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
+      } else if (reset_with_error && stream.filter_manager_.streamInfo().hasResponseFlag(
+                                         StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
       } else {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
@@ -1219,6 +1227,9 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
       }
 
+      filter_manager_.streamInfo().setResponseFlag(
+          StreamInfo::CoreResponseFlag::DownstreamProtocolError);
+
       // H/2 codec was resetting requests that were rejected due to headers with underscores,
       // instead of sending 400. Preserving this behavior for now.
       // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
@@ -1260,6 +1271,9 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
   if (Grpc::Common::hasGrpcContentType(*request_headers_)) {
     grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
   }
+
+  filter_manager_.streamInfo().setResponseFlag(
+      StreamInfo::CoreResponseFlag::DownstreamProtocolError);
 
   // H/2 codec was resetting requests that were rejected due to headers with underscores,
   // instead of sending 400. Preserving this behavior for now.
@@ -2046,7 +2060,8 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
 
   // If the codec sets its responseDetails() for a reason other than peer reset, set a
   // DownstreamProtocolError. Either way, propagate details.
-  if (!encoder_details.empty() && reset_reason == StreamResetReason::LocalReset) {
+  if (reset_reason == StreamResetReason::ProtocolError ||
+      (!encoder_details.empty() && reset_reason == StreamResetReason::LocalReset)) {
     filter_manager_.streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::DownstreamProtocolError);
   }
@@ -2100,7 +2115,7 @@ void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
 void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
   ASSERT(!state_.codec_encode_complete_);
   state_.on_reset_stream_called_ = true;
-  ENVOY_STREAM_LOG(debug, "Codec timed out flushing stream", *this);
+  ENVOY_STREAM_LOG(debug, "Codec low level reset", *this);
 
   // TODO(kbaichoo): Update streamInfo to account for the reset.
 

@@ -107,23 +107,38 @@ public:
   virtual MatchTreeHttpMatchingDataSharedPtr
   getMessageMatcher(const std::string& message_name) const;
 
+  /**
+   * Resolves the human-readable name of a specific enum value.
+   *
+   * @param enum_type_name The fully qualified name of the enum type (e.g., "package.Status").
+   * @param enum_value The integer value of the enum (e.g., 99).
+   * @return The string name of the enum value (e.g., "DEBUG_MODE").
+   * Returns empty string if the type or value is not found.
+   */
+  virtual absl::StatusOr<absl::string_view> getEnumName(absl::string_view enum_type_name,
+                                                        int enum_value) const;
+
   // Returns a constant reference to the type finder which resolves type URL string to the
   // corresponding `Protobuf::Type*`.
-  const TypeFinder& getTypeFinder() const { return *type_finder_; };
+  virtual const TypeFinder& getTypeFinder() const { return *type_finder_; };
 
   // Returns the request type of the method.
-  absl::StatusOr<const Protobuf::Type*> getRequestType(const std::string& method_name) const;
+  virtual absl::StatusOr<const Protobuf::Type*>
+  getRequestType(const std::string& method_name) const;
 
   // Returns the response type of the method.
-  absl::StatusOr<const Protobuf::Type*> getResponseType(const std::string& method_name) const;
+  virtual absl::StatusOr<const Protobuf::Type*>
+  getResponseType(const std::string& method_name) const;
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
-private:
-  friend class MockProtoApiScrubberFilterConfig;
-  // Private constructor to make sure that this class is used in a factory fashion using the
+protected:
+  // Protected constructor to make sure that this class is used in a factory fashion using the
   // public `create` method.
   ProtoApiScrubberFilterConfig() = default;
+
+private:
+  friend class MockProtoApiScrubberFilterConfig;
 
   // Validates the filtering mode. Currently, only FilteringMode::OVERRIDE is supported.
   // For any unsupported FilteringMode, it returns absl::InvalidArgument.

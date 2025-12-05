@@ -46,8 +46,6 @@ jobs:
       # head-sha: ${{ github.sha }}
 
   build:
-    secrets:
-      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
     permissions:
       actions: read
       contents: read
@@ -59,13 +57,11 @@ jobs:
     needs:
     - load
     with:
-      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   coverage:
     secrets:
-      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
       gcp-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED || secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
@@ -78,13 +74,10 @@ jobs:
     needs:
     - load
     with:
-      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   runtime:
-    secrets:
-      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
     permissions:
       actions: read
       contents: read
@@ -96,13 +89,10 @@ jobs:
     needs:
     - load
     with:
-      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   san:
-    secrets:
-      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
     permissions:
       actions: read
       contents: read
@@ -114,7 +104,6 @@ jobs:
     needs:
     - load
     with:
-      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 

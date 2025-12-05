@@ -42,6 +42,7 @@ jobs:
     secrets:
       ssh-key-extra: ${{ needs.load.outputs.trusted  && secrets.ENVOY_MOBILE_WEBSITE_DEPLOY_KEY || '' }}
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-docs }}

@@ -18,7 +18,6 @@ envoy_cmake(
     name = "ipp-crypto",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {

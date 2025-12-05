@@ -35,6 +35,16 @@ using OnHttpFilterStreamCompleteType =
 using OnHttpFilterDestroyType = decltype(&envoy_dynamic_module_on_http_filter_destroy);
 using OnHttpFilterHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_http_filter_http_callout_done);
+using OnHttpFilterHttpStreamHeadersType =
+    decltype(&envoy_dynamic_module_on_http_filter_http_stream_headers);
+using OnHttpFilterHttpStreamDataType =
+    decltype(&envoy_dynamic_module_on_http_filter_http_stream_data);
+using OnHttpFilterHttpStreamTrailersType =
+    decltype(&envoy_dynamic_module_on_http_filter_http_stream_trailers);
+using OnHttpFilterHttpStreamCompleteType =
+    decltype(&envoy_dynamic_module_on_http_filter_http_stream_complete);
+using OnHttpFilterHttpStreamResetType =
+    decltype(&envoy_dynamic_module_on_http_filter_http_stream_reset);
 using OnHttpFilterScheduled = decltype(&envoy_dynamic_module_on_http_filter_scheduled);
 using OnHttpFilterDownstreamAboveWriteBufferHighWatermark =
     decltype(&envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark);
@@ -79,6 +89,11 @@ public:
   OnHttpFilterStreamCompleteType on_http_filter_stream_complete_ = nullptr;
   OnHttpFilterDestroyType on_http_filter_destroy_ = nullptr;
   OnHttpFilterHttpCalloutDoneType on_http_filter_http_callout_done_ = nullptr;
+  OnHttpFilterHttpStreamHeadersType on_http_filter_http_stream_headers_ = nullptr;
+  OnHttpFilterHttpStreamDataType on_http_filter_http_stream_data_ = nullptr;
+  OnHttpFilterHttpStreamTrailersType on_http_filter_http_stream_trailers_ = nullptr;
+  OnHttpFilterHttpStreamCompleteType on_http_filter_http_stream_complete_ = nullptr;
+  OnHttpFilterHttpStreamResetType on_http_filter_http_stream_reset_ = nullptr;
   OnHttpFilterScheduled on_http_filter_scheduled_ = nullptr;
   OnHttpFilterDownstreamAboveWriteBufferHighWatermark
       on_http_filter_downstream_above_write_buffer_high_watermark_ = nullptr;
