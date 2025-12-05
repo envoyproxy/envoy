@@ -73,6 +73,7 @@ constexpr absl::string_view ResponseTrailerLatencyUsField = "response_trailer_la
 constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_call_status";
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
+constexpr absl::string_view FailedOpenField = "failed_open";
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -416,6 +417,7 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<double>(bytes_sent_));
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
+  (*struct_msg->mutable_fields())[FailedOpenField].set_bool_value(failed_open_);
   return struct_msg;
 }
 
@@ -519,6 +521,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   }
   if (field_name == BytesReceivedField) {
     return static_cast<int64_t>(bytes_received_);
+  }
+  if (field_name == FailedOpenField) {
+    return bool(failed_open_);
   }
   return {};
 }
@@ -635,6 +640,7 @@ void Filter::onError() {
     // Close the external processing.
     processing_complete_ = true;
     stats_.failure_mode_allowed_.inc();
+    logging_info_->setFailedOpen();
     clearAsyncState();
   } else {
     // Return an error and stop processing the current stream.
@@ -1830,6 +1836,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // ignore it and also ignore the stream for the rest of this filter
       // instance's lifetime to protect us from a malformed server.
       stats_.failure_mode_allowed_.inc();
+      logging_info_->setFailedOpen();
       closeStream();
       clearAsyncState(processing_status.raw_code());
       processing_complete_ = true;
@@ -1857,10 +1864,11 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     return;
   }
 
+  stats_.server_half_closed_.inc();
   if (failureModeAllow()) {
     onGrpcCloseWithStatus(status);
     stats_.failure_mode_allowed_.inc();
-
+    logging_info_->setFailedOpen();
   } else {
     processing_complete_ = true;
     // Since the stream failed, there is no need to handle timeouts, so
@@ -1887,6 +1895,7 @@ void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
 
   processing_complete_ = true;
   stats_.streams_closed_.inc();
+  stats_.server_half_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();
@@ -1905,6 +1914,7 @@ void Filter::onMessageTimeout() {
     processing_complete_ = true;
     closeStream();
     stats_.failure_mode_allowed_.inc();
+    logging_info_->setFailedOpen();
     clearAsyncState(Grpc::Status::DeadlineExceeded);
 
   } else {
@@ -1958,6 +1968,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   };
 
   sent_immediate_response_ = true;
+  stats_.immediate_responses_sent_.inc();
   ENVOY_STREAM_LOG(debug, "Sending local reply with status code {}", *decoder_callbacks_,
                    status_code);
   const auto details = StringUtil::replaceAllEmptySpace(response.details());

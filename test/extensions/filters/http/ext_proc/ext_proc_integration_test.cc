@@ -4855,66 +4855,8 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
 
-  auto access_log_path = TestEnvironment::temporaryPath("ext_proc_filter_state_access.log");
-
-  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    auto* access_log = cm.add_access_log();
-    access_log->set_name("accesslog");
-    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-    access_log_config.set_path(access_log_path);
-    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
-
-    // Test all three serialization modes.
-    (*json_format->mutable_fields())["ext_proc_plain"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:PLAIN)%");
-    (*json_format->mutable_fields())["ext_proc_typed"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:TYPED)%");
-
-    // Test field extraction for coverage.
-    (*json_format->mutable_fields())["field_request_header_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_latency_us)%");
-    (*json_format->mutable_fields())["field_request_header_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_call_status)%");
-    (*json_format->mutable_fields())["field_request_body_calls"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_call_count)%");
-    (*json_format->mutable_fields())["field_request_body_total_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_total_latency_us)%");
-    (*json_format->mutable_fields())["field_request_body_max_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_max_latency_us)%");
-    (*json_format->mutable_fields())["field_request_body_last_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_last_call_status)%");
-    (*json_format->mutable_fields())["field_request_trailer_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_latency_us)%");
-    (*json_format->mutable_fields())["field_request_trailer_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_call_status)%");
-    (*json_format->mutable_fields())["field_response_header_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_latency_us)%");
-    (*json_format->mutable_fields())["field_response_header_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_call_status)%");
-    (*json_format->mutable_fields())["field_response_body_calls"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_call_count)%");
-    (*json_format->mutable_fields())["field_response_body_total_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_total_latency_us)%");
-    (*json_format->mutable_fields())["field_response_body_max_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_max_latency_us)%");
-    (*json_format->mutable_fields())["field_response_body_last_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_last_call_status)%");
-    (*json_format->mutable_fields())["field_response_trailer_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_latency_us)%");
-    (*json_format->mutable_fields())["field_response_trailer_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_call_status)%");
-    (*json_format->mutable_fields())["field_bytes_sent"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_sent)%");
-    (*json_format->mutable_fields())["field_bytes_received"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_received)%");
-
-    // Test non-existent field for coverage
-    (*json_format->mutable_fields())["field_non_existent"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:non_existent_field)%");
-
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-  });
-
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  initializeLogConfig(access_log_path);
   initializeConfig();
   HttpIntegrationTest::initialize();
 
@@ -5034,20 +4976,8 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
 }
 
 TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
-  auto access_log_path = TestEnvironment::temporaryPath("ext_proc_filter_state_access.log");
-
-  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    auto* access_log = cm.add_access_log();
-    access_log->set_name("accesslog");
-    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-    access_log_config.set_path(access_log_path);
-    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
-
-    (*json_format->mutable_fields())["field_request_header_call_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_call_status)%");
-
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-  });
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  initializeLogConfig(access_log_path);
   proto_config_.set_failure_mode_allow(true);
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
   initializeConfig();
@@ -5069,7 +4999,7 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
   verifyDownstreamResponse(*response, 200);
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
   auto json_log = Json::Factory::loadFromString(log_result).value();
-  auto field_request_header_status = json_log->getString("field_request_header_call_status");
+  auto field_request_header_status = json_log->getString("field_request_header_status");
   // Should be 4:DEADLINE_EXCEEDED instead of 10:ABORTED
   EXPECT_EQ(*field_request_header_status, "4");
 }
@@ -5134,6 +5064,34 @@ TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
   EXPECT_THAT(log_content, testing::HasSubstr("request_header_latency_us"));
   EXPECT_THAT(log_content, testing::HasSubstr("response_header_call_status"));
   EXPECT_THAT(log_content, testing::HasSubstr("response_header_latency_us"));
+}
+
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingFailedOpen) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  proto_config_.set_failure_mode_allow(true);
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeLogConfig(access_log_path);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Travel forward 400 ms
+                                 timeSystem().advanceTimeWaitImpl(400ms);
+                                 return false;
+                               });
+
+  // We should be able to continue from here since the error was ignored
+  handleUpstreamRequest();
+  // Since we are ignoring errors, the late response to the request headers
+  // message meant that subsequent messages are spurious and the response
+  // headers message was never sent.
+  // Despite the timeout the request should succeed.
+  verifyDownstreamResponse(*response, 200);
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_server_half_closed = json_log->getString("failed_open_field");
+  EXPECT_EQ(*field_server_half_closed, "1");
 }
 
 } // namespace ExternalProcessing
