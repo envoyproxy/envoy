@@ -46,7 +46,7 @@ message CookieConfig {
   // to support flows where the callback URL is on a different path.
   //
   // If not specified, defaults to ``/``.
-  string path = 2;
+  string path = 2 [(validate.rules).string = {pattern: "^[^\\x00-\\x1f\\x7f;]*$"}];
 }
 
 // [#next-free-field: 8]
