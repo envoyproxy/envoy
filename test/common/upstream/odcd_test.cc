@@ -1,14 +1,19 @@
 #include <chrono>
 
+#include "envoy/api/api.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/thread.h"
 #include "source/common/config/xds_resource.h"
 
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
 #include "test/mocks/upstream/od_cds_api.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
@@ -273,6 +278,33 @@ TEST_F(ODCDTest, TestMainThreadDiscoveryInProgressDetection) {
   auto cdm = cluster_manager_->createAndSwapClusterDiscoveryManager("another_fake_thread");
   auto handle2 =
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
+}
+
+// Test that destroying an OdCdsApiHandle from a worker thread does not cause SIGABRT.
+// This simulates the scenario where a filter is removed during VHDS updates, causing
+// the handle to be destroyed on a worker thread. Handles can be safely destroyed from
+// any thread since they don't own subscriptions.
+TEST_F(ODCDTest, TestDestroyHandleFromWorkerThread) {
+  auto handle_to_destroy = cluster_manager_->createOdCdsApiHandle(odcds_);
+
+  bool destruction_completed = false;
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr worker_dispatcher(api->allocateDispatcher("test_worker_thread"));
+
+  Thread::ThreadPtr worker_thread = Thread::threadFactoryForTest().createThread(
+      [&handle_to_destroy, &destruction_completed, &worker_dispatcher]() {
+        Thread::SkipAsserts skip;
+
+        EXPECT_FALSE(Thread::MainThread::isMainThread());
+
+        handle_to_destroy.reset();
+        destruction_completed = true;
+
+        worker_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+      });
+
+  worker_thread->join();
+  EXPECT_TRUE(destruction_completed);
 }
 
 } // namespace
