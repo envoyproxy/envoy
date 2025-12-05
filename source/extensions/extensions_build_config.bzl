@@ -602,10 +602,10 @@ EXTENSIONS = {
     "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
 
     # Certificate selectors
-    "envoy.tls.certificate_selectors.on_demand_secret":                  "//source/extensions/certificate_selectors/on_demand:config",
+    "envoy.tls.certificate_selectors.on_demand_secret":                  "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
 
     # Certificate mappers
-    "envoy.tls.certificate_mappers.static_name":                  "//source/extensions/certificate_mappers/static_name:config",
+    "envoy.tls.certificate_mappers.static_name":                  "//source/extensions/transport_sockets/tls/cert_mappers/static_name:config",
 
     # Local address selectors
     "envoy.upstream.local_address_selector.filter_state_override": "//source/extensions/local_address_selectors/filter_state_override:config",

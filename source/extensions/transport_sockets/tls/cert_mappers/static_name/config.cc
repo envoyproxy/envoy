@@ -1,7 +1,9 @@
-#include "source/extensions/certificate_mappers/static_name/config.h"
+#include "source/extensions/transport_sockets/tls/cert_mappers/static_name/config.h"
 
 namespace Envoy {
 namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 namespace CertificateMappers {
 namespace StaticName {
 
@@ -19,5 +21,7 @@ REGISTER_FACTORY(StaticNameMapperFactory, Ssl::TlsCertificateMapperConfigFactory
 
 } // namespace StaticName
 } // namespace CertificateMappers
+} // namespace Tls
+} // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy

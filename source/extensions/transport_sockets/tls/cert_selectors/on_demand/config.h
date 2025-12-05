@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/certificate_selectors/on_demand_secret/v3/config.pb.h"
-#include "envoy/extensions/certificate_selectors/on_demand_secret/v3/config.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
+#include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/ssl/handshaker.h"
@@ -12,6 +12,8 @@
 
 namespace Envoy {
 namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 namespace CertificateSelectors {
 namespace OnDemand {
 
@@ -26,7 +28,8 @@ struct CertSelectionStats {
 
 class AsyncContext;
 using AsyncContextConstSharedPtr = std::shared_ptr<const AsyncContext>;
-using ConfigProto = envoy::extensions::certificate_selectors::on_demand_secret::v3::Config;
+using ConfigProto =
+    envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config;
 using UpdateCb = std::function<absl::Status(absl::string_view, const Ssl::TlsCertificateConfig&)>;
 using RemoveCb = std::function<absl::Status(absl::string_view)>;
 
@@ -79,7 +82,7 @@ public:
    */
   explicit Handle(AsyncContextConstSharedPtr cert_context) : active_context_(cert_context) {}
 
-  /** 
+  /**
    * Asynchronous handle constructor must also keep the callback for the secret manager.
    */
   Handle(Ssl::CertificateSelectionCallbackPtr&& cb, bool client_ocsp_capable)
@@ -101,8 +104,8 @@ private:
 using HandleSharedPtr = std::shared_ptr<Handle>;
 
 /**
- * Secret manager maintains dynamic subscriptions to SDS secrets and converts them from the xDS form to the
- * boringssl TLS contexts, while applying the parent TLS configuration.
+ * Secret manager maintains dynamic subscriptions to SDS secrets and converts them from the xDS form
+ * to the boringssl TLS contexts, while applying the parent TLS configuration.
  */
 class SecretManager : public std::enable_shared_from_this<SecretManager>,
                       protected Logger::Loggable<Logger::Id::secret> {
@@ -212,5 +215,7 @@ DECLARE_FACTORY(OnDemandTlsCertificateSelectorFactory);
 
 } // namespace OnDemand
 } // namespace CertificateSelectors
+} // namespace Tls
+} // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy

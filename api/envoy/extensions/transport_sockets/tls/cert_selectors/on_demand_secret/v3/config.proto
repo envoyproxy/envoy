@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.certificate_selectors.on_demand_secret.v3;
+package envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3;
 
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
@@ -8,10 +8,10 @@ import "envoy/config/core/v3/extension.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.certificate_selectors.on_demand_secret.v3";
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/certificate_selectors/on_demand_secret/v3;on_demand_secretv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3;on_demand_secretv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: On-demand secret certificate selector]

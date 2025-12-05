@@ -1,4 +1,4 @@
-#include "source/extensions/certificate_selectors/on_demand/config.h"
+#include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -7,6 +7,8 @@
 
 namespace Envoy {
 namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 namespace CertificateSelectors {
 namespace OnDemand {
 
@@ -45,13 +47,15 @@ void Handle::notify(AsyncContextConstSharedPtr cert_ctx) {
   bool staple = false;
   if (cert_ctx) {
     active_context_ = cert_ctx;
-    staple = (TransportSockets::Tls::ocspStapleAction(
-      active_context_->tlsContext(), client_ocsp_capable_, active_context_->ocspStaplePolicy()) == Ssl::OcspStapleAction::Staple);
+    staple =
+        (ocspStapleAction(active_context_->tlsContext(), client_ocsp_capable_,
+                          active_context_->ocspStaplePolicy()) == Ssl::OcspStapleAction::Staple);
   }
   Event::Dispatcher& dispatcher = cb_->dispatcher();
   // TODO: This could benefit from batching events by the dispatcher.
   dispatcher.post([cb = std::move(cb_), cert_ctx, staple] {
-    cb->onCertificateSelectionResult(makeOptRefFromPtr(cert_ctx ? &cert_ctx->tlsContext() : nullptr), staple);
+    cb->onCertificateSelectionResult(
+        makeOptRefFromPtr(cert_ctx ? &cert_ctx->tlsContext() : nullptr), staple);
   });
   cb_ = nullptr;
 }
@@ -130,10 +134,11 @@ absl::Status SecretManager::removeCertificateConfig(absl::string_view secret_nam
   // We cannot remove the subscription caller directly because this is called during a callback
   // which continues later. Instead, we post to the main as a completion.
   factory_context_.mainThreadDispatcher().post(
-      [weak_this = std::weak_ptr<SecretManager>(shared_from_this()), name = std::string(secret_name)]{
-      if (auto that = weak_this.lock(); that) {
-        that->doRemoveCertificateConfig(name);
-      }
+      [weak_this = std::weak_ptr<SecretManager>(shared_from_this()),
+       name = std::string(secret_name)] {
+        if (auto that = weak_this.lock(); that) {
+          that->doRemoveCertificateConfig(name);
+        }
       });
   return absl::OkStatus();
 }
@@ -154,7 +159,8 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name) {
   cache_.erase(it);
   setContext(secret_name, nullptr);
   stats_.cert_active_.dec();
-  ENVOY_LOG(trace, "Removed certificate subscription for '{}', notified {} pending connections", secret_name, notify_count);
+  ENVOY_LOG(trace, "Removed certificate subscription for '{}', notified {} pending connections",
+            secret_name, notify_count);
 }
 
 HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
@@ -203,13 +209,13 @@ SecretManager::getContext(absl::string_view secret_name) const {
 Ssl::SelectionResult AsyncSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
                                                      Ssl::CertificateSelectionCallbackPtr cb) {
   const std::string name = mapper_(ssl_client_hello);
-  const bool client_ocsp_capable = TransportSockets::Tls::isClientOcspCapable(ssl_client_hello);
+  const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
   auto current_context = secret_manager_->getContext(name);
   if (current_context) {
     ENVOY_LOG(trace, "Using an existing certificate '{}'", name);
     const Ssl::TlsContext* tls_context = &current_context.value()->tlsContext();
-    const auto staple_action = TransportSockets::Tls::ocspStapleAction(
-        *tls_context, client_ocsp_capable, current_context.value()->ocspStaplePolicy());
+    const auto staple_action = ocspStapleAction(*tls_context, client_ocsp_capable,
+                                                current_context.value()->ocspStaplePolicy());
     auto handle = std::make_shared<Handle>(*std::move(current_context));
     return Ssl::SelectionResult{
         .status = Ssl::SelectionResult::SelectionStatus::Success,
@@ -259,5 +265,7 @@ REGISTER_FACTORY(OnDemandTlsCertificateSelectorFactory, Ssl::TlsCertificateSelec
 
 } // namespace OnDemand
 } // namespace CertificateSelectors
+} // namespace Tls
+} // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy
