@@ -13,6 +13,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
+#include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response.h"
+#include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response_factory.h"
 
 #include "test/extensions/filters/http/ext_proc/filter_test_common.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
@@ -1271,6 +1273,59 @@ TEST_F(StreamingLocalReplyTest, ProcessingStreamingLocalResponse) {
                   .at("envoy-test-ext_proc-streaming_immediate_response")
                   .fields()
                   .contains("trailers_response"));
+  filter_->onDestroy();
+}
+
+TEST_F(StreamingLocalReplyTest, SaveStreamingLocalResponse) {
+  Http::ExternalProcessing::SaveProcessingResponseFactory factory;
+  Envoy::Registry::InjectFactory<OnProcessingResponseFactory> registration(factory);
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  on_processing_response:
+    name: "abc"
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
+      save_immediate_response:
+        save_response: true
+  )EOF");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true));
+  processRequestHeadersAndStartLocalResponse(
+      [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
+        makeLocalResponseHeaders(header_resp, true);
+      });
+
+  auto filter_state =
+      stream_info_.filterState()
+          ->getDataMutable<Http::ExternalProcessing::SaveProcessingResponseFilterState>(
+              Http::ExternalProcessing::SaveProcessingResponseFilterState::kFilterStateName);
+  ASSERT_TRUE(filter_state->response.has_value());
+
+  constexpr absl::string_view expected_proto = R"pb(
+    streamed_immediate_response {
+      headers_response {
+        end_of_stream: true
+        headers {
+          headers {
+            key: ":status"
+            raw_value: "200"
+          }
+          headers {
+            key: "x-some-other-header"
+            raw_value: "no"
+          }
+        }
+      }
+    }
+  )pb";
+  envoy::service::ext_proc::v3::ProcessingResponse expected_local_response;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(expected_proto, &expected_local_response));
+  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
+                                      expected_local_response));
+
   filter_->onDestroy();
 }
 

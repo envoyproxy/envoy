@@ -175,6 +175,7 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ext_proc",
         "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
+        "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
