@@ -426,6 +426,9 @@ new_features:
   change: |
     Propagate the transport error from the tls_inspector to the DownstreamTransportFailureReason in StreamInfo
     for access logging prior to the TLS handshake.
+- area: tls_inspector
+  change: |
+    Add configuration parameter to TLS inspector for maximum acceptable client hello size.
 - area: ext_proc
   change: |
     Add support for forwarding cluster metadata to ext_proc server.
