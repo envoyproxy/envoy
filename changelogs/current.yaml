@@ -444,5 +444,9 @@ new_features:
 - area: attributes
   change: |
     added :ref:`attributes <arch_overview_attributes>` for looking up request or response headers bytes.
+- area: ext_proc
+  change: |
+    Added :ref:`StreamedImmediateResponse <envoy_v3_api_msg_service.ext_proc.v3.StreamedImmediateResponse>` for streaming local
+    responses.
 
 deprecated:
