@@ -1,0 +1,53 @@
+name: Compdb
+
+permissions:
+  contents: read
+
+on:
+  push:
+  pull_request:
+    branches:
+    - main
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+
+
+jobs:
+  compdb:
+    permissions:
+      contents: read
+    runs-on: ubuntu-22.04
+    if: github.repository == 'envoyproxy/envoy'
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.35
+      if: |
+        ! github.event.repository.private
+      with:
+        mounts: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/runner-cache
+            target: /home/runner/.cache
+            chown: "runner:runner"
+    - name: Free disk space
+      if: |
+        env.BUILD_TARGETS != ''
+        && github.event.repository.private
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.35
+      with:
+        to_remove: |
+          /usr/local/.ghcup
+          /usr/local/lib/android
+
+    - name: Checkout repository
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      with:
+        fetch-depth: 2
+
+    - name: Get build targets
+      run: |
+        bazel run --config=clang //:refresh_compile_commands
