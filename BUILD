@@ -1,5 +1,7 @@
 licenses(["notice"])  # Apache 2
 
+load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
+
 exports_files([
     "VERSION.txt",
     "API_VERSION.txt",
@@ -74,3 +76,9 @@ package_group(
 exports_files([
     "rustfmt.toml",
 ])
+
+refresh_compile_commands(
+    name = "refresh_compile_commands",
+    targets = {"//...": ""},
+    use_hermetic_python_workaround = True,
+)

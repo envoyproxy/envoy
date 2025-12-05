@@ -234,6 +234,7 @@ def envoy_dependencies(skip_targets = []):
     _kafka_deps()
     _com_github_wamr()
     _com_github_wasmtime()
+    _hedron_compile_commands()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -904,3 +905,6 @@ def _com_github_maxmind_libmaxminddb():
         name = "com_github_maxmind_libmaxminddb",
         build_file_content = BUILD_ALL_CONTENT,
     )
+
+def _hedron_compile_commands():
+    external_http_archive("hedron_compile_commands")

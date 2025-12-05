@@ -1632,6 +1632,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/FDio/vpp/blob/{version}/LICENSE",
     ),
+    hedron_compile_commands = dict(
+        project_name = "Hedron compile commands",
+        project_desc = "Enable awesome tooling for Bazel users of the C language family.",
+        project_url = "https://github.com/hedronvision/bazel-compile-commands-extractor",
+        version = "0123f530403b4a766b6213850f0a3671f9ae8752",
+        sha256 = "0b57135da04c9ce0eb387b873da2383bb7f1f5ac6eda8a5faa8c7222b039a71b",
+        strip_prefix = "bazel-compile-commands-extractor-{version}",
+        urls = ["https://github.com/hedronvision/bazel-compile-commands-extractor/archive/{version}.tar.gz"],
+        use_category = ["test_only"],
+        release_date = "2025-08-11",
+        cpe = "N/A",
+    ),
     intel_dlb = dict(
         project_name = "Intel Dlb",
         project_desc = "Dlb",

@@ -3,6 +3,7 @@ load("@com_google_protobuf//bazel/private:proto_bazel_features.bzl", "proto_baze
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 load("@envoy_examples//bazel:env.bzl", "envoy_examples_env")
 load("@envoy_toolshed//sysroot:sysroot.bzl", "setup_sysroots")
+load("@hedron_compile_commands//:workspace_setup.bzl", "hedron_compile_commands_setup")
 load("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:crates.bzl", "crate_repositories")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
@@ -41,3 +42,5 @@ def envoy_dependencies_extra(
         proto_bazel_features(name = "proto_bazel_features")
 
     envoy_examples_env()
+
+    hedron_compile_commands_setup()
