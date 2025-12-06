@@ -369,6 +369,13 @@ envoy.filters.http.compressor:
   type_urls:
   - envoy.extensions.filters.http.compressor.v3.Compressor
   - envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
+envoy.filters.http.grpc_compressor:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.grpc_compressor.v3.Compressor
 envoy.filters.http.connect_grpc_bridge:
   categories:
   - envoy.filters.http
