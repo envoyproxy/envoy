@@ -28,6 +28,7 @@
       "settings": {
         "terminal.integrated.shell.linux": "/bin/bash",
         "bazel.buildifierFixOnFormat": true,
+        "clangd.path": "${workspaceFolder}/.devcontainer/clangd-wrapper.sh",
         "clangd.arguments": [
           "--query-driver=/usr/local/bin/cc_wrapper.sh"
         ],
