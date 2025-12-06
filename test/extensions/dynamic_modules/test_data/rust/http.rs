@@ -233,7 +233,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       envoy_filter.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::SourceAddress);
     assert!(downstream_addr.is_some());
     assert_eq!(
-      std::str::from_utf8(&downstream_addr.unwrap().as_slice()).unwrap(),
+      std::str::from_utf8(downstream_addr.unwrap().as_slice()).unwrap(),
       "1.1.1.1:1234"
     );
 
@@ -726,6 +726,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BodyCallbacksFilterConfig {
 /// A HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`].
 ///
 /// This filter tests the body related callbacks.
+#[derive(Default)]
 struct BodyCallbacksFilter {
   request_body: Vec<u8>,
   response_body: Vec<u8>,
@@ -738,15 +739,6 @@ impl BodyCallbacksFilter {
   }
   fn get_final_read_response_body<'a>(&'a self) -> &'a Vec<u8> {
     &self.response_body
-  }
-}
-
-impl Default for BodyCallbacksFilter {
-  fn default() -> Self {
-    Self {
-      request_body: vec![],
-      response_body: vec![],
-    }
   }
 }
 
@@ -855,7 +847,7 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
   }
 }
 
-impl<'a, EHF: EnvoyHttpFilter> std::io::Write for BodyWriter<'a, EHF> {
+impl<EHF: EnvoyHttpFilter> std::io::Write for BodyWriter<'_, EHF> {
   fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
     if self.request {
       if self.received {
@@ -865,30 +857,24 @@ impl<'a, EHF: EnvoyHttpFilter> std::io::Write for BodyWriter<'a, EHF> {
             "Buffer is not available",
           ));
         }
-      } else {
-        if !self.envoy_filter.append_buffered_request_body(buf) {
-          return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Buffer is not available",
-          ));
-        }
+      } else if !self.envoy_filter.append_buffered_request_body(buf) {
+        return Err(std::io::Error::new(
+          std::io::ErrorKind::Other,
+          "Buffer is not available",
+        ));
       }
-    } else {
-      if self.received {
-        if !self.envoy_filter.append_received_response_body(buf) {
-          return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Buffer is not available",
-          ));
-        }
-      } else {
-        if !self.envoy_filter.append_buffered_response_body(buf) {
-          return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Buffer is not available",
-          ));
-        }
+    } else if self.received {
+      if !self.envoy_filter.append_received_response_body(buf) {
+        return Err(std::io::Error::new(
+          std::io::ErrorKind::Other,
+          "Buffer is not available",
+        ));
       }
+    } else if !self.envoy_filter.append_buffered_response_body(buf) {
+      return Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "Buffer is not available",
+      ));
     }
 
     Ok(buf.len())

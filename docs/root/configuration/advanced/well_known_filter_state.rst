@@ -3,7 +3,7 @@
 Well Known Filter State Objects
 ===============================
 
-The following lists the filter state object keys used by the Envoy extensions:
+The following lists the filter state object keys used by the Envoy extensions to programmatically modify their behavior:
 
 ``envoy.network.upstream_server_name``
   Sets the transport socket option to override the `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ in
@@ -17,10 +17,6 @@ The following lists the filter state object keys used by the Envoy extensions:
 ``envoy.network.upstream_subject_alt_names``
   Enables additional verification of the upstream peer certificate SAN names. Accepts a comma-separated list of SAN
   names as a constructor.
-
-``envoy.network.ip``
-  Shared Filter State object used to create an IP address.
-  Accepts both `IPv4`` and `IPv6` string as a constructor.
 
 ``envoy.tcp_proxy.cluster``
   :ref:`TCP proxy <config_network_filters_tcp_proxy>` dynamic cluster name selection on a per-connection basis. Accepts
@@ -67,10 +63,6 @@ The following lists the filter state object keys used by the Envoy extensions:
 ``envoy.filters.network.http_connection_manager.local_reply_owner``
   Shared filter status for logging which filter config name in the HTTP filter chain sent the local reply.
 
-``envoy.string``
-  A special generic string object factory, to be used as a :ref:`factory lookup key
-  <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`.
-
 ``envoy.tcp_proxy.per_connection_idle_timeout_ms``
   :ref:`TCP proxy idle timeout duration
   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.idle_timeout>` override on a per-connection
@@ -83,6 +75,28 @@ The following lists the filter state object keys used by the Envoy extensions:
 
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
+
+``envoy.network.upstream_bind_override.network_namespace``
+  Allows overriding the network namespace on the upstream connections using the :ref:`Linux network
+  namespace local address selector
+  <envoy_v3_api_msg_extensions.local_address_selectors.filter_state_override.v3.Config>`
+  extension. The object should serialize to the network namespace filepath, and the empty string
+  value clears the network namespace. This object is expected to be shared from the downstream
+  filters with the upstream connections.
+
+Filter state object factories
+-----------------------------
+
+The following generic filter state factories can be used to create filter state objects via
+configuration with a :ref:`factory lookup key
+<envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`.
+
+``envoy.string``
+  A special generic string object factory. Accepts any string as its value.
+
+``envoy.network.ip``
+  A factory to create IP addresses from ``IPv4`` and ``IPv6`` address strings.
+
 
 Filter state object fields
 --------------------------

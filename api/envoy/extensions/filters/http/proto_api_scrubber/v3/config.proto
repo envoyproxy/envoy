@@ -62,6 +62,12 @@ message Restrictions {
   // Key - Fully qualified method name e.g., ``endpoints.examples.bookstore.BookStore/GetShelf``.
   // Value - Method restrictions.
   map<string, MethodRestrictions> method_restrictions = 1;
+
+  // Specifies the message restrictions.
+  // Key - Fully qualified message name e.g.,
+  //       ``endpoints.examples.bookstore.Book``.
+  // Value - Message restrictions.
+  map<string, MessageRestrictions> message_restrictions = 2;
 }
 
 // Contains the method restrictions which include the field level restrictions
@@ -78,6 +84,23 @@ message MethodRestrictions {
   // Value - Restrictions map containing the mapping from restriction name to
   // the restriction values.
   map<string, RestrictionConfig> response_field_restrictions = 2;
+
+  // Optional restriction that applies to the entire method. If present, this
+  // rule takes precedence for the method itself over field-level or
+  // message-level rules. The 'matcher' within RestrictionConfig will determine
+  // if the method is denied/scrubbed. If the matcher evaluates to true:
+  // - The request is **denied**, and further processing is stopped.
+  // - The implementation should generate an immediate error response
+  //   (e.g., an HTTP 403 Forbidden status) and send it to the client.
+  RestrictionConfig method_restriction = 3;
+}
+
+// Contains message-level restrictions.
+message MessageRestrictions {
+  // The core restriction to apply to this message type.
+  // The 'matcher' within RestrictionConfig will determine if the message is
+  // scrubbed/denied/allowed.
+  RestrictionConfig config = 1;
 }
 
 // The restriction configuration.

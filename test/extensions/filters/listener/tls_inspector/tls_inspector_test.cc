@@ -122,9 +122,9 @@ INSTANTIATE_TEST_SUITE_P(TlsProtocolVersions, TlsInspectorTest,
 // Test that an exception is thrown for an invalid value for max_client_hello_size
 TEST_P(TlsInspectorTest, MaxClientHelloSize) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  EXPECT_THROW_WITH_MESSAGE(
-      Config(*store_.rootScope(), proto_config, Config::TLS_MAX_CLIENT_HELLO + 1), EnvoyException,
-      "max_client_hello_size of 16385 is greater than maximum of 16384.");
+  proto_config.mutable_max_client_hello_size()->set_value(Config::TLS_MAX_CLIENT_HELLO + 1);
+  EXPECT_THROW_WITH_MESSAGE(Config(*store_.rootScope(), proto_config), EnvoyException,
+                            "max_client_hello_size of 16385 is greater than maximum of 16384.");
 }
 
 // Test that a ClientHello with an SNI value causes the correct name notification.
@@ -463,6 +463,9 @@ TEST_P(TlsInspectorTest, NotSsl) {
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
   EXPECT_EQ(5, bytes_processed[0]);
+  EXPECT_EQ(
+      "TLS_error|error:100000f7:SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER:TLS_error_end",
+      cb_.streamInfo().downstreamTransportFailureReason());
 }
 
 // Verify that a plain text connection with a single I/O read of more than
@@ -515,7 +518,8 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
   const uint32_t initial_buffer_size = 15;
   const size_t max_size = 50;
   proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
-  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config, max_size);
+  proto_config.mutable_max_client_hello_size()->set_value(max_size);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
   buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
       *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
       cfg_->initialReadBufferSize() == 0, cfg_->initialReadBufferSize());

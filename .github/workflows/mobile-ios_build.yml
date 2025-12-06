@@ -40,6 +40,7 @@ jobs:
 
   build:
     permissions:
+      actions: read
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
@@ -69,7 +70,9 @@ jobs:
         - name: Build Envoy.framework distributable
           args: >-
             build
-            --config=mobile-remote-ci-macos-ios
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-ios
             //library/swift:ios_framework
           target: ios
           timeout-minutes: 120
@@ -87,7 +90,7 @@ jobs:
   #   with:
   #     args: >-
   #       build
-  #       ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #       ${{ matrix.args || '--config=mobile-ios' }}
   #       ${{ matrix.app }}
   #     command: ./bazelw
   #     container-command:
@@ -98,10 +101,10 @@ jobs:
   #       source ./ci/mac_ci_setup.sh
   #       ./bazelw shutdown
   #     steps-post: |
-  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.30
+  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.35
   #         with:
   #           app: ${{ matrix.app }}
-  #           args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #           args: ${{ matrix.args || '--config=mobile-ios' }}
   #           expected: received headers with status ${{ matrix.expected-status }}
   #         env:
   #           ANDROID_NDK_HOME:
@@ -133,7 +136,7 @@ jobs:
   #   with:
   #     args: >-
   #       build
-  #       ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #       ${{ matrix.args || '--config=mobile-ios' }}
   #       ${{ matrix.app }}
   #     command: ./bazelw
   #     container-command:
@@ -143,10 +146,10 @@ jobs:
   #     source: |
   #       source ./ci/mac_ci_setup.sh
   #     steps-post: |
-  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.30
+  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.35
   #         with:
   #           app: ${{ matrix.app }}
-  #           args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #           args: ${{ matrix.args || '--config=mobile-ios' }}
   #           expected: >-
   #             ${{ matrix.expected
   #                 || format('received headers with status {0}', matrix.expected-status) }}
@@ -164,7 +167,7 @@ jobs:
   #       include:
   #       - name: Build swift experimental app
   #         args: >-
-  #           --config=mobile-remote-ci-macos-ios
+  #           --config=mobile-ios
   #         app: //test/swift/apps/experimental:app
   #         expected-status: 200
   #         target: swift-experimental-app
