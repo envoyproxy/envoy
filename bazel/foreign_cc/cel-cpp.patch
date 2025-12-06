@@ -51,7 +51,7 @@ diff --git a/common/value.h b/common/value.h
 index abcdef123..987654fed 100644
 --- a/common/value.h
 +++ b/common/value.h
-@@ -2726,7 +2726,7 @@
+@@ -2794,7 +2794,7 @@
      const google::protobuf::DescriptorPool* absl_nonnull descriptor_pool,
      google::protobuf::MessageFactory* absl_nonnull message_factory,
      google::protobuf::Arena* absl_nonnull arena) const {
@@ -60,26 +60,47 @@ index abcdef123..987654fed 100644
    ABSL_DCHECK(descriptor_pool != nullptr);
    ABSL_DCHECK(message_factory != nullptr);
    ABSL_DCHECK(arena != nullptr);
-diff --git a/common/values/value_variant.h b/common/values/value_variant.h
-index 61c19ce5f..fc7969bc8 100644
---- a/common/values/value_variant.h
-+++ b/common/values/value_variant.h
-@@ -737,9 +737,6 @@
- #if defined(__GNUC__) && !defined(__clang__)
- #pragma GCC diagnostic push
- #pragma GCC diagnostic ignored "-Wclass-memaccess"
--#elif defined(__clang__)
--#pragma clang diagnostic push
--#pragma clang diagnostic ignored "-Wnontrivial-memcall"
- #endif
-         alignas(ValueVariant) std::byte tmp[sizeof(ValueVariant)];
-         // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
-@@ -751,8 +748,6 @@
-         std::memcpy(std::addressof(rhs), tmp, sizeof(ValueVariant));
- #if defined(__GNUC__) && !defined(__clang__)
- #pragma GCC diagnostic pop
--#elif defined(__clang__)
--#pragma clang diagnostic pop
- #endif
-       } else {
-         SlowSwap(lhs, rhs, lhs_trivial, rhs_trivial);
+diff --git a/internal/json.cc b/internal/json.cc
+index abcdef123..123456789 100644
+--- a/internal/json.cc
++++ b/internal/json.cc
+@@ -302,7 +302,7 @@
+         SetStringValue(result, TimeUtil::ToString(timestamp));
+       } break;
+       case Descriptor::WELLKNOWNTYPE_VALUE: {
+-        absl::Cord serialized;
++        std::string serialized;
+         if (!message.SerializePartialToString(&serialized)) {
+           return absl::UnknownError(
+               "failed to serialize message google.protobuf.Value");
+@@ -313,7 +313,7 @@
+         }
+       } break;
+       case Descriptor::WELLKNOWNTYPE_LISTVALUE: {
+-        absl::Cord serialized;
++        std::string serialized;
+         if (!message.SerializePartialToString(&serialized)) {
+           return absl::UnknownError(
+               "failed to serialize message google.protobuf.ListValue");
+@@ -324,7 +324,7 @@
+         }
+       } break;
+       case Descriptor::WELLKNOWNTYPE_STRUCT: {
+-        absl::Cord serialized;
++        std::string serialized;
+         if (!message.SerializePartialToString(&serialized)) {
+           return absl::UnknownError(
+               "failed to serialize message google.protobuf.Struct");
+diff --git a/internal/well_known_types.cc b/internal/well_known_types.cc
+index abcdef123..123456789 100644
+--- a/internal/well_known_types.cc
++++ b/internal/well_known_types.cc
+@@ -1974,7 +1974,7 @@
+                                       return unpacked->ParseFromString(string);
+                                     },
+                                     [&](const absl::Cord& cord) -> bool {
+-                                      return unpacked->ParseFromString(cord);
++                                      return unpacked->ParseFromString(static_cast<std::string>(cord));
+                                     }),
+                                 AsVariant(value));
+     if (!ok) {
