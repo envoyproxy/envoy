@@ -1,21 +1,59 @@
 module(
     name = "envoy",
-    version = "1.37.0-dev",
 )
 
+# All bazel_dep entries are organized alphabetically for improved readability.
+# Runtime dependencies from Bazel Central Registry
+bazel_dep(name = "apple_support", version = "1.24.1", repo_name = "build_bazel_apple_support")
 bazel_dep(name = "aspect_bazel_lib", version = "2.21.2")
-bazel_dep(name = "envoy_api", version = "1.37.0-dev")
-bazel_dep(name = "envoy_build_config", version = "1.37.0-dev")
-bazel_dep(name = "envoy_mobile", version = "1.37.0-dev")
+bazel_dep(name = "aspect_rules_js", version = "2.5.0")
+bazel_dep(name = "bazel_features", version = "1.38.0")
+bazel_dep(name = "bazel_skylib", version = "1.8.2")
+bazel_dep(name = "boringssl", version = "0.20250514.0")
+bazel_dep(name = "brotli", version = "1.2.0", repo_name = "org_brotli")
+bazel_dep(name = "cel-spec", version = "0.25.1", repo_name = "dev_cel")
+bazel_dep(name = "emsdk", version = "4.0.13")
+bazel_dep(name = "envoy_api")
+bazel_dep(name = "envoy_build_config")
+bazel_dep(name = "envoy_mobile")
+bazel_dep(name = "fast_float", version = "8.0.2")
+bazel_dep(name = "flatbuffers", version = "25.9.23", repo_name = "com_github_google_flatbuffers")
+bazel_dep(name = "fmt", version = "12.1.0", repo_name = "com_github_fmtlib_fmt")
+bazel_dep(name = "gazelle", version = "0.47.0", repo_name = "bazel_gazelle")
+bazel_dep(name = "googleapis", version = "0.0.0-20241220-5e258e33.bcr.1", repo_name = "com_google_googleapis")
 bazel_dep(name = "gperftools", version = "2.17.2")
+bazel_dep(name = "highway", version = "1.2.0")
 bazel_dep(name = "numactl", version = "2.0.19")
+bazel_dep(name = "nlohmann_json", version = "3.12.0", repo_name = "com_github_nlohmann_json")
 bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "protobuf", version = "30.0", repo_name = "com_google_protobuf")
+bazel_dep(name = "protoc-gen-validate", version = "1.2.1.bcr.1", repo_name = "com_envoyproxy_protoc_gen_validate")
+bazel_dep(name = "re2", version = "2024-07-02.bcr.1", repo_name = "com_googlesource_code_re2")
+bazel_dep(name = "rules_buf", version = "0.5.2")
+bazel_dep(name = "rules_cc", version = "0.2.14")
+bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+bazel_dep(name = "rules_go", version = "0.59.0", repo_name = "io_bazel_rules_go")
+bazel_dep(name = "rules_java", version = "8.14.0")
+bazel_dep(name = "rules_license", version = "1.0.0")
+bazel_dep(name = "rules_pkg", version = "1.1.0")
+bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "rules_python", version = "1.6.3")
 bazel_dep(name = "rules_rust", version = "0.67.0")
 bazel_dep(name = "rules_shell", version = "0.6.1")
+bazel_dep(name = "rules_swift", version = "2.3.0", repo_name = "build_bazel_rules_swift")
+bazel_dep(name = "spdlog", version = "1.16.0", repo_name = "com_github_gabime_spdlog")
+bazel_dep(name = "xxhash", version = "0.8.3", repo_name = "com_github_cyan4973_xxhash")
+bazel_dep(name = "yaml-cpp", version = "0.8.0", repo_name = "com_github_jbeder_yaml_cpp")
 bazel_dep(name = "zlib", version = "1.3.1.bcr.7")
 bazel_dep(name = "zstd", version = "1.5.7")
 
+# Development dependencies from Bazel Central Registry
+bazel_dep(name = "google_benchmark", version = "1.9.4", dev_dependency = True, repo_name = "com_github_google_benchmark")
+bazel_dep(name = "googletest", version = "1.17.0", dev_dependency = True, repo_name = "com_google_googletest")
+bazel_dep(name = "rules_fuzzing", version = "0.6.0", dev_dependency = True)
+bazel_dep(name = "rules_shellcheck", version = "0.4.0", dev_dependency = True, repo_name = "com_github_aignas_rules_shellcheck")
+
+# Local module overrides for internal Envoy modules
 local_path_override(
     module_name = "envoy_api",
     path = "api",
@@ -29,4 +67,134 @@ local_path_override(
 local_path_override(
     module_name = "envoy_mobile",
     path = "mobile",
+)
+
+git_override(
+    module_name = "xds",
+    # Commit containing MODULE.bazel with version 0.0.0
+    commit = "8bfbf64dc13ee1a570be4fbdcfccbdd8532463f0",
+    remote = "https://github.com/cncf/xds",
+)
+
+# Rules CC extensions for toolchain configuration
+cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
+use_repo(cc_configure, "local_config_cc", "local_config_cc_toolchains")
+
+# CC compatibility layer
+compat = use_extension("@rules_cc//cc:extensions.bzl", "compatibility_proxy")
+use_repo(compat, "cc_compatibility_proxy")
+
+# Java compatibility extension
+java_compat = use_extension("@rules_java//java:rules_java_deps.bzl", "compatibility_proxy")
+use_repo(java_compat, "compatibility_proxy")
+
+# Go SDK and toolchain configuration
+go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.24.6")
+use_repo(
+    go_sdk,
+    "go_toolchains",
+    "io_bazel_rules_nogo",
+)
+
+# Go dependencies for Envoy's Go components
+go_deps = use_extension("@bazel_gazelle//:extensions.bzl", "go_deps")
+go_deps.module(
+    path = "github.com/cncf/xds/go",
+    sum = "h1:gt7U1Igw0xbJdyaCM5H2CnlAlPSkzrhsebQB6WQWjLA=",
+    version = "v0.0.0-20251110193048-8bfbf64dc13e",
+)
+go_deps.module(
+    path = "github.com/iancoleman/strcase",
+    sum = "h1:nTXanmYxhfFAMjZL34Ov6gkzEsSJZ5DbhxWjvSASxEI=",
+    version = "v0.3.0",
+)
+go_deps.module(
+    path = "github.com/lyft/protoc-gen-star/v2",
+    sum = "h1:sIXJOMrYnQZJu7OB7ANSF4MYri2fTEGIsRLz6LwI4xE=",
+    version = "v2.0.4-0.20230330145011-496ad1ac90a4",
+)
+go_deps.module(
+    path = "github.com/planetscale/vtprotobuf",
+    sum = "h1:ujRGEVWJEoaxQ+8+HMl8YEpGaDAgohgZxJ5S+d2TTFQ=",
+    version = "v0.6.1-0.20240409071808-615f978279ca",
+)
+go_deps.module(
+    path = "github.com/spf13/afero",
+    sum = "h1:EaGW2JJh15aKOejeuJ+wpFSHnbd7GE6Wvp3TsNhb6LY=",
+    version = "v1.10.0",
+)
+go_deps.module(
+    path = "golang.org/x/net",
+    sum = "h1:T5GQRQb2y08kTAByq9L4/bz8cipCdA8FbRTXewonqY8=",
+    version = "v0.35.0",
+)
+go_deps.module(
+    path = "golang.org/x/text",
+    sum = "h1:bofq7m3/HAFvbF51jz3Q9wLg3jkvSPuiZu/pD1XwgtM=",
+    version = "v0.22.0",
+)
+go_deps.module(
+    path = "google.golang.org/genproto/googleapis/api",
+    sum = "h1:gap6+3Gk41EItBuyi4XX/bp4oqJ3UwuIMl25yGinuAA=",
+    version = "v0.0.0-20250115164207-1a7da9e5054f",
+)
+go_deps.module(
+    path = "google.golang.org/genproto/googleapis/rpc",
+    sum = "h1:OxYkA3wjPsZyBylwymxSHa7ViiW1Sml4ToBrncvFehI=",
+    version = "v0.0.0-20250115164207-1a7da9e5054f",
+)
+go_deps.module(
+    path = "google.golang.org/protobuf",
+    sum = "h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=",
+    version = "v1.36.10",
+)
+use_repo(
+    go_deps,
+    "com_github_cncf_xds_go",
+    "com_github_iancoleman_strcase",
+    "com_github_lyft_protoc_gen_star_v2",
+    "com_github_planetscale_vtprotobuf",
+    "com_github_spf13_afero",
+    "org_golang_google_genproto_googleapis_api",
+    "org_golang_google_genproto_googleapis_rpc",
+    "org_golang_google_protobuf",
+    "org_golang_x_net",
+    "org_golang_x_text",
+)
+
+# Aspect Bazel lib extensions
+bazel_lib = use_extension("@aspect_bazel_lib//lib:extensions.bzl", "toolchains")
+bazel_lib.jq()
+bazel_lib.yq()
+use_repo(bazel_lib, "jq_toolchains", "yq_toolchains")
+
+# Buf extension for protocol buffers
+buf = use_extension("@rules_buf//buf:extensions.bzl", "buf")
+buf.toolchains(
+    sha256 = "366ed6c11819d56e122042c18cb8dbcf012f773456821f15324c22d192dfc65c",
+    version = "v1.61.0",
+)
+use_repo(buf, "rules_buf_toolchains")
+
+# Rust crate dependencies
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+crate.from_cargo(
+    name = "dynamic_modules_rust_sdk_crate_index",
+    cargo_lockfile = "//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
+    lockfile = "//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock",
+    manifests = ["//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
+)
+use_repo(crate, "dynamic_modules_rust_sdk_crate_index")
+
+# Python dependencies using upstream rules_python extensions
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.12",
+)
+use_repo(
+    python,
+    "python_3_12",
+    python = "python_versions",
 )
