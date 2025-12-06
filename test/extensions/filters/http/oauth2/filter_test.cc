@@ -76,6 +76,7 @@ public:
   MOCK_METHOD(std::string&, username, (), (const));
   MOCK_METHOD(std::string&, token, (), (const));
   MOCK_METHOD(std::string&, refreshToken, (), (const));
+  MOCK_METHOD(std::string&, idToken, (), (const));
 
   MOCK_METHOD(bool, canUpdateTokenByRefreshToken, (), (const));
   MOCK_METHOD(bool, isValid, (), (const));
@@ -157,7 +158,10 @@ public:
           ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
               CookieConfig_SameSite_DISABLED,
       int csrf_token_expires_in = 0, int code_verifier_token_expires_in = 0,
-      bool disable_token_encryption = false) {
+      bool disable_token_encryption = false,
+      ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_TokenType token_type =
+          ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_TokenType::
+              OAuth2Config_TokenType_ACCESS_TOKEN) {
 
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
@@ -174,6 +178,7 @@ public:
     p.set_disable_access_token_set_cookie(disable_access_token_set_cookie);
     p.set_disable_refresh_token_set_cookie(disable_refresh_token_set_cookie);
     p.set_stat_prefix("my_prefix");
+    p.set_forward_bearer_token_type(token_type);
 
     auto* useRefreshToken = p.mutable_use_refresh_token();
     useRefreshToken->set_value(use_refresh_token);
@@ -3889,6 +3894,112 @@ TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
   run_test_with_prefix("__Secure-", true);
   run_test_with_prefix("__Host-", true);
   run_test_with_prefix("", false);
+}
+
+/**
+ * Testing that the accessToken is send back to upstream with no specific config.
+ *
+ * Expected behavior: Bearer Token should be the Access Token.
+ */
+
+class ForwardBearerTokenTests : public OAuth2Test {
+public:
+  ForwardBearerTokenTests() : OAuth2Test(false) {}
+
+  FilterConfigSharedPtr configWithTokenType(
+      ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_TokenType token_type) {
+    return getConfig(true, true,
+                     ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                         OAuth2Config_AuthType_URL_ENCODED_BODY,
+                     0 /* default_refresh_token_expires_in */, false, false, false, false, false,
+                     ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                         CookieConfig_SameSite_DISABLED,
+                     ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                         CookieConfig_SameSite_DISABLED,
+                     ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                         CookieConfig_SameSite_DISABLED,
+                     ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                         CookieConfig_SameSite_DISABLED,
+                     ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                         CookieConfig_SameSite_DISABLED,
+                     ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                         CookieConfig_SameSite_DISABLED,
+                     ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                         CookieConfig_SameSite_DISABLED,
+                     0, 0, false, token_type);
+  }
+
+  FilterConfigSharedPtr configWithoutTokenType() { return getConfig(true, true); }
+
+  void initForward(FilterConfigSharedPtr config) {
+    init(config);
+    request_headers_ = {
+        {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
+        {Http::Headers::get().Scheme.get(), "https"},
+    };
+
+    std::string legit_token{"legit_token"};
+    EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+
+    std::string legit_refresh_token{"legit_refresh_token"};
+    EXPECT_CALL(*validator_, refreshToken()).WillRepeatedly(ReturnRef(legit_refresh_token));
+
+    // Fail the validation to trigger the OAuth flow with trying to get the access token using by
+    // refresh token.
+    EXPECT_CALL(*validator_, setParams(_, _));
+    EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+    EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
+
+    EXPECT_CALL(*oauth_client_,
+                asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
+                                        "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+              filter_->decodeHeaders(request_headers_, false));
+
+    EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+    filter_->onRefreshAccessTokenSuccess(access_code_, id_token_, refresh_token_, expires_in_);
+
+    EXPECT_EQ(1, config_->stats().oauth_refreshtoken_success_.value());
+    EXPECT_EQ(1, config_->stats().oauth_success_.value());
+  }
+
+  const std::string access_code_{"unitest-access-token"};
+  const std::string id_token_{"unitest-id-token"};
+  const std::string refresh_token_{"unitest-refresh-token"};
+  const std::chrono::seconds expires_in_{600};
+  Http::TestRequestHeaderMapImpl request_headers_;
+};
+
+TEST_F(ForwardBearerTokenTests, BearerTokenUnsetIsAccessToken) {
+  initForward(configWithoutTokenType());
+  EXPECT_EQ(request_headers_.getInlineValue(authorization_handle.handle()),
+            "Bearer unitest-access-token");
+}
+
+TEST_F(ForwardBearerTokenTests, BearerTokenSetToAccessTokenIsAccessToken) {
+  initForward(configWithTokenType(::envoy::extensions::filters::http::oauth2::v3::
+                                      OAuth2Config_TokenType::OAuth2Config_TokenType_ACCESS_TOKEN));
+  EXPECT_EQ(request_headers_.getInlineValue(authorization_handle.handle()),
+            "Bearer unitest-access-token");
+}
+
+TEST_F(ForwardBearerTokenTests, BearerTokenSetToIdTokenIsIdToken) {
+  initForward(configWithTokenType(::envoy::extensions::filters::http::oauth2::v3::
+                                      OAuth2Config_TokenType::OAuth2Config_TokenType_ID_TOKEN));
+  EXPECT_EQ(request_headers_.getInlineValue(authorization_handle.handle()),
+            "Bearer unitest-id-token");
+}
+
+TEST_F(ForwardBearerTokenTests, BearerTokenSetToRefreshTokenIsRefreshToken) {
+  initForward(
+      configWithTokenType(::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_TokenType::
+                              OAuth2Config_TokenType_REFRESH_TOKEN));
+  EXPECT_EQ(request_headers_.getInlineValue(authorization_handle.handle()),
+            "Bearer unitest-refresh-token");
 }
 
 } // namespace Oauth2

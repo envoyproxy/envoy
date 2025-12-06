@@ -506,6 +506,126 @@ TEST(ConfigTest, EndSessionEndpointWithoutOpenId) {
       "OAuth2 filter: end session endpoint is only supported for OpenID Connect.");
 }
 
+TEST(ConfigTest, ForwardBearerTypeIsAccessTokenAndIsValid) {
+  const std::string yaml = R"EOF(
+config:
+  forward_bearer_token: true
+  forward_bearer_token_type: ACCESS_TOKEN
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: token
+    hmac_secret:
+      name: hmac
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+  )EOF";
+
+  OAuth2Config factory;
+  envoy::extensions::filters::http::oauth2::v3::OAuth2 proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  const auto result = factory.createFilterFactoryFromProto(proto_config, yaml, context);
+  EXPECT_TRUE(result.ok()) << result.status().message();
+  EXPECT_EQ(proto_config.config().forward_bearer_token_type(),
+            ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_TokenType::
+                OAuth2Config_TokenType_ACCESS_TOKEN);
+}
+
+TEST(ConfigTest, ForwardBearerTypeIsRefreshTokenAndIsValid) {
+  const std::string yaml = R"EOF(
+config:
+  forward_bearer_token: true
+  forward_bearer_token_type: REFRESH_TOKEN
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: token
+    hmac_secret:
+      name: hmac
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+    )EOF";
+
+  OAuth2Config factory;
+  envoy::extensions::filters::http::oauth2::v3::OAuth2 proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  const auto result = factory.createFilterFactoryFromProto(proto_config, yaml, context);
+  EXPECT_TRUE(result.ok()) << result.status().message();
+  EXPECT_EQ(proto_config.config().forward_bearer_token_type(),
+            ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_TokenType::
+                OAuth2Config_TokenType_REFRESH_TOKEN);
+}
+
+TEST(ConfigTest, ForwardBearerTypeIsIdTokenAndIsValid) {
+  const std::string yaml = R"EOF(
+config:
+  forward_bearer_token: true
+  forward_bearer_token_type: ID_TOKEN
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: token
+    hmac_secret:
+      name: hmac
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+    )EOF";
+
+  OAuth2Config factory;
+  envoy::extensions::filters::http::oauth2::v3::OAuth2 proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  const auto result = factory.createFilterFactoryFromProto(proto_config, yaml, context);
+  EXPECT_TRUE(result.ok()) << result.status().message();
+  EXPECT_EQ(proto_config.config().forward_bearer_token_type(),
+            ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_TokenType::
+                OAuth2Config_TokenType_ID_TOKEN);
+}
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions

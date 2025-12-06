@@ -38,6 +38,11 @@ public:
  */
 enum class AuthType { UrlEncodedBody, BasicAuth };
 
+/**
+ * Describes the token type that will be forward to upstream.
+ */
+enum class TokenType { AccessToken, IdToken, RefreshToken };
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
