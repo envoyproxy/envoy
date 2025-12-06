@@ -75,8 +75,6 @@ envoy_cc_test(
     # Following attribute will be enabled once the filter is registered.
     # extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = "6gig",
-    # FIXME This test is failing with newer protobuf
-    tags = ["manual"],
     deps = [
         "//source/common/grpc:common_lib",
         "//source/extensions/filters/http/proto_api_scrubber:config",
