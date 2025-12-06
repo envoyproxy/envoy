@@ -108,9 +108,19 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
   }
 }
 
+absl::StatusOr<std::shared_ptr<FilterConfig>> FilterConfig::create(
+    const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
+    Stats::Scope& scope, Regex::Engine& regex_engine, bool per_route) {
+  absl::Status creation_status = absl::OkStatus();
+  auto cfg = std::shared_ptr<FilterConfig>(
+      new FilterConfig(proto_config, scope, regex_engine, per_route, creation_status));
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return cfg;
+}
+
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
-    Stats::Scope& scope, Regex::Engine& regex_engine)
+    Stats::Scope& scope, Regex::Engine& regex_engine, bool per_route, absl::Status& creation_status)
     : rqstats_{ALL_JSON_TO_METADATA_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "json_to_metadata.rq"))},
       respstats_{
@@ -133,9 +143,10 @@ FilterConfig::FilterConfig(
               ? generateAllowContentTypeRegexs(
                     proto_config.response_rules().allow_content_types_regex(), regex_engine)
               : nullptr) {
-  if (request_rules_.empty() && response_rules_.empty()) {
-    throw EnvoyException("json_to_metadata_filter: Per filter configs must at least specify "
-                         "either request or response rules");
+  if (per_route && request_rules_.empty() && response_rules_.empty()) {
+    creation_status = absl::InvalidArgumentError(
+        "json_to_metadata_filter: Per route configs must at least specify one of "
+        "request_rules or response_rules.");
   }
 }
 
@@ -393,57 +404,62 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
 }
 
 void Filter::processRequestBody() {
-  processBody(decoder_callbacks_->decodingBuffer(), config_->requestRules(), true,
-              config_->rqstats(), *decoder_callbacks_, request_processing_finished_);
+  auto* config = getConfig();
+  processBody(decoder_callbacks_->decodingBuffer(), config->requestRules(), true, config->rqstats(),
+              *decoder_callbacks_, request_processing_finished_);
 }
 
 void Filter::processResponseBody() {
-  processBody(encoder_callbacks_->encodingBuffer(), config_->responseRules(), false,
-              config_->respstats(), *encoder_callbacks_, response_processing_finished_);
+  auto* config = getConfig();
+  processBody(encoder_callbacks_->encodingBuffer(), config->responseRules(), false,
+              config->respstats(), *encoder_callbacks_, response_processing_finished_);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  if (!config_->doRequest()) {
+  auto* config = getConfig();
+  if (!config->doRequest()) {
     return Http::FilterHeadersStatus::Continue;
   }
-  if (!config_->requestContentTypeAllowed(headers.getContentTypeValue())) {
-    handleAllOnError(config_->requestRules(), true, *decoder_callbacks_,
+  if (!config->requestContentTypeAllowed(headers.getContentTypeValue())) {
+    handleAllOnError(config->requestRules(), true, *decoder_callbacks_,
                      request_processing_finished_);
-    config_->rqstats().mismatched_content_type_.inc();
+    config->rqstats().mismatched_content_type_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_,
+    handleAllOnMissing(config->requestRules(), true, *decoder_callbacks_,
                        request_processing_finished_);
-    config_->rqstats().no_body_.inc();
+    config->rqstats().no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
   return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
-  if (!config_->doResponse()) {
+  auto* config = getConfig();
+  if (!config->doResponse()) {
     return Http::FilterHeadersStatus::Continue;
   }
-  if (!config_->responseContentTypeAllowed(headers.getContentTypeValue())) {
-    handleAllOnError(config_->responseRules(), false, *encoder_callbacks_,
+  if (!config->responseContentTypeAllowed(headers.getContentTypeValue())) {
+    handleAllOnError(config->responseRules(), false, *encoder_callbacks_,
                      response_processing_finished_);
-    config_->respstats().mismatched_content_type_.inc();
+    config->respstats().mismatched_content_type_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->responseRules(), false, *encoder_callbacks_,
+    handleAllOnMissing(config->responseRules(), false, *encoder_callbacks_,
                        response_processing_finished_);
-    config_->respstats().no_body_.inc();
+    config->respstats().no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
   return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  if (!config_->doRequest()) {
+  auto* config = getConfig();
+  if (!config->doRequest()) {
     return Http::FilterDataStatus::Continue;
   }
   if (request_processing_finished_) {
@@ -455,9 +471,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
     if (!decoder_callbacks_->decodingBuffer() ||
         decoder_callbacks_->decodingBuffer()->length() == 0) {
-      handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_,
+      handleAllOnMissing(config->requestRules(), true, *decoder_callbacks_,
                          request_processing_finished_);
-      config_->rqstats().no_body_.inc();
+      config->rqstats().no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
     processRequestBody();
@@ -468,7 +484,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (!config_->doResponse()) {
+  auto* config = getConfig();
+  if (!config->doResponse()) {
     return Http::FilterDataStatus::Continue;
   }
   if (response_processing_finished_) {
@@ -480,9 +497,9 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 
     if (!encoder_callbacks_->encodingBuffer() ||
         encoder_callbacks_->encodingBuffer()->length() == 0) {
-      handleAllOnMissing(config_->responseRules(), false, *encoder_callbacks_,
+      handleAllOnMissing(config->responseRules(), false, *encoder_callbacks_,
                          response_processing_finished_);
-      config_->respstats().no_body_.inc();
+      config->respstats().no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
     processResponseBody();
@@ -493,7 +510,8 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
-  if (!config_->doRequest()) {
+  auto* config = getConfig();
+  if (!config->doRequest()) {
     return Http::FilterTrailersStatus::Continue;
   }
   if (!request_processing_finished_) {
@@ -503,13 +521,30 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
-  if (!config_->doResponse()) {
+  auto* config = getConfig();
+  if (!config->doResponse()) {
     return Http::FilterTrailersStatus::Continue;
   }
   if (!response_processing_finished_) {
     processResponseBody();
   }
   return Http::FilterTrailersStatus::Continue;
+}
+
+FilterConfig* Filter::getConfig() const {
+  // Cached config pointer.
+  if (effective_config_) {
+    return effective_config_;
+  }
+
+  effective_config_ = const_cast<FilterConfig*>(
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_));
+  if (effective_config_) {
+    return effective_config_;
+  }
+
+  effective_config_ = config_.get();
+  return effective_config_;
 }
 
 } // namespace JsonToMetadata
