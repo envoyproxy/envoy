@@ -474,6 +474,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/matcher:matcher_lib",

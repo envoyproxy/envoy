@@ -1404,6 +1404,124 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+TEST_F(RateLimitPolicyTest, GenericKeyValidationInvalidFormat) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%INVALID_COMMAND%"
+  )EOF";
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
+
+  EXPECT_FALSE(creation_status.ok());
+}
+
+TEST_F(RateLimitPolicyTest, HeaderValueMatchValidationInvalidFormat) {
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%INVALID_COMMAND%"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
+
+  EXPECT_FALSE(creation_status.ok());
+}
+
+TEST_F(RateLimitPolicyTest, QueryParameterValueMatchValidationInvalidFormat) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%INVALID_COMMAND%"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
+
+  EXPECT_FALSE(creation_status.ok());
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyValidationMultipleProviders) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%REQ(header1)%%REQ(header2)%"
+  )EOF";
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
+
+  EXPECT_FALSE(creation_status.ok());
+  EXPECT_THAT(creation_status.message(),
+              testing::HasSubstr("descriptor_value can contain at most one substitution"));
+}
+
+TEST_F(RateLimitPolicyTest, HeaderValueMatchValidationMultipleProviders) {
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%REQ(header1)%%REQ(header2)%"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
+
+  EXPECT_FALSE(creation_status.ok());
+  EXPECT_THAT(creation_status.message(),
+              testing::HasSubstr("descriptor_value can contain at most one substitution"));
+}
+
+TEST_F(RateLimitPolicyTest, QueryParameterValueMatchValidationMultipleProviders) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%REQ(header1)%%REQ(header2)%"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
+
+  EXPECT_FALSE(creation_status.ok());
+  EXPECT_THAT(creation_status.message(),
+              testing::HasSubstr("descriptor_value can contain at most one substitution"));
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyWithDefaultValuePlainString) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: "user_key"
+    descriptor_value: "static_value"
+    default_value: "should_not_be_used"
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // When descriptor_value is a plain string, it should always be used
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"user_key", "static_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
 } // namespace
 } // namespace RateLimit
 } // namespace Common
