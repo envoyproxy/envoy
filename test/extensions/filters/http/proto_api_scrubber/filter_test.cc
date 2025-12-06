@@ -64,6 +64,8 @@ class MockProtoApiScrubberFilterConfig : public ProtoApiScrubberFilterConfig {
 public:
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getMethodMatcher,
               (const std::string& method_name), (const, override));
+  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getMessageMatcher,
+              (const std::string& message_name), (const, override));
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getRequestFieldMatcher,
               (const std::string& method_name, const std::string& field_mask), (const, override));
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
@@ -95,6 +97,9 @@ public:
         });
     ON_CALL(*this, getMethodMatcher(_)).WillByDefault([this](const std::string& method_name) {
       return real_config_->getMethodMatcher(method_name);
+    });
+    ON_CALL(*this, getMessageMatcher(_)).WillByDefault([this](const std::string& message_name) {
+      return real_config_->getMessageMatcher(message_name);
     });
   }
 

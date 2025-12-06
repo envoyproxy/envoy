@@ -71,7 +71,10 @@ envoy_cc_test(
     srcs = [
         "integration_test.cc",
     ],
-    data = ["//test/proto:apikeys_proto_descriptor"],
+    data = [
+        "//test/proto:apikeys_proto_descriptor",
+        "//test/proto:bookstore_proto_descriptor",
+    ],
     # Following attribute will be enabled once the filter is registered.
     # extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = "6gig",
@@ -83,6 +86,7 @@ envoy_cc_test(
         "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/proto:apikeys_proto_cc_proto",
+        "//test/proto:bookstore_proto_cc_proto",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_cel_cpp//parser",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
