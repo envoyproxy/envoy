@@ -9,8 +9,6 @@ echo "build --config=clang" >> user.bazelrc
 
 [[ -n "${BUILD_DIR}" ]] && sudo chown -R "$(id -u):$(id -g)" "${BUILD_DIR}"
 
-echo "Downloading LLVM toolchain..."
-bazel build @llvm_toolchain//:clangd
-
-sudo ln -s "$(bazel info output_base)"/external/llvm_toolchain_llvm/bin/{clang-format,clangd} /usr/local/bin/
-sudo ln -s "$(bazel info output_base)"/external/llvm_toolchain/bin/cc_wrapper.sh /usr/local/bin/
+echo "Downloading tools and creating symlinks..."
+sudo chown "$(id -u):$(id -g)" /usr/local/bin
+bazel run //tools/devcontainer:create_tool_links
