@@ -773,5 +773,29 @@ public:
   const std::vector<Address::IpVersion> versions_;
 };
 
+class MockConnectionInfoProvider : public ConnectionInfoProvider {
+public:
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directLocalAddress, (), (const, override));
+  MOCK_METHOD(bool, localAddressRestored, (), (const, override));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const, override));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const, override));
+  MOCK_METHOD(absl::string_view, requestedServerName, (), (const, override));
+  MOCK_METHOD(const std::vector<std::string>&, requestedApplicationProtocols, (),
+              (const, override));
+  MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const, override));
+  MOCK_METHOD(absl::optional<absl::string_view>, interfaceName, (), (const, override));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const, override));
+  MOCK_METHOD(Envoy::Ssl::ConnectionInfoConstSharedPtr, sslConnection, (), (const, override));
+  MOCK_METHOD(absl::string_view, ja3Hash, (), (const, override));
+  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, roundTripTime, (),
+              (const, override));
+  MOCK_METHOD(Envoy::OptRef<const Envoy::Network::FilterChainInfo>, filterChainInfo, (),
+              (const, override));
+  MOCK_METHOD(Envoy::OptRef<const Envoy::Network::ListenerInfo>, listenerInfo, (),
+              (const, override));
+  MOCK_METHOD(absl::string_view, ja4Hash, (), (const, override));
+};
+
 } // namespace Network
 } // namespace Envoy
