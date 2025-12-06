@@ -73,16 +73,48 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
     case ProtoRateLimit::Action::ActionSpecifierCase::kRemoteAddress:
       actions_.emplace_back(new Envoy::Router::RemoteAddressAction());
       break;
-    case ProtoRateLimit::Action::ActionSpecifierCase::kGenericKey:
-      actions_.emplace_back(new Envoy::Router::GenericKeyAction(action.generic_key()));
+    case ProtoRateLimit::Action::ActionSpecifierCase::kGenericKey: {
+      // Validate GenericKey before construction
+      const auto& generic_key = action.generic_key();
+      if (!generic_key.descriptor_value().empty()) {
+        auto providers_or_error =
+            Formatter::SubstitutionFormatParser::parse(generic_key.descriptor_value());
+        SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
+        if (providers_or_error->size() > 1) {
+          creation_status = absl::InvalidArgumentError(
+              "GenericKey: descriptor_value can contain at most one substitution");
+          return;
+        }
+        actions_.emplace_back(new Envoy::Router::GenericKeyAction(
+            action.generic_key(), std::move(providers_or_error.value()[0])));
+      } else {
+        actions_.emplace_back(new Envoy::Router::GenericKeyAction(action.generic_key()));
+      }
       break;
+    }
     case ProtoRateLimit::Action::ActionSpecifierCase::kMetadata:
       actions_.emplace_back(new Envoy::Router::MetaDataAction(action.metadata()));
       break;
-    case ProtoRateLimit::Action::ActionSpecifierCase::kHeaderValueMatch:
-      actions_.emplace_back(
-          new Envoy::Router::HeaderValueMatchAction(action.header_value_match(), context));
+    case ProtoRateLimit::Action::ActionSpecifierCase::kHeaderValueMatch: {
+      // Validate HeaderValueMatch before construction
+      const auto& header_value_match = action.header_value_match();
+      if (!header_value_match.descriptor_value().empty()) {
+        auto providers_or_error =
+            Formatter::SubstitutionFormatParser::parse(header_value_match.descriptor_value());
+        SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
+        if (providers_or_error->size() > 1) {
+          creation_status = absl::InvalidArgumentError(
+              "HeaderValueMatch: descriptor_value can contain at most one substitution");
+          return;
+        }
+        actions_.emplace_back(new Envoy::Router::HeaderValueMatchAction(
+            action.header_value_match(), context, std::move(providers_or_error.value()[0])));
+      } else {
+        actions_.emplace_back(
+            new Envoy::Router::HeaderValueMatchAction(action.header_value_match(), context));
+      }
       break;
+    }
     case ProtoRateLimit::Action::ActionSpecifierCase::kExtension: {
       ProtobufMessage::ValidationVisitor& validator = context.messageValidationVisitor();
       auto* factory =
@@ -113,10 +145,27 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
     case ProtoRateLimit::Action::ActionSpecifierCase::kMaskedRemoteAddress:
       actions_.emplace_back(new Router::MaskedRemoteAddressAction(action.masked_remote_address()));
       break;
-    case ProtoRateLimit::Action::ActionSpecifierCase::kQueryParameterValueMatch:
-      actions_.emplace_back(new Router::QueryParameterValueMatchAction(
-          action.query_parameter_value_match(), context));
+    case ProtoRateLimit::Action::ActionSpecifierCase::kQueryParameterValueMatch: {
+      // Validate QueryParameterValueMatch before construction
+      const auto& query_parameter_value_match = action.query_parameter_value_match();
+      if (!query_parameter_value_match.descriptor_value().empty()) {
+        auto providers_or_error = Formatter::SubstitutionFormatParser::parse(
+            query_parameter_value_match.descriptor_value());
+        SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
+        if (providers_or_error->size() > 1) {
+          creation_status = absl::InvalidArgumentError(
+              "QueryParameterValueMatch: descriptor_value can contain at most one substitution");
+          return;
+        }
+        actions_.emplace_back(new Router::QueryParameterValueMatchAction(
+            action.query_parameter_value_match(), context,
+            std::move(providers_or_error.value()[0])));
+      } else {
+        actions_.emplace_back(new Router::QueryParameterValueMatchAction(
+            action.query_parameter_value_match(), context));
+      }
       break;
+    }
     default:
       creation_status = absl::InvalidArgumentError(fmt::format(
           "Unsupported rate limit action: {}", static_cast<int>(action.action_specifier_case())));

@@ -2198,12 +2198,34 @@ message RateLimit {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.GenericKey";
 
-      // The value to use in the descriptor entry.
+      // Substitution format string to generate the value for the descriptor entry.
+      // The same :ref:`format specifier <config_access_log_format>` as used for
+      // :ref:`HTTP access logging <config_access_log>` applies here.
+      //
+      // .. note::
+      //
+      //   The format string must contain at most one valid substitution field. If the format string
+      //   contains more than one substitution field, the configuration will be rejected.
+      //   If it contains no substitution fields, the value will be used as is.
+      //
+      //   If the format string evaluation fails during request processing and ``default_value`` is set,
+      //   the ``default_value`` will be used. If ``default_value`` is not set, this descriptor will be
+      //   skipped and not included in the rate limit call.
+      //
+      // For example, ``static_value`` will be used as is since there are no substitution fields.
+      // ``%REQ(:method)%`` will be replaced with the HTTP method, and
+      // ``%CEL(request.headers['user-id'])%`` will use CEL to extract the user ID from request headers.
+      //
       string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
 
       // An optional key to use in the descriptor entry. If not set it defaults
       // to 'generic_key' as the descriptor key.
       string descriptor_key = 2;
+
+      // An optional value to use if ``descriptor_value`` format string evaluation fails.
+      // If not set and the format string evaluation fails, this descriptor will be
+      // skipped and not included in the rate limit call.
+      string default_value = 3;
     }
 
     // The following descriptor entry is appended to the descriptor:
@@ -2211,17 +2233,35 @@ message RateLimit {
     // .. code-block:: cpp
     //
     //   ("header_match", "<descriptor_value>")
+    // [#next-free-field: 6]
     message HeaderValueMatch {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.HeaderValueMatch";
+
+      // Substitution format string to generate the value for the descriptor entry.
+      // The same :ref:`format specifier <config_access_log_format>` as used for
+      // :ref:`HTTP access logging <config_access_log>` applies here.
+      //
+      // .. note::
+      //
+      //   The format string must contain at most one valid substitution field. If the format string
+      //   contains more than one substitution field, the configuration will be rejected.
+      //   If it contains no substitution fields, the value will be used as is.
+      //
+      //   If the format string evaluation fails during request processing and ``default_value`` is set,
+      //   the ``default_value`` will be used. If ``default_value`` is not set, this descriptor will be
+      //   skipped and not included in the rate limit call.
+      //
+      // For example, ``static_value`` will be used as is since there are no substitution fields.
+      // ``%REQ(:method)%`` will be replaced with the HTTP method, and
+      // ``%CEL(request.headers['user-id'])%`` will use CEL to extract the user ID from request headers.
+      //
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
 
       // The key to use in the descriptor entry.
       //
       // Defaults to ``header_match``.
       string descriptor_key = 4;
-
-      // The value to use in the descriptor entry.
-      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
 
       // If set to true, the action will append a descriptor entry when the
       // request matches the headers. If set to false, the action will append a
@@ -2230,11 +2270,16 @@ message RateLimit {
       google.protobuf.BoolValue expect_match = 2;
 
       // Specifies a set of headers that the rate limit action should match
-      // on. The action will check the request’s headers against all the
+      // on. The action will check the request's headers against all the
       // specified headers in the config. A match will happen if all the
       // headers in the config are present in the request with the same values
       // (or based on presence if the value field is not in the config).
       repeated HeaderMatcher headers = 3 [(validate.rules).repeated = {min_items: 1}];
+
+      // An optional value to use if ``descriptor_value`` format string evaluation fails.
+      // If not set and the format string evaluation fails, this descriptor will be
+      // skipped and not included in the rate limit call.
+      string default_value = 5;
     }
 
     // The following descriptor entry is appended when the
@@ -2310,14 +2355,32 @@ message RateLimit {
     // .. code-block:: cpp
     //
     //   ("query_match", "<descriptor_value>")
+    // [#next-free-field: 6]
     message QueryParameterValueMatch {
+      // Substitution format string to generate the value for the descriptor entry.
+      // The same :ref:`format specifier <config_access_log_format>` as used for
+      // :ref:`HTTP access logging <config_access_log>` applies here.
+      //
+      // .. note::
+      //
+      //   The format string must contain at most one valid substitution field. If the format string
+      //   contains more than one substitution field, the configuration will be rejected.
+      //   If it contains no substitution fields, the value will be used as is.
+      //
+      //   If the format string evaluation fails during request processing and ``default_value`` is set,
+      //   the ``default_value`` will be used. If ``default_value`` is not set, this descriptor will be
+      //   skipped and not included in the rate limit call.
+      //
+      // For example, ``static_value`` will be used as is since there are no substitution fields.
+      // ``%REQ(:method)%`` will be replaced with the HTTP method, and
+      // ``%CEL(request.headers['user-id'])%`` will use CEL to extract the user ID from request headers.
+      //
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
+
       // The key to use in the descriptor entry.
       //
       // Defaults to ``query_match``.
       string descriptor_key = 4;
-
-      // The value to use in the descriptor entry.
-      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
 
       // If set to true, the action will append a descriptor entry when the
       // request matches the headers. If set to false, the action will append a
@@ -2326,12 +2389,17 @@ message RateLimit {
       google.protobuf.BoolValue expect_match = 2;
 
       // Specifies a set of query parameters that the rate limit action should match
-      // on. The action will check the request’s query parameters against all the
+      // on. The action will check the request's query parameters against all the
       // specified query parameters in the config. A match will happen if all the
       // query parameters in the config are present in the request with the same values
       // (or based on presence if the value field is not in the config).
       repeated QueryParameterMatcher query_parameters = 3
           [(validate.rules).repeated = {min_items: 1}];
+
+      // An optional value to use if ``descriptor_value`` format string evaluation fails.
+      // If not set and the format string evaluation fails, this descriptor will be
+      // skipped and not included in the rate limit call.
+      string default_value = 5;
     }
 
     oneof action_specifier {
