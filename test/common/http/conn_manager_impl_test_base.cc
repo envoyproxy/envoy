@@ -235,8 +235,10 @@ void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
                                        percent1,
                                        percent2,
                                        percent1,
-                                       false,
-                                       256});
+                                       nullptr,
+                                       nullptr,
+                                       256,
+                                       false});
   }
 }
 

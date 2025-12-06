@@ -5,6 +5,7 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/tracer_config.h"
 
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/tracing/custom_tag_impl.h"
 
 namespace Envoy {
@@ -77,18 +78,35 @@ public:
     verbose_ = tracing_config.verbose();
     max_path_tag_length_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(tracing_config, max_path_tag_length,
                                                            Tracing::DefaultMaxPathTagLength);
+
+    if (!tracing_config.operation().empty()) {
+      auto operation =
+          Formatter::FormatterImpl::create(tracing_config.operation(), true, command_parsers);
+      THROW_IF_NOT_OK_REF(operation.status());
+      operation_ = std::move(operation.value());
+    }
+
+    if (!tracing_config.upstream_operation().empty()) {
+      auto operation = Formatter::FormatterImpl::create(tracing_config.upstream_operation(), true,
+                                                        command_parsers);
+      THROW_IF_NOT_OK_REF(operation.status());
+      upstream_operation_ = std::move(operation.value());
+    }
   }
 
   ConnectionManagerTracingConfig(Tracing::OperationName operation_name,
                                  Tracing::CustomTagMap custom_tags,
                                  envoy::type::v3::FractionalPercent client_sampling,
                                  envoy::type::v3::FractionalPercent random_sampling,
-                                 envoy::type::v3::FractionalPercent overall_sampling, bool verbose,
-                                 uint32_t max_path_tag_length)
+                                 envoy::type::v3::FractionalPercent overall_sampling,
+                                 Formatter::FormatterPtr operation,
+                                 Formatter::FormatterPtr upstream_operation,
+                                 uint32_t max_path_tag_length, bool verbose)
       : operation_name_(operation_name), custom_tags_(std::move(custom_tags)),
         client_sampling_(std::move(client_sampling)), random_sampling_(std::move(random_sampling)),
-        overall_sampling_(std::move(overall_sampling)), verbose_(verbose),
-        max_path_tag_length_(max_path_tag_length) {}
+        overall_sampling_(std::move(overall_sampling)), operation_(std::move(operation)),
+        upstream_operation_(std::move(upstream_operation)),
+        max_path_tag_length_(max_path_tag_length), verbose_(verbose) {}
 
   ConnectionManagerTracingConfig() = default;
 
@@ -109,8 +127,10 @@ public:
   envoy::type::v3::FractionalPercent client_sampling_;
   envoy::type::v3::FractionalPercent random_sampling_;
   envoy::type::v3::FractionalPercent overall_sampling_;
-  bool verbose_{};
+  Formatter::FormatterPtr operation_;
+  Formatter::FormatterPtr upstream_operation_;
   uint32_t max_path_tag_length_{};
+  bool verbose_{};
   bool spawn_upstream_span_{};
 };
 

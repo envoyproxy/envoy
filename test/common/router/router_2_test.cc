@@ -466,6 +466,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
   EXPECT_CALL(*child_span, finishSpan());
   ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
@@ -525,6 +526,8 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UR")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("remote reset")));
+  EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
+
   EXPECT_CALL(*child_span, finishSpan());
   encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 }
@@ -574,6 +577,8 @@ TEST_F(RouterTestChildSpan, CancelFlow) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Canceled), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
+
   EXPECT_CALL(*child_span, finishSpan());
   router_->onDestroy();
 }
@@ -624,6 +629,8 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
   EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)))
       .Times(2);
   EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("remote reset")));
+  EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
+
   EXPECT_CALL(*child_span_1, finishSpan());
 
   router_->retry_state_->expectResetRetry();
@@ -667,6 +674,8 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
+
   EXPECT_CALL(*child_span_2, finishSpan());
   ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);

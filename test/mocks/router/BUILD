@@ -15,6 +15,7 @@ envoy_cc_mock(
     rbe_pool = "6gig",
     deps = [
         "//envoy/event:dispatcher_interface",
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:stateful_session_interface",
         "//envoy/json:json_object_interface",
         "//envoy/local_info:local_info_interface",

@@ -526,7 +526,7 @@ private:
     // returned by the public tracingConfig() method.
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
-    void modifySpan(Tracing::Span& span) const override;
+    void modifySpan(Tracing::Span& span, bool upstream_span) const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
     bool spawnUpstreamSpan() const override;
@@ -535,6 +535,8 @@ private:
     std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
     std::queue<MetadataMapPtr> deferred_metadata_;
     RequestTrailerMapPtr deferred_request_trailers_;
+    const Router::Decorator* route_decorator_{nullptr};
+    const Router::RouteTracing* route_tracing_{nullptr};
     const bool trace_refresh_after_route_refresh_{true};
   };
 

@@ -122,7 +122,7 @@ void TracerUtility::finalizeSpan(Span& span, const StreamInfo::StreamInfo& strea
   if (tracing_config.verbose()) {
     annotateVerbose(span, stream_info);
   }
-  tracing_config.modifySpan(span);
+  tracing_config.modifySpan(span, upstream_span);
 
   // Finish the span.
   span.finishSpan();

@@ -492,22 +492,25 @@ class RouteTracingImpl : public RouteTracing {
 public:
   explicit RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing);
 
-  // Tracing::getClientSampling
+  // RouteTracing
   const envoy::type::v3::FractionalPercent& getClientSampling() const override;
-
-  // Tracing::getRandomSampling
   const envoy::type::v3::FractionalPercent& getRandomSampling() const override;
-
-  // Tracing::getOverallSampling
   const envoy::type::v3::FractionalPercent& getOverallSampling() const override;
-
   const Tracing::CustomTagMap& getCustomTags() const override;
+  OptRef<const Formatter::Formatter> operation() const override {
+    return makeOptRefFromPtr(operation_.get());
+  }
+  OptRef<const Formatter::Formatter> upstreamOperation() const override {
+    return makeOptRefFromPtr(upstream_operation_.get());
+  }
 
 private:
   envoy::type::v3::FractionalPercent client_sampling_;
   envoy::type::v3::FractionalPercent random_sampling_;
   envoy::type::v3::FractionalPercent overall_sampling_;
   Tracing::CustomTagMap custom_tags_;
+  Formatter::FormatterPtr operation_;
+  Formatter::FormatterPtr upstream_operation_;
 };
 
 /**

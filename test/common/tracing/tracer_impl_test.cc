@@ -109,7 +109,8 @@ protected:
     for (const CustomTagCase& cas : cases) {
       envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
-      custom_tags.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
+      auto custom_tag_ptr = CustomTagUtility::createCustomTag(custom_tag);
+      custom_tags.emplace(custom_tag_ptr->tag(), custom_tag_ptr);
       if (cas.set) {
         EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(cas.value)));
       } else {
@@ -117,7 +118,7 @@ protected:
       }
     }
 
-    EXPECT_CALL(config, modifySpan(_)).WillOnce(Invoke([this](Span& span) {
+    EXPECT_CALL(config, modifySpan(_, _)).WillOnce(Invoke([this](Span& span, bool) {
       const CustomTagContext ctx{trace_context, stream_info, {&request_headers_}};
       for (const auto& [_, custom_tag] : custom_tags) {
         custom_tag->applySpan(span, ctx);
@@ -339,7 +340,7 @@ TEST(EgressConfigImplTest, EgressConfigImplTest) {
   EXPECT_EQ(false, config_impl.verbose());
   EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config_impl.maxPathTagLength());
   NiceMock<MockSpan> span;
-  config_impl.modifySpan(span);
+  config_impl.modifySpan(span, false);
 }
 
 TEST(NullTracerTest, BasicFunctionality) {
@@ -365,6 +366,7 @@ TEST(NullTracerTest, BasicFunctionality) {
   ASSERT_EQ(span_ptr->getSpanId(), "");
   span_ptr->injectContext(trace_context, upstream_context);
   span_ptr->log(SystemTime(), "fake_event");
+  span_ptr->useLocalDecision();
 
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }

@@ -1,5 +1,6 @@
 #include "source/common/tracing/tracer_config_impl.h"
 
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -33,6 +34,9 @@ TEST(ConnectionManagerTracingConfigImplTest, SimpleTest) {
     EXPECT_EQ(50, config.getClientSampling().numerator());
     EXPECT_EQ(5000, config.getRandomSampling().numerator());
     EXPECT_EQ(5000, config.getOverallSampling().numerator());
+
+    EXPECT_EQ(config.operation_, nullptr);
+    EXPECT_EQ(config.upstream_operation_, nullptr);
   }
 
   {
@@ -47,6 +51,8 @@ TEST(ConnectionManagerTracingConfigImplTest, SimpleTest) {
     auto* custom_tag2 = tracing_config.add_custom_tags();
     custom_tag2->set_tag("dynamic_foo");
     custom_tag2->set_value("%REQ(X-FOO)%");
+    tracing_config.set_operation("%REQ(my-custom-downstream-operation)%");
+    tracing_config.set_upstream_operation("my-custom-fixed-upstream-operation");
 
     ConnectionManagerTracingConfig config(traffic_direction, tracing_config);
 
@@ -58,6 +64,17 @@ TEST(ConnectionManagerTracingConfigImplTest, SimpleTest) {
     EXPECT_EQ(100, config.getClientSampling().numerator());
     EXPECT_EQ(10000, config.getRandomSampling().numerator());
     EXPECT_EQ(10000, config.getOverallSampling().numerator());
+
+    EXPECT_NE(config.operation_, nullptr);
+    EXPECT_NE(config.upstream_operation_, nullptr);
+
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    Formatter::Context formatter_context;
+    Http::TestRequestHeaderMapImpl headers{{"my-custom-downstream-operation", "downstream_op"}};
+    formatter_context.setRequestHeaders(headers);
+    EXPECT_EQ("downstream_op", config.operation_->format(formatter_context, stream_info));
+    EXPECT_EQ("my-custom-fixed-upstream-operation",
+              config.upstream_operation_->format(formatter_context, stream_info));
   }
 }
 

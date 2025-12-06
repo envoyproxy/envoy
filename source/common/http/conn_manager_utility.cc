@@ -381,10 +381,11 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   const envoy::type::v3::FractionalPercent* overall_sampling =
       &config.tracingConfig()->overall_sampling_;
 
-  if (route && route->tracingConfig()) {
-    client_sampling = &route->tracingConfig()->getClientSampling();
-    random_sampling = &route->tracingConfig()->getRandomSampling();
-    overall_sampling = &route->tracingConfig()->getOverallSampling();
+  const Router::RouteTracing* route_tracing = route ? route->tracingConfig() : nullptr;
+  if (route_tracing != nullptr) {
+    client_sampling = &route_tracing->getClientSampling();
+    random_sampling = &route_tracing->getRandomSampling();
+    overall_sampling = &route_tracing->getOverallSampling();
   }
 
   // Do not apply tracing transformations if we are currently tracing.

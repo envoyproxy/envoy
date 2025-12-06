@@ -419,6 +419,16 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
   for (const auto& tag : tracing.custom_tags()) {
     custom_tags_.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
   }
+  if (!tracing.operation().empty()) {
+    auto operation = Formatter::FormatterImpl::create(tracing.operation(), true);
+    THROW_IF_NOT_OK_REF(operation.status());
+    operation_ = std::move(operation.value());
+  }
+  if (!tracing.upstream_operation().empty()) {
+    auto operation = Formatter::FormatterImpl::create(tracing.upstream_operation(), true);
+    THROW_IF_NOT_OK_REF(operation.status());
+    upstream_operation_ = std::move(operation.value());
+  }
 }
 
 const envoy::type::v3::FractionalPercent& RouteTracingImpl::getClientSampling() const {
