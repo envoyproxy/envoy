@@ -541,9 +541,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   Tag sds_resource;
   sds_resource.name_ = tag_names.XDS_RESOURCE_NAME;
   sds_resource.value_ = "xds_trusted_ca";
-  regex_tester.testRegex(
-      "sds.xds_trusted_ca.update_attempt",
-      "sds.update_attempt", {sds_resource});
+  regex_tester.testRegex("sds.xds_trusted_ca.update_attempt", "sds.update_attempt", {sds_resource});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {
