@@ -24,17 +24,33 @@ message Geoip {
   message XffConfig {
     // The number of additional ingress proxy hops from the right side of the
     // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
-    // determining the origin client's IP address. The default is zero if this option
-    // is not specified. See the documentation for
+    // determining the origin client's IP address. See the documentation for
     // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
+    //
+    // Defaults to ``0``.
     uint32 xff_num_trusted_hops = 1;
   }
 
-  // If set, the :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.XffConfig.xff_num_trusted_hops>` field will be used to determine
-  // trusted client address from ``x-forwarded-for`` header.
-  // Otherwise, the immediate downstream connection source address will be used.
-  // [#next-free-field: 2]
+  // Configuration for extracting the client IP address from the
+  // ``x-forwarded-for`` header. If set, the
+  // :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.XffConfig.xff_num_trusted_hops>`
+  // field will be used to determine the trusted client address from the ``x-forwarded-for`` header.
+  // If not set, the immediate downstream connection source address will be used.
+  //
+  // Only one of ``xff_config`` or
+  // :ref:`ip_address_header <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.ip_address_header>`
+  // can be set.
   XffConfig xff_config = 1;
+
+  // If set, the client IP address will be extracted from the specified request header.
+  // The header value must contain a valid IP address (IPv4 or IPv6). If the header is
+  // missing or contains an invalid IP address, the filter will fall back to using the
+  // immediate downstream connection source address.
+  //
+  // Only one of ``ip_address_header`` or
+  // :ref:`xff_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.xff_config>`
+  // can be set.
+  string ip_address_header = 4;
 
   // Geoip driver specific configuration which depends on the driver being instantiated.
   // See the geoip drivers for examples:

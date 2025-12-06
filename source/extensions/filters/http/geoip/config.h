@@ -15,11 +15,11 @@ namespace Geoip {
  * Config registration for the geoip filter. @see NamedHttpFilterConfigFactory.
  */
 class GeoipFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::geoip::v3::Geoip> {
+    : public Common::ExceptionFreeFactoryBase<envoy::extensions::filters::http::geoip::v3::Geoip> {
 public:
-  GeoipFilterFactory() : FactoryBase("envoy.filters.http.geoip") {}
+  GeoipFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.geoip") {}
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
