@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "29.3"
+PROTOBUF_VERSION = "33.1"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,12 +8,12 @@ PROTOBUF_VERSION = "29.3"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "6427349140e01f06e049e707a58709a4f221ae73ab9a0425bc4a00c8d0e1ab32",
-    linux_x86_64 = "3e866620c5be27664f3d2fa2d656b5f3e09b5152b42f1bedbf427b333e90021a",
-    linux_ppcle_64 = "0e9894ec2e3992b14d183e7ceac16465d6a6ee73e1d234695d80e6d1e947014c",
-    osx_aarch_64 = "2b8a3403cd097f95f3ba656e14b76c732b6b26d7f183330b11e36ef2bc028765",
-    osx_x86_64 = "9a788036d8f9854f7b03c305df4777cf0e54e5b081e25bf15252da87e0e90875",
-    win64 = "57ea59e9f551ad8d71ffaa9b5cfbe0ca1f4e720972a1db7ec2d12ab44bff9383",
+    linux_aarch_64 = "6018147740548e0e0f764408c87f4cd040e6e1c1203e13aeacaf811892b604f3",
+    linux_x86_64 = "f3340e28a83d1c637d8bafdeed92b9f7db6a384c26bca880a6e5217b40a4328b",
+    linux_ppcle_64 = "01d54870bc5887fc0afc92fd809d12de73e2e8cc42095b20ea0da98b06063c95",
+    osx_aarch_64 = "db7e66ff7f9080614d0f5505a6b0ac488cf89a15621b6a361672d1332ec2e14e",
+    osx_x86_64 = "e20b5f930e886da85e7402776a4959efb1ed60c57e72794bcade765e67abaa82",
+    win64 = "d7a207fb6eec0e4b1b6613be3b7d11905375b6fd1147a071116eb8e9f24ac53b",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -423,12 +423,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "gRPC",
         project_desc = "gRPC C core library",
         project_url = "https://grpc.io",
-        version = "1.72.0",
-        sha256 = "4a8aa99d5e24f80ea6b7ec95463e16af5bd91aa805e26c661ef6491ae3d2d23c",
+        version = "1.76.0",
+        sha256 = "0af37b800953130b47c075b56683ee60bdc3eda3c37fc6004193f5b569758204",
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2025-04-23",
+        release_date = "2025-10-20",
         cpe = "cpe:2.3:a:grpc:grpc:*",
         license = "Apache-2.0",
         license_url = "https://github.com/grpc/grpc/blob/v{version}/LICENSE",
@@ -964,11 +964,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "008a11cc56f9b96679b4c285fd05f46d317d685be3ab524b2a310be0fbad987e",
+        sha256 = "fda132cb0c86400381c0af1fe98bd0f775cb566cb247cdcc105e344e00acc30e",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2025-01-08",
+        release_date = "2025-11-12",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1022,13 +1022,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "proto_processing_lib",
         project_desc = "Library that provides utility functionality for proto field scrubbing",
         project_url = "https://github.com/grpc-ecosystem/proto_processing_lib",
-        version = "11d825fb33f92eefcbacbd7b0db9eea8df6e8acb",
-        sha256 = "fb687515a3673849d5b9c4cfe3b6dc50d878a028b8579e6f546b2357931da7cd",
+        version = "279353cfab372ac7f268ae529df29c4d546ca18d",
+        sha256 = "bac7a0d02fd8533cd5ce6d0f39dc324fc0565702d85a9ee3b65b0be8e7cbdd8d",
         strip_prefix = "proto_processing_lib-{version}",
         urls = ["https://github.com/grpc-ecosystem/proto_processing_lib/archive/{version}.zip"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.grpc_json_transcoder", "envoy.filters.http.grpc_field_extraction", "envoy.filters.http.proto_message_extraction"],
-        release_date = "2024-10-11",
+        release_date = "2025-01-10",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/grpc-ecosystem/proto_processing_lib/blob/{version}/LICENSE",
@@ -1795,7 +1795,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2025-01-08",
+            release_date = "2025-11-12",
             cpe = "N/A",
             license = "Protocol Buffers",
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",

@@ -92,6 +92,8 @@ public:
           remove_action);
       matcher_entry->mutable_on_match()->mutable_action()->set_name("remove_field");
 
+      std::string matcher_text;
+      Protobuf::TextFormat::PrintToString(matcher_proto, &matcher_text);
       full_config_text = fmt::format(R"pb(
       filtering_mode: OVERRIDE
       descriptor_set {{
@@ -111,11 +113,11 @@ public:
         }}
       }}
     )pb",
-                                     descriptor_path,            // {0}
-                                     method_name,                // {1}
-                                     restriction_key,            // {2}
-                                     field_to_scrub,             // {3}
-                                     matcher_proto.DebugString() // {4} Inject the Generic Matcher
+                                     descriptor_path, // {0}
+                                     method_name,     // {1}
+                                     restriction_key, // {2}
+                                     field_to_scrub,  // {3}
+                                     matcher_text     // {4} Inject the Generic Matcher
       );
     }
 

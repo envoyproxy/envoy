@@ -9,7 +9,6 @@ def envoy_copts(repository, test = False):
         "-Wall",
         "-Wextra",
         "-Werror",
-        "-Wnon-virtual-dtor",
         "-Woverloaded-virtual",
         "-Wold-style-cast",
         "-Wformat",

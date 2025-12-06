@@ -1,8 +1,8 @@
 diff --git a/BUILD b/BUILD
-index 848e65d..84aea62 100644
+index 9e067aa29e..089a447ec4 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -33,7 +33,7 @@ package(
+@@ -34,7 +34,7 @@ package(
      default_visibility = ["//visibility:public"],
      features = [
          "-parse_headers",
@@ -12,7 +12,7 @@ index 848e65d..84aea62 100644
  )
  
 diff --git a/bazel/grpc_build_system.bzl b/bazel/grpc_build_system.bzl
-index 0fc2e1d..aab6e99 100644
+index a3b8923b6e..f4a2ed3f13 100644
 --- a/bazel/grpc_build_system.bzl
 +++ b/bazel/grpc_build_system.bzl
 @@ -27,7 +27,6 @@
@@ -23,7 +23,7 @@ index 0fc2e1d..aab6e99 100644
  load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
  load("@build_bazel_rules_apple//apple/testing/default_runner:ios_test_runner.bzl", "ios_test_runner")
  load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-@@ -194,14 +193,9 @@ def grpc_proto_plugin(name, srcs = [], deps = []):
+@@ -195,16 +194,11 @@ def grpc_proto_plugin(name, srcs = [], deps = []):
          srcs = srcs,
          deps = deps,
      )
@@ -31,18 +31,20 @@ index 0fc2e1d..aab6e99 100644
 -        name = name + "_universal",
 -        binary = name + "_native",
 -    )
+ 
+     # In order to avoid warnings from Bazel, names of the rule and its output file must differ.
      native.genrule(
          name = name,
          srcs = select({
 -            "@platforms//os:macos": [name + "_universal"],
              "//conditions:default": [name + "_native"],
          }),
-         outs = [name],
+         outs = [name + "_binary"],
 diff --git a/src/core/BUILD b/src/core/BUILD
-index e8bf5e8..442348d 100644
+index 0a8eebafb9..6d4f158719 100644
 --- a/src/core/BUILD
 +++ b/src/core/BUILD
-@@ -27,7 +27,7 @@ licenses(["reciprocal"])
+@@ -29,7 +29,7 @@ licenses(["reciprocal"])
  package(
      default_visibility = ["//:__subpackages__"],
      features = [
@@ -52,7 +54,7 @@ index e8bf5e8..442348d 100644
  )
  
 diff --git a/src/core/lib/promise/detail/promise_factory.h b/src/core/lib/promise/detail/promise_factory.h
-index 53b75cb..485acda 100644
+index 3fb5d68146..583a2f9553 100644
 --- a/src/core/lib/promise/detail/promise_factory.h
 +++ b/src/core/lib/promise/detail/promise_factory.h
 @@ -125,17 +125,16 @@ struct OnceToken {};
@@ -148,9 +150,9 @@ index 53b75cb..485acda 100644
    return f();
  }
  
-@@ -224,10 +221,10 @@ class OncePromiseFactory {
-   using Promise = decltype(PromiseFactoryImpl(OnceToken{}, std::move(f_),
+@@ -225,10 +222,10 @@ class OncePromiseFactory {
                                                std::declval<A>()));
+   using UnderlyingFactory = F;
  
 -  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit OncePromiseFactory(F f)
 +  explicit OncePromiseFactory(F f)
@@ -161,9 +163,9 @@ index 53b75cb..485acda 100644
      return PromiseFactoryImpl(OnceToken{}, std::move(f_), std::forward<Arg>(a));
    }
  };
-@@ -241,10 +238,10 @@ class OncePromiseFactory<void, F> {
-   using Arg = void;
+@@ -243,10 +240,10 @@ class OncePromiseFactory<void, F> {
    using Promise = decltype(PromiseFactoryImpl(OnceToken{}, std::move(f_)));
+   using UnderlyingFactory = F;
  
 -  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit OncePromiseFactory(F f)
 +  explicit OncePromiseFactory(F f)
@@ -174,7 +176,7 @@ index 53b75cb..485acda 100644
      return PromiseFactoryImpl(OnceToken{}, std::move(f_));
    }
  };
-@@ -263,13 +260,13 @@ class RepeatedPromiseFactory {
+@@ -265,13 +262,13 @@ class RepeatedPromiseFactory {
    using Promise =
        decltype(PromiseFactoryImpl(RepeatableToken{}, f_, std::declval<A>()));
  
@@ -190,8 +192,8 @@ index 53b75cb..485acda 100644
 +  Promise Make(Arg&& a) {
      return PromiseFactoryImpl(RepeatableToken{}, f_, std::forward<Arg>(a));
    }
- };
-@@ -283,13 +280,13 @@ class RepeatedPromiseFactory<void, F> {
+   template <typename U>
+@@ -293,13 +290,13 @@ class RepeatedPromiseFactory<void, F> {
    using Arg = void;
    using Promise = decltype(PromiseFactoryImpl(RepeatableToken{}, f_));
  
@@ -209,7 +211,7 @@ index 53b75cb..485acda 100644
    }
  };
 diff --git a/src/proto/grpc/health/v1/BUILD b/src/proto/grpc/health/v1/BUILD
-index f6165e0..3746535 100644
+index f6165e0392..374653516a 100644
 --- a/src/proto/grpc/health/v1/BUILD
 +++ b/src/proto/grpc/health/v1/BUILD
 @@ -44,3 +44,10 @@ filegroup(
@@ -224,10 +226,10 @@ index f6165e0..3746535 100644
 +    visibility = ["//visibility:public"],
 +)
 diff --git a/third_party/BUILD b/third_party/BUILD
-index 9cf5e50..5771ad9 100644
+index 13a4714d4b..8664e99ffc 100644
 --- a/third_party/BUILD
 +++ b/third_party/BUILD
-@@ -31,19 +31,13 @@ config_setting(
+@@ -33,19 +33,13 @@ config_setting(
  
  alias(
      name = "libssl",
@@ -249,7 +251,7 @@ index 9cf5e50..5771ad9 100644
      tags = ["manual"],
  )
  
-@@ -80,7 +74,7 @@ alias(
+@@ -82,7 +76,7 @@ alias(
  
  alias(
      name = "cares",
