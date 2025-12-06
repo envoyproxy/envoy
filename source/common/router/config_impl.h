@@ -919,7 +919,7 @@ private:
 
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
-  Envoy::Config::DataSource::DataSourceProviderPtr direct_response_body_provider_;
+  Envoy::Config::DataSource::DataSourceProviderPtr<std::string> direct_response_body_provider_;
   Formatter::FormatterPtr direct_response_body_formatter_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   const std::string route_name_;

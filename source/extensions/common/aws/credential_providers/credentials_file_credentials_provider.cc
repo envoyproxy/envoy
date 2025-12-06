@@ -16,9 +16,10 @@ CredentialsFileCredentialsProvider::CredentialsFileCredentialsProvider(
     : context_(context), profile_("") {
 
   if (credential_file_config.has_credentials_data_source()) {
-    auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+    auto provider_or_error_ = Config::DataSource::DataSourceProvider<std::string>::create(
         credential_file_config.credentials_data_source(), context.mainThreadDispatcher(),
-        context.threadLocal(), context.api(), false, 4096);
+        context.threadLocal(), context.api(), false,
+        [](absl::string_view data) { return std::make_shared<std::string>(data); }, 4096);
     if (provider_or_error_.ok()) {
       credential_file_data_source_provider_ = std::move(provider_or_error_.value());
       if (credential_file_config.credentials_data_source().has_watched_directory()) {
@@ -48,8 +49,9 @@ void CredentialsFileCredentialsProvider::refresh() {
   std::string credential_file_data, credential_file_path;
 
   // Use data source if provided, otherwise read from default AWS credential file path
-  if (credential_file_data_source_provider_.has_value()) {
-    credential_file_data = credential_file_data_source_provider_.value()->data();
+  if (credential_file_data_source_provider_.has_value() &&
+      credential_file_data_source_provider_.value()->data() != nullptr) {
+    credential_file_data = *credential_file_data_source_provider_.value()->data();
     credential_file_path = "<config datasource>";
   } else {
     credential_file_path = Utility::getCredentialFilePath();
