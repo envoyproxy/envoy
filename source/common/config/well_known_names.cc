@@ -244,6 +244,9 @@ TagNameValues::TagNameValues() {
   addRe2(TLS_CERTIFICATE,
          R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.certificate\.((<TAG_VALUE>)\.).*$)",
          ".ssl.certificate");
+
+  // sds.[<resource_name>.]**
+  addRe2(XDS_RESOURCE_NAME, R"(^sds\.((<TAG_VALUE>)\.).+)");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
