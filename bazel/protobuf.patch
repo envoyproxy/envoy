@@ -1,20 +1,17 @@
 diff --git a/BUILD.bazel b/BUILD.bazel
-index 32b26cbdc..a5e7a554c 100644
+index 8926b04e5..8994f79f2 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
-@@ -229,14 +229,88 @@ alias(
-     visibility = ["//visibility:public"],
+@@ -354,13 +354,83 @@ alias(
  )
  
-+# Envoy: Patch
-+
  cc_binary(
 -    name = "protoc",
 +    name = "compiled_protoc",
      copts = COPTS,
      linkopts = LINK_OPTS,
      visibility = ["//visibility:public"],
-     deps = ["//src/google/protobuf/compiler:protoc_lib"],
+     deps = ["//src/google/protobuf/compiler:protoc_lib_stage1"],
  )
  
 +# Lifted from `rules_proto`
@@ -87,146 +84,17 @@ index 32b26cbdc..a5e7a554c 100644
 +    visibility = ["//visibility:public"],
 +)
 +
-+# /Envoy: Patch
-+
  cc_binary(
-     name = "protoc_static",
+     name = "protoc_stage0",
      copts = COPTS,
-diff --git a/src/google/protobuf/arena.h b/src/google/protobuf/arena.h
-index 545fd5126a478..92025a84119f3 100644
---- a/src/google/protobuf/arena.h
-+++ b/src/google/protobuf/arena.h
-@@ -32,7 +32,6 @@ using type_info = ::type_info;
- #include "absl/base/optimization.h"
- #include "absl/base/prefetch.h"
- #include "absl/log/absl_check.h"
--#include "absl/utility/internal/if_constexpr.h"
- #include "google/protobuf/arena_align.h"
- #include "google/protobuf/arena_allocation_policy.h"
- #include "google/protobuf/port.h"
-@@ -60,12 +59,6 @@ struct RepeatedFieldBase;
- class ExtensionSet;
- }  // namespace internal
-
--namespace arena_metrics {
--
--void EnableArenaMetrics(ArenaOptions* options);
--
--}  // namespace arena_metrics
--
- namespace TestUtil {
- class ReflectionTester;  // defined in test_util.h
- }  // namespace TestUtil
-@@ -214,41 +207,31 @@ class PROTOBUF_EXPORT PROTOBUF_ALIGNAS(8) Arena final {
-   // otherwise, returns a heap-allocated object.
-   template <typename T, typename... Args>
-   PROTOBUF_NDEBUG_INLINE static T* Create(Arena* arena, Args&&... args) {
--    return absl::utility_internal::IfConstexprElse<
--        is_arena_constructable<T>::value>(
--        // Arena-constructable
--        [arena](auto&&... args) {
--          using Type = std::remove_const_t<T>;
--#ifdef __cpp_if_constexpr
--          // DefaultConstruct/CopyConstruct are optimized for messages, which
--          // are both arena constructible and destructor skippable and they
--          // assume much. Don't use these functions unless the invariants
--          // hold.
--          if constexpr (is_destructor_skippable<T>::value) {
--            constexpr auto construct_type = GetConstructType<T, Args&&...>();
--            // We delegate to DefaultConstruct/CopyConstruct where appropriate
--            // because protobuf generated classes have external templates for
--            // these functions for code size reasons. When `if constexpr` is not
--            // available always use the fallback.
--            if constexpr (construct_type == ConstructType::kDefault) {
--              return static_cast<Type*>(DefaultConstruct<Type>(arena));
--            } else if constexpr (construct_type == ConstructType::kCopy) {
--              return static_cast<Type*>(CopyConstruct<Type>(arena, &args...));
--            }
--          }
--#endif
--          return CreateArenaCompatible<Type>(arena,
--                                             std::forward<Args>(args)...);
--        },
--        // Non arena-constructable
--        [arena](auto&&... args) {
--          if (PROTOBUF_PREDICT_FALSE(arena == nullptr)) {
--            return new T(std::forward<Args>(args)...);
--          }
--          return new (arena->AllocateInternal<T>())
--              T(std::forward<Args>(args)...);
--        },
--        std::forward<Args>(args)...);
-+    if constexpr (is_arena_constructable<T>::value) {
-+      using Type = std::remove_const_t<T>;
-+      // DefaultConstruct/CopyConstruct are optimized for messages, which
-+      // are both arena constructible and destructor skippable and they
-+      // assume much. Don't use these functions unless the invariants
-+      // hold.
-+      if constexpr (is_destructor_skippable<T>::value) {
-+        constexpr auto construct_type = GetConstructType<T, Args&&...>();
-+        // We delegate to DefaultConstruct/CopyConstruct where appropriate
-+        // because protobuf generated classes have external templates for
-+        // these functions for code size reasons. When `if constexpr` is not
-+        // available always use the fallback.
-+        if constexpr (construct_type == ConstructType::kDefault) {
-+          return static_cast<Type*>(DefaultConstruct<Type>(arena));
-+        } else if constexpr (construct_type == ConstructType::kCopy) {
-+          return static_cast<Type*>(CopyConstruct<Type>(arena, &args...));
-+        }
-+      }
-+      return CreateArenaCompatible<Type>(arena, std::forward<Args>(args)...);
-+    } else {
-+      if (ABSL_PREDICT_FALSE(arena == nullptr)) {
-+        return new T(std::forward<Args>(args)...);
-+      }
-+      return new (arena->AllocateInternal<T>()) T(std::forward<Args>(args)...);
-+    }
-   }
-
-   // API to delete any objects not on an arena.  This can be used to safely
-diff --git a/src/google/protobuf/BUILD.bazel b/src/google/protobuf/BUILD.bazel
-index 567676895c940..bab75c42f4f21 100644
---- a/src/google/protobuf/BUILD.bazel
-+++ b/src/google/protobuf/BUILD.bazel
-@@ -578,7 +578,6 @@ cc_library(
-         "@com_google_absl//absl/time",
-         "@com_google_absl//absl/types:optional",
-         "@com_google_absl//absl/types:span",
--        "@com_google_absl//absl/utility:if_constexpr",
-     ],
- )
-
-@@ -452,7 +452,6 @@ cc_library(
-         "@com_google_absl//absl/numeric:bits",
-         "@com_google_absl//absl/synchronization",
-         "@com_google_absl//absl/types:span",
--        "@com_google_absl//absl/utility:if_constexpr",
-     ],
- )
-
-diff --git a/protobuf.bzl b/protobuf.bzl
-index c8d32a604..5bd22e021 100644
---- a/protobuf.bzl
-+++ b/protobuf.bzl
-@@ -99,6 +99,10 @@ def _proto_gen_impl(ctx):
- 
-     if ctx.attr.includes:
-         for include in ctx.attr.includes:
-+            if include == ".":
-+                # This is effectively source_dir, which has already been handled,
-+                # and may be generated incorrectly here.
-+                continue
-             import_flags += ["-I" + _GetPath(ctx, include)]
- 
-     import_flags = depset(direct = import_flags)
 diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
-index 2185c200b..e705cf6d8 100755
+index e9ced612f..9454a47bd 100755
 --- a/python/google/protobuf/__init__.py
 +++ b/python/google/protobuf/__init__.py
 @@ -8,3 +8,10 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
  
- __version__ = '5.29.3'
+ __version__ = '6.33.1'
 +
 +
 +if __name__ != '__main__':
@@ -234,103 +102,3 @@ index 2185c200b..e705cf6d8 100755
 +        __import__('pkg_resources').declare_namespace(__name__)
 +    except ImportError:
 +        __path__ = __import__('pkgutil').extend_path(__path__, __name__)
-diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/compiler/BUILD.bazel
-index 5012ee793..edf9adc5f 100644
---- a/src/google/protobuf/compiler/BUILD.bazel
-+++ b/src/google/protobuf/compiler/BUILD.bazel
-@@ -547,7 +547,7 @@ cc_library(
-     srcs = ["retention.cc"],
-     hdrs = ["retention.h"],
-     strip_include_prefix = "/src",
--    visibility = ["//src/google/protobuf:__subpackages__"],
-+    visibility = ["//visibility:public"],
-     deps = [
-         "//src/google/protobuf",
-         "//src/google/protobuf:port",
-diff --git a/src/google/protobuf/map.cc b/src/google/protobuf/map.cc
-index 570b61bec..da6ceb99d 100644
---- a/src/google/protobuf/map.cc
-+++ b/src/google/protobuf/map.cc
-@@ -116,7 +116,7 @@ void UntypedMapBase::ClearTable(const ClearInput input) {
-   ABSL_DCHECK_NE(num_buckets_, kGlobalEmptyTableSize);
- 
-   if (alloc_.arena() == nullptr) {
--    const auto loop = [=](auto destroy_node) {
-+    const auto loop = [&, this](auto destroy_node) {
-       const TableEntryPtr* table = table_;
-       for (map_index_t b = index_of_first_non_null_, end = num_buckets_;
-            b < end; ++b) {
-diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
-index 56f995e45..123f936ac 100644
---- a/src/google/protobuf/port_def.inc
-+++ b/src/google/protobuf/port_def.inc
-@@ -835,7 +835,7 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
- #pragma clang diagnostic ignored "-Wshorten-64-to-32"
- // Turn on -Wdeprecated-enum-enum-conversion. This deprecation comes in C++20
- // via http://wg21.link/p1120r0.
--#pragma clang diagnostic error "-Wdeprecated-enum-enum-conversion"
-+// #pragma clang diagnostic error "-Wdeprecated-enum-enum-conversion"
- // This error has been generally flaky, but we need to disable it specifically
- // to fix https://github.com/protocolbuffers/protobuf/issues/12313
- #pragma clang diagnostic ignored "-Wunused-parameter"
-@@ -904,7 +904,8 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
- #pragma warning(disable: 4125)
- #endif
- 
--#if PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
-+#if defined(PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII) && \
-+  PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
- #define PROTOBUF_DEBUG true
- #else
- #define PROTOBUF_DEBUG false
-diff --git a/upb/message/internal/accessors.h b/upb/message/internal/accessors.h
-index aae0fdc0a..01a874e4c 100644
---- a/upb/message/internal/accessors.h
-+++ b/upb/message/internal/accessors.h
-@@ -163,7 +163,7 @@ UPB_INLINE void UPB_PRIVATE(_upb_Message_SetPresence)(
-   }
- }
- 
--UPB_INLINE void UPB_PRIVATE(_upb_MiniTableField_DataCopy)(
-+UPB_INLINE_IF_NOT_GCC void UPB_PRIVATE(_upb_MiniTableField_DataCopy)(
-     const upb_MiniTableField* f, void* to, const void* from) {
-   switch (UPB_PRIVATE(_upb_MiniTableField_GetRep)(f)) {
-     case kUpb_FieldRep_1Byte:
-@@ -183,7 +183,7 @@ UPB_INLINE void UPB_PRIVATE(_upb_MiniTableField_DataCopy)(
-   UPB_UNREACHABLE();
- }
- 
--UPB_INLINE bool UPB_PRIVATE(_upb_MiniTableField_DataEquals)(
-+UPB_INLINE_IF_NOT_GCC bool UPB_PRIVATE(_upb_MiniTableField_DataEquals)(
-     const upb_MiniTableField* f, const void* a, const void* b) {
-   switch (UPB_PRIVATE(_upb_MiniTableField_GetRep)(f)) {
-     case kUpb_FieldRep_1Byte:
-diff --git a/upb/port/def.inc b/upb/port/def.inc
-index 4c073b32f..cc63a28b5 100644
---- a/upb/port/def.inc
-+++ b/upb/port/def.inc
-@@ -82,6 +82,12 @@ Error, UINTPTR_MAX is undefined
- #define UPB_INLINE static
- #endif
- 
-+#if defined(__GNUC__) && !defined(__clang__)
-+#define UPB_INLINE_IF_NOT_GCC static
-+#else
-+#define UPB_INLINE_IF_NOT_GCC UPB_INLINE
-+#endif
-+
- #ifdef UPB_BUILD_API
- #define UPB_API UPB_EXPORT
- #define UPB_API_INLINE UPB_EXPORT
-diff --git a/upb/port/undef.inc b/upb/port/undef.inc
-index f94e2764e..5e02a3627 100644
---- a/upb/port/undef.inc
-+++ b/upb/port/undef.inc
-@@ -12,6 +12,7 @@
- #undef UPB_MAPTYPE_STRING
- #undef UPB_EXPORT
- #undef UPB_INLINE
-+#undef UPB_INLINE_IF_NOT_GCC
- #undef UPB_API
- #undef UPBC_API
- #undef UPB_API_INLINE
