@@ -96,6 +96,16 @@ void StatsHandler::onEvent(WasmEvent event) const {
   case WasmEvent::VmReloadFailure:
     wasm_stats_.vm_reload_failure_.inc();
     break;
+  // VM failure events - increment the universal vm_failed counter
+  case WasmEvent::UnableToCreateVm:
+  case WasmEvent::UnableToCloneVm:
+  case WasmEvent::MissingFunction:
+  case WasmEvent::UnableToInitializeCode:
+  case WasmEvent::StartFailed:
+  case WasmEvent::ConfigureFailed:
+  case WasmEvent::RuntimeError:
+    wasm_stats_.vm_failed_.inc();
+    break;
   default:
     break;
   }
