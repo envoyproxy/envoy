@@ -384,6 +384,9 @@ private:
     bool bindToPort() const override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+      return std::chrono::milliseconds::zero();
+    }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
     bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return scope_; }

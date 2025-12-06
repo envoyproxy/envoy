@@ -103,6 +103,7 @@ public:
   }
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
+  void setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
   bool aboveHighWatermark() const override { return write_buffer_above_high_watermark_; }
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
@@ -236,6 +237,10 @@ private:
 
   void closeInternal(ConnectionCloseType type);
 
+  void onBufferHighWatermarkTimeout();
+  void scheduleBufferHighWatermarkTimeout();
+  void maybeCancelBufferHighWatermarkTimeout();
+
   static std::atomic<uint64_t> next_global_id_;
 
   std::list<BytesSentCb> bytes_sent_callbacks_;
@@ -249,6 +254,8 @@ private:
   Buffer::Instance* current_write_buffer_{};
   uint32_t read_disable_count_{0};
   DetectedCloseType detected_close_type_{DetectedCloseType::Normal};
+  std::chrono::milliseconds buffer_high_watermark_timeout_{};
+  Event::TimerPtr buffer_high_watermark_timer_{nullptr};
   bool write_buffer_above_high_watermark_ : 1;
   bool detect_early_close_ : 1;
   bool enable_half_close_ : 1;

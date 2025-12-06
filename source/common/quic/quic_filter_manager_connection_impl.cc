@@ -73,6 +73,11 @@ void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   IS_ENVOY_BUG("unexpected call to setBufferLimits");
 }
 
+void QuicFilterManagerConnectionImpl::setBufferHighWatermarkTimeout(
+    std::chrono::milliseconds /*timeout*/) {
+  IS_ENVOY_BUG("unexpected call to setBufferHighWatermarkTimeout");
+}
+
 bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
   return write_buffer_watermark_simulation_.isAboveHighWatermark();
 }

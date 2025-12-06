@@ -513,6 +513,7 @@ public:
   MOCK_METHOD(bool, bindToPort, (), (const));
   MOCK_METHOD(bool, handOffRestoredDestinationConnections, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, perConnectionBufferHighWatermarkTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, listenerFiltersTimeout, (), (const));
   MOCK_METHOD(bool, continueOnListenerFiltersTimeout, (), (const));
   MOCK_METHOD(Stats::Scope&, listenerScope, ());

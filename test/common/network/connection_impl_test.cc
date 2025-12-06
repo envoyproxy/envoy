@@ -4033,6 +4033,85 @@ TEST_F(MockTransportConnectionImplTest, FlushWriteBufferAndRtt) {
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
 }
 
+TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutClosesConnection) {
+  initializeConnection();
+  InSequence s;
+
+  const std::chrono::milliseconds timeout(5);
+  auto* buffer_timer = new Event::MockTimer(&dispatcher_);
+
+  connection_->setBufferLimits(1);
+  connection_->setBufferHighWatermarkTimeout(timeout);
+
+  Buffer::OwnedImpl data("data");
+  EXPECT_CALL(*buffer_timer, enableTimer(timeout, _));
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual("data"), _))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  connection_->write(data, false);
+
+  EXPECT_CALL(*transport_socket_, closeSocket(ConnectionEvent::LocalClose));
+  buffer_timer->invokeCallback();
+  EXPECT_EQ(static_cast<const Network::Connection&>(*connection_).localCloseReason(),
+            StreamInfo::LocalCloseReasons::get().BufferHighWatermarkTimeout);
+}
+
+TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutCancelledOnDrain) {
+  initializeConnection();
+  InSequence s;
+
+  const std::chrono::milliseconds timeout(10);
+  auto* buffer_timer = new Event::MockTimer(&dispatcher_);
+
+  connection_->setBufferLimits(1);
+  connection_->setBufferHighWatermarkTimeout(timeout);
+
+  Buffer::OwnedImpl data("bytes");
+  EXPECT_CALL(*buffer_timer, enableTimer(timeout, _));
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual("bytes"), _))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  connection_->write(data, false);
+
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual("bytes"), _))
+      .WillOnce(Invoke(&MockTransportConnectionImplTest::simulateSuccessfulWrite));
+  EXPECT_CALL(*buffer_timer, disableTimer());
+  EXPECT_TRUE(file_ready_cb_(Event::FileReadyType::Write).ok());
+
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  connection_->close(ConnectionCloseType::NoFlush);
+}
+
+TEST_F(MockTransportConnectionImplTest, ReadBufferHighWatermarkSchedulesTimeout) {
+  initializeConnection();
+
+  const std::chrono::milliseconds timeout(7);
+  auto* buffer_timer = new Event::MockTimer(&dispatcher_);
+
+  connection_->setBufferLimits(1);
+  connection_->setBufferHighWatermarkTimeout(timeout);
+
+  EXPECT_CALL(*buffer_timer, enableTimer(timeout, _));
+  StreamBuffer read_buffer = connection_->getReadBuffer();
+  read_buffer.buffer.add("xy");
+}
+
+TEST_F(MockTransportConnectionImplTest, ReadBufferHighWatermarkTimeoutCancelledOnDrain) {
+  initializeConnection();
+
+  const std::chrono::milliseconds timeout(9);
+  auto* buffer_timer = new Event::MockTimer(&dispatcher_);
+
+  connection_->setBufferLimits(1);
+  connection_->setBufferHighWatermarkTimeout(timeout);
+
+  StreamBuffer read_buffer = connection_->getReadBuffer();
+  EXPECT_CALL(*buffer_timer, enableTimer(timeout, _));
+  read_buffer.buffer.add("xy");
+  EXPECT_CALL(*buffer_timer, disableTimer());
+  read_buffer.buffer.drain(read_buffer.buffer.length());
+}
+
 // Fixture for validating behavior after a connection is closed.
 class PostCloseConnectionImplTest : public MockTransportConnectionImplTest {
 public:

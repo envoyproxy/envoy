@@ -83,6 +83,7 @@ public:
   MOCK_METHOD(bool, connecting, (), (const));                                                      \
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));                            \
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));                                            \
+  MOCK_METHOD(void, setBufferHighWatermarkTimeout, (std::chrono::milliseconds timeout));           \
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));                                                 \
   MOCK_METHOD(bool, aboveHighWatermark, (), (const));                                              \
   MOCK_METHOD(const ConnectionSocketPtr&, getSocket, (), (const));                                 \

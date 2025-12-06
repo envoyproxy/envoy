@@ -252,6 +252,38 @@ void ConnectionImpl::closeInternal(ConnectionCloseType type) {
                               (enable_half_close_ ? 0 : Event::FileReadyType::Closed));
 }
 
+void ConnectionImpl::onBufferHighWatermarkTimeout() {
+  ENVOY_CONN_LOG(debug, "buffer high watermark timeout reached", *this);
+  buffer_high_watermark_timer_.reset();
+  if (!socket_->isOpen()) {
+    return;
+  }
+  closeConnectionImmediatelyWithDetails(
+      StreamInfo::LocalCloseReasons::get().BufferHighWatermarkTimeout);
+}
+
+void ConnectionImpl::scheduleBufferHighWatermarkTimeout() {
+  if (buffer_high_watermark_timeout_.count() > 0 && !buffer_high_watermark_timer_) {
+    ENVOY_CONN_LOG(debug, "scheduling buffer high watermark timeout", *this);
+    buffer_high_watermark_timer_ =
+        dispatcher_.createTimer([this]() -> void { onBufferHighWatermarkTimeout(); });
+    buffer_high_watermark_timer_->enableTimer(buffer_high_watermark_timeout_);
+  }
+}
+
+void ConnectionImpl::maybeCancelBufferHighWatermarkTimeout() {
+  if (buffer_high_watermark_timeout_.count() == 0 || !buffer_high_watermark_timer_) {
+    return;
+  }
+
+  // Don't cancel the timeout if either the write or read buffer is above the high watermark.
+  if (!write_buffer_->highWatermarkTriggered() && !read_buffer_->highWatermarkTriggered()) {
+    ENVOY_CONN_LOG(debug, "cancelling buffer high watermark timeout", *this);
+    buffer_high_watermark_timer_->disableTimer();
+    buffer_high_watermark_timer_.reset();
+  }
+}
+
 Connection::State ConnectionImpl::state() const {
   if (!socket_->isOpen()) {
     return State::Closed;
@@ -617,10 +649,15 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   }
 }
 
+void ConnectionImpl::setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) {
+  buffer_high_watermark_timeout_ = timeout;
+}
+
 void ConnectionImpl::onReadBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowReadBufferLowWatermark", *this);
   if (state() == State::Open) {
     readDisable(false);
+    maybeCancelBufferHighWatermarkTimeout();
   }
 }
 
@@ -628,6 +665,7 @@ void ConnectionImpl::onReadBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveReadBufferHighWatermark", *this);
   if (state() == State::Open) {
     readDisable(true);
+    scheduleBufferHighWatermarkTimeout();
   }
 }
 
@@ -635,6 +673,9 @@ void ConnectionImpl::onWriteBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
   ASSERT(write_buffer_above_high_watermark_);
   write_buffer_above_high_watermark_ = false;
+  if (state() == State::Open) {
+    maybeCancelBufferHighWatermarkTimeout();
+  }
   for (ConnectionCallbacks* callback : callbacks_) {
     if (callback) {
       callback->onBelowWriteBufferLowWatermark();
@@ -646,6 +687,9 @@ void ConnectionImpl::onWriteBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
   ASSERT(!write_buffer_above_high_watermark_);
   write_buffer_above_high_watermark_ = true;
+  if (state() == State::Open) {
+    scheduleBufferHighWatermarkTimeout();
+  }
   for (ConnectionCallbacks* callback : callbacks_) {
     if (callback) {
       callback->onAboveWriteBufferHighWatermark();
