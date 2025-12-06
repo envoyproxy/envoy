@@ -2,7 +2,7 @@
   "name": "Envoy Dev",
   "dockerFile": "Dockerfile",
   "runArgs": [
-    "--user=vscode",
+    "--user=envoybuild",
     "--cap-add=SYS_PTRACE",
     "--cap-add=NET_RAW",
     "--cap-add=NET_ADMIN",
@@ -19,8 +19,8 @@
     "HTTP_PROXY": "${env:VSCODE_CONTAINER_HTTP_PROXY}",
     "NO_PROXY": "${env:VSCODE_CONTAINER_NO_PROXY}"
   },
-  "remoteUser": "vscode",
-  "containerUser": "vscode",
+  "remoteUser": "envoybuild",
+  "containerUser": "envoybuild",
   "initializeCommand": ".devcontainer/init.sh",
   "postCreateCommand": ".devcontainer/setup.sh",
   "customizations": {
@@ -28,7 +28,10 @@
       "settings": {
         "terminal.integrated.shell.linux": "/bin/bash",
         "bazel.buildifierFixOnFormat": true,
-        "clangd.path": "/opt/llvm/bin/clangd",
+        "clangd.path": "${workspaceFolder}/.devcontainer/clangd-wrapper.sh",
+        "clangd.arguments": [
+          "--query-driver=/usr/local/bin/cc_wrapper.sh"
+        ],
         "python.pythonPath": "/usr/bin/python3",
         "python.formatting.provider": "yapf",
         "python.formatting.yapfArgs": [

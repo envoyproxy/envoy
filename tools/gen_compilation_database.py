@@ -79,6 +79,10 @@ def is_compile_target(target, args):
 def modify_compile_command(target, args):
     cc, options = target["command"].split(" ", 1)
 
+    # Strip wrapper path so that clangd can find the compiler.
+    if cc.endswith("cc_wrapper.sh"):
+        cc = "cc_wrapper.sh"
+
     # Workaround for bazel added C++11 options, those doesn't affect build itself but
     # clang-tidy will misinterpret them.
     options = options.replace("-std=c++0x ", "")
