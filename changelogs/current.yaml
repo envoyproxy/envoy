@@ -218,6 +218,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: oauth2
+  change: |
+    Added support for configuring cookie path in OAuth2 filter. The :ref:`path
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.CookieConfig.path>` field can now be set
+    for each cookie type to control the scope of OAuth2 cookies.
 - area: dynamic modules
   change: |
     Added support for loading dynamic modules globally by setting :ref:`load_globally

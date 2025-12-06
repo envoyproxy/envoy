@@ -37,6 +37,16 @@ message CookieConfig {
 
   // The value used for the SameSite cookie attribute.
   SameSite same_site = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // The path attribute for the cookie.
+  //
+  // This controls the scope of the cookie and is useful for path-based routing scenarios
+  // where different logical boundaries or applications may operate with different OAuth2 clients.
+  // The CSRF cookie (nonce cookie) can be configured with a different path than session cookies
+  // to support flows where the callback URL is on a different path.
+  //
+  // If not specified, defaults to ``/``.
+  string path = 2 [(validate.rules).string = {pattern: "^$|^/[^\\x00-\\x1f\\x7f \",;<>\\\\]*$"}];
 }
 
 // [#next-free-field: 8]
