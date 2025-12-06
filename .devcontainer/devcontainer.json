@@ -28,7 +28,14 @@
       "settings": {
         "terminal.integrated.shell.linux": "/bin/bash",
         "bazel.buildifierFixOnFormat": true,
-        "clangd.path": "/opt/llvm/bin/clangd",
+        // Use the clang from the llvm toolchain by default. The output_base of Envoy compdb is
+        // ${BUILD_DIR}/bazel_root/base-envoy-compdb so we can use a fixed path to the toolchain.
+        // See ci/build_setup.sh and also ci/do_ci.sh refresh_compdb for how this bazel 
+        // output_base is set.
+        "clangd.arguments": [
+          "--query-driver=/build/bazel_root/base-envoy-compdb/external/llvm_toolchain/bin/cc_wrapper.sh"
+        ],
+        "clangd.path": "/build/bazel_root/base-envoy-compdb/external/llvm_toolchain/bin/clangd",
         "python.pythonPath": "/usr/bin/python3",
         "python.formatting.provider": "yapf",
         "python.formatting.yapfArgs": [
