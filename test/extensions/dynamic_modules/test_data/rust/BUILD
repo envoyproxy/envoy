@@ -18,3 +18,5 @@ test_program(name = "abi_version_mismatch")
 test_program(name = "http")
 
 test_program(name = "http_integration_test")
+
+test_program(name = "http_stream_callouts_test")

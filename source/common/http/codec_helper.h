@@ -135,6 +135,7 @@ protected:
   virtual bool hasPendingData() PURE;
 
   CodecEventCallbacks* codec_callbacks_{nullptr};
+  bool codec_low_level_reset_is_called_{false};
 
 private:
   Event::Dispatcher& dispatcher_;

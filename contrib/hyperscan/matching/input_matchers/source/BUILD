@@ -19,7 +19,6 @@ envoy_cmake(
     name = "hyperscan",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     build_data = ["@org_boost//:header"],
@@ -36,8 +35,8 @@ envoy_cmake(
     },
     default_cache_entries = {},
     env = {
-        "NM": "$(NM)",
-        "OBJCOPY": "$(OBJCOPY)",
+        "NM": "$$EXT_BUILD_ROOT/$(NM)",
+        "OBJCOPY": "$$EXT_BUILD_ROOT/$(OBJCOPY)",
     },
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {
@@ -62,8 +61,7 @@ envoy_cmake(
 envoy_cmake(
     name = "vectorscan",
     build_args = select({
-        "//bazel/foreign_cc:parallel_builds_enabled": ["-j1"],
-        "//bazel:engflow_rbe_aarch64": ["-j1"],
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     build_data = ["@org_boost//:header"],

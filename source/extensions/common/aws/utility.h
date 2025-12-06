@@ -219,6 +219,14 @@ public:
    */
   static bool shouldNormalizeUriPath(const std::string service_name);
 
+  /**
+   * Checks if a URI path is already percent-encoded according to RFC 3986.
+   * Returns false if any character that should be percent-encoded is found unencoded.
+   * @param path the URI path to check.
+   * @return true if the path is already properly encoded, false otherwise.
+   */
+  static bool isUriPathEncoded(absl::string_view path);
+
 private:
   /**
    * Helper method to encode a character based on reserved character rules.

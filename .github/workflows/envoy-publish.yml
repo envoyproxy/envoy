@@ -50,10 +50,10 @@ jobs:
 
   build:
     permissions:
+      actions: read
       contents: read
       packages: read
     secrets:
-      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
       gpg-key: >-
         ${{ needs.load.outputs.trusted
             && fromJSON(needs.load.outputs.trusted)
@@ -77,7 +77,6 @@ jobs:
         - arm64
     with:
       arch: ${{ matrix.arch }}
-      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
@@ -105,7 +104,6 @@ jobs:
             && fromJSON(needs.load.outputs.trusted)
             && secrets.ENVOY_CI_PUBLISH_APP_KEY
             || '' }}
-      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
       gpg-key: >-
         ${{ needs.load.outputs.trusted
             && fromJSON(needs.load.outputs.trusted)
@@ -117,6 +115,7 @@ jobs:
             && secrets.ENVOY_GPG_MAINTAINER_KEY_PASSWORD
             || secrets.ENVOY_GPG_SNAKEOIL_KEY_PASSWORD }}
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ fromJSON(needs.load.outputs.request).run.release }}
@@ -126,14 +125,12 @@ jobs:
     uses: ./.github/workflows/_publish_release.yml
     name: Release
     with:
-      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   verify:
-    secrets:
-      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ fromJSON(needs.load.outputs.request).run.verify }}
@@ -144,7 +141,6 @@ jobs:
     uses: ./.github/workflows/_publish_verify.yml
     name: Verify
     with:
-      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 

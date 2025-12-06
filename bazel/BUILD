@@ -439,11 +439,6 @@ config_setting(
     values = {"define": "path_normalization_by_default=true"},
 )
 
-cc_proto_library(
-    name = "grpc_health_proto",
-    deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
-)
-
 config_setting(
     name = "enable_exported_symbols",
     values = {"define": "exported_symbols=enabled"},

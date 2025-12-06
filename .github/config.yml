@@ -1,13 +1,19 @@
 agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
-  repo: docker.io/envoyproxy/envoy-build-ubuntu
+  repo: docker.io/envoyproxy/envoy-build
   repo-gcr: gcr.io/envoy-ci/envoy-build
-  sha: de54e91a8d27623ffbd3fb9bd1aba8241567e41c0fb82b167128e3629c2ede18
-  sha-mobile: c0e11c4adaf7c7eec1e3bdc5f598e09ce5e5d5c355f161df8d75f0a10504f6ff
+  # default ci caching (ci)
+  sha: 5fcc9d3e10f1a0e628250b44b4c39bde1bdfc6cb8fe6075838a732c2ba04ef42
+  sha-ci: 5fcc9d3e10f1a0e628250b44b4c39bde1bdfc6cb8fe6075838a732c2ba04ef42
+  sha-devtools: fa69c24f030ce114371de36b2b74ede3370ca70463c7bbcc35e82db900bf2566
+  sha-docker: 82a823b14ac45da97942d24a649ff5b9db35ebb640999c449d391f4b88711e83
+  sha-gcc: c8a21f4efd097f063edd94c6473f33fd8b2346d4b2e3105b8d029287ba919cb5
+  sha-mobile: 04ae4e9abd445f2cfd4cbad24dfcdef85144cd150e5f268ce6f5aade92fdd4d4
+  sha-worker: 3d28abae22d41631f14cf3264694dd294fe9f9a924fcc35b202d27afb59db7ad
   # TODO: remove this dupe (currently used by ci request handler)
-  mobile-sha: c0e11c4adaf7c7eec1e3bdc5f598e09ce5e5d5c355f161df8d75f0a10504f6ff
-  tag: 4ce0cb04f941fb89d475597a640176ae64070bb1
+  mobile-sha: 04ae4e9abd445f2cfd4cbad24dfcdef85144cd150e5f268ce6f5aade92fdd4d4
+  tag: e0b4993c78551c1638ac00cf21d36313fe35d81d
 
 config:
   envoy:
@@ -220,6 +226,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
@@ -231,6 +238,7 @@ run:
     - .github/config.yml
     - api/**/*
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - envoy/**/*
     - mobile/.bazelrc
@@ -246,6 +254,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
@@ -321,6 +330,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
@@ -391,7 +401,7 @@ tables:
     title: Build image
     table-title: Container image/s (as used in this CI run)
     filter: |
-      "https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?page=1&name=" as $dockerLink
+      "https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=" as $dockerLink
       | .request["build-image"]
       | del(.changed)
       | with_entries(
@@ -403,7 +413,7 @@ tables:
     title: Build image (current)
     table-title: Current or previous container image
     filter: |
-      "https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?page=1&name=" as $dockerLink
+      "https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=" as $dockerLink
       | if .request["build-image"].changed then
           .request["build-image-current"]
           | with_entries(
