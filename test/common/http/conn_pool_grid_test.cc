@@ -7,6 +7,7 @@
 #include "source/common/upstream/transport_socket_match_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/common/quic/test_utils.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -182,7 +183,8 @@ public:
   void initialize() {
     quic_connection_persistent_info_ =
 #ifdef ENVOY_ENABLE_QUIC
-        Quic::createPersistentQuicInfoForCluster(dispatcher_, *cluster_);
+        Quic::createPersistentQuicInfoForCluster(dispatcher_, *cluster_,
+                                                 factory_context_.server_context_);
 #else
         std::make_unique<PersistentQuicInfo>();
 #endif
@@ -247,7 +249,7 @@ public:
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
 
-  Quic::EnvoyQuicNetworkObserverRegistry registry_;
+  Quic::TestNetworkObserverRegistry registry_;
   std::unique_ptr<ConnectivityGridForTest> grid_;
   std::string host_impl_hostname_ = "hostname";
 };

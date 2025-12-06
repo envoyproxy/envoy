@@ -25,6 +25,10 @@ envoy_cc_library(
         ":use_android_system_helper": ["-DUSE_ANDROID_SYSTEM_HELPER"],
         "//conditions:default": [],
     }),
+    linkopts = select({
+        ":use_android_system_helper": ["-landroid"],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     deps = [
         ":default_system_helper_lib",

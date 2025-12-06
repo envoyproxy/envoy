@@ -16,6 +16,12 @@ open class EngineBuilder() {
   protected var logger: ((LogLevel, String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
+  protected var useQuicPlatformPacketWriter = false
+  protected var enableQuicConnectionMigration = false
+  protected var migrateIdleQuicConnection = false
+  protected var maxIdleTimeBeforeQuicMigrationSeconds: Long = 0
+  protected var maxTimeOnNonDefaultNetworkSeconds: Long = 0
+
   private var runtimeGuards = mutableMapOf<String, Boolean>()
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(
@@ -569,6 +575,11 @@ open class EngineBuilder() {
         enablePlatformCertificatesValidation,
         upstreamTlsSni,
         h3ConnectionKeepaliveInitialIntervalMilliseconds,
+        useQuicPlatformPacketWriter,
+        enableQuicConnectionMigration,
+        migrateIdleQuicConnection,
+        maxIdleTimeBeforeQuicMigrationSeconds,
+        maxTimeOnNonDefaultNetworkSeconds
       )
 
     return EngineImpl(engineType(), engineConfiguration, logLevel)

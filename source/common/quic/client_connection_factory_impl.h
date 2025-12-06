@@ -42,7 +42,8 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
 
 std::unique_ptr<PersistentQuicInfoImpl>
 createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
-                                   const Upstream::ClusterInfo& cluster);
+                                   const Upstream::ClusterInfo& cluster,
+                                   Server::Configuration::ServerFactoryContext& server_context);
 
 std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     Http::PersistentQuicInfo& info, std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
