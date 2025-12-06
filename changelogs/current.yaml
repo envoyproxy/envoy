@@ -426,10 +426,10 @@ new_features:
 - area: listener
   change: |
     Added support for configuring TCP keepalive settings on both primary and additional addresses
-    by setting :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.Listener.tcp_keepalive>`.
-    It is possible to override the TCP keepalive settings for additional addresses by setting
-    :ref:`tcp_keepalive_override <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive_override>`
-    on additional addresses.
+    by setting :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.Listener.tcp_keepalive>`
+    and :ref:`additional address tcp_keepalive <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive>`.
+    Setting any keepalive field to ``0`` disables TCP keepalive for that address (or for the
+    listener and inherited additional addresses when only the listener keepalive is configured).
 - area: ext_proc
   change: |
     The :ref:`MappedAttributeBuilder

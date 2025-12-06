@@ -354,12 +354,14 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     SET_AND_RETURN_IF_NOT_OK(checkIpv4CompatAddress(address, config.address()), creation_status);
     addresses_.emplace_back(address);
     auto opts = std::make_shared<Network::Socket::Options>();
-    auto keepalive_opts = std::make_shared<Network::Socket::Options>();
+    Network::Socket::OptionsSharedPtr keepalive_opts;
     if (config.has_tcp_keepalive()) {
       keepalive_opts = Network::SocketOptionFactory::buildTcpKeepaliveOptions(
           Network::parseTcpKeepaliveConfig(config.tcp_keepalive()));
     }
-    addListenSocketOptions(opts, keepalive_opts);
+    if (keepalive_opts != nullptr && !keepalive_opts->empty()) {
+      addListenSocketOptions(opts, keepalive_opts);
+    }
     addListenSocketOptions(
         opts, Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
     address_opts_list.emplace_back(opts);
@@ -383,16 +385,15 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       addresses_.emplace_back(additional_address);
       auto opts = std::make_shared<Network::Socket::Options>();
 
-      if (config.additional_addresses(i).has_tcp_keepalive_override()) {
-        if (config.additional_addresses(i).tcp_keepalive_override().has_tcp_keepalive()) {
-          addListenSocketOptions(
-              opts,
-              Network::SocketOptionFactory::buildTcpKeepaliveOptions(
-                  Network::parseTcpKeepaliveConfig(
-                      config.additional_addresses(i).tcp_keepalive_override().tcp_keepalive())));
-        }
-      } else if (config.has_tcp_keepalive()) {
-        addListenSocketOptions(opts, keepalive_opts);
+      Network::Socket::OptionsSharedPtr additional_keepalive_opts;
+      if (config.additional_addresses(i).has_tcp_keepalive()) {
+        additional_keepalive_opts = Network::SocketOptionFactory::buildTcpKeepaliveOptions(
+            Network::parseTcpKeepaliveConfig(config.additional_addresses(i).tcp_keepalive()));
+      } else {
+        additional_keepalive_opts = keepalive_opts;
+      }
+      if (additional_keepalive_opts != nullptr && !additional_keepalive_opts->empty()) {
+        addListenSocketOptions(opts, additional_keepalive_opts);
       }
 
       if (config.additional_addresses(i).has_socket_options()) {
@@ -1256,7 +1257,7 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
     if (lhs_addr.has_socket_options() != rhs_addr.has_socket_options()) {
       return false;
     }
-    if (lhs_addr.has_tcp_keepalive_override() != rhs_addr.has_tcp_keepalive_override()) {
+    if (lhs_addr.has_tcp_keepalive() != rhs_addr.has_tcp_keepalive()) {
       return false;
     }
 
@@ -1275,18 +1276,9 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
       }
     }
 
-    if (lhs_addr.has_tcp_keepalive_override()) {
-      if (lhs_addr.tcp_keepalive_override().has_tcp_keepalive() !=
-          rhs_addr.tcp_keepalive_override().has_tcp_keepalive()) {
-        return false;
-      }
-
-      if (lhs_addr.tcp_keepalive_override().has_tcp_keepalive() &&
-          !Protobuf::util::MessageDifferencer::Equals(
-              lhs_addr.tcp_keepalive_override().tcp_keepalive(),
-              rhs_addr.tcp_keepalive_override().tcp_keepalive())) {
-        return false;
-      }
+    if (lhs_addr.has_tcp_keepalive() && !Protobuf::util::MessageDifferencer::Equals(
+                                            lhs_addr.tcp_keepalive(), rhs_addr.tcp_keepalive())) {
+      return false;
     }
   }
 
