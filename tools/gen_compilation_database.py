@@ -78,6 +78,11 @@ def is_compile_target(target, args):
 
 def modify_compile_command(target, args):
     cc, options = target["command"].split(" ", 1)
+    # Use the clang from the llvm toolchain by default. The output_base of Envoy compdb is
+    # ${BUILD_DIR}/bazel_root/base-envoy-compdb so we can use a fixed path to the toolchain.
+    # See ci/build_setup.sh and also ci/do_ci.sh refresh_compdb for how this bazel 
+    # output_base is set.
+    cc = "/build/bazel_root/base-envoy-compdb/external/llvm_toolchain/bin/cc_wrapper.sh"
 
     # Workaround for bazel added C++11 options, those doesn't affect build itself but
     # clang-tidy will misinterpret them.
@@ -88,10 +93,6 @@ def modify_compile_command(target, args):
         # Visual Studio Code doesn't seem to like "-iquote". Replace it with
         # old-style "-I".
         options = options.replace("-iquote ", "-I ")
-
-    if args.system_clang:
-        if cc.find("clang"):
-            cc = "clang++"
 
     if is_header(target["file"]):
         options += " -Wno-pragma-once-outside-header -Wno-unused-const-variable"
@@ -122,12 +123,7 @@ if __name__ == "__main__":
     parser.add_argument('--vscode', action='store_true')
     parser.add_argument('--include_all', action='store_true')
     parser.add_argument('--exclude_contrib', action='store_true')
-    parser.add_argument(
-        '--system-clang',
-        action='store_true',
-        help=
-        'Use `clang++` instead of the bazel wrapper for commands. This may help if `clangd` cannot find/run the tools.'
-    )
+
     parser.add_argument(
         'bazel_targets', nargs='*', default=[
             "//source/...",
