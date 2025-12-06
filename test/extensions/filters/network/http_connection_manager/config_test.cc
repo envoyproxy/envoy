@@ -3081,6 +3081,32 @@ http_filters:
       "expect envoy.extensions.filters.http.health_check.v3.HealthCheck.");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, DynamicFilterRequireConfigSource) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: {}
+    type_urls:
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                            "Error: filter config foo has no config source specifier.");
+}
+
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterRequireTypeUrlMissingFactory) {
   const std::string yaml_string = R"EOF(
 codec_type: http1

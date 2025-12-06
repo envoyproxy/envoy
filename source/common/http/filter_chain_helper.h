@@ -188,6 +188,12 @@ private:
       }
     }
 
+    if (config_discovery.config_source().config_source_specifier_case() ==
+        envoy::config::core::v3::ConfigSource::CONFIG_SOURCE_SPECIFIER_NOT_SET) {
+      return absl::InvalidArgumentError(
+          fmt::format("Error: filter config {} has no config source specifier.", name));
+    }
+
     auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
         config_discovery, name, server_context_, factory_context_, cluster_manager_,
         last_filter_in_current_config, filter_chain_type, nullptr);
