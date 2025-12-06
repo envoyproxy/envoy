@@ -4,6 +4,7 @@
 #include <string>
 
 #include "test/integration/integration.h"
+#include "test/integration/ssl_utility.h"
 #include "test/mocks/secret/mocks.h"
 
 #include "gtest/gtest.h"
@@ -50,6 +51,7 @@ public:
   virtual FakeUpstream* dataStream() { return fake_upstreams_.front().get(); }
 
   std::unique_ptr<Ssl::ContextManager> context_manager_;
+  Ssl::ClientSslTransportOptions ssl_options_;
   Network::UpstreamTransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   std::unique_ptr<ClientSslConnection> client_;

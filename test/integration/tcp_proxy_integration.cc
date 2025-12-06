@@ -1,7 +1,5 @@
 #include "test/integration/tcp_proxy_integration.h"
 
-#include "test/integration/ssl_utility.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -23,7 +21,7 @@ void TcpProxySslIntegrationTest::initialize() {
 
   context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
       server_factory_context_);
-  context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
 }
 
 TcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(

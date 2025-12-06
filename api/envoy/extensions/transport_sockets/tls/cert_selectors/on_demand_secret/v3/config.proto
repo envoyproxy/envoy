@@ -18,8 +18,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.tls.certificate_selectors.on_demand_secret]
 
 // Fetches the secret on-demand while allowing the parent cluster or listener to accept connections
-// without warming. The certificate secret is validated against the outer common TLS context, e.g.
-// by setting the FIPS compliance policy on the loaded secret material.
+// without warming. During the handshake, a secret name is derived from the peer hello message, an
+// SDS resource request starts, and the handshake is paused. Once an SDS response is received with a
+// resource, the handshake is resumed with the provided certificate. If the SDS server indicates the
+// resource removal, the handshake is failed, and the SDS subscription to the resource is stopped.
+//
+// Similar to the regular SDS, the certificate is configured using the outer common TLS context,
+// e.g. by setting the FIPS compliance policy on the loaded certificate.
 message Config {
   // Defines the configuration source of the secrets.
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];

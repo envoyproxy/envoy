@@ -606,6 +606,7 @@ EXTENSIONS = {
 
     # Certificate mappers
     "envoy.tls.certificate_mappers.static_name":                  "//source/extensions/transport_sockets/tls/cert_mappers/static_name:config",
+    "envoy.tls.certificate_mappers.sni":                  "//source/extensions/transport_sockets/tls/cert_mappers/sni:config",
 
     # Local address selectors
     "envoy.upstream.local_address_selector.filter_state_override": "//source/extensions/local_address_selectors/filter_state_override:config",

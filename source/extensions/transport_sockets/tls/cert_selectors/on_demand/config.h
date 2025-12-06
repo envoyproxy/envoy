@@ -78,7 +78,7 @@ class Handle : public Ssl::SelectionHandle {
 public:
   /**
    * Synchronous handle constructor must extend the context lifetime since it holds the low TLS
-   *context.
+   * context.
    */
   explicit Handle(AsyncContextConstSharedPtr cert_context) : active_context_(cert_context) {}
 

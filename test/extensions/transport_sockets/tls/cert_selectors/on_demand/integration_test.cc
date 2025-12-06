@@ -26,6 +26,7 @@ namespace TransportSockets {
 namespace Tls {
 namespace CertificateSelectors {
 namespace OnDemand {
+namespace {
 
 // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221.
 const envoy::service::secret::v3::SdsDummy _sds_dummy;
@@ -102,7 +103,7 @@ protected:
     return secret;
   }
 
-  FakeStream& waitSendSdsResponse(absl::string_view cert, bool fail = false) {
+  FakeStream& waitSendSdsResponse(absl::string_view cert, bool fail_fast = false) {
     xds_streams_.emplace_back();
     AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_streams_.back());
     RELEASE_ASSERT(result, result.message());
@@ -116,7 +117,7 @@ protected:
         << "Should be 1 resource in DELTA_GRPC";
     EXPECT_EQ(cert, delta_discovery_request.resource_names_subscribe().at(0))
         << "Secret name doesn't match in the request";
-    if (fail) {
+    if (fail_fast) {
       removeSecret(xds_stream, cert);
       return xds_stream;
     }
@@ -180,6 +181,27 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
       name: server
+  )EOF");
+  auto conn = std::make_unique<ClientSslConnection>(*this);
+  waitCertsRequested(1);
+  createXdsConnection();
+  waitSendSdsResponse("server");
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, BasicSuccessSNI) {
+  ssl_options_.setSni("server");
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
   )EOF");
   auto conn = std::make_unique<ClientSslConnection>(*this);
   waitCertsRequested(1);
@@ -338,6 +360,7 @@ INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, OnDemandIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+} // namespace
 } // namespace OnDemand
 } // namespace CertificateSelectors
 } // namespace Tls
