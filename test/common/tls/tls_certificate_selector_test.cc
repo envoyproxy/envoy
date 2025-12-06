@@ -128,23 +128,19 @@ private:
 class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory {
 public:
   using CreateProviderHook =
-      std::function<void(const Protobuf::Message&, Server::Configuration::CommonFactoryContext&,
-                         ProtobufMessage::ValidationVisitor&)>;
+      std::function<void(const Protobuf::Message&, Server::Configuration::GenericFactoryContext&)>;
 
-  Ssl::TlsCertificateSelectorFactory
+  absl::StatusOr<Ssl::TlsCertificateSelectorFactory>
   createTlsCertificateSelectorFactory(const Protobuf::Message& config,
-                                      Server::Configuration::CommonFactoryContext& factory_context,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                      absl::Status& creation_status, bool for_quic) override {
+                                      Server::Configuration::GenericFactoryContext& factory_context,
+                                      const Ssl::ServerContextConfig&, bool for_quic) override {
     if (selector_cb_) {
-      selector_cb_(config, factory_context, validation_visitor);
+      selector_cb_(config, factory_context);
     }
     if (for_quic) {
-      creation_status = absl::InvalidArgumentError("does not supported for quic");
-      return {};
+      return absl::InvalidArgumentError("does not supported for quic");
     }
-    return [&config, this](const Ssl::ServerContextConfig&,
-                           Ssl::TlsCertificateSelectorContext& selector_ctx) {
+    return [&config, this](Ssl::TlsCertificateSelectorContext& selector_ctx) {
       ENVOY_LOG_MISC(info, "debug: init provider");
       auto provider = std::make_unique<TestTlsCertificateSelector>(selector_ctx, config);
       provider->mod_ = mod_;
@@ -152,7 +148,7 @@ public:
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<xds::type::v3::TypedStruct>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "test-tls-context-provider"; };
 
@@ -195,9 +191,7 @@ protected:
     custom_tls_certificate_selector:
       name: test-tls-context-provider
       typed_config:
-        "@type": type.googleapis.com/xds.type.v3.TypedStruct
-        value:
-          foo: bar
+        "@type": type.googleapis.com/google.protobuf.StringValue
 )EOF";
     const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
@@ -222,17 +216,17 @@ protected:
     provider_factory_.selector_cb_ = mock_factory_cb.AsStdFunction();
 
     EXPECT_CALL(mock_factory_cb, Call)
-        .WillOnce(WithArg<1>([&](Server::Configuration::CommonFactoryContext& context) {
+        .WillOnce(WithArg<1>([&](Server::Configuration::GenericFactoryContext& context) {
           // Check that the objects available via the context are the same ones
           // provided to the parent context.
-          EXPECT_THAT(context.api(), Ref(*server_api));
+          EXPECT_THAT(context.serverFactoryContext().api(), Ref(*server_api));
         }));
 
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
     // provider factory callback will be Called here.
     auto server_cfg = *ServerContextConfigImpl::create(server_tls_context,
-                                                       transport_socket_factory_context, false);
+                                                       transport_socket_factory_context, {}, false);
 
     Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
     provider_factory_.mod_ = mod;
@@ -240,8 +234,7 @@ protected:
     NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
     Tls::ContextManagerImpl manager(server_factory_context);
     auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-        std::move(server_cfg), manager, *server_stats_store.rootScope(),
-        std::vector<std::string>{});
+        std::move(server_cfg), manager, *server_stats_store.rootScope());
 
     auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(version_));
@@ -372,9 +365,7 @@ TEST_P(TlsCertificateSelectorFactoryTest, QUICFactory) {
     custom_tls_certificate_selector:
       name: test-tls-context-provider
       typed_config:
-        "@type": type.googleapis.com/xds.type.v3.TypedStruct
-        value:
-          foo: bar
+        "@type": type.googleapis.com/google.protobuf.StringValue
 )EOF";
 
   Event::SimulatedTimeSystem time_system;
@@ -388,8 +379,8 @@ TEST_P(TlsCertificateSelectorFactoryTest, QUICFactory) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   // provider factory callback will be Called here.
-  auto server_cfg =
-      ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context, true);
+  auto server_cfg = ServerContextConfigImpl::create(server_tls_context,
+                                                    transport_socket_factory_context, {}, true);
 
   EXPECT_FALSE(server_cfg.ok());
 }

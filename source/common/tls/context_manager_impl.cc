@@ -34,9 +34,10 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
   return context;
 }
 
-absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> ContextManagerImpl::createSslServerContext(
-    Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-    const std::vector<std::string>& server_names, Ssl::ContextAdditionalInitFunc additional_init) {
+absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr>
+ContextManagerImpl::createSslServerContext(Stats::Scope& scope,
+                                           const Envoy::Ssl::ServerContextConfig& config,
+                                           Ssl::ContextAdditionalInitFunc additional_init) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (!config.isReady()) {
     return nullptr;
@@ -49,8 +50,7 @@ absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> ContextManagerImpl::createSsl
     return nullptr;
   }
   absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> context_or_error =
-      factory->createServerContext(scope, config, server_names, factory_context_,
-                                   std::move(additional_init));
+      factory->createServerContext(scope, config, factory_context_, std::move(additional_init));
   RETURN_IF_NOT_OK(context_or_error.status());
   contexts_.insert(*context_or_error);
   return *context_or_error;

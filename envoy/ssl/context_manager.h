@@ -40,7 +40,6 @@ public:
    */
   virtual absl::StatusOr<ServerContextSharedPtr>
   createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
-                         const std::vector<std::string>& server_names,
                          ContextAdditionalInitFunc additional_init) PURE;
 
   /**

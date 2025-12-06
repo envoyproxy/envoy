@@ -38,6 +38,7 @@ public:
   Ssl::CertificateSelectionCallbackPtr createCertificateSelectionCallback() override {
     return nullptr;
   }
+  void setCertSelectionHandle(Ssl::SelectionHandleConstSharedPtr) override {}
   void onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool,
                                        bool) override {
     cert_selection_result_ = selected_ctx.has_value() ? Ssl::CertificateSelectionStatus::Successful

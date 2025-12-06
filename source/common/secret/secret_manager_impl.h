@@ -54,7 +54,7 @@ public:
   findOrCreateTlsCertificateProvider(const envoy::config::core::v3::ConfigSource& config_source,
                                      const std::string& config_name,
                                      Server::Configuration::ServerFactoryContext& server_context,
-                                     Init::Manager& init_manager) override;
+                                     OptRef<Init::Manager> init_manager, bool warm) override;
 
   CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
@@ -84,7 +84,7 @@ private:
     findOrCreate(const envoy::config::core::v3::ConfigSource& sds_config_source,
                  const std::string& config_name,
                  Server::Configuration::ServerFactoryContext& server_context,
-                 Init::Manager& init_manager) {
+                 OptRef<Init::Manager> init_manager, bool warm) {
       const std::string map_key =
           absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
 
@@ -96,7 +96,7 @@ private:
           removeDynamicSecretProvider(map_key);
         };
         secret_provider = SecretType::create(server_context, sds_config_source, config_name,
-                                             unregister_secret_provider);
+                                             unregister_secret_provider, warm);
         dynamic_secret_providers_[map_key] = secret_provider;
       }
       // It is important to add the init target to the manager regardless the secret provider is new
@@ -111,7 +111,11 @@ private:
       //
       // It is expected that correct init manager will be passed to this method by the caller
       // separately.
-      init_manager.add(*secret_provider->initTarget());
+      if (init_manager) {
+        init_manager->add(*secret_provider->initTarget());
+      } else {
+        secret_provider->start();
+      }
       return secret_provider;
     }
 

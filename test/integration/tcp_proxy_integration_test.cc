@@ -1,5 +1,3 @@
-#include "test/integration/tcp_proxy_integration_test.h"
-
 #include <memory>
 #include <string>
 
@@ -19,6 +17,7 @@
 
 #include "test/integration/fake_access_log.h"
 #include "test/integration/ssl_utility.h"
+#include "test/integration/tcp_proxy_integration.h"
 #include "test/integration/tcp_proxy_integration_test.pb.h"
 #include "test/integration/tcp_proxy_integration_test.pb.validate.h"
 #include "test/integration/utility.h"
@@ -33,18 +32,6 @@ using testing::MatchesRegex;
 using testing::NiceMock;
 
 namespace Envoy {
-
-void TcpProxyIntegrationTest::initialize() {
-  config_helper_.renameListener("tcp_proxy");
-  BaseIntegrationTest::initialize();
-}
-
-void TcpProxyIntegrationTest::setupByteMeterAccessLog() {
-  useListenerAccessLog("DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
-                       "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-                       "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
-                       "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
-}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -1453,86 +1440,6 @@ INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxySslIntegrationTe
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-void TcpProxySslIntegrationTest::initialize() {
-  config_helper_.addSslConfig();
-  TcpProxyIntegrationTest::initialize();
-
-  context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
-      server_factory_context_);
-  payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
-}
-
-void TcpProxySslIntegrationTest::setupConnections() {
-  initialize();
-
-  // Set up the mock buffer factory so the newly created SSL client will have a mock write
-  // buffer. This allows us to track the bytes actually written to the socket.
-
-  EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
-      .Times(AtLeast(1))
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer_ =
-            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        ON_CALL(*client_write_buffer_, move(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-        ON_CALL(*client_write_buffer_, drain(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-        return client_write_buffer_;
-      }));
-  // Set up the SSL client.
-  Network::Address::InstanceConstSharedPtr address =
-      Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-  context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
-  ssl_client_ = dispatcher_->createClientConnection(
-      address, Network::Address::InstanceConstSharedPtr(),
-      context_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
-
-  // Perform the SSL handshake. Loopback is allowlisted in tcp_proxy.json for the ssl_auth
-  // filter so there will be no pause waiting on auth data.
-  ssl_client_->addConnectionCallbacks(connect_callbacks_);
-  ssl_client_->enableHalfClose(true);
-  ssl_client_->addReadFilter(payload_reader_);
-  ssl_client_->connect();
-  while (!connect_callbacks_.connected()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-
-  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_);
-  RELEASE_ASSERT(result, result.message());
-}
-
-// Test proxying data in both directions with envoy doing TCP and TLS
-// termination.
-void TcpProxySslIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_send_upstream,
-                                                       const std::string& data_to_send_downstream) {
-  // Ship some data upstream.
-  Buffer::OwnedImpl buffer(data_to_send_upstream);
-  ssl_client_->write(buffer, false);
-  while (client_write_buffer_->bytesDrained() != data_to_send_upstream.size()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-
-  // Make sure the data makes it upstream.
-  ASSERT_TRUE(fake_upstream_connection_->waitForData(data_to_send_upstream.size()));
-
-  // Now send data downstream and make sure it arrives.
-  ASSERT_TRUE(fake_upstream_connection_->write(data_to_send_downstream));
-  payload_reader_->setDataToWaitFor(data_to_send_downstream);
-  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
-
-  // Clean up.
-  Buffer::OwnedImpl empty_buffer;
-  ssl_client_->write(empty_buffer, true);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
-  ASSERT_TRUE(fake_upstream_connection_->write("", true));
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  EXPECT_TRUE(payload_reader_->readLastByte());
-  EXPECT_TRUE(connect_callbacks_.closed());
-}
-
 TEST_P(TcpProxySslIntegrationTest, SendTlsToTlsListener) {
   setupConnections();
   sendAndReceiveTlsData("hello", "world");
@@ -1593,44 +1500,44 @@ TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
   setupConnections();
 
   Buffer::OwnedImpl empty_buffer;
-  ssl_client_->write(empty_buffer, true);
+  client_->ssl_client_->write(empty_buffer, true);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
+  ASSERT_TRUE(client_->fake_upstream_connection_->waitForHalfClose());
 
   const std::string data("data");
-  ASSERT_TRUE(fake_upstream_connection_->write(data, false));
-  payload_reader_->setDataToWaitFor(data);
-  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  EXPECT_FALSE(payload_reader_->readLastByte());
+  ASSERT_TRUE(client_->fake_upstream_connection_->write(data, false));
+  client_->payload_reader_->setDataToWaitFor(data);
+  client_->ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(client_->payload_reader_->readLastByte());
 
-  ASSERT_TRUE(fake_upstream_connection_->write("", true));
-  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  EXPECT_TRUE(payload_reader_->readLastByte());
+  ASSERT_TRUE(client_->fake_upstream_connection_->write("", true));
+  client_->ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(client_->payload_reader_->readLastByte());
 }
 
 // Test that a half-close on the upstream side is proxied correctly.
 TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   setupConnections();
 
-  ASSERT_TRUE(fake_upstream_connection_->write("", true));
-  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  EXPECT_TRUE(payload_reader_->readLastByte());
-  EXPECT_FALSE(connect_callbacks_.closed());
+  ASSERT_TRUE(client_->fake_upstream_connection_->write("", true));
+  client_->ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(client_->payload_reader_->readLastByte());
+  EXPECT_FALSE(client_->connect_callbacks_.closed());
 
   const std::string& val("data");
   Buffer::OwnedImpl buffer(val);
-  ssl_client_->write(buffer, false);
-  while (client_write_buffer_->bytesDrained() != val.size()) {
+  client_->ssl_client_->write(buffer, false);
+  while (client_->client_write_buffer_->bytesDrained() != val.size()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  ASSERT_TRUE(fake_upstream_connection_->waitForData(val.size()));
+  ASSERT_TRUE(client_->fake_upstream_connection_->waitForData(val.size()));
 
   Buffer::OwnedImpl empty_buffer;
-  ssl_client_->write(empty_buffer, true);
-  while (!connect_callbacks_.closed()) {
+  client_->ssl_client_->write(empty_buffer, true);
+  while (!client_->connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
+  ASSERT_TRUE(client_->fake_upstream_connection_->waitForHalfClose());
 }
 
 // Integration test a Mysql upstream, where the upstream sends data immediately

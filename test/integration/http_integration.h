@@ -348,8 +348,6 @@ protected:
   std::string downstreamProtocolStatsRoot() const;
   // Return the upstream protocol part of the stats root.
   std::string upstreamProtocolStatsRoot() const;
-  // Prefix listener stat with IP:port, including IP version dependent loopback address.
-  std::string listenerStatPrefix(const std::string& stat_name);
 
   Network::UpstreamTransportSocketFactoryPtr quic_transport_socket_factory_;
   // Must outlive |codec_client_| because it may not close connection till the end of its life

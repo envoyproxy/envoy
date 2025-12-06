@@ -16,13 +16,13 @@ namespace Envoy {
 
 namespace Server {
 namespace Configuration {
-class CommonFactoryContext;
+class GenericFactoryContext;
 } // namespace Configuration
 } // namespace Server
 
 namespace Ssl {
 
-// Opaque type defined and used by the ``ServerContext``.
+// Opaque type defined and used by the low-level TLS certificate context.
 struct TlsContext;
 
 class ServerContextConfig;
@@ -180,6 +180,11 @@ public:
   virtual SslCtxCb sslctxCb(HandshakerFactoryContext& handshaker_factory_context) const PURE;
 };
 
+// A handle tracking the certificate selection request. This can be used to supply additonal data
+// to attach to the TLS sockets, and to detect when a request is cancelled.
+class SelectionHandle {};
+using SelectionHandleConstSharedPtr = std::shared_ptr<const SelectionHandle>;
+
 struct SelectionResult {
   enum class SelectionStatus {
     // A certificate was successfully selected.
@@ -189,11 +194,15 @@ struct SelectionResult {
     // Certificate selection failed.
     Failed,
   };
-  SelectionStatus status; // Status of the certificate selection.
-  // Selected TLS context which it only be non-null when status is Success.
-  const Ssl::TlsContext* selected_ctx;
+
+  // Status of the certificate selection.
+  SelectionStatus status;
+  // Selected TLS context: it must be non-null when status is Success.
+  const Ssl::TlsContext* selected_ctx{nullptr};
   // True if OCSP stapling should be enabled.
-  bool staple;
+  bool staple{false};
+  // Optional handle to attach to the individual TLS socket connection.
+  SelectionHandleConstSharedPtr handle{nullptr};
 };
 
 /**
@@ -223,10 +232,17 @@ public:
   virtual ~TlsCertificateSelector() = default;
 
   /**
+   * @return true if the selector provides its own SSL contexts.
+   */
+  virtual bool providesCertificates() const { return false; }
+
+  /**
    * Select TLS context based on the client hello in non-QUIC TLS handshake.
    *
    * @return selected_ctx should only not be null when status is SelectionStatus::Success, and it
    * will have the same lifetime as ``ServerContextImpl``.
+   *
+   * @param ssl_client_hello low-level SSL object, only valid during the callback.
    */
   virtual SelectionResult selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
                                            CertificateSelectionCallbackPtr cb) PURE;
@@ -248,30 +264,50 @@ public:
   virtual ~TlsCertificateSelectorContext() = default;
 
   /**
-   * @return reference to the initialized Tls Contexts.
+   * @return reference to the available TLS contexts.
    */
   virtual const std::vector<TlsContext>& getTlsContexts() const PURE;
 };
 
-using TlsCertificateSelectorFactory = std::function<TlsCertificateSelectorPtr(
-    const ServerContextConfig&, TlsCertificateSelectorContext&)>;
+using TlsCertificateSelectorFactory =
+    std::function<TlsCertificateSelectorPtr(TlsCertificateSelectorContext&)>;
 
 class TlsCertificateSelectorConfigFactory : public Config::TypedFactory {
 public:
   /**
+   * Create a certificate selector for a TLS context.
+   * @param config proto configuration.
+   * @param factory_context generic factory context.
+   * @param tls_context is the parent TLS context which is guaranteed to outlive the selector.
    * @param for_quic true when in quic context, which does not support selecting certificate
    * asynchronously.
    * @returns a factory to create a TlsCertificateSelector. Accepts the |config| and
    * |validation_visitor| for early validation. This virtual base doesn't
    * perform MessageUtil::downcastAndValidate, but an implementation should.
    */
-  virtual TlsCertificateSelectorFactory
+  virtual absl::StatusOr<TlsCertificateSelectorFactory>
   createTlsCertificateSelectorFactory(const Protobuf::Message& config,
-                                      Server::Configuration::CommonFactoryContext& factory_context,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                      absl::Status& creation_status, bool for_quic) PURE;
+                                      Server::Configuration::GenericFactoryContext& factory_context,
+                                      const ServerContextConfig& tls_context, bool for_quic) PURE;
 
   std::string category() const override { return "envoy.tls.certificate_selectors"; }
+};
+
+using TlsCertificateMapper = std::function<std::string(const SSL_CLIENT_HELLO&)>;
+using TlsCertificateMapperFactory = std::function<TlsCertificateMapper()>;
+
+class TlsCertificateMapperConfigFactory : public Config::TypedFactory {
+public:
+  /**
+   * Create a certificate selector secret name mapper.
+   * @param config proto configuration.
+   * @param factory_context generic factory context.
+   */
+  virtual absl::StatusOr<TlsCertificateMapperFactory> createTlsCertificateMapperFactory(
+      const Protobuf::Message& config,
+      Server::Configuration::GenericFactoryContext& factory_context) PURE;
+
+  std::string category() const override { return "envoy.tls.certificate_mappers"; }
 };
 
 } // namespace Ssl

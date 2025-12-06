@@ -69,11 +69,10 @@ require_client_certificate: true
         TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     TestUtility::loadFromYaml(yaml, tls_context);
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_, false);
+        tls_context, factory_context_, {}, false);
     static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
-        std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
   }
 
   void createUpstreams() override {

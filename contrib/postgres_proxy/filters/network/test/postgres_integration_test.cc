@@ -352,12 +352,12 @@ public:
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
     ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        downstream_tls_context, mock_factory_ctx, false);
+        downstream_tls_context, mock_factory_ctx, {}, false);
     static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
     Network::DownstreamTransportSocketFactoryPtr tls_context =
         Network::DownstreamTransportSocketFactoryPtr{
             *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-                std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()), {})};
+                std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()))};
 
     Network::TransportSocketPtr ts = tls_context->createDownstreamTransportSocket();
     // Synchronization object used to suspend execution

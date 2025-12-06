@@ -300,6 +300,7 @@ message CommonTlsContext {
   // Select TLS certificate based on TLS client hello.
   // If empty, defaults to native TLS certificate selection behavior:
   // DNS SANs or Subject Common Name in TLS certificates is extracted as server name pattern to match SNI.
+  // [#extension-category: envoy.tls.certificate_selectors]
   config.core.v3.TypedExtensionConfig custom_tls_certificate_selector = 16;
 
   // Certificate provider for fetching TLS certificates.

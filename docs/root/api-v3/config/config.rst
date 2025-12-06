@@ -10,6 +10,8 @@ Extensions
   accesslog/filters
   formatter/formatter
   accesslog/accesslog
+  certificate_mappers/certificate_mappers
+  certificate_selectors/certificate_selectors
   cluster/cluster
   common/common
   compression/compression

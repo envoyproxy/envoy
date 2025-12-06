@@ -71,7 +71,7 @@ std::vector<TlsCertificateConfigProviderSharedPtrWithName> getTlsCertificateConf
                 .secretManager()
                 .findOrCreateTlsCertificateProvider(
                     sds_secret_config.sds_config(), sds_secret_config.name(),
-                    factory_context.serverFactoryContext(), factory_context.initManager())});
+                    factory_context.serverFactoryContext(), factory_context.initManager(), true)});
       } else {
         // Load static secret.
         auto secret_provider =

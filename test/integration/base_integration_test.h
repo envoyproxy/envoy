@@ -172,6 +172,9 @@ public:
 
   std::string listener_access_log_name_;
 
+  // Prefix listener stat with IP:port, including IP version dependent loopback address.
+  std::string listenerStatPrefix(const std::string& stat_name);
+
   // Last node received on an xDS stream from the server.
   envoy::config::core::v3::Node last_node_;
 
