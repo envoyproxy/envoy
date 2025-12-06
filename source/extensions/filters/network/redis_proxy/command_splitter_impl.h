@@ -327,6 +327,27 @@ private:
 };
 
 /**
+ * ShardInfoRequest sends the INFO command to a specific shard identified by shard_id.
+ * This allows querying INFO from individual shards including sections like Persistence and
+ * Replication that don't make sense when aggregated across the cluster.
+ * Command format: INFO.SHARD <shard_id> [section]
+ */
+class ShardInfoRequest : public FragmentedRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  ShardInfoRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                   bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+  // RedisProxy::CommandSplitter::FragmentedRequest
+  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
+};
+
+/**
  * RandomShardRequest sends the command to a single random shard. This is used for commands like
  * RANDOMKEY and CLUSTER that don't require responses from all shards, just one representative
  * response. This optimizes performance by avoiding the overhead of sending to all shards.
@@ -410,26 +431,6 @@ private:
   }
 
   std::unique_ptr<BaseClusterScopeResponseHandler> response_handler_;
-};
-
-/**
- * InfoRequest sends the INFO command to all Redis servers and merges the results. The INFO command
- * provides information and statistics about the Redis server, and this request handles the
- * aggregation of that information from multiple servers.
- */
-class InfoRequest : public FragmentedRequest {
-public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
-                                SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool delay_command_latency,
-                                const StreamInfo::StreamInfo& stream_info);
-
-private:
-  InfoRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
-              bool delay_command_latency)
-      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
-  // RedisProxy::CommandSplitter::FragmentedRequest
-  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
 };
 
 /**
@@ -583,7 +584,7 @@ private:
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<KeysRequest> keys_handler_;
   CommandHandlerFactory<ScanRequest> scan_handler_;
-  CommandHandlerFactory<InfoRequest> info_handler_;
+  CommandHandlerFactory<ShardInfoRequest> shard_info_handler_;
   CommandHandlerFactory<SelectRequest> select_handler_;
   CommandHandlerFactory<RoleRequest> role_handler_;
   CommandHandlerFactory<RandomShardRequest> random_shard_handler_;

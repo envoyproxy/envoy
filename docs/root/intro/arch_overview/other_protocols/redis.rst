@@ -141,6 +141,16 @@ Arguments to PING are not allowed. Envoy responds to ECHO immediately with the c
 All other supported commands must contain a key. Supported commands are functionally identical to the
 original Redis command except possibly in failure scenarios.
 
+INFO command
+^^^^^^^^^^^^
+INFO command is handled by envoy differently it aggregates metrics across all shards and returns consolidated cluster-wide statistics.
+An optional section parameter can be provided to filter the output (e.g., INFO memory).
+INFO.SHARD is an Envoy-specific command introduced for debugging purposes that queries a specific shard by index
+and returns that shard's complete INFO response (e.g., INFO.SHARD 0 memory).
+Shard numbering starts from 0 and shards are ordered from lowest to highest slot assignment.
+when using INFO.SHARD command, if the provided shard index is invalid, Envoy will return an error.
+when using INFO.SHARD command, via redis-cli, make sure to use --raw flag to get the proper output format.
+
 For details on each command's usage see the official
 `Redis command reference <https://redis.io/commands>`_.
 
@@ -298,6 +308,7 @@ For details on each command's usage see the official
   INCRBY, String
   INCRBYFLOAT, String
   INFO, Server
+  INFO.SHARD, Server
   ROLE, Server
   MGET, String
   MSET, String

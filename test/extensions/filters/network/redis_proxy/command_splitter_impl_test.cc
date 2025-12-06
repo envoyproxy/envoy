@@ -1619,20 +1619,10 @@ TEST_F(ScanHandlerTest, ScanWrongNumberOfArgs) {
 
 INSTANTIATE_TEST_SUITE_P(ScanHandlerTest, ScanHandlerTest, testing::Values("scan"));
 
-class InfoHandlerTest : public FragmentedRequestCommandHandlerTest,
-                        public testing::WithParamInterface<std::string> {
+// INFO.SHARD command handler tests - queries a single specific shard
+class InfoShardHandlerTest : public FragmentedRequestCommandHandlerTest,
+                             public testing::WithParamInterface<std::string> {
 public:
-  void setup(uint16_t shard_size, const std::list<uint64_t>& null_handle_indexes,
-             bool mirrored = false, bool is_single_param = false) {
-    if (is_single_param) {
-      std::vector<std::string> request_strings = {"info"};
-      makeRequestToShard(shard_size, request_strings, null_handle_indexes, mirrored);
-      return;
-    }
-    std::vector<std::string> request_strings = {"info", "default"};
-    makeRequestToShard(shard_size, request_strings, null_handle_indexes, mirrored);
-  }
-
   Common::Redis::RespValuePtr response() {
     Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
     response->type(Common::Redis::RespType::BulkString);
@@ -1641,21 +1631,28 @@ public:
   }
 };
 
-TEST_P(InfoHandlerTest, Normal) {
+TEST_P(InfoShardHandlerTest, Normal) {
   InSequence s;
 
-  setup(2, {});
-  EXPECT_NE(nullptr, handle_);
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Array);
-  std::vector<Common::Redis::RespValue> elements(2);
-  elements[0].type(Common::Redis::RespType::BulkString);
-  elements[0].asString() = "# Server\r\nredis_version:6.2.6\r\n";
-  elements[1].type(Common::Redis::RespType::BulkString);
-  elements[1].asString() = "# Server\r\nredis_version:6.2.6\r\n";
-  expected_response.asArray().swap(elements);
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"info.shard", "0"});
 
-  pool_callbacks_[1]->onResponse(response());
+  pool_callbacks_.resize(1);
+  std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(1);
+  pool_requests_.swap(tmp_pool_requests);
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(2));
+  EXPECT_CALL(*conn_pool_, makeRequestToShard_(0, _, _))
+      .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[0])), Return(&pool_requests_[0])));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::BulkString);
+  expected_response.asString() = "# Server\r\nredis_version:6.2.6\r\n";
+
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
   EXPECT_CALL(
       store_,
@@ -1667,156 +1664,132 @@ TEST_P(InfoHandlerTest, Normal) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
 };
 
-TEST_P(InfoHandlerTest, UpstreamError) {
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Error);
-  expected_response.asString() = "finished with 2 error(s)";
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  setup(2, {0, 1});
-  EXPECT_EQ(nullptr, handle_);
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
-};
-
-TEST_P(InfoHandlerTest, Mirrored) {
+TEST_F(InfoShardHandlerTest, Cancel) {
   InSequence s;
 
-  setupMirrorPolicy();
-  setup(2, {}, true);
-  EXPECT_NE(nullptr, handle_);
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"info.shard", "0"});
 
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Array);
-  std::vector<Common::Redis::RespValue> elements(2);
-  elements[0].type(Common::Redis::RespType::BulkString);
-  elements[0].asString() = "# Server\r\nredis_version:6.2.6\r\n";
-  elements[1].type(Common::Redis::RespType::BulkString);
-  elements[1].asString() = "# Server\r\nredis_version:6.2.6\r\n";
-  expected_response.asArray().swap(elements);
+  pool_callbacks_.resize(1);
+  std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(1);
+  pool_requests_.swap(tmp_pool_requests);
 
-  pool_callbacks_[1]->onResponse(response());
-  mirror_pool_callbacks_[1]->onResponse(response());
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(2));
+  EXPECT_CALL(*conn_pool_, makeRequestToShard_(0, _, _))
+      .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[0])), Return(&pool_requests_[0])));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(
-      store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  pool_callbacks_[0]->onResponse(response());
-  mirror_pool_callbacks_[0]->onResponse(response());
-
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
-};
-
-TEST_F(InfoHandlerTest, Cancel) {
-  InSequence s;
-
-  setup(2, {});
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_NE(nullptr, handle_);
 
   EXPECT_CALL(pool_requests_[0], cancel());
-  EXPECT_CALL(pool_requests_[1], cancel());
   handle_->cancel();
 };
 
-TEST_P(InfoHandlerTest, NoUpstreamHostForAll) {
+TEST_P(InfoShardHandlerTest, NoUpstreamHostForAll) {
   Common::Redis::RespValue expected_response;
   expected_response.type(Common::Redis::RespType::Error);
   expected_response.asString() = "no upstream host";
 
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"info.shard", "0"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  setup(0, {});
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
 };
 
-TEST_F(InfoHandlerTest, InfoWrongNumberOfArgs) {
+TEST_F(InfoShardHandlerTest, InfoShardWrongNumberOfArgs) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"info.shard", "0", "server", "extra"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "wrong number of arguments for 'info.shard' command";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+}
+// When the mandatory shard_id parameter is missing, command splitter rejects the request before
+// reaching our handler
+TEST_F(InfoShardHandlerTest, InfoShardMissingShardId) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"info.shard"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "invalid request";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
+TEST_F(InfoShardHandlerTest, InfoShardInvalidShardId) {
   InSequence s;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
+  response.asString() = "ERR invalid shard_id - must be a numeric shard index";
 
-  response.asString() = "ERR syntax error";
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  makeBulkStringArray(*request, {"info", "a", "b"});
+  makeBulkStringArray(*request, {"info.shard", "abc"});
   EXPECT_EQ(nullptr,
             splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
-};
 
-TEST_P(InfoHandlerTest, SingleShardErrorResponse) {
-  InSequence s;
-
-  setup(2, {});
-  EXPECT_NE(nullptr, handle_);
-
-  Common::Redis::RespValue expected_final_error_response;
-  expected_final_error_response.type(Common::Redis::RespType::Error);
-  expected_final_error_response.asString() = "finished with 1 error(s)";
-
-  pool_callbacks_[0]->onResponse(response());
-  Common::Redis::RespValuePtr error_resp = Common::Redis::Utility::makeError("shard error");
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_final_error_response)));
-  pool_callbacks_[1]->onResponse(std::move(error_resp));
-
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.shard.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.shard.error").value());
 }
 
-TEST_P(InfoHandlerTest, SingleShardUnexpectedResponseType) {
+TEST_F(InfoShardHandlerTest, InfoShardOutOfRange) {
   InSequence s;
 
-  setup(2, {});
-  EXPECT_NE(nullptr, handle_);
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "ERR shard_id 999 out of range (0-1)";
 
-  Common::Redis::RespValue expected_final_error_response;
-  expected_final_error_response.type(Common::Redis::RespType::Error);
-  expected_final_error_response.asString() = "finished with 1 error(s)";
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(2));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  makeBulkStringArray(*request, {"info.shard", "999"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
 
-  pool_callbacks_[0]->onResponse(response());
-
-  Common::Redis::RespValuePtr unexpected_resp = std::make_unique<Common::Redis::RespValue>();
-  unexpected_resp->type(Common::Redis::RespType::Integer);
-  unexpected_resp->asInteger() = 123;
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_final_error_response)));
-  pool_callbacks_[1]->onResponse(std::move(unexpected_resp));
-
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.shard.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.shard.error").value());
 }
 
-TEST_P(InfoHandlerTest, SingleShardSuccessResponse) {
+TEST_F(InfoShardHandlerTest, InfoShardWithSection) {
   InSequence s;
 
-  setup(1, {});
-  EXPECT_NE(nullptr, handle_);
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"info.shard", "0", "server"});
 
-  Common::Redis::RespValuePtr expected_single_response = response();
+  pool_callbacks_.resize(1);
+  std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(1);
+  pool_requests_.swap(tmp_pool_requests);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
-  EXPECT_CALL(
-      store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 5));
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(2));
+  EXPECT_CALL(*conn_pool_, makeRequestToShard_(0, _, _))
+      .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[0])), Return(&pool_requests_[0])));
 
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(expected_single_response.get())));
-  pool_callbacks_[0]->onResponse(response());
-
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
-}
-
-TEST_P(InfoHandlerTest, SingleShardResponseUnwrapped) {
-  InSequence s;
-
-  setup(1, {});
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_NE(nullptr, handle_);
 
   Common::Redis::RespValue expected_response;
@@ -1826,47 +1799,34 @@ TEST_P(InfoHandlerTest, SingleShardResponseUnwrapped) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(response());
 
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.shard.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.shard.success").value());
 }
 
-TEST_P(InfoHandlerTest, InfoNoArgumentAddsDefault) {
+TEST_F(InfoShardHandlerTest, InfoShardNoUpstreamForShard) {
   InSequence s;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"info"});
+  makeBulkStringArray(*request, {"info.shard", "0"});
 
-  pool_callbacks_.resize(1);
-  std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(1);
-  pool_requests_.swap(tmp_pool_requests);
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = Response::get().NoUpstreamHost;
 
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  std::vector<Common::Redis::Client::MockPoolRequest> dummy_requests(1);
-
-  EXPECT_CALL(*conn_pool_, shardSize_()).WillRepeatedly(Return(1));
-  ConnPool::RespVariant keys(*request);
-  EXPECT_CALL(*conn_pool_, makeRequestToShard_(0, _, _))
-      .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[0])), Return(&pool_requests_[0])));
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(2));
+  EXPECT_CALL(*conn_pool_, makeRequestToShard_(0, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
 
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  // Even though we get an error, a request object is returned (onResponse is called immediately)
   EXPECT_NE(nullptr, handle_);
 
-  Common::Redis::RespValuePtr response_from_shard = std::make_unique<Common::Redis::RespValue>();
-  response_from_shard->type(Common::Redis::RespType::BulkString);
-  response_from_shard->asString() = "# Server\r\nredis_version:6.2.6\r\n";
-
-  Common::Redis::RespValue expected_final_response;
-  expected_final_response.type(Common::Redis::RespType::BulkString);
-  expected_final_response.asString() = "# Server\r\nredis_version:6.2.6\r\n";
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_final_response)));
-  pool_callbacks_[0]->onResponse(std::move(response_from_shard));
-
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.shard.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.shard.error").value());
 }
 
-INSTANTIATE_TEST_SUITE_P(InfoHandlerTest, InfoHandlerTest, testing::Values("info"));
+INSTANTIATE_TEST_SUITE_P(InfoShardHandlerTest, InfoShardHandlerTest, testing::Values("info.shard"));
 
 class SelectHandlerTest : public FragmentedRequestCommandHandlerTest,
                           public testing::WithParamInterface<std::string> {
@@ -3263,6 +3223,384 @@ TEST_F(ClusterScopeCommandRoutingTest, NoShardsAvailable) {
 
   auto handle = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle);
+}
+
+TEST_F(ClusterScopeCommandRoutingTest, InvalidSubcommand) {
+  // Test that CLUSTER command with invalid subcommand is rejected
+  // Only "cluster" has subcommand validation: {"info", "slots", "keyslot", "nodes"}
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"cluster", "invalidsubcommand"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+
+  auto handle = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle);
+}
+
+// Test cluster scope commands - INFO (InfoCmdAggregateResponseHandler)
+class ClusterScopeInfoTest : public FragmentedRequestCommandHandlerTest {
+public:
+  void setup(uint16_t shard_size, const std::list<uint64_t>& null_handle_indexes,
+             const std::string& section = "") {
+    std::vector<std::string> request_strings = {"info"};
+    if (!section.empty()) {
+      request_strings.push_back(section);
+    }
+    makeRequestToShard(shard_size, request_strings, null_handle_indexes, false);
+  }
+
+  Common::Redis::RespValuePtr infoResponse(const std::string& content) {
+    auto response = std::make_unique<Common::Redis::RespValue>();
+    response->type(Common::Redis::RespType::BulkString);
+    response->asString() = content;
+    return response;
+  }
+
+  Common::Redis::RespValuePtr errorResponse(const std::string& error_msg) {
+    return Common::Redis::Utility::makeError(error_msg);
+  }
+};
+
+// Test all aggregation types: First, Sum, Max, Constant, Custom (Keyspace), PostProcess
+// (human-readable) This single test covers all code paths for metric aggregation without section
+// filtering
+TEST_F(ClusterScopeInfoTest, InfoAggregationAllTypes) {
+  InSequence s;
+  setup(3, {}); // 3 shards for better Max aggregation testing
+  EXPECT_NE(nullptr, handle_);
+
+  // Comprehensive response covering all aggregation types
+  std::string shard1_response =
+      "# Server\r\n"
+      "redis_version:7.0.0\r\n"    // First: takes first shard value
+      "redis_mode:cluster\r\n"     // Constant: same across all shards
+      "os:Linux 5.10.0\r\n"        // First: takes first shard value
+      "arch_bits:64\r\n"           // First: takes first shard value
+      "uptime_in_seconds:1000\r\n" // Max: takes maximum value
+      "# Clients\r\n"
+      "connected_clients:10\r\n" // Sum: adds all shards
+      "# Memory\r\n"
+      "used_memory:1048576\r\n"      // Sum: adds all shards
+      "used_memory_human:1.00M\r\n"  // PostProcess: human-readable conversion
+      "used_memory_rss:1572864\r\n"  // Sum: adds all shards
+      "used_memory_peak:2097152\r\n" // Max: takes maximum value
+      "maxmemory:10485760\r\n"       // Constant: same across all shards
+      "# Stats\r\n"
+      "total_connections_received:1000\r\n" // Sum: adds all shards
+      "total_commands_processed:5000\r\n"   // Sum: adds all shards
+      "keyspace_hits:3000\r\n"              // Sum: adds all shards
+      "keyspace_misses:500\r\n"             // Sum: adds all shards
+      "# CPU\r\n"
+      "used_cpu_sys:10.5\r\n"  // Sum: adds all shards (float)
+      "used_cpu_user:25.3\r\n" // Sum: adds all shards (float)
+      "# Cluster\r\n"
+      "cluster_enabled:1\r\n" // Constant: same across all shards
+      "# Keyspace\r\n"
+      "db0:keys=1000,expires=100,avg_ttl=5000\r\n"; // Custom: keyspace aggregation
+
+  std::string shard2_response = "# Server\r\n"
+                                "redis_version:7.0.1\r\n" // Different but First takes shard1
+                                "redis_mode:cluster\r\n"
+                                "os:Linux 5.10.0\r\n"
+                                "arch_bits:64\r\n"
+                                "uptime_in_seconds:2500\r\n" // Max: this is maximum
+                                "# Clients\r\n"
+                                "connected_clients:15\r\n"
+                                "# Memory\r\n"
+                                "used_memory:2097152\r\n"
+                                "used_memory_human:2.00M\r\n"
+                                "used_memory_rss:2621440\r\n"
+                                "used_memory_peak:3145728\r\n" // Max: this is maximum
+                                "maxmemory:10485760\r\n"
+                                "# Stats\r\n"
+                                "total_connections_received:1500\r\n"
+                                "total_commands_processed:7500\r\n"
+                                "keyspace_hits:4500\r\n"
+                                "keyspace_misses:750\r\n"
+                                "# CPU\r\n"
+                                "used_cpu_sys:15.2\r\n"
+                                "used_cpu_user:35.7\r\n"
+                                "# Cluster\r\n"
+                                "cluster_enabled:1\r\n"
+                                "# Keyspace\r\n"
+                                "db0:keys=1500,expires=150,avg_ttl=6000\r\n";
+
+  std::string shard3_response = "# Server\r\n"
+                                "redis_version:7.0.2\r\n"
+                                "redis_mode:cluster\r\n"
+                                "os:Linux 5.10.0\r\n"
+                                "arch_bits:64\r\n"
+                                "uptime_in_seconds:1800\r\n"
+                                "# Clients\r\n"
+                                "connected_clients:12\r\n"
+                                "# Memory\r\n"
+                                "used_memory:1572864\r\n"
+                                "used_memory_human:1.50M\r\n"
+                                "used_memory_rss:2097152\r\n"
+                                "used_memory_peak:2621440\r\n"
+                                "maxmemory:10485760\r\n"
+                                "# Stats\r\n"
+                                "total_connections_received:1200\r\n"
+                                "total_commands_processed:6000\r\n"
+                                "keyspace_hits:3500\r\n"
+                                "keyspace_misses:600\r\n"
+                                "# CPU\r\n"
+                                "used_cpu_sys:12.8\r\n"
+                                "used_cpu_user:28.5\r\n"
+                                "# Cluster\r\n"
+                                "cluster_enabled:1\r\n"
+                                "# Keyspace\r\n"
+                                "db0:keys=1200,expires=120,avg_ttl=5500\r\n";
+
+  pool_callbacks_[0]->onResponse(infoResponse(shard1_response));
+  pool_callbacks_[1]->onResponse(infoResponse(shard2_response));
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[2]->onResponse(infoResponse(shard3_response));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.success").value());
+}
+
+// Test section filtering - iterates through all major sections with same comprehensive response
+// This tests shouldIncludeSection() logic with case-insensitive matching
+TEST_F(ClusterScopeInfoTest, InfoSectionFiltering) {
+  // All major Redis INFO sections
+  std::vector<std::string> sections = {"server", "clients", "memory", "stats", "cpu", "keyspace"};
+
+  // Comprehensive response with all sections
+  std::string comprehensive_response = "# Server\r\n"
+                                       "redis_version:7.0.0\r\n"
+                                       "os:Linux\r\n"
+                                       "# Clients\r\n"
+                                       "connected_clients:10\r\n"
+                                       "# Memory\r\n"
+                                       "used_memory:1048576\r\n"
+                                       "used_memory_human:1.00M\r\n"
+                                       "# Stats\r\n"
+                                       "total_commands_processed:1000\r\n"
+                                       "# CPU\r\n"
+                                       "used_cpu_sys:10.5\r\n"
+                                       "# Keyspace\r\n"
+                                       "db0:keys=1000,expires=100,avg_ttl=5000\r\n";
+
+  for (const auto& section : sections) {
+    InSequence s;
+
+    // Test lowercase section name
+    setup(2, {}, section);
+    EXPECT_NE(nullptr, handle_);
+    pool_callbacks_[0]->onResponse(infoResponse(comprehensive_response));
+    EXPECT_CALL(callbacks_, onResponse_(_));
+    pool_callbacks_[1]->onResponse(infoResponse(comprehensive_response));
+
+    // Test uppercase section name (case-insensitive)
+    std::string uppercase_section = section;
+    std::transform(uppercase_section.begin(), uppercase_section.end(), uppercase_section.begin(),
+                   ::toupper);
+    setup(2, {}, uppercase_section);
+    EXPECT_NE(nullptr, handle_);
+    pool_callbacks_[0]->onResponse(infoResponse(comprehensive_response));
+    EXPECT_CALL(callbacks_, onResponse_(_));
+    pool_callbacks_[1]->onResponse(infoResponse(comprehensive_response));
+  }
+
+  // Test empty section (should include all sections)
+  {
+    InSequence s;
+    setup(2, {}, "");
+    EXPECT_NE(nullptr, handle_);
+    pool_callbacks_[0]->onResponse(infoResponse(comprehensive_response));
+    EXPECT_CALL(callbacks_, onResponse_(_));
+    pool_callbacks_[1]->onResponse(infoResponse(comprehensive_response));
+  }
+}
+
+// Test error handling - non-bulk-string response
+TEST_F(ClusterScopeInfoTest, InfoNonBulkStringResponse) {
+  InSequence s;
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  std::string shard1_response = "# Server\r\nredis_version:7.0.0\r\n";
+  pool_callbacks_[0]->onResponse(infoResponse(shard1_response));
+
+  // Second shard returns non-bulk-string
+  auto invalid_response = std::make_unique<Common::Redis::RespValue>();
+  invalid_response->type(Common::Redis::RespType::Integer);
+  invalid_response->asInteger() = 123;
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(8));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 8));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[1]->onResponse(std::move(invalid_response));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.error").value());
+}
+
+// Test error handling - null response
+TEST_F(ClusterScopeInfoTest, InfoNullResponse) {
+  InSequence s;
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  std::string shard1_response = "# Server\r\nredis_version:7.0.0\r\n";
+  pool_callbacks_[0]->onResponse(infoResponse(shard1_response));
+
+  Common::Redis::RespValuePtr null_resp;
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[1]->onResponse(std::move(null_resp));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.error").value());
+}
+
+// Test error handling - error response from shard
+TEST_F(ClusterScopeInfoTest, InfoErrorResponse) {
+  InSequence s;
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  std::string shard1_response = "# Server\r\nredis_version:7.0.0\r\n";
+  pool_callbacks_[0]->onResponse(infoResponse(shard1_response));
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(12));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 12));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[1]->onResponse(errorResponse("ERR internal error"));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.error").value());
+}
+
+// Test shard failure
+TEST_F(ClusterScopeInfoTest, InfoShardFailure) {
+  InSequence s;
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  std::string shard1_response = "# Server\r\nredis_version:7.0.0\r\n";
+  pool_callbacks_[0]->onResponse(infoResponse(shard1_response));
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(15));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 15));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[1]->onFailure();
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.error").value());
+}
+
+// Test cancel operation
+TEST_F(ClusterScopeInfoTest, InfoCancel) {
+  InSequence s;
+  setup(3, {});
+  EXPECT_NE(nullptr, handle_);
+
+  EXPECT_CALL(pool_requests_[0], cancel());
+  EXPECT_CALL(pool_requests_[1], cancel());
+  EXPECT_CALL(pool_requests_[2], cancel());
+  handle_->cancel();
+}
+
+// Test no upstream hosts
+TEST_F(ClusterScopeInfoTest, InfoNoUpstream) {
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "no upstream host";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  setup(0, {});
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.error").value());
+}
+
+// Test bytesToHuman conversion for all size ranges and proper metric aggregation
+TEST_F(ClusterScopeInfoTest, InfoBytesToHumanAllSizes) {
+  InSequence s;
+  setup(2, {}); // Use 2 shards to properly test aggregation
+  EXPECT_NE(nullptr, handle_);
+
+  // Shard 1: Test various size ranges covering all bytesToHuman branches
+  std::string shard1_response =
+      "# Memory\r\n"
+      "used_memory:512\r\n"                        // Bytes: 512B (Sum aggregation)
+      "used_memory_rss:2048\r\n"                   // KB: 2.00K (Sum aggregation)
+      "used_memory_peak:5242880\r\n"               // MB: 5.00M (Max aggregation)
+      "used_memory_lua:3221225472\r\n"             // GB: 3.00G (Sum, has _human)
+      "used_memory_scripts:5497558138880\r\n"      // TB: 5.00T (Sum, has _human)
+      "used_memory_vm_total:6755399441055744\r\n"  // PB: 6.00P (Sum, has _human)
+      "total_system_memory:576460752303423488\r\n" // EB: 0.50E (Sum, triggers else branch)
+      "maxmemory:10485760\r\n";                    // Sum: total max memory
+
+  // Shard 2: Add more values to test Sum and Max aggregation properly
+  std::string shard2_response =
+      "# Memory\r\n"
+      "used_memory:256\r\n"                   // Sum: 512 + 256 = 768B
+      "used_memory_rss:1024\r\n"              // Sum: 2048 + 1024 = 3072 = 3.00K
+      "used_memory_peak:2621440\r\n"          // Max: max(5242880, 2621440) = 5.00M
+      "used_memory_lua:1073741824\r\n"        // Sum: 3221225472 + 1073741824 = 4294967296 = 4.00G
+      "used_memory_scripts:2748779069440\r\n" // Sum: 5497558138880 + 2748779069440 = 8246337208320
+                                              // = 7.50T
+      "used_memory_vm_total:3377699720527872\r\n"  // Sum: 6755399441055744 + 3377699720527872 =
+                                                   // 10133099161583616 = 9.00P
+      "total_system_memory:576460752303423488\r\n" // Sum: 0.5E + 0.5E = 1.00E (>= 1EB, else)
+      "maxmemory:10485760\r\n";                    // Sum: 10485760 + 10485760 = 20971520
+
+  pool_callbacks_[0]->onResponse(infoResponse(shard1_response));
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 10));
+
+  // Verify the response contains correctly formatted human-readable values
+  EXPECT_CALL(callbacks_, onResponse_(_)).WillOnce([](Common::Redis::RespValuePtr& response) {
+    ASSERT_NE(nullptr, response);
+    ASSERT_EQ(Common::Redis::RespType::BulkString, response->type());
+    std::string content = response->asString();
+
+    // Verify _human metrics covering ALL size ranges
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_human:768B"));      // Bytes: 512+256
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_rss_human:3.00K")); // KB: 2048+1024
+    EXPECT_THAT(content,
+                testing::HasSubstr("used_memory_peak_human:5.00M")); // MB: max(5242880,2621440)
+    EXPECT_THAT(content,
+                testing::HasSubstr("used_memory_lua_human:4.00G")); // GB: 3221225472+1073741824
+    EXPECT_THAT(content,
+                testing::HasSubstr("used_memory_scripts_human:7.50T")); // TB: sum of values
+    EXPECT_THAT(content,
+                testing::HasSubstr("used_memory_vm_total_human:9.00P")); // PB: sum of values
+    EXPECT_THAT(content, testing::HasSubstr(
+                             "total_system_memory_human:1152921504606846976B")); // >= 1EB (else)
+    EXPECT_THAT(content, testing::HasSubstr("maxmemory_human:20.00M"));          // MB: 20971520
+
+    // Verify Sum aggregation worked for numeric values
+    EXPECT_THAT(content, testing::HasSubstr("used_memory:768"));                        // 512+256
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_rss:3072"));                   // 2048+1024
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_peak:5242880"));               // max value
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_lua:4294967296"));             // GB sum
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_scripts:8246337208320"));      // TB sum
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_vm_total:10133099161583616")); // PB sum
+    EXPECT_THAT(content, testing::HasSubstr("total_system_memory:1152921504606846976")); // EB sum
+    EXPECT_THAT(content, testing::HasSubstr("maxmemory:20971520")); // 10485760+10485760
+  });
+
+  pool_callbacks_[1]->onResponse(infoResponse(shard2_response));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.success").value());
 }
 
 } // namespace CommandSplitter

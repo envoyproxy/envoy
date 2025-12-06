@@ -13,7 +13,7 @@ bool SupportedCommands::isSupportedCommand(const std::string& command) {
           transactionCommands().contains(command) || auth() == command || echo() == command ||
           mget() == command || mset() == command || keys() == command || ping() == command ||
           time() == command || quit() == command || select() == command || scan() == command ||
-          info() == command || role() == command);
+          infoShard() == command || role() == command);
 }
 
 bool SupportedCommands::isCommandValidWithoutArgs(const std::string& command_name) {
