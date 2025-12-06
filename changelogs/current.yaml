@@ -339,6 +339,9 @@ new_features:
   change: |
     Added :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.access_log>` for the
     DNS filter.
+- area: ratelimit
+  change: |
+    Added support for substitution formatting in rate limit descriptor values.
 - area: redis
   change: |
     Added support for ``redis_proxy`` to use separate credentials for each upstream Redis cluster.
