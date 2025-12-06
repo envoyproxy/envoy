@@ -4,6 +4,7 @@
 #include "envoy/extensions/tracers/opentelemetry/samplers/v3/trace_id_ratio_based_sampler.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/common/byte_order.h"
 #include "source/common/common/random_generator.h"
 #include "source/extensions/tracers/opentelemetry/samplers/trace_id_ratio_based/trace_id_ratio_based_sampler.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
@@ -38,7 +39,7 @@ TEST(TraceIdRatioBasedSamplerTest, TestTraceIdToUint64) {
   std::string short_trace_id = "5b8aa5a";
   EXPECT_EQ(sampler->traceIdToUint64(short_trace_id), 0);
 
-  uint64_t first_8_bytes = 16749670771141741147ULL;
+  uint64_t first_8_bytes = fromEndianness<ByteOrder::BigEndian>(0x5b8aa5a2d2c872e8ULL);
 
   // Test with a string of exactly 16 characters.
   std::string trace_id_16 = "5b8aa5a2d2c872e8";
