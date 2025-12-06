@@ -149,7 +149,6 @@ public:
   uint32_t numDegradations() const { return num_degradations_; }
 
   void putHttpResponseCode(uint64_t response_code);
-  void putHttpResponseCodeDegraded(uint64_t response_code);
 
   const SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) const {
     return (SuccessRateMonitorType::ExternalOrigin == type) ? external_origin_sr_monitor_

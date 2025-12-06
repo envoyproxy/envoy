@@ -78,7 +78,6 @@ void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
 
 void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   external_origin_sr_monitor_.incTotalReqCounter();
-
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
@@ -104,28 +103,6 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     consecutive_5xx_ = 0;
     consecutive_gateway_failure_ = 0;
   }
-}
-
-void DetectorHostMonitorImpl::putHttpResponseCodeDegraded(uint64_t response_code) {
-  // Degraded should only be applied to successful responses (not 5xx).
-  // This ensures degradation doesn't interfere with any ejection logic.
-  ASSERT(!Http::CodeUtility::is5xx(response_code),
-         "Degraded detection should only be applied to non-5xx responses");
-
-  external_origin_sr_monitor_.incTotalReqCounter();
-  external_origin_sr_monitor_.incSuccessReqCounter();
-
-  std::shared_ptr<DetectorImpl> detector = detector_.lock();
-  if (!detector) {
-    return;
-  }
-
-  // Mark host as degraded (separate from ejection)
-  detector->setHostDegraded(host_.lock());
-
-  // Reset consecutive error counters since this is a successful response
-  consecutive_5xx_ = 0;
-  consecutive_gateway_failure_ = 0;
 }
 
 absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result result) {
@@ -167,10 +144,12 @@ absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resu
 // - if *code* is defined, it is taken as HTTP code and reported as such to outlier detector.
 void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
                                                             absl::optional<uint64_t> code) {
-  // Handle degraded separately
+  // Mark host as degraded if needed, then process normally
   if (result == Result::ExtOriginRequestDegraded) {
-    putHttpResponseCodeDegraded(code.value_or(enumToInt(Http::Code::OK)));
-    return;
+    std::shared_ptr<DetectorImpl> detector = detector_.lock();
+    if (detector) {
+      detector->setHostDegraded(host_.lock());
+    }
   }
 
   if (code) {
@@ -212,7 +191,12 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
     putHttpResponseCode(code.value_or(enumToInt(Http::Code::OK)));
     break;
   case Result::ExtOriginRequestDegraded:
-    putHttpResponseCodeDegraded(code.value_or(enumToInt(Http::Code::OK)));
+    // Mark host as degraded, then process as successful response
+    std::shared_ptr<DetectorImpl> detector = detector_.lock();
+    if (detector) {
+      detector->setHostDegraded(host_.lock());
+    }
+    putHttpResponseCode(code.value_or(enumToInt(Http::Code::OK)));
     break;
   }
 }
