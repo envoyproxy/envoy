@@ -850,8 +850,7 @@ TEST(DefaultCertValidatorTest, TestCertificateValidationErrorDetailsForSanFailur
   EXPECT_EQ(Ssl::ClientValidationStatus::Failed, status);
 
   // The error_details should be populated with a meaningful error message
-  EXPECT_THAT(error_details, testing::HasSubstr("verify cert failed"));
-  EXPECT_THAT(error_details, testing::HasSubstr("SAN matcher"));
+  EXPECT_EQ(error_details, "verify cert failed: SAN matcher");
 }
 
 // Test that TestSslExtendedSocketInfo properly stores and retrieves certificate validation errors.
@@ -888,7 +887,7 @@ TEST(DefaultCertValidatorTest, TestEmptyCertChainErrorDetails) {
 
   EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
   EXPECT_TRUE(results.error_details.has_value());
-  EXPECT_THAT(results.error_details.value(), testing::HasSubstr("empty cert chain"));
+  EXPECT_EQ(results.error_details.value(), "verify cert failed: empty cert chain");
 }
 
 } // namespace Tls
