@@ -224,6 +224,9 @@ public:
   EngineBuilder& setNodeMetadata(Protobuf::Struct node_metadata);
   // Sets whether to collect Envoy's internal stats (counters & guages). Off by default.
   EngineBuilder& enableStatsCollection(bool stats_collection_on);
+  // If true, initialize the platform network change monitor to listen for network change events.
+  // Defaults to false.
+  EngineBuilder& enableNetworkChangeMonitor(bool network_change_monitor_on);
 
 #ifdef ENVOY_MOBILE_XDS
   // Sets the xDS configuration for the Envoy Mobile engine.
@@ -267,6 +270,7 @@ private:
   bool enable_logger_{true};
   std::unique_ptr<EngineCallbacks> callbacks_;
   std::unique_ptr<EnvoyEventTracker> event_tracker_{nullptr};
+  std::unique_ptr<NetworkChangeMonitor> network_change_monitor_;
 
   int connect_timeout_seconds_ = 10;
   int dns_refresh_seconds_ = 60;
@@ -341,6 +345,7 @@ private:
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;
   absl::optional<Protobuf::Struct> node_metadata_ = absl::nullopt;
   bool enable_stats_collection_ = true;
+  bool enable_network_change_monitor_ = false;
 #ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif // ENVOY_MOBILE_XDS
