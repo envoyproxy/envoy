@@ -1,8 +1,5 @@
 #pragma once
 
-#include <chrono>
-#include <cstdint>
-#include <memory>
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -25,6 +22,7 @@
 #include "source/extensions/filters/common/ext_proc/client_base.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/ext_proc/allowed_override_modes_set.h"
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
@@ -279,9 +277,15 @@ public:
     return typed_cluster_metadata_forwarding_namespaces_;
   }
 
-  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
-  allowedOverrideModes() const {
-    return allowed_override_modes_;
+  /*
+   * Returns true if there are no allowed_override_modes defined, or if defined
+   * then one of them matches the given input.
+   *
+   * @param mode the processing mode that needs to be explicitly defined.
+   */
+  bool isAllowedOverrideMode(
+      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) const {
+    return allowed_override_modes_.empty() || allowed_override_modes_.isModeSupported(mode);
   }
 
   ThreadLocalStreamManager& threadLocalStreamManager() {
@@ -355,8 +359,7 @@ private:
   const std::vector<std::string> untyped_receiving_namespaces_;
   const std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_;
   const std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_;
-  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
-      allowed_override_modes_;
+  const AllowedOverrideModesSet allowed_override_modes_;
   const ExpressionManager expression_manager_;
 
   const std::function<std::unique_ptr<ProcessingRequestModifier>()>

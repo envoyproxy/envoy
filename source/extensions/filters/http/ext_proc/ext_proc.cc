@@ -283,8 +283,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       typed_cluster_metadata_forwarding_namespaces_(
           config.metadata_options().cluster_metadata_forwarding_namespaces().typed().begin(),
           config.metadata_options().cluster_metadata_forwarding_namespaces().typed().end()),
-      allowed_override_modes_(config.allowed_override_modes().begin(),
-                              config.allowed_override_modes().end()),
+      allowed_override_modes_(config.allowed_override_modes()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       processing_request_modifier_factory_cb_(
@@ -1728,27 +1727,11 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       (config_->processingMode().request_body_mode() != ProcessingMode::FULL_DUPLEX_STREAMED) &&
       (config_->processingMode().response_body_mode() != ProcessingMode::FULL_DUPLEX_STREAMED) &&
       inHeaderProcessState() && response->has_mode_override()) {
-    bool mode_override_allowed = true;
     const auto mode_override =
         effectiveModeOverride(response->mode_override(), config_->processingMode());
 
-    // First, check if mode override allow-list is configured
-    if (!config_->allowedOverrideModes().empty()) {
-      // Second, check if mode override from response is allowed.
-      mode_override_allowed = absl::c_any_of(
-          config_->allowedOverrideModes(),
-          [&mode_override](
-              const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& other) {
-            // Ignore matching on request_header_mode as it's not applicable.
-            return mode_override.request_body_mode() == other.request_body_mode() &&
-                   mode_override.request_trailer_mode() == other.request_trailer_mode() &&
-                   mode_override.response_header_mode() == other.response_header_mode() &&
-                   mode_override.response_body_mode() == other.response_body_mode() &&
-                   mode_override.response_trailer_mode() == other.response_trailer_mode();
-          });
-    }
-
-    if (mode_override_allowed) {
+    // Check if mode override allow-list is configured.
+    if (config_->isAllowedOverrideMode(mode_override)) {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server for this request",
                        *decoder_callbacks_);
       decoding_state_.setProcessingMode(mode_override);
