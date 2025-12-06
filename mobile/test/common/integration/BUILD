@@ -27,6 +27,7 @@ envoy_cc_test(
     deps = [
         ":base_client_integration_test_lib",
         "//test/common/mocks/common:common_mocks",
+        "//test/common/mocks/dns:mock_dns_resolver_lib",
         "@envoy//source/common/quic:active_quic_listener_lib",
         "@envoy//source/common/quic:client_connection_factory_lib",
         "@envoy//source/common/quic:quic_server_factory_lib",
@@ -36,6 +37,8 @@ envoy_cc_test(
         "@envoy//source/extensions/udp_packet_writer/gso:config",
         "@envoy//test/extensions/filters/http/dynamic_forward_proxy:test_resolver_lib",
         "@envoy//test/test_common:test_random_generator_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_build_config//:test_extensions",
     ],
 )
 
