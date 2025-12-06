@@ -47,11 +47,17 @@ public:
     return cert_selection_result_;
   }
 
+  void setCertificateValidationError(absl::string_view error_details) override {
+    cert_validation_error_ = std::string(error_details);
+  }
+  absl::string_view certificateValidationError() const override { return cert_validation_error_; }
+
 private:
   Envoy::Ssl::ClientValidationStatus status_;
   Ssl::ValidateStatus validate_result_{Ssl::ValidateStatus::NotStarted};
   Ssl::CertificateSelectionStatus cert_selection_result_{
       Ssl::CertificateSelectionStatus::NotStarted};
+  std::string cert_validation_error_;
 };
 
 class TestCertificateValidationContextConfig

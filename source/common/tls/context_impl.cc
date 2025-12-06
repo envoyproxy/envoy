@@ -487,6 +487,10 @@ enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* ou
     if (result.tls_alert.has_value() && out_alert) {
       *out_alert = result.tls_alert.value();
     }
+    // Store detailed error information for access log reporting.
+    if (result.error_details.has_value()) {
+      extended_socket_info->setCertificateValidationError(result.error_details.value());
+    }
     return ssl_verify_invalid;
   }
   }

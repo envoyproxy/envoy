@@ -244,6 +244,71 @@ TEST_F(HandshakerTest, NormalOperationWithSslHandshakerImplForTest) {
   EXPECT_EQ(post_io_action, Network::PostIoAction::Close);
 }
 
+// Test that SslExtendedSocketInfoImpl properly stores and retrieves certificate validation errors.
+TEST_F(HandshakerTest, SslExtendedSocketInfoCertValidationError) {
+  NiceMock<Network::MockConnection> mock_connection;
+  ON_CALL(mock_connection, state).WillByDefault(Return(Network::Connection::State::Closed));
+
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks;
+  ON_CALL(handshake_callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
+
+  SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
+
+  // Get the extended socket info through the SSL ex_data mechanism
+  auto* extended_info =
+      reinterpret_cast<Ssl::SslExtendedSocketInfo*>(SSL_get_ex_data(handshaker.ssl(), 0));
+  ASSERT_NE(extended_info, nullptr);
+
+  // Initially, the certificate validation error should be empty.
+  EXPECT_TRUE(extended_info->certificateValidationError().empty());
+
+  // Set the certificate validation error.
+  const std::string error_msg =
+      "verify cert failed: X509_verify_cert: certificate verification error at depth 0: "
+      "certificate has expired";
+  extended_info->setCertificateValidationError(error_msg);
+
+  // Verify the error is properly stored and retrievable.
+  EXPECT_EQ(error_msg, extended_info->certificateValidationError());
+
+  // Test that we can overwrite the error.
+  const std::string new_error_msg = "verify cert failed: SAN matcher";
+  extended_info->setCertificateValidationError(new_error_msg);
+  EXPECT_EQ(new_error_msg, extended_info->certificateValidationError());
+}
+
+// Test that ValidateResultCallbackImpl properly stores error details.
+TEST_F(HandshakerTest, ValidateResultCallbackStoresErrorDetails) {
+  NiceMock<Network::MockConnection> mock_connection;
+  ON_CALL(mock_connection, state).WillByDefault(Return(Network::Connection::State::Open));
+
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks;
+  ON_CALL(handshake_callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
+
+  SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
+
+  // Get the extended socket info
+  auto* extended_info =
+      reinterpret_cast<Ssl::SslExtendedSocketInfo*>(SSL_get_ex_data(handshaker.ssl(), 0));
+  ASSERT_NE(extended_info, nullptr);
+
+  // Create a validation callback (simulating async validation)
+  auto callback = extended_info->createValidateResultCallback();
+  ASSERT_NE(callback, nullptr);
+
+  // Simulate validation failure with error details
+  const std::string error_details =
+      "verify cert failed: X509_verify_cert: certificate verification error at depth 1: "
+      "unable to get local issuer certificate";
+  callback->onCertValidationResult(false, Ssl::ClientValidationStatus::Failed, error_details,
+                                   SSL_AD_UNKNOWN_CA);
+
+  // Verify the error was stored in extended socket info
+  EXPECT_EQ(error_details, extended_info->certificateValidationError());
+  EXPECT_EQ(Ssl::ClientValidationStatus::Failed, extended_info->certificateValidationStatus());
+  EXPECT_EQ(SSL_AD_UNKNOWN_CA, extended_info->certificateValidationAlert());
+}
+
 } // namespace
 } // namespace Tls
 } // namespace TransportSockets
