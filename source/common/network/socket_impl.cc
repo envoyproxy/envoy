@@ -13,7 +13,7 @@ SocketImpl::SocketImpl(Socket::Type sock_type,
                        const Address::InstanceConstSharedPtr& address_for_io_handle,
                        const Address::InstanceConstSharedPtr& remote_address,
                        const SocketCreationOptions& options)
-    : io_handle_(ioHandleForAddr(sock_type, address_for_io_handle, options)),
+    : io_handle_(ioHandleForAddr(sock_type, address_for_io_handle, options).value_or(nullptr)),
       connection_info_provider_(
           std::make_shared<ConnectionInfoSetterImpl>(nullptr, remote_address)),
       sock_type_(sock_type), addr_type_(address_for_io_handle->type()) {}
@@ -57,6 +57,10 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
 }
 
 Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr address) {
+  if (!io_handle_ || !isOpen()) {
+    return Api::SysCallIntResult{-1, HANDLE_ERROR_INVALID};
+  }
+
   Api::SysCallIntResult bind_result;
 
   if (address->type() == Address::Type::Pipe) {
@@ -91,9 +95,18 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
   return bind_result;
 }
 
-Api::SysCallIntResult SocketImpl::listen(int backlog) { return io_handle_->listen(backlog); }
+Api::SysCallIntResult SocketImpl::listen(int backlog) {
+  if (!io_handle_ || !isOpen()) {
+    return Api::SysCallIntResult{-1, HANDLE_ERROR_INVALID};
+  }
+  return io_handle_->listen(backlog);
+}
 
 Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
+  if (!io_handle_ || !isOpen()) {
+    return Api::SysCallIntResult{-1, HANDLE_ERROR_INVALID};
+  }
+
   auto result = io_handle_->connect(address);
   if (address->type() == Address::Type::Ip) {
     auto address_or_error = io_handle_->localAddress();
@@ -107,11 +120,17 @@ Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstS
 
 Api::SysCallIntResult SocketImpl::setSocketOption(int level, int optname, const void* optval,
                                                   socklen_t optlen) {
+  if (!io_handle_ || !isOpen()) {
+    return Api::SysCallIntResult{-1, HANDLE_ERROR_INVALID};
+  }
   return io_handle_->setOption(level, optname, optval, optlen);
 }
 
 Api::SysCallIntResult SocketImpl::getSocketOption(int level, int optname, void* optval,
                                                   socklen_t* optlen) const {
+  if (!io_handle_ || !isOpen()) {
+    return Api::SysCallIntResult{-1, HANDLE_ERROR_INVALID};
+  }
   return io_handle_->getOption(level, optname, optval, optlen);
 }
 
@@ -119,11 +138,17 @@ Api::SysCallIntResult SocketImpl::ioctl(unsigned long control_code, void* in_buf
                                         unsigned long in_buffer_len, void* out_buffer,
                                         unsigned long out_buffer_len,
                                         unsigned long* bytes_returned) {
+  if (!io_handle_ || !isOpen()) {
+    return Api::SysCallIntResult{-1, HANDLE_ERROR_INVALID};
+  }
   return io_handle_->ioctl(control_code, in_buffer, in_buffer_len, out_buffer, out_buffer_len,
                            bytes_returned);
 }
 
 Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {
+  if (!io_handle_ || !isOpen()) {
+    return Api::SysCallIntResult{-1, HANDLE_ERROR_INVALID};
+  }
   return io_handle_->setBlocking(blocking);
 }
 

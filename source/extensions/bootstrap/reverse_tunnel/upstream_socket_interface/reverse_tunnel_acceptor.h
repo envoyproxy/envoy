@@ -20,6 +20,8 @@
 #include "source/common/network/socket_interface.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_connection_io_handle.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -55,7 +57,7 @@ public:
    * @param options socket creation options.
    * @return nullptr since reverse connections require specific addresses.
    */
-  Envoy::Network::IoHandlePtr
+  absl::StatusOr<Envoy::Network::IoHandlePtr>
   socket(Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
          Envoy::Network::Address::IpVersion version, bool socket_v6only,
          const Envoy::Network::SocketCreationOptions& options) const override;
@@ -65,9 +67,9 @@ public:
    * @param socket_type the type of socket to create.
    * @param addr the address to bind to.
    * @param options socket creation options.
-   * @return IoHandlePtr for the reverse connection socket.
+   * @return StatusOr<IoHandlePtr> with the reverse connection socket, nullptr for error
    */
-  Envoy::Network::IoHandlePtr
+  absl::StatusOr<Envoy::Network::IoHandlePtr>
   socket(Envoy::Network::Socket::Type socket_type,
          const Envoy::Network::Address::InstanceConstSharedPtr addr,
          const Envoy::Network::SocketCreationOptions& options) const override;

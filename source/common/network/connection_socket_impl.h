@@ -103,8 +103,9 @@ class ClientSocketImpl : public ConnectionSocketImpl {
 public:
   ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address,
                    const OptionsSharedPtr& options)
-      : ConnectionSocketImpl(Network::ioHandleForAddr(Socket::Type::Stream, remote_address, {}),
-                             nullptr, remote_address) {
+      : ConnectionSocketImpl(
+            Network::ioHandleForAddr(Socket::Type::Stream, remote_address, {}).value_or(nullptr),
+            nullptr, remote_address) {
     if (options) {
       addOptions(options);
     }

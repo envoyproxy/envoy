@@ -10,6 +10,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -169,19 +170,23 @@ TEST_F(TestReverseTunnelAcceptor, CreateEmptyConfigProto) {
 
 TEST_F(TestReverseTunnelAcceptor, SocketWithoutAddress) {
   Network::SocketCreationOptions options;
-  auto io_handle =
+  absl::StatusOr<Network::IoHandlePtr> io_handle =
       socket_interface_->socket(Network::Socket::Type::Stream, Network::Address::Type::Ip,
                                 Network::Address::IpVersion::v4, false, options);
-  EXPECT_EQ(io_handle, nullptr);
+  ASSERT_TRUE(io_handle.ok());
+  EXPECT_EQ(*io_handle, nullptr);
 }
 
 TEST_F(TestReverseTunnelAcceptor, SocketWithAddressNoThreadLocal) {
   const std::string node_id = "test-node";
   auto address = createAddressWithLogicalName(node_id);
   Network::SocketCreationOptions options;
-  auto io_handle = socket_interface_->socket(Network::Socket::Type::Stream, address, options);
-  EXPECT_NE(io_handle, nullptr);
-  EXPECT_EQ(dynamic_cast<UpstreamReverseConnectionIOHandle*>(io_handle.get()), nullptr);
+  absl::StatusOr<Network::IoHandlePtr> io_handle =
+      socket_interface_->socket(Network::Socket::Type::Stream, address, options);
+
+  ASSERT_TRUE(io_handle.ok());
+  ASSERT_NE(*io_handle, nullptr);
+  EXPECT_EQ(dynamic_cast<UpstreamReverseConnectionIOHandle*>(io_handle->get()), nullptr);
 
   // Verify fallback counter increments for diagnostics.
   // Counter name is "<scope>.<stat_prefix>.fallback_no_reverse_socket".
@@ -199,9 +204,11 @@ TEST_F(TestReverseTunnelAcceptor, SocketWithAddressAndThreadLocalNoCachedSockets
   auto address = createAddressWithLogicalName(node_id);
 
   Network::SocketCreationOptions options;
-  auto io_handle = socket_interface_->socket(Network::Socket::Type::Stream, address, options);
-  EXPECT_NE(io_handle, nullptr);
-  EXPECT_EQ(dynamic_cast<UpstreamReverseConnectionIOHandle*>(io_handle.get()), nullptr);
+  absl::StatusOr<Network::IoHandlePtr> io_handle =
+      socket_interface_->socket(Network::Socket::Type::Stream, address, options);
+  ASSERT_TRUE(io_handle.ok());
+  ASSERT_NE(*io_handle, nullptr);
+  EXPECT_EQ(dynamic_cast<UpstreamReverseConnectionIOHandle*>(io_handle->get()), nullptr);
 }
 
 TEST_F(TestReverseTunnelAcceptor, SocketWithAddressAndThreadLocalWithCachedSockets) {
@@ -221,16 +228,19 @@ TEST_F(TestReverseTunnelAcceptor, SocketWithAddressAndThreadLocalWithCachedSocke
   auto address = createAddressWithLogicalName(node_id);
 
   Network::SocketCreationOptions options;
-  auto io_handle = socket_interface_->socket(Network::Socket::Type::Stream, address, options);
-  EXPECT_NE(io_handle, nullptr);
+  absl::StatusOr<Network::IoHandlePtr> io_handle =
+      socket_interface_->socket(Network::Socket::Type::Stream, address, options);
+  ASSERT_TRUE(io_handle.ok());
+  ASSERT_NE(*io_handle, nullptr);
 
-  auto* upstream_io_handle = dynamic_cast<UpstreamReverseConnectionIOHandle*>(io_handle.get());
+  auto* upstream_io_handle = dynamic_cast<UpstreamReverseConnectionIOHandle*>(io_handle->get());
   EXPECT_NE(upstream_io_handle, nullptr);
 
-  auto another_io_handle =
+  absl::StatusOr<Network::IoHandlePtr> another_io_handle =
       socket_interface_->socket(Network::Socket::Type::Stream, address, options);
-  EXPECT_NE(another_io_handle, nullptr);
-  EXPECT_EQ(dynamic_cast<UpstreamReverseConnectionIOHandle*>(another_io_handle.get()), nullptr);
+  ASSERT_TRUE(another_io_handle.ok());
+  ASSERT_NE(*another_io_handle, nullptr);
+  EXPECT_EQ(dynamic_cast<UpstreamReverseConnectionIOHandle*>(another_io_handle->get()), nullptr);
 }
 
 TEST_F(TestReverseTunnelAcceptor, IpFamilySupported) {

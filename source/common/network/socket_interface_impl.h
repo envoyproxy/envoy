@@ -25,11 +25,14 @@ protected:
 class SocketInterfaceImpl : public SocketInterfaceBase {
 public:
   // SocketInterface
-  IoHandlePtr socket(Socket::Type socket_type, Address::Type addr_type, Address::IpVersion version,
-                     bool socket_v6only, const SocketCreationOptions& options) const override;
-  IoHandlePtr socket(Socket::Type socket_type, const Address::InstanceConstSharedPtr addr,
-                     const SocketCreationOptions& options) const override;
+  absl::StatusOr<IoHandlePtr> socket(Socket::Type socket_type, Address::Type addr_type,
+                                     Address::IpVersion version, bool socket_v6only,
+                                     const SocketCreationOptions& options) const override;
+  absl::StatusOr<IoHandlePtr> socket(Socket::Type socket_type,
+                                     const Address::InstanceConstSharedPtr addr,
+                                     const SocketCreationOptions& options) const override;
   bool ipFamilySupported(int domain) override;
+  bool ipFamilySupported(int domain) const;
 
   // Server::Configuration::BootstrapExtensionFactory
   Server::BootstrapExtensionPtr

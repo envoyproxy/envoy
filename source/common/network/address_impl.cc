@@ -114,7 +114,6 @@ Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* so
                            absl::optional<std::string> network_namespace)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)),
       network_namespace_(network_namespace) {
-  THROW_IF_NOT_OK(validateProtocolSupported());
   initHelper(address);
 }
 
@@ -127,7 +126,6 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
                            absl::optional<std::string> network_namespace)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)),
       network_namespace_(network_namespace) {
-  THROW_IF_NOT_OK(validateProtocolSupported());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
@@ -144,7 +142,6 @@ Ipv4Instance::Ipv4Instance(uint32_t port, const SocketInterface* sock_interface,
                            absl::optional<std::string> network_namespace)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)),
       network_namespace_(network_namespace) {
-  THROW_IF_NOT_OK(validateProtocolSupported());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
@@ -158,10 +155,7 @@ Ipv4Instance::Ipv4Instance(absl::Status& status, const sockaddr_in* address,
                            absl::optional<std::string> network_namespace)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)),
       network_namespace_(network_namespace) {
-  status = validateProtocolSupported();
-  if (!status.ok()) {
-    return;
-  }
+  status = absl::OkStatus();
   initHelper(address);
 }
 
@@ -288,7 +282,6 @@ Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
                            absl::optional<std::string> network_namespace)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)),
       network_namespace_(network_namespace) {
-  THROW_IF_NOT_OK(validateProtocolSupported());
   initHelper(address, v6only);
 }
 
@@ -302,7 +295,6 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
                            absl::optional<std::string> network_namespace)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)),
       network_namespace_(network_namespace) {
-  THROW_IF_NOT_OK(validateProtocolSupported());
   sockaddr_in6 addr_in;
   memset(&addr_in, 0, sizeof(addr_in));
   addr_in.sin6_family = AF_INET6;
@@ -335,10 +327,7 @@ Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bo
                            absl::optional<std::string> network_namespace)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)),
       network_namespace_(network_namespace) {
-  status = validateProtocolSupported();
-  if (!status.ok()) {
-    return;
-  }
+  status = absl::OkStatus();
   initHelper(address, v6only);
 }
 

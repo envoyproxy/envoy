@@ -32,7 +32,7 @@ DownstreamSocketThreadLocal* ReverseTunnelInitiator::getLocalRegistry() const {
   return extension_->getLocalRegistry();
 }
 
-Envoy::Network::IoHandlePtr
+absl::StatusOr<Envoy::Network::IoHandlePtr>
 ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
                                Envoy::Network::Address::Type addr_type,
                                Envoy::Network::Address::IpVersion version, bool,
@@ -60,7 +60,7 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
 /**
  * Thread-safe helper method to create reverse connection socket with config.
  */
-Envoy::Network::IoHandlePtr ReverseTunnelInitiator::createReverseConnectionSocket(
+absl::StatusOr<Envoy::Network::IoHandlePtr> ReverseTunnelInitiator::createReverseConnectionSocket(
     Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
     Envoy::Network::Address::IpVersion version, const ReverseConnectionSocketConfig& config) const {
 
@@ -104,7 +104,7 @@ Envoy::Network::IoHandlePtr ReverseTunnelInitiator::createReverseConnectionSocke
   return socket(socket_type, addr_type, version, false, Envoy::Network::SocketCreationOptions{});
 }
 
-Envoy::Network::IoHandlePtr
+absl::StatusOr<Envoy::Network::IoHandlePtr>
 ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
                                const Envoy::Network::Address::InstanceConstSharedPtr addr,
                                const Envoy::Network::SocketCreationOptions& options) const {

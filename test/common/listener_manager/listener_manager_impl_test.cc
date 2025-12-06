@@ -38,6 +38,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 
@@ -8359,9 +8360,10 @@ public:
   TestCustomSocketInterface() = default;
 
   // Network::SocketInterface
-  Network::IoHandlePtr socket(Network::Socket::Type socket_type, Network::Address::Type addr_type,
-                              Network::Address::IpVersion version, bool socket_v6only,
-                              const Network::SocketCreationOptions& options) const override {
+  absl::StatusOr<Network::IoHandlePtr>
+  socket(Network::Socket::Type socket_type, Network::Address::Type addr_type,
+         Network::Address::IpVersion version, bool socket_v6only,
+         const Network::SocketCreationOptions& options) const override {
     UNREFERENCED_PARAMETER(socket_v6only);
     UNREFERENCED_PARAMETER(options);
     // Create a regular socket for testing
@@ -8377,9 +8379,9 @@ public:
     return nullptr;
   }
 
-  Network::IoHandlePtr socket(Network::Socket::Type socket_type,
-                              const Network::Address::InstanceConstSharedPtr addr,
-                              const Network::SocketCreationOptions& options) const override {
+  absl::StatusOr<Network::IoHandlePtr>
+  socket(Network::Socket::Type socket_type, const Network::Address::InstanceConstSharedPtr addr,
+         const Network::SocketCreationOptions& options) const override {
     // Delegate to the other socket method
     return socket(socket_type, addr->type(),
                   addr->ip() ? addr->ip()->version() : Network::Address::IpVersion::v4, false,
@@ -8553,9 +8555,9 @@ TEST_P(ListenerManagerImplTest, CustomSocketInterfaceFailureIsHandledGracefully)
   public:
     // Don't hide the other overload.
     using TestCustomSocketInterface::socket;
-    Network::IoHandlePtr socket(Network::Socket::Type socket_type,
-                                const Network::Address::InstanceConstSharedPtr addr,
-                                const Network::SocketCreationOptions& options) const override {
+    absl::StatusOr<Network::IoHandlePtr>
+    socket(Network::Socket::Type socket_type, const Network::Address::InstanceConstSharedPtr addr,
+           const Network::SocketCreationOptions& options) const override {
       UNREFERENCED_PARAMETER(socket_type);
       UNREFERENCED_PARAMETER(addr);
       UNREFERENCED_PARAMETER(options);

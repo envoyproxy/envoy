@@ -9,6 +9,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -169,15 +170,15 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWhenSocketInterfaceWrongType)
     ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
 
     // SocketInterface methods
-    Network::IoHandlePtr socket(Network::Socket::Type, Network::Address::Type,
-                                Network::Address::IpVersion, bool,
-                                const Network::SocketCreationOptions&) const override {
+    absl::StatusOr<Network::IoHandlePtr>
+    socket(Network::Socket::Type, Network::Address::Type, Network::Address::IpVersion, bool,
+           const Network::SocketCreationOptions&) const override {
       return nullptr;
     }
 
-    Network::IoHandlePtr socket(Network::Socket::Type,
-                                const Network::Address::InstanceConstSharedPtr,
-                                const Network::SocketCreationOptions&) const override {
+    absl::StatusOr<Network::IoHandlePtr>
+    socket(Network::Socket::Type, const Network::Address::InstanceConstSharedPtr,
+           const Network::SocketCreationOptions&) const override {
       return nullptr;
     }
 
