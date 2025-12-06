@@ -78,11 +78,11 @@ public:
 
   explicit ProcessorState(
       Filter& filter, envoy::config::core::v3::TrafficDirection traffic_direction,
-      const std::vector<std::string>& untyped_forwarding_namespaces,
-      const std::vector<std::string>& typed_forwarding_namespaces,
-      const std::vector<std::string>& untyped_receiving_namespaces,
-      const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
-      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
+      const Protobuf::RepeatedPtrField<std::string>& untyped_forwarding_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& typed_forwarding_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& untyped_receiving_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& untyped_cluster_metadata_forwarding_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& typed_cluster_metadata_forwarding_namespaces)
       : filter_(filter), traffic_direction_(traffic_direction),
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
         typed_forwarding_namespaces_(&typed_forwarding_namespaces),
@@ -117,36 +117,39 @@ public:
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) PURE;
 
-  const std::vector<std::string>& untypedForwardingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>& untypedForwardingMetadataNamespaces() const {
     return *untyped_forwarding_namespaces_;
   };
-  void setUntypedForwardingMetadataNamespaces(const std::vector<std::string>& ns) {
+  void setUntypedForwardingMetadataNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
     untyped_forwarding_namespaces_ = &ns;
   };
 
-  const std::vector<std::string>& typedForwardingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>& typedForwardingMetadataNamespaces() const {
     return *typed_forwarding_namespaces_;
   };
-  void setTypedForwardingMetadataNamespaces(const std::vector<std::string>& ns) {
+  void setTypedForwardingMetadataNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
     typed_forwarding_namespaces_ = &ns;
   };
 
-  const std::vector<std::string>& untypedReceivingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>& untypedReceivingMetadataNamespaces() const {
     return *untyped_receiving_namespaces_;
   };
-  void setUntypedReceivingMetadataNamespaces(const std::vector<std::string>& ns) {
+  void setUntypedReceivingMetadataNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
     untyped_receiving_namespaces_ = &ns;
   };
-  const std::vector<std::string>& untypedClusterMetadataForwardingNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>&
+  untypedClusterMetadataForwardingNamespaces() const {
     return *untyped_cluster_metadata_forwarding_namespaces_;
   }
-  void setUntypedClusterMetadataForwardingNamespaces(const std::vector<std::string>& ns) {
+  void
+  setUntypedClusterMetadataForwardingNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
     untyped_cluster_metadata_forwarding_namespaces_ = &ns;
   }
-  const std::vector<std::string>& typedClusterMetadataForwardingNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>& typedClusterMetadataForwardingNamespaces() const {
     return *typed_cluster_metadata_forwarding_namespaces_;
   }
-  void setTypedClusterMetadataForwardingNamespaces(const std::vector<std::string>& ns) {
+  void
+  setTypedClusterMetadataForwardingNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
     typed_cluster_metadata_forwarding_namespaces_ = &ns;
   }
 
@@ -300,11 +303,12 @@ protected:
   absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
   const envoy::config::core::v3::TrafficDirection traffic_direction_;
 
-  const std::vector<std::string>* untyped_forwarding_namespaces_{};
-  const std::vector<std::string>* typed_forwarding_namespaces_{};
-  const std::vector<std::string>* untyped_receiving_namespaces_{};
-  const std::vector<std::string>* untyped_cluster_metadata_forwarding_namespaces_{};
-  const std::vector<std::string>* typed_cluster_metadata_forwarding_namespaces_{};
+  const Protobuf::RepeatedPtrField<std::string>* untyped_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>* typed_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>* untyped_receiving_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>* untyped_cluster_metadata_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>* typed_cluster_metadata_forwarding_namespaces_;
+
   // If true, the attributes for this processing state have already been sent.
   bool attributes_sent_{};
 
@@ -446,11 +450,11 @@ class DecodingProcessorState : public ProcessorState {
 public:
   explicit DecodingProcessorState(
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode,
-      const std::vector<std::string>& untyped_forwarding_namespaces,
-      const std::vector<std::string>& typed_forwarding_namespaces,
-      const std::vector<std::string>& untyped_receiving_namespaces,
-      const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
-      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
+      const Protobuf::RepeatedPtrField<std::string>& untyped_forwarding_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& typed_forwarding_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& untyped_receiving_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& untyped_cluster_metadata_forwarding_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& typed_cluster_metadata_forwarding_namespaces)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
                        untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
@@ -540,11 +544,11 @@ class EncodingProcessorState : public ProcessorState {
 public:
   explicit EncodingProcessorState(
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode,
-      const std::vector<std::string>& untyped_forwarding_namespaces,
-      const std::vector<std::string>& typed_forwarding_namespaces,
-      const std::vector<std::string>& untyped_receiving_namespaces,
-      const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
-      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
+      const Protobuf::RepeatedPtrField<std::string>& untyped_forwarding_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& typed_forwarding_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& untyped_receiving_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& untyped_cluster_metadata_forwarding_namespaces,
+      const Protobuf::RepeatedPtrField<std::string>& typed_cluster_metadata_forwarding_namespaces)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
                        untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,

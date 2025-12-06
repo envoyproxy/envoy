@@ -3714,10 +3714,10 @@ TEST_F(OverrideTest, ClusterMetadataNamespacesOverride) {
   FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
   FilterConfigPerRoute merged_route(route1, route2);
 
-  ASSERT_TRUE(merged_route.typedClusterMetadataForwardingNamespaces().has_value());
+  ASSERT_TRUE(merged_route.typedClusterMetadataForwardingNamespaces() != nullptr);
   EXPECT_THAT(*merged_route.typedClusterMetadataForwardingNamespaces(),
               testing::ElementsAre("more_specific_typed_ns_2"));
-  ASSERT_TRUE(merged_route.untypedClusterMetadataForwardingNamespaces().has_value());
+  ASSERT_TRUE(merged_route.untypedClusterMetadataForwardingNamespaces() != nullptr);
   EXPECT_THAT(*merged_route.untypedClusterMetadataForwardingNamespaces(),
               testing::ElementsAre("more_specific_untyped_ns_2"));
 }

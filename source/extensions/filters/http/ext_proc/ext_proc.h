@@ -259,24 +259,25 @@ public:
 
   bool isUpstream() const { return is_upstream_; }
 
-  const std::vector<std::string>& untypedForwardingMetadataNamespaces() const {
-    return untyped_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>& untypedForwardingMetadataNamespaces() const {
+    return proto_config_.metadata_options().forwarding_namespaces().untyped();
   }
 
-  const std::vector<std::string>& typedForwardingMetadataNamespaces() const {
-    return typed_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>& typedForwardingMetadataNamespaces() const {
+    return proto_config_.metadata_options().forwarding_namespaces().typed();
   }
 
-  const std::vector<std::string>& untypedReceivingMetadataNamespaces() const {
-    return untyped_receiving_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>& untypedReceivingMetadataNamespaces() const {
+    return proto_config_.metadata_options().receiving_namespaces().untyped();
   }
 
-  const std::vector<std::string>& untypedClusterMetadataForwardingNamespaces() const {
-    return untyped_cluster_metadata_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>&
+  untypedClusterMetadataForwardingNamespaces() const {
+    return proto_config_.metadata_options().cluster_metadata_forwarding_namespaces().untyped();
   }
 
-  const std::vector<std::string>& typedClusterMetadataForwardingNamespaces() const {
-    return typed_cluster_metadata_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>& typedClusterMetadataForwardingNamespaces() const {
+    return proto_config_.metadata_options().cluster_metadata_forwarding_namespaces().typed();
   }
 
   const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
@@ -324,6 +325,7 @@ private:
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
       Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
       Server::Configuration::CommonFactoryContext& context);
+  const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   const bool failure_mode_allow_;
   const bool observability_mode_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
@@ -350,11 +352,6 @@ private:
   // is_upstream_ is true if ext_proc filter is in the upstream filter chain.
   const bool is_upstream_;
   const bool graceful_grpc_close_;
-  const std::vector<std::string> untyped_forwarding_namespaces_;
-  const std::vector<std::string> typed_forwarding_namespaces_;
-  const std::vector<std::string> untyped_receiving_namespaces_;
-  const std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_;
-  const std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_;
   const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       allowed_override_modes_;
   const ExpressionManager expression_manager_;
@@ -395,22 +392,20 @@ public:
     return grpc_initial_metadata_;
   }
 
-  const absl::optional<const std::vector<std::string>>&
-  untypedForwardingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>* untypedForwardingMetadataNamespaces() const {
     return untyped_forwarding_namespaces_;
   }
-  const absl::optional<const std::vector<std::string>>& typedForwardingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>* typedForwardingMetadataNamespaces() const {
     return typed_forwarding_namespaces_;
   }
-  const absl::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>* untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
-  const absl::optional<const std::vector<std::string>>&
+  const Protobuf::RepeatedPtrField<std::string>*
   untypedClusterMetadataForwardingNamespaces() const {
     return untyped_cluster_metadata_forwarding_namespaces_;
   }
-  const absl::optional<const std::vector<std::string>>&
-  typedClusterMetadataForwardingNamespaces() const {
+  const Protobuf::RepeatedPtrField<std::string>* typedClusterMetadataForwardingNamespaces() const {
     return typed_cluster_metadata_forwarding_namespaces_;
   }
   const absl::optional<bool>& failureModeAllow() const { return failure_mode_allow_; }
@@ -433,13 +428,12 @@ private:
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
   std::vector<envoy::config::core::v3::HeaderValue> grpc_initial_metadata_;
 
-  const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
-  const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
-  const absl::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
-  const absl::optional<const std::vector<std::string>>
-      untyped_cluster_metadata_forwarding_namespaces_;
-  const absl::optional<const std::vector<std::string>>
-      typed_cluster_metadata_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>* untyped_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>* typed_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>* untyped_receiving_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>* untyped_cluster_metadata_forwarding_namespaces_;
+  const Protobuf::RepeatedPtrField<std::string>* typed_cluster_metadata_forwarding_namespaces_;
+
   const absl::optional<bool> failure_mode_allow_;
 
   const std::function<std::unique_ptr<ProcessingRequestModifier>()>
@@ -634,11 +628,6 @@ private:
   DecodingProcessorState decoding_state_;
   EncodingProcessorState encoding_state_;
 
-  std::vector<std::string> untyped_forwarding_namespaces_{};
-  std::vector<std::string> typed_forwarding_namespaces_{};
-  std::vector<std::string> untyped_receiving_namespaces_{};
-  std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_{};
-  std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_{};
   Http::StreamFilterCallbacks* filter_callbacks_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
 
