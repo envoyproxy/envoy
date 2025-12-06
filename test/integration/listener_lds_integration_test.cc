@@ -1723,8 +1723,7 @@ TEST_P(ListenerFilterIntegrationTest, BasicSuccessWithMultiAddressesAndKeepalive
     listener_config_.mutable_tcp_keepalive();
 
     auto* additional_addr = listener_config_.mutable_additional_addresses()->Add();
-    additional_addr->mutable_tcp_keepalive_override()
-        ->mutable_tcp_keepalive()
+    additional_addr->mutable_tcp_keepalive()
         ->mutable_keepalive_probes()
         ->set_value(3);
 
@@ -1784,7 +1783,7 @@ TEST_P(ListenerFilterIntegrationTest, BasicSuccessWithMultiAddressesAndKeepalive
   // Update the config where default keepalive time is changed and keepalive is explicitly disabled
   // on the additional address.
   listener_config_.mutable_tcp_keepalive()->mutable_keepalive_time()->set_value(74);
-  listener_config_.mutable_additional_addresses(0)->mutable_tcp_keepalive_override()->Clear();
+  listener_config_.mutable_additional_addresses(0)->mutable_tcp_keepalive()->mutable_keepalive_time()->set_value(0);
 
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);

@@ -28,6 +28,12 @@ parseTcpKeepaliveConfig(const envoy::config::core::v3::TcpKeepalive& options) {
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
 }
 
+static inline bool isTcpKeepaliveConfigDisabled(const Network::TcpKeepaliveConfig& config) {
+  return (config.keepalive_probes_.has_value() && config.keepalive_probes_.value() == 0) ||
+         (config.keepalive_time_.has_value() && config.keepalive_time_.value() == 0) ||
+         (config.keepalive_interval_.has_value() && config.keepalive_interval_.value() == 0);
+}
+
 class SocketOptionFactory : Logger::Loggable<Logger::Id::connection> {
 public:
   static std::unique_ptr<Socket::Options>

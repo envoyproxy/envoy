@@ -6515,11 +6515,10 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, ListenerKeepaliveOnAdditionalAddr
     additional_addresses:
     - address:
         socket_address: { address: 127.0.0.1, port_value: 2222 }
-      tcp_keepalive_override:
-        tcp_keepalive:
-          keepalive_probes: 3
-          keepalive_time: 4
-          keepalive_interval: 5
+      tcp_keepalive:
+        keepalive_probes: 3
+        keepalive_time: 4
+        keepalive_interval: 5
     enable_reuse_port: false
     filter_chains:
     - filters: []
@@ -6569,7 +6568,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, ListenerKeepaliveAdditionalAddres
     additional_addresses:
     - address:
         socket_address: { address: 127.0.0.1, port_value: 2222 }
-      tcp_keepalive_override: {}
+      tcp_keepalive:
+        keepalive_probes: 0
     enable_reuse_port: false
     filter_chains:
     - filters: []
@@ -6587,7 +6587,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, ListenerKeepaliveAdditionalAddres
                            /* expected_num_options */ 1,
                            ListenerComponentFactory::BindType::NoReusePort);
 
-  // First & Second address option.
+  // First address options.
   expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_SO_KEEPALIVE.level(),
                    /* expected_sockopt_name */ ENVOY_SOCKET_SO_KEEPALIVE.option(),
                    /* expected_value */ 1,

@@ -35,13 +35,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // The additional address the listener is listening on.
 message AdditionalAddress {
-  // TcpKeepaliveOverride wraps the TCP keepalive settings for the additional address.
-  // It provides a mechanism to override or disable TCP keepalive on a per-address basis.
-  message TcpKeepaliveOverride {
-    // Configures TCP keepalive for the additional address.
-    core.v3.TcpKeepalive tcp_keepalive = 1;
-  }
-
   core.v3.Address address = 1;
 
   // Additional socket options that may not be present in Envoy source code or
@@ -54,11 +47,12 @@ message AdditionalAddress {
   core.v3.SocketOptionsOverride socket_options = 2;
 
   // Configures TCP keepalive settings for the additional address.
-  // If specified, this will override the listener :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.Listener.tcp_keepalive>` configuration.
-  // If the :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.AdditionalAddress.TcpKeepaliveOverride.tcp_keepalive>`
-  // within the override is not specified, it means TCP keepalive settings will not be enabled
-  // for the additional address.
-  TcpKeepaliveOverride tcp_keepalive_override = 3;
+  // If not set, the listener :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.Listener.tcp_keepalive>`
+  // configuration is inherited. You can explicitly disable TCP keepalive for the additional address by setting any keepalive field
+  // (:ref:`keepalive_probes <envoy_v3_api_field_config.core.v3.TcpKeepalive.keepalive_probes>`,
+  // :ref:`keepalive_time <envoy_v3_api_field_config.core.v3.TcpKeepalive.keepalive_time>`, or
+  // :ref:`keepalive_interval <envoy_v3_api_field_config.core.v3.TcpKeepalive.keepalive_interval>`) to ``0``.
+  core.v3.TcpKeepalive tcp_keepalive = 3;
 }
 
 // Listener list collections. Entries are ``Listener`` resources or references.
@@ -437,8 +431,8 @@ message Listener {
 
   // If set, TCP keepalive settings are configured for the listener address and inherited by
   // additional addresses. If not set, TCP keepalive settings are not configured for the
-  // listener address and additional addresses by default. See :ref:`tcp_keepalive_override <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive_override>`
-  // to override TCP keepalive settings for individual additional addresses.
+  // listener address and additional addresses by default. See :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive>`
+  // to explicitly configure TCP keepalive settings for individual additional addresses.
   core.v3.TcpKeepalive tcp_keepalive = 37;
 }
 
