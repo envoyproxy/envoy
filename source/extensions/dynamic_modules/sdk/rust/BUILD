@@ -1,4 +1,5 @@
 load("@dynamic_modules_rust_sdk_crate_index//:defs.bzl", "all_crate_deps")
+load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library")
 load(
@@ -14,9 +15,17 @@ cargo_build_script(
     name = "build_script",
     srcs = ["build.rs"],
     build_script_env = select({
+        "@envoy_repo//:use_local_llvm": {
+            "LIBCLANG_PATH": "%s/lib/libclang.so" % LLVM_PATH,
+            "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
+                "-resource-dir %s/lib/clang/18" % LLVM_PATH,
+                "-isystem %s/lib/clang/18/include" % LLVM_PATH,
+                "-isystem %s/include/x86_64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
+                "-isystem %s/include/aarch64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
+            ]),
+        },
         "@platforms//os:linux": {
             "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
-            # Note: We construct the string here before passing it to select
             "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/lib/clang/18/include",
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/include/x86_64-unknown-linux-gnu/c++/v1/",
@@ -29,6 +38,7 @@ cargo_build_script(
         "//source/extensions/dynamic_modules:abi.h",
         "//source/extensions/dynamic_modules:abi_version.h",
     ] + select({
+        "@envoy_repo//:use_local_llvm": [],
         "@platforms//os:linux": [
             "@llvm_toolchain_llvm//:include",
             "@llvm_toolchain_llvm//:lib",

@@ -1,6 +1,7 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
@@ -183,6 +184,7 @@ def envoy_cc_test(
         name = name,
         srcs = srcs,
         data = data + select({
+            "%s//bazel:local_asan_build" % repository: [],
             "%s//bazel:asan_build" % repository: ["@llvm_toolchain_llvm//:symbolizer"],
             "//conditions:default": [],
         }),
@@ -205,6 +207,7 @@ def envoy_cc_test(
         size = size,
         flaky = flaky,
         env = env | select({
+            "%s//bazel:local_asan_build" % repository: {"ASAN_SYMBOLIZER_PATH": "%s/bin/llvm-symbolizer" % LLVM_PATH},
             "%s//bazel:asan_build" % repository: {"ASAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
             "//conditions:default": {},
         }),
