@@ -76,6 +76,9 @@ envoy_cc_library(
     hdrs = [
         "tracer_config_impl.h",
     ],
+    srcs = [
+        "tracer_config_impl.cc",
+    ],
     deps = [
         ":custom_tag_lib",
         "//envoy/server:tracer_config_interface",
