@@ -167,6 +167,27 @@ absl::string_view getErrorDescription(int err);
  */
 std::string getX509VerificationErrorInfo(X509_STORE_CTX* ctx);
 
+/**
+ * Get the DER-encoded size of an X509 certificate.
+ * @param cert the X509 certificate
+ * @return the size in bytes, or 0 if cert is null
+ */
+size_t getCertificateDerSize(X509* cert);
+
+/**
+ * Get the total DER-encoded size of the peer certificate chain.
+ * @param ssl the SSL connection
+ * @return the total size in bytes of the peer certificate chain
+ */
+size_t getPeerCertificateChainDerSize(SSL* ssl);
+
+/**
+ * Get the total DER-encoded size of the local certificate chain.
+ * @param ssl the SSL connection
+ * @return the total size in bytes of the local certificate chain
+ */
+size_t getLocalCertificateChainDerSize(SSL* ssl);
+
 } // namespace Utility
 } // namespace Tls
 } // namespace TransportSockets

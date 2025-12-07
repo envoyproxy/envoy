@@ -564,6 +564,17 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   if (SSL_was_key_usage_invalid(ssl)) {
     stats_.was_key_usage_invalid_.inc();
   }
+
+  // Record certificate chain sizes (DER-encoded bytes) for TLS overhead visibility.
+  const size_t peer_cert_size = Utility::getPeerCertificateChainDerSize(ssl);
+  if (peer_cert_size > 0) {
+    stats_.peer_certificate_chain_bytes_.recordValue(peer_cert_size);
+  }
+
+  const size_t local_cert_size = Utility::getLocalCertificateChainDerSize(ssl);
+  if (local_cert_size > 0) {
+    stats_.local_certificate_chain_bytes_.recordValue(local_cert_size);
+  }
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {

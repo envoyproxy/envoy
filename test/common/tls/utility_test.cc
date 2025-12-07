@@ -343,6 +343,33 @@ TEST(UtilityTest, TestMapX509Stack) {
   EXPECT_EQ(std::vector<std::string>{""}, Utility::mapX509Stack(*fake_cert_chain, func));
 }
 
+TEST(UtilityTest, TestGetCertificateDerSize) {
+  // Test with a valid certificate
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+
+  // DER-encoded size should be positive for a valid certificate
+  size_t der_size = Utility::getCertificateDerSize(cert.get());
+  EXPECT_GT(der_size, 0);
+
+  // Verify the size is reasonable (certificates are typically 1-5KB)
+  EXPECT_GT(der_size, 100);
+  EXPECT_LT(der_size, 10000);
+
+  // Test with null certificate
+  EXPECT_EQ(0, Utility::getCertificateDerSize(nullptr));
+}
+
+TEST(UtilityTest, TestGetPeerCertificateChainDerSize) {
+  // Test with null SSL should return 0
+  EXPECT_EQ(0, Utility::getPeerCertificateChainDerSize(nullptr));
+}
+
+TEST(UtilityTest, TestGetLocalCertificateChainDerSize) {
+  // Test with null SSL should return 0
+  EXPECT_EQ(0, Utility::getLocalCertificateChainDerSize(nullptr));
+}
+
 } // namespace
 } // namespace Tls
 } // namespace TransportSockets

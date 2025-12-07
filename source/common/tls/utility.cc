@@ -565,6 +565,51 @@ std::vector<std::string> Utility::mapX509Stack(stack_st_X509& stack,
   return result;
 }
 
+size_t Utility::getCertificateDerSize(X509* cert) {
+  if (cert == nullptr) {
+    return 0;
+  }
+  // i2d_X509 with nullptr for output returns the required size for DER encoding
+  int len = i2d_X509(cert, nullptr);
+  return len > 0 ? static_cast<size_t>(len) : 0;
+}
+
+size_t Utility::getPeerCertificateChainDerSize(SSL* ssl) {
+  if (ssl == nullptr) {
+    return 0;
+  }
+  size_t total_size = 0;
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+  if (cert_chain != nullptr) {
+    for (size_t i = 0; i < sk_X509_num(cert_chain); ++i) {
+      X509* cert = sk_X509_value(cert_chain, i);
+      total_size += getCertificateDerSize(cert);
+    }
+  }
+  return total_size;
+}
+
+size_t Utility::getLocalCertificateChainDerSize(SSL* ssl) {
+  if (ssl == nullptr) {
+    return 0;
+  }
+  size_t total_size = 0;
+  // Get the local certificate
+  X509* cert = SSL_get_certificate(ssl);
+  total_size += getCertificateDerSize(cert);
+
+  // Get extra chain certs
+  STACK_OF(X509)* extra_chain = nullptr;
+  SSL_CTX_get_extra_chain_certs(SSL_get_SSL_CTX(ssl), &extra_chain);
+  if (extra_chain != nullptr) {
+    for (size_t i = 0; i < sk_X509_num(extra_chain); ++i) {
+      X509* extra_cert = sk_X509_value(extra_chain, i);
+      total_size += getCertificateDerSize(extra_cert);
+    }
+  }
+  return total_size;
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

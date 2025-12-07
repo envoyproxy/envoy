@@ -21,7 +21,9 @@ namespace Tls {
   COUNTER(ocsp_staple_omitted)                                                                     \
   COUNTER(ocsp_staple_responses)                                                                   \
   COUNTER(ocsp_staple_requests)                                                                    \
-  COUNTER(was_key_usage_invalid)
+  COUNTER(was_key_usage_invalid)                                                                   \
+  HISTOGRAM(peer_certificate_chain_bytes, Bytes)                                                   \
+  HISTOGRAM(local_certificate_chain_bytes, Bytes)
 
 /**
  * Wrapper struct for SSL stats. @see stats_macros.h
