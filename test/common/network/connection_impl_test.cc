@@ -4056,6 +4056,22 @@ TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutClosesConnecti
             StreamInfo::LocalCloseReasons::get().BufferHighWatermarkTimeout);
 }
 
+TEST_F(MockTransportConnectionImplTest, ZeroBufferHighWatermarkTimeoutDoesNotScheduleTimer) {
+  initializeConnection();
+
+  connection_->setBufferLimits(1);
+  connection_->setBufferHighWatermarkTimeout(std::chrono::milliseconds(0));
+
+  Buffer::OwnedImpl data("data");
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual("data"), _))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+  connection_->write(data, false);
+}
+
 TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutCancelledOnDrain) {
   initializeConnection();
   InSequence s;
