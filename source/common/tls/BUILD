@@ -182,6 +182,7 @@ envoy_cc_library(
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
+        ":cert_compression_lib",
         ":stats_lib",
         ":utility_lib",
         "//envoy/ssl:context_config_interface",
@@ -257,5 +258,17 @@ envoy_cc_library(
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "cert_compression_lib",
+    srcs = ["cert_compression.cc"],
+    hdrs = ["cert_compression.h"],
+    external_deps = ["ssl"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "@zlib",
     ],
 )

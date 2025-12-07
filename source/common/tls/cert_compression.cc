@@ -1,7 +1,6 @@
-#include "source/common/quic/cert_compression.h"
+#include "source/common/tls/cert_compression.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "openssl/tls1.h"
 
@@ -9,7 +8,9 @@
 #include "zlib.h"
 
 namespace Envoy {
-namespace Quic {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 
 namespace {
 
@@ -27,7 +28,7 @@ private:
 
 } // namespace
 
-void CertCompression::registerSslContext(SSL_CTX* ssl_ctx) {
+void CertCompression::registerZlib(SSL_CTX* ssl_ctx) {
   auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_zlib, compressZlib,
                                               decompressZlib);
   ASSERT(ret == 1);
@@ -125,5 +126,7 @@ int CertCompression::decompressZlib(SSL*, CRYPTO_BUFFER** out, size_t uncompress
   return SUCCESS;
 }
 
-} // namespace Quic
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy

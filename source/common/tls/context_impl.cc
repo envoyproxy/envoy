@@ -26,6 +26,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -162,6 +163,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         return;
       }
     }
+
+    // Register certificate compression algorithms to reduce TLS handshake size.
+    CertCompression::registerZlib(ctx.ssl_ctx_.get());
   }
 
   auto verify_mode_or_error = cert_validator_->initializeSslContexts(
