@@ -269,6 +269,9 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "@org_brotli//:brotlidec",
+        "@org_brotli//:brotlienc",
         "@zlib",
+        "@zstd",
     ],
 )

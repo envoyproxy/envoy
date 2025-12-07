@@ -165,7 +165,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
 
     // Register certificate compression algorithms to reduce TLS handshake size.
-    CertCompression::registerZlib(ctx.ssl_ctx_.get());
+    // This registers brotli, zstd, and zlib in priority order (RFC 8879).
+    CertCompression::registerAll(ctx.ssl_ctx_.get());
   }
 
   auto verify_mode_or_error = cert_validator_->initializeSslContexts(

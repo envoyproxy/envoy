@@ -12,10 +12,11 @@ namespace Quic {
  */
 class CertCompression : protected Logger::Loggable<Logger::Id::quic> {
 public:
-  // Registers compression and decompression functions on `ssl_ctx` if enabled.
+  // Registers all compression and decompression functions on `ssl_ctx`.
   // This is a wrapper that calls the TLS implementation.
+  // Registers brotli, zstd, and zlib in priority order (RFC 8879).
   static void registerSslContext(SSL_CTX* ssl_ctx) {
-    Extensions::TransportSockets::Tls::CertCompression::registerZlib(ssl_ctx);
+    Extensions::TransportSockets::Tls::CertCompression::registerAll(ssl_ctx);
   }
 
   // Callbacks for `SSL_CTX_add_cert_compression_alg`.
