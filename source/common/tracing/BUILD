@@ -73,11 +73,11 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "tracer_config_lib",
-    hdrs = [
-        "tracer_config_impl.h",
-    ],
     srcs = [
         "tracer_config_impl.cc",
+    ],
+    hdrs = [
+        "tracer_config_impl.h",
     ],
     deps = [
         ":custom_tag_lib",
