@@ -39,23 +39,23 @@ Configuration example
     xff_config:
       xff_num_trusted_hops: 1
     provider:
-        name: "envoy.geoip_providers.maxmind"
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
-          common_provider_config:
-            geo_headers_to_add:
-              country: "x-geo-country"
-              region: "x-geo-region"
-              city: "x-geo-city"
-              asn: "x-geo-asn"
-          city_db_path: "geoip/GeoLite2-City-Test.mmdb"
-          isp_db_path: "geoip/GeoIP2-ISP-Test.mmdb"
-
+      name: "envoy.geoip_providers.maxmind"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
+        common_provider_config:
+          geo_headers_to_add:
+            country: "x-geo-country"
+            region: "x-geo-region"
+            city: "x-geo-city"
+            asn: "x-geo-asn"
+        city_db_path: "geoip/GeoLite2-City-Test.mmdb"
+        isp_db_path: "geoip/GeoIP2-ISP-Test.mmdb"
+        asn_db_path: "geoip/GeoLite2-ASN-Test.mmdb"
 
 Statistics
 -------------
 
-Geolocation HTTP filter has a statistics tree rooted at ``http.<stat_prefix>.``. The :ref:`stat prefix
+Geolocation HTTP filter has a statistics tree rooted at ``http.<stat_prefix>.geoip.``. The :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager.
 
@@ -63,11 +63,11 @@ comes from the owning HTTP connection manager.
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   ``rq_total``, Counter, Total number of requests for which geolocation filter was invoked.
+   ``total``, Counter, Total number of requests for which geolocation filter was invoked.
 
 Besides Geolocation filter level statisctics, there is statistics emitted by the :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
 per geolocation database type (rooted at ``<stat_prefix>.maxmind.``). Database type can be one of `city_db <https://www.maxmind.com/en/geoip2-city>`_,
-`isp_db <https://www.maxmind.com/en/geoip2-isp-database>`_, `anon_db <https://dev.maxmind.com/geoip/docs/databases/anonymous-ip>`_.
+`isp_db <https://www.maxmind.com/en/geoip2-isp-database>`_, `anon_db <https://dev.maxmind.com/geoip/docs/databases/anonymous-ip>`_, `asn_db <https://www.maxmind.com/en/geoip2-asn-database>`_.
 
 .. csv-table::
    :header: Name, Type, Description
@@ -79,5 +79,3 @@ per geolocation database type (rooted at ``<stat_prefix>.maxmind.``). Database t
    ``<db_type>.db_reload_success``, Counter, Total number of times when the geolocation database file was reloaded successfully.
    ``<db_type>.db_reload_error``, Counter, Total number of times when the geolocation database file failed to reload.
    ``<db_type>.db_build_epoch``, Gauge, The build timestamp of the geolocation database file represented as a Unix epoch value.
-
-
