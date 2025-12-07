@@ -285,6 +285,26 @@ ContextConfigImpl::ContextConfigImpl(
   }
   capabilities_ = handshaker_factory->capabilities();
   sslctx_cb_ = handshaker_factory->sslctxCb(handshaker_factory_context);
+
+  // Parse certificate compression algorithms configuration.
+  for (const auto& algo : config.certificate_compression_algorithms()) {
+    Ssl::CertificateCompressionAlgorithmConfig alg_config;
+    switch (algo.algorithm()) {
+    case envoy::extensions::transport_sockets::tls::v3::CertificateCompressionAlgorithm::BROTLI:
+      alg_config.algorithm = Ssl::CertificateCompressionAlgorithmConfig::Algorithm::Brotli;
+      break;
+    case envoy::extensions::transport_sockets::tls::v3::CertificateCompressionAlgorithm::ZSTD:
+      alg_config.algorithm = Ssl::CertificateCompressionAlgorithmConfig::Algorithm::Zstd;
+      break;
+    case envoy::extensions::transport_sockets::tls::v3::CertificateCompressionAlgorithm::ZLIB:
+      alg_config.algorithm = Ssl::CertificateCompressionAlgorithmConfig::Algorithm::Zlib;
+      break;
+    default:
+      creation_status = absl::InvalidArgumentError("Unknown certificate compression algorithm");
+      return;
+    }
+    certificate_compression_algorithms_.push_back(alg_config);
+  }
 }
 
 absl::StatusOr<Ssl::CertificateValidationContextConfigPtr>

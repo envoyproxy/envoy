@@ -184,7 +184,7 @@ message TlsKeyLog {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
@@ -362,4 +362,22 @@ message CommonTlsContext {
 
   // TLS key log configuration
   TlsKeyLog key_log = 15;
+
+  // Configuration for TLS certificate compression (RFC 8879).
+  // The list order determines algorithm priority - the first algorithm in the list
+  // that the peer supports will be used.
+  //
+  // If not specified or empty, certificate compression is disabled.
+  //
+  // Example configuration to prefer brotli, fall back to zstd:
+  //
+  // .. code-block:: yaml
+  //
+  //   certificate_compression_algorithms:
+  //   - algorithm: BROTLI
+  //     compression_level: 4
+  //   - algorithm: ZSTD
+  //     compression_level: 3
+  //
+  repeated CertificateCompressionAlgorithm certificate_compression_algorithms = 17;
 }

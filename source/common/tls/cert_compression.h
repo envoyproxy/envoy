@@ -1,5 +1,9 @@
 #pragma once
 
+#include <vector>
+
+#include "envoy/ssl/context_config.h"
+
 #include "source/common/common/logger.h"
 
 #include "openssl/ssl.h"
@@ -32,6 +36,14 @@ namespace Tls {
  */
 class CertCompression : protected Logger::Loggable<Logger::Id::connection> {
 public:
+  // Register compression algorithms from configuration.
+  // Only registers the algorithms specified in the config, in the order specified.
+  // The order determines priority - first algorithm in the list that the peer supports is used.
+  // If the config is empty, no compression algorithms are registered.
+  static void registerFromConfig(
+      SSL_CTX* ssl_ctx,
+      const std::vector<Ssl::CertificateCompressionAlgorithmConfig>& algorithms);
+
   // Register all supported compression algorithms in priority order.
   // Priority: brotli > zstd > zlib (brotli generally provides best compression for certs)
   static void registerAll(SSL_CTX* ssl_ctx);

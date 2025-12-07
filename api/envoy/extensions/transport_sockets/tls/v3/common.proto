@@ -595,3 +595,25 @@ message CertificateValidationContext {
   // Trusted issues are specified by setting :ref:`trusted_ca <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`
   google.protobuf.UInt32Value max_verify_depth = 16 [(validate.rules).uint32 = {lte: 100}];
 }
+
+// Configuration for a certificate compression algorithm per RFC 8879.
+// [#next-free-field: 2]
+message CertificateCompressionAlgorithm {
+  // Supported certificate compression algorithms per RFC 8879.
+  enum Algorithm {
+    // Brotli compression (RFC 8879 algorithm ID 2).
+    // Typically provides the best compression ratio.
+    BROTLI = 0;
+
+    // Zstandard compression (RFC 8879 algorithm ID 3).
+    // Good balance of speed and compression ratio.
+    ZSTD = 1;
+
+    // Zlib/DEFLATE compression (RFC 8879 algorithm ID 1).
+    // Widely supported, moderate compression.
+    ZLIB = 2;
+  }
+
+  // The compression algorithm to use.
+  Algorithm algorithm = 1 [(validate.rules).enum = {defined_only: true}];
+}

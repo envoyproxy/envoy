@@ -31,6 +31,26 @@ private:
 
 } // namespace
 
+void CertCompression::registerFromConfig(
+    SSL_CTX* ssl_ctx,
+    const std::vector<Ssl::CertificateCompressionAlgorithmConfig>& algorithms) {
+  // Register algorithms in the order specified by the config.
+  // The order determines priority - first algorithm in the list that the peer supports is used.
+  for (const auto& algo : algorithms) {
+    switch (algo.algorithm) {
+    case Ssl::CertificateCompressionAlgorithmConfig::Algorithm::Brotli:
+      registerBrotli(ssl_ctx);
+      break;
+    case Ssl::CertificateCompressionAlgorithmConfig::Algorithm::Zstd:
+      registerZstd(ssl_ctx);
+      break;
+    case Ssl::CertificateCompressionAlgorithmConfig::Algorithm::Zlib:
+      registerZlib(ssl_ctx);
+      break;
+    }
+  }
+}
+
 void CertCompression::registerAll(SSL_CTX* ssl_ctx) {
   // Register all algorithms in priority order.
   // The TLS handshake will negotiate the best mutually supported algorithm.

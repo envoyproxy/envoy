@@ -20,6 +20,14 @@ namespace Envoy {
 namespace Ssl {
 
 /**
+ * Configuration for a certificate compression algorithm (RFC 8879).
+ */
+struct CertificateCompressionAlgorithmConfig {
+  enum class Algorithm { Brotli, Zstd, Zlib };
+  Algorithm algorithm;
+};
+
+/**
  * Supplies the configuration for an SSL context.
  */
 class ContextConfig {
@@ -125,6 +133,15 @@ public:
   virtual absl::optional<
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
   compliancePolicy() const PURE;
+
+  /**
+   * @return the certificate compression algorithms configuration.
+   * The list order determines algorithm priority - the first algorithm in the list
+   * that the peer supports will be used.
+   * If empty, certificate compression is disabled.
+   */
+  virtual const std::vector<CertificateCompressionAlgorithmConfig>&
+  certificateCompressionAlgorithms() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

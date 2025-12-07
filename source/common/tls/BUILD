@@ -267,6 +267,7 @@ envoy_cc_library(
     hdrs = ["cert_compression.h"],
     external_deps = ["ssl"],
     deps = [
+        "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "@org_brotli//:brotlidec",
