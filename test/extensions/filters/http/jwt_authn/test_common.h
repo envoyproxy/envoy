@@ -186,6 +186,32 @@ rules:
 bypass_cors_preflight: true
 )";
 
+// A good config with allow_missing_or_failed.
+const char AllowMissingExampleConfig[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    audiences:
+    - example_service
+    - http://example_service1
+    - https://example_service2/
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+      cache_duration:
+        seconds: 600
+    forward_payload_header: sec-istio-auth-userinfo
+rules:
+- match:
+    path: "/"
+  requires:
+    allow_missing_or_failed: {}
+bypass_cors_preflight: true
+)";
+
 // Config with claim_to_headers and clear_route_cache.
 const char ClaimToHeadersConfig[] = R"(
 providers:
