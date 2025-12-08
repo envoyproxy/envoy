@@ -35,9 +35,9 @@ static_resources:
                     -- For example, enable auth for requests to /secure paths.
                     local path = request_handle:headers():get(":path")
                     if string.match(path, "^/secure") then
-                      request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.ext_authz", "require_auth", true)
+                      request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.ext_authz", "require_auth", "true")
                     else
-                      request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.ext_authz", "require_auth", false)
+                      request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.ext_authz", "require_auth", "false")
                     end
                   end
           # ExtensionWithMatcher wraps ext_authz and conditionally invokes it based on dynamic metadata.
@@ -53,26 +53,34 @@ static_resources:
                       cluster_name: ext-authz
                     timeout: 0.5s
                   include_peer_certificate: true
-              # The xds_matcher evaluates dynamic metadata to decide whether to invoke ext_authz.
+              # The xds matcher evaluates dynamic metadata to decide whether to invoke ext_authz.
+              # We use matcher_list with custom_match because DynamicMetadataInput returns a custom
+              # MetadataMatchData type that requires a custom matcher and not exact_match_map.
               xds_matcher:
-                matcher_tree:
-                  input:
-                    name: dynamic-metadata
-                    typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DynamicMetadataInput
-                      filter: envoy.filters.http.ext_authz
-                      path:
-                      - key: require_auth
-                  exact_match_map:
-                    map:
-                      # When require_auth is "false", skip ext_authz.
-                      "false":
-                        action:
-                          name: skip
+                matcher_list:
+                  matchers:
+                  - predicate:
+                      single_predicate:
+                        input:
+                          name: envoy.matching.inputs.dynamic_metadata
                           typed_config:
-                            "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
-                      # For all other values (including "true" or when metadata is not set),
-                      # the default behavior is to invoke the filter. No explicit action is needed.
+                            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DynamicMetadataInput
+                            filter: envoy.filters.http.ext_authz
+                            path:
+                            - key: require_auth
+                        custom_match:
+                          name: envoy.matching.matchers.metadata_matcher
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.metadata.v3.Metadata
+                            value:
+                              string_match:
+                                exact: "false"
+                    # When require_auth is "false", skip ext_authz.
+                    on_match:
+                      action:
+                        name: skip
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
