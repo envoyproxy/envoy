@@ -50,7 +50,6 @@ using ::envoy::service::ext_proc::v3::HeadersResponse;
 using ::envoy::service::ext_proc::v3::HttpBody;
 using ::envoy::service::ext_proc::v3::HttpHeaders;
 using ::envoy::service::ext_proc::v3::HttpTrailers;
-using ::envoy::service::ext_proc::v3::ImmediateResponse;
 using ::envoy::service::ext_proc::v3::ProcessingRequest;
 using ::envoy::service::ext_proc::v3::TrailersResponse;
 using ::testing::NiceMock;
