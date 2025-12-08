@@ -2140,4 +2140,4 @@ envoy.tls.certificate_mappers.sni:
   security_posture: unknown
   status: alpha
   type_urls:
-  - envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.Config
+  - envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
