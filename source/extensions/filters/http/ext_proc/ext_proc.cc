@@ -401,14 +401,6 @@ void ExtProcLoggingInfo::recordProcessingEffect(
   }
 }
 
-const ExtProcLoggingInfo::ProcessingEffects& ExtProcLoggingInfo::processingEffects(
-    envoy::config::core::v3::TrafficDirection traffic_direction) const {
-  ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
-  return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
-             ? decoding_processor_effects_
-             : encoding_processor_effects_;
-}
-
 ExtProcLoggingInfo::ProcessingEffects&
 ExtProcLoggingInfo::processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) {
   ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
