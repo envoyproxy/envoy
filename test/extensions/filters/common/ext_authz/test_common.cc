@@ -85,6 +85,33 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
   return response;
 }
 
+CheckResponsePtr TestCommon::makeErrorCheckResponse(Grpc::Status::GrpcStatus response_status,
+                                                    envoy::type::v3::StatusCode http_status_code,
+                                                    const std::string& body,
+                                                    const HeaderValueOptionVector& headers) {
+  auto response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto status = response->mutable_status();
+  status->set_code(response_status);
+
+  const auto error_response = response->mutable_error_response();
+  if (!body.empty()) {
+    error_response->set_body(body);
+  }
+
+  auto status_code = error_response->mutable_status();
+  status_code->set_code(http_status_code);
+
+  auto error_response_headers = error_response->mutable_headers();
+  if (!headers.empty()) {
+    for (const auto& header : headers) {
+      auto* item = error_response_headers->Add();
+      item->CopyFrom(header);
+    }
+  }
+
+  return response;
+}
+
 Response
 TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code, const std::string& body,
                               const HeaderValueOptionVector& headers,

@@ -1,4 +1,3 @@
-# No compilation for unused binaries and libs.
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 7757916..6241f45 100644
 --- a/CMakeLists.txt
@@ -73,7 +72,54 @@ index 7757916..6241f45 100644
  endif()
  
  if (BUILD_STATIC_AND_SHARED OR BUILD_SHARED_LIBS)
-# Workaround for uninitialized use.
+diff --git a/cmake/build_wrapper.sh b/cmake/build_wrapper.sh
+index 895610c..6be61fd 100755
+--- a/cmake/build_wrapper.sh
++++ b/cmake/build_wrapper.sh
+@@ -8,6 +8,26 @@ cleanup () {
+ PREFIX=$1
+ KEEPSYMS_IN=$2
+ shift 2
++
++if [ -n "$EXT_BUILD_ROOT" ]; then
++    if [ -n "$NM" ]; then
++        case "$NM" in
++            /*) ;;
++            */*) NM="$EXT_BUILD_ROOT/$NM" ;;
++        esac
++    fi
++    if [ -n "$OBJCOPY" ]; then
++        case "$OBJCOPY" in
++            /*) ;;
++            */*) OBJCOPY="$EXT_BUILD_ROOT/$OBJCOPY" ;;
++        esac
++    fi
++fi
++
++# Set defaults if not set
++: ${NM:=nm}
++: ${OBJCOPY:=objcopy}
++
+ # $@ contains the actual build command
+ OUT=$(echo "$@" | rev | cut -d ' ' -f 2- | rev | sed 's/.* -o \(.*\.o\).*/\1/')
+ trap cleanup INT QUIT EXIT
+@@ -17,12 +37,13 @@ KEEPSYMS=$(mktemp -p /tmp keep.syms.XXXXX)
+ LIBC_SO=$("$@" --print-file-name=libc.so.6)
+ cp ${KEEPSYMS_IN} ${KEEPSYMS}
+ # get all symbols from libc and turn them into patterns
+-nm -f p -g -D ${LIBC_SO} | sed -s 's/\([^ @]*\).*/^\1$/' >> ${KEEPSYMS}
++${NM:-nm} -f posix -g -D ${LIBC_SO} | sed -s 's/\([^ @]*\).*/^\1$/' >> ${KEEPSYMS}
+ # build the object
+ "$@"
+ # rename the symbols in the object
+-nm -f p -g ${OUT} | cut -f1 -d' ' | grep -v -f ${KEEPSYMS} | sed -e "s/\(.*\)/\1\ ${PREFIX}_\1/" >> ${SYMSFILE}
++${NM} -f posix -g ${OUT} | cut -f1 -d' ' | grep -v -f ${KEEPSYMS} | sed -e "s/\(.*\)/\1\ ${PREFIX}_\1/" >> ${SYMSFILE}
++
+ if test -s ${SYMSFILE}
+ then
+-    objcopy --redefine-syms=${SYMSFILE} ${OUT}
++    ${OBJCOPY} --redefine-syms=${SYMSFILE} ${OUT}
+ fi
 diff --git a/src/fdr/teddy_runtime_common.h b/src/fdr/teddy_runtime_common.h
 index b76800e..6e587c2 100644
 --- a/src/fdr/teddy_runtime_common.h
@@ -86,26 +132,3 @@ index b76800e..6e587c2 100644
          assert(start_offset - start <= avail);
          u64a k = ones_u64a << (64 - avail + start_offset - start)
                             >> (64 - avail);
-diff --git a/cmake/build_wrapper.sh b/cmake/build_wrapper.sh
-index 895610c..73b7b56 100755
---- a/cmake/build_wrapper.sh
-+++ b/cmake/build_wrapper.sh
-@@ -15,14 +15,15 @@ SYMSFILE=$(mktemp -p /tmp ${PREFIX}_rename.syms.XXXXX)
- KEEPSYMS=$(mktemp -p /tmp keep.syms.XXXXX)
- # find the libc used by gcc
- LIBC_SO=$("$@" --print-file-name=libc.so.6)
- cp ${KEEPSYMS_IN} ${KEEPSYMS}
- # get all symbols from libc and turn them into patterns
--nm -f p -g -D ${LIBC_SO} | sed -s 's/\([^ @]*\).*/^\1$/' >> ${KEEPSYMS}
-+${NM:-nm} -f posix -g -D ${LIBC_SO} | sed -s 's/\([^ @]*\).*/^\1$/' >> ${KEEPSYMS}
- # build the object
- "$@"
- # rename the symbols in the object
--nm -f p -g ${OUT} | cut -f1 -d' ' | grep -v -f ${KEEPSYMS} | sed -e "s/\(.*\)/\1\ ${PREFIX}_\1/" >> ${SYMSFILE}
-+${NM:-nm} -f posix -g ${OUT} | cut -f1 -d' ' | grep -v -f ${KEEPSYMS} | sed -e "s/\(.*\)/\1\ ${PREFIX}_\1/" >> ${SYMSFILE}
-+
- if test -s ${SYMSFILE}
- then
--    objcopy --redefine-syms=${SYMSFILE} ${OUT}
-+    ${OBJCOPY:-objcopy} --redefine-syms=${SYMSFILE} ${OUT}
- fi

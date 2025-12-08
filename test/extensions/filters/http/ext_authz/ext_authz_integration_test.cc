@@ -2396,6 +2396,211 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EncodeHeadersToAppendIfAbsentExceedsLimit) {
   cleanup();
 }
 
+// Test that an error response with custom status, headers, and body is correctly sent to the
+// client.
+TEST_P(ExtAuthzGrpcIntegrationTest, ErrorResponseWithCustomAttributes) {
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::INTERNAL;
+  initializeConfig();
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  // Send error_response with custom attributes.
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+  auto* error_response = check_response.mutable_error_response();
+  error_response->mutable_status()->set_code(envoy::type::v3::ServiceUnavailable);
+  error_response->set_body("{\"error\": \"auth service unavailable\"}");
+
+  auto* header1 = error_response->mutable_headers()->Add();
+  header1->mutable_header()->set_key("x-error-code");
+  header1->mutable_header()->set_value("AUTH_SERVICE_ERROR");
+
+  auto* header2 = error_response->mutable_headers()->Add();
+  header2->mutable_header()->set_key("x-error-message");
+  header2->mutable_header()->set_value("Service temporarily unavailable");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
+  EXPECT_EQ(
+      "AUTH_SERVICE_ERROR",
+      response_->headers().get(Http::LowerCaseString("x-error-code"))[0]->value().getStringView());
+  EXPECT_EQ("Service temporarily unavailable", response_->headers()
+                                                   .get(Http::LowerCaseString("x-error-message"))[0]
+                                                   ->value()
+                                                   .getStringView());
+  EXPECT_EQ("{\"error\": \"auth service unavailable\"}", response_->body());
+
+  cleanup();
+}
+
+// Test that an error response respects failure_mode_allow configuration.
+TEST_P(ExtAuthzGrpcIntegrationTest, ErrorResponseWithFailureModeAllow) {
+  GrpcInitializeConfigOpts opts;
+  opts.failure_mode_allow = true;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::INTERNAL;
+  initializeConfig(opts);
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  // Send error_response - should be ignored due to failure_mode_allow.
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+  auto* error_response = check_response.mutable_error_response();
+  error_response->mutable_status()->set_code(envoy::type::v3::InternalServerError);
+  error_response->set_body("This should be ignored");
+
+  auto* header = error_response->mutable_headers()->Add();
+  header->mutable_header()->set_key("x-should-not-appear");
+  header->mutable_header()->set_value("ignored");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  // Request should be allowed and forwarded to upstream.
+  waitForSuccessfulUpstreamResponse("200");
+
+  // Verify error headers are not present in the response.
+  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("x-should-not-appear")).empty());
+
+  cleanup();
+}
+
+// Test that an error response body is truncated if it exceeds max_denied_response_body_bytes.
+TEST_P(ExtAuthzGrpcIntegrationTest, ErrorResponseWithBodyTruncation) {
+  GrpcInitializeConfigOpts opts;
+  opts.max_denied_response_body_bytes = 15;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::INTERNAL;
+  initializeConfig(opts);
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+  auto* error_response = check_response.mutable_error_response();
+  error_response->mutable_status()->set_code(envoy::type::v3::InternalServerError);
+  error_response->set_body("this-is-a-very-long-error-body-that-should-be-truncated");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
+  EXPECT_EQ("this-is-a-very-", response_->body()); // Truncated to 15 bytes
+
+  cleanup();
+}
+
+// Test that error response with both headers_to_set and headers_to_append works correctly.
+TEST_P(ExtAuthzGrpcIntegrationTest, ErrorResponseWithSetAndAppendHeaders) {
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::UNAVAILABLE;
+  initializeConfig();
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Unavailable);
+  auto* error_response = check_response.mutable_error_response();
+  error_response->mutable_status()->set_code(envoy::type::v3::ServiceUnavailable);
+  error_response->set_body("Service error");
+
+  // Add header with append = false (headers_to_set).
+  auto* header_set = error_response->mutable_headers()->Add();
+  header_set->mutable_append()->set_value(false);
+  header_set->mutable_header()->set_key("x-error-set");
+  header_set->mutable_header()->set_value("set-value");
+
+  // Add header with append = true (headers_to_append).
+  auto* header_append = error_response->mutable_headers()->Add();
+  header_append->mutable_append()->set_value(true);
+  header_append->mutable_header()->set_key("x-error-append");
+  header_append->mutable_header()->set_value("append-value");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
+  EXPECT_EQ(
+      "set-value",
+      response_->headers().get(Http::LowerCaseString("x-error-set"))[0]->value().getStringView());
+  EXPECT_EQ("append-value", response_->headers()
+                                .get(Http::LowerCaseString("x-error-append"))[0]
+                                ->value()
+                                .getStringView());
+  EXPECT_EQ("Service error", response_->body());
+
+  cleanup();
+}
+
+// Test that error response with invalid headers is rejected when validate_mutations is enabled.
+TEST_P(ExtAuthzGrpcIntegrationTest, ErrorResponseWithInvalidHeaders) {
+  GrpcInitializeConfigOpts opts;
+  opts.validate_mutations = true;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::INTERNAL;
+  initializeConfig(opts);
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+  auto* error_response = check_response.mutable_error_response();
+  error_response->mutable_status()->set_code(envoy::type::v3::InternalServerError);
+  error_response->set_body("This body should be cleared due to invalid headers");
+
+  // Add invalid header with newlines.
+  auto* header = error_response->mutable_headers()->Add();
+  header->mutable_header()->set_key("invalid\nheader");
+  header->mutable_header()->set_value("value");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  // Should fall back to default 403 status.
+  EXPECT_EQ("403", response_->headers().getStatusValue());
+  // Body should be empty due to validation failure.
+  EXPECT_TRUE(response_->body().empty());
+
+  cleanup();
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/17344
 TEST(ExtConfigValidateTest, Validate) {
   Server::TestComponentFactory component_factory;

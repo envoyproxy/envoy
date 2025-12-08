@@ -925,6 +925,23 @@ case $CI_TARGET in
         pkill clangd || :
         ;;
 
+    pre_refresh_compdb)
+        setup_clang_toolchain
+        # Override the BAZEL_STARTUP_OPTIONS to setting different output directory.
+        # So the compdb headers won't be overwritten by another bazel run.
+        for i in "${!BAZEL_STARTUP_OPTIONS[@]}"; do
+            if [[ ${BAZEL_STARTUP_OPTIONS[i]} == "--output_base"* ]]; then
+                COMPDB_OUTPUT_BASE="${BAZEL_STARTUP_OPTIONS[i]}"-envoy-compdb
+                BAZEL_STARTUP_OPTIONS[i]="${COMPDB_OUTPUT_BASE}"
+                BAZEL_STARTUP_OPTION_LIST="${BAZEL_STARTUP_OPTIONS[*]}"
+                export BAZEL_STARTUP_OPTION_LIST
+            fi
+        done
+        # Ensure that LLVM toolchain is downloaded by using clangd target.
+        # This is used during devcontainer bootstrap.
+        bazel build @llvm_toolchain//:clangd
+        ;;
+
     *)
         echo "Invalid do_ci.sh target (${CI_TARGET}), see ci/README.md for valid targets."
         exit 1
