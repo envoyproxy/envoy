@@ -117,6 +117,7 @@ envoy_cc_library(
         ":hot_restart_interface",
         ":lifecycle_notifier_interface",
         ":listener_manager_interface",
+        ":memory_interface",
         ":options_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/api:api_interface",
@@ -146,6 +147,14 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "memory_interface",
+    hdrs = ["memory.h"],
+    deps = [
+        "//envoy/common:pure_lib",
     ],
 )
 

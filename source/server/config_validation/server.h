@@ -106,6 +106,7 @@ public:
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   OverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
+  MemoryAllocatorManager& memoryAllocatorManager() override { return memory_allocator_manager_; }
   bool healthCheckFailed() override { return false; }
   const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { PANIC("not implemented"); }
@@ -157,6 +158,12 @@ public:
   }
 
 private:
+  class NoopMemoryAllocatorManager : public MemoryAllocatorManager {
+  public:
+    void maybeReleaseFreeMemory() override {}
+    void releaseFreeMemory() override {}
+  };
+
   void initialize(const Options& options,
                   const Network::Address::InstanceConstSharedPtr& local_address,
                   ComponentFactory& component_factory);
@@ -195,6 +202,7 @@ private:
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;
+  NoopMemoryAllocatorManager memory_allocator_manager_;
   MutexTracer* mutex_tracer_{nullptr};
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;

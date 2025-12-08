@@ -4,6 +4,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/memory.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -34,6 +35,7 @@ protected:
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
+  NiceMock<Server::MockMemoryAllocatorManager> allocator_manager_;
   Event::TimerCb timer_cb_;
 };
 
@@ -41,7 +43,8 @@ TEST_F(HeapShrinkerTest, DoNotShrinkWhenNotConfigured) {
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _)).WillOnce(Return(false));
   EXPECT_CALL(dispatcher, createTimer_(_)).Times(0);
-  HeapShrinker h(dispatcher, overload_manager_, *stats_.rootScope());
+  EXPECT_CALL(allocator_manager_, releaseFreeMemory()).Times(0);
+  HeapShrinker h(dispatcher, overload_manager_, *stats_.rootScope(), allocator_manager_);
 }
 
 TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
@@ -52,7 +55,8 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
         return true;
       }));
 
-  HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
+  EXPECT_CALL(allocator_manager_, releaseFreeMemory()).Times(2);
+  HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope(), allocator_manager_);
 
   auto data = std::make_unique<char[]>(5000000);
   const uint64_t physical_mem_before_shrink =

@@ -4,6 +4,7 @@
 
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/http/http_server_properties_cache.h"
+#include "test/mocks/server/memory.h"
 #include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
@@ -42,6 +43,7 @@ public:
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
+  MemoryAllocatorManager& memoryAllocatorManager() override { return memory_allocator_manager_; }
   MOCK_METHOD(Runtime::Loader&, runtime, ());
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(bool, isShutdown, ());
@@ -64,7 +66,7 @@ public:
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
   MOCK_METHOD(bool, enableReusePortDefault, ());
-  MOCK_METHOD(void, setSinkPredicates, (std::unique_ptr<Envoy::Stats::SinkPredicates>&&));
+  MOCK_METHOD(void, setSinkPredicates, (std::unique_ptr<Envoy::Stats::SinkPredicates> &&));
 
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
@@ -99,6 +101,7 @@ public:
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   testing::NiceMock<MockOverloadManager> null_overload_manager_;
+  testing::NiceMock<MockMemoryAllocatorManager> memory_allocator_manager_;
   Singleton::ManagerPtr singleton_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;

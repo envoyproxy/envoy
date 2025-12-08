@@ -16,6 +16,7 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/memory.h"
 #include "envoy/server/process_context.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -290,6 +291,7 @@ public:
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   OverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
+  Memory::AllocatorManager& memoryAllocatorManager() override { return *memory_allocator_manager_; }
   Runtime::Loader& runtime() override;
   void shutdown() override;
   bool isShutdown() final { return shutdown_; }
@@ -359,7 +361,8 @@ private:
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb = [] {});
+  void notifyCallbacksForStage(
+      Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
