@@ -39,9 +39,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
   Http::HttpServerPropertiesCacheSharedPtr cache;
   auto info = encoder_callbacks_->streamInfo().upstreamClusterInfo();
-  if (info && (*info)->alternateProtocolsCacheOptions()) {
-    cache = config_->alternateProtocolCacheManager().getCache(
-        *((*info)->alternateProtocolsCacheOptions()), dispatcher_);
+  if (info) {
+    const auto& alternate_options = (*info)->httpProtocolOptions().alternateProtocolsCacheOptions();
+    if (alternate_options) {
+      cache = config_->alternateProtocolCacheManager().getCache(*alternate_options, dispatcher_);
+    }
   }
   if (!cache) {
     return Http::FilterHeadersStatus::Continue;

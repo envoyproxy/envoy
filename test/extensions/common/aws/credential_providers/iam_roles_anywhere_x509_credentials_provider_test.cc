@@ -37,71 +37,71 @@ namespace Aws {
 //         Signature Algorithm: ecdsa-with-SHA256
 //         Issuer: CN = test-ecdsa-p256
 //         Validity
-//             Not Before: Nov 11 21:42:11 2024 GMT
-//             Not After : Nov 11 22:42:11 2025 GMT
+//             Not Before: Nov 12 10:16:07 2025 GMT
+//             Not After : Sep 25 10:16:07 2225 GMT
 //         Subject: C = XX, L = Default City, O = Default Company Ltd, CN = test-ecdsa.test
 //         Subject Public Key Info:
 //                 Public-Key: (256 bit)
 //                 pub:
-//                     04:2e:1d:a1:d1:7c:db:e0:4e:38:82:bc:7d:7c:33:
-//                     5e:7f:e4:01:02:fd:70:f0:47:19:50:90:99:68:8c:
-//                     50:5f:de:42:31:0e:83:2f:f1:f6:7a:f9:21:be:a2:
-//                     60:7d:bd:01:fa:89:c4:28:62:b4:b0:cd:5b:a2:5d:
-//                     33:24:fb:85:d9
+//                     04:39:bd:3c:e8:92:d4:8f:10:d1:c6:f3:49:d0:02:
+//                     f1:62:77:1f:df:4c:d6:40:8c:0c:ae:47:3c:14:c2:
+//                     b0:bb:77:04:39:9e:da:45:e2:14:81:93:77:1d:68:
+//                     42:f7:77:39:ea:e5:19:9c:cb:a6:21:07:a3:f2:74:
+//                     5c:88:74:eb:74
 //                 ASN1 OID: prime256v1
 //                 NIST CURVE: P-256
 //         X509v3 extensions:
 //             X509v3 Basic Constraints:
 //                 CA:FALSE
-//             X509v3 Authority Key Identifier:
-//                 32:89:A1:4A:00:AC:C1:96:76:5D:D8:D4:D4:CE:18:8D:1B:77:5A:4B
+//
 //             X509v3 Subject Key Identifier:
-//                 37:EC:2F:8B:31:1C:42:FF:79:6E:2F:40:FA:22:DC:FB:2F:C4:76:A1
+//                 7E:13:23:B2:E5:45:55:18:E9:A2:9A:2D:60:88:E8:A0:4E:0D:B7:3F
 //             X509v3 Key Usage: critical
-//                 Digital Signature, Key
 //             X509v3 Extended Key Usage:
 //                 TLS Web Server Authentication, TLS Web Client Authentication
 //     Signature Algorithm: ecdsa-with-SHA256
-//     Signature Value:
-//         30:44:02:20:0e:4c:50:b6:3a:ba:e4:c4:3f:bb:0b:6f:86:7a:
-//         2a:83:0d:0c:69:3b:1c:ba:cf:25:36:10:30:f0:1d:15:cb:cc:
-//         02:20:48:25:16:2f:32:e4:20:40:c9:a4:57:a0:c1:99:7a:d9:
-//         a6:b9:33:95:d1:be:ad:d1:69:c2:c9:6a:1d:2d:89:ef
+//          30:46:02:21:00:bd:50:46:03:a6:c0:55:22:8a:c5:8c:93:16:
+//          a8:b0:35:f2:ff:66:08:8b:56:c8:35:71:ef:c3:d3:86:c9:15:
+//          9c:02:21:00:9f:73:1c:77:04:00:8a:aa:ef:d7:ca:05:ef:c6:
+//          34:14:68:8d:9c:6c:08:33:d5:66:a8:6e:d2:8b:b7:52:69:77
 //
 
 std::string server_root_cert_ecdsa_der_b64 = R"EOF(
-MIIB7zCCAZagAwIBAgIQA+x+3DenV9P2mjCafZGlFjAKBggqhkjOPQQDAjAaMRgwFgYDVQQDDA90
-ZXN0LWVjZHNhLXAyNTYwHhcNMjQxMTExMjE0MjExWhcNMjUxMTExMjI0MjExWjBcMQswCQYDVQQG
-EwJYWDEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRk
-MRgwFgYDVQQDDA90ZXN0LWVjZHNhLnRlc3QwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQuHaHR
-fNvgTjiCvH18M15/5AEC/XDwRxlQkJlojFBf3kIxDoMv8fZ6+SG+omB9vQH6icQoYrSwzVuiXTMk
-+4XZo3wwejAJBgNVHRMEAjAAMB8GA1UdIwQYMBaAFDKJoUoArMGWdl3Y1NTOGI0bd1pLMB0GA1Ud
-DgQWBBQ37C+LMRxC/3luL0D6Itz7L8R2oTAOBgNVHQ8BAf8EBAMCBaAwHQYDVR0lBBYwFAYIKwYB
-BQUHAwEGCCsGAQUFBwMCMAoGCCqGSM49BAMCA0cAMEQCIA5MULY6uuTEP7sLb4Z6KoMNDGk7HLrP
-JTYQMPAdFcvMAiBIJRYvMuQgQMmkV6DBmXrZprkzldG+rdFpwslqHS2J7w==
+MIIB8zCCAZigAwIBAgIQA+x+3DenV9P2mjCafZGlFjAKBggqhkjOPQQDAjAaMRgwFgYDVQQDDA90
+ZXN0LWVjZHNhLXAyNTYwIBcNMjUxMTEyMTAxNjA3WhgPMjIyNTA5MjUxMDE2MDdaMFwxCzAJBgNV
+BAYTAlhYMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNVBAoME0RlZmF1bHQgQ29tcGFueSBM
+dGQxGDAWBgNVBAMMD3Rlc3QtZWNkc2EudGVzdDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABDm9
+POiS1I8Q0cbzSdAC8WJ3H99M1kCMDK5HPBTCsLt3BDme2kXiFIGTdx1oQvd3OerlGZzLpiEHo/J0
+XIh063SjfDB6MAkGA1UdEwQCMAAwHwYDVR0jBBgwFoAU8AfpSBXUJ8q9PVK5YzQ3QAI0bSwwHQYD
+VR0OBBYEFH4TI7LlRVUY6aKaLWCI6KBODbc/MA4GA1UdDwEB/wQEAwIFoDAdBgNVHSUEFjAUBggr
+BgEFBQcDAQYIKwYBBQUHAwIwCgYIKoZIzj0EAwIDSQAwRgIhAL1QRgOmwFUiisWMkxaosDXy/2YI
+i1bINXHvw9OGyRWcAiEAn3McdwQAiqrv18oF78Y0FGiNnGwIM9VmqG7Si7dSaXc=
 )EOF";
 
 std::string server_root_cert_ecdsa_pem = R"EOF(
 -----BEGIN CERTIFICATE-----
-MIIB7zCCAZagAwIBAgIQA+x+3DenV9P2mjCafZGlFjAKBggqhkjOPQQDAjAaMRgw
-FgYDVQQDDA90ZXN0LWVjZHNhLXAyNTYwHhcNMjQxMTExMjE0MjExWhcNMjUxMTEx
-MjI0MjExWjBcMQswCQYDVQQGEwJYWDEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRww
-GgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRkMRgwFgYDVQQDDA90ZXN0LWVjZHNh
-LnRlc3QwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQuHaHRfNvgTjiCvH18M15/
-5AEC/XDwRxlQkJlojFBf3kIxDoMv8fZ6+SG+omB9vQH6icQoYrSwzVuiXTMk+4XZ
-o3wwejAJBgNVHRMEAjAAMB8GA1UdIwQYMBaAFDKJoUoArMGWdl3Y1NTOGI0bd1pL
-MB0GA1UdDgQWBBQ37C+LMRxC/3luL0D6Itz7L8R2oTAOBgNVHQ8BAf8EBAMCBaAw
-HQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMAoGCCqGSM49BAMCA0cAMEQC
-IA5MULY6uuTEP7sLb4Z6KoMNDGk7HLrPJTYQMPAdFcvMAiBIJRYvMuQgQMmkV6DB
-mXrZprkzldG+rdFpwslqHS2J7w==
+MIIB8zCCAZigAwIBAgIQA+x+3DenV9P2mjCafZGlFjAKBggqhkjOPQQDAjAaMRgw
+FgYDVQQDDA90ZXN0LWVjZHNhLXAyNTYwIBcNMjUxMTEyMTAxNjA3WhgPMjIyNTA5
+MjUxMDE2MDdaMFwxCzAJBgNVBAYTAlhYMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkx
+HDAaBgNVBAoME0RlZmF1bHQgQ29tcGFueSBMdGQxGDAWBgNVBAMMD3Rlc3QtZWNk
+c2EudGVzdDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABDm9POiS1I8Q0cbzSdAC
+8WJ3H99M1kCMDK5HPBTCsLt3BDme2kXiFIGTdx1oQvd3OerlGZzLpiEHo/J0XIh0
+63SjfDB6MAkGA1UdEwQCMAAwHwYDVR0jBBgwFoAU8AfpSBXUJ8q9PVK5YzQ3QAI0
+bSwwHQYDVR0OBBYEFH4TI7LlRVUY6aKaLWCI6KBODbc/MA4GA1UdDwEB/wQEAwIF
+oDAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwCgYIKoZIzj0EAwIDSQAw
+RgIhAL1QRgOmwFUiisWMkxaosDXy/2YIi1bINXHvw9OGyRWcAiEAn3McdwQAiqrv
+18oF78Y0FGiNnGwIM9VmqG7Si7dSaXc=
 -----END CERTIFICATE-----
 )EOF";
 
 std::string server_root_private_key_ecdsa_pem = R"EOF(
+-----BEGIN EC PARAMETERS-----
+BggqhkjOPQMBBw==
+-----END EC PARAMETERS-----
 -----BEGIN EC PRIVATE KEY-----
-MHcCAQEEIC96bc9hG8Aa3vHDAogZOkndTg0XmyWR7hw7i5dqGdcwoAoGCCqGSM49
-AwEHoUQDQgAELh2h0Xzb4E44grx9fDNef+QBAv1w8EcZUJCZaIxQX95CMQ6DL/H2
-evkhvqJgfb0B+onEKGK0sM1bol0zJPuF2Q==
+MHcCAQEEILjtTl7LGvCXeWPPx3Hq6A6EQQF6VuXNTk01TWbVfnfQoAoGCCqGSM49
+AwEHoUQDQgAEOb086JLUjxDRxvNJ0ALxYncf30zWQIwMrkc8FMKwu3cEOZ7aReIU
+gZN3HWhC93c56uUZnMumIQej8nRciHTrdA==
 -----END EC PRIVATE KEY-----
 )EOF";
 
@@ -110,65 +110,61 @@ evkhvqJgfb0B+onEKGK0sM1bol0zJPuF2Q==
 //     Data:
 //         Version: 3 (0x2)
 //         Serial Number:
-//             39:21:bc:e7:f3:15:1a:4b:7f:ef:54:ef:ef:54:c4:09:a5:03:0f:3a
+//             cd:2e:95:2e:32:ba:16:98:13:04:67:f7:47:c4:77:5f:fb:c4:cb:89
 //         Signature Algorithm: ecdsa-with-SHA256
-//         Issuer: C = XX, L = Default City, O = Default Company Ltd, CN =
-//         test-ecdsa-p256-subordinate Validity
-//             Not Before: Nov 17 10:44:05 2024 GMT
-//             Not After : Nov 17 10:44:05 2025 GMT
+//         Issuer: CN = test-ecdsa-p256
+//         Validity
+//             Not Before: Nov 12 12:08:33 2025 GMT
+//             Not After : Sep 25 12:08:33 2225 GMT
 //         Subject: C = XX, L = Default City, O = Default Company Ltd, CN =
 //         test-ecdsa-p256-subordinate Subject Public Key Info:
 //                 Public-Key: (256 bit)
 //                 pub:
-//                     04:49:81:46:65:f7:22:74:e4:a8:16:6e:0e:ef:cf:
-//                     f0:b8:a3:50:75:e4:82:c9:9d:c5:f1:a9:50:73:3b:
-//                     c1:42:a7:e6:7e:47:dd:4e:bc:e9:33:f9:1a:c0:ad:
-//                     09:20:f6:35:6c:fc:01:1a:2e:d0:f0:8b:e7:b2:7d:
-//                     d8:02:91:74:d8
+//                     04:c7:d0:66:fc:ce:dc:5e:11:30:ea:f9:7d:74:11:
+//                     b3:35:17:65:c6:e2:19:23:7f:d5:0c:43:92:e9:32:
+//                     fd:06:62:8b:64:cf:94:9e:c0:44:f7:c0:fa:9b:93:
+//                     ef:89:c3:3c:d9:8e:b9:17:d8:7e:1c:59:d3:a7:fa:
+//                     c9:9f:e2:87:92
 //                 ASN1 OID: prime256v1
 //                 NIST CURVE: P-256
 //         X509v3 extensions:
-//             X509v3 Subject Key Identifier:
-//                 53:A2:C6:B8:5A:AA:37:4B:67:9B:E9:20:1E:C2:F3:01:7C:BC:0A:CD
-//             X509v3 Authority Key Identifier:
-//                 53:A2:C6:B8:5A:AA:37:4B:67:9B:E9:20:1E:C2:F3:01:7C:BC:0A:CD
 //             X509v3 Basic Constraints: critical
 //                 CA:TRUE
+//             X509v3 Subject Key Identifier:
+//                 2B:BC:CF:4E:63:DA:9F:12:54:04:FB:4A:B8:58:0B:A8:89:34:77:97
+//
 //     Signature Algorithm: ecdsa-with-SHA256
-//     Signature Value:
-//         30:45:02:20:2f:ab:3c:58:06:04:4b:c5:00:01:56:46:e8:b5:
-//         c2:f6:84:20:58:e0:30:97:74:3d:e8:6a:43:e5:61:68:55:34:
-//         02:21:00:89:1e:c6:1a:67:e0:b1:e1:20:4b:a2:a5:28:30:18:
-//         6f:22:63:24:85:2a:4d:ee:9a:92:75:02:d1:31:53:2b:70
+//          30:44:02:20:21:24:51:54:36:42:1e:84:d2:77:e1:6f:b0:63:
+//          a1:48:92:f0:58:40:71:5d:20:4f:32:1a:59:8d:47:23:55:17:
+//          02:20:43:68:d7:0f:23:34:4b:76:ca:52:11:5d:25:9b:91:e7:
+//          ef:c9:6c:69:1f:10:16:48:f3:17:e2:5f:93:fc:c2:28
 
 std::string server_subordinate_cert_ecdsa_pem = R"EOF(
 -----BEGIN CERTIFICATE-----
-MIICJTCCAcugAwIBAgIUOSG85/MVGkt/71Tv71TECaUDDzowCgYIKoZIzj0EAwIw
-aDELMAkGA1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoGA1UECgwT
-RGVmYXVsdCBDb21wYW55IEx0ZDEkMCIGA1UEAwwbdGVzdC1lY2RzYS1wMjU2LXN1
-Ym9yZGluYXRlMB4XDTI0MTExNzEwNDQwNVoXDTI1MTExNzEwNDQwNVowaDELMAkG
-A1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoGA1UECgwTRGVmYXVs
-dCBDb21wYW55IEx0ZDEkMCIGA1UEAwwbdGVzdC1lY2RzYS1wMjU2LXN1Ym9yZGlu
-YXRlMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESYFGZfcidOSoFm4O78/wuKNQ
-deSCyZ3F8alQczvBQqfmfkfdTrzpM/kawK0JIPY1bPwBGi7Q8Ivnsn3YApF02KNT
-MFEwHQYDVR0OBBYEFFOixrhaqjdLZ5vpIB7C8wF8vArNMB8GA1UdIwQYMBaAFFOi
-xrhaqjdLZ5vpIB7C8wF8vArNMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwID
-SAAwRQIgL6s8WAYES8UAAVZG6LXC9oQgWOAwl3Q96GpD5WFoVTQCIQCJHsYaZ+Cx
-4SBLoqUoMBhvImMkhSpN7pqSdQLRMVMrcA==
+MIIB6jCCAZCgAwIBAgIVAM0ulS4yuhaYEwRn90fEd1/7xMuJMAoGCCqGSM49BAMC
+MBoxGDAWBgNVBAMMD3Rlc3QtZWNkc2EtcDI1NjAgFw0yNTExMTIxMjA4MzNaGA8y
+MjI1MDkyNTEyMDgzM1owaDELMAkGA1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQg
+Q2l0eTEcMBoGA1UECgwTRGVmYXVsdCBDb21wYW55IEx0ZDEkMCIGA1UEAwwbdGVz
+dC1lY2RzYS1wMjU2LXN1Ym9yZGluYXRlMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcD
+QgAEzweun9csA6k1Q2ubBCClYv/SMZa1CtHsm7EThXpyVwh2SCJU6W5xLHzKTHtv
+WiU8GN7TjXs+0GqvkjwE4TE+z6NjMGEwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4E
+FgQUdXdc+5AklLHtG9IPaarYcIzam68wHwYDVR0jBBgwFoAUXiDvhes3PXlzAq0W
+E4rzxe8oj98wDgYDVR0PAQH/BAQDAgGGMAoGCCqGSM49BAMCA0gAMEUCIQCYi3jI
+lVB+4u6eC7i3210Zy6Z+Ne5oPRbw+1QxakP8vwIgQmmfXe2BaQbqKuqY/YzVk1Ao
+I0RukOw+Rnl0jhwN1rE=
 -----END CERTIFICATE-----
 )EOF";
 
 std::string server_subordinate_cert_ecdsa_der_b64 = R"EOF(
-MIICJTCCAcugAwIBAgIUOSG85/MVGkt/71Tv71TECaUDDzowCgYIKoZIzj0EAwIwaDELMAkGA1UE
-BhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoGA1UECgwTRGVmYXVsdCBDb21wYW55IEx0
-ZDEkMCIGA1UEAwwbdGVzdC1lY2RzYS1wMjU2LXN1Ym9yZGluYXRlMB4XDTI0MTExNzEwNDQwNVoX
-DTI1MTExNzEwNDQwNVowaDELMAkGA1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoG
-A1UECgwTRGVmYXVsdCBDb21wYW55IEx0ZDEkMCIGA1UEAwwbdGVzdC1lY2RzYS1wMjU2LXN1Ym9y
-ZGluYXRlMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESYFGZfcidOSoFm4O78/wuKNQdeSCyZ3F
-8alQczvBQqfmfkfdTrzpM/kawK0JIPY1bPwBGi7Q8Ivnsn3YApF02KNTMFEwHQYDVR0OBBYEFFOi
-xrhaqjdLZ5vpIB7C8wF8vArNMB8GA1UdIwQYMBaAFFOixrhaqjdLZ5vpIB7C8wF8vArNMA8GA1Ud
-EwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDSAAwRQIgL6s8WAYES8UAAVZG6LXC9oQgWOAwl3Q96GpD
-5WFoVTQCIQCJHsYaZ+Cx4SBLoqUoMBhvImMkhSpN7pqSdQLRMVMrcA==
+MIIB6jCCAZCgAwIBAgIVAM0ulS4yuhaYEwRn90fEd1/7xMuJMAoGCCqGSM49BAMCMBoxGDAWBgNV
+BAMMD3Rlc3QtZWNkc2EtcDI1NjAgFw0yNTExMTIxMjA4MzNaGA8yMjI1MDkyNTEyMDgzM1owaDEL
+MAkGA1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoGA1UECgwTRGVmYXVsdCBDb21w
+YW55IEx0ZDEkMCIGA1UEAwwbdGVzdC1lY2RzYS1wMjU2LXN1Ym9yZGluYXRlMFkwEwYHKoZIzj0C
+AQYIKoZIzj0DAQcDQgAEzweun9csA6k1Q2ubBCClYv/SMZa1CtHsm7EThXpyVwh2SCJU6W5xLHzK
+THtvWiU8GN7TjXs+0GqvkjwE4TE+z6NjMGEwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUdXdc
++5AklLHtG9IPaarYcIzam68wHwYDVR0jBBgwFoAUXiDvhes3PXlzAq0WE4rzxe8oj98wDgYDVR0P
+AQH/BAQDAgGGMAoGCCqGSM49BAMCA0gAMEUCIQCYi3jIlVB+4u6eC7i3210Zy6Z+Ne5oPRbw+1Qx
+akP8vwIgQmmfXe2BaQbqKuqY/YzVk1AoI0RukOw+Rnl0jhwN1rE=
 )EOF";
 
 std::string server_subordinate_private_key_ecdsa_pem = R"EOF(
@@ -176,51 +172,56 @@ std::string server_subordinate_private_key_ecdsa_pem = R"EOF(
 BggqhkjOPQMBBw==
 -----END EC PARAMETERS-----
 -----BEGIN EC PRIVATE KEY-----
-MHcCAQEEIPzRePzrwYiOSrv0MLVSJEw6fEvaJVYDzVBrYEGlS45OoAoGCCqGSM49
-AwEHoUQDQgAESYFGZfcidOSoFm4O78/wuKNQdeSCyZ3F8alQczvBQqfmfkfdTrzp
-M/kawK0JIPY1bPwBGi7Q8Ivnsn3YApF02A==
+MHcCAQEEIIySfOoXNx9Til/OcIJnRASZUfUMvB0uYWX3uOM0Ais3oAoGCCqGSM49
+AwEHoUQDQgAE+zlA/fa8wC/M4i4OtUXIHfEKoCsRjXRvzJTKJ6BaIcjxFWMELMKy
+k0gX4ixwIwZmi6oE32TEaDTgY5UnxrAfYw==
 -----END EC PRIVATE KEY-----
 )EOF";
 
 std::string server_subordinate_chain_ecdsa_pem = R"EOF(
 -----BEGIN CERTIFICATE-----
-MIIBpDCCAUqgAwIBAgIQEtGBpKhUy68xOvOSxGaJKDAKBggqhkjOPQQDAjAaMRgw
-FgYDVQQDDA90ZXN0LWVjZHNhLXAyNTYwHhcNMjQxMTE3MDkzOTUyWhcNMjUxMTIx
-MTAzOTE0WjAmMSQwIgYDVQQDDBt0ZXN0LWVjZHNhLXAyNTYtc3Vib3JkaW5hdGUw
-WTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQpX+Tfr1UOeCVwxKb1FveTbAIG7J5Q
-JmoWi8DxuXv4R2D/yKtjL0ezPLIfonVCigodW6lVNRtJUeuG5s/w7lfmo2YwZDAS
-BgNVHRMBAf8ECDAGAQH/AgEAMB8GA1UdIwQYMBaAFDKJoUoArMGWdl3Y1NTOGI0b
-d1pLMB0GA1UdDgQWBBSWdfzMJkRqFUIwO382QI80sO9hPDAOBgNVHQ8BAf8EBAMC
-AYYwCgYIKoZIzj0EAwIDSAAwRQIhAKHYHe2Tmc1BGnw1xT2Tn8RX26Hf1oY+K3QW
-7wRhrRQzAiAnfZLHoyJWU57VyYhP1mMAQY7bO5plRGoh2PSScFb59A==
+MIIB6jCCAZCgAwIBAgIVAM0ulS4yuhaYEwRn90fEd1/7xMuJMAoGCCqGSM49BAMC
+MBoxGDAWBgNVBAMMD3Rlc3QtZWNkc2EtcDI1NjAgFw0yNTExMTIxMjA4MzNaGA8y
+MjI1MDkyNTEyMDgzM1owaDELMAkGA1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQg
+Q2l0eTEcMBoGA1UECgwTRGVmYXVsdCBDb21wYW55IEx0ZDEkMCIGA1UEAwwbdGVz
+dC1lY2RzYS1wMjU2LXN1Ym9yZGluYXRlMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcD
+QgAEzweun9csA6k1Q2ubBCClYv/SMZa1CtHsm7EThXpyVwh2SCJU6W5xLHzKTHtv
+WiU8GN7TjXs+0GqvkjwE4TE+z6NjMGEwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4E
+FgQUdXdc+5AklLHtG9IPaarYcIzam68wHwYDVR0jBBgwFoAUXiDvhes3PXlzAq0W
+E4rzxe8oj98wDgYDVR0PAQH/BAQDAgGGMAoGCCqGSM49BAMCA0gAMEUCIQCYi3jI
+lVB+4u6eC7i3210Zy6Z+Ne5oPRbw+1QxakP8vwIgQmmfXe2BaQbqKuqY/YzVk1Ao
+I0RukOw+Rnl0jhwN1rE=
 -----END CERTIFICATE-----
 -----BEGIN CERTIFICATE-----
-MIIBdTCCARugAwIBAgIRAPfOpjFoMikiVrNYSaU01BcwCgYIKoZIzj0EAwIwGjEY
-MBYGA1UEAwwPdGVzdC1lY2RzYS1wMjU2MB4XDTI0MTExMTIxMjYyMFoXDTM0MTEx
-MTIyMjYwN1owGjEYMBYGA1UEAwwPdGVzdC1lY2RzYS1wMjU2MFkwEwYHKoZIzj0C
-AQYIKoZIzj0DAQcDQgAERdsHH8nBE8nC2i5oa1FNhsSpNf/+KtO56HiPNf1I61vV
-h09pqLKnI05esqlQapZmFeUYM4ZXWb6UR/b67u05J6NCMEAwDwYDVR0TAQH/BAUw
-AwEB/zAdBgNVHQ4EFgQUMomhSgCswZZ2XdjU1M4YjRt3WkswDgYDVR0PAQH/BAQD
-AgGGMAoGCCqGSM49BAMCA0gAMEUCIDp85MaWSMiOi4Gu7p/vW5L0fTchzwu6o6BU
-pbvDxRwtAiEA2586MbVLvM9wZ0cw+GqfDPzJVQiJUIZouRZ5V3XdQFY=
+MIIBiDCCAS6gAwIBAgIRANU2fOxPEClRBUgtykrPZ24wCgYIKoZIzj0EAwIwGjEY
+MBYGA1UEAwwPdGVzdC1lY2RzYS1wMjU2MCAXDTI1MTExMjEyMDgzM1oYDzIyMjUw
+OTI1MTIwODMzWjAaMRgwFgYDVQQDDA90ZXN0LWVjZHNhLXAyNTYwWTATBgcqhkjO
+PQIBBggqhkjOPQMBBwNCAATsqxwEMkg6iwd3vocJd77apHpPx/HBWbySQ+NBBK0M
+ExvnawlnaWQVafCTJXNa3XenHWnkGY1IlPtqJ9vggo6Ao1MwUTAdBgNVHQ4EFgQU
+XiDvhes3PXlzAq0WE4rzxe8oj98wHwYDVR0jBBgwFoAUXiDvhes3PXlzAq0WE4rz
+xe8oj98wDwYDVR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNIADBFAiB/JDje83oo
+4l2iXb8CtRo2KYKNDqTIvDkiYPjFHOA37gIhAKDtkHAKxFmt02XXybfK8KVYLa/R
+o7Kf455sNAyGOBTs
 -----END CERTIFICATE-----
 )EOF";
 
 std::string server_subordinate_chain_ecdsa_der_b64 = R"EOF(
-MIIBpDCCAUqgAwIBAgIQEtGBpKhUy68xOvOSxGaJKDAKBggqhkjOPQQDAjAaMRgwFgYDVQQDDA90
-ZXN0LWVjZHNhLXAyNTYwHhcNMjQxMTE3MDkzOTUyWhcNMjUxMTIxMTAzOTE0WjAmMSQwIgYDVQQD
-DBt0ZXN0LWVjZHNhLXAyNTYtc3Vib3JkaW5hdGUwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQp
-X+Tfr1UOeCVwxKb1FveTbAIG7J5QJmoWi8DxuXv4R2D/yKtjL0ezPLIfonVCigodW6lVNRtJUeuG
-5s/w7lfmo2YwZDASBgNVHRMBAf8ECDAGAQH/AgEAMB8GA1UdIwQYMBaAFDKJoUoArMGWdl3Y1NTO
-GI0bd1pLMB0GA1UdDgQWBBSWdfzMJkRqFUIwO382QI80sO9hPDAOBgNVHQ8BAf8EBAMCAYYwCgYI
-KoZIzj0EAwIDSAAwRQIhAKHYHe2Tmc1BGnw1xT2Tn8RX26Hf1oY+K3QW7wRhrRQzAiAnfZLHoyJW
-U57VyYhP1mMAQY7bO5plRGoh2PSScFb59A==,MIIBdTCCARugAwIBAgIRAPfOpjFoMikiVrNYSaU01BcwCgYIKoZIzj0EAwIwGjEYMBYGA1UEAwwP
-dGVzdC1lY2RzYS1wMjU2MB4XDTI0MTExMTIxMjYyMFoXDTM0MTExMTIyMjYwN1owGjEYMBYGA1UE
-AwwPdGVzdC1lY2RzYS1wMjU2MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAERdsHH8nBE8nC2i5o
-a1FNhsSpNf/+KtO56HiPNf1I61vVh09pqLKnI05esqlQapZmFeUYM4ZXWb6UR/b67u05J6NCMEAw
-DwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUMomhSgCswZZ2XdjU1M4YjRt3WkswDgYDVR0PAQH/
-BAQDAgGGMAoGCCqGSM49BAMCA0gAMEUCIDp85MaWSMiOi4Gu7p/vW5L0fTchzwu6o6BUpbvDxRwt
-AiEA2586MbVLvM9wZ0cw+GqfDPzJVQiJUIZouRZ5V3XdQFY=
+MIIB6jCCAZCgAwIBAgIVAM0ulS4yuhaYEwRn90fEd1/7xMuJMAoGCCqGSM49BAMCMBoxGDAWBgNV
+BAMMD3Rlc3QtZWNkc2EtcDI1NjAgFw0yNTExMTIxMjA4MzNaGA8yMjI1MDkyNTEyMDgzM1owaDEL
+MAkGA1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoGA1UECgwTRGVmYXVsdCBDb21w
+YW55IEx0ZDEkMCIGA1UEAwwbdGVzdC1lY2RzYS1wMjU2LXN1Ym9yZGluYXRlMFkwEwYHKoZIzj0C
+AQYIKoZIzj0DAQcDQgAEzweun9csA6k1Q2ubBCClYv/SMZa1CtHsm7EThXpyVwh2SCJU6W5xLHzK
+THtvWiU8GN7TjXs+0GqvkjwE4TE+z6NjMGEwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUdXdc
++5AklLHtG9IPaarYcIzam68wHwYDVR0jBBgwFoAUXiDvhes3PXlzAq0WE4rzxe8oj98wDgYDVR0P
+AQH/BAQDAgGGMAoGCCqGSM49BAMCA0gAMEUCIQCYi3jIlVB+4u6eC7i3210Zy6Z+Ne5oPRbw+1Qx
+akP8vwIgQmmfXe2BaQbqKuqY/YzVk1AoI0RukOw+Rnl0jhwN1rE=,MIIBiDCCAS6gAwIBAgIRANU2
+fOxPEClRBUgtykrPZ24wCgYIKoZIzj0EAwIwGjEYMBYGA1UEAwwPdGVzdC1lY2RzYS1wMjU2MCAX
+DTI1MTExMjEyMDgzM1oYDzIyMjUwOTI1MTIwODMzWjAaMRgwFgYDVQQDDA90ZXN0LWVjZHNhLXAy
+NTYwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAATsqxwEMkg6iwd3vocJd77apHpPx/HBWbySQ+NB
+BK0MExvnawlnaWQVafCTJXNa3XenHWnkGY1IlPtqJ9vggo6Ao1MwUTAdBgNVHQ4EFgQUXiDvhes3
+PXlzAq0WE4rzxe8oj98wHwYDVR0jBBgwFoAUXiDvhes3PXlzAq0WE4rzxe8oj98wDwYDVR0TAQH/
+BAUwAwEB/zAKBggqhkjOPQQDAgNIADBFAiB/JDje83oo4l2iXb8CtRo2KYKNDqTIvDkiYPjFHOA3
+7gIhAKDtkHAKxFmt02XXybfK8KVYLa/Ro7Kf455sNAyGOBTs
 )EOF";
 
 // Test RSA signed certificate - Issued from Root CA
@@ -232,48 +233,57 @@ AiEA2586MbVLvM9wZ0cw+GqfDPzJVQiJUIZouRZ5V3XdQFY=
 //         Signature Algorithm: sha256WithRSAEncryption
 //         Issuer: CN = test-rsa
 //         Validity
-//             Not Before: Nov 17 23:23:37 2024 GMT
-//             Not After : Nov 18 00:23:37 2025 GMT
+//             Not Before: Nov 12 10:16:07 2025 GMT
+//             Not After : Sep 25 10:16:07 2225 GMT
 //         Subject: C = XX, L = Default City, O = Default Company Ltd, CN = test-rsa.test
 //         Subject Public Key Info:
 //             Public Key Algorithm: rsaEncryption
-//                 Public-Key: (2048 bit)
+//                 RSA Public-Key: (2048 bit)
 //                 Modulus:
-//                     00:aa:30:47:af:04:3f:40:ca:9f:a4:40:bf:ee:5e:
-//                     c8:01:66:4e:08:6f:6a:ab:b6:2d:8d:43:01:48:ff:
-//                     9c:2d:10:2d:fe:a9:2d:5d:8d:06:bf:bf:af:35:7a:
-//                     9e:4c:af:e7:68:a6:2a:2e:fe:af:29:c7:a9:d7:fb:
-//                     74:47:59:1c:80:5f:40:79:f2:36:07:51:a6:a7:f8:
-//                     80:7f:ee:d7:94:6d:fa:5c:a0:2e:32:c6:64:d1:22:
-//                     e0:dd:4b:e7:ab:04:2d:87:d7:21:da:e6:70:70:03:
-//                     e6:0d:a7:e2:94:eb:26:fc:65:5b:5b:49:36:5b:90:
-//                     9b:91:68:a0:75:00:51:1c:fd:a3:fe:b2:e9:11:82:
-//                     fa:71:79:2e:a9:15:4f:54:3b:60:06:87:6d:58:28:
-//                     e3:3b:c2:79:e9:ee:4d:8e:55:e2:19:cb:90:63:9a:
-//                     46:97:3b:04:2e:f8:fa:00:87:a6:e5:a6:a3:7b:05:
-//                     d0:fc:9d:41:90:87:3b:a1:ca:bd:7f:9a:87:50:76:
-//                     d0:15:78:87:a2:c1:6d:6b:88:a6:50:c4:69:5e:77:
-//                     eb:6f:2e:e3:2b:77:c5:a2:02:64:83:d4:f0:5a:5b:
-//                     aa:7a:9a:df:82:94:d9:2b:ea:0c:d7:06:df:6b:14:
-//                     0f:2b:c9:c6:17:f9:af:79:02:26:a6:42:92:a8:aa:
-//                     84:49
+//                     00:ca:17:c7:cf:02:1e:d3:ed:90:0a:06:89:a2:d4:
+//                     78:0f:07:41:98:ad:0b:bb:fb:89:1b:60:cd:2e:8e:
+//                     40:c9:51:8c:7c:f1:99:3c:24:f8:de:df:af:f7:8c:
+//                     34:90:74:17:28:10:14:85:f9:56:4f:1a:1d:a8:a1:
+//                     e7:df:35:e6:1b:c8:68:f0:41:ae:a3:c3:99:02:62:
+//                     1b:52:6f:97:86:79:62:4e:1e:60:e3:b7:ea:fd:43:
+//                     21:38:10:a8:a5:af:8b:6e:7b:b4:b9:bb:6e:f7:34:
+//                     d9:74:a0:34:6a:73:48:56:58:92:8c:90:32:b4:9e:
+//                     e1:eb:b3:38:84:be:dd:3c:aa:9d:4b:9a:cf:5c:fd:
+//                     c4:b8:0b:8a:d1:80:63:f0:b0:0d:d7:d9:ea:77:45:
+//                     d8:de:2a:f6:0f:8d:e9:3a:fa:ec:9c:ae:8c:c0:05:
+//                     d3:ab:ea:68:87:1f:07:1c:fa:f9:87:03:86:f1:a0:
+//                     83:3c:d6:e7:c8:52:e2:9f:73:f3:c7:14:73:ac:7c:
+//                     fe:f3:29:43:42:f3:66:7d:bf:21:c6:3f:de:18:f5:
+//                     eb:0d:6a:e6:b9:4d:58:1d:86:78:12:58:a3:62:17:
+//                     79:d1:53:b3:0c:31:c8:ef:ba:fc:c5:50:d6:af:8b:
+//                     cc:89:e4:6e:53:2b:e3:74:4f:a8:43:da:a0:f9:f1:
+//                     14:b3
 //                 Exponent: 65537 (0x10001)
 //         X509v3 extensions:
 //             X509v3 Basic Constraints:
 //                 CA:FALSE
-//             X509v3 Authority Key Identifier:
-//                 41:E2:65:FF:60:32:8D:5F:D9:EC:A0:A5:D3:FA:EC:B0:DE:A6:C2:CF
+//
 //             X509v3 Subject Key Identifier:
-//                 A1:4A:95:75:4D:81:4E:51:FB:D9:62:46:E2:3F:2C:02:79:AD:97:51
+//                 2D:09:1B:BA:63:C2:4F:1A:88:0A:8D:0E:52:F4:42:17:76:9E:10:27
 //             X509v3 Key Usage: critical
-//                 Digital Signature, Key
 //             X509v3 Extended Key Usage:
 //                 TLS Web Server Authentication, TLS Web Client Authentication
 //     Signature Algorithm: sha256WithRSAEncryption
-//     Signature Value:
-//         01:db:ce:a7:d0:ff:79:dc:71:48:a6:aa:08:20:b1:42:c3:28:
-//         41:6d:88:d5:1a:2c:04:27:c4:a0:ef:8b:5a:f9:8e:d2:e9:56:
-//         4b:4a:fd:1a:8f:5f:09:3e:a1:30:6b:b0:d1:be:09:e6:29:5e:
+//          11:7c:47:35:29:f6:4d:2f:ef:97:40:02:57:52:79:3f:70:27:
+//          c5:ee:ed:6b:8c:fc:93:ba:8d:21:a5:9a:f1:5a:21:a5:cb:21:
+//          4d:d5:35:b7:ec:5e:1a:80:00:fe:8e:00:c2:bf:80:13:5e:54:
+//          da:a9:eb:54:c3:93:7a:0d:90:3d:9e:dc:1e:f9:19:37:dd:33:
+//          00:05:56:47:a3:b9:0c:76:e3:40:8d:0b:de:d0:01:52:57:24:
+//          17:02:9d:52:3f:e1:41:f3:06:53:c3:e0:95:de:ab:33:ba:5e:
+//          62:d7:51:a7:f3:4c:ea:37:2a:9f:20:0a:ff:a4:6b:d1:f6:94:
+//          5f:10:90:58:a7:30:95:86:f3:a8:4b:5c:be:24:49:cc:d6:d2:
+//          8f:95:2e:9d:34:c6:94:1a:b6:8a:74:d6:73:cd:1c:31:fa:8e:
+//          6e:10:b5:86:52:bc:ce:bb:33:3a:2c:74:96:68:b0:ae:9d:a7:
+//          42:e9:28:f7:81:a5:8d:98:49:7e:30:f6:f0:1b:c1:9c:30:5f:
+//          d2:1b:12:c3:61:34:17:c9:13:ba:d9:16:76:03:80:50:0a:71:
+//          31:3c:07:82:73:9c:5b:b7:b8:ed:6f:f9:a9:59:fe:d7:64:5b:
+//          c3:4d:d4:bf:3c:52:ef:c1:a7:8d:f2:8d:c1:5a:aa:19:47:a8:
+//          e0:bf:c7:3e
 //         94:05:99:85:fe:74:f5:91:50:c4:ca:27:2f:b6:67:3c:56:aa:
 //         cb:f8:7b:14:71:32:9f:28:ca:ad:3c:80:4c:a6:ec:5f:6d:8e:
 //         ec:a0:54:bb:cf:23:64:6e:81:65:50:fb:4f:ad:4e:d0:3e:3c:
@@ -289,114 +299,114 @@ AiEA2586MbVLvM9wZ0cw+GqfDPzJVQiJUIZouRZ5V3XdQFY=
 
 std::string server_root_cert_rsa_pem = R"EOF(
 -----BEGIN CERTIFICATE-----
-MIIDczCCAlugAwIBAgIQYy0lLc2af47/u52i06RCqDANBgkqhkiG9w0BAQsFADAT
-MREwDwYDVQQDDAh0ZXN0LXJzYTAeFw0yNDExMTcyMzIzMzdaFw0yNTExMTgwMDIz
-MzdaMFoxCzAJBgNVBAYTAlhYMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNV
-BAoME0RlZmF1bHQgQ29tcGFueSBMdGQxFjAUBgNVBAMMDXRlc3QtcnNhLnRlc3Qw
-ggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCqMEevBD9Ayp+kQL/uXsgB
-Zk4Ib2qrti2NQwFI/5wtEC3+qS1djQa/v681ep5Mr+dopiou/q8px6nX+3RHWRyA
-X0B58jYHUaan+IB/7teUbfpcoC4yxmTRIuDdS+erBC2H1yHa5nBwA+YNp+KU6yb8
-ZVtbSTZbkJuRaKB1AFEc/aP+sukRgvpxeS6pFU9UO2AGh21YKOM7wnnp7k2OVeIZ
-y5BjmkaXOwQu+PoAh6blpqN7BdD8nUGQhzuhyr1/modQdtAVeIeiwW1riKZQxGle
-d+tvLuMrd8WiAmSD1PBaW6p6mt+ClNkr6gzXBt9rFA8rycYX+a95AiamQpKoqoRJ
-AgMBAAGjfDB6MAkGA1UdEwQCMAAwHwYDVR0jBBgwFoAUQeJl/2AyjV/Z7KCl0/rs
-sN6mws8wHQYDVR0OBBYEFKFKlXVNgU5R+9liRuI/LAJ5rZdRMA4GA1UdDwEB/wQE
-AwIFoDAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwDQYJKoZIhvcNAQEL
-BQADggEBAAHbzqfQ/3nccUimqgggsULDKEFtiNUaLAQnxKDvi1r5jtLpVktK/RqP
-Xwk+oTBrsNG+CeYpXpQFmYX+dPWRUMTKJy+2ZzxWqsv4exRxMp8oyq08gEym7F9t
-juygVLvPI2RugWVQ+0+tTtA+PPbwuwItq6Gg4vCHlmFmsY5LXfQIlVwTohKeiwiT
-vXfkLugngyPoZ8YjIvut6LYGI6SNlCnUx/M/VHNgz/3F8hDfHkjQU8fErucVLOUw
-C7A913wkxeuIOQVfAhXV2smAdz1RxAyyPOODUQiN7WkV9lLaLOODCoF7m/S7T7Gi
-Y8+oHhvOTdKX9TjRwRXBBkPpGsiRQQk=
+MIIDdTCCAl2gAwIBAgIQYy0lLc2af47/u52i06RCqDANBgkqhkiG9w0BAQsFADAT
+MREwDwYDVQQDDAh0ZXN0LXJzYTAgFw0yNTExMTIxMDE2MDdaGA8yMjI1MDkyNTEw
+MTYwN1owWjELMAkGA1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoG
+A1UECgwTRGVmYXVsdCBDb21wYW55IEx0ZDEWMBQGA1UEAwwNdGVzdC1yc2EudGVz
+dDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMoXx88CHtPtkAoGiaLU
+eA8HQZitC7v7iRtgzS6OQMlRjHzxmTwk+N7fr/eMNJB0FygQFIX5Vk8aHaih5981
+5hvIaPBBrqPDmQJiG1Jvl4Z5Yk4eYOO36v1DITgQqKWvi257tLm7bvc02XSgNGpz
+SFZYkoyQMrSe4euzOIS+3TyqnUuaz1z9xLgLitGAY/CwDdfZ6ndF2N4q9g+N6Tr6
+7JyujMAF06vqaIcfBxz6+YcDhvGggzzW58hS4p9z88cUc6x8/vMpQ0LzZn2/IcY/
+3hj16w1q5rlNWB2GeBJYo2IXedFTswwxyO+6/MVQ1q+LzInkblMr43RPqEPaoPnx
+FLMCAwEAAaN8MHowCQYDVR0TBAIwADAfBgNVHSMEGDAWgBRiTsT+FgZY/4KHQ211
+jywKwIpxJzAdBgNVHQ4EFgQULQkbumPCTxqICo0OUvRCF3aeECcwDgYDVR0PAQH/
+BAQDAgWgMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjANBgkqhkiG9w0B
+AQsFAAOCAQEAEXxHNSn2TS/vl0ACV1J5P3Anxe7ta4z8k7qNIaWa8VohpcshTdU1
+t+xeGoAA/o4Awr+AE15U2qnrVMOTeg2QPZ7cHvkZN90zAAVWR6O5DHbjQI0L3tAB
+UlckFwKdUj/hQfMGU8Pgld6rM7peYtdRp/NM6jcqnyAK/6Rr0faUXxCQWKcwlYbz
+qEtcviRJzNbSj5UunTTGlBq2inTWc80cMfqObhC1hlK8zrszOix0lmiwrp2nQuko
+94GljZhJfjD28BvBnDBf0hsSw2E0F8kTutkWdgOAUApxMTwHgnOcW7e47W/5qVn+
+12Rbw03UvzxS78GnjfKNwVqqGUeo4L/HPg==
 -----END CERTIFICATE-----
 )EOF";
 
 std::string server_root_chain_rsa_pem = R"EOF(
 -----BEGIN CERTIFICATE-----
-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
+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
+pikAr9Z1f7sC1g==
 -----END CERTIFICATE-----
 )EOF";
 
 std::string server_root_chain_rsa_der_b64 = R"EOF(
-MIIC8zCCAdugAwIBAgIRAKPuvF4B35jaiV9QrXSH9hIwDQYJKoZIhvcNAQELBQAwEzERMA8GA1UE
-AwwIdGVzdC1yc2EwHhcNMjQxMTE3MjMyMzMzWhcNMzQxMTE4MDAyMzMxWjATMREwDwYDVQQDDAh0
-ZXN0LXJzYTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAK+Om/cFBnAM8hytvuKf+sIj
-jqzQcdedKpk9Jq4T5f8E/arlFQwsCulSLt7Cb45yJ9J6DuiLiFf4o31eCtwrZn47KZcysWmG5Q99
-2OI0vdQgeQMidbUVDXmcv20iawx3FKoU/LIrnFkLlKWivhbjrAX9pgiL2bQeMvlt/oISevlUi0SY
-keCJl2X5hVOTnRmCDHoeWUegRoZLSkPH/eQBsNwkVY+2IxwXcRCxozFjV1wPcoNPp0+2KwGAJ16o
-UUum9SqIUFcZx9DB3gnIvAu9BxgLJ6KSvs64DVDmWcrHpo+ZU9JsKeBI9GXOOrCaYZwglxLt7GY6
-OvNdWPCabkPhJCcCAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUQeJl/2AyjV/Z
-7KCl0/rssN6mws8wDgYDVR0PAQH/BAQDAgGGMA0GCSqGSIb3DQEBCwUAA4IBAQBYxHCbtZZGpOtL
-YIvTnGJDns8D0Hc3eaoifmhmIPEdmcmxlHXqKyh5HyRdQ+sklNfVdjxBmwQDE96Tx9o3q3Xdfp2A
-HEaupzQxXYtl50W49OuHzelXicOZY7aVe5ixb4l8m5UT7bO3A6RG+qgL1SRZbVftDGO2NxFeiO8K
-g7h3ti564Vv6I4SNoZEjkDKg8NWfDN1NYqd2FN1Crzida5RZf5fIXxnjAmnXubewSfcSGN98K+IR
-EpCWSbf9DMkaeHx6Sw85UjovZU2KgedQHkQ0bhsXqY1PDlP3WgTQAfHx04TA8rljw5lyGxOZJQ3W
-Ivsc4qCn2Q1Dv+AjpLNZq411
+MIIDBjCCAe6gAwIBAgIRAIlbFz9equFy7I8tNZpLvnMwDQYJKoZIhvcNAQELBQAwEzERMA8GA1UE
+AwwIdGVzdC1yc2EwIBcNMjUxMTEyMTIwODMzWhgPMjIyNTA5MjUxMjA4MzNaMBMxETAPBgNVBAMM
+CHRlc3QtcnNhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtzkfO4XL1jlsFQYLQH+G
+K05ZQkaHs30FGjwt3aeWLnW2LX06VGGb/pyKts3S+Z2UZjNXn9/VV6Objzeefq+PbjQVGWYh8MhG
+wn587NHz9i1mxHOc5DKNA8NPXloYZFBen0UEykVdISYjdOBIOvfbB1eAo809ROkhniv8bqUdG9Zb
+AzpkqyR5PbUN5hWGquZWu5NE8oaYkYbZ377WpV9UhjkjTZAhOUXVp6XQ6RF7GHzzdI9/sEYKmiYg
+xH/1OSJayIscEGHa5EF2M3TH7tLco265SdYECMpaXSyvpOY9VqAlXLMhSLo1vcUmsib0ICZ0kQX8
+zf7m+SbnnBrrcloqNQIDAQABo1MwUTAdBgNVHQ4EFgQU/JvuGresYp35PfJYVMJTnNcUMpMwHwYD
+VR0jBBgwFoAU/JvuGresYp35PfJYVMJTnNcUMpMwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0B
+AQsFAAOCAQEAlByM8jOvrww7Al16Fgs/jKqctJMMNN+UmpMw2IY+asJ6Kw4LQf8JkojNZusbhrey
+xzUYVsty3LE5/GppsMLdEifclJIu+ewElJvulnJOpgFgmwjYeAndu15fr/5yzaZF0ojH1AbrEGhN
+dddYZAzMQ7DC88udPwFUM+YxzLg+QA1OU7XsXbwQu/srpJaVhvX3Iy8bwgMpJFVL6nj7VIDGMpgM
+6wqvRRIrKdJ7zeY2XnucnRRpGiHRxUBGMfZdLQJT3DptT+vOtbLx99nnT9IGDxheSQ1osyRsY0Jt
+JAryujC5rgKlVpazOw62V9dxntzJ+nUeqdKhpikAr9Z1f7sC1g==
 )EOF";
 
 std::string server_root_cert_rsa_der_b64 = R"EOF(
-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
+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
 )EOF";
 
 std::string server_root_private_key_rsa_pem = R"EOF(
------BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCqMEevBD9Ayp+k
-QL/uXsgBZk4Ib2qrti2NQwFI/5wtEC3+qS1djQa/v681ep5Mr+dopiou/q8px6nX
-+3RHWRyAX0B58jYHUaan+IB/7teUbfpcoC4yxmTRIuDdS+erBC2H1yHa5nBwA+YN
-p+KU6yb8ZVtbSTZbkJuRaKB1AFEc/aP+sukRgvpxeS6pFU9UO2AGh21YKOM7wnnp
-7k2OVeIZy5BjmkaXOwQu+PoAh6blpqN7BdD8nUGQhzuhyr1/modQdtAVeIeiwW1r
-iKZQxGled+tvLuMrd8WiAmSD1PBaW6p6mt+ClNkr6gzXBt9rFA8rycYX+a95Aiam
-QpKoqoRJAgMBAAECggEAAkzrhSM9rySmBoh9B632jmVJf/3wj1Bjun15wJi67dWC
-h6cWBsYTnacryUFmbyMwEbcwSgkViU8qfbHHkzjSRK507skOP6hUBEB8zS3ncllP
-uW2NXlCV94k9CKTAZYyFiIjpC15SzgLReuUGcCyjDuWYV+osDs4MOkmTpK07y3Rh
-HOCRoPcjbboyiP/7OS8XvTC+WojNmLBM2GFyXe3zw75I8qXglLjp2s+aKzszo9TN
-k2YCCd90PxiqbII2A4TYUB+utRpZ2p4QH5l2+X2EOHwf96qFhRpPKSJDpQp+hsm1
-OTitFJWrRzBwG862ET0Mm14KEmUynv462YKz2mMHAQKBgQDPze2dDAzEJqou41e1
-SX7klqPMiI/Cr2fL64G4PdoXVf8SmdA69sWksvlv2+TIzA66dVbDq0fMJYOj3hPM
-EDB5x7mQEmqR5yfW+rA7xNMxfPSK4deAFbuXZWQbNPHr+3fmcoz9MNyu0mz26t3H
-F5Ib42M6tY5kZzGzQT79W7t7SQKBgQDRqPhM154Mt8ow80lLiUES7NeDsCmUSXw6
-RwSo2zXER05w4DMYfmWHcXZ/LIMd9HnY2nUFejoB2P8JGkLgB6zbFH+aBNgBX5V4
-6vxx7bp3x/utxSdc1f39697BuXrtv6qUn4I4NyIm/rj/vqBDXNRj79J1utdd8U+c
-d/aVGBXBAQKBgQCMA0cvQpgzbY3LC9jjyAJciHcS74xVc5PvHN4JQnt4r7OuV76q
-i+y9PO2+BZ4QARWHYlo0empkzX314kLagqn207Bet1ngtqvsOHqXutVFidjG3sYx
-gfMkXedmQXUjOAsgVVxTmCGJFTTf5X3KkEIc0kfgncW0NqeRDMwhLzaSKQKBgBxN
-cg91f/l5igrnnLpcsfMrE8DMNCC3dtSrJ57f0LdJZPZp3Zvt3CjXkUaDrMOLcDNs
-8iUmJdSABZWl/OcfQh9k+gDBrKMq0xO6rQ94JxbqYThJCBJJNPtlLvH55vVXTWC4
-06xhDPQ0qKalhh7x1h4TjtajvVUKMVQPAbOIx88BAoGANUyfP2m4QdtHR3hOE8W8
-U+p2qcbT0/02ggwwdKALqlmUaWgljoG8rarmV8ISc82j2B9fEgJR2z5frA/EKzV5
-RBqAC6sxyAYn2wbzuyINJdSLpehQKDkKxEnO4QLodClHYV1F9AlAfbSLmIlRFv/y
-1mNT8ElsYLTkJr2AqGNZOlQ=
------END PRIVATE KEY-----
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAyhfHzwIe0+2QCgaJotR4DwdBmK0Lu/uJG2DNLo5AyVGMfPGZ
+PCT43t+v94w0kHQXKBAUhflWTxodqKHn3zXmG8ho8EGuo8OZAmIbUm+XhnliTh5g
+47fq/UMhOBCopa+Lbnu0ubtu9zTZdKA0anNIVliSjJAytJ7h67M4hL7dPKqdS5rP
+XP3EuAuK0YBj8LAN19nqd0XY3ir2D43pOvrsnK6MwAXTq+pohx8HHPr5hwOG8aCD
+PNbnyFLin3PzxxRzrHz+8ylDQvNmfb8hxj/eGPXrDWrmuU1YHYZ4ElijYhd50VOz
+DDHI77r8xVDWr4vMieRuUyvjdE+oQ9qg+fEUswIDAQABAoIBAQDKAndiP7ZdFazT
+uLFAKK5SJ2i0mtWN9OOakGrJTL0KABA0nLQV4Mc80dBt3KJ2evTiwSAiw5g4vdxD
+woOrJY982hm7f4x4en6qWTMCdjW63/8aI1eqiR/GRaIhDtXluNHhgJqoxekoBpYP
+9Eww1EfMuADVrRZiYidmmeG3H6q6hfJrIR9Geb/h0pAi7RiPDWaV3vYxvYk3Hg9G
+I+lIwovQQrxWDugrqpjQDTJUD+i13IyG88FFB1APB+Rqsv1sFEyVBFgs5NIcK4Hl
+FSY86C859B+VqNYI7Z0EhTxKGJYCwbqhOePkVJdOm48CKLoKj8a+40tVVKJSDrav
+5NGtjzVRAoGBAOvP6VaBaQ8DlJG/FAseSAbLvZr+fzCYtc/CmdcweHmsVX+2E2a3
+/PlaEFEMhoyBAazTjF0vJe3VGRhyp3aKh4FvpCABjR7umrZmeznvh62fI7Ngk4Lr
+dWzfvI3a9s/pvlBt3TpkNQVF2hWJ3PJJ9bYkSEszL3cH9vJIY7U1zeWHAoGBANtk
+350jqwGcmhquWPNd9D2mYm6HOmUR+qV3qzk30Thdl5jLWNMfux2WH19gZE6dJfFk
+8RBEsfr2/Dh5aNz/NP6kyoBKwjMw3XeC7cvF0AzEDmg//eoFtfHYU1tditOHAuk9
+/iVRTXo5OJiFvbOxWfb7wViuzPXzn2prLsLdmuJ1AoGAVPH4ZCkJ51aq1jW2yqqF
+16zdCFBVEPRxyf2X3WSggXQK+I5mPsJYZpqC9i9E6KgwKkmqboblat8wwxXKLXGJ
+jp7gyIbGhzX8lWglS6F1hp2lBqDrgmW/TxDpo1AVSKAy5lYtMzOVxeh7vvaCmOT7
+ljlLsYsmtgIweuaIxGY1XVECgYB88noXuFSP2mw5fcnS8FNFORkd8Y3kOdURn5G4
+SH2zKDpKHqU7t/qM4w6C9xapXv5Y+DACH91tHHSQhTSfiAjabWeWoPzwwoeepMZh
+IwtV+eJqpOcq/I2eaqEui5ug1GdoBpJTFnaVgTkmRCTBzeN6se5vXz4DZPgJV3mO
+KT8ocQKBgQCvJ7RPd2u8OVxldiqtlwOoNyErbiga/0rd8HP2TLnhQzYg+DpvIN0l
+Gs/f3GRVHHTso72lj5sER2k/kTGp2PTOUjcrGDrh+h7tZEYYVy+kcxfXnn/0He3+
+GLRZInotRxU37IebI6HSX5U3D/7rzTD29TbsNmWMDs+CQWoJzoIQvg==
+-----END RSA PRIVATE KEY-----
 )EOF";
 
 // Expired certificate generated with OpenSSL
@@ -743,8 +753,8 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   EXPECT_EQ(credentials.certificateSerial(), "5215639076998761095638506031589467414");
   EXPECT_TRUE(credentials.certificatePrivateKey().has_value());
   EXPECT_EQ(credentials.certificatePrivateKey(), server_root_private_key_ecdsa_pem);
-  // Not After : Nov 11 22:42:11 2025 GMT
-  SystemTime a(std::chrono::seconds(1762900931));
+  // Not After : Sep 25 10:16:07 2225 GMT
+  SystemTime a(std::chrono::seconds(8070142567));
   EXPECT_EQ(credentials.certificateExpiration(), a);
   // std::chrono::time_point<std::chrono::system_clock>(std::chrono::milliseconds(1762900931000000)));
 
@@ -792,7 +802,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   EXPECT_EQ(credentials.publicKeySignatureAlgorithm(),
             X509Credentials::PublicKeySignatureAlgorithm::ECDSA);
   EXPECT_TRUE(credentials.certificateSerial().has_value());
-  EXPECT_EQ(credentials.certificateSerial(), "326164854566604267642234107702204417305661869882");
+  EXPECT_EQ(credentials.certificateSerial(), "1171381937749039847038735600209560248209027419017");
   EXPECT_TRUE(credentials.certificatePrivateKey().has_value());
   EXPECT_EQ(credentials.certificatePrivateKey(), server_subordinate_private_key_ecdsa_pem);
   EXPECT_TRUE(credentials.certificateChainDerB64().has_value());
@@ -850,7 +860,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   EXPECT_EQ(credentials.publicKeySignatureAlgorithm(),
             X509Credentials::PublicKeySignatureAlgorithm::ECDSA);
   EXPECT_TRUE(credentials.certificateSerial().has_value());
-  EXPECT_EQ(credentials.certificateSerial(), "326164854566604267642234107702204417305661869882");
+  EXPECT_EQ(credentials.certificateSerial(), "1171381937749039847038735600209560248209027419017");
   EXPECT_TRUE(credentials.certificatePrivateKey().has_value());
   EXPECT_EQ(credentials.certificatePrivateKey(), server_subordinate_private_key_ecdsa_pem);
   EXPECT_TRUE(credentials.certificateChainDerB64().has_value());
@@ -897,7 +907,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   EXPECT_EQ(credentials.publicKeySignatureAlgorithm(),
             X509Credentials::PublicKeySignatureAlgorithm::ECDSA);
   EXPECT_TRUE(credentials.certificateSerial().has_value());
-  EXPECT_EQ(credentials.certificateSerial(), "326164854566604267642234107702204417305661869882");
+  EXPECT_EQ(credentials.certificateSerial(), "1171381937749039847038735600209560248209027419017");
   EXPECT_TRUE(credentials.certificatePrivateKey().has_value());
   EXPECT_EQ(credentials.certificatePrivateKey(), server_subordinate_private_key_ecdsa_pem);
   EXPECT_TRUE(credentials.certificateChainDerB64().has_value());
@@ -951,8 +961,8 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   EXPECT_EQ(credentials.certificatePrivateKey(), server_root_private_key_rsa_pem);
   EXPECT_TRUE(credentials.certificateChainDerB64().has_value());
   EXPECT_EQ(credentials.certificateChainDerB64(), server_root_chain_rsa_der_b64);
-  // Not After : Nov 18 00:23:37 2025 GMT
-  SystemTime b(std::chrono::seconds(1763425417));
+  // Not After : Sep 25 10:16:07 2225 GMT
+  SystemTime b(std::chrono::seconds(8070142567));
   EXPECT_EQ(credentials.certificateExpiration(), b);
 }
 
@@ -1054,7 +1064,7 @@ TEST(ValidPemWithAppendedJunk, PemToAlgorithmSerialExpiration) {
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(serial, "131827979019394590882466519576505238184");
   EXPECT_EQ(algorithm, X509Credentials::PublicKeySignatureAlgorithm::RSA);
-  EXPECT_EQ(time, SystemTime(std::chrono::seconds(1763425417)));
+  EXPECT_EQ(time, SystemTime(std::chrono::seconds(8070142567)));
 }
 
 TEST(JunkPem, PemToDerB64) {
@@ -1171,25 +1181,25 @@ TEST(ChainTooLarge, PemToDerB64) {
 
 TEST(ChainParse, PemToDerB64) {
 
-  std::string converted_pem = "MIIDczCCAlugAwIBAgIQYy0lLc2af47/u52i06RCqDANBgkqhkiG9w0BAQsFADAT"
-                              "MREwDwYDVQQDDAh0ZXN0LXJzYTAeFw0yNDExMTcyMzIzMzdaFw0yNTExMTgwMDIz"
-                              "MzdaMFoxCzAJBgNVBAYTAlhYMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNV"
-                              "BAoME0RlZmF1bHQgQ29tcGFueSBMdGQxFjAUBgNVBAMMDXRlc3QtcnNhLnRlc3Qw"
-                              "ggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCqMEevBD9Ayp+kQL/uXsgB"
-                              "Zk4Ib2qrti2NQwFI/5wtEC3+qS1djQa/v681ep5Mr+dopiou/q8px6nX+3RHWRyA"
-                              "X0B58jYHUaan+IB/7teUbfpcoC4yxmTRIuDdS+erBC2H1yHa5nBwA+YNp+KU6yb8"
-                              "ZVtbSTZbkJuRaKB1AFEc/aP+sukRgvpxeS6pFU9UO2AGh21YKOM7wnnp7k2OVeIZ"
-                              "y5BjmkaXOwQu+PoAh6blpqN7BdD8nUGQhzuhyr1/modQdtAVeIeiwW1riKZQxGle"
-                              "d+tvLuMrd8WiAmSD1PBaW6p6mt+ClNkr6gzXBt9rFA8rycYX+a95AiamQpKoqoRJ"
-                              "AgMBAAGjfDB6MAkGA1UdEwQCMAAwHwYDVR0jBBgwFoAUQeJl/2AyjV/Z7KCl0/rs"
-                              "sN6mws8wHQYDVR0OBBYEFKFKlXVNgU5R+9liRuI/LAJ5rZdRMA4GA1UdDwEB/wQE"
-                              "AwIFoDAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwDQYJKoZIhvcNAQEL"
-                              "BQADggEBAAHbzqfQ/3nccUimqgggsULDKEFtiNUaLAQnxKDvi1r5jtLpVktK/RqP"
-                              "Xwk+oTBrsNG+CeYpXpQFmYX+dPWRUMTKJy+2ZzxWqsv4exRxMp8oyq08gEym7F9t"
-                              "juygVLvPI2RugWVQ+0+tTtA+PPbwuwItq6Gg4vCHlmFmsY5LXfQIlVwTohKeiwiT"
-                              "vXfkLugngyPoZ8YjIvut6LYGI6SNlCnUx/M/VHNgz/3F8hDfHkjQU8fErucVLOUw"
-                              "C7A913wkxeuIOQVfAhXV2smAdz1RxAyyPOODUQiN7WkV9lLaLOODCoF7m/S7T7Gi"
-                              "Y8+oHhvOTdKX9TjRwRXBBkPpGsiRQQk=";
+  std::string converted_pem = "MIIDdTCCAl2gAwIBAgIQYy0lLc2af47/u52i06RCqDANBgkqhkiG9w0BAQsFADAT"
+                              "MREwDwYDVQQDDAh0ZXN0LXJzYTAgFw0yNTExMTIxMDE2MDdaGA8yMjI1MDkyNTEw"
+                              "MTYwN1owWjELMAkGA1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoG"
+                              "A1UECgwTRGVmYXVsdCBDb21wYW55IEx0ZDEWMBQGA1UEAwwNdGVzdC1yc2EudGVz"
+                              "dDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMoXx88CHtPtkAoGiaLU"
+                              "eA8HQZitC7v7iRtgzS6OQMlRjHzxmTwk+N7fr/eMNJB0FygQFIX5Vk8aHaih5981"
+                              "5hvIaPBBrqPDmQJiG1Jvl4Z5Yk4eYOO36v1DITgQqKWvi257tLm7bvc02XSgNGpz"
+                              "SFZYkoyQMrSe4euzOIS+3TyqnUuaz1z9xLgLitGAY/CwDdfZ6ndF2N4q9g+N6Tr6"
+                              "7JyujMAF06vqaIcfBxz6+YcDhvGggzzW58hS4p9z88cUc6x8/vMpQ0LzZn2/IcY/"
+                              "3hj16w1q5rlNWB2GeBJYo2IXedFTswwxyO+6/MVQ1q+LzInkblMr43RPqEPaoPnx"
+                              "FLMCAwEAAaN8MHowCQYDVR0TBAIwADAfBgNVHSMEGDAWgBRiTsT+FgZY/4KHQ211"
+                              "jywKwIpxJzAdBgNVHQ4EFgQULQkbumPCTxqICo0OUvRCF3aeECcwDgYDVR0PAQH/"
+                              "BAQDAgWgMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjANBgkqhkiG9w0B"
+                              "AQsFAAOCAQEAEXxHNSn2TS/vl0ACV1J5P3Anxe7ta4z8k7qNIaWa8VohpcshTdU1"
+                              "t+xeGoAA/o4Awr+AE15U2qnrVMOTeg2QPZ7cHvkZN90zAAVWR6O5DHbjQI0L3tAB"
+                              "UlckFwKdUj/hQfMGU8Pgld6rM7peYtdRp/NM6jcqnyAK/6Rr0faUXxCQWKcwlYbz"
+                              "qEtcviRJzNbSj5UunTTGlBq2inTWc80cMfqObhC1hlK8zrszOix0lmiwrp2nQuko"
+                              "94GljZhJfjD28BvBnDBf0hsSw2E0F8kTutkWdgOAUApxMTwHgnOcW7e47W/5qVn+"
+                              "12Rbw03UvzxS78GnjfKNwVqqGUeo4L/HPg==";
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;

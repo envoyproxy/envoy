@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
+#include "source/common/common/cancel_wrapper.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
@@ -27,6 +28,8 @@ public:
       std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> assume_role_signer,
       envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider assume_role_config);
 
+  ~AssumeRoleCredentialsProvider() override { cancel_refresh_callback_(); }
+
   std::string providerName() override { return "AssumeRoleCredentialsProvider"; };
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface
@@ -47,6 +50,7 @@ private:
   const std::string external_id_;
   absl::optional<uint16_t> session_duration_;
   std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> assume_role_signer_;
+  CancelWrapper::CancelFunction cancel_refresh_callback_ = []() {};
 };
 
 using AssumeRoleCredentialsProviderPtr = std::shared_ptr<AssumeRoleCredentialsProvider>;

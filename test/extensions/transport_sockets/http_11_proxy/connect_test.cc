@@ -717,6 +717,118 @@ TEST_P(Http11ConnectTest, RuntimeGuardLegacyBehaviorEndpointMetadata) {
   EXPECT_EQ(msg.length(), rc2.bytes_processed_);
 }
 
+// Test that writes are buffered until CONNECT response is received, and then flushed by
+// flushWriteBuffer().
+TEST_P(Http11ConnectTest, WriteFlushedAfterConnectRead) {
+  initialize();
+
+  // Write CONNECT header.
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoError::none());
+      }));
+  Buffer::OwnedImpl msg("initial data");
+  Network::IoResult rc1 = connect_socket_->doWrite(msg, false);
+  EXPECT_EQ(connect_data_.length(), rc1.bytes_processed_);
+
+  // Data write should fail with EAGAIN because CONNECT response is not received. This should result
+  // in a KeepOpen action.
+  Network::IoResult rc2 = connect_socket_->doWrite(msg, false);
+  EXPECT_EQ(0, rc2.bytes_processed_);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, rc2.action_);
+
+  EXPECT_CALL(*inner_socket_, onConnected());
+  connect_socket_->onConnected();
+
+  // Read CONNECT response.
+  std::string connect_response("HTTP/1.1 200 OK\r\n\r\n");
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
+      .WillOnce(Invoke([&connect_response](void* buffer, size_t, int) {
+        memcpy(buffer, connect_response.data(), connect_response.length());
+        return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
+      }));
+  EXPECT_CALL(io_handle_, read(_, Optional(connect_response.length())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+        buffer.add(connect_response);
+        return Api::IoCallUint64Result(connect_response.length(), Api::IoError::none());
+      }));
+
+  // doRead should result in a call to flushWriteBuffer to wake up connection. This is the purpose
+  // of the test.
+  EXPECT_CALL(transport_callbacks_, flushWriteBuffer());
+  EXPECT_CALL(*inner_socket_, doRead(_))
+      .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 0, false}));
+  Buffer::OwnedImpl read_buffer("");
+  connect_socket_->doRead(read_buffer);
+
+  // After CONNECT response is processed, data write should succeed.
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false))
+      .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false}));
+  Network::IoResult rc3 = connect_socket_->doWrite(msg, false);
+  EXPECT_EQ(msg.length(), rc3.bytes_processed_);
+}
+
+// Test that flushWriteBuffer is NOT called on partial headers,
+// and IS called only when the full 200 OK is received.
+TEST_P(Http11ConnectTest, FragmentedConnectResponse) {
+  initialize();
+
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoError::none());
+      }));
+  Buffer::OwnedImpl msg("initial data");
+  connect_socket_->doWrite(msg, false); // Writes CONNECT, blocks 'msg'
+
+  EXPECT_CALL(*inner_socket_, onConnected());
+  connect_socket_->onConnected();
+
+  // Receive partial response.
+  std::string part1("HTTP/1.1 200 OK\r\n");
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
+      .WillOnce(Invoke([&part1](void* buffer, size_t, int) {
+        memcpy(buffer, part1.data(), part1.length());
+        return Api::IoCallUint64Result(part1.length(), Api::IoError::none());
+      }));
+
+  // Ensure we do not signal readiness yet.
+  EXPECT_CALL(transport_callbacks_, flushWriteBuffer()).Times(0);
+
+  Buffer::OwnedImpl buffer("");
+  auto result = connect_socket_->doRead(buffer);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, result.action_);
+
+  // Receive the rest of the response.
+  std::string part2("Server: Envoy\r\n\r\n");
+  std::string full_response = part1 + part2;
+
+  // Socket peeks again to find full buffer.
+  EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
+      .WillOnce(Invoke([&full_response](void* buffer, size_t, int) {
+        memcpy(buffer, full_response.data(), full_response.length());
+        return Api::IoCallUint64Result(full_response.length(), Api::IoError::none());
+      }));
+
+  // Socket consumes the full headers.
+  EXPECT_CALL(io_handle_, read(_, Optional(full_response.length())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+        buffer.add(full_response);
+        return Api::IoCallUint64Result(full_response.length(), Api::IoError::none());
+      }));
+
+  // Verify the flush.
+  EXPECT_CALL(transport_callbacks_, flushWriteBuffer());
+
+  EXPECT_CALL(*inner_socket_, doRead(_))
+      .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 0, false}));
+
+  connect_socket_->doRead(buffer);
+}
+
 } // namespace
 } // namespace Http11Connect
 } // namespace TransportSockets

@@ -101,12 +101,12 @@ public:
     } else {
       if (!active_socket->connected()) {
         // If active_socket is about to be destructed, emit logs if a connection is not created.
-        if (active_socket->streamInfo() != nullptr) {
-          emitLogs(*config_, *active_socket->streamInfo());
+        if (active_socket->streamInfoPtr() != nullptr) {
+          emitLogs(*config_, active_socket->streamInfo());
         } else {
           // If the active_socket is not connected, this socket is not promoted to active
           // connection. Thus the stream_info_ is owned by this active socket.
-          ENVOY_BUG(active_socket->streamInfo() != nullptr,
+          ENVOY_BUG(active_socket->streamInfoPtr() != nullptr,
                     "the unconnected active socket must have stream info.");
         }
       }
