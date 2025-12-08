@@ -5,14 +5,7 @@ permissions:
 
 on:
   workflow_call:
-    secrets:
-      gcs-cache-key:
-        required: true
-
     inputs:
-      gcs-cache-bucket:
-        type: string
-        required: true
       request:
         type: string
         required: true
@@ -27,14 +20,14 @@ concurrency:
 
 jobs:
   build:
-    secrets:
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
+      actions: read
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name ||matrix.target }}
     with:
+      bazel-cache: true
       bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
@@ -43,7 +36,6 @@ jobs:
         ERROR
         error:
         Error:
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: true
       request: ${{ inputs.request }}
       target: ${{ matrix.target }}

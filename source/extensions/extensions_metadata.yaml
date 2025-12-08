@@ -572,6 +572,13 @@ envoy.filters.http.mcp:
   type_urls:
   - envoy.extensions.filters.http.mcp.v3.Mcp
   - envoy.extensions.filters.http.mcp.v3.McpOverride
+envoy.filters.http.mcp_router:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.mcp_router.v3.McpRouter
 envoy.filters.http.oauth2:
   categories:
   - envoy.filters.http

@@ -166,15 +166,15 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
         SamplingResult res;
         res.decision = Decision::Drop;
         OtelAttributes attributes;
-        attributes["char_key"] = "char_value";
-        attributes["sv_key"] = absl::string_view("sv_value");
         attributes["bool_key"] = true;
         attributes["int_key"] = static_cast<int32_t>(123);
         attributes["uint_key"] = static_cast<uint32_t>(123);
         attributes["int64_t_key"] = static_cast<int64_t>(INT64_MAX);
         attributes["uint64_t_key"] = static_cast<uint64_t>(UINT64_MAX);
         attributes["double_key"] = 0.123;
-        attributes["not_supported_span"] = opentelemetry::nostd::span<bool>();
+        attributes["string_key"] = std::string("string_value");
+        attributes["sv_key"] = absl::string_view("sv_value");
+        attributes["string_array"] = std::vector<std::string>{"value_1", "value_2"};
 
         res.attributes = std::make_unique<const OtelAttributes>(std::move(attributes));
         res.tracestate = "this_is=another_tracesate";
@@ -197,9 +197,6 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
     return nullptr;
   };
 
-  ASSERT_NE(get_attr_value("char_key"), nullptr);
-  EXPECT_STREQ(get_attr_value("char_key")->string_value().c_str(), "char_value");
-
   ASSERT_NE(get_attr_value("sv_key"), nullptr);
   EXPECT_STREQ(get_attr_value("sv_key")->string_value().c_str(), "sv_value");
 
@@ -220,6 +217,11 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
 
   ASSERT_NE(get_attr_value("double_key"), nullptr);
   EXPECT_EQ(get_attr_value("double_key")->double_value(), 0.123);
+
+  auto string_array = get_attr_value("string_array");
+  ASSERT_NE(string_array, nullptr);
+  EXPECT_EQ(string_array->mutable_array_value()->mutable_values(0)->string_value(), "value_1");
+  EXPECT_EQ(string_array->mutable_array_value()->mutable_values(1)->string_value(), "value_2");
 }
 
 // Test that sampler receives trace_context

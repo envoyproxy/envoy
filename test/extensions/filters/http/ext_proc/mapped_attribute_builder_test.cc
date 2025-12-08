@@ -20,6 +20,7 @@ using Envoy::Http::ExternalProcessing::MappedAttributeBuilder;
 using MappedAttributeBuilderProto = ::envoy::extensions::http::ext_proc::
     processing_request_modifiers::mapped_attribute_builder::v3::MappedAttributeBuilder;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 
 class MappedAttributeBuilderTest : public testing::Test {
@@ -139,7 +140,7 @@ TEST_F(MappedAttributeBuilderTest, CelDynamicMetadata) {
   EXPECT_EQ("metadata_value", attributes.fields().at("metadata_key").string_value());
 }
 
-TEST_F(MappedAttributeBuilderTest, ModifiedOnce) {
+TEST_F(MappedAttributeBuilderTest, ModifiedOnceForInbound) {
   initialize(R"EOF(
   mapped_request_attributes:
     "key": "request.path"
@@ -165,13 +166,15 @@ TEST_F(MappedAttributeBuilderTest, ModifiedOnce) {
   EXPECT_EQ(0, req2.attributes_size());
 }
 
-TEST_F(MappedAttributeBuilderTest, ModifiedOnlyForInbound) {
+TEST_F(MappedAttributeBuilderTest, ModifiedOnceForOutbound) {
   initialize(R"EOF(
-  mapped_request_attributes:
+  mapped_response_attributes:
     "key": "response.code"
   )EOF");
 
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(Return(200));
+
+  Http::TestResponseHeaderMapImpl response_headers;
   ProcessingRequestModifier::Params params{
       envoy::config::core::v3::TrafficDirection::OUTBOUND,
       &callbacks_,
@@ -180,10 +183,17 @@ TEST_F(MappedAttributeBuilderTest, ModifiedOnlyForInbound) {
       nullptr,
   };
 
-  // Call should do nothing and return false
   envoy::service::ext_proc::v3::ProcessingRequest req;
-  EXPECT_FALSE(builder_->modifyRequest(params, req));
-  EXPECT_EQ(0, req.attributes_size());
+  EXPECT_TRUE(builder_->modifyRequest(params, req));
+  const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
+  EXPECT_EQ(1, attributes.fields_size());
+  EXPECT_TRUE(attributes.fields().contains("key"));
+  EXPECT_EQ(200, attributes.fields().at("key").number_value());
+
+  // Second call should do nothing and return false
+  envoy::service::ext_proc::v3::ProcessingRequest req2;
+  EXPECT_FALSE(builder_->modifyRequest(params, req2));
+  EXPECT_EQ(0, req2.attributes_size());
 }
 
 TEST_F(MappedAttributeBuilderTest, CelEvalFailure) {

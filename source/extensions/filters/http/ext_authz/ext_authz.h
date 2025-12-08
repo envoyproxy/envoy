@@ -433,6 +433,22 @@ private:
   // code.
   void rejectResponse();
 
+  // Validates error response headers and clears custom attributes if invalid headers are found.
+  // Returns true if headers are valid or validation is disabled, false if headers are invalid.
+  bool
+  validateAndClearInvalidErrorResponseAttributes(Filters::Common::ExtAuthz::ResponsePtr& response);
+
+  // Helper to check if we can add more headers to the response, respecting header limits.
+  // Returns true if we can add more headers, false if the limit has been reached.
+  bool canAddResponseHeader(Http::HeaderMap& response_headers);
+
+  // Helper to add error response headers (both set and append) to the response header map,
+  // respecting enforceResponseHeaderLimits().
+  void addErrorResponseHeaders(
+      Http::HeaderMap& response_headers,
+      const std::vector<std::pair<std::string, std::string>>& headers_to_set,
+      const std::vector<std::pair<std::string, std::string>>& headers_to_append);
+
   // Create a new gRPC client for per-route gRPC service configuration.
   Filters::Common::ExtAuthz::ClientPtr
   createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service);

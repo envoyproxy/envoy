@@ -403,7 +403,13 @@ protected:
     }
     void onResetEncoded(uint32_t error_code) {
       if (codec_callbacks_ && error_code != 0) {
-        codec_callbacks_->onCodecLowLevelReset();
+        // TODO(wbpcode): this ensure that onCodecLowLevelReset is only called once. But
+        // we should replace this with a better design later.
+        // See https://github.com/envoyproxy/envoy/issues/42264 for why we need this.
+        if (!codec_low_level_reset_is_called_) {
+          codec_low_level_reset_is_called_ = true;
+          codec_callbacks_->onCodecLowLevelReset();
+        }
       }
     }
 
