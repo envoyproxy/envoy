@@ -1,0 +1,816 @@
+#include "source/extensions/filters/http/mcp_router/mcp_router.h"
+
+#include "source/common/common/base64.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
+#include "nlohmann/json.hpp"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace McpRouter {
+
+namespace {
+
+constexpr absl::string_view kNameDelimiter = "__";
+constexpr absl::string_view kSessionIdHeader = "mcp-session-id";
+
+constexpr absl::string_view kGatewayName = "envoy-mcp-gateway";
+constexpr absl::string_view kGatewayVersion = "1.0.0";
+constexpr absl::string_view kProtocolVersion = "2025-06-18";
+
+void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeaderMap& dest) {
+  // Headers that we set explicitly or should not be forwarded
+  static const absl::flat_hash_set<absl::string_view> kSkipHeaders = {
+      ":method", ":path", ":authority", "host", "content-type", kSessionIdHeader};
+
+  source.iterate([&dest](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    absl::string_view key = header.key().getStringView();
+
+    if (!kSkipHeaders.contains(absl::AsciiStrToLower(key))) {
+      dest.addCopy(Http::LowerCaseString(std::string(key)), header.value().getStringView());
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
+}
+
+} // namespace
+
+McpMethod parseMethodString(absl::string_view method_str) {
+  if (method_str == "initialize")
+    return McpMethod::Initialize;
+  if (method_str == "tools/list")
+    return McpMethod::ToolsList;
+  if (method_str == "tools/call")
+    return McpMethod::ToolsCall;
+  if (method_str == "ping")
+    return McpMethod::Ping;
+  if (absl::StartsWith(method_str, "notifications/"))
+    return McpMethod::Notification;
+  // TODO(botengyao): Add support for more MCP methods:
+  // - resources/list, resources/read, resources/subscribe, resources/unsubscribe
+  // - prompts/list, prompts/get
+  // - completion/complete
+  // - logging/setLevel
+  return McpMethod::Unknown;
+}
+
+// TODO(botengyao): Add encryption for session IDs to prevent tampering.
+// Currently using Base64 encoding only, which provides no security.
+std::string SessionCodec::encode(const std::string& data) {
+  return Base64::encode(data.data(), data.size());
+}
+
+std::string SessionCodec::decode(const std::string& encoded) { return Base64::decode(encoded); }
+
+std::string SessionCodec::buildCompositeSessionId(
+    const std::string& route, const std::string& subject,
+    const absl::flat_hash_map<std::string, std::string>& backend_sessions) {
+  std::vector<std::string> backend_parts;
+  backend_parts.reserve(backend_sessions.size());
+
+  for (const auto& [backend, session] : backend_sessions) {
+    std::string encoded = Base64::encode(session.data(), session.size());
+    backend_parts.push_back(absl::StrCat(backend, ":", encoded));
+  }
+
+  return absl::StrCat(route, "@", subject, "@", absl::StrJoin(backend_parts, ","));
+}
+
+// TODO(botengyao): we could add a config option to the previous mcp_filter to get
+// the subject from the session id, to apply identity check with the subject.
+absl::StatusOr<SessionCodec::ParsedSession>
+SessionCodec::parseCompositeSessionId(const std::string& composite) {
+  std::vector<std::string> parts = absl::StrSplit(composite, '@');
+  if (parts.size() != 3) {
+    return absl::InvalidArgumentError("Invalid session format");
+  }
+
+  ParsedSession result;
+  result.route = parts[0];
+  result.subject = parts[1];
+
+  if (parts[2].empty()) {
+    return absl::InvalidArgumentError("Empty backend sessions");
+  }
+
+  std::vector<std::string> backend_parts = absl::StrSplit(parts[2], ',');
+  for (const auto& bp : backend_parts) {
+    size_t colon = bp.find(':');
+    if (colon == std::string::npos || colon == 0) {
+      return absl::InvalidArgumentError("Invalid backend session format");
+    }
+    std::string backend = bp.substr(0, colon);
+    std::string encoded_session = bp.substr(colon + 1);
+    result.backend_sessions[backend] = Base64::decode(encoded_session);
+  }
+
+  return result;
+}
+
+McpRouterConfig::McpRouterConfig(
+    const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
+    Server::Configuration::FactoryContext& context)
+    : factory_context_(context) {
+
+  for (const auto& server : proto_config.servers()) {
+    McpBackendConfig backend;
+    const auto& mcp_cluster = server.mcp_cluster();
+    backend.name = server.name().empty() ? mcp_cluster.cluster() : server.name();
+    backend.cluster_name = mcp_cluster.cluster();
+    backend.path = mcp_cluster.path().empty() ? "/mcp" : mcp_cluster.path();
+    backend.timeout =
+        std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(mcp_cluster, timeout, 5000));
+    backends_.push_back(std::move(backend));
+  }
+
+  if (backends_.size() == 1) {
+    default_backend_name_ = backends_[0].name;
+  }
+}
+
+const McpBackendConfig* McpRouterConfig::findBackend(const std::string& name) const {
+  for (const auto& backend : backends_) {
+    if (backend.name == name) {
+      return &backend;
+    }
+  }
+  return nullptr;
+}
+
+BackendStreamCallbacks::BackendStreamCallbacks(const std::string& backend_name,
+                                               std::function<void(BackendResponse)> on_complete)
+    : backend_name_(backend_name), on_complete_(std::move(on_complete)) {
+  response_.backend_name = backend_name;
+}
+
+void BackendStreamCallbacks::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+  if (headers && headers->Status()) {
+    response_.status_code = Http::Utility::getResponseStatus(*headers);
+    response_.success = (response_.status_code >= 200 && response_.status_code < 300);
+
+    // Extract session ID from response header
+    auto session_header = headers->get(Http::LowerCaseString(std::string(kSessionIdHeader)));
+    if (!session_header.empty()) {
+      response_.session_id = std::string(session_header[0]->value().getStringView());
+    }
+  }
+
+  if (end_stream) {
+    complete();
+  }
+}
+
+void BackendStreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
+  response_.body.append(data.toString());
+  if (end_stream) {
+    complete();
+  }
+}
+
+void BackendStreamCallbacks::onTrailers(Http::ResponseTrailerMapPtr&&) { complete(); }
+
+void BackendStreamCallbacks::onComplete() { complete(); }
+
+void BackendStreamCallbacks::onReset() {
+  response_.success = false;
+  response_.error = "Stream reset";
+  complete();
+}
+
+void BackendStreamCallbacks::complete() {
+  if (!completed_) {
+    completed_ = true;
+    ENVOY_LOG(debug, "Backend '{}' complete: status={}, body_size={}", backend_name_,
+              response_.status_code, response_.body.size());
+    on_complete_(std::move(response_));
+  }
+}
+
+McpRouterFilter::McpRouterFilter(McpRouterConfigSharedPtr config)
+    : config_(std::move(config)), muxdemux_(Http::MuxDemux::create(config_->factoryContext())) {}
+
+McpRouterFilter::~McpRouterFilter() = default;
+
+void McpRouterFilter::onDestroy() {
+  destroyed_ = true;
+  if (multistream_) {
+    multistream_.reset(); // This will reset all streams
+  }
+  if (single_stream_) {
+    single_stream_->reset();
+    single_stream_ = nullptr;
+  }
+  stream_callbacks_.clear();
+  upstream_headers_.clear();
+}
+
+Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                         bool end_stream) {
+  request_headers_ = &headers;
+
+  // Extract session ID from header
+  auto session_header = headers.get(Http::LowerCaseString(std::string(kSessionIdHeader)));
+  if (!session_header.empty()) {
+    encoded_session_id_ = std::string(session_header[0]->value().getStringView());
+  }
+
+  // TODO(botengyao): Extract subject from JWT filter metadata or authorization header.
+  // For Initialize requests, there is no session yet, so we need to get the subject
+  // from the authentication layer (e.g., JWT claims or auth header) and store it.
+  // This subject will be used when building the composite session ID after backends respond.
+  // Example: subject_ = extractSubjectFromJwtOrAuth(headers);
+
+  if (end_stream) {
+    // No body - invalid MCP POST request
+    sendHttpError(400, "Missing request body");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  return Http::FilterHeadersStatus::StopIteration;
+}
+
+Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  // Initialize on first data chunk - mcp_filter has already parsed metadata
+  if (!initialized_) {
+    if (!readMetadataFromMcpFilter()) {
+      sendHttpError(400, "Invalid or missing MCP request");
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+
+    ENVOY_LOG(debug, "MCP router: method={}, request_id={}", static_cast<int>(method_),
+              request_id_);
+
+    if (!encoded_session_id_.empty() && !decodeAndParseSession()) {
+      sendHttpError(400, "Invalid session ID");
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+
+    // Initialize connections based on method type
+    switch (method_) {
+    case McpMethod::Initialize:
+      handleInitialize();
+      break;
+
+    case McpMethod::ToolsList:
+      handleToolsList();
+      break;
+
+    case McpMethod::ToolsCall:
+      handleToolsCall();
+      break;
+
+    case McpMethod::Ping:
+    case McpMethod::Notification:
+      handlePingOrNotification();
+      break;
+
+    default:
+      sendHttpError(400, "Unsupported method");
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+
+    initialized_ = true;
+
+    // Perform body rewriting if needed (e.g., tool name prefix stripping)
+    // This is done once on the first data chunk after initialization.
+    // Future methods like resources/get can also use this pattern.
+    if (needs_body_rewrite_) {
+      rewriteToolCallBody(data);
+      needs_body_rewrite_ = false;
+    }
+  }
+
+  streamData(data, end_stream);
+
+  return Http::FilterDataStatus::StopIterationNoBuffer;
+}
+
+Http::FilterTrailersStatus McpRouterFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
+  if (multistream_) {
+    multistream_->multicastTrailers(trailers);
+  } else if (single_stream_) {
+    single_stream_->sendTrailers(trailers);
+  }
+  return Http::FilterTrailersStatus::Continue;
+}
+
+bool McpRouterFilter::readMetadataFromMcpFilter() {
+  const auto& metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
+
+  // TODO(botengyao): make this filter_metadata configurable.
+  auto filter_it = metadata.filter_metadata().find("mcp_proxy");
+  if (filter_it == metadata.filter_metadata().end()) {
+    return false;
+  }
+
+  const auto& mcp_metadata = filter_it->second;
+  const auto& fields = mcp_metadata.fields();
+
+  auto method_it = fields.find("method");
+  if (method_it != fields.end() && method_it->second.has_string_value()) {
+    method_ = parseMethodString(method_it->second.string_value());
+  }
+
+  if (method_ == McpMethod::Unknown) {
+    ENVOY_LOG(warn, "unsupported or missing method in metadata");
+    return false;
+  }
+
+  if (method_ == McpMethod::ToolsCall) {
+    const auto& fields = mcp_metadata.fields();
+    auto params_it = fields.find("params");
+    if (params_it != fields.end() && params_it->second.has_struct_value()) {
+      const auto& params_fields = params_it->second.struct_value().fields();
+      auto name_it = params_fields.find("name");
+      if (name_it != params_fields.end() && name_it->second.has_string_value()) {
+        tool_name_ = name_it->second.string_value();
+      }
+    }
+  }
+
+  return true;
+}
+
+bool McpRouterFilter::decodeAndParseSession() {
+  std::string decoded = SessionCodec::decode(encoded_session_id_);
+  if (decoded.empty()) {
+    ENVOY_LOG(warn, "Failed to decode session ID");
+    sendHttpError(400, "Invalid session ID");
+    return false;
+  }
+
+  auto parsed = SessionCodec::parseCompositeSessionId(decoded);
+  if (!parsed.ok()) {
+    ENVOY_LOG(warn, "Failed to parse session: {}", parsed.status().message());
+    sendHttpError(400, "Invalid session ID");
+    return false;
+  }
+
+  route_name_ = parsed->route;
+  session_subject_ = parsed->subject;
+  backend_sessions_ = std::move(parsed->backend_sessions);
+
+  return true;
+}
+
+std::pair<std::string, std::string> McpRouterFilter::parseToolName(const std::string& prefixed) {
+  if (!config_->isMultiplexing()) {
+    return {config_->defaultBackendName(), prefixed};
+  }
+
+  size_t pos = prefixed.find(kNameDelimiter);
+  if (pos == std::string::npos) {
+    if (!config_->defaultBackendName().empty()) {
+      return {config_->defaultBackendName(), prefixed};
+    }
+    return {"", prefixed};
+  }
+
+  std::string backend = prefixed.substr(0, pos);
+  std::string tool = prefixed.substr(pos + kNameDelimiter.size());
+
+  if (config_->findBackend(backend) != nullptr) {
+    return {backend, tool};
+  }
+
+  return {"", prefixed};
+}
+
+ssize_t McpRouterFilter::rewriteToolCallBody(Buffer::Instance& buffer) {
+  if (tool_name_.empty() || tool_name_ == unprefixed_tool_name_) {
+    return 0;
+  }
+
+  // Search for the prefixed tool name directly and replace with the unprefixed version.
+  // This is simpler and handles any JSON formatting but less error proof.
+  // TODO(botengyao): The mcp_filter's JSON decoder should provide a cursor/byte offset
+  // for the params.name field, allowing precise replacement without pattern searching.
+  ssize_t pos = buffer.search(tool_name_.data(), tool_name_.size(), 0);
+  if (pos < 0) {
+    return 0;
+  }
+
+  return rewriteAtPosition(buffer, pos, tool_name_, unprefixed_tool_name_);
+}
+
+ssize_t McpRouterFilter::rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos,
+                                           const std::string& search_str,
+                                           const std::string& replacement) {
+  ssize_t size_delta =
+      static_cast<ssize_t>(replacement.size()) - static_cast<ssize_t>(search_str.size());
+
+  Buffer::OwnedImpl new_buffer;
+
+  if (pos > 0) {
+    Buffer::OwnedImpl prefix;
+    prefix.move(buffer, pos);
+    new_buffer.move(prefix);
+  }
+
+  buffer.drain(search_str.size());
+  new_buffer.add(replacement);
+  new_buffer.move(buffer);
+  buffer.move(new_buffer);
+
+  return size_delta;
+}
+
+void McpRouterFilter::initializeFanout(AggregationCallback callback) {
+  if (config_->backends().empty()) {
+    sendHttpError(500, "No backends configured");
+    return;
+  }
+
+  if (!muxdemux_->isIdle()) {
+    ENVOY_LOG(warn, "MuxDemux not idle, cannot start new fanout");
+    sendHttpError(500, "Internal error: concurrent fanout not allowed");
+    return;
+  }
+
+  size_t expected = config_->backends().size();
+  pending_responses_ = std::make_shared<std::vector<BackendResponse>>();
+  pending_responses_->reserve(expected);
+  response_count_ = std::make_shared<std::atomic<size_t>>(0);
+  aggregation_callback_ = std::move(callback);
+
+  std::vector<Http::MuxDemux::Callbacks> mux_callbacks;
+  mux_callbacks.reserve(expected);
+
+  for (const auto& backend : config_->backends()) {
+    auto responses = pending_responses_;
+    auto count = response_count_;
+    auto expected_count = expected;
+    auto agg_callback = aggregation_callback_;
+    auto destroyed = &destroyed_;
+
+    auto stream_cb = std::make_shared<BackendStreamCallbacks>(
+        backend.name,
+        [responses, count, expected_count, agg_callback, destroyed](BackendResponse resp) {
+          if (*destroyed)
+            return;
+
+          responses->push_back(std::move(resp));
+          if (++(*count) >= expected_count && agg_callback) {
+            agg_callback(std::move(*responses));
+          }
+        });
+
+    stream_callbacks_.push_back(stream_cb);
+    mux_callbacks.push_back({
+        .cluster_name = backend.cluster_name,
+        .callbacks = std::weak_ptr<Http::AsyncClient::StreamCallbacks>(stream_cb),
+    });
+  }
+
+  // TODO(botengyao): MuxDemux::multicast uses a single StreamOptions for all backends,
+  // so per-backend timeouts are not currently supported. Using max timeout as a workaround.
+  Http::AsyncClient::StreamOptions options;
+  std::chrono::milliseconds max_timeout{0};
+  for (const auto& backend : config_->backends()) {
+    max_timeout = std::max(max_timeout, backend.timeout);
+  }
+  options.setTimeout(max_timeout);
+
+  auto multistream_or = muxdemux_->multicast(options, mux_callbacks);
+  if (!multistream_or.ok()) {
+    ENVOY_LOG(error, "Failed to start multicast: {}", multistream_or.status().message());
+    sendHttpError(500, "Failed to start fanout");
+    return;
+  }
+
+  multistream_ = std::move(*multistream_or);
+
+  upstream_headers_.clear();
+  upstream_headers_.reserve(expected);
+
+  // Store headers in upstream_headers_ because AsyncStreamImpl::sendHeaders only
+  // stores a pointer to the headers.
+  auto stream_it = multistream_->begin();
+  for (const auto& backend : config_->backends()) {
+    if (stream_it == multistream_->end())
+      break;
+
+    auto headers = createUpstreamHeaders(backend, backend_sessions_[backend.name]);
+    upstream_headers_.push_back(std::move(headers));
+    (*stream_it)->sendHeaders(*upstream_headers_.back(), false);
+    ++stream_it;
+  }
+}
+
+void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
+                                              std::function<void(BackendResponse)> callback) {
+  auto* cluster =
+      config_->factoryContext().serverFactoryContext().clusterManager().getThreadLocalCluster(
+          backend.cluster_name);
+  if (!cluster) {
+    ENVOY_LOG(error, "Cluster '{}' not found", backend.cluster_name);
+    sendHttpError(500, fmt::format("Cluster '{}' not found", backend.cluster_name));
+    return;
+  }
+
+  single_backend_callback_ = std::move(callback);
+  auto stream_cb = std::make_shared<BackendStreamCallbacks>(backend.name, single_backend_callback_);
+  stream_callbacks_.push_back(stream_cb);
+
+  Http::AsyncClient::StreamOptions options;
+  options.setTimeout(backend.timeout);
+
+  single_stream_ = cluster->httpAsyncClient().start(*stream_cb, options);
+  if (!single_stream_) {
+    ENVOY_LOG(error, "Failed to start stream for cluster '{}'", backend.cluster_name);
+    sendHttpError(500, "Failed to start backend request");
+    return;
+  }
+
+  std::string backend_session;
+  auto it = backend_sessions_.find(backend.name);
+  if (it != backend_sessions_.end()) {
+    backend_session = it->second;
+  }
+
+  // Store headers in upstream_headers_ because AsyncStreamImpl::sendHeaders only
+  // stores a pointer to the headers.
+  auto headers = createUpstreamHeaders(backend, backend_session);
+  upstream_headers_.clear();
+  upstream_headers_.push_back(std::move(headers));
+  single_stream_->sendHeaders(*upstream_headers_.back(), false);
+}
+
+void McpRouterFilter::streamData(Buffer::Instance& data, bool end_stream) {
+  if (multistream_) {
+    multistream_->multicastData(data, end_stream);
+  } else if (single_stream_) {
+    single_stream_->sendData(data, end_stream);
+  }
+}
+
+void McpRouterFilter::handleInitialize() {
+  ENVOY_LOG(debug, "Initialize: setting up fanout to {} backends", config_->backends().size());
+
+  initializeFanout([this](std::vector<BackendResponse> responses) {
+    if (destroyed_)
+      return;
+
+    std::string response_body = aggregateInitialize(responses);
+
+    absl::flat_hash_map<std::string, std::string> sessions;
+    for (const auto& resp : responses) {
+      if (resp.success && !resp.session_id.empty()) {
+        sessions[resp.backend_name] = resp.session_id;
+      }
+    }
+
+    if (sessions.empty()) {
+      sendHttpError(500, "All backends failed to initialize");
+      return;
+    }
+
+    // Build composite session ID
+    // TODO(botengyao): extract subject from JWT filter metadata or authorization header.
+    std::string composite = SessionCodec::buildCompositeSessionId(route_name_, "default", sessions);
+    std::string encoded_session = SessionCodec::encode(composite);
+
+    sendJsonResponse(response_body, encoded_session);
+  });
+}
+
+void McpRouterFilter::handleToolsList() {
+  ENVOY_LOG(debug, "tools/list: setting up fanout to {} backends", config_->backends().size());
+
+  initializeFanout([this](std::vector<BackendResponse> responses) {
+    if (destroyed_)
+      return;
+
+    std::string response_body = aggregateToolsList(responses);
+    sendJsonResponse(response_body);
+  });
+}
+
+void McpRouterFilter::handleToolsCall() {
+  auto [backend_name, actual_tool] = parseToolName(tool_name_);
+
+  if (backend_name.empty()) {
+    sendHttpError(400, fmt::format("Invalid tool name '{}': cannot determine backend", tool_name_));
+    return;
+  }
+
+  const McpBackendConfig* backend = config_->findBackend(backend_name);
+  if (!backend) {
+    sendHttpError(400, fmt::format("Unknown backend '{}' in tool name", backend_name));
+    return;
+  }
+
+  // Store the unprefixed tool name for body rewriting
+  unprefixed_tool_name_ = actual_tool;
+  needs_body_rewrite_ = (tool_name_ != unprefixed_tool_name_);
+
+  ENVOY_LOG(debug, "tools/call: backend='{}', tool='{}' -> '{}', needs_rewrite={}", backend_name,
+            tool_name_, actual_tool, needs_body_rewrite_);
+
+  initializeSingleBackend(*backend, [this](BackendResponse resp) {
+    if (destroyed_)
+      return;
+
+    if (resp.success) {
+      sendJsonResponse(resp.body);
+    } else {
+      sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+    }
+  });
+}
+
+void McpRouterFilter::handlePingOrNotification() {
+  ENVOY_LOG(debug, "Ping/Notification: setting up fanout to {} backends (fire-and-forget)",
+            config_->backends().size());
+
+  // Fire-and-forget: set up fanout to all backends, return 202 Accepted immediately
+  initializeFanout([](std::vector<BackendResponse>) {
+    // Responses ignored for ping or notifications
+  });
+
+  sendAccepted();
+}
+
+std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendResponse>& responses) {
+  // Check if at least one backend succeeded using std::any_of for clarity
+  const bool any_success = std::any_of(responses.begin(), responses.end(),
+                                       [](const BackendResponse& resp) { return resp.success; });
+
+  if (!any_success) {
+    // Use absl::StrCat for efficient string concatenation
+    return absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_,
+                        R"(,"error":{"code":-32603,"message":"All backends failed"}})");
+  }
+
+  // Return gateway capabilities using absl::StrCat for efficiency
+  // Pre-computed static parts avoid repeated string operations
+  return absl::StrCat(
+      R"({"jsonrpc":"2.0","id":)", request_id_, R"(,"result":{)", R"("protocolVersion":")",
+      kProtocolVersion, R"(",)",
+      R"("capabilities":{"tools":{"listChanged":true},"prompts":{"listChanged":true},"resources":{"listChanged":true,"subscribe":true}},)",
+      R"("serverInfo":{"name":")", kGatewayName, R"(","version":")", kGatewayVersion, R"("},)",
+      R"("instructions":"MCP gateway aggregating multiple backend servers.")", R"(}})");
+}
+
+std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendResponse>& responses) {
+  nlohmann::json all_tools = nlohmann::json::array();
+
+  const bool is_multiplexing = config_->isMultiplexing();
+
+  for (const auto& resp : responses) {
+    if (!resp.success) {
+      continue;
+    }
+
+    nlohmann::json parsed_body;
+    try {
+      parsed_body = nlohmann::json::parse(resp.body);
+    } catch (const nlohmann::json::parse_error& e) {
+      ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name, e.what());
+      continue;
+    }
+
+    if (!parsed_body.contains("result") || !parsed_body["result"].is_object()) {
+      continue;
+    }
+
+    const auto& result = parsed_body["result"];
+    if (!result.contains("tools") || !result["tools"].is_array()) {
+      continue;
+    }
+
+    for (const auto& tool : result["tools"]) {
+      if (!tool.is_object() || !tool.contains("name") || !tool["name"].is_string()) {
+        continue;
+      }
+
+      const std::string& tool_name = tool["name"].get_ref<const std::string&>();
+      std::string prefixed_name =
+          is_multiplexing ? absl::StrCat(resp.backend_name, kNameDelimiter, tool_name) : tool_name;
+
+      nlohmann::json tool_obj;
+      tool_obj["name"] = std::move(prefixed_name);
+
+      if (tool.contains("description") && tool["description"].is_string()) {
+        const std::string& desc = tool["description"].get_ref<const std::string&>();
+        if (!desc.empty()) {
+          tool_obj["description"] = desc;
+        }
+      }
+
+      if (tool.contains("inputSchema") && tool["inputSchema"].is_object()) {
+        tool_obj["inputSchema"] = {{"type", "object"}};
+      }
+
+      all_tools.push_back(std::move(tool_obj));
+    }
+  }
+
+  nlohmann::json final_response = {
+      {"jsonrpc", "2.0"}, {"id", request_id_}, {"result", {{"tools", std::move(all_tools)}}}};
+
+  return final_response.dump();
+}
+
+Http::RequestHeaderMapPtr
+McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
+                                       const std::string& backend_session_id) {
+  auto headers = Http::RequestHeaderMapImpl::create();
+
+  // Set required headers for MCP backend
+  headers->setMethod(Http::Headers::get().MethodValues.Post);
+  headers->setPath(backend.path);
+  headers->setHost(backend.cluster_name);
+  headers->setContentType("application/json");
+
+  if (!backend_session_id.empty()) {
+    headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), backend_session_id);
+  }
+
+  // TODO(botengyao): Make header forwarding (authorization, etc.) configurable via proto config.
+  if (request_headers_) {
+    copyRequestHeaders(*request_headers_, *headers);
+
+    // Adjust content-length when tool name rewriting changes body size.
+    // Size delta is negative when removing the backend prefix from tool names.
+    if (needs_body_rewrite_ && request_headers_->ContentLength()) {
+      uint64_t original_length = 0;
+      if (absl::SimpleAtoi(request_headers_->getContentLengthValue(), &original_length)) {
+        // Use signed arithmetic: unprefixed is shorter, so delta is negative
+        int64_t new_length = static_cast<int64_t>(original_length) +
+                             static_cast<int64_t>(unprefixed_tool_name_.size()) -
+                             static_cast<int64_t>(tool_name_.size());
+        headers->setContentLength(new_length);
+        ENVOY_LOG(debug, "Adjusted content-length: {} -> {}", original_length, new_length);
+      }
+    }
+  }
+
+  return headers;
+}
+
+void McpRouterFilter::sendJsonResponse(const std::string& body, const std::string& session_id) {
+  if (destroyed_)
+    return;
+
+  auto headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(200);
+  headers->setContentType("application/json");
+  headers->setContentLength(body.length());
+
+  if (!session_id.empty()) {
+    headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), session_id);
+  }
+
+  decoder_callbacks_->encodeHeaders(std::move(headers), body.empty(), "mcp_router");
+
+  if (!body.empty()) {
+    Buffer::OwnedImpl response_body(body);
+    decoder_callbacks_->encodeData(response_body, true);
+  }
+}
+
+void McpRouterFilter::sendAccepted() {
+  if (destroyed_)
+    return;
+
+  auto headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(202);
+
+  if (!encoded_session_id_.empty()) {
+    headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), encoded_session_id_);
+  }
+
+  decoder_callbacks_->encodeHeaders(std::move(headers), true, "mcp_router");
+}
+
+void McpRouterFilter::sendHttpError(uint64_t status_code, const std::string& message) {
+  if (destroyed_)
+    return;
+
+  auto headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(status_code);
+  headers->setContentType("text/plain");
+  headers->setContentLength(message.length());
+
+  decoder_callbacks_->encodeHeaders(std::move(headers), message.empty(), "mcp_router");
+
+  if (!message.empty()) {
+    Buffer::OwnedImpl body(message);
+    decoder_callbacks_->encodeData(body, true);
+  }
+}
+
+} // namespace McpRouter
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

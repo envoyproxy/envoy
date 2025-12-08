@@ -1,0 +1,230 @@
+#pragma once
+
+#include <atomic>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.h"
+#include "envoy/http/filter.h"
+#include "envoy/server/filter_config.h"
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/muxdemux.h"
+
+#include "absl/container/flat_hash_map.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace McpRouter {
+
+namespace MetadataKeys {
+constexpr absl::string_view kFilterNamespace = "envoy.filters.http.mcp";
+} // namespace MetadataKeys
+
+/** Enumeration of supported MCP protocol methods. */
+enum class McpMethod {
+  Unknown,
+  Initialize,
+  ToolsList,
+  ToolsCall,
+  Ping,
+  Notification,
+};
+
+McpMethod parseMethodString(absl::string_view method_str);
+
+/**
+ * Codec for encoding and decoding composite MCP session IDs.
+ * Combines route, subject, and per-backend session IDs into a single encoded string.
+ */
+class SessionCodec {
+public:
+  static std::string encode(const std::string& data);
+  static std::string decode(const std::string& encoded);
+
+  // Format: {route}@{subject}@{backend1}:{base64(sid1)},{backend2}:{base64(sid2)}
+  static std::string
+  buildCompositeSessionId(const std::string& route, const std::string& subject,
+                          const absl::flat_hash_map<std::string, std::string>& backend_sessions);
+
+  struct ParsedSession {
+    std::string route;
+    std::string subject;
+    absl::flat_hash_map<std::string, std::string> backend_sessions;
+  };
+  static absl::StatusOr<ParsedSession> parseCompositeSessionId(const std::string& composite);
+};
+
+/** Configuration for a single MCP backend server. */
+struct McpBackendConfig {
+  std::string name;
+  std::string cluster_name;
+  std::string path;
+  std::chrono::milliseconds timeout{5000};
+};
+
+/** Response received from a backend MCP server. */
+struct BackendResponse {
+  std::string backend_name;
+  bool success{false};
+  uint64_t status_code{0};
+  std::string body;
+  std::string session_id;
+  std::string error;
+};
+
+using AggregationCallback = std::function<void(std::vector<BackendResponse>)>;
+
+/**
+ * Callbacks for handling async HTTP responses from backend MCP servers.
+ * Accumulates response data and invokes completion callback when stream ends.
+ */
+class BackendStreamCallbacks : public Http::AsyncClient::StreamCallbacks,
+                               public std::enable_shared_from_this<BackendStreamCallbacks>,
+                               public Logger::Loggable<Logger::Id::filter> {
+public:
+  BackendStreamCallbacks(const std::string& backend_name,
+                         std::function<void(BackendResponse)> on_complete);
+
+  // AsyncClient::StreamCallbacks
+  void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void onData(Buffer::Instance& data, bool end_stream) override;
+  void onTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
+  void onComplete() override;
+  void onReset() override;
+
+private:
+  void complete();
+
+  std::string backend_name_;
+  std::function<void(BackendResponse)> on_complete_;
+  BackendResponse response_;
+  bool completed_{false};
+};
+
+/** Configuration for the MCP router filter, containing backend server definitions. */
+class McpRouterConfig {
+public:
+  McpRouterConfig(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
+                  Server::Configuration::FactoryContext& context);
+
+  const std::vector<McpBackendConfig>& backends() const { return backends_; }
+  bool isMultiplexing() const { return backends_.size() > 1; }
+  const std::string& defaultBackendName() const { return default_backend_name_; }
+  Server::Configuration::FactoryContext& factoryContext() const { return factory_context_; }
+  const McpBackendConfig* findBackend(const std::string& name) const;
+
+private:
+  std::vector<McpBackendConfig> backends_;
+  std::string default_backend_name_;
+  Server::Configuration::FactoryContext& factory_context_;
+};
+
+using McpRouterConfigSharedPtr = std::shared_ptr<McpRouterConfig>;
+
+/**
+ * HTTP filter that routes MCP requests to one or more backend servers.
+ * Supports fanout to multiple backends for initialize/tools-list and
+ * single-backend routing for tools-call based on tool name prefix.
+ */
+class McpRouterFilter : public Http::StreamDecoderFilter,
+                        public Logger::Loggable<Logger::Id::filter> {
+public:
+  explicit McpRouterFilter(McpRouterConfigSharedPtr config);
+  ~McpRouterFilter() override;
+
+  void onDestroy() override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
+
+private:
+  bool readMetadataFromMcpFilter();
+  bool decodeAndParseSession();
+
+  std::pair<std::string, std::string> parseToolName(const std::string& prefixed_name);
+  // Rewrites the tool name in the buffer. Returns the size delta (new_size - old_size).
+  ssize_t rewriteToolCallBody(Buffer::Instance& buffer);
+  // Helper to replace content at a position in the buffer, and return the delta.
+  ssize_t rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos, const std::string& search_str,
+                            const std::string& replacement);
+
+  // Initialization handlers - set up connections, don't send body
+  void handleInitialize();
+  void handleToolsList();
+  void handleToolsCall();
+  void handlePingOrNotification();
+
+  // Aggregation functions
+  std::string aggregateInitialize(const std::vector<BackendResponse>& responses);
+  std::string aggregateToolsList(const std::vector<BackendResponse>& responses);
+
+  // Initialize fanout connections.
+  void initializeFanout(AggregationCallback callback);
+
+  // Initialize single backend connection.
+  void initializeSingleBackend(const McpBackendConfig& backend,
+                               std::function<void(BackendResponse)> callback);
+
+  // Stream data to established connection(s)
+  void streamData(Buffer::Instance& data, bool end_stream);
+
+  void sendJsonResponse(const std::string& body, const std::string& session_id = "");
+  void sendAccepted();
+  void sendHttpError(uint64_t status_code, const std::string& message);
+
+  Http::RequestHeaderMapPtr createUpstreamHeaders(const McpBackendConfig& backend,
+                                                  const std::string& backend_session_id = "");
+
+  McpRouterConfigSharedPtr config_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+
+  Http::RequestHeaderMap* request_headers_{};
+  Buffer::OwnedImpl request_body_;
+
+  std::string request_id_;
+  McpMethod method_{McpMethod::Unknown};
+  std::string tool_name_;            // Original prefixed tool name (e.g., "time__get_current_time")
+  std::string unprefixed_tool_name_; // Unprefixed tool name for backend (e.g., "get_current_time")
+  bool needs_body_rewrite_{false};   // Whether tool name rewriting is needed
+
+  std::string route_name_{"default"};
+  std::string session_subject_;
+  std::string encoded_session_id_;
+  absl::flat_hash_map<std::string, std::string> backend_sessions_;
+
+  // MuxDemux for fanout operations (per-filter instance)
+  std::shared_ptr<Http::MuxDemux> muxdemux_;
+  std::unique_ptr<Http::MultiStream> multistream_;
+  std::vector<std::shared_ptr<BackendStreamCallbacks>> stream_callbacks_;
+
+  // Single backend stream (for tools/call)
+  Http::AsyncClient::Stream* single_stream_{};
+
+  // Store headers to keep them alive for the duration of the stream
+  // AsyncStreamImpl stores only a pointer to headers, so we must keep them alive
+  std::vector<Http::RequestHeaderMapPtr> upstream_headers_;
+
+  // Aggregation state
+  std::shared_ptr<std::vector<BackendResponse>> pending_responses_;
+  std::shared_ptr<std::atomic<size_t>> response_count_;
+  AggregationCallback aggregation_callback_;
+  std::function<void(BackendResponse)> single_backend_callback_;
+
+  bool destroyed_{false};
+  bool initialized_{false}; // Track if fanout/backend has been initialized
+};
+
+} // namespace McpRouter
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

@@ -463,5 +463,11 @@ new_features:
 - area: attributes
   change: |
     added :ref:`attributes <arch_overview_attributes>` for looking up request or response headers bytes.
+- area: mcp
+  change: |
+    Added :ref:`mcp_router HTTP filter <config_http_filters_mcp_router>` which routes MCP (Model Context Protocol)
+    requests to more backend servers. The filter supports fanout to multiple backends for initialize
+    and tools-list requests, single-backend routing for tools-call based on tool name prefix, session
+    management with composite session IDs, and response aggregation.
 
 deprecated:
