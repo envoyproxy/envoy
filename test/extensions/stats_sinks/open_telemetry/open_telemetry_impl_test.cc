@@ -44,13 +44,15 @@ public:
               bool emit_tags_as_attributes = true, bool use_tag_extracted_name = true,
               const std::string& stat_prefix = "",
               absl::flat_hash_map<std::string, std::string> resource_attributes = {},
-              absl::string_view metric_conversion_pbtext = "") {
+              absl::string_view metric_conversion_pbtext = "",
+              bool use_otel_temporality_env_var = false) {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     sink_config.set_report_counters_as_deltas(report_counters_as_deltas);
     sink_config.set_report_histograms_as_deltas(report_histograms_as_deltas);
     sink_config.mutable_emit_tags_as_attributes()->set_value(emit_tags_as_attributes);
     sink_config.mutable_use_tag_extracted_name()->set_value(use_tag_extracted_name);
     sink_config.set_prefix(stat_prefix);
+    sink_config.set_use_otel_temporality_env_var(use_otel_temporality_env_var);
     Tracers::OpenTelemetry::Resource resource;
     for (const auto& [key, value] : resource_attributes) {
       resource.attributes_[key] = value;
@@ -1246,6 +1248,172 @@ TEST_F(OpenTelemetryGrpcSinkTests, BasicFlow) {
       .WillOnce(Return(ByMove(std::move(request2))));
   EXPECT_CALL(*exporter_, send(_));
   sink.flush(snapshot_);
+}
+
+// Tests for OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE env var support.
+class OtlpTemporalityEnvVarTests : public OtlpMetricsFlusherTests {
+public:
+  void SetUp() override {
+    // Store original env var value if set.
+    const char* original = std::getenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE");
+    if (original != nullptr) {
+      original_env_value_ = original;
+      had_original_env_ = true;
+    }
+  }
+
+  void TearDown() override {
+    // Restore original env var value.
+    if (had_original_env_) {
+      setenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", original_env_value_.c_str(), 1);
+    } else {
+      unsetenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE");
+    }
+  }
+
+  std::string original_env_value_;
+  bool had_original_env_{false};
+};
+
+// Verifies that setting env var to "delta" enables delta temporality for counters and histograms.
+TEST_F(OtlpTemporalityEnvVarTests, EnvVarDeltaEnablesDeltaTemporality) {
+  setenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "delta", 1);
+
+  // Create options with use_otel_temporality_env_var=true.
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(/*report_counters_as_deltas=*/false, /*report_histograms_as_deltas=*/false,
+                  /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/true,
+                  /*stat_prefix=*/"", /*resource_attributes=*/{},
+                  /*metric_conversion_pbtext=*/"", /*use_otel_temporality_env_var=*/true));
+
+  addCounterToSnapshot("test_counter", 5, 10);
+  addHistogramToSnapshot("test_histogram", /*is_delta=*/true);
+
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  expectMetricsCount(metrics, 2);
+
+  // Counter should use delta temporality.
+  const auto* counter_metric = findSum(metrics, getTagExtractedName("test_counter"));
+  ASSERT_NE(counter_metric, nullptr);
+  expectSum(*counter_metric, getTagExtractedName("test_counter"), 5, /*is_delta=*/true);
+
+  // Histogram should use delta temporality.
+  const auto* histogram_metric = findHistogram(metrics, getTagExtractedName("test_histogram"));
+  ASSERT_NE(histogram_metric, nullptr);
+  expectHistogram(*histogram_metric, getTagExtractedName("test_histogram"), /*is_delta=*/true);
+}
+
+// Verifies that setting env var to "lowmemory" enables delta temporality.
+TEST_F(OtlpTemporalityEnvVarTests, EnvVarLowMemoryEnablesDeltaTemporality) {
+  setenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "lowmemory", 1);
+
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(/*report_counters_as_deltas=*/false, /*report_histograms_as_deltas=*/false,
+                  /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/true,
+                  /*stat_prefix=*/"", /*resource_attributes=*/{},
+                  /*metric_conversion_pbtext=*/"", /*use_otel_temporality_env_var=*/true));
+
+  addCounterToSnapshot("test_counter", 5, 10);
+
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  expectMetricsCount(metrics, 1);
+
+  // Counter should use delta temporality.
+  const auto* counter_metric = findSum(metrics, getTagExtractedName("test_counter"));
+  ASSERT_NE(counter_metric, nullptr);
+  expectSum(*counter_metric, getTagExtractedName("test_counter"), 5, /*is_delta=*/true);
+}
+
+// Verifies that setting env var to "cumulative" keeps cumulative temporality.
+TEST_F(OtlpTemporalityEnvVarTests, EnvVarCumulativeKeepsCumulativeTemporality) {
+  setenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "cumulative", 1);
+
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(/*report_counters_as_deltas=*/false, /*report_histograms_as_deltas=*/false,
+                  /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/true,
+                  /*stat_prefix=*/"", /*resource_attributes=*/{},
+                  /*metric_conversion_pbtext=*/"", /*use_otel_temporality_env_var=*/true));
+
+  addCounterToSnapshot("test_counter", 5, 10);
+
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  expectMetricsCount(metrics, 1);
+
+  // Counter should use cumulative temporality.
+  const auto* counter_metric = findSum(metrics, getTagExtractedName("test_counter"));
+  ASSERT_NE(counter_metric, nullptr);
+  expectSum(*counter_metric, getTagExtractedName("test_counter"), 10, /*is_delta=*/false);
+}
+
+// Verifies that env var is not read when use_otel_temporality_env_var is false.
+TEST_F(OtlpTemporalityEnvVarTests, EnvVarIgnoredWhenFlagIsFalse) {
+  setenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "delta", 1);
+
+  // Create options with use_otel_temporality_env_var=false (default).
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(/*report_counters_as_deltas=*/false, /*report_histograms_as_deltas=*/false,
+                  /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/true,
+                  /*stat_prefix=*/"", /*resource_attributes=*/{},
+                  /*metric_conversion_pbtext=*/"", /*use_otel_temporality_env_var=*/false));
+
+  addCounterToSnapshot("test_counter", 5, 10);
+
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  expectMetricsCount(metrics, 1);
+
+  // Counter should use cumulative temporality (env var ignored).
+  const auto* counter_metric = findSum(metrics, getTagExtractedName("test_counter"));
+  ASSERT_NE(counter_metric, nullptr);
+  expectSum(*counter_metric, getTagExtractedName("test_counter"), 10, /*is_delta=*/false);
+}
+
+// Verifies that explicit config takes precedence over env var.
+TEST_F(OtlpTemporalityEnvVarTests, ExplicitConfigTakesPrecedenceOverEnvVar) {
+  setenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "cumulative", 1);
+
+  // Set explicit delta for counters, cumulative env var should not override.
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(/*report_counters_as_deltas=*/true, /*report_histograms_as_deltas=*/false,
+                  /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/true,
+                  /*stat_prefix=*/"", /*resource_attributes=*/{},
+                  /*metric_conversion_pbtext=*/"", /*use_otel_temporality_env_var=*/true));
+
+  addCounterToSnapshot("test_counter", 5, 10);
+
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  expectMetricsCount(metrics, 1);
+
+  // Counter should use delta temporality (explicit config wins).
+  const auto* counter_metric = findSum(metrics, getTagExtractedName("test_counter"));
+  ASSERT_NE(counter_metric, nullptr);
+  expectSum(*counter_metric, getTagExtractedName("test_counter"), 5, /*is_delta=*/true);
+}
+
+// Verifies that unset env var keeps cumulative temporality.
+TEST_F(OtlpTemporalityEnvVarTests, UnsetEnvVarUsesCumulativeTemporality) {
+  unsetenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE");
+
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(/*report_counters_as_deltas=*/false, /*report_histograms_as_deltas=*/false,
+                  /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/true,
+                  /*stat_prefix=*/"", /*resource_attributes=*/{},
+                  /*metric_conversion_pbtext=*/"", /*use_otel_temporality_env_var=*/true));
+
+  addCounterToSnapshot("test_counter", 5, 10);
+
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  expectMetricsCount(metrics, 1);
+
+  // Counter should use cumulative temporality (default).
+  const auto* counter_metric = findSum(metrics, getTagExtractedName("test_counter"));
+  ASSERT_NE(counter_metric, nullptr);
+  expectSum(*counter_metric, getTagExtractedName("test_counter"), 10, /*is_delta=*/false);
 }
 
 } // namespace

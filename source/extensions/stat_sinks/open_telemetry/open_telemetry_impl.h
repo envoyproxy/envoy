@@ -25,6 +25,14 @@ namespace Extensions {
 namespace StatSinks {
 namespace OpenTelemetry {
 
+// Environment variable name for OTel SDK temporality preference.
+constexpr absl::string_view kOtelTemporalityEnvVar =
+    "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE";
+// Supported temporality preference values from OTel SDK specification.
+constexpr absl::string_view kTemporalityDelta = "delta";
+constexpr absl::string_view kTemporalityCumulative = "cumulative";
+constexpr absl::string_view kTemporalityLowMemory = "lowmemory";
+
 using AggregationTemporality = opentelemetry::proto::metrics::v1::AggregationTemporality;
 using MetricsExportRequest =
     opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;

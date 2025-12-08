@@ -1,5 +1,7 @@
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
+#include <cstdlib>
+
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/stat_match_action.h"
 
@@ -231,11 +233,39 @@ createMatcher(const xds::type::matcher::v3::Matcher& matcher_config,
   return factory.create(matcher_config)();
 }
 
+// Returns true if the temporality env var indicates delta temporality should be used.
+// Only checks the env var if use_otel_temporality_env_var is true.
+bool shouldUseDeltaFromEnvVar(bool use_env_var) {
+  if (!use_env_var) {
+    return false;
+  }
+
+  const char* env_value = std::getenv(std::string(kOtelTemporalityEnvVar).c_str());
+  if (env_value == nullptr || env_value[0] == '\0') {
+    return false;
+  }
+
+  const std::string pref(env_value);
+  if (pref == kTemporalityDelta || pref == kTemporalityLowMemory) {
+    return true;
+  }
+
+  if (pref != kTemporalityCumulative) {
+    ENVOY_LOG_MISC(warn, "Invalid {} value '{}', using cumulative temporality.",
+                   kOtelTemporalityEnvVar, pref);
+  }
+  return false;
+}
+
 OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
                          const Tracers::OpenTelemetry::Resource& resource,
                          Server::Configuration::ServerFactoryContext& server)
-    : report_counters_as_deltas_(sink_config.report_counters_as_deltas()),
-      report_histograms_as_deltas_(sink_config.report_histograms_as_deltas()),
+    : report_counters_as_deltas_(
+          sink_config.report_counters_as_deltas() ||
+          shouldUseDeltaFromEnvVar(sink_config.use_otel_temporality_env_var())),
+      report_histograms_as_deltas_(
+          sink_config.report_histograms_as_deltas() ||
+          shouldUseDeltaFromEnvVar(sink_config.use_otel_temporality_env_var())),
       emit_tags_as_attributes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true)),
       use_tag_extracted_name_(

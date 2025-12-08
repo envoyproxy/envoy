@@ -269,6 +269,12 @@ new_features:
     Added support for dropping stats via
     :ref:`DropAction <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during
     custom metric conversion.
+- area: otlp_stat_sink
+  change: |
+    Added :ref:`use_otel_temporality_env_var
+    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.use_otel_temporality_env_var>` to read
+    the ``OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`` environment variable for configuring metrics
+    temporality. Supports values ``cumulative`` (default), ``delta``, and ``lowmemory``.
 - area: tcp_proxy
   change: |
     Added :ref:`upstream_connect_mode

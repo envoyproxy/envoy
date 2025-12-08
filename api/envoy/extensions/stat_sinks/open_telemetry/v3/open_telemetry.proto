@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
 // [#extension: envoy.stat_sinks.open_telemetry]
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message SinkConfig {
   // ConversionAction is used to convert a stat to a metric. If a stat matches,
   // the metric_name and static_metric_labels will be
@@ -82,4 +82,13 @@ message SinkConfig {
   // - ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction``.
   // If stats are not matched, they will be directly converted to OTLP metrics as usual.
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
+
+  // When true, reads the ``OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`` environment variable
+  // to set temporality preference. Supported values are ``cumulative`` (default), ``delta``, and
+  // ``lowmemory``. When set to ``delta`` or ``lowmemory``, counters and histograms are reported as
+  // deltas. This is only used when ``report_counters_as_deltas`` and ``report_histograms_as_deltas``
+  // are not explicitly configured. If those fields are set, they take precedence over the
+  // environment variable. Follows `OTel SDK conventions
+  // <https://opentelemetry.io/docs/specs/otel/metrics/sdk_exporters/otlp/#additional-configuration>`_.
+  bool use_otel_temporality_env_var = 9;
 }
