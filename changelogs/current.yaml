@@ -433,7 +433,7 @@ new_features:
     external authorization server for making authorization decisions.
 - area: attributes
   change: |
-    added :ref:`attributes <arch_overview_attributes>` for looking up request or response headers bytes.
+    Added :ref:`attributes <arch_overview_attributes>` for looking up request or response header bytes.
 - area: json_to_metadata
   change: |
     Added support for per-route configuration override in the ``json_to_metadata`` http filter. Routes can now
