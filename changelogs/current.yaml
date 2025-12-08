@@ -434,5 +434,10 @@ new_features:
 - area: attributes
   change: |
     Added :ref:`attributes <arch_overview_attributes>` for looking up request or response header bytes.
+- area: json_to_metadata
+  change: |
+    Added support for per-route configuration override in the ``json_to_metadata`` http filter. Routes can now
+    specify different JSON to metadata conversion rules via per-route configuration, allowing different routes
+    to extract different metadata from request or response bodies.
 
 deprecated:
