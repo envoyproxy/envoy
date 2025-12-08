@@ -131,7 +131,8 @@ message OAuth2Credentials {
 
   // The domain to set the cookie on. If not set, the cookie will default to the host of the request, not including the subdomains.
   // This is useful when token cookies need to be shared across multiple subdomains.
-  string cookie_domain = 5;
+  string cookie_domain = 5
+      [(validate.rules).string = {pattern: "^$|^[^\\x00-\\x1f\\x7f \",;<>\\\\]+$"}];
 }
 
 // OAuth config
