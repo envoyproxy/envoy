@@ -1,11 +1,17 @@
 #include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 
+#include <cinttypes>
+
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/extensions/filters/network/redis_proxy/info_command_handler.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_split.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -48,6 +54,11 @@ ClusterResponseHandlerFactory::createAggregateHandler(const std::string& command
   // CONFIG commands
   if (command_name == "config" && subcommand == "get") {
     return std::make_unique<ArrayMergeAggregateResponseHandler>(shard_count);
+  }
+
+  // INFO command
+  if (command_name == "info") {
+    return std::make_unique<InfoCmdAggregateResponseHandler>(shard_count, subcommand);
   }
 
   // This should never be reached - all commands mapped to aggregate_all_responses
@@ -93,6 +104,7 @@ ClusterResponseHandlerFactory::getResponseHandlerType(const std::string& command
           {"config:get", ClusterScopeResponseHandlerType::aggregate_all_responses},
           {"slowlog:get", ClusterScopeResponseHandlerType::aggregate_all_responses},
           {"slowlog:len", ClusterScopeResponseHandlerType::aggregate_all_responses},
+          {"info", ClusterScopeResponseHandlerType::aggregate_all_responses},
       };
 
   // First check with subcommand to see if there is a map entry
