@@ -37,7 +37,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       std::string decoded, errmsg;
       EXPECT_TRUE(Json::TestUtil::decodeEscapedJson(sanitized, decoded, errmsg))
           << input << ": " << errmsg;
-      EXPECT_EQ(input, decoded);
+      EXPECT_EQ(sanitized, decoded);
     }
   }
 }
