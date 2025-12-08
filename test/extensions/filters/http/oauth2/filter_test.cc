@@ -160,7 +160,8 @@ public:
       bool disable_token_encryption = false, const std::string& bearer_token_path = "",
       const std::string& hmac_path = "", const std::string& expires_path = "",
       const std::string& id_token_path = "", const std::string& refresh_token_path = "",
-      const std::string& nonce_path = "", const std::string& code_verifier_path = "") {
+      const std::string& nonce_path = "", const std::string& code_verifier_path = "",
+      const std::string& cookie_config_domain = "") {
 
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
@@ -228,12 +229,18 @@ public:
     if (!bearer_token_path.empty()) {
       bearer_config->set_path(bearer_token_path);
     }
+    if (!cookie_config_domain.empty()) {
+      bearer_config->set_domain(cookie_config_domain);
+    }
 
     // HMAC Cookie Config, Set value to disabled by default.
     auto* hmac_config = cookie_configs->mutable_oauth_hmac_cookie_config();
     hmac_config->set_same_site(hmac_samesite);
     if (!hmac_path.empty()) {
       hmac_config->set_path(hmac_path);
+    }
+    if (!cookie_config_domain.empty()) {
+      hmac_config->set_domain(cookie_config_domain);
     }
 
     // Set value to disabled by default.
@@ -242,12 +249,18 @@ public:
     if (!expires_path.empty()) {
       expires_config->set_path(expires_path);
     }
+    if (!cookie_config_domain.empty()) {
+      expires_config->set_domain(cookie_config_domain);
+    }
 
     // Set value to disabled by default.
     auto* id_token_config = cookie_configs->mutable_id_token_cookie_config();
     id_token_config->set_same_site(id_token_samesite);
     if (!id_token_path.empty()) {
       id_token_config->set_path(id_token_path);
+    }
+    if (!cookie_config_domain.empty()) {
+      id_token_config->set_domain(cookie_config_domain);
     }
 
     // Set value to disabled by default.
@@ -256,6 +269,9 @@ public:
     if (!refresh_token_path.empty()) {
       refresh_token_config->set_path(refresh_token_path);
     }
+    if (!cookie_config_domain.empty()) {
+      refresh_token_config->set_domain(cookie_config_domain);
+    }
 
     // Set value to disabled by default.
     auto* oauth_nonce_config = cookie_configs->mutable_oauth_nonce_cookie_config();
@@ -263,12 +279,18 @@ public:
     if (!nonce_path.empty()) {
       oauth_nonce_config->set_path(nonce_path);
     }
+    if (!cookie_config_domain.empty()) {
+      oauth_nonce_config->set_domain(cookie_config_domain);
+    }
 
     // Set value to disabled by default.
     auto* code_verifier_config = cookie_configs->mutable_code_verifier_cookie_config();
     code_verifier_config->set_same_site(code_verifier_samesite);
     if (!code_verifier_path.empty()) {
       code_verifier_config->set_path(code_verifier_path);
+    }
+    if (!cookie_config_domain.empty()) {
+      code_verifier_config->set_domain(cookie_config_domain);
     }
 
     p.set_disable_token_encryption(disable_token_encryption);
@@ -1924,10 +1946,15 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
  * Expected behavior: Cookie domain should be set to the domain in the config.
  */
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
+  const auto DisabledSameSite = ::envoy::extensions::filters::http::oauth2::v3::
+      CookieConfig_SameSite::CookieConfig_SameSite_DISABLED;
   init(getConfig(true, true,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY,
-                 0, false, false, true /* set_cookie_domain */));
+                 0, false, false, false /* set_cookie_domain */, false, false, DisabledSameSite,
+                 DisabledSameSite, DisabledSameSite, DisabledSameSite, DisabledSameSite,
+                 DisabledSameSite, DisabledSameSite, 0, 0, false, "", "", "", "", "", "", "",
+                 "example.com"));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
       {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
@@ -2028,6 +2055,51 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
               encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
 
   filter_->finishGetAccessTokenFlow();
+}
+
+TEST_F(OAuth2Test, LegacyCookieDomainFallbackAppliedToCookieSettings) {
+  auto config = getConfig(true, true,
+                          ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                              OAuth2Config_AuthType_URL_ENCODED_BODY,
+                          0, false, false, true /* set_cookie_domain */);
+
+  EXPECT_EQ(config->hmacCookieSettings().domain_, "example.com");
+  EXPECT_EQ(config->bearerTokenCookieSettings().domain_, "example.com");
+  EXPECT_EQ(config->codeVerifierCookieSettings().domain_, "example.com");
+}
+
+TEST_F(OAuth2Test, CookieConfigDomainOverridesLegacyDomain) {
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("https://example.com/callback");
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact("/callback");
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  p.mutable_credentials()->set_client_id("client_id");
+  p.mutable_credentials()->mutable_token_secret()->set_name("token_secret");
+  p.mutable_credentials()->mutable_hmac_secret()->set_name("hmac_secret");
+
+  // Legacy domain
+  p.mutable_credentials()->set_cookie_domain("legacy.com");
+
+  // Bearer token config with specific domain
+  auto* bearer = p.mutable_cookie_configs()->mutable_bearer_token_cookie_config();
+  bearer->set_domain("specific.com");
+
+  // HMAC config without domain (should use legacy)
+  p.mutable_cookie_configs()->mutable_oauth_hmac_cookie_config();
+
+  MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  FilterConfig config(p, factory_context_.server_factory_context_, secret_reader, scope_,
+                      "test_prefix");
+
+  EXPECT_EQ(config.bearerTokenCookieSettings().domain_, "specific.com");
+  EXPECT_EQ(config.hmacCookieSettings().domain_, "legacy.com");
 }
 
 /**

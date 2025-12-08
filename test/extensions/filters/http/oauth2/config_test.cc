@@ -102,7 +102,9 @@ config:
       oauth_expires: OauthExpires
       id_token: IdToken
       refresh_token: RefreshToken
-    cookie_domain: example.com
+  cookie_configs:
+    bearer_token_cookie_config:
+      domain: example.com
   authorization_endpoint: https://oauth.com/oauth/authorize/
   redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
   redirect_path_matcher:
@@ -241,7 +243,9 @@ config:
       oauth_expires: OauthExpires
       id_token: IdToken
       refresh_token: RefreshToken
-    cookie_domain: example.com
+  cookie_configs:
+    bearer_token_cookie_config:
+      domain: example.com
   authorization_endpoint: https://oauth.com/oauth/authorize/
   redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
   redirect_path_matcher:

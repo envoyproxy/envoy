@@ -31,6 +31,12 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: oauth2
+  change: |
+    Added per-cookie ``domain`` support via ``cookie_configs.*.domain`` for the OAuth2 filter,
+    aligning domain and path scoping of emitted cookies. The legacy
+    ``credentials.cookie_domain`` field is now deprecated but continues to be honored as a
+    fallback.
 - area: router
   change: |
     Added :ref:`host_rewrite

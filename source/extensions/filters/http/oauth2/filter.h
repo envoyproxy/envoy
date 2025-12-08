@@ -156,6 +156,7 @@ public:
   FilterStats& stats() { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
+  // Legacy cookie domain fallback for deprecated credentials.cookie_domain.
   const std::string& cookieDomain() const { return cookie_domain_; }
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
@@ -179,17 +180,20 @@ public:
   bool shouldUseRefreshToken(
       const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
   struct CookieSettings {
-    CookieSettings(const envoy::extensions::filters::http::oauth2::v3::CookieConfig& config)
-        : same_site_(config.same_site()), path_(config.path().empty() ? "/" : config.path()) {}
+    CookieSettings(const envoy::extensions::filters::http::oauth2::v3::CookieConfig& config,
+                   const std::string& legacy_cookie_domain)
+        : same_site_(config.same_site()), path_(config.path().empty() ? "/" : config.path()),
+          domain_(config.domain().empty() ? legacy_cookie_domain : config.domain()) {}
 
     // Default constructor.
     CookieSettings()
         : same_site_(envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
                          CookieConfig_SameSite_DISABLED),
-          path_("/") {}
+          path_("/"), domain_("") {}
 
     const envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite same_site_;
     const std::string path_;
+    const std::string domain_;
   };
 
   const CookieSettings& bearerTokenCookieSettings() const { return bearer_token_cookie_settings_; }

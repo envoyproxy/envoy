@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.oauth2.v3;
 
+import "envoy/annotations/deprecation.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/config/route/v3/route_components.proto";
@@ -47,6 +48,11 @@ message CookieConfig {
   //
   // If not specified, defaults to ``/``.
   string path = 2 [(validate.rules).string = {pattern: "^$|^/[^\\x00-\\x1f\\x7f \",;<>\\\\]*$"}];
+
+  // The domain attribute for the cookie.
+  //
+  // If not specified, defaults to the request host without subdomains.
+  string domain = 3 [(validate.rules).string = {pattern: "^$|^[^\\x00-\\x1f\\x7f \",;<>\\\\]+$"}];
 }
 
 // [#next-free-field: 8]
@@ -131,7 +137,11 @@ message OAuth2Credentials {
 
   // The domain to set the cookie on. If not set, the cookie will default to the host of the request, not including the subdomains.
   // This is useful when token cookies need to be shared across multiple subdomains.
-  string cookie_domain = 5;
+  //
+  // This field is deprecated. Use :ref:`cookie_configs.*.domain
+  // <envoy_v3_api_field_extensions.filters.http.oauth2.v3.CookieConfig.domain>` instead.
+  string cookie_domain = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // OAuth config
