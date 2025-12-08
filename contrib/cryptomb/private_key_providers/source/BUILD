@@ -20,13 +20,24 @@ envoy_cmake(
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
         "//conditions:default": ["-j1"],
     }),
-    cache_entries = {
-        "BORINGSSL": "on",
-        "DYNAMIC_LIB": "off",
-        "MB_STANDALONE": "on",
-        "Python_EXECUTABLE": "$$EXT_BUILD_ROOT/$(PYTHON3)",
-        "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto_internal.a",
-    },
+    cache_entries = select({
+        # FIPS builds use libcrypto.a/libssl.a
+        "//bazel:boringssl_fips": {
+            "BORINGSSL": "on",
+            "DYNAMIC_LIB": "off",
+            "MB_STANDALONE": "on",
+            "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto.a",
+            "Python_EXECUTABLE": "$$EXT_BUILD_ROOT/$(PYTHON3)",
+        },
+        # Non-FIPS builds use libcrypto_internal.a/libssl_internal.a
+        "//conditions:default": {
+            "BORINGSSL": "on",
+            "DYNAMIC_LIB": "off",
+            "MB_STANDALONE": "on",
+            "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto_internal.a",
+            "Python_EXECUTABLE": "$$EXT_BUILD_ROOT/$(PYTHON3)",
+        },
+    }),
     defines = [
         "OPENSSL_USE_STATIC_LIBS=TRUE",
     ],
