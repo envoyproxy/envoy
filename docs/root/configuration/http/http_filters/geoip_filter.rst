@@ -31,26 +31,12 @@ This provider should be configured with the type URL ``type.googleapis.com/envoy
 Configuration example
 ---------------------
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.geoip
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.geoip.v3.Geoip
-    xff_config:
-      xff_num_trusted_hops: 1
-    provider:
-      name: "envoy.geoip_providers.maxmind"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
-        common_provider_config:
-          geo_headers_to_add:
-            country: "x-geo-country"
-            region: "x-geo-region"
-            city: "x-geo-city"
-            asn: "x-geo-asn"
-        city_db_path: "geoip/GeoLite2-City-Test.mmdb"
-        isp_db_path: "geoip/GeoIP2-ISP-Test.mmdb"
-        asn_db_path: "geoip/GeoLite2-ASN-Test.mmdb"
+.. literalinclude:: _include/geoip-filter.yaml
+    :language: yaml
+    :lines: 31-49
+    :lineno-start: 31
+    :linenos:
+    :caption: :download:`geoip-filter.yaml <_include/geoip-filter.yaml>`
 
 Statistics
 -------------
