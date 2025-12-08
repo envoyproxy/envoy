@@ -274,6 +274,12 @@ new_features:
     Added support for dropping stats via
     :ref:`DropAction <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction>` during
     custom metric conversion.
+- area: ext_authz
+  change: |
+    Added support for :ref:`error_response <envoy_v3_api_field_service.auth.v3.CheckResponse.error_response>` in the
+    external authorization API. This allows authorization services to return custom HTTP status codes, headers,
+    and response bodies when encountering internal errors, reusing the existing :ref:`DeniedHttpResponse
+    <envoy_v3_api_msg_service.auth.v3.DeniedHttpResponse>` message type.
 - area: tcp_proxy
   change: |
     Added :ref:`upstream_connect_mode
