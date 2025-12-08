@@ -181,7 +181,6 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   }
 
   std::string parse_buffer;
-  parse_buffer.reserve(to_parse);
   parse_buffer.resize(to_parse);
   data.copyOut(bytes_parsed_, to_parse, parse_buffer.data());
 

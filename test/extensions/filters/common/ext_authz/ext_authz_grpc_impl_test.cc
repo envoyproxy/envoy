@@ -337,6 +337,90 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
   client_->onFailure(grpc_status, "", span_);
 }
 
+// Test the client when an error response with custom attributes is received.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorWithAllAttributes) {
+  initialize();
+
+  const std::string expected_body{"Internal Server Error"};
+  const auto expected_headers =
+      TestCommon::makeHeaderValueOption({{"x-error-code", "AUTH_SERVICE_ERROR", false}});
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
+  auto check_response = TestCommon::makeErrorCheckResponse(
+      grpc_status, envoy::type::v3::InternalServerError, expected_body, expected_headers);
+  auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::Error, Http::Code::InternalServerError, expected_body, expected_headers,
+      HeaderValueOptionVector{}, grpc_status);
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+  EXPECT_EQ(nullptr, headers.RequestId());
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_error")));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(authz_response))));
+
+  client_->onSuccess(std::move(check_response), span_);
+}
+
+// Test the client when an error response with empty status code is received.
+// The response sent to client should use the status_on_error configuration.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorWithEmptyErrorResponseStatus) {
+  initialize();
+
+  const std::string expected_body{"Service Unavailable"};
+  const auto expected_headers =
+      TestCommon::makeHeaderValueOption({{"x-error-message", "auth backend down", false}});
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Unavailable;
+  auto check_response = TestCommon::makeErrorCheckResponse(grpc_status, envoy::type::v3::Empty,
+                                                           expected_body, expected_headers);
+  // When the error_response has no HTTP status code, the gRPC client doesn't set a default.
+  // The filter will use status_on_error configuration instead.
+  auto authz_response =
+      TestCommon::makeAuthzResponse(CheckStatus::Error, static_cast<Http::Code>(0), expected_body,
+                                    expected_headers, HeaderValueOptionVector{}, grpc_status);
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+  EXPECT_EQ(nullptr, headers.RequestId());
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_error")));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(authz_response))));
+
+  client_->onSuccess(std::move(check_response), span_);
+}
+
+// Test the client when an error response with no attributes is received.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorNoAttributes) {
+  initialize();
+
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
+  auto check_response = TestCommon::makeErrorCheckResponse(
+      grpc_status, envoy::type::v3::InternalServerError, "", HeaderValueOptionVector{});
+  auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::Error, Http::Code::InternalServerError, "", HeaderValueOptionVector{},
+      HeaderValueOptionVector{}, grpc_status);
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+  EXPECT_EQ(nullptr, headers.RequestId());
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_error")));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(authz_response))));
+
+  client_->onSuccess(std::move(check_response), span_);
+}
+
 // Test the client when an OK response is received with dynamic metadata in that OK response.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   initialize();
