@@ -154,23 +154,6 @@ Proxy uses the SNI from connection metadata for routing:
           name: dynamic_forward_proxy_cache_config
           dns_lookup_family: V4_ONLY
 
-.. note::
-
-  **SNI-based filter chain selection for PostgreSQL < 17:**
-
-  SNI-based filter chain selection is **not supported** for PostgreSQL versions prior to 17 because:
-
-  1. The postgres_inspector detects the PostgreSQL protocol and triggers filter chain selection
-  2. The postgres_proxy sends the 'S' response to the client's SSLRequest
-  3. The client then initiates the TLS handshake (which contains SNI)
-  4. By this time, the filter chain has already been selected
-
-  For SNI-based routing with PostgreSQL < 17, use the Dynamic Forward Proxy approach shown above,
-  which reads SNI from connection metadata **after** the TLS handshake completes.
-
-  **PostgreSQL 17+ natively supports SNI-based filter chain selection** as shown in the first example,
-  because the SSLRequest and TLS ClientHello are sent together.
-
 Statistics
 ----------
 
