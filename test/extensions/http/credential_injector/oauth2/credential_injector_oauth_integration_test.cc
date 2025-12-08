@@ -94,7 +94,7 @@ resources:
     EXPECT_EQ(Http::Headers::get().UserAgentValues.GoBrowser, user_agent);
   }
 
-  void getFakeOuth2Connection() {
+  void getFakeOauth2Connection() {
     AssertionResult result =
         fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_oauth2_connection_);
     RELEASE_ASSERT(result, result.message());
@@ -763,7 +763,7 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
 
-  getFakeOuth2Connection();
+  getFakeOauth2Connection();
   acceptNewStream();
 
   const std::string request_body = oauth2_request_->body().toString();
