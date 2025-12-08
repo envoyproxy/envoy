@@ -2,7 +2,6 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include <functional>
-#include <iostream>
 #include <memory>
 #include <utility>
 

@@ -184,7 +184,6 @@ protected:
   void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true,
                                         bool response = false, absl::string_view body_sent = "");
   void serverSendTrailerRespDuplexStreamed();
-  void prependExprocCompositeFilter();
   void initializeLogConfig(std::string& access_log_path);
   void prependExtProcCompositeFilter(const Protobuf::Message& match_input);
 
