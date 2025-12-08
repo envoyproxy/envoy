@@ -109,6 +109,7 @@ protected:
 
 private:
   friend class DynamicModuleClusterFactory;
+  friend class DynamicModuleClusterTestPeer;
 
   /**
    * Cleanup callback for periodic maintenance.

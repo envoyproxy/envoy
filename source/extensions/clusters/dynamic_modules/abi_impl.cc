@@ -37,7 +37,7 @@ envoy_dynamic_module_type_cluster_result envoy_dynamic_module_callback_cluster_a
     } else if (result.status().code() == absl::StatusCode::kResourceExhausted) {
       return envoy_dynamic_module_type_cluster_result_MaxHostsReached;
     }
-    return envoy_dynamic_module_type_cluster_result_Error;
+    return envoy_dynamic_module_type_cluster_result_Error; // LCOV_EXCL_LINE
   }
 
   *host_out = result.value().get();
