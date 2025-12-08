@@ -289,7 +289,7 @@ DynamicDescriptor::DynamicDescriptor(uint64_t per_descriptor_max_tokens,
 
 RateLimitTokenBucketSharedPtr
 DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descriptor) {
-  absl::WriterMutexLock lock(&dyn_desc_lock_);
+  absl::WriterMutexLock lock(dyn_desc_lock_);
   auto iter = dynamic_descriptors_.find(request_descriptor);
   if (iter != dynamic_descriptors_.end()) {
     if (iter->second.second != lru_list_.begin()) {

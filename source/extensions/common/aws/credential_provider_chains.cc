@@ -166,6 +166,19 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
           absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE)));
     }
 
+    // Ensure we always have a watched directory configured for file-based token sources. This
+    // ensures we automatically pick up tokens replaced on the filesystem.
+    if (web_identity.web_identity_token_data_source().has_filename() &&
+        !web_identity.web_identity_token_data_source().has_watched_directory()) {
+      auto split = context.api().fileSystem().splitPathFromFilename(
+          web_identity.web_identity_token_data_source().filename());
+      if (split.ok() && !split->directory_.empty()) {
+        web_identity.mutable_web_identity_token_data_source()
+            ->mutable_watched_directory()
+            ->set_path(split->directory_);
+      }
+    }
+
     if (web_identity.role_arn().empty()) {
       web_identity.set_role_arn(absl::NullSafeStringView(std::getenv(AWS_ROLE_ARN)));
     }
@@ -273,7 +286,8 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
   // Create our own signer specifically for signing AssumeRole API call
   auto signer = std::make_unique<SigV4SignerImpl>(
       STS_SERVICE_NAME, region, credentials_provider_chain, context,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
 
   auto credential_provider = std::make_shared<AssumeRoleCredentialsProvider>(
       context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,

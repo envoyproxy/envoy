@@ -978,7 +978,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
   }
 
   EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::ProtocolError, _));
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ProtocolError, _));
   response_encoder_->encodeHeaders(response_headers, false);
   driveToCompletion();
   EXPECT_TRUE(client_wrapper_->status_.ok());
@@ -1001,11 +1001,7 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   EXPECT_CALL(server_stream_callbacks_,
               onResetStream(StreamResetReason::LocalRefusedStreamReset, _));
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset, _));
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events")) {
-    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
-  } else {
-    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
-  }
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
   driveToCompletion();
 }
@@ -2062,11 +2058,8 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
         server_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
         server_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
       }));
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events")) {
-    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
-  } else {
-    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
-  }
+
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
   driveToCompletion();
 
@@ -3867,11 +3860,7 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
 
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectError, _));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ConnectError, _));
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events")) {
-    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
-  } else {
-    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
-  }
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
   response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
   driveToCompletion();
 }

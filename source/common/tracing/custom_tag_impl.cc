@@ -3,6 +3,7 @@
 #include "envoy/router/router.h"
 
 #include "source/common/formatter/substitution_formatter.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/types/optional.h"
 
@@ -48,12 +49,20 @@ EnvironmentCustomTag::EnvironmentCustomTag(
 RequestHeaderCustomTag::RequestHeaderCustomTag(
     const std::string& tag, const envoy::type::tracing::v3::CustomTag::Header& request_header)
     : CustomTagBase(tag), name_(Http::LowerCaseString(request_header.name())),
-      default_value_(request_header.default_value()) {}
+      header_name_(request_header.name()), default_value_(request_header.default_value()) {}
 
 absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  const auto entry = name_.get(ctx.trace_context);
-  return entry.value_or(default_value_);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.get_header_tag_from_header_map")) {
+    const auto entry = name_.get(ctx.trace_context);
+    return entry.value_or(default_value_);
+  }
+  if (const auto headers = ctx.formatter_context.requestHeaders(); headers.has_value()) {
+    if (const auto values = headers->get(header_name_); !values.empty()) {
+      return values[0]->value().getStringView();
+    }
+  }
+  return default_value_;
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,

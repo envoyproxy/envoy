@@ -128,6 +128,8 @@ envoy_cc_library(
         "@envoy_mobile//test/common/http/filters/test_read:filter_cc_proto_descriptor",
         "@envoy_mobile//test/common/http/filters/test_remote_response:config",
         "@envoy_mobile//test/common/http/filters/test_remote_response:filter_cc_proto_descriptor",
+        "@envoy_mobile//test/common/mocks/dns:mock_dns_resolver_lib",
+        "@envoy_mobile//test/common/mocks/dns:mock_dns_resolver_proto_cc_proto_descriptor",
     ],
     alwayslink = 1,
 )

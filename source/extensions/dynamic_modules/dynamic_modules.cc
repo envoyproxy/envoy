@@ -16,7 +16,8 @@ namespace DynamicModules {
 constexpr char DYNAMIC_MODULES_SEARCH_PATH[] = "ENVOY_DYNAMIC_MODULES_SEARCH_PATH";
 
 absl::StatusOr<DynamicModulePtr>
-newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close) {
+newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
+                 const bool load_globally) {
   // From the man page of dlopen(3):
   //
   // > This can be used to test if the object is already resident (dlopen() returns NULL if it
@@ -30,10 +31,15 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     // loaded module. We don't need to call the init function again.
     return std::make_unique<DynamicModule>(handle);
   }
-  // RTLD_LOCAL is always needed to avoid collisions between multiple modules.
   // RTLD_LAZY is required for not only performance but also simply to load the module, otherwise
   // dlopen results in Invalid argument.
-  int mode = RTLD_LOCAL | RTLD_LAZY;
+  int mode = RTLD_LAZY;
+  if (load_globally) {
+    mode |= RTLD_GLOBAL;
+  } else {
+    // RTLD_LOCAL is used by default to avoid collisions between multiple modules.
+    mode |= RTLD_LOCAL;
+  }
   if (do_not_close) {
     mode |= RTLD_NODELETE;
   }
@@ -67,7 +73,8 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
 }
 
 absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
-                                                        const bool do_not_close) {
+                                                        const bool do_not_close,
+                                                        const bool load_globally) {
   const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);
   if (module_search_path == nullptr) {
     return absl::InvalidArgumentError(absl::StrCat("Failed to load dynamic module: ", module_name,
@@ -76,7 +83,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
   }
   const std::filesystem::path file_path_absolute =
       std::filesystem::absolute(fmt::format("{}/lib{}.so", module_search_path, module_name));
-  return newDynamicModule(file_path_absolute, do_not_close);
+  return newDynamicModule(file_path_absolute, do_not_close, load_globally);
 }
 
 DynamicModule::~DynamicModule() { dlclose(handle_); }

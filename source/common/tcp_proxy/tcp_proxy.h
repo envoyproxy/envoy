@@ -361,6 +361,13 @@ public:
     return shared_config_->proxyProtocolTLVs();
   }
 
+  envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode
+  upstreamConnectMode() const {
+    return upstream_connect_mode_;
+  }
+
+  const absl::optional<uint32_t>& maxEarlyDataBytes() const { return max_early_data_bytes_; }
+
 private:
   struct SimpleRouteImpl : public Route {
     SimpleRouteImpl(const Config& parent, absl::string_view cluster_name);
@@ -413,6 +420,9 @@ private:
   Random::RandomGenerator& random_generator_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
   Regex::Engine& regex_engine_; // Static lifetime object, safe to store as a reference
+  envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode upstream_connect_mode_{
+      envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE};
+  absl::optional<uint32_t> max_early_data_bytes_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -677,6 +687,11 @@ protected:
   void enableRetryTimer();
   void disableRetryTimer();
 
+public:
+  // Public for testing purposes
+  void onDownstreamTlsHandshakeComplete();
+
+protected:
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
@@ -720,6 +735,15 @@ protected:
   bool early_data_end_stream_{false};
   Buffer::OwnedImpl early_data_buffer_{};
   HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
+
+  // Connection establishment mode configuration.
+  envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode connect_mode_{
+      envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE};
+  bool waiting_for_tls_handshake_{false};
+  bool tls_handshake_complete_{false};
+  bool initial_data_received_{false};
+  bool read_disabled_due_to_buffer_{false}; // Track if we disabled reading due to buffer overflow.
+  uint32_t max_buffered_bytes_{65536};      // Default 64KB.
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream

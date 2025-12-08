@@ -443,12 +443,7 @@ new_features:
     pattern as the ``cgroups_memory`` resource monitor. Additionally, CPU utilization calculation
     logic has been moved into the ``CpuTimes`` struct via a new ``calculateUtilization()`` method,
     encapsulating cgroup v1 and v2 differences within the data structure itself. No configuration changes
-    are required, and the behavior remains functionally equivalent to the previous implementation while
-    being more robust and maintainable.
-- area: json_to_metadata
-  change: |
-    Added support for per-route configuration override in the ``json_to_metadata`` http filter. Routes can now
-    specify different JSON to metadata conversion rules via per-route configuration, allowing different routes
-    to extract different metadata from request or response bodies.
+    are required, and the behavior remains functionally equivalent to the previous implementation while 
+    being more robust and maintainable.    
 
 deprecated:

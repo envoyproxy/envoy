@@ -58,7 +58,7 @@ using SymbolVec = std::vector<Symbol>;
  *
  * StatNameStorage can be used to manage memory for the byte-encoding. Not all
  * StatNames are backed by StatNameStorage -- the storage may be inlined into
- * another object such as HeapStatData. StaNameStorage is not fully RAII --
+ * another object such as HeapStatData. StatNameStorage is not fully RAII --
  * instead the owner must call free(SymbolTable&) explicitly before
  * StatNameStorage is destructed. This saves 8 bytes of storage per stat,
  * relative to holding a SymbolTable& in each StatNameStorage object.

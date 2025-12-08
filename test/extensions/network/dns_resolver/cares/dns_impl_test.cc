@@ -638,6 +638,9 @@ public:
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
   absl::string_view addressType() const override { PANIC("not implemented"); }
   absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
+    return nullptr;
+  }
 
   Address::Type type() const override { return instance_.type(); }
   const SocketInterface& socketInterface() const override {
@@ -913,21 +916,26 @@ public:
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
     EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(getifaddrs_supported));
-    if (getifaddrs_supported) {
-      if (getifaddrs_success) {
-        EXPECT_CALL(os_sys_calls, getifaddrs(_))
-            .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
-              for (uint32_t i = 0; i < ifaddrs.size(); i++) {
-                auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(ifaddrs[i]);
-                vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
-              }
-              return {0, 0};
-            }));
-      } else {
-        EXPECT_CALL(os_sys_calls, getifaddrs(_))
-            .WillOnce(Invoke(
-                [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; }));
+    if (filterUnroutableFamilies()) {
+      if (getifaddrs_supported) {
+        if (getifaddrs_success) {
+          EXPECT_CALL(os_sys_calls, getifaddrs(_))
+              .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+                for (uint32_t i = 0; i < ifaddrs.size(); i++) {
+                  auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(ifaddrs[i]);
+                  vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
+                }
+                return {0, 0};
+              }));
+        } else {
+          EXPECT_CALL(os_sys_calls, getifaddrs(_))
+              .WillOnce(Invoke(
+                  [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; }));
+        }
       }
+    } else {
+      // When filter_unroutable_families is false, getifaddrs should NOT be called
+      EXPECT_CALL(os_sys_calls, getifaddrs(_)).Times(0);
     }
 
     // These passthrough calls are needed to let the resolver communicate with the DNS server

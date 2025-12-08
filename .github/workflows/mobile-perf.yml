@@ -40,6 +40,7 @@ jobs:
 
   build:
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-perf }}
@@ -64,7 +65,9 @@ jobs:
         - name: Current size
           args: >-
             build
-            --config=mobile-remote-release-clang
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-release
             //test/performance:test_binary_size
           # Ensure files don't leak back into the main binary
           source: |-
@@ -74,13 +77,16 @@ jobs:
         - name: Main size
           args: >-
             build
-            --config=mobile-remote-release-clang
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-release
             //test/performance:test_binary_size
           ref: main
           target: size-main
 
   compare:
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-perf }}
