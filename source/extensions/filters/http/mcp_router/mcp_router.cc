@@ -6,12 +6,12 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/json/json_streamer.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
-#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -662,63 +662,82 @@ std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendRespon
 }
 
 std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendResponse>& responses) {
-  nlohmann::json all_tools = nlohmann::json::array();
-
   const bool is_multiplexing = config_->isMultiplexing();
 
-  for (const auto& resp : responses) {
-    if (!resp.success) {
-      continue;
-    }
+  std::string output;
+  Json::StringStreamer streamer(output);
+  {
+    auto root = streamer.makeRootMap();
+    root->addKey("jsonrpc");
+    root->addString("2.0");
+    root->addKey("id");
+    root->addString(request_id_);
+    root->addKey("result");
+    {
+      auto result_map = root->addMap();
+      result_map->addKey("tools");
+      {
+        auto tools_array = result_map->addArray();
 
-    nlohmann::json parsed_body;
-    try {
-      parsed_body = nlohmann::json::parse(resp.body);
-    } catch (const nlohmann::json::parse_error& e) {
-      ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name, e.what());
-      continue;
-    }
+        for (const auto& resp : responses) {
+          if (!resp.success) {
+            continue;
+          }
 
-    if (!parsed_body.contains("result") || !parsed_body["result"].is_object()) {
-      continue;
-    }
+          auto parsed_or = Json::Factory::loadFromString(resp.body);
+          if (!parsed_or.ok()) {
+            ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
+                      parsed_or.status().message());
+            continue;
+          }
 
-    const auto& result = parsed_body["result"];
-    if (!result.contains("tools") || !result["tools"].is_array()) {
-      continue;
-    }
+          Json::ObjectSharedPtr parsed_body = *parsed_or;
 
-    for (const auto& tool : result["tools"]) {
-      if (!tool.is_object() || !tool.contains("name") || !tool["name"].is_string()) {
-        continue;
-      }
+          auto result_or = parsed_body->getObject("result");
+          if (!result_or.ok() || !(*result_or)) {
+            continue;
+          }
 
-      const std::string& tool_name = tool["name"].get_ref<const std::string&>();
-      std::string prefixed_name =
-          is_multiplexing ? absl::StrCat(resp.backend_name, kNameDelimiter, tool_name) : tool_name;
+          auto tools_or = (*result_or)->getObjectArray("tools");
+          if (!tools_or.ok()) {
+            continue;
+          }
 
-      nlohmann::json tool_obj;
-      tool_obj["name"] = std::move(prefixed_name);
+          for (const auto& tool : *tools_or) {
+            if (!tool || !tool->isObject()) {
+              continue;
+            }
 
-      if (tool.contains("description") && tool["description"].is_string()) {
-        const std::string& desc = tool["description"].get_ref<const std::string&>();
-        if (!desc.empty()) {
-          tool_obj["description"] = desc;
+            auto name_or = tool->getString("name");
+            if (!name_or.ok()) {
+              continue;
+            }
+
+            auto tool_map = tools_array->addMap();
+            tool_map->addKey("name");
+            tool_map->addString(is_multiplexing
+                                    ? absl::StrCat(resp.backend_name, kNameDelimiter, *name_or)
+                                    : *name_or);
+
+            auto desc_or = tool->getString("description", "");
+            if (desc_or.ok() && !desc_or->empty()) {
+              tool_map->addKey("description");
+              tool_map->addString(*desc_or);
+            }
+
+            if (tool->hasObject("inputSchema")) {
+              tool_map->addKey("inputSchema");
+              auto schema_map = tool_map->addMap();
+              schema_map->addKey("type");
+              schema_map->addString("object");
+            }
+          }
         }
       }
-
-      if (tool.contains("inputSchema") && tool["inputSchema"].is_object()) {
-        tool_obj["inputSchema"] = {{"type", "object"}};
-      }
-
-      all_tools.push_back(std::move(tool_obj));
     }
   }
 
-  nlohmann::json final_response = {
-      {"jsonrpc", "2.0"}, {"id", request_id_}, {"result", {{"tools", std::move(all_tools)}}}};
-
-  return final_response.dump();
+  return output;
 }
 
 Http::RequestHeaderMapPtr
