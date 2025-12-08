@@ -120,7 +120,6 @@ private:
 
   void handleParseError(absl::string_view error_msg);
   Http::FilterDataStatus completeParsing();
-  const ParserConfig& getParserConfig() const;
 
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
@@ -129,7 +128,6 @@ private:
   std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
-  std::unique_ptr<Protobuf::Struct> metadata_;
 };
 
 } // namespace Mcp
