@@ -110,14 +110,6 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
-  // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
-    return Http::FilterHeadersStatus::Continue;
-  };
-  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
-    return Http::FilterDataStatus::Continue;
-  };
-
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
