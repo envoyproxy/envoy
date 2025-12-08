@@ -74,6 +74,7 @@ constexpr absl::string_view ResponseTrailerLatencyUsField = "response_trailer_la
 constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_call_status";
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
+constexpr absl::string_view GrpcStatusBeforeFirstCallField = "grpc_status_before_first_call";
 constexpr absl::string_view RequestHeaderProcessingEffectField = "request_header_processing_effect";
 constexpr absl::string_view ResponseHeaderProcessingEffectField =
     "response_header_processing_effect";
@@ -466,6 +467,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<double>(bytes_sent_));
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
+  (*struct_msg->mutable_fields())[GrpcStatusBeforeFirstCallField].set_number_value(
+      static_cast<double>(static_cast<int>(grpc_status_before_first_call_)));
   (*struct_msg->mutable_fields())[ResponseTrailerProcessingEffectField].set_number_value(
       static_cast<int>(encoding_processor_effects_.trailer_effect_));
   (*struct_msg->mutable_fields())[ResponseHeaderProcessingEffectField].set_number_value(
@@ -519,6 +522,7 @@ absl::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
   }
   parts.push_back(absl::StrCat("bs:", bytes_sent_));
   parts.push_back(absl::StrCat("br:", bytes_received_));
+  parts.push_back(absl::StrCat("os:", static_cast<int>(grpc_status_before_first_call_)));
 
   return absl::StrJoin(parts, ",");
 }
@@ -599,6 +603,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   }
   if (field_name == BytesReceivedField) {
     return static_cast<int64_t>(bytes_received_);
+  }
+  if (field_name == GrpcStatusBeforeFirstCallField) {
+    return static_cast<int64_t>(grpc_status_before_first_call_);
   }
   return {};
 }
@@ -1998,9 +2005,19 @@ void Filter::onMessageTimeout() {
   }
 }
 
+void Filter::recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status) {
+  if (!decoding_state_.getCallStartTime().has_value() &&
+      !encoding_state_.getCallStartTime().has_value()) {
+    if (loggingInfo() != nullptr) {
+      loggingInfo()->recordGrpcStatusBeforeFirstCall(call_status);
+    }
+  }
+}
+
 // Regardless of the current filter state, reset it to "IDLE", continue
 // the current callback, and reset timers. This is used in a few error-handling situations.
 void Filter::clearAsyncState(Grpc::Status::GrpcStatus call_status) {
+  recordGrpcStatusBeforeFirstCall(call_status);
   decoding_state_.clearAsyncState(call_status);
   encoding_state_.clearAsyncState(call_status);
 }
@@ -2008,6 +2025,7 @@ void Filter::clearAsyncState(Grpc::Status::GrpcStatus call_status) {
 // Regardless of the current state, ensure that the timers won't fire
 // again.
 void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
+  recordGrpcStatusBeforeFirstCall(call_status);
   decoding_state_.onFinishProcessorCall(call_status);
   encoding_state_.onFinishProcessorCall(call_status);
 }
