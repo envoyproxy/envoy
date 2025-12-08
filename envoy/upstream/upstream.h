@@ -732,6 +732,9 @@ public:
   COUNTER(upstream_flow_control_resumed_reading_total)                                             \
   COUNTER(upstream_internal_redirect_failed_total)                                                 \
   COUNTER(upstream_internal_redirect_succeeded_total)                                              \
+  COUNTER(upstream_orca_lb_success)                                                                \
+  COUNTER(upstream_orca_lb_error)                                                                  \
+  COUNTER(upstream_orca_lrs)                                                                       \
   COUNTER(upstream_rq_cancelled)                                                                   \
   COUNTER(upstream_rq_completed)                                                                   \
   COUNTER(upstream_rq_maintenance_mode)                                                            \

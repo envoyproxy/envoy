@@ -7614,6 +7614,8 @@ TEST_F(RouterTest, OrcaLoadReport) {
   EXPECT_EQ(load_metric_stats_map->at("cpu_utilization").num_requests_with_metric, 1);
   EXPECT_EQ(load_metric_stats_map->at("named_metrics.good").total_metric_value, 0.7);
   EXPECT_EQ(load_metric_stats_map->at("named_metrics.good").num_requests_with_metric, 1);
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->traffic_stats_->upstream_orca_lrs_.value());
 }
 
 TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
@@ -7702,6 +7704,12 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   // Verify that received load report is set in headers.
   EXPECT_EQ(received_orca_load_report.cpu_utilization(),
             headers_orca_load_report.cpu_utilization());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->traffic_stats_->upstream_orca_lb_success_.value());
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->traffic_stats_->upstream_orca_lb_error_.value());
 }
 
 TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
@@ -7742,6 +7750,12 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
       {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
   response_decoder->decodeTrailers(std::move(response_trailers));
   EXPECT_EQ(received_orca_load_report.named_metrics().at("good"), 0.7);
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->traffic_stats_->upstream_orca_lb_success_.value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->traffic_stats_->upstream_orca_lb_error_.value());
 }
 
 TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {

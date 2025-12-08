@@ -2415,6 +2415,7 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   if (cluster_->lrsReportMetricNames().has_value()) {
     ENVOY_STREAM_LOG(trace, "Adding ORCA load report {} to load metrics", *callbacks_,
                      orca_load_report->DebugString());
+    cluster_->trafficStats()->upstream_orca_lrs_.inc();
     Envoy::Orca::addOrcaLoadReportToLoadMetricStats(
         *cluster_->lrsReportMetricNames(), *orca_load_report, upstream_host->loadMetricStats());
   }
@@ -2427,6 +2428,9 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
       ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
                          "LB policy onOrcaLoadReport failed: {} for load report {}",
                          status.message(), orca_load_report->DebugString());
+      cluster_->trafficStats()->upstream_orca_lb_error_.inc();
+    } else {
+      cluster_->trafficStats()->upstream_orca_lb_success_.inc();
     }
   }
 }
