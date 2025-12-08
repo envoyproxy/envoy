@@ -1625,6 +1625,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_THAT(response->headers(), ContainsHeader("x-failure-reason", "testing"));
   EXPECT_THAT(response->headers(), ContainsHeader("content-type", "application/json"));
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.ext_proc.immediate_responses_sent")->value());
 }
 
 // Same as ExtProcIntegrationTest but with the helper function to configure ext_proc
@@ -2336,6 +2337,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
 
   // We should immediately have an error response now
   verifyDownstreamResponse(*response, 504);
+  EXPECT_EQ(1, test_server_->counter("http.config_test.ext_proc.immediate_responses_sent")->value());
 }
 
 TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
