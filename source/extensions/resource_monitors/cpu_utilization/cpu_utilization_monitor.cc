@@ -57,19 +57,10 @@ void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks&
   }
 
   // Debug logging
-  if (cpu_times.is_cgroup_v2) {
-    const double work_over_period = cpu_times.work_time - previous_cpu_times_.work_time;
-    const int64_t total_over_period = cpu_times.total_time - previous_cpu_times_.total_time;
-    ENVOY_LOG_MISC(trace, "cgroupsv2 current_utilization: {}", current_utilization);
-    ENVOY_LOG_MISC(trace, "cgroupsv2 work_over_period: {}", work_over_period);
-    ENVOY_LOG_MISC(trace, "cgroupsv2 total_over_period: {}", total_over_period);
-    ENVOY_LOG_MISC(trace, "cgroupsv2 effective_cores: {}", cpu_times.effective_cores);
-  } else {
-    ENVOY_LOG_MISC(trace, "cgroupsv1 current_utilization: {}", current_utilization);
-  }
-  ENVOY_LOG_MISC(trace, "Prev work={}, Cur work={}, Prev Total={}, Cur Total={}",
-                 previous_cpu_times_.work_time, cpu_times.work_time, previous_cpu_times_.total_time,
-                 cpu_times.total_time);
+  ENVOY_LOG_MISC(
+      trace, "CPU utilization: {}, work_time={}, total_time={}, effective_cores={} (cgroup v{})",
+      current_utilization, cpu_times.work_time, cpu_times.total_time, cpu_times.effective_cores,
+      cpu_times.is_cgroup_v2 ? 2 : 1);
 
   // The new utilization is calculated/smoothed using EWMA
   utilization_ = current_utilization * DAMPENING_ALPHA + (1 - DAMPENING_ALPHA) * utilization_;
