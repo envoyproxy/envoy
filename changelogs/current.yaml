@@ -273,5 +273,16 @@ new_features:
   change: |
     Added new ``US_RX_BODY_BEG`` time point to the ``%COMMON_DURATION%`` to indicate
     the time point of upstream response body receiving begin.
+- area: resource_monitors
+  change: |
+    Refactored and enhanced the CPU utilization resource monitor with improved cgroup v2 support.
+    The monitor now uses a factory pattern with ``CgroupV1CpuStatsReader`` and ``CgroupV2CpuStatsReader``
+    classes that implement a common ``LinuxContainerCpuStatsReader`` interface, automatically selecting
+    the appropriate reader based on available cgroup files at runtime. This follows the same design
+    pattern as the ``cgroups_memory`` resource monitor. Additionally, CPU utilization calculation
+    logic has been moved into the ``CpuTimes`` struct via a new ``calculateUtilization()`` method,
+    encapsulating cgroup v1 and v2 differences within the data structure itself. No configuration 
+    changes are required, and the behavior remains functionally equivalent to the previous 
+    implementation while being more robust and maintainabl    
 
 deprecated:
