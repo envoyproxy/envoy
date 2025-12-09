@@ -400,6 +400,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsSelectorType, TlsCertificateSelectorFactoryTe
                          testing::ValuesIn(testParams()), testParamsToString);
 
 TEST(TlsCertificateSelectorFactoryQuicTest, QUICFactory) {
+  TestTlsCertificateSelectorFactory provider_factory;
+  Registry::InjectFactory<Ssl::TlsCertificateSelectorConfigFactory> registered_factory(
+      provider_factory);
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
