@@ -273,6 +273,11 @@ new_features:
   change: |
     Added new ``US_RX_BODY_BEG`` time point to the ``%COMMON_DURATION%`` to indicate
     the time point of upstream response body receiving begin.
+- area: json_to_metadata
+  change: |
+    Added support for per-route configuration override in the ``json_to_metadata`` http filter. Routes can now
+    specify different JSON to metadata conversion rules via per-route configuration, allowing different routes
+    to extract different metadata from request or response bodies.
 - area: resource_monitors
   change: |
     Refactored and enhanced the CPU utilization resource monitor with improved cgroup v2 support.
