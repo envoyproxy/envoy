@@ -74,7 +74,7 @@ struct SupportedCommands {
    */
   static const absl::flat_hash_set<std::string>& ClusterScopeCommands() {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "script", "flushall", "flushdb",
-                           "slowlog", "config");
+                           "slowlog", "config", "info");
   }
 
   /**
@@ -155,9 +155,9 @@ struct SupportedCommands {
   static const std::string& scan() { CONSTRUCT_ON_FIRST_USE(std::string, "scan"); }
 
   /**
-   * @return info command
+   * @return info.shard command
    */
-  static const std::string& info() { CONSTRUCT_ON_FIRST_USE(std::string, "info"); }
+  static const std::string& infoShard() { CONSTRUCT_ON_FIRST_USE(std::string, "info.shard"); }
 
   /**
    * @return role command
