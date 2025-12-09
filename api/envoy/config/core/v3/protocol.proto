@@ -273,7 +273,7 @@ message AlternateProtocolsCacheOptions {
   repeated string canonical_suffixes = 5;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HttpProtocolOptions";
@@ -326,6 +326,17 @@ message HttpProtocolOptions {
   // if there are no active streams. See :ref:`drain_timeout
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
   google.protobuf.Duration max_connection_duration = 3;
+
+  // Percentage-based jitter for ``max_connection_duration``. The jitter increases the
+  // ``max_connection_duration`` by a random duration up to the provided percentage.
+  // This field is ignored if ``max_connection_duration`` is not set. If not set, no jitter
+  // is added.
+  //
+  // This helps prevent the "thundering herd" problem when many HTTP/2 connections hit their maximum
+  // duration simultaneously, causing synchronized connection draining and service disruptions.
+  // For example, with a max_connection_duration of 3600s (1 hour) and a jitter percentage of 10%,
+  // connections will be closed between 3600s and 3960s (1 hour to 1 hour 6 minutes).
+  type.v3.Percent max_connection_duration_jitter_percentage = 8;
 
   // The maximum number of headers (request headers if configured on HttpConnectionManager,
   // response headers when configured on a cluster).

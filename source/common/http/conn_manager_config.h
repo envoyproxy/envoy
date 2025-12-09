@@ -291,6 +291,13 @@ public:
   virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
 
   /**
+   * @return optional maximum connection duration timeout with jitter applied for manager
+   *         connections. Returns nullopt if max_connection_duration is not set.
+   */
+  virtual absl::optional<std::chrono::milliseconds>
+  calculateMaxConnectionDurationWithJitter() const PURE;
+
+  /**
    * @return whether maxConnectionDuration allows HTTP1 clients to choose when to close connection
    *         (rather than Envoy closing the connection itself when there are no active streams).
    */
