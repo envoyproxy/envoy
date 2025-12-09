@@ -431,9 +431,27 @@ new_features:
     <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces>` in the
     ext-authz network filter. This allows passing connection metadata (such as proxy protocol TLV data) to the
     external authorization server for making authorization decisions.
+- area: admin
+  change: |
+    Added :ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>` to admin
+    interface to restrict access to specific admin endpoints. When configured, only paths matching
+    the specified string matchers will be accessible. All other paths will return 403 Forbidden.
 - area: attributes
   change: |
     Added :ref:`attributes <arch_overview_attributes>` for looking up request or response header bytes.
+- area: json_to_metadata
+  change: |
+    Added support for per-route configuration override in the ``json_to_metadata`` http filter. Routes can now
+    specify different JSON to metadata conversion rules via per-route configuration, allowing different routes
+    to extract different metadata from request or response bodies.
+- area: proxy_protocol
+  change: |
+    Added :ref:`tlv_location <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.tlv_location>`
+    configuration field to control where proxy protocol TLV values are stored. When set to ``FILTER_STATE``, TLV values
+    are stored in a single filter state object with key ``envoy.network.proxy_protocol.tlv``, enabling HTTP filters to
+    access TLV values via FilterStateInput without requiring custom HTTP filters to copy metadata. Individual TLV values
+    can be accessed via field access: ``%FILTER_STATE(envoy.network.proxy_protocol.tlv:FIELD:key)%``. Defaults to
+    ``DYNAMIC_METADATA`` to maintain existing behavior.
 - area: ext_proc
   change: |
     Added new method processingEffects within Filter State. This mehtod returns the per HTTP event procesing_effects that occurred
