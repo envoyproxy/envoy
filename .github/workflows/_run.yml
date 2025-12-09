@@ -268,7 +268,8 @@ jobs:
           "ipv6": true,
           "fixed-cidr-v6": "2001:db8:1::/64"
           }' | sudo tee /etc/docker/daemon.json
-        sudo service docker restart
+        sudo systemctl restart docker
+        sudo systemctl reset-failed docker
       name: Configure Docker ipv6
       if: ${{ inputs.docker-ipv6 }}
 
@@ -300,7 +301,7 @@ jobs:
         key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
     - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@8b167c983b73a02bfc10ab289376a6178a064ec3
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@cc6799b581841d36da7eeb350e7272922046776e
       with:
         image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
