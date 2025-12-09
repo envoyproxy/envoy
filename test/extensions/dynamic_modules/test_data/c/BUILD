@@ -1,4 +1,4 @@
-load("//test/extensions/dynamic_modules/test_data/c:test_data.bzl", "test_program")
+load("//test/extensions/dynamic_modules/test_data/c:test_data.bzl", "cluster_test_program", "test_program")
 
 licenses(["notice"])  # Apache 2
 
@@ -50,4 +50,4 @@ test_program(name = "program_global")
 
 test_program(name = "program_child")
 
-test_program(name = "cluster_no_op")
+cluster_test_program(name = "cluster_no_op")

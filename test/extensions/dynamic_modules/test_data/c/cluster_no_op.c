@@ -4,13 +4,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/clusters/dynamic_modules/abi.h"
+#include "source/extensions/clusters/dynamic_modules/abi_version.h"
 #include "source/extensions/dynamic_modules/abi_version.h"
 
 // No-op cluster module for testing. This implements the minimum required cluster ABI functions
 // to verify the integration works correctly.
 
+// Base ABI version check (required by all modules).
 const char* envoy_dynamic_module_on_program_init() { return kAbiVersion; }
+
+// Cluster ABI version check (required by cluster modules).
+const char* envoy_dynamic_module_on_cluster_program_init() { return kClusterAbiVersion; }
 
 // Cluster config functions.
 envoy_dynamic_module_type_cluster_config_module_ptr envoy_dynamic_module_on_cluster_config_new(

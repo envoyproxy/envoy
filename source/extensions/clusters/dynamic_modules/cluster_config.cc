@@ -1,6 +1,7 @@
 #include "source/extensions/clusters/dynamic_modules/cluster_config.h"
 
 #include "source/common/config/utility.h"
+#include "source/extensions/clusters/dynamic_modules/abi_version.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,6 +32,23 @@ newDynamicModuleClusterConfig(const absl::string_view cluster_name,
                               Server::Configuration::ServerFactoryContext& context) {
   auto config = std::make_shared<DynamicModuleClusterConfig>(cluster_name, cluster_config,
                                                              std::move(dynamic_module), context);
+
+  // Verify the cluster ABI version.
+  auto on_cluster_program_init =
+      config->dynamic_module_
+          ->getFunctionPointer<decltype(&envoy_dynamic_module_on_cluster_program_init)>(
+              "envoy_dynamic_module_on_cluster_program_init");
+  RETURN_IF_NOT_OK_REF(on_cluster_program_init.status());
+
+  const char* cluster_abi_version = (*on_cluster_program_init.value())();
+  if (cluster_abi_version == nullptr) {
+    return absl::InvalidArgumentError("Cluster module returned null ABI version");
+  }
+  if (absl::string_view(cluster_abi_version) != absl::string_view(kClusterAbiVersion)) {
+    return absl::InvalidArgumentError(absl::StrCat("Cluster ABI version mismatch: got ",
+                                                   cluster_abi_version, ", but expected ",
+                                                   kClusterAbiVersion));
+  }
 
   // Resolve the function pointers from the dynamic module.
   auto on_cluster_config_new =

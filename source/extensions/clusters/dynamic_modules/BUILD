@@ -10,10 +10,22 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "cluster_abi_version_lib",
+    hdrs = [
+        "abi.h",
+        "abi_version.h",
+    ],
+    deps = [
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_config_lib",
     srcs = ["cluster_config.cc"],
     hdrs = ["cluster_config.h"],
     deps = [
+        ":cluster_abi_version_lib",
         "//envoy/server:factory_context_interface",
         "//source/common/config:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",

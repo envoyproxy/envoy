@@ -12,6 +12,22 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "abi_version_test",
+    srcs = ["abi_version_test.cc"],
+    data = [
+        "//source/extensions/clusters/dynamic_modules:abi.h",
+    ],
+    extension_names = ["envoy.clusters.dynamic_modules"],
+    deps = [
+        "//source/common/common:hex_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/extensions/clusters/dynamic_modules:cluster_abi_version_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     data = [

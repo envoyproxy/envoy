@@ -11,7 +11,6 @@ envoy_extension_package()
 envoy_cc_library(
     name = "dynamic_modules_lib",
     srcs = [
-        "abi_cluster_stubs.cc",
         "dynamic_modules.cc",
     ],
     hdrs = [

@@ -3516,6 +3516,13 @@ macro_rules! declare_cluster_init_functions {
         ::std::ptr::null()
       }
     }
+
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_cluster_program_init() -> *const ::std::os::raw::c_char
+    {
+      envoy_proxy_dynamic_modules_rust_sdk::abi::kClusterAbiVersion.as_ptr()
+        as *const ::std::os::raw::c_char
+    }
   };
 }
 

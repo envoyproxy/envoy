@@ -2,7 +2,7 @@
 
 #include "envoy/server/factory_context.h"
 
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/clusters/dynamic_modules/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {
