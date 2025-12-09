@@ -18,6 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Allows detecting whether the transport appears to be TLS or plaintext.
 // [#extension: envoy.filters.listener.tls_inspector]
 
+// [#next-free-field: 6]
 message TlsInspector {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.listener.tls_inspector.v2.TlsInspector";
@@ -48,4 +49,11 @@ message TlsInspector {
   // counter to be incremented if the ClientHello message is over implementation defined limit
   // (currently 16Kb).
   bool close_connection_on_client_hello_parsing_errors = 4;
+
+  // The maximum size in bytes of the ClientHello that the tls_inspector will
+  // process. If the ClientHello is larger than this size, the tls_inspector
+  // will stop processing and indicate failure. If not defined, defaults to
+  // 16KiB.
+  google.protobuf.UInt32Value max_client_hello_size = 5
+      [(validate.rules).uint32 = {lte: 16384 gt: 255}];
 }
