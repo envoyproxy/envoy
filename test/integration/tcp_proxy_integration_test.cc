@@ -1633,6 +1633,54 @@ TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 }
 
+// Test that ON_DOWNSTREAM_TLS_HANDSHAKE mode works correctly with TLS termination.
+// This test validates that the TLS handshake can complete before establishing
+// the upstream connection, without requiring max_early_data_bytes.
+TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeMode) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    // Set ON_DOWNSTREAM_TLS_HANDSHAKE mode without max_early_data_bytes.
+    tcp_proxy_config.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  setupConnections(); // This performs TLS handshake - would timeout/fail without fix
+  sendAndReceiveTlsData("hello", "world");
+}
+
+// Test that ON_DOWNSTREAM_TLS_HANDSHAKE with max_early_data_bytes works correctly with TLS termination
+TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    // Set ON_DOWNSTREAM_TLS_HANDSHAKE mode with max_early_data_bytes.
+    tcp_proxy_config.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    tcp_proxy_config.mutable_max_early_data_bytes()->set_value(16384);
+
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  setupConnections();
+  sendAndReceiveTlsData("hello", "world");
+}
+
 // Integration test a Mysql upstream, where the upstream sends data immediately
 // after a connection is established.
 class FakeMysqlUpstream : public FakeUpstream {

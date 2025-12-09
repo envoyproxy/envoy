@@ -457,7 +457,10 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
     }
   }
 
-  if (!receive_before_connect_) {
+  // Disable reads if we're not buffering early data AND not waiting for TLS handshake.
+  // If waiting for TLS handshake, we must NOT disable reads because the handshake
+  // needs to read data from the client. Reads will be disabled after handshake completes.
+  if (!receive_before_connect_ && !waiting_for_tls_handshake_) {
     // Need to disable reads so that we don't write to an upstream that might fail
     // in onData(). This will get re-enabled when the upstream connection is
     // established.
@@ -1380,6 +1383,11 @@ void Filter::onDownstreamTlsHandshakeComplete() {
 
   // For ON_DOWNSTREAM_TLS_HANDSHAKE mode, establish the upstream connection now.
   if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_TLS_HANDSHAKE) {
+    // Now that handshake is complete, disable reads until upstream is ready
+    // (if not using receive_before_connect mode which handles buffering).
+    if (!receive_before_connect_) {
+      read_callbacks_->connection().readDisable(true);
+    }
     // Route should already be set in onNewConnection().
     ASSERT(route_ != nullptr);
     establishUpstreamConnection();
