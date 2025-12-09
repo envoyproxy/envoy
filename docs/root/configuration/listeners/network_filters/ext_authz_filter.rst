@@ -118,6 +118,59 @@ The TLS alert is only sent when:
 
 For non-TLS connections, the connection is closed without sending an alert.
 
+.. _config_network_filters_ext_authz_tcp_proxy:
+
+Usage with TCP Proxy
+--------------------
+
+When using the External Authorization network filter with the :ref:`TCP proxy <config_network_filters_tcp_proxy>`
+filter, the default behavior establishes upstream connections immediately when a downstream connection is accepted.
+This means the upstream connection may be established before authorization completes.
+
+To ensure upstream connections are only established after authorization succeeds, configure the
+TCP proxy filter to delay upstream connection establishment using
+:ref:`upstream_connect_mode <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`.
+
+Example configuration:
+
+.. code-block:: yaml
+
+  filter_chains:
+  - filters:
+    - name: envoy.filters.network.ext_authz
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz
+        stat_prefix: ext_authz
+        grpc_service:
+          envoy_grpc:
+            cluster_name: ext-authz
+        include_peer_certificate: true
+    - name: envoy.filters.network.tcp_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+        stat_prefix: tcp
+        cluster: backend
+        upstream_connect_mode: ON_DOWNSTREAM_DATA
+        max_early_data_bytes: 8192
+
+In this configuration:
+
+* ``upstream_connect_mode: ON_DOWNSTREAM_DATA`` delays the upstream connection until data is received
+  from the downstream client.
+* The External Authorization check happens when data arrives, before the TCP proxy establishes the
+  upstream connection.
+* If authorization is denied, the connection is closed without ever connecting to the upstream.
+
+Alternatively, use ``ON_DOWNSTREAM_TLS_HANDSHAKE`` to wait for the TLS handshake to complete, which
+provides access to client certificates when using :ref:`include_peer_certificate
+<envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.include_peer_certificate>`.
+
+.. attention::
+
+  The ``ON_DOWNSTREAM_DATA`` mode is not suitable for server-first protocols where the server sends
+  the initial greeting (e.g., SMTP, MySQL, POP3). For such protocols, use the default ``IMMEDIATE``
+  mode and accept that upstream connections may be established before authorization completes.
+
 Metadata Context
 ----------------
 

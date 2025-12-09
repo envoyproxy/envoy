@@ -2310,7 +2310,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeId(id) = id;
     let res = unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_increase_gauge(self.raw_ptr, id, value)
+      abi::envoy_dynamic_module_callback_http_filter_increment_gauge(self.raw_ptr, id, value)
     };
     if res == envoy_dynamic_module_type_metrics_result::Success {
       Ok(())
@@ -2327,7 +2327,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
     let res = unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
+      abi::envoy_dynamic_module_callback_http_filter_increment_gauge_vec(
         self.raw_ptr,
         id,
         labels.as_ptr() as *const _ as *mut _,
@@ -2349,7 +2349,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeId(id) = id;
     let res = unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_decrease_gauge(self.raw_ptr, id, value)
+      abi::envoy_dynamic_module_callback_http_filter_decrement_gauge(self.raw_ptr, id, value)
     };
     if res == envoy_dynamic_module_type_metrics_result::Success {
       Ok(())
@@ -2366,7 +2366,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
     let res = unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
+      abi::envoy_dynamic_module_callback_http_filter_decrement_gauge_vec(
         self.raw_ptr,
         id,
         labels.as_ptr() as *const _ as *mut _,
