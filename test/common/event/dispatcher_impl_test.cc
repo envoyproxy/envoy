@@ -57,6 +57,11 @@ protected:
   SchedulableCallbackImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
+  ~SchedulableCallbackImplTest() override {
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
+  }
+
   void createCallback(std::function<void()> cb) {
     callbacks_.emplace_back(dispatcher_->createSchedulableCallback(cb));
   }
@@ -262,6 +267,9 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 
   EXPECT_CALL(callback3, Call);
   dispatcher->clearDeferredDeleteList();
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 TEST(DeferredTaskTest, DeferredTask) {
@@ -282,6 +290,9 @@ TEST(DeferredTaskTest, DeferredTask) {
   EXPECT_CALL(callback2, Call);
   EXPECT_CALL(callback3, Call);
   dispatcher->clearDeferredDeleteList();
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 TEST(DeferredDeleteTest, DeferredDeleteAndPostOrdering) {
@@ -299,6 +310,9 @@ TEST(DeferredDeleteTest, DeferredDeleteAndPostOrdering) {
   dispatcher->deferredDelete(
       std::make_unique<TestDeferredDeletable>(delete_callback.AsStdFunction()));
   dispatcher->run(Dispatcher::RunType::NonBlock);
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 class DispatcherImplTest : public testing::Test {
@@ -504,6 +518,9 @@ TEST(DispatcherThreadDeletedImplTest, DispatcherThreadDeletedAtNextCycle) {
   EXPECT_CALL(callbacks[1], Call);
   EXPECT_CALL(callbacks[2], Call);
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 class DispatcherShutdownTest : public testing::Test {
@@ -522,6 +539,23 @@ TEST_F(DispatcherShutdownTest, ShutdownClearThreadLocalDeletables) {
       std::make_unique<TestDispatcherThreadDeletable>(callback.AsStdFunction()));
   EXPECT_CALL(callback, Call);
   dispatcher_->shutdown();
+}
+
+TEST_F(DispatcherShutdownTest, ShutdownCalledTwiceTriggersEnvoyBug) {
+  // First shutdown should succeed.
+  dispatcher_->shutdown();
+  // Second shutdown should trigger ENVOY_BUG but not crash.
+  EXPECT_ENVOY_BUG(dispatcher_->shutdown(), "shutdown() called multiple times");
+}
+
+TEST(DispatcherDestructorTest, DestructorWithoutShutdownTriggersEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        Api::ApiPtr api = Api::createApiForTest();
+        DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+        // Dispatcher goes out of scope without shutdown() - triggers ENVOY_BUG.
+      },
+      "destroyed without calling shutdown()");
 }
 
 TEST_F(DispatcherShutdownTest, ShutdownClearsDeferredAndThreadLocalButNotPost) {
@@ -981,12 +1015,20 @@ TEST_F(DispatcherImplTest, OnlyRunsFatalActionsIfRunningOnSameThread) {
   }
 
   EXPECT_EQ(action->getNumTimesRan(), 1);
+
+  // Must call shutdown() on the non-running dispatcher before it goes out of scope.
+  non_running_dispatcher->shutdown();
 }
 
 class NotStartedDispatcherImplTest : public testing::Test {
 protected:
   NotStartedDispatcherImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  ~NotStartedDispatcherImplTest() override {
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
+  }
 
   Api::ApiPtr api_;
   DispatcherPtr dispatcher_;
@@ -1004,7 +1046,10 @@ protected:
     dispatcher_ = api_->allocateDispatcher("test_thread");
     dispatcher_->initializeStats(scope_);
   }
-  ~DispatcherMonotonicTimeTest() override = default;
+  ~DispatcherMonotonicTimeTest() override {
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
+  }
 
   NiceMock<Stats::MockStore> store_; // Used in InitializeStats, must outlive dispatcher_->exit().
   Stats::Scope& scope_{*store_.rootScope()};
@@ -1056,7 +1101,11 @@ protected:
     evwatch_prepare_new(&libevent_base_, callPrepareCallback, &prepare_callback_);
     evwatch_check_new(&libevent_base_, onCheck, this);
   }
-  ~TimerImplTest() override { ASSERT(check_callbacks_.empty()); }
+  ~TimerImplTest() override {
+    ASSERT(check_callbacks_.empty());
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
+  }
 
   // Run a callback inside the event loop. The libevent monotonic time used for timer registration
   // is frozen while within this callback, so timers enabled within this callback end up with the
@@ -1525,6 +1574,9 @@ TEST_F(TimerImplTimingTest, TheoreticalTimerTiming) {
                   .count(),
               timing);
   }
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 class TimerUtilsTest : public testing::Test {
@@ -1582,6 +1634,9 @@ TEST(DispatcherWithScaledTimerFactoryTest, CreatesScaledTimerManager) {
 
   DispatcherPtr dispatcher =
       api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithMinimum) {
@@ -1597,6 +1652,9 @@ TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithMinimum) {
 
   EXPECT_CALL(*manager, createTimer_(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), _));
   dispatcher->createScaledTimer(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), []() {});
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithTimerType) {
@@ -1612,6 +1670,9 @@ TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithTimerType) {
 
   EXPECT_CALL(*manager, createTypedTimer_(ScaledTimerType::UnscaledRealTimerForTest, _));
   dispatcher->createScaledTimer(ScaledTimerType::UnscaledRealTimerForTest, []() {});
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 class DispatcherWithWatchdogTest : public testing::Test {
@@ -1621,6 +1682,11 @@ protected:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         os_sys_calls_(Api::OsSysCallsSingleton::get()) {
     dispatcher_->registerWatchdog(watchdog_, min_touch_interval_);
+  }
+
+  ~DispatcherWithWatchdogTest() override {
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -1722,6 +1788,11 @@ class DispatcherConnectionTest : public testing::Test {
 protected:
   DispatcherConnectionTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  ~DispatcherConnectionTest() override {
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
+  }
 
   Api::ApiPtr api_;
   DispatcherPtr dispatcher_;

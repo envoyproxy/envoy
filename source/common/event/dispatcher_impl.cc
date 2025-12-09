@@ -87,13 +87,11 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
 DispatcherImpl::~DispatcherImpl() {
   ENVOY_LOG(debug, "destroying dispatcher {}", name_);
   FatalErrorHandler::removeFatalErrorHandler(*this);
-  // shutdown() should be called before destruction to properly clean up all lists.
-  if (!shutdown_called_) {
-    ENVOY_LOG(warn,
-              "Dispatcher {} destroyed without calling shutdown(). This may lead to "
-              "non-deterministic cleanup order and memory leaks.",
-              name_);
-  }
+  // shutdown() must be called before destruction to properly clean up all lists.
+  ENVOY_BUG(shutdown_called_,
+            fmt::format("Dispatcher {} destroyed without calling shutdown(). This may lead to "
+                        "non-deterministic cleanup order and memory leaks.",
+                        name_));
 }
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
@@ -279,21 +277,20 @@ void DispatcherImpl::post(PostCb callback) {
 }
 
 void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) {
-  bool need_schedule;
-  bool is_shutting_down;
+  bool need_schedule = false;
   {
     Thread::LockGuard lock(thread_local_deletable_lock_);
-    is_shutting_down = shutdown_called_;
-    if (!is_shutting_down) {
+    if (!shutdown_called_) {
       need_schedule = deletables_in_dispatcher_thread_.empty();
       deletables_in_dispatcher_thread_.emplace_back(std::move(deletable));
     }
-    // If shutdown has been called, discard the item. This can happen when destructors of objects
-    // being cleaned up during shutdown try to add more items. We silently discard them because
-    // shutdown is already in progress and will complete cleanup.
+    // If shutdown has been called, the deletable unique_ptr will be destroyed when this function
+    // returns, running its destructor immediately. This is not a leak! The object is cleaned up,
+    // just immediately rather than deferred. This can happen when destructors of objects being
+    // cleaned up during shutdown try to add more items.
   }
 
-  if (!is_shutting_down && need_schedule) {
+  if (need_schedule) {
     thread_local_delete_cb_->scheduleCallbackCurrentIteration();
   }
 }
@@ -315,10 +312,11 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
 void DispatcherImpl::shutdown() {
   ASSERT(isThreadSafe());
 
-  // Make shutdown() idempotent - if already called, just return. This handles cases where
-  // shutdown() might be called multiple times (e.g., explicitly and from destructor).
+  // shutdown() should only be called once. If called multiple times, it indicates a bug in the
+  // calling code.
+  ENVOY_BUG(!shutdown_called_,
+            fmt::format("Dispatcher {} shutdown() called multiple times.", name_));
   if (shutdown_called_) {
-    ENVOY_LOG(debug, "Dispatcher {} shutdown() called multiple times, ignoring", name_);
     return;
   }
   shutdown_called_ = true;
@@ -343,8 +341,9 @@ void DispatcherImpl::shutdown() {
     has_pending_work = false;
 
     // Clean deferred delete list.
-    if (current_to_delete_->size() > 0) {
-      total_deferred_deleted += current_to_delete_->size();
+    const auto deferred_size = current_to_delete_->size();
+    if (deferred_size > 0) {
+      total_deferred_deleted += deferred_size;
       clearDeferredDeleteList();
       has_pending_work = true;
     }
@@ -354,8 +353,9 @@ void DispatcherImpl::shutdown() {
     // We only need to prevent new callbacks from being added (via shutdown_called_ check).
     {
       Thread::LockGuard lock(post_lock_);
-      if (!post_callbacks_.empty()) {
-        total_post_callbacks += post_callbacks_.size();
+      const auto post_size = post_callbacks_.size();
+      if (post_size > 0) {
+        total_post_callbacks += post_size;
         post_callbacks_.clear();
         has_pending_work = true;
       }
@@ -365,10 +365,9 @@ void DispatcherImpl::shutdown() {
     bool has_thread_local_deletables = false;
     {
       Thread::LockGuard lock(thread_local_deletable_lock_);
-      has_thread_local_deletables = !deletables_in_dispatcher_thread_.empty();
-      if (has_thread_local_deletables) {
-        total_thread_local_deleted += deletables_in_dispatcher_thread_.size();
-      }
+      const auto thread_local_size = deletables_in_dispatcher_thread_.size();
+      has_thread_local_deletables = thread_local_size > 0;
+      total_thread_local_deleted += thread_local_size;
     }
     if (has_thread_local_deletables) {
       runThreadLocalDelete();
@@ -389,12 +388,12 @@ void DispatcherImpl::shutdown() {
       Thread::LockGuard lock(thread_local_deletable_lock_);
       remaining_thread_local_deletables = deletables_in_dispatcher_thread_.size();
     }
-    ENVOY_LOG(critical,
-              "Dispatcher {} shutdown reached maximum iterations ({}). This may indicate a cleanup "
-              "loop. Remaining: {} deferred deletables, {} post callbacks, {} thread local "
-              "deletables.",
-              name_, kMaxIterations, current_to_delete_->size(), remaining_post_callbacks,
-              remaining_thread_local_deletables);
+    ENVOY_BUG(false,
+              fmt::format("Dispatcher {} shutdown reached maximum iterations ({}). This may "
+                          "indicate a cleanup loop. Remaining: {} deferred deletables, {} post "
+                          "callbacks, {} thread local deletables.",
+                          name_, kMaxIterations, current_to_delete_->size(),
+                          remaining_post_callbacks, remaining_thread_local_deletables));
   }
 
   ENVOY_LOG(debug,
