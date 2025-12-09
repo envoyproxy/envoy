@@ -270,7 +270,7 @@ jobs:
           }' | sudo tee /etc/docker/daemon.json
         sudo systemctl restart docker
         # workaround systemd rubbish
-        ip link delete docker0 2>/dev/null || true
+        ip link delete docker0 2>/dev/null || :
       name: Configure Docker ipv6
       if: ${{ inputs.docker-ipv6 }}
 
