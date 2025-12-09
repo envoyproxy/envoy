@@ -1664,7 +1664,8 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
         break;
       }
       if (decoding_state_.bodyMode() == ProcessingMode::NONE && decoding_state_.sendTrailers()) {
-        if (decoding_state_.completeBodyAvailable() && (decoding_state_.responseTrailers() == nullptr)) {
+        if (decoding_state_.completeBodyAvailable() &&
+            (decoding_state_.responseTrailers() == nullptr)) {
           last_response = true;
           break;
         }
@@ -1704,7 +1705,8 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
       break;
     }
     if (encoding_state_.bodyMode() == ProcessingMode::NONE && encoding_state_.sendTrailers()) {
-      if (encoding_state_.completeBodyAvailable() && (encoding_state_.responseTrailers() == nullptr)) {
+      if (encoding_state_.completeBodyAvailable() &&
+          (encoding_state_.responseTrailers() == nullptr)) {
         last_response = true;
         break;
       }
