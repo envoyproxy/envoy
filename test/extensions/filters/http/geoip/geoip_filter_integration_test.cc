@@ -427,15 +427,20 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataNotPopulatedWhenIpAddressHeaderInvalid
                                                  {":scheme", "http"},
                                                  {":authority", "host"},
                                                  {"x-real-ip", "not-a-valid-ip"}};
-  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-  // Localhost IP is not in the database, so no geo headers should be populated.
-  ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-city")).empty());
-  ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-region")).empty());
-  ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-country")).empty());
-  ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-asn")).empty());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  EXPECT_LOG_CONTAINS(
+      "debug", "Geoip filter: failed to parse IP address from header 'x-real-ip': 'not-a-valid-ip'",
+      {
+        auto response =
+            sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+        // Localhost IP is not in the database, so no geo headers should be populated.
+        ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-city")).empty());
+        ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-region")).empty());
+        ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-country")).empty());
+        ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-asn")).empty());
+        ASSERT_TRUE(response->complete());
+        EXPECT_EQ("200", response->headers().getStatusValue());
+        test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+      });
 }
 
 } // namespace

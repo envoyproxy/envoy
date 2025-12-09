@@ -27,9 +27,9 @@ public:
   uint32_t xffNumTrustedHops() const { return xff_num_trusted_hops_; }
 
   // Returns true if a custom header should be used to extract the IP address.
-  bool useIpAddressHeader() const { return !ip_address_header_.get().empty(); }
+  bool useIpAddressHeader() const { return ip_address_header_.has_value(); }
   // Returns the header name to use for extracting the IP address.
-  const Http::LowerCaseString& ipAddressHeader() const { return ip_address_header_; }
+  const Http::LowerCaseString& ipAddressHeader() const { return ip_address_header_.value(); }
 
 private:
   void incCounter(Stats::StatName name);
@@ -40,7 +40,7 @@ private:
   const Stats::StatName unknown_hit_;
   bool use_xff_;
   const uint32_t xff_num_trusted_hops_;
-  const Http::LowerCaseString ip_address_header_;
+  absl::optional<Http::LowerCaseString> ip_address_header_;
 };
 
 using GeoipFilterConfigSharedPtr = std::shared_ptr<GeoipFilterConfig>;

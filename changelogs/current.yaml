@@ -426,7 +426,7 @@ new_features:
 - area: geoip
   change: |
     Added :ref:`custom_header_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.custom_header_config>`
-    to allow extracting the client IP address from a custom request header instead of using the
+    to allow extracting the client IP address from a custom request header which can be used instead of
     ``x-forwarded-for`` header or downstream connection source address.
 - area: ext_authz
   change: |

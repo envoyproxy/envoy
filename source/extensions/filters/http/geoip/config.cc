@@ -12,7 +12,6 @@ namespace HttpFilters {
 namespace Geoip {
 
 namespace {
-// Validates the GeoIP filter configuration.
 absl::Status validateConfig(const envoy::extensions::filters::http::geoip::v3::Geoip& config) {
   // xff_config and custom_header_config are mutually exclusive.
   if (config.has_xff_config() && config.has_custom_header_config()) {
