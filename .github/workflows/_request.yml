@@ -67,7 +67,7 @@ jobs:
       name: Checkout Envoy repository (requested)
       with:
         pr: ${{ github.event.number }}
-        branch: ${{ github.ref_name }}
+        branch: ${{ github.base_ref || github.ref_name }}
         config: |
           fetch-depth: ${{ startsWith(github.event_name, 'pull_request') && 1 || 2 }}
           path: requested
