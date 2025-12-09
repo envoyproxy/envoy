@@ -458,6 +458,7 @@ message Admin {
   bool ignore_global_conn_limit = 6;
 
   // List of admin paths that are accessible. If not specified, all admin endpoints are accessible.
+  //
   // When specified, only paths in this list will be accessible, all others will return 403 Forbidden.
   //
   // Example:
