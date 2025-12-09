@@ -11,7 +11,11 @@
 #include <string>
 #include <thread>
 
+#include "envoy/common/exception.h"
+
+#include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
 
 #include "absl/strings/str_split.h"
 
@@ -40,20 +44,24 @@ void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks&
     callbacks.onFailure(error);
     return;
   }
-  const double work_over_period = cpu_times.work_time - previous_cpu_times_.work_time;
-  const int64_t total_over_period = cpu_times.total_time - previous_cpu_times_.total_time;
-  if (work_over_period < 0 || total_over_period <= 0) {
-    const auto& error = EnvoyException(
-        fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
-                    "be a negative number and total_over_period='{}' must be a positive number.",
-                    work_over_period, total_over_period));
-    callbacks.onFailure(error);
+
+  // Calculate utilization (encapsulates cgroup v1 vs v2 differences and validation)
+  double current_utilization;
+  TRY_ASSERT_MAIN_THREAD {
+    current_utilization = cpu_times.calculateUtilization(previous_cpu_times_);
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
+    callbacks.onFailure(e);
     return;
   }
-  const double current_utilization = work_over_period / total_over_period;
-  ENVOY_LOG_MISC(trace, "Prev work={}, Cur work={}, Prev Total={}, Cur Total={}",
-                 previous_cpu_times_.work_time, cpu_times.work_time, previous_cpu_times_.total_time,
-                 cpu_times.total_time);
+
+  // Debug logging
+  ENVOY_LOG_MISC(
+      trace, "CPU utilization: {}, work_time={}, total_time={}, effective_cores={} (cgroup v{})",
+      current_utilization, cpu_times.work_time, cpu_times.total_time, cpu_times.effective_cores,
+      cpu_times.is_cgroup_v2 ? 2 : 1);
+
   // The new utilization is calculated/smoothed using EWMA
   utilization_ = current_utilization * DAMPENING_ALPHA + (1 - DAMPENING_ALPHA) * utilization_;
 

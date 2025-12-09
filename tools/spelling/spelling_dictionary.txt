@@ -1616,3 +1616,17 @@ NXDOMAIN
 DNAT
 RSP
 EWMA
+hotplug
+cgroup
+cgroupv1
+cgroupv2
+cgroupsv1
+cgroupsv2
+usage_usec
+usec
+nsec
+millicores
+cpuacct
+cpuacct.usage
+effective_cpus
+cpus
