@@ -96,6 +96,17 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
           return client_context_impl->newSessionKey(session);
         });
   }
+
+  if (auto factory = config.tlsCertificateSelectorFactory(); factory) {
+    tls_certificate_selector_ = factory(*this);
+    SSL_CTX_set_cert_cb(
+        tls_contexts_[0].ssl_ctx_.get(),
+        [](SSL* ssl, void*) -> int {
+          return static_cast<ClientContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)))
+              ->selectTlsContext(ssl);
+        },
+        nullptr);
+  }
 }
 
 absl::StatusOr<bssl::UniquePtr<SSL>>
@@ -201,6 +212,67 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
   // Add new session key at the front of the queue, so that it's used first.
   session_keys_.push_front(bssl::UniquePtr<SSL_SESSION>(session));
   return 1; // Tell BoringSSL that we took ownership of the session.
+}
+
+// This callback should return 1 on success, 0 on internal error, and negative number
+// on failure or pause a handshake.
+int ClientContextImpl::selectTlsContext(SSL* ssl) {
+  ASSERT(tls_certificate_selector_ != nullptr);
+
+  auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+      SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+
+  auto selection_result = extended_socket_info->certificateSelectionResult();
+  switch (selection_result) {
+  case Ssl::CertificateSelectionStatus::NotStarted:
+    // continue
+    break;
+
+  case Ssl::CertificateSelectionStatus::Pending:
+    ENVOY_LOG(trace, "already waiting certificate");
+    return -1;
+
+  case Ssl::CertificateSelectionStatus::Successful:
+    ENVOY_LOG(trace, "wait certificate success");
+    return 1;
+
+  default:
+    ENVOY_LOG(trace, "wait certificate failed");
+    return 0;
+  }
+
+  ENVOY_LOG(trace, "upstream TLS context selection result: {}, before selectTlsContext",
+            static_cast<int>(selection_result));
+  auto transport_socket_options_shared_ptr_ptr =
+      static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(SSL_get_app_data(ssl));
+  ASSERT(transport_socket_options_shared_ptr_ptr);
+
+  const auto result = tls_certificate_selector_->selectTlsContext(
+      *ssl, *transport_socket_options_shared_ptr_ptr,
+      extended_socket_info->createCertificateSelectionCallback());
+
+  ENVOY_LOG(trace,
+            "upstream TLS context selection result: {}, after selectTlsContext, selection result "
+            "status: {}",
+            static_cast<int>(extended_socket_info->certificateSelectionResult()),
+            static_cast<int>(result.status));
+  ASSERT(extended_socket_info->certificateSelectionResult() ==
+             Ssl::CertificateSelectionStatus::Pending,
+         "invalid selection result");
+
+  switch (result.status) {
+  case Ssl::SelectionResult::SelectionStatus::Success:
+    extended_socket_info->onCertificateSelectionCompleted(*result.selected_ctx, result.staple,
+                                                          false);
+    return 1;
+  case Ssl::SelectionResult::SelectionStatus::Pending:
+    return -1;
+  case Ssl::SelectionResult::SelectionStatus::Failed:
+    extended_socket_info->onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext>(), false,
+                                                          false);
+    return 0;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Tls

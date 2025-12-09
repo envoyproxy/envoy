@@ -422,12 +422,28 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     creation_status = absl::InvalidArgumentError("SNI names containing NULL-byte are not allowed");
     return;
   }
+
   // TODO(PiotrSikora): Support multiple TLS certificates.
   if ((config.common_tls_context().tls_certificates().size() +
-       config.common_tls_context().tls_certificate_sds_secret_configs().size()) > 1) {
+       config.common_tls_context().tls_certificate_sds_secret_configs().size()) > 1 &&
+      !config.common_tls_context().has_custom_tls_certificate_selector()) {
     creation_status = absl::InvalidArgumentError(
         "Multiple TLS certificates are not supported for client contexts");
     return;
+  }
+
+  if (config.common_tls_context().has_custom_tls_certificate_selector()) {
+    const auto& provider_config = config.common_tls_context().custom_tls_certificate_selector();
+    Ssl::UpstreamTlsCertificateSelectorConfigFactory& provider_factory =
+        Config::Utility::getAndCheckFactory<Ssl::UpstreamTlsCertificateSelectorConfigFactory>(
+            provider_config);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        provider_config.typed_config(), factory_context.messageValidationVisitor(),
+        provider_factory);
+    auto selector_factory =
+        provider_factory.createTlsCertificateSelectorFactory(*message, factory_context, *this);
+    SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
+    tls_certificate_selector_factory_ = *std::move(selector_factory);
   }
 }
 

@@ -17,6 +17,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 class CommonFactoryContext;
+class GenericFactoryContext;
 } // namespace Configuration
 } // namespace Server
 
@@ -272,6 +273,35 @@ public:
                                       absl::Status& creation_status, bool for_quic) PURE;
 
   std::string category() const override { return "envoy.tls.certificate_selectors"; }
+};
+
+class UpstreamTlsCertificateSelector {
+public:
+  virtual ~UpstreamTlsCertificateSelector() = default;
+
+  /**
+   * Select TLS context.
+   */
+  virtual SelectionResult
+  selectTlsContext(const SSL& ssl, const Network::TransportSocketOptionsConstSharedPtr& options,
+                   CertificateSelectionCallbackPtr cb) PURE;
+};
+
+using UpstreamTlsCertificateSelectorPtr = std::unique_ptr<UpstreamTlsCertificateSelector>;
+
+using UpstreamTlsCertificateSelectorFactory =
+    std::function<UpstreamTlsCertificateSelectorPtr(TlsCertificateSelectorContext&)>;
+
+class UpstreamTlsCertificateSelectorConfigFactory : public Config::TypedFactory {
+public:
+  /**
+   */
+  virtual absl::StatusOr<UpstreamTlsCertificateSelectorFactory>
+  createTlsCertificateSelectorFactory(const Protobuf::Message& config,
+                                      Server::Configuration::GenericFactoryContext& factory_context,
+                                      const ClientContextConfig& tls_context) PURE;
+
+  std::string category() const override { return "envoy.tls.upstream_certificate_selectors"; }
 };
 
 } // namespace Ssl
