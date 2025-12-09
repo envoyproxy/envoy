@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.geoip.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.geoip.v3";
+option java_outer_classname = "GeoipProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/geoip/v3;geoipv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Geoip]
+// Geoip :ref:`configuration overview <config_network_filters_geoip>`.
+// [#extension: envoy.filters.network.geoip]
+
+message Geoip {
+  // The key to use for storing geolocation data in filter state.
+  // The geo data is stored as a typed ``GeoipInfo`` object which supports
+  // serialization for access logging and field-level access.
+  // If not specified, defaults to ``envoy.geoip``.
+  string metadata_namespace = 1;
+
+  // Geoip driver specific configuration which depends on the driver being instantiated.
+  // See the geoip drivers for examples:
+  //
+  // - :ref:`MaxMindConfig <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
+  // [#extension-category: envoy.geoip_providers]
+  config.core.v3.TypedExtensionConfig provider = 2 [(validate.rules).message = {required: true}];
+}
