@@ -61,7 +61,7 @@ index c481820..eead5c1 100644
 -SUBDIRS=. test v1/test uadk_tool sample
 +SUBDIRS=. 
 diff --git a/configure.ac b/configure.ac
-index 592b868..82740c4 100644
+index 592b868..172a161 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -4,6 +4,11 @@ AC_CONFIG_SRCDIR([wd.c])
@@ -76,7 +76,7 @@ index 592b868..82740c4 100644
  AC_CONFIG_HEADERS([config.h])
  
  # Checks for programs.
-@@ -50,12 +55,23 @@ AC_CHECK_LIB(z, zlibVersion,
+@@ -50,12 +55,6 @@ AC_CHECK_LIB(z, zlibVersion,
  	     [ have_zlib=false ])
  AM_CONDITIONAL([HAVE_ZLIB], [test "x$have_zlib" = "xtrue"])
  
@@ -85,27 +85,11 @@ index 592b868..82740c4 100644
 -	       have_crypto=true ],
 -	     [ have_crypto=false ])
 -AM_CONDITIONAL([HAVE_CRYPTO], [test "x$have_crypto" = "xtrue"])
-+# Replace pkg-config
-+AC_CHECK_HEADER([openssl/crypto.h],
-+    [ have_crypto_header=yes ],
-+    [ have_crypto_header=no ])
- 
-+AC_CHECK_LIB([crypto], [CRYPTO_set_locking_callback],
-+    [ have_crypto_lib=yes ],
-+    [ have_crypto_lib=no ])
-+
-+AS_IF([test "x$have_crypto_header" = "xyes" -a "x$have_crypto_lib" = "xyes"], [
-+    AC_DEFINE([HAVE_CRYPTO], [1], [Have crypto])
-+    have_crypto=true
-+], [
-+    have_crypto=false
-+])
-+
-+AM_CONDITIONAL([HAVE_CRYPTO], [test "x$have_crypto" = "xtrue"])
+-
  AC_ARG_WITH(log_file,
  	AS_HELP_STRING([--with-log_file], [File to write log]),
  	WITH_LOG_FILE=$withvar, WITH_LOG_FILE=)
-@@ -93,16 +109,5 @@ AC_CHECK_FUNCS([gettimeofday memmove memset munmap strstr strtoul strtoull])
+@@ -93,16 +92,5 @@ AC_CHECK_FUNCS([gettimeofday memmove memset munmap strstr strtoul strtoull])
  
  AC_CONFIG_FILES([Makefile
  		 lib/libwd_crypto.pc lib/libwd_comp.pc lib/libwd.pc
