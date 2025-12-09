@@ -33,8 +33,8 @@ Configuration example
 
 .. literalinclude:: _include/geoip-filter.yaml
     :language: yaml
-    :lines: 32-49
-    :lineno-start: 32
+    :lines: 27-43
+    :lineno-start: 27
     :linenos:
     :caption: :download:`geoip-filter.yaml <_include/geoip-filter.yaml>`
 
