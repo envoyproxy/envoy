@@ -128,9 +128,6 @@ CpuTimes CgroupV1CpuStatsReader::getCpuTimes() {
   }
 }
 
-// ================================================================================
-// CgroupV2CpuStatsReader Implementation
-// ================================================================================
 
 CgroupV2CpuStatsReader::CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)
     : LinuxContainerCpuStatsReader(fs, time_source), stat_path_(CpuPaths::V2::getStatPath()),
