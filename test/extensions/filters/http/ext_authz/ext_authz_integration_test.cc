@@ -2693,7 +2693,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
-    codec_client_->close();
+    cleanupUpstreamAndDownstream();
   }
 
   // Test 2: Request to /secure path should invoke ext_authz (require_auth = true).
@@ -2730,7 +2730,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
-    codec_client_->close();
+    cleanupUpstreamAndDownstream();
   }
 
   // Test 3: Request to /secure path with authorization denied.
@@ -2742,8 +2742,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
                                        {":path", "/secure/admin"},
                                        {":scheme", "http"},
                                        {":authority", "host"}});
-    // ext_authz should be invoked, wait for the check request.
-    // Reuse the connection from Test 2.
+    // ext_authz should be invoked.
     AssertionResult result =
         fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
     RELEASE_ASSERT(result, result.message());
@@ -2763,7 +2762,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("403", response->headers().getStatusValue());
-    codec_client_->close();
+    cleanup();
   }
 }
 
