@@ -4319,12 +4319,12 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
     auto cookies = extract_cookies(response_headers);
     bool found_nonce = false, found_code_verifier = false;
     for (const auto& cookie : cookies) {
-      if (cookie.find("OauthNonce=") != std::string::npos) {
+      if (cookie.find("OauthNonce.00000000075bcd15=") != std::string::npos) {
         EXPECT_NE(cookie.find(";path=/auth/callback;"), std::string::npos)
             << "OauthNonce should have path=/auth/callback, got: " << cookie;
         found_nonce = true;
       }
-      if (cookie.find("CodeVerifier=") != std::string::npos) {
+      if (cookie.find("CodeVerifier.00000000075bcd15=") != std::string::npos) {
         EXPECT_NE(cookie.find(";path=/auth/callback;"), std::string::npos)
             << "CodeVerifier should have path=/auth/callback, got: " << cookie;
         found_code_verifier = true;
@@ -4362,8 +4362,9 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
         {Http::Headers::get().Host.get(), "traffic.example.com"},
         {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
         {Http::Headers::get().Scheme.get(), "https"},
-        {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_CSRF_TOKEN},
-        {Http::Headers::get().Cookie.get(), "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER},
+        {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+        {Http::Headers::get().Cookie.get(),
+         "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
     };
 
     EXPECT_CALL(*validator_, setParams(_, _));
@@ -4434,6 +4435,8 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
         {Http::Headers::get().Host.get(), "traffic.example.com"},
         {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
         {Http::Headers::get().Scheme.get(), "https"},
+        {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=csrf_token"},
+        {Http::Headers::get().Cookie.get(), "CodeVerifier.00000000075bcd15=code_verifier"},
     };
 
     Http::TestResponseHeaderMapImpl response_headers;
@@ -4446,21 +4449,27 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
               filter_->decodeHeaders(signout_headers, false));
 
     auto cookies = extract_cookies(response_headers);
-    bool found_hmac_delete = false, found_nonce_delete = false;
+    bool found_hmac_delete = false, found_nonce_delete = false, found_code_verifier_delete = false;
     for (const auto& cookie : cookies) {
       if (cookie.find("OauthHMAC=deleted") != std::string::npos) {
         EXPECT_NE(cookie.find("path=/app"), std::string::npos)
             << "OauthHMAC deletion should have path=/app, got: " << cookie;
         found_hmac_delete = true;
       }
-      if (cookie.find("OauthNonce=deleted") != std::string::npos) {
+      if (cookie.find("OauthNonce.00000000075bcd15=deleted") != std::string::npos) {
         EXPECT_NE(cookie.find("path=/auth/callback"), std::string::npos)
             << "OauthNonce deletion should have path=/auth/callback, got: " << cookie;
         found_nonce_delete = true;
       }
+      if (cookie.find("CodeVerifier.00000000075bcd15=deleted") != std::string::npos) {
+        EXPECT_NE(cookie.find("path=/auth/callback"), std::string::npos)
+            << "CodeVerifier deletion should have path=/auth/callback, got: " << cookie;
+        found_code_verifier_delete = true;
+      }
     }
     EXPECT_TRUE(found_hmac_delete) << "OauthHMAC deletion cookie not found.";
     EXPECT_TRUE(found_nonce_delete) << "OauthNonce deletion cookie not found.";
+    EXPECT_TRUE(found_code_verifier_delete) << "CodeVerifier deletion cookie not found.";
   }
 }
 

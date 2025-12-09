@@ -900,8 +900,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   std::string csrf_expires = std::to_string(csrf_token_expires_in.count());
 
   std::string csrf_same_site = getSameSiteString(config_->nonceCookieSettings().same_site_);
+  std::string csrf_path = config_->nonceCookieSettings().path_;
   std::string csrf_cookie_tail =
-      fmt::format(CookieTailHttpOnlyFormatString, csrf_expires, csrf_same_site);
+      fmt::format(CookieTailHttpOnlyFormatString, csrf_path, csrf_expires, csrf_same_site);
   if (!config_->cookieDomain().empty()) {
     csrf_cookie_tail = absl::StrCat(fmt::format(CookieDomainFormatString, config_->cookieDomain()),
                                     csrf_cookie_tail);
@@ -913,6 +914,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
       Http::Headers::get().SetCookie,
       absl::StrCat(csrf_cookie_name, "=", csrf_token, csrf_cookie_tail));
 
+  // Encode the state parameter for the OAuth flow.
+  // The flow id is included in the state to allow retrieval of flow-specific cookies later.
   const std::string state = encodeState(original_url, csrf_token, flow_id);
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
@@ -970,18 +973,14 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap& headers) const {
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
-  std::string cookie_domain;
-  if (!config_->cookieDomain().empty()) {
-    cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
-  }
-
   const CookieNames& cookie_names = config_->cookieNames();
 
   // Map cookie names to their respective paths from configuration.
-  const std::vector<std::pair<absl::string_view, absl::string_view>> cookies_to_delete{
+  std::vector<std::pair<absl::string_view, absl::string_view>> cookies_to_delete{
       {cookie_names.oauth_hmac_, config_->hmacCookieSettings().path_},
       {cookie_names.bearer_token_, config_->bearerTokenCookieSettings().path_},
       {cookie_names.id_token_, config_->idTokenCookieSettings().path_},
+      {cookie_names.refresh_token_, config_->refreshTokenCookieSettings().path_},
   };
 
   absl::flat_hash_map<std::string, std::string> request_cookies =
@@ -994,6 +993,11 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
     } else if (cookieNameMatchesBase(cookie.first, cookie_names.code_verifier_)) {
       cookies_to_delete.emplace_back(cookie.first, config_->codeVerifierCookieSettings().path_);
     }
+  }
+
+  std::string cookie_domain;
+  if (!config_->cookieDomain().empty()) {
+    cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
   }
 
   for (const auto& [cookie_name, cookie_path] : cookies_to_delete) {
@@ -1340,19 +1344,20 @@ void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers
     cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
   }
 
-  auto add_delete_cookie = [&](absl::string_view base_name) {
+  auto add_delete_cookie = [&](absl::string_view base_name, absl::string_view cookie_path) {
     const std::string cookie_name = cookieNameWithSuffix(base_name, flow_id);
     const bool add_secure_attr =
         absl::StartsWith(cookie_name, "__Secure-") || absl::StartsWith(cookie_name, "__Host-");
     const absl::string_view maybe_secure_attr = add_secure_attr ? "; Secure" : "";
 
-    headers.addReferenceKey(Http::Headers::get().SetCookie,
-                            absl::StrCat(fmt::format(CookieDeleteFormatString, cookie_name),
-                                         cookie_domain, maybe_secure_attr));
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, cookie_name, cookie_path), cookie_domain,
+                     maybe_secure_attr));
   };
 
-  add_delete_cookie(cookie_names.oauth_nonce_);
-  add_delete_cookie(cookie_names.code_verifier_);
+  add_delete_cookie(cookie_names.oauth_nonce_, config_->nonceCookieSettings().path_);
+  add_delete_cookie(cookie_names.code_verifier_, config_->codeVerifierCookieSettings().path_);
 }
 
 void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
