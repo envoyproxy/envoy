@@ -1,13 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: December 9, 2025
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: dns
   change: |
     Update c-ares to version 1.34.6 to resolve CVE-2025-0913.
@@ -16,14 +9,8 @@ bug_fixes:
 
     advisory: https://github.com/envoyproxy/envoy/security/advisories/GHSA-fg9g-pvc4-776f.
 
-
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
 new_features:
 - area: dns
   change: |
     Update c-ares to version 1.34.4. This upgrade exposes ``ares_reinit()`` which allows the reinitialization of c-ares channels,
     among several other new features, bug-fixes, etc.
-
-deprecated:
