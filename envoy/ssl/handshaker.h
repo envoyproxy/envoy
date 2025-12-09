@@ -280,7 +280,8 @@ public:
   virtual ~UpstreamTlsCertificateSelector() = default;
 
   /**
-   * Select TLS context.
+   * Select TLS context using a server hello and transport socket options.
+   * Please see bssl documentation on the accessors to the SSL object.
    */
   virtual SelectionResult
   selectTlsContext(const SSL& ssl, const Network::TransportSocketOptionsConstSharedPtr& options,
@@ -295,6 +296,8 @@ using UpstreamTlsCertificateSelectorFactory =
 class UpstreamTlsCertificateSelectorConfigFactory : public Config::TypedFactory {
 public:
   /**
+   * Creates a factory for the upstream TLS certificate selectors. The factory
+   * is bound to the client context config.
    */
   virtual absl::StatusOr<UpstreamTlsCertificateSelectorFactory>
   createTlsCertificateSelectorFactory(const Protobuf::Message& config,

@@ -25,23 +25,6 @@
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/tls/cert_validator/timed_cert_validator.h"
-#include "test/common/tls/ssl_certs_test.h"
-#include "test/common/tls/test_data/ca_cert_info.h"
-#include "test/common/tls/test_data/extensions_cert_info.h"
-#include "test/common/tls/test_data/no_san_cert_info.h"
-#include "test/common/tls/test_data/password_protected_cert_info.h"
-#include "test/common/tls/test_data/san_dns2_cert_info.h"
-#include "test/common/tls/test_data/san_dns3_cert_info.h"
-#include "test/common/tls/test_data/san_dns4_cert_info.h"
-#include "test/common/tls/test_data/san_dns_cert_info.h"
-#include "test/common/tls/test_data/san_dns_ecdsa_1_cert_info.h"
-#include "test/common/tls/test_data/san_dns_rsa_1_cert_info.h"
-#include "test/common/tls/test_data/san_dns_rsa_2_cert_info.h"
-#include "test/common/tls/test_data/san_multiple_dns_1_cert_info.h"
-#include "test/common/tls/test_data/san_multiple_dns_cert_info.h"
-#include "test/common/tls/test_data/san_uri_cert_info.h"
-#include "test/common/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
-#include "test/common/tls/test_private_key_method_provider.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -63,7 +46,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
-#include "xds/type/v3/typed_struct.pb.h"
 
 using testing::_;
 using testing::Invoke;
@@ -77,13 +59,16 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+namespace {
 
 class TestTlsCertificateSelector : public Ssl::TlsCertificateSelector,
                                    public Ssl::UpstreamTlsCertificateSelector {
 public:
   TestTlsCertificateSelector(Ssl::TlsCertificateSelectorContext& selector_ctx,
                              Ssl::SelectionResult::SelectionStatus mode)
-      : selector_ctx_(selector_ctx), mod_(mode) {}
+      : selector_ctx_(selector_ctx), mod_(mode) {
+    ENVOY_LOG_MISC(info, "debug: init provider");
+  }
 
   ~TestTlsCertificateSelector() override {
     ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector");
@@ -158,7 +143,6 @@ public:
     }
     return
         [this](const Ssl::ServerContextConfig&, Ssl::TlsCertificateSelectorContext& selector_ctx) {
-          ENVOY_LOG_MISC(info, "debug: init provider");
           return std::make_unique<TestTlsCertificateSelector>(selector_ctx, mod_);
         };
   }
@@ -167,13 +151,12 @@ public:
                                       Server::Configuration::GenericFactoryContext&,
                                       const Ssl::ClientContextConfig&) override {
     return [&](Ssl::TlsCertificateSelectorContext& selector_ctx) {
-      ENVOY_LOG_MISC(info, "debug: init provider");
       return std::make_unique<TestTlsCertificateSelector>(selector_ctx, mod_);
     };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<google::protobuf::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "test-tls-context-provider"; };
 
@@ -235,10 +218,7 @@ class TlsCertificateSelectorFactoryTest : public testing::TestWithParam<TestPara
 protected:
   TlsCertificateSelectorFactoryTest()
       : registered_factory_(provider_factory_), upstream_registered_factory_(provider_factory_),
-        version_(GetParam().ip_version) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-  }
+        version_(GetParam().ip_version) {}
 
   void runTest() {
     const auto mod = GetParam().mode;
@@ -410,7 +390,6 @@ protected:
   Registry::InjectFactory<Ssl::TlsCertificateSelectorConfigFactory> registered_factory_;
   Registry::InjectFactory<Ssl::UpstreamTlsCertificateSelectorConfigFactory>
       upstream_registered_factory_;
-  TestScopedRuntime scoped_runtime_;
 
   Network::Address::IpVersion version_;
 };
@@ -421,11 +400,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsSelectorType, TlsCertificateSelectorFactoryTe
                          testing::ValuesIn(testParams()), testParamsToString);
 
 TEST(TlsCertificateSelectorFactoryQuicTest, QUICFactory) {
-  TestTlsCertificateSelectorFactory provider_factory;
-  Registry::InjectFactory<Ssl::TlsCertificateSelectorConfigFactory> registered_factory(
-      provider_factory);
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -459,6 +433,7 @@ TEST(TlsCertificateSelectorFactoryQuicTest, QUICFactory) {
   EXPECT_FALSE(server_cfg.ok());
 }
 
+} // namespace
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

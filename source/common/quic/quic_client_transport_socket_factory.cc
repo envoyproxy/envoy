@@ -18,6 +18,9 @@ absl::StatusOr<std::unique_ptr<QuicClientTransportSocketFactory>>
 QuicClientTransportSocketFactory::create(
     Ssl::ClientContextConfigPtr config,
     Server::Configuration::TransportSocketFactoryContext& context) {
+  if (config->tlsCertificateSelectorFactory() != nullptr) {
+    return absl::UnimplementedError("Certificate selector not supported on Quic");
+  }
   absl::Status creation_status = absl::OkStatus();
   auto factory = std::unique_ptr<QuicClientTransportSocketFactory>(
       new QuicClientTransportSocketFactory(std::move(config), context, creation_status));

@@ -115,6 +115,8 @@ categories:
 - envoy.transport_sockets.downstream
 - envoy.transport_sockets.upstream
 - envoy.tls.cert_validator
+- envoy.tls.certificate_selectors
+- envoy.tls.upstream_certificate_selectors
 - envoy.upstreams
 - envoy.upstream.local_address_selector
 - envoy.udp_packet_writer
