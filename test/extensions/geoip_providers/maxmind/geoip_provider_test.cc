@@ -106,6 +106,28 @@ const std::string default_anon_config_yaml = R"EOF(
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
 
+// Country DB reload tests use City-Test databases since they contain country info and we have
+// an updated version available. The `GeoIP2-Country-Test` DB is used for non-reload country tests.
+const std::string default_country_db_path =
+    "{{ test_rundir "
+    "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb";
+
+const std::string default_updated_country_db_path =
+    "{{ test_rundir "
+    "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test-Updated.mmdb";
+
+const std::string default_country_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+
+// Invalid DB path for reload error tests.
+const std::string invalid_db_path = "{{ test_rundir "
+                                    "}}/test/extensions/geoip_providers/maxmind/test_data/"
+                                    "libmaxminddb-offset-integer-overflow.mmdb";
+
 } // namespace
 
 class GeoipProviderTestBase {
@@ -669,60 +691,6 @@ TEST_F(GeoipProviderTest, DbEpochGaugeUpdatesWhenReloadedOnMmdbFileUpdate) {
   TestEnvironment::renameFile(city_db_path + "1", city_db_path);
 }
 
-TEST_F(GeoipProviderTest, DbReloadError) {
-  constexpr absl::string_view config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        country: "x-geo-country"
-        region: "x-geo-region"
-        city: "x-geo-city"
-    city_db_path: {}
-  )EOF";
-  std::string city_db_path = TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb");
-  std::string reloaded_invalid_city_db_path =
-      TestEnvironment::substitute("{{ test_rundir "
-                                  "}}/test/extensions/geoip_providers/maxmind/test_data/"
-                                  "libmaxminddb-offset-integer-overflow.mmdb");
-  const std::string formatted_config =
-      fmt::format(config_yaml, TestEnvironment::substitute(city_db_path));
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
-  initializeProvider(formatted_config, cb_added_opt);
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("81.2.69.144");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
-  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  EXPECT_EQ(3, captured_lookup_response_.size());
-  const auto& city_it = captured_lookup_response_.find("x-geo-city");
-  EXPECT_EQ("London", city_it->second);
-  TestEnvironment::renameFile(city_db_path, city_db_path + "1");
-  TestEnvironment::renameFile(reloaded_invalid_city_db_path, city_db_path);
-  cb_added_opt.value().waitReady();
-  {
-    absl::ReaderMutexLock guard(&mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
-  }
-  // On mmdb reload error the old mmdb instance should be used for subsequent lookup requests.
-  expectReloadStats("city_db", 0, 1);
-  captured_lookup_response_.clear();
-  EXPECT_EQ(0, captured_lookup_response_.size());
-  remote_address = Network::Utility::parseInternetAddressNoThrow("81.2.69.144");
-  Geolocation::LookupRequest lookup_rq2{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb2;
-  auto lookup_cb_std2 = lookup_cb2.AsStdFunction();
-  EXPECT_CALL(lookup_cb2, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
-  const auto& city1_it = captured_lookup_response_.find("x-geo-city");
-  EXPECT_EQ("London", city1_it->second);
-  // Clean up modifications to mmdb file names.
-  TestEnvironment::renameFile(city_db_path, reloaded_invalid_city_db_path);
-  TestEnvironment::renameFile(city_db_path + "1", city_db_path);
-}
-
 using GeoipProviderDeathTest = GeoipProviderTest;
 
 TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
@@ -931,9 +899,118 @@ struct MmdbReloadTestCase mmdb_reload_test_cases[] = {
      "x-geo-asn", "237", "23742", "2806:2000::"},
     {default_anon_config_yaml, "anon_db", default_anon_db_path, default_updated_anon_db_path,
      "x-geo-anon", "true", "false", "65.4.3.2"},
+    // Country DB uses City-Test databases since they contain country info and we have an updated
+    // version. Both databases return GB for this IP.
+    {default_country_config_yaml, "country_db", default_country_db_path,
+     default_updated_country_db_path, "x-geo-country", "GB", "GB", "81.2.69.144"},
 };
 
 INSTANTIATE_TEST_SUITE_P(TestName, MmdbReloadImplTest, ::testing::ValuesIn(mmdb_reload_test_cases));
+
+// Parametrized test for reload errors. It verifies that when db reload fails, the old db is used.
+struct MmdbReloadErrorTestCase {
+  MmdbReloadErrorTestCase() = default;
+  MmdbReloadErrorTestCase(const std::string& yaml_config, const std::string& db_type,
+                          const std::string& source_db_file_path,
+                          const std::string& expected_header_name,
+                          const std::string& expected_header_value, const std::string& ip,
+                          uint32_t expected_lookup_count)
+      : yaml_config_(yaml_config), db_type_(db_type), source_db_file_path_(source_db_file_path),
+        expected_header_name_(expected_header_name), expected_header_value_(expected_header_value),
+        ip_(ip), expected_lookup_count_(expected_lookup_count) {}
+  MmdbReloadErrorTestCase(const MmdbReloadErrorTestCase& rhs) = default;
+
+  std::string yaml_config_;
+  std::string db_type_;
+  std::string source_db_file_path_;
+  std::string expected_header_name_;
+  std::string expected_header_value_;
+  std::string ip_;
+  uint32_t expected_lookup_count_;
+};
+
+class MmdbReloadErrorImplTest : public ::testing::TestWithParam<MmdbReloadErrorTestCase>,
+                                public GeoipProviderTestBase {};
+
+TEST_P(MmdbReloadErrorImplTest, MmdbReloadErrorUsesPreviousDb) {
+  MmdbReloadErrorTestCase test_case = GetParam();
+  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  initializeProvider(test_case.yaml_config_, cb_added_opt);
+  std::string source_db_file_path = TestEnvironment::substitute(test_case.source_db_file_path_);
+  std::string invalid_db_file_path = TestEnvironment::substitute(invalid_db_path);
+
+  // Initial lookup should succeed using the valid DB.
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(test_case.expected_lookup_count_, captured_lookup_response_.size());
+  const auto& header_it = captured_lookup_response_.find(test_case.expected_header_name_);
+  EXPECT_EQ(test_case.expected_header_value_, header_it->second);
+
+  // Replace db with invalid file and trigger reload.
+  TestEnvironment::renameFile(source_db_file_path, source_db_file_path + "1");
+  TestEnvironment::renameFile(invalid_db_file_path, source_db_file_path);
+  cb_added_opt.value().waitReady();
+  {
+    absl::ReaderMutexLock guard(&mutex_);
+    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  }
+  // On reload error the old db instance should be used for subsequent lookup requests.
+  expectReloadStats(test_case.db_type_, 0, 1);
+
+  // Lookup should still work using the previously loaded valid DB.
+  captured_lookup_response_.clear();
+  EXPECT_EQ(0, captured_lookup_response_.size());
+  remote_address = Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
+  Geolocation::LookupRequest lookup_rq2{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb2;
+  auto lookup_cb_std2 = lookup_cb2.AsStdFunction();
+  EXPECT_CALL(lookup_cb2, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
+  const auto& header2_it = captured_lookup_response_.find(test_case.expected_header_name_);
+  EXPECT_EQ(test_case.expected_header_value_, header2_it->second);
+
+  // Clean up modifications to db file names.
+  TestEnvironment::renameFile(source_db_file_path, invalid_db_file_path);
+  TestEnvironment::renameFile(source_db_file_path + "1", source_db_file_path);
+}
+
+// Config with full path for city_db reload error test.
+const std::string city_db_reload_error_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        region: "x-geo-region"
+        city: "x-geo-city"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+
+// Config with full path for country_db reload error test.
+const std::string country_db_reload_error_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
+  )EOF";
+
+// Country DB reload error test uses actual Country-Test MMDB for testing.
+const std::string country_db_reload_error_path =
+    "{{ test_rundir "
+    "}}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb";
+
+struct MmdbReloadErrorTestCase mmdb_reload_error_test_cases[] = {
+    {city_db_reload_error_config_yaml, "city_db", default_city_db_path, "x-geo-city", "London",
+     "81.2.69.144", 3},
+    {country_db_reload_error_config_yaml, "country_db", country_db_reload_error_path,
+     "x-geo-country", "SE", "89.160.20.112", 1},
+};
+
+INSTANTIATE_TEST_SUITE_P(TestName, MmdbReloadErrorImplTest,
+                         ::testing::ValuesIn(mmdb_reload_error_test_cases));
 
 // Country DB specific tests.
 TEST_F(GeoipProviderTest, ValidConfigCountryDbSuccessfulLookup) {
@@ -1010,104 +1087,6 @@ TEST_F(GeoipProviderTest, CountryFallsBackToCityDbWhenCountryDbNotConfigured) {
   EXPECT_EQ("Linköping", city_it->second);
   // Country should be looked up from City DB.
   expectStats("city_db", 1, 1, 0);
-}
-
-// Test that Country DB reload mechanism works. We use City test databases as Country DB
-// since they have the same structure for country lookups.
-TEST_F(GeoipProviderTest, CountryDbReloadUpdatesDbBuildEpoch) {
-  constexpr absl::string_view config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        country: "x-geo-country"
-    country_db_path: {}
-  )EOF";
-  // Use City test databases since they have the same structure for country lookups.
-  std::string country_db_path = TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb");
-  std::string reloaded_country_db_path = TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test-Updated.mmdb");
-  const std::string formatted_config =
-      fmt::format(config_yaml, TestEnvironment::substitute(country_db_path));
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
-  initializeProvider(formatted_config, cb_added_opt);
-  // Verify initial db_build_epoch.
-  expectStats("country_db", 0, 0, 0, 1671567063);
-  TestEnvironment::renameFile(country_db_path, country_db_path + "1");
-  TestEnvironment::renameFile(reloaded_country_db_path, country_db_path);
-  cb_added_opt.value().waitReady();
-  {
-    absl::ReaderMutexLock guard(&mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
-  }
-  expectReloadStats("country_db", 1, 0);
-  // Verify db_build_epoch changed after reload.
-  expectStats("country_db", 0, 0, 0, 1753263760);
-
-  // Clean up modifications to mmdb file names.
-  TestEnvironment::renameFile(country_db_path, reloaded_country_db_path);
-  TestEnvironment::renameFile(country_db_path + "1", country_db_path);
-}
-
-TEST_F(GeoipProviderTest, CountryDbReloadErrorUsesPreviousDb) {
-  constexpr absl::string_view config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        country: "x-geo-country"
-    country_db_path: {}
-  )EOF";
-
-  // Start with valid country DB and then replace with an invalid mmdb file to trigger reload error.
-  std::string country_db_path = TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb");
-  std::string invalid_country_db_path =
-      TestEnvironment::substitute("{{ test_rundir "
-                                  "}}/test/extensions/geoip_providers/maxmind/test_data/"
-                                  "libmaxminddb-offset-integer-overflow.mmdb");
-
-  const std::string formatted_config =
-      fmt::format(config_yaml, TestEnvironment::substitute(country_db_path));
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
-  initializeProvider(formatted_config, cb_added_opt);
-
-  // Initial lookup should succeed using the valid Country DB.
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
-  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  const auto& country_it = captured_lookup_response_.find("x-geo-country");
-  EXPECT_EQ("SE", country_it->second);
-
-  // Replace the country db with an invalid file and trigger reload.
-  TestEnvironment::renameFile(country_db_path, country_db_path + "1");
-  TestEnvironment::renameFile(invalid_country_db_path, country_db_path);
-  cb_added_opt.value().waitReady();
-  {
-    absl::ReaderMutexLock guard(&mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
-  }
-  expectReloadStats("country_db", 0, 1);
-
-  // Lookup should still work using the previously loaded valid DB.
-  captured_lookup_response_.clear();
-  Network::Address::InstanceConstSharedPtr remote_address2 =
-      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
-  Geolocation::LookupRequest lookup_rq2{std::move(remote_address2)};
-  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb2;
-  auto lookup_cb_std2 = lookup_cb2.AsStdFunction();
-  EXPECT_CALL(lookup_cb2, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
-  const auto& country2_it = captured_lookup_response_.find("x-geo-country");
-  EXPECT_EQ("SE", country2_it->second);
-
-  // Clean up modifications to mmdb file names.
-  TestEnvironment::renameFile(country_db_path, invalid_country_db_path);
-  TestEnvironment::renameFile(country_db_path + "1", country_db_path);
 }
 
 // Test Country DB lookup error when MMDB_get_entry_data_list fails due to corrupted entry data.

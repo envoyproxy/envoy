@@ -52,8 +52,8 @@ message MaxMindConfig {
   // Full file path to the MaxMind Country database, e.g., ``/etc/GeoLite2-Country.mmdb``.
   // Database file is expected to have ``.mmdb`` extension.
   //
-  // If ``country_db_path`` is not defined, country information will be fetched from
-  // ``city_db`` instead.
+  // If ``country_db_path`` is not specified, country information will be fetched from
+  // ``city_db`` if ``city_db`` is configured.
   string country_db_path = 6 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
   // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
