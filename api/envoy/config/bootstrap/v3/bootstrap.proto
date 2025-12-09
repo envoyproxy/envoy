@@ -461,10 +461,14 @@ message Admin {
   // When specified, only paths in this list will be accessible, all others will return 403 Forbidden.
   //
   // Example:
-  // allow_paths:
-  // - exact: /stats
-  // - exact: /ready
-  // - prefix: /healthcheck
+  //
+  // .. code-block:: yaml
+  //
+  //   allow_paths:
+  //   - exact: /stats
+  //   - exact: /ready
+  //   - prefix: /healthcheck
+  //
   repeated type.matcher.v3.StringMatcher allow_paths = 7;
 }
 
