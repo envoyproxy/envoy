@@ -41,8 +41,8 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
     authorization_handle(Http::CustomHeaders::get().Authorization);
 
 constexpr const char* CookieDeleteFormatString =
-    "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly{}";
+    "{}=deleted; path={}; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+constexpr const char* CookieTailHttpOnlyFormatString = ";path={};Max-Age={};secure;HttpOnly{}";
 constexpr const char* CookieDomainFormatString = ";domain={}";
 
 constexpr const char* OIDCLogoutUrlFormatString =
@@ -931,8 +931,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   std::string expire_in = std::to_string(code_verifier_token_expires_in.count());
 
   std::string same_site = getSameSiteString(config_->codeVerifierCookieSettings().same_site_);
+  std::string path = config_->codeVerifierCookieSettings().path_;
   std::string cookie_tail_http_only =
-      fmt::format(CookieTailHttpOnlyFormatString, expire_in, same_site);
+      fmt::format(CookieTailHttpOnlyFormatString, path, expire_in, same_site);
   if (!config_->cookieDomain().empty()) {
     cookie_tail_http_only = absl::StrCat(
         fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
@@ -975,37 +976,27 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   }
 
   const CookieNames& cookie_names = config_->cookieNames();
-  const std::vector<absl::string_view> base_cookie_names{
-      cookie_names.oauth_hmac_,
-      cookie_names.bearer_token_,
-      cookie_names.id_token_,
-      cookie_names.refresh_token_,
+
+  // Map cookie names to their respective paths from configuration.
+  const std::vector<std::pair<absl::string_view, absl::string_view>> cookies_to_delete{
+      {cookie_names.oauth_hmac_, config_->hmacCookieSettings().path_},
+      {cookie_names.bearer_token_, config_->bearerTokenCookieSettings().path_},
+      {cookie_names.id_token_, config_->idTokenCookieSettings().path_},
   };
 
   absl::flat_hash_map<std::string, std::string> request_cookies =
       Http::Utility::parseCookies(headers);
-  std::vector<std::string> cookies_to_delete;
-  auto addCookieName = [&cookies_to_delete](absl::string_view name) {
-    std::string cookie_name(name);
-    if (std::find(cookies_to_delete.begin(), cookies_to_delete.end(), cookie_name) ==
-        cookies_to_delete.end()) {
-      cookies_to_delete.emplace_back(std::move(cookie_name));
-    }
-  };
-
-  for (const auto& base_name : base_cookie_names) {
-    addCookieName(base_name);
-  }
 
   // Delete any flow-specific cookies that may exist.
   for (const auto& cookie : request_cookies) {
-    if (cookieNameMatchesBase(cookie.first, cookie_names.oauth_nonce_) ||
-        cookieNameMatchesBase(cookie.first, cookie_names.code_verifier_)) {
-      addCookieName(cookie.first);
+    if (cookieNameMatchesBase(cookie.first, cookie_names.oauth_nonce_)) {
+      cookies_to_delete.emplace_back(cookie.first, config_->nonceCookieSettings().path_);
+    } else if (cookieNameMatchesBase(cookie.first, cookie_names.code_verifier_)) {
+      cookies_to_delete.emplace_back(cookie.first, config_->codeVerifierCookieSettings().path_);
     }
   }
 
-  for (const auto& cookie_name : cookies_to_delete) {
+  for (const auto& [cookie_name, cookie_path] : cookies_to_delete) {
     // Cookie names prefixed with "__Secure-" or "__Host-" are special. They MUST be set with the
     // Secure attribute so that the browser handles their deletion properly.
     const bool add_secure_attr =
@@ -1014,7 +1005,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 
     response_headers->addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(fmt::format(CookieDeleteFormatString, cookie_name), cookie_domain,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, cookie_name, cookie_path), cookie_domain,
                      maybe_secure_attr));
   }
 
@@ -1146,29 +1137,36 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
 std::string OAuth2Filter::BuildCookieTail(int cookie_type) const {
   std::string same_site;
   std::string expires_time = expires_in_;
+  std::string path;
 
   switch (cookie_type) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case 1: // BEARER_TOKEN TYPE
     same_site = getSameSiteString(config_->bearerTokenCookieSettings().same_site_);
+    path = config_->bearerTokenCookieSettings().path_;
     break;
   case 2: // OAUTH_HMAC TYPE
     same_site = getSameSiteString(config_->hmacCookieSettings().same_site_);
+    path = config_->hmacCookieSettings().path_;
     break;
   case 3: // OAUTH_EXPIRES TYPE
     same_site = getSameSiteString(config_->expiresCookieSettings().same_site_);
+    path = config_->expiresCookieSettings().path_;
     break;
   case 4: // ID_TOKEN TYPE
     same_site = getSameSiteString(config_->idTokenCookieSettings().same_site_);
+    path = config_->idTokenCookieSettings().path_;
     expires_time = expires_id_token_in_;
     break;
   case 5: // REFRESH_TOKEN TYPE
     same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
+    path = config_->refreshTokenCookieSettings().path_;
     expires_time = expires_refresh_token_in_;
     break;
   }
 
-  std::string cookie_tail = fmt::format(CookieTailHttpOnlyFormatString, expires_time, same_site);
+  std::string cookie_tail =
+      fmt::format(CookieTailHttpOnlyFormatString, path, expires_time, same_site);
   if (!config_->cookieDomain().empty()) {
     cookie_tail =
         absl::StrCat(fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail);
@@ -1237,8 +1235,8 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   if (!refresh_token_.empty()) {
     cookies.insert_or_assign(cookie_names.refresh_token_, refresh_token_);
   } else if (cookies.contains(cookie_names.refresh_token_)) {
-    // If we actually went through the refresh token flow, but we didn't get a new refresh token, we
-    // want to still ensure that the old one is set if it was sent in a cookie
+    // If we actually went through the refresh token flow, but we didn't get a new refresh token,
+    // we want to still ensure that the old one is set if it was sent in a cookie
     refresh_token_ = findValue(cookies, cookie_names.refresh_token_);
   }
 
@@ -1264,7 +1262,8 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
 
 void OAuth2Filter::onRefreshAccessTokenFailure() {
   config_->stats().oauth_refreshtoken_failure_.inc();
-  // We failed to get an access token via the refresh token, so send the user to the oauth endpoint.
+  // We failed to get an access token via the refresh token, so send the user to the oauth
+  // endpoint.
   if (canRedirectToOAuthServer(*request_headers_)) {
     redirectToOAuthServer(*request_headers_);
   } else {
@@ -1279,9 +1278,9 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
   const CookieNames& cookie_names = config_->cookieNames();
 
   // Set the cookies in the response headers.
-  headers.addReferenceKey(
-      Http::Headers::get().SetCookie,
-      absl::StrCat(cookie_names.oauth_hmac_, "=", encoded_token, BuildCookieTail(2))); // OAUTH_HMAC
+  headers.addReferenceKey(Http::Headers::get().SetCookie,
+                          absl::StrCat(cookie_names.oauth_hmac_, "=", encoded_token,
+                                       BuildCookieTail(2))); // OAUTH_HMAC
 
   headers.addReferenceKey(Http::Headers::get().SetCookie,
                           absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_,
@@ -1302,7 +1301,8 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
   } else if (request_cookies.contains(cookie_names.bearer_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_),
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_,
+                                 config_->bearerTokenCookieSettings().path_),
                      cookie_domain));
   }
 
@@ -1313,7 +1313,8 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
   } else if (request_cookies.contains(cookie_names.id_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_),
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_,
+                                 config_->idTokenCookieSettings().path_),
                      cookie_domain));
   }
 
@@ -1325,7 +1326,8 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
   } else if (request_cookies.contains(cookie_names.refresh_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_,
+                                 config_->refreshTokenCookieSettings().path_),
                      cookie_domain));
   }
 }
@@ -1404,9 +1406,9 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
         fmt::format("Code or state query param does not exist: {}", query_parameters.toString())};
   }
 
-  // Return 401 unauthorized if the state query parameter does not contain the original request URL
-  // or the CSRF token.
-  // Decode the state parameter to get the original request URL and the CSRF token.
+  // Return 401 unauthorized if the state query parameter does not contain the original request
+  // URL or the CSRF token. Decode the state parameter to get the original request URL and the
+  // CSRF token.
   CallbackValidationResult result = validateState(headers, stateVal.value());
   result.auth_code_ = codeVal.value();
   return result;
@@ -1415,9 +1417,9 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
 // Validates the state parameter in the OAuth callback request.
 CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMap& headers,
                                                      const absl::string_view state_str) const {
-  // Return 401 unauthorized if the state query parameter does not contain the original request URL
-  // or the CSRF token.
-  // Decode the state parameter to get the original request URL and the CSRF token.
+  // Return 401 unauthorized if the state query parameter does not contain the original request
+  // URL or the CSRF token. Decode the state parameter to get the original request URL and the
+  // CSRF token.
   const std::string state = Base64Url::decode(state_str);
   bool has_unknown_field;
   Protobuf::Struct message;

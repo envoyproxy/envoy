@@ -96,6 +96,13 @@ public:
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
+  void recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status) {
+    grpc_status_before_first_call_ = call_status;
+  }
+  Grpc::Status::GrpcStatus getGrpcStatusBeforeFirstCall() const {
+    return grpc_status_before_first_call_;
+  }
+
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
@@ -144,6 +151,8 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
   std::string http_response_code_details_;
+  // The gRPC status when the openStream() operation fails.
+  Grpc::Status::GrpcStatus grpc_status_before_first_call_ = Grpc::Status::Ok;
 };
 
 class ThreadLocalStreamManager;
@@ -548,6 +557,7 @@ private:
   void closeStream();
   void halfCloseAndWaitForRemoteClose();
 
+  void recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status);
   void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
   void clearAsyncState(Grpc::Status::GrpcStatus call_status = Grpc::Status::Aborted);
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
