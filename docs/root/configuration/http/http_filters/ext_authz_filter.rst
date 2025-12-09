@@ -158,7 +158,7 @@ dynamic metadata set by a Lua filter:
 
 .. literalinclude:: _include/ext-authz-extension-with-matcher.yaml
     :language: yaml
-    :lines: 26-78
+    :lines: 26-83
     :lineno-start: 26
     :linenos:
     :caption: :download:`ext-authz-extension-with-matcher.yaml <_include/ext-authz-extension-with-matcher.yaml>`
