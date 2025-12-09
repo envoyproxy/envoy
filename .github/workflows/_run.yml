@@ -300,7 +300,7 @@ jobs:
         key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
     - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@bce04411c37978feb8f10f569de969d64c4107d5
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@8b167c983b73a02bfc10ab289376a6178a064ec3
       with:
         image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
