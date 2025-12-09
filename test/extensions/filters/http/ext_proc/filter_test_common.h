@@ -28,6 +28,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -197,6 +198,7 @@ protected:
   envoy::config::core::v3::Metadata dynamic_metadata_;
   testing::NiceMock<Network::MockConnection> connection_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  TestScopedRuntime scoped_runtime_;
 };
 
 } // namespace ExternalProcessing

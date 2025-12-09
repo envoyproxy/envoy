@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace Upstream {
 
-class TestUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
+class TestUpstreamLocalAddressSelector : public UpstreamLocalAddressSelectorBase {
 public:
   TestUpstreamLocalAddressSelector(
       std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
@@ -17,7 +17,8 @@ public:
         return_empty_source_address_{return_empty_source_address} {}
 
   UpstreamLocalAddress
-  getUpstreamLocalAddressImpl(const Network::Address::InstanceConstSharedPtr&) const override {
+  getUpstreamLocalAddressImpl(const Network::Address::InstanceConstSharedPtr&,
+                              OptRef<const Network::TransportSocketOptions>) const override {
     ++(*num_calls_);
     if (return_empty_source_address_) {
       return {};

@@ -202,9 +202,17 @@ void UberFilterFuzzer::perFilterSetup() {
 
   // Prepare expectations for AWSRequestSigning filter
   ON_CALL(decoder_callbacks_, addDecodedData(_, _))
-      .WillByDefault([this](Buffer::Instance& data, bool) { decoding_buffer_ = &data; });
+      .WillByDefault([this](Buffer::Instance& data, bool) {
+        if (decoding_buffer_ == nullptr) {
+          decoding_buffer_ = std::make_unique<Buffer::OwnedImpl>();
+        }
+        decoding_buffer_->move(data);
+      });
   ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault([this]() -> const Buffer::Instance* {
-    return decoding_buffer_;
+    if (decoding_buffer_ == nullptr) {
+      decoding_buffer_ = std::make_unique<Buffer::OwnedImpl>();
+    }
+    return decoding_buffer_.get();
   });
   ON_CALL(encoder_callbacks_, dispatcher()).WillByDefault([this]() -> Event::Dispatcher& {
     return *worker_thread_dispatcher_;

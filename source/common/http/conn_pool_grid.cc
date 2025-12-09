@@ -196,6 +196,12 @@ void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
 }
 
 void ConnectivityGrid::WrapperCallbacks::deleteThis() {
+  if (delete_started_) {
+    // This instance has already been removed from the `wrapped_callbacks_` list and scheduled for
+    // deferred deletion.
+    return;
+  }
+  delete_started_ = true;
   // Set this to delete on the next dispatcher loop.
   grid_.dispatcher_.deferredDelete(removeFromList(grid_.wrapped_callbacks_));
 }

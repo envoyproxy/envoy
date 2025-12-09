@@ -10,7 +10,7 @@ int getSomeVariable(void) {
   return some_variable;
 }
 
-envoy_dynamic_module_type_abi_version_envoy_ptr envoy_dynamic_module_on_program_init(void) {
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
   return kAbiVersion;
 }
 
@@ -89,7 +89,7 @@ void envoy_dynamic_module_on_http_filter_http_callout_done(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint32_t callout_id,
     envoy_dynamic_module_type_http_callout_result result,
-    envoy_dynamic_module_type_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_envoy_buffer* body_vector, size_t body_vector_size) {}
 
 void envoy_dynamic_module_on_http_filter_scheduled(
@@ -103,3 +103,33 @@ void envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_wate
 void envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr) {}
+
+void envoy_dynamic_module_on_http_filter_http_stream_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_handle,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    bool end_stream) {}
+
+void envoy_dynamic_module_on_http_filter_http_stream_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_handle,
+    const envoy_dynamic_module_type_envoy_buffer* data, size_t data_count, bool end_stream) {}
+
+void envoy_dynamic_module_on_http_filter_http_stream_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_handle,
+    envoy_dynamic_module_type_envoy_http_header* trailers, size_t trailers_size) {}
+
+void envoy_dynamic_module_on_http_filter_http_stream_complete(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_handle) {}
+
+void envoy_dynamic_module_on_http_filter_http_stream_reset(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_http_stream_envoy_ptr stream_handle,
+    envoy_dynamic_module_type_http_stream_reset_reason reset_reason) {}

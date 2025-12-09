@@ -184,8 +184,8 @@ void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
   });
 }
 
-void FakeStream::encodeResetStream() {
-  postToConnectionThread([this]() -> void {
+void FakeStream::encodeResetStream(Http::StreamResetReason reason) {
+  postToConnectionThread([this, reason]() -> void {
     {
       absl::MutexLock lock(lock_);
       if (!parent_.connected() || saw_reset_) {
@@ -196,7 +196,7 @@ void FakeStream::encodeResetStream() {
     if (parent_.type() == Http::CodecType::HTTP1) {
       parent_.connection().close(Network::ConnectionCloseType::FlushWrite);
     } else {
-      encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset);
+      encoder_.getStream().resetStream(reason);
     }
   });
 }
@@ -427,7 +427,7 @@ FakeHttpConnection::FakeHttpConnection(
     codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this, stats,
         fake_upstream.http3Options(), max_request_headers_kb, max_request_headers_count,
-        headers_with_underscores_action);
+        headers_with_underscores_action, overload_manager_);
 #else
     ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
@@ -839,7 +839,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
     for (size_t i = 0; i < upstreams.size(); ++i) {
       FakeUpstream& upstream = *upstreams[i];
       {
-        absl::MutexLock lock(&upstream.lock_);
+        absl::MutexLock lock(upstream.lock_);
         if (!upstream.isInitialized()) {
           return absl::InternalError(
               "Must initialize the FakeUpstream first by calling initializeServer().");
@@ -855,7 +855,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       }
 
       EXPECT_TRUE(upstream.runOnDispatcherThreadAndWait([&]() {
-        absl::MutexLock lock(&upstream.lock_);
+        absl::MutexLock lock(upstream.lock_);
         connection = std::make_unique<FakeHttpConnection>(
             upstream, upstream.consumeConnection(), upstream.http_type_, upstream.timeSystem(),
             Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,

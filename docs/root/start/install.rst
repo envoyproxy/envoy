@@ -33,6 +33,14 @@ Install Envoy on Debian-based Linux
       $ sudo apt-get install envoy
       $ envoy --version
 
+   .. code-tab:: console Debian trixie
+
+      $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
+      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io trixie main" | sudo tee /etc/apt/sources.list.d/envoy.list
+      $ sudo apt-get update
+      $ sudo apt-get install envoy
+      $ envoy --version
+
    .. code-tab:: console Ubuntu focal
 
       $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
@@ -45,6 +53,14 @@ Install Envoy on Debian-based Linux
 
       $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
       $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io jammy main" | sudo tee /etc/apt/sources.list.d/envoy.list
+      $ sudo apt-get update
+      $ sudo apt-get install envoy
+      $ envoy --version
+
+   .. code-tab:: console Ubuntu noble
+
+      $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
+      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io noble main" | sudo tee /etc/apt/sources.list.d/envoy.list
       $ sudo apt-get update
       $ sudo apt-get install envoy
       $ envoy --version

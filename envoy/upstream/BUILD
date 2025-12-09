@@ -196,3 +196,12 @@ envoy_cc_library(
     deps = [
     ],
 )
+
+envoy_cc_library(
+    name = "transport_socket_matching_data_interface",
+    hdrs = ["transport_socket_matching_data.h"],
+    deps = [
+        "//envoy/stream_info:filter_state_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)

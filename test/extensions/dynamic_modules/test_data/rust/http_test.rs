@@ -46,15 +46,32 @@ fn test_header_callbacks_filter_on_request_headers() {
     .once();
 
   envoy_filter
+    .expect_get_request_header_value()
+    .withf(|name| name == "new")
+    .returning(|_| Some(EnvoyBuffer::new("value")))
+    .once();
+
+  envoy_filter
     .expect_remove_request_header()
     .withf(|name| name == "to-be-deleted")
     .return_const(true)
     .once();
 
   envoy_filter
-    .expect_get_request_header_value()
-    .withf(|name| name == "new")
-    .returning(|_| Some(EnvoyBuffer::new("value")))
+    .expect_add_request_header()
+    .withf(|name, value| name == "multi" && value == b"value3")
+    .return_const(true)
+    .once();
+
+  envoy_filter
+    .expect_get_request_header_values()
+    .withf(|name| name == "multi")
+    .returning(|_| {
+      let value1 = EnvoyBuffer::new("value1");
+      let value2 = EnvoyBuffer::new("value2");
+      let value3 = EnvoyBuffer::new("value3");
+      vec![value1, value2, value3]
+    })
     .once();
 
   envoy_filter
@@ -64,7 +81,8 @@ fn test_header_callbacks_filter_on_request_headers() {
       let multi1 = (EnvoyBuffer::new("multi"), EnvoyBuffer::new("value1"));
       let multi2 = (EnvoyBuffer::new("multi"), EnvoyBuffer::new("value2"));
       let new = (EnvoyBuffer::new("new"), EnvoyBuffer::new("value"));
-      vec![single, multi1, multi2, new]
+      let multi3 = (EnvoyBuffer::new("multi"), EnvoyBuffer::new("value3"));
+      vec![single, multi1, multi2, new, multi3]
     })
     .once();
 
@@ -93,7 +111,7 @@ fn test_send_response_filter() {
 
   envoy_filter
     .expect_send_response()
-    .withf(|status_code, headers, body| {
+    .withf(|status_code, headers, body, details| {
       *status_code == 200
         && *headers
           == vec![
@@ -101,6 +119,7 @@ fn test_send_response_filter() {
             ("header2", "value2".as_bytes()),
           ]
         && *body == Some(b"Hello, World!")
+        && details.is_none()
     })
     .once()
     .return_const(());

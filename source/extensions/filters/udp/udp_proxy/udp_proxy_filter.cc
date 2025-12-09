@@ -90,6 +90,7 @@ Network::FilterStatus StickySessionUdpProxyFilter::onDataInternal(Network::UdpRe
     if (active_session == nullptr) {
       return Network::FilterStatus::StopIteration;
     }
+    data.addresses_ = active_session->addresses();
   } else {
     active_session = active_session_it->get();
     // We defer the socket creation when the session includes filters, so the filters can be
@@ -112,6 +113,10 @@ Network::FilterStatus StickySessionUdpProxyFilter::onDataInternal(Network::UdpRe
         ENVOY_LOG(debug, "upstream session unhealthy, recreating the session");
         removeSession(active_session);
         active_session = createSession(std::move(data.addresses_), host, false);
+        if (active_session == nullptr) {
+          return Network::FilterStatus::StopIteration;
+        }
+        data.addresses_ = active_session->addresses();
       } else {
         // In this case we could not get a better host, so just keep using the current session.
         ENVOY_LOG(trace, "upstream session unhealthy, but unable to get a better host");
@@ -149,6 +154,7 @@ PerPacketLoadBalancingUdpProxyFilter::onDataInternal(Network::UdpRecvData& data)
     if (active_session == nullptr) {
       return Network::FilterStatus::StopIteration;
     }
+    data.addresses_ = active_session->addresses();
   } else {
     active_session = active_session_it->get();
     ENVOY_LOG(trace, "found already existing session on host {}.",

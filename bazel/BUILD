@@ -326,6 +326,14 @@ config_setting(
 )
 
 selects.config_setting_group(
+    name = "http3_enabled_and_linux",
+    match_all = [
+        "//bazel:linux",
+        "//bazel:enable_http3",
+    ],
+)
+
+selects.config_setting_group(
     name = "enable_http3_on_linux_ppc",
     match_all = [
         ":enable_http3",
@@ -429,11 +437,6 @@ config_setting(
 config_setting(
     name = "enable_path_normalization_by_default",
     values = {"define": "path_normalization_by_default=true"},
-)
-
-cc_proto_library(
-    name = "grpc_health_proto",
-    deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
 )
 
 config_setting(
@@ -903,81 +906,6 @@ json_data(
     ),
 )
 
-platform(
-    name = "android_aarch64",
-    constraint_values = [
-        "@platforms//cpu:aarch64",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_armeabi",
-    constraint_values = [
-        "@platforms//cpu:armv7",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_x86",
-    constraint_values = [
-        "@platforms//cpu:x86_32",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_x86_64",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "macos_x86_64",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:macos",
-    ],
-)
-
-platform(
-    name = "macos_arm64",
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:macos",
-    ],
-)
-
-platform(
-    name = "ios_x86_64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:simulator",
-    ],
-)
-
-platform(
-    name = "ios_sim_arm64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:simulator",
-    ],
-)
-
-platform(
-    name = "ios_arm64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:device",
-    ],
-)
-
 # A dependency required by python protobuf
 # Envoy does not have any C++ code that includes python.h so this dummy
 # target is enough. However if such code is added in the future when this
@@ -1021,7 +949,7 @@ cc_library(
             "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
             "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
         ],
-        "//conditions:default": ["//bazel/foreign_cc:gperftools"],
+        "//conditions:default": ["//bazel/external:gperftools"],
     }),
 )
 
@@ -1033,7 +961,7 @@ cc_library(
             "//bazel:linux_x86_64",
             "//bazel:linux_aarch64",
         ): ["@com_github_google_tcmalloc//tcmalloc"],
-        "//conditions:default": ["//bazel/foreign_cc:gperftools"],
+        "//conditions:default": ["//bazel/external:gperftools"],
     }),
 )
 

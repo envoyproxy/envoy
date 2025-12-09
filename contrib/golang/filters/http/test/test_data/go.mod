@@ -1,19 +1,18 @@
 module example.com/test-data
 
-go 1.23
-
-require github.com/envoyproxy/envoy v1.33.2
+go 1.24.6
 
 require (
-	github.com/cncf/xds/go v0.0.0-20241223141626-cff3c89139a3
+	github.com/cncf/xds/go v0.0.0-20251110193048-8bfbf64dc13e
+	github.com/envoyproxy/envoy v1.36.2
 	google.golang.org/protobuf v1.36.10
 )
 
 require (
-	cel.dev/expr v0.15.0 // indirect
-	github.com/envoyproxy/protoc-gen-validate v1.0.4 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20230822172742-b8732ec3820d // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237 // indirect
+	cel.dev/expr v0.25.1 // indirect
+	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240903143218-8af14fe29dc1 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 )
 
 replace github.com/envoyproxy/envoy => ../../../../../../

@@ -914,7 +914,7 @@ public:
       Envoy::OptRef<const Envoy::Network::DownstreamTransportSocketFactory>
       /*transport_socket_factory*/,
       Envoy::Event::Dispatcher& /*dispatcher*/) override {
-    ASSERT(session->connection()->version().handshake_protocol == quic::PROTOCOL_TLS1_3);
+    ASSERT(session->connection()->version().transport_version > quic::QUIC_VERSION_46);
     return std::make_unique<QuicCustomTlsServerHandshaker>(session, crypto_config, fail_handshake_);
   }
 
@@ -1008,7 +1008,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) 
 
   {
     // Lock up fake upstream so that it won't process handshake.
-    absl::MutexLock l(&fake_upstreams_[0]->lock());
+    absl::MutexLock l(fake_upstreams_[0]->lock());
     auto response2 = codec_client_->makeHeaderOnlyRequest(
         Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                        {":path", "/test/long/url"},
@@ -1061,7 +1061,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
   IntegrationStreamDecoderPtr response4;
   {
     // Lock up fake upstream so that it won't process handshake.
-    absl::MutexLock l(&fake_upstreams_[0]->lock());
+    absl::MutexLock l(fake_upstreams_[0]->lock());
     response2 = codec_client_->makeHeaderOnlyRequest(
         Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                        {":path", "/test/long/url"},

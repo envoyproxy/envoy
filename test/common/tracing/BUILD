@@ -58,6 +58,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -87,6 +88,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/tracing:tracer_config_lib",
     ],
 )
