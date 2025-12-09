@@ -34,6 +34,11 @@ on:
       bind-mounts:
         type: string
         default: |
+          - src: /mnt/docker
+            target: /var/lib/docker
+            rm: true
+            command-pre: sudo systemctl stop docker
+            command-post: sudo systemctl start docker
           - src: /mnt/workspace
             target: GITHUB_WORKSPACE
             chown: "runner:runner"
@@ -299,7 +304,6 @@ jobs:
       with:
         image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
-        bind-mount: /mnt/docker
 
     - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.35
       id: appauth
