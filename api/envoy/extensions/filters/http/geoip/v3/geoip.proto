@@ -20,9 +20,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Geoip :ref:`configuration overview <config_http_filters_geoip>`.
 // [#extension: envoy.filters.http.geoip]
 
-// [#next-free-field: 5]
 message Geoip {
-  // [#next-free-field: 2]
   message XffConfig {
     // The number of additional ingress proxy hops from the right side of the
     // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
@@ -33,7 +31,6 @@ message Geoip {
     uint32 xff_num_trusted_hops = 1;
   }
 
-  // [#next-free-field: 2]
   message CustomHeaderConfig {
     // The name of the request header to extract the client IP address from.
     // The header value must contain a valid IP address (IPv4 or IPv6).
