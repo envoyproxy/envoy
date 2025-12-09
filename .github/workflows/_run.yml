@@ -34,6 +34,11 @@ on:
       bind-mounts:
         type: string
         default: |
+          - src: /mnt/docker
+            target: /var/lib/docker
+            rm: true
+            command-pre: sudo systemctl stop docker
+            command-post: sudo systemctl start docker
           - src: /mnt/workspace
             target: GITHUB_WORKSPACE
             chown: "runner:runner"
@@ -263,9 +268,14 @@ jobs:
           "ipv6": true,
           "fixed-cidr-v6": "2001:db8:1::/64"
           }' | sudo tee /etc/docker/daemon.json
-        sudo service docker restart
       name: Configure Docker ipv6
       if: ${{ inputs.docker-ipv6 }}
+    - if: >-
+        inputs.docker-ipv6
+        && inputs.cache-build-image
+        && steps.cache-lookup.outputs.cache-hit == 'true'
+      run: |
+        sudo systemctl restart docker
 
     # Caches
     - uses: envoyproxy/toolshed/gh-actions/cache/restore@actions-v0.3.35
@@ -295,11 +305,10 @@ jobs:
         key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
     - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.35
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@8b167c983b73a02bfc10ab289376a6178a064ec3
       with:
         image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
-        bind-mount: /mnt/docker
 
     - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.35
       id: appauth
