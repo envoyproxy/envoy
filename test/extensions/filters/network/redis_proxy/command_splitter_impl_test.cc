@@ -3221,58 +3221,64 @@ TEST_F(ClusterScopeInfoTest, InfoBytesToHumanAllSizes) {
   // Shard 1: Test various size ranges covering all bytesToHuman branches
   std::string shard1_response =
       "# Memory\r\n"
-      "used_memory:512\r\n"                      // Bytes: 512B (Sum aggregation)
-      "used_memory_rss:2048\r\n"                 // KB: 2.00K (Sum aggregation)
-      "used_memory_peak:5242880\r\n"             // MB: 5.00M (Max aggregation)
-      "used_memory_overhead:3221225472\r\n"      // GB: 3.00G (Sum aggregation, no _human)
-      "used_memory_dataset:5497558138880\r\n"    // TB: 5.00T (Sum aggregation, no _human)
-      "used_memory_startup:6755399441055744\r\n" // PB: 6.00P (Sum aggregation, no _human)
-      "maxmemory:10485760\r\n";                  // Sum: total max memory
+      "used_memory:512\r\n"                        // Bytes: 512B (Sum aggregation)
+      "used_memory_rss:2048\r\n"                   // KB: 2.00K (Sum aggregation)
+      "used_memory_peak:5242880\r\n"               // MB: 5.00M (Max aggregation)
+      "used_memory_lua:3221225472\r\n"             // GB: 3.00G (Sum, has _human)
+      "used_memory_scripts:5497558138880\r\n"      // TB: 5.00T (Sum, has _human)
+      "used_memory_vm_total:6755399441055744\r\n"  // PB: 6.00P (Sum, has _human)
+      "total_system_memory:576460752303423488\r\n" // EB: 0.50E (Sum, triggers else branch)
+      "maxmemory:10485760\r\n";                    // Sum: total max memory
 
   // Shard 2: Add more values to test Sum and Max aggregation properly
   std::string shard2_response =
       "# Memory\r\n"
-      "used_memory:256\r\n"                      // Sum: 512 + 256 = 768B
-      "used_memory_rss:1024\r\n"                 // Sum: 2048 + 1024 = 3072 = 3.00K
-      "used_memory_peak:2621440\r\n"             // Max: max(5242880, 2621440) = 5242880 = 5.00M
-      "used_memory_overhead:1073741824\r\n"      // Sum: test GB range aggregation
-      "used_memory_dataset:2748779069440\r\n"    // Sum: test TB range aggregation
-      "used_memory_startup:3377699720527872\r\n" // Sum: test PB range aggregation
-      "maxmemory:10485760\r\n";                  // Sum: 10485760 + 10485760 = 20971520
+      "used_memory:256\r\n"                   // Sum: 512 + 256 = 768B
+      "used_memory_rss:1024\r\n"              // Sum: 2048 + 1024 = 3072 = 3.00K
+      "used_memory_peak:2621440\r\n"          // Max: max(5242880, 2621440) = 5.00M
+      "used_memory_lua:1073741824\r\n"        // Sum: 3221225472 + 1073741824 = 4294967296 = 4.00G
+      "used_memory_scripts:2748779069440\r\n" // Sum: 5497558138880 + 2748779069440 = 8246337208320
+                                              // = 7.50T
+      "used_memory_vm_total:3377699720527872\r\n"  // Sum: 6755399441055744 + 3377699720527872 =
+                                                   // 10133099161583616 = 9.00P
+      "total_system_memory:576460752303423488\r\n" // Sum: 0.5E + 0.5E = 1.00E (>= 1EB, else)
+      "maxmemory:10485760\r\n";                    // Sum: 10485760 + 10485760 = 20971520
 
   pool_callbacks_[0]->onResponse(infoResponse(shard1_response));
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 10));
-
   // Verify the response contains correctly formatted human-readable values
   EXPECT_CALL(callbacks_, onResponse_(_)).WillOnce([](Common::Redis::RespValuePtr& response) {
     ASSERT_NE(nullptr, response);
     ASSERT_EQ(Common::Redis::RespType::BulkString, response->type());
     std::string content = response->asString();
 
-    // Verify _human metrics (only 3 metrics have PostProcess _human variants)
+    // Verify _human metrics covering ALL size ranges
     EXPECT_THAT(content, testing::HasSubstr("used_memory_human:768B"));      // Bytes: 512+256
     EXPECT_THAT(content, testing::HasSubstr("used_memory_rss_human:3.00K")); // KB: 2048+1024
     EXPECT_THAT(content,
                 testing::HasSubstr("used_memory_peak_human:5.00M")); // MB: max(5242880,2621440)
+    EXPECT_THAT(content,
+                testing::HasSubstr("used_memory_lua_human:4.00G")); // GB: 3221225472+1073741824
+    EXPECT_THAT(content,
+                testing::HasSubstr("used_memory_scripts_human:7.50T")); // TB: sum of values
+    EXPECT_THAT(content,
+                testing::HasSubstr("used_memory_vm_total_human:9.00P")); // PB: sum of values
+    EXPECT_THAT(content, testing::HasSubstr(
+                             "total_system_memory_human:1152921504606846976B")); // >= 1EB (else)
+    EXPECT_THAT(content, testing::HasSubstr("maxmemory_human:20.00M"));          // MB: 20971520
 
-    // Verify Sum aggregation worked for numeric values (these don't get _human suffix)
-    EXPECT_THAT(content, testing::HasSubstr("used_memory:768"));          // 512+256
-    EXPECT_THAT(content, testing::HasSubstr("used_memory_rss:3072"));     // 2048+1024
-    EXPECT_THAT(content, testing::HasSubstr("used_memory_peak:5242880")); // max value
-    EXPECT_THAT(content,
-                testing::HasSubstr("used_memory_overhead:4294967296")); // 3221225472+1073741824
-    EXPECT_THAT(content,
-                testing::HasSubstr("used_memory_dataset:8246337208320")); // sum of TB values
-    EXPECT_THAT(content,
-                testing::HasSubstr("used_memory_startup:10133099161583616")); // sum of PB values
-
-    // max memory is Sum type, so it adds: 10485760 + 10485760 = 20971520
-    EXPECT_THAT(content, testing::HasSubstr("maxmemory:20971520"));
-    EXPECT_THAT(content,
-                testing::HasSubstr("maxmemory_human:20.00M")); // PostProcess for max memory
+    // Verify Sum aggregation worked for numeric values
+    EXPECT_THAT(content, testing::HasSubstr("used_memory:768"));                        // 512+256
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_rss:3072"));                   // 2048+1024
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_peak:5242880"));               // max value
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_lua:4294967296"));             // GB sum
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_scripts:8246337208320"));      // TB sum
+    EXPECT_THAT(content, testing::HasSubstr("used_memory_vm_total:10133099161583616")); // PB sum
+    EXPECT_THAT(content, testing::HasSubstr("total_system_memory:1152921504606846976")); // EB sum
+    EXPECT_THAT(content, testing::HasSubstr("maxmemory:20971520")); // 10485760+10485760
   });
 
   pool_callbacks_[1]->onResponse(infoResponse(shard2_response));
