@@ -157,10 +157,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # https://boringssl.googlesource.com/boringssl/+/refs/heads/master/crypto/fipsmodule/FIPS.md, for example
         # https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4735.
         version = "fips-20220613",
-        sha256 = "62f733289f2d677c2723f556aa58034c438f3a7bbca6c12b156538a88e38da8a",
-        urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-0c6f40132b828e92ba365c6b7680e32820c63fa7.tar.xz"],
+        sha256 = "a343962da2fbb10d8fa2cd9a2832839a23045a197c0ff306dc0fa0abb85759b3",
+        strip_prefix = "boringssl-{version}",
+        urls = ["https://github.com/google/boringssl/archive/refs/tags/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-06-13",
+        release_date = "2022-08-01",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     aspect_bazel_lib = dict(
