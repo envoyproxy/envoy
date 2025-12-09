@@ -1645,19 +1645,48 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
     return;
   }
 
+  if (decoding_state_.callbackState() != ProcessorState::CallbackState::Idle ||
+      encoding_state_.callbackState() != ProcessorState::CallbackState::Idle) {
+    return;
+  }
+
   bool last_response = false;
 
   switch (response.response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
-    if ((decoding_state_.hasNoBody() ||
-         (decoding_state_.bodyMode() == ProcessingMode::NONE && !decoding_state_.sendTrailers())) &&
-        encoding_state_.noExternalProcess()) {
-      last_response = true;
+    if (encoding_state_.noExternalProcess()) {
+      if (decoding_state_.hasNoBody()) {
+        last_response = true;
+        break;
+      }
+      if (decoding_state_.bodyMode() == ProcessingMode::NONE && !decoding_state_.sendTrailers()) {
+        last_response = true;
+        break;
+      }
+      if (decoding_state_.bodyMode() == ProcessingMode::NONE && decoding_state_.sendTrailers()) {
+        if (decoding_state_.completeBodyAvailable() && (decoding_state_.responseTrailers() == nullptr)) {
+          last_response = true;
+          break;
+        }
+      }
+      if (decoding_state_.bodyMode() != ProcessingMode::NONE && !decoding_state_.sendTrailers()) {
+        if (decoding_state_.responseTrailers() != nullptr) {
+          last_response = true;
+          break;
+        }
+      }
     }
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    if (is_last_body_resp && encoding_state_.noExternalProcess()) {
-      last_response = true;
+    if (encoding_state_.noExternalProcess()) {
+      if (is_last_body_resp) {
+        last_response = true;
+        break;
+      }
+      if (!decoding_state_.sendTrailers() && decoding_state_.responseTrailers() != nullptr) {
+        last_response = true;
+        break;
+      }
     }
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
@@ -1666,14 +1695,34 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
     }
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
-    if (encoding_state_.hasNoBody() ||
-        (encoding_state_.bodyMode() == ProcessingMode::NONE && !encoding_state_.sendTrailers())) {
+    if (encoding_state_.hasNoBody()) {
       last_response = true;
+      break;
+    }
+    if (encoding_state_.bodyMode() == ProcessingMode::NONE && !encoding_state_.sendTrailers()) {
+      last_response = true;
+      break;
+    }
+    if (encoding_state_.bodyMode() == ProcessingMode::NONE && encoding_state_.sendTrailers()) {
+      if (encoding_state_.completeBodyAvailable() && (encoding_state_.responseTrailers() == nullptr)) {
+        last_response = true;
+        break;
+      }
+    }
+    if (encoding_state_.bodyMode() != ProcessingMode::NONE && !encoding_state_.sendTrailers()) {
+      if (encoding_state_.responseTrailers() != nullptr) {
+        last_response = true;
+        break;
+      }
     }
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
     if (is_last_body_resp) {
       last_response = true;
+    }
+    if (!encoding_state_.sendTrailers() && encoding_state_.responseTrailers() != nullptr) {
+      last_response = true;
+      break;
     }
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
