@@ -1170,6 +1170,76 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MessageNameValidations) {
               IsOk());
 }
 
+TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
+  std::string filter_conf_string = R"pb(
+    descriptor_set: {}
+    restrictions: {
+      method_restrictions: {
+        key: "/library.BookService/GetBook"
+        value: {
+          request_field_restrictions: {
+            key: "debug_info"
+            value: {
+              matcher: {
+                matcher_list: {
+                  matchers: {
+                    predicate: {
+                      single_predicate: {
+                        input: {
+                          name: "request"
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {}
+                          }
+                        }
+                        custom_match: {
+                           name: "cel"
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                              expr_match: {
+                                parsed_expr: { expr: { const_expr: { bool_value: true } } }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    on_match: {
+                      action: {
+                        name: "some_unknown_action"
+                        typed_config: {
+                          # Using Google Protobuf Empty as a placeholder for an unknown action
+                          [type.googleapis.com/google.protobuf.Empty] {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  )pb";
+  ProtoApiScrubberConfig proto_config;
+  Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+  *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+          .value();
+
+  // Validate that creating the config throws an EnvoyException because the action
+  // "some_unknown_action" is not registered.
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto status_or_config =
+            ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
+      },
+      EnvoyException,
+      "Didn't find a registered implementation for 'some_unknown_action' with type URL: "
+      "'google.protobuf.Empty'");
+}
+
 } // namespace
 } // namespace ProtoApiScrubber
 } // namespace HttpFilters

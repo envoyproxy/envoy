@@ -391,6 +391,9 @@ build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+# This flag may be more generally useful - it sets foreign_cc builds -jauto.
+# It is only set here because if it were the default it risks OOMing on local builds.
+build:remote --@envoy//bazel/foreign_cc:parallel_builds
 
 ## RBE (Engflow Envoy)
 

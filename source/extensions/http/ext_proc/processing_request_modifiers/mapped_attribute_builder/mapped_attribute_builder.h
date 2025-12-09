@@ -37,6 +37,7 @@ private:
       v3::MappedAttributeBuilder config_;
   const Extensions::HttpFilters::ExternalProcessing::ExpressionManager expression_manager_;
   bool sent_request_attributes_ = false;
+  bool sent_response_attributes_ = false;
 };
 
 } // namespace ExternalProcessing
