@@ -269,7 +269,8 @@ jobs:
           "fixed-cidr-v6": "2001:db8:1::/64"
           }' | sudo tee /etc/docker/daemon.json
         sudo systemctl restart docker
-        sudo systemctl reset-failed docker
+        # workaround systemd rubbish
+        ip link delete docker0 2>/dev/null || true
       name: Configure Docker ipv6
       if: ${{ inputs.docker-ipv6 }}
 
