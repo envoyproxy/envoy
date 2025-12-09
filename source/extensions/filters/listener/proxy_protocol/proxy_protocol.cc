@@ -67,18 +67,22 @@ public:
    * @param key The key (rule key) for the TLV value.
    * @param value The sanitized TLV value string.
    */
-  void addTlvValue(const std::string& key, const std::string& value) {
-    (*struct_.mutable_fields())[key] = ValueUtil::stringValue(value);
-  }
+  void addTlvValue(const std::string& key, const std::string& value) { tlv_values_[key] = value; }
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     auto s = std::make_unique<Protobuf::Struct>();
-    s->CopyFrom(struct_);
+    for (const auto& [key, value] : tlv_values_) {
+      (*s->mutable_fields())[key] = ValueUtil::stringValue(value);
+    }
     return s;
   }
 
   absl::optional<std::string> serializeAsString() const override {
-    auto json_or_error = MessageUtil::getJsonStringFromMessage(struct_, false, true);
+    Protobuf::Struct struct_proto;
+    for (const auto& [key, value] : tlv_values_) {
+      (*struct_proto.mutable_fields())[key] = ValueUtil::stringValue(value);
+    }
+    auto json_or_error = MessageUtil::getJsonStringFromMessage(struct_proto, false, true);
     if (json_or_error.ok()) {
       return json_or_error.value();
     }
@@ -88,16 +92,15 @@ public:
   bool hasFieldSupport() const override { return true; }
 
   StreamInfo::FilterState::Object::FieldType getField(absl::string_view field_name) const override {
-    const auto& fields = struct_.fields();
-    auto it = fields.find(std::string(field_name));
-    if (it != fields.end() && it->second.has_string_value()) {
-      return absl::string_view(it->second.string_value());
+    auto it = tlv_values_.find(std::string(field_name));
+    if (it != tlv_values_.end()) {
+      return absl::string_view(it->second);
     }
     return absl::monostate{};
   }
 
 private:
-  Protobuf::Struct struct_;
+  absl::flat_hash_map<std::string, std::string> tlv_values_;
 };
 
 constexpr absl::string_view kProxyProtoStatsPrefix = "proxy_proto.";
@@ -164,7 +167,7 @@ Config::Config(
                          ? proto_config.pass_through_tlvs().match_type() ==
                                ProxyProtocolPassThroughTLVs::INCLUDE_ALL
                          : false),
-      tlv_storage_location_(proto_config.tlv_storage_location()) {
+      tlv_location_(proto_config.tlv_location()) {
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
   }
@@ -607,7 +610,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
       auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
       std::string sanitised_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
 
-      if (config_->tlvStorageLocation() ==
+      if (config_->tlvLocation() ==
           envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE) {
         // Store TLV values in a single filter state object.
         constexpr absl::string_view kFilterStateKey = "envoy.network.proxy_protocol.tlv";

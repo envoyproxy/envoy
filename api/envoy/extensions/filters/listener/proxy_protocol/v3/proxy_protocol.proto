@@ -24,7 +24,7 @@ message ProxyProtocol {
       "envoy.config.filter.listener.proxy_protocol.v2.ProxyProtocol";
 
   // Controls where TLV values are stored when rules match.
-  enum TlvStorageLocation {
+  enum TlvLocation {
     // Store TLV values in dynamic metadata.
     DYNAMIC_METADATA = 0;
 
@@ -103,5 +103,5 @@ message ProxyProtocol {
   string stat_prefix = 5;
 
   // Controls where TLV values are stored when rules match. Defaults to DYNAMIC_METADATA.
-  TlvStorageLocation tlv_storage_location = 6;
+  TlvLocation tlv_location = 6;
 }

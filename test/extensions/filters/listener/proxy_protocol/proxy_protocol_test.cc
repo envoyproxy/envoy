@@ -2047,7 +2047,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateAsStringAccessor) {
   constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
 
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
-  proto_config.set_tlv_storage_location(
+  proto_config.set_tlv_location(
       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE);
   auto rule1 = proto_config.add_rules();
   rule1->set_tlv_type(0x02);
@@ -2095,7 +2095,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateAsStringAccessor) {
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateDefaultBehavior) {
-  // Test that default behavior (DYNAMIC_METADATA) still works when tlv_storage_location is not set
+  // Test that default behavior (DYNAMIC_METADATA) still works when tlv_location is not set
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x27, 0x01, 0x02, 0x03, 0x04,
                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
@@ -2107,7 +2107,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateDefaultBehavior) {
   constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
 
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
-  // Don't set tlv_storage_location - should default to DYNAMIC_METADATA
+  // Don't set tlv_location - should default to DYNAMIC_METADATA
   auto rule1 = proto_config.add_rules();
   rule1->set_tlv_type(0x02);
   rule1->mutable_on_tlv_present()->set_key("PP2 type authority");
@@ -2153,7 +2153,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToDynamicMetadataExplicit) {
   constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
 
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
-  proto_config.set_tlv_storage_location(
+  proto_config.set_tlv_location(
       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::DYNAMIC_METADATA);
   auto rule = proto_config.add_rules();
   rule->set_tlv_type(0x02);
@@ -2195,7 +2195,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateSerializeMethods) {
   constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
 
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
-  proto_config.set_tlv_storage_location(
+  proto_config.set_tlv_location(
       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE);
   auto rule = proto_config.add_rules();
   rule->set_tlv_type(0x02);

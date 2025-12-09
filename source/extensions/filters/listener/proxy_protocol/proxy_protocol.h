@@ -142,9 +142,9 @@ public:
   /**
    * Get the TLV storage location configuration.
    */
-  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::TlvStorageLocation
-  tlvStorageLocation() const {
-    return tlv_storage_location_;
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::TlvLocation
+  tlvLocation() const {
+    return tlv_location_;
   }
 
 private:
@@ -154,8 +154,8 @@ private:
   absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
   bool allow_v1_{true};
   bool allow_v2_{true};
-  const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::TlvStorageLocation
-      tlv_storage_location_;
+  const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::TlvLocation
+      tlv_location_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
