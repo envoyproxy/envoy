@@ -1,14 +1,8 @@
-admin:
-  address:
-    socket_address:
-      address: 0.0.0.0
-      port_value: 9901
 static_resources:
   listeners:
   - name: listener_0
     address:
       socket_address:
-        protocol: TCP
         address: 0.0.0.0
         port_value: 10000
     filter_chains:
@@ -52,7 +46,6 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: service
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
