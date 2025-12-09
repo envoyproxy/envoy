@@ -159,7 +159,8 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithIpAddressHeader) {
   DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
-    ip_address_header: "x-real-ip"
+    custom_header_config:
+      header_name: "x-real-ip"
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
@@ -185,7 +186,8 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigMutualExclusionXffAndIpAddressHeade
   std::string filter_config_yaml = R"EOF(
     xff_config:
       xff_num_trusted_hops: 1
-    ip_address_header: "x-real-ip"
+    custom_header_config:
+      header_name: "x-real-ip"
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
@@ -198,7 +200,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigMutualExclusionXffAndIpAddressHeade
   auto status_or = factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context);
   EXPECT_FALSE(status_or.ok());
   EXPECT_EQ(status_or.status().message(),
-            "Only one of xff_config or ip_address_header can be set in the geoip filter "
+            "Only one of xff_config or custom_header_config can be set in the geoip filter "
             "configuration");
 }
 

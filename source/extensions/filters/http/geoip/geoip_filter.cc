@@ -19,7 +19,8 @@ GeoipFilterConfig::GeoipFilterConfig(
       stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")), use_xff_(config.has_xff_config()),
       xff_num_trusted_hops_(config.has_xff_config() ? config.xff_config().xff_num_trusted_hops()
                                                     : 0),
-      ip_address_header_(config.ip_address_header()) {
+      ip_address_header_(
+          config.has_custom_header_config() ? config.custom_header_config().header_name() : "") {
   stat_name_set_->rememberBuiltin("total");
 }
 

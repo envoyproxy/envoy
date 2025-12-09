@@ -119,7 +119,8 @@ const std::string ConfigWithIpAddressHeader = R"EOF(
 name: envoy.filters.http.geoip
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.geoip.v3.Geoip
-  ip_address_header: "x-real-ip"
+  custom_header_config:
+    header_name: "x-real-ip"
   provider:
     name: envoy.geoip_providers.maxmind
     typed_config:

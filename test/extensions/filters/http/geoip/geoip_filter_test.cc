@@ -298,7 +298,8 @@ TEST_F(GeoipFilterTest, NoCrashIfFilterDestroyedBeforeCallbackCalled) {
 TEST_F(GeoipFilterTest, UseIpAddressHeaderSuccessfulLookup) {
   initializeProviderFactory();
   const std::string external_request_yaml = R"EOF(
-    ip_address_header: "x-real-ip"
+    custom_header_config:
+      header_name: "x-real-ip"
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
@@ -331,7 +332,8 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderSuccessfulLookup) {
 TEST_F(GeoipFilterTest, UseIpAddressHeaderWithIpv6) {
   initializeProviderFactory();
   const std::string external_request_yaml = R"EOF(
-    ip_address_header: "x-real-ip"
+    custom_header_config:
+      header_name: "x-real-ip"
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
@@ -364,7 +366,8 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderWithIpv6) {
 TEST_F(GeoipFilterTest, UseIpAddressHeaderFallbackOnMissingHeader) {
   initializeProviderFactory();
   const std::string external_request_yaml = R"EOF(
-    ip_address_header: "x-real-ip"
+    custom_header_config:
+      header_name: "x-real-ip"
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
@@ -397,7 +400,8 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderFallbackOnMissingHeader) {
 TEST_F(GeoipFilterTest, UseIpAddressHeaderFallbackOnInvalidIp) {
   initializeProviderFactory();
   const std::string external_request_yaml = R"EOF(
-    ip_address_header: "x-real-ip"
+    custom_header_config:
+      header_name: "x-real-ip"
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
