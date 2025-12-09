@@ -18,7 +18,7 @@ fi
 
 
 # Bazel magic.
-# ROOT=$(dirname $(rootpath boringssl/BUILDING.md))/..
+# ROOT=$(dirname $(rootpath BUILDING.md))/..
 ROOT=./external/boringssl_fips
 pushd "$ROOT"
 export HOME="$PWD"
@@ -116,10 +116,10 @@ if [[ `cmake --version | head -n1` != "cmake version $VERSION" ]]; then
 fi
 
 # Clean after previous build.
-rm -rf boringssl/build
+rm -rf build
 
 # Build BoringSSL.
-cd boringssl
+# cd boringssl
 # Setting -fPIC only affects the compilation of the non-module code in libcrypto.a,
 # because the FIPS module itself is already built with -fPIC.
 mkdir build && cd build && cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=${HOME}/toolchain -DFIPS=1 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-fPIC" -DCMAKE_CXX_FLAGS="-fPIC" ..
@@ -140,5 +140,5 @@ fi
 
 # Move compiled libraries to the expected destinations.
 popd
-mv $ROOT/boringssl/build/crypto/libcrypto.a $1
-mv $ROOT/boringssl/build/ssl/libssl.a $2
+mv $ROOT/build/crypto/libcrypto.a $1
+mv $ROOT/build/ssl/libssl.a $2
