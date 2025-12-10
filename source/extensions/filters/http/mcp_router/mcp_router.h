@@ -126,7 +126,7 @@ struct DetachedFanout : public Logger::Loggable<Logger::Id::filter> {
 
 /**
  * Thread-local storage for detached fanout operations.
- * Allows fire-and-forget fanouts to complete after their filter is destroyed.
+ * Allows the fire-and-forget fanout to complete after their filter is destroyed.
  */
 class ThreadLocalFanoutManager : public ThreadLocal::ThreadLocalObject,
                                  public Logger::Loggable<Logger::Id::filter> {
