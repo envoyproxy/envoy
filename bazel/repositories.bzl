@@ -73,7 +73,11 @@ default_envoy_build_config = repository_rule(
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
-    external_http_archive("grpc_httpjson_transcoding")
+    external_http_archive(
+        name = "grpc_httpjson_transcoding",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:grpc_httpjson_transcoding.patch"],
+    )
     external_http_archive(
         name = "com_google_protoconverter",
         patch_args = ["-p1"],
@@ -226,6 +230,8 @@ def envoy_dependencies(skip_targets = []):
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
 
+    _toolchains_llvm()
+
     _cc_deps()
     _go_deps(skip_targets)
     _rust_deps()
@@ -299,6 +305,8 @@ def _com_github_axboe_liburing():
     external_http_archive(
         name = "com_github_axboe_liburing",
         build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:liburing.patch"],
     )
 
 def _com_github_bazel_buildtools():
@@ -642,6 +650,9 @@ def _com_google_protobuf():
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+        },
     )
 
 def _v8():
@@ -803,6 +814,9 @@ def _com_github_wamr():
         name = "com_github_wamr",
         build_file_content = BUILD_ALL_CONTENT,
     )
+
+def _toolchains_llvm():
+    external_http_archive(name = "toolchains_llvm")
 
 def _com_github_wasmtime():
     external_http_archive(

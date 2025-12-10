@@ -16,7 +16,7 @@ single_version_override(
 # Core dependencies from Bazel Central Registry
 bazel_dep(name = "abseil-cpp", version = "20250127.1", repo_name = "com_google_absl")
 bazel_dep(name = "bazel_skylib", version = "1.8.2")
-bazel_dep(name = "cel-spec", version = "0.24.0", repo_name = "dev_cel")
+bazel_dep(name = "cel-spec", version = "0.25.1", repo_name = "dev_cel")
 bazel_dep(name = "gazelle", version = "0.45.0", repo_name = "bazel_gazelle")
 bazel_dep(name = "googleapis", version = "0.0.0-20240819-fe8ba054a", repo_name = "com_google_googleapis")
 bazel_dep(name = "grpc", version = "1.66.0.bcr.2", repo_name = "com_github_grpc_grpc")

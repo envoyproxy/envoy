@@ -274,7 +274,8 @@ void CheckRequestUtils::createHttpCheck(
 void CheckRequestUtils::createTcpCheck(
     const Network::ReadFilterCallbacks* callbacks, envoy::service::auth::v3::CheckRequest& request,
     bool include_peer_certificate, bool include_tls_session,
-    const Protobuf::Map<std::string, std::string>& destination_labels) {
+    const Protobuf::Map<std::string, std::string>& destination_labels,
+    envoy::config::core::v3::Metadata&& metadata_context) {
 
   auto attrs = request.mutable_attributes();
 
@@ -290,6 +291,8 @@ void CheckRequestUtils::createTcpCheck(
     setTLSSession(*attrs->mutable_tls_session(), cb->connection());
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
+  // Fill in the metadata context.
+  (*attrs->mutable_metadata_context()) = std::move(metadata_context);
 }
 
 MatcherSharedPtr

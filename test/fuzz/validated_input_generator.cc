@@ -171,7 +171,7 @@ void ValidatedInputGenerator::handleAnyRules(
     const Protobuf::Descriptor* descriptor = msg->GetDescriptor();
     std::unique_ptr<Protobuf::Message> inner_message;
     if (descriptor->full_name() == kAny) {
-      const std::string class_name = parents.back()->GetDescriptor()->full_name();
+      const std::string class_name = std::string(parents.back()->GetDescriptor()->full_name());
       AnyMap::const_iterator any_map_cand = any_map_.find(class_name);
       if (any_map_cand != any_map_.end()) {
         const FieldToTypeUrls& field_to_typeurls = any_map_cand->second;
@@ -430,7 +430,7 @@ void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
                                !reflection->HasOneof(msg, descriptor->oneof_decl(oneof_index)))) {
       // No required member in one of set, so create one.
       for (int index = 0; index < oneof_desc->field_count(); ++index) {
-        const std::string class_name = descriptor->full_name();
+        const auto class_name = descriptor->full_name();
         // Treat matchers special, because in their oneof they reference themselves, which may
         // create long chains. Prefer the first alternative, which does not reference itself.
         // Nevertheless do it randomly to allow for some nesting.

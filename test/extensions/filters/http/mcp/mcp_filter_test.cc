@@ -149,11 +149,6 @@ TEST_F(McpFilterTest, RejectModeRejectsNonJsonRpc) {
 
   std::string body = R"({"method": "test"})";
   Buffer::OwnedImpl buffer(body);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
@@ -189,22 +184,36 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
 
   filter_->decodeHeaders(headers, false);
 
-  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
 
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
 
-  // Expect dynamic metadata to be set
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+        auto jsonrpc_it = fields.find("jsonrpc");
+        ASSERT_NE(jsonrpc_it, fields.end());
+        EXPECT_EQ(jsonrpc_it->second.string_value(), "2.0");
+
+        auto method_it = fields.find("method");
+        ASSERT_NE(method_it, fields.end());
+        EXPECT_EQ(method_it->second.string_value(), "tools/call");
+
+        auto params_it = fields.find("params");
+        ASSERT_NE(params_it, fields.end());
+        const auto& params = params_it->second.struct_value().fields();
+
+        auto name_it = params.find("name");
+        ASSERT_NE(name_it, params.end());
+        EXPECT_EQ(name_it->second.string_value(), "test");
+      });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Test buffering behavior for streaming data
-TEST_F(McpFilterTest, StreamingDataBuffering) {
+TEST_F(McpFilterTest, PartialNoJsonData) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
@@ -215,7 +224,7 @@ TEST_F(McpFilterTest, StreamingDataBuffering) {
   Buffer::OwnedImpl buffer("partial data");
 
   // Not end_stream, should buffer
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
 // Test encoder passthrough
@@ -240,11 +249,6 @@ TEST_F(McpFilterTest, WrongJsonRpcVersion) {
 
   std::string wrong_version = R"({"jsonrpc": "1.0", "method": "test", "id": 1})";
   Buffer::OwnedImpl buffer(wrong_version);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
 
@@ -326,18 +330,14 @@ TEST_F(McpFilterTest, RequestBodyUnderLimitSucceeds) {
   // Create a JSON-RPC body that's under 1KB
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
 
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
-// Test request body exceeding the limit gets 413
-TEST_F(McpFilterTest, RequestBodyExceedingLimitRejected) {
+// Test request body exceeding, but it will continue since we get the enough data.
+TEST_F(McpFilterTest, RequestBodyExceedingLimitContinues) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(100); // Very small limit
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -356,16 +356,33 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejected) {
   std::string json =
       R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "longkey": "this is a very long string to exceed the limit"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
 
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+// Test request body exceeding limit when there is not enough data.
+TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_max_request_body_size()->set_value(20); // Very small limit
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(20));
+  filter_->decodeHeaders(headers, false);
+
+  // Create a JSON body that exceeds 20 bytes but is incomplete
+  std::string json = R"({"jsonrpc": "2.0", "me)";
+  Buffer::OwnedImpl buffer(json);
 
   EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::PayloadTooLarge,
-                             testing::HasSubstr("Request body size exceeds maximum allowed size"),
-                             _, _, "mcp_filter_body_too_large"));
+              sendLocalReply(Http::Code::BadRequest,
+                             "reached end_stream or configured body size, don't get enough data.",
+                             _, _, _));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
@@ -392,11 +409,6 @@ TEST_F(McpFilterTest, RequestBodyWithDisabledLimitAllowsLargeBodies) {
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"data": ")" + large_data +
                      R"("}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
 
   // Should succeed even with large body
@@ -430,11 +442,6 @@ TEST_F(McpFilterTest, RequestBodyExactlyAtLimitSucceeds) {
   json = json.substr(0, 100);
 
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   // Should NOT be rejected
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::PayloadTooLarge, _, _, _, _)).Times(0);
@@ -498,16 +505,7 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   std::string json =
       R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value with lots of data"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::PayloadTooLarge, _, _, _, "mcp_filter_body_too_large"));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Test route cache is NOT cleared by default when metadata is set
@@ -521,11 +519,6 @@ TEST_F(McpFilterTest, RouteCacheNotClearedByDefault) {
 
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   // Expect dynamic metadata to be set
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
@@ -549,11 +542,6 @@ TEST_F(McpFilterTest, RouteCacheNotClearedWhenDisabled) {
 
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   // Expect dynamic metadata to be set
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
@@ -577,11 +565,6 @@ TEST_F(McpFilterTest, RouteCacheClearedWhenExplicitlyEnabled) {
 
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
 
   // Expect dynamic metadata to be set
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
@@ -604,6 +587,98 @@ TEST_F(McpFilterTest, ClearRouteCacheConfigGetter) {
   // Explicitly set to true
   setupWithClearRouteCache(true);
   EXPECT_TRUE(config_->clearRouteCache());
+}
+
+TEST_F(McpFilterTest, FilterWithCustomParserConfig) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+
+  // Add custom parser config
+  auto* parser_config = proto_config.mutable_parser_config();
+  auto* method_rule = parser_config->add_methods();
+  method_rule->set_method("custom/method");
+  method_rule->add_extraction_rules()->set_path("params.custom_field");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "custom/method",
+    "params": {
+      "custom_field": "extracted_value",
+      "other_field": "ignored"
+    },
+    "id": 1
+  })";
+  Buffer::OwnedImpl buffer(json);
+
+  // Expect dynamic metadata to be set with the custom field
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+        auto it = fields.find("params");
+        ASSERT_NE(it, fields.end());
+        const auto& params = it->second.struct_value().fields();
+
+        // Custom field should be extracted
+        auto custom_it = params.find("custom_field");
+        ASSERT_NE(custom_it, params.end());
+        EXPECT_EQ(custom_it->second.string_value(), "extracted_value");
+
+        // Other field should not be extracted
+        EXPECT_EQ(params.find("other_field"), params.end());
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test that extra data is ignored after parsing is complete
+TEST_F(McpFilterTest, ParsingCompleteIgnoresExtraData) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Send a complete JSON-RPC request
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Should complete parsing and return Continue
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+
+  // Send more data
+  Buffer::OwnedImpl extra_buffer("extra data");
+  // Should return Continue immediately because parsing is complete
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(extra_buffer, true));
+}
+
+// Test that partial valid JSON returns StopIterationAndBuffer
+TEST_F(McpFilterTest, PartialValidJsonBuffers) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Send partial JSON with a method that requires params (tools/call requires params.name)
+  // This ensures early stop is not triggered immediately.
+  std::string json = R"({"jsonrpc": "2.0", "method": "tools/call")";
+  Buffer::OwnedImpl buffer(json);
+
+  // Should buffer and wait for more data
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
 }
 
 // Test per-route max body size override with smaller limit
@@ -630,25 +705,7 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeSmallerLimit) {
 
   // Should use per-route limit of 100 bytes, not global 1024
   EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(100));
-  filter_->decodeHeaders(headers, false);
-
-  // Create a body that exceeds per-route limit (100) but under global (1024)
-  std::string json =
-      R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "extra": "data to exceed 100 bytes"}, "id": 1})";
-  Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-
-  // Should be rejected based on per-route limit
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::PayloadTooLarge,
-                             testing::HasSubstr("Request body size exceeds maximum allowed size"),
-                             _, _, "mcp_filter_body_too_large"));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
 // Test per-route max body size override with larger limit
@@ -675,21 +732,7 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeLargerLimit) {
 
   // Should use per-route limit of 2048 bytes, not global 100
   EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(2048));
-  filter_->decodeHeaders(headers, false);
-
-  // Create a body that exceeds global limit (100) but under per-route (2048)
-  std::string json =
-      R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "extra": "data to exceed 100 bytes limit"}, "id": 1})";
-  Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
-
-  // Should succeed based on per-route limit
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
 // Test fallback to global max body size when no per-route override
@@ -716,20 +759,7 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeFallbackToGlobal) {
 
   // Should fallback to global limit of 512 bytes
   EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(512));
-  filter_->decodeHeaders(headers, false);
-
-  // Create a valid JSON-RPC body under 512 bytes
-  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
-  Buffer::OwnedImpl buffer(json);
-  Buffer::OwnedImpl decoding_buffer;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillOnce([&decoding_buffer](Buffer::Instance& data, bool) { decoding_buffer.move(data); });
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
-
-  // Should succeed based on global limit
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
 } // namespace
