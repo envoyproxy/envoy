@@ -204,24 +204,24 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& diffs
 bool decodeEscapedJson(absl::string_view sanitized, std::string& decoded, std::string& errmsg) {
   // A map between a character to its escape character.
   static constexpr std::array<char, 256> escape_map = []() {
-      std::array<char, 256> map = {};
+    std::array<char, 256> map = {};
 
-      // By default maps every character to itself (Identity).
-      // This handles cases like '\'' -> '\'' or '\\' -> '\\' automatically,
-      // and ensures non-special chars (like 'c' in '\c') remain strictly 'c'.
-      for (int i = 0; i < 256; ++i) {
-          map[i] = static_cast<char>(i);
-      }
-      // Special handling for special escape characters.
-      map['n'] = '\n';
-      map['r'] = '\r';
-      map['t'] = '\t';
-      map['v'] = '\v';
-      map['b'] = '\b';
-      map['f'] = '\f';
-      map['a'] = '\a';
-      map['0'] = '\0';
-      return map;
+    // By default maps every character to itself (Identity).
+    // This handles cases like '\'' -> '\'' or '\\' -> '\\' automatically,
+    // and ensures non-special chars (like 'c' in '\c') remain strictly 'c'.
+    for (int i = 0; i < 256; ++i) {
+      map[i] = static_cast<char>(i);
+    }
+    // Special handling for special escape characters.
+    map['n'] = '\n';
+    map['r'] = '\r';
+    map['t'] = '\t';
+    map['v'] = '\v';
+    map['b'] = '\b';
+    map['f'] = '\f';
+    map['a'] = '\a';
+    map['0'] = '\0';
+    return map;
   }();
 
   // Iterate over the characters in sanitized, and decode the escaped characters.
@@ -235,6 +235,8 @@ bool decodeEscapedJson(absl::string_view sanitized, std::string& decoded, std::s
 
       switch (c) {
       // For simple character escapes, append the decoded char and advance past the escape sequence.
+      // Note that some control characters (e.g., '\0') are not allowed in JSON
+      // (but \u0000 is allowed).
       case 'n':
       case 'r':
       case 't':
