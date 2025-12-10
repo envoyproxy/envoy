@@ -31,6 +31,7 @@ struct GrpcMuxContext {
   BackOffStrategyPtr backoff_strategy_;
   const std::string& target_xds_authority_;
   EdsResourcesCachePtr eds_resources_cache_;
+  bool skip_subsequent_node_;
 };
 
 } // namespace Config

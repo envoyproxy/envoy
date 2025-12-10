@@ -70,7 +70,7 @@ public:
         {{"envoy.restart_features.xds_failover_support", using_xds_failover_ ? "true" : "false"}});
   }
 
-  void setup() {
+  void setup(bool skip_subsequent_node = false) {
     auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
         SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
     GrpcMuxContext grpc_mux_context{
@@ -88,9 +88,10 @@ public:
         /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_)};
+        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+        /*skip_subsequent_node_=*/skip_subsequent_node};
     if (isUnifiedMuxTest()) {
-      grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context, false);
+      grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context);
       return;
     }
     grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(grpc_mux_context);
@@ -103,9 +104,11 @@ public:
                          const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
                          const std::string& error_message = "",
                          const std::map<std::string, std::string>& initial_resource_versions = {},
-                         Grpc::MockAsyncStream* async_stream = nullptr) {
+                         Grpc::MockAsyncStream* async_stream = nullptr, bool expect_node = true) {
     API_NO_BOOST(envoy::service::discovery::v3::DeltaDiscoveryRequest) expected_request;
-    expected_request.mutable_node()->CopyFrom(local_info_.node());
+    if (expect_node) {
+      expected_request.mutable_node()->CopyFrom(local_info_.node());
+    }
     for (const auto& resource : resource_names_subscribe) {
       expected_request.add_resource_names_subscribe(resource);
     }
@@ -227,6 +230,26 @@ TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
   EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar").ok());
 
   expectSendMessage("foo", {}, {"x", "y"});
+}
+
+// Validate behavior when skip_subsequent_node is set to true.
+TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode) {
+  setup(true);
+  InSequence s;
+  auto watch = grpc_mux_->addWatch("foo", {"x"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // first message
+  expectSendMessage("foo", {"x"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {}, nullptr,
+                    true);
+  grpc_mux_->start();
+
+  // second message
+  expectSendMessage("foo", {"y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {}, nullptr,
+                    false);
+  watch->update({"x", "y"});
+  // for teardown
+  expectSendMessage("foo", {}, {"x", "y"}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
+                    nullptr, false);
 }
 
 // Validate cached nonces are cleared on reconnection.

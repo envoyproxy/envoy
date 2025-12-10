@@ -79,7 +79,8 @@ class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
                          const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                         XdsConfigTrackerOptRef xds_config_tracker);
+                         XdsConfigTrackerOptRef xds_config_tracker,
+                         bool skip_subsequent_node);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
@@ -171,6 +172,7 @@ private:
   UntypedConfigUpdateCallbacks& watch_map_;
   const LocalInfo::LocalInfo& local_info_;
   XdsConfigTrackerOptRef xds_config_tracker_;
+  const bool skip_subsequent_node_;
 
   bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};

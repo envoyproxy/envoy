@@ -15,7 +15,8 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
                                                const LocalInfo::LocalInfo& local_info,
                                                Event::Dispatcher& dispatcher,
-                                               XdsConfigTrackerOptRef xds_config_tracker)
+                                               XdsConfigTrackerOptRef xds_config_tracker,
+                                               bool skip_subsequent_node)
     // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
     // empty resources as updates.
     : supports_heartbeats_(type_url != "envoy.config.route.v3.VirtualHost"),
@@ -38,7 +39,8 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
           },
           dispatcher, dispatcher.timeSource()),
       type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
-      xds_config_tracker_(xds_config_tracker) {}
+      xds_config_tracker_(xds_config_tracker),
+      skip_subsequent_node_(skip_subsequent_node) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,
@@ -293,6 +295,9 @@ envoy::service::discovery::v3::DeltaDiscoveryRequest
 DeltaSubscriptionState::getNextRequestAckless() {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   must_send_discovery_request_ = false;
+  if (!any_request_sent_yet_in_current_stream_ || !skip_subsequent_node_) {
+    request.mutable_node()->MergeFrom(local_info_.node());
+  }
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     const bool is_legacy_wildcard = isInitialRequestForLegacyWildcard();
@@ -335,7 +340,6 @@ DeltaSubscriptionState::getNextRequestAckless() {
   names_removed_.clear();
 
   request.set_type_url(type_url_);
-  request.mutable_node()->MergeFrom(local_info_.node());
   return request;
 }
 

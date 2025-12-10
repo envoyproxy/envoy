@@ -452,5 +452,9 @@ new_features:
     access TLV values via FilterStateInput without requiring custom HTTP filters to copy metadata. Individual TLV values
     can be accessed via field access: ``%FILTER_STATE(envoy.network.proxy_protocol.tlv:FIELD:key)%``. Defaults to
     ``DYNAMIC_METADATA`` to maintain existing behavior.
+- area: config
+  change: |
+    Added support for `:ref:`set_node_on_first_message_only
+    <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` to delta xDS (NewGrpcMuxImpl)
 
 deprecated:
