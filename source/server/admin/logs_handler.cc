@@ -52,6 +52,12 @@ LogsHandler::getLoggerGroups() {
     {"grpc", {"source/common/grpc/*"}},
     {"filter", {"source/common/filter/*", "source/extensions/filters/*"}},
     {"listener", {"source/server/listener*", "source/common/listener_manager/*"}},
+    {"tls", {"source/common/tls/*", "source/common/ssl/*", "source/extensions/transport_sockets/tls/*"}},
+    {"quic", {"source/common/quic/*"}},
+    {"tracing", {"source/common/tracing/*", "source/extensions/tracers/*"}},
+    {"stats", {"source/common/stats/*"}},
+    {"runtime", {"source/common/runtime/*"}},
+    {"secret", {"source/common/secret/*", "source/extensions/common/secret/*"}},
   });
   return groups;
 }

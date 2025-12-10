@@ -192,6 +192,14 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: admin
+  change: |
+    Added support for group-based logging control via the ``/logging`` endpoint. Users can now change log levels for
+    predefined groups of loggers using ``/logging?group=<group_name>:<level>`` (e.g., ``/logging?group=http:trace``).
+    Available groups include ``http``, ``router``, ``network``, ``upstream``, ``connection``, ``admin``, ``config``,
+    ``grpc``, ``filter``, ``listener``, ``tls``, ``quic``, ``tracing``, ``stats``, ``runtime``, and ``secret``.
+    This feature requires fine-grain logging to be enabled and simplifies debugging by allowing log level changes
+    for entire subsystems with a single command.
 - area: oauth2
   change: |
     Added support for configuring cookie path in the OAuth2 filter. The :ref:`path
