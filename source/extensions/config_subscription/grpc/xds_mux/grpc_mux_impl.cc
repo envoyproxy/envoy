@@ -521,7 +521,7 @@ public:
          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads"))
             ? std::make_unique<EdsResourcesCacheImpl>(dispatcher)
             : nullptr,
-        ads_config.set_node_on_first_message_only()};
+        /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only()};
     return std::make_shared<GrpcMuxDelta>(grpc_mux_context);
   }
 };
@@ -561,7 +561,7 @@ public:
          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads"))
             ? std::make_unique<EdsResourcesCacheImpl>(dispatcher)
             : nullptr,
-        ads_config.set_node_on_first_message_only()};
+        /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only()};
     return std::make_shared<GrpcMuxSotw>(grpc_mux_context);
   }
 };

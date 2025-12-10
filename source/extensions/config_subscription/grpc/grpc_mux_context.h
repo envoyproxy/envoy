@@ -15,8 +15,7 @@
 namespace Envoy {
 namespace Config {
 
-// Context (data) needed for creating a GrpcMux object.
-// These are parameters needed for the creation of all GrpcMux objects.
+// Context (data) needed for creating any GrpcMux object.
 struct GrpcMuxContext {
   Grpc::RawAsyncClientSharedPtr async_client_;
   Grpc::RawAsyncClientSharedPtr failover_async_client_;
