@@ -108,7 +108,7 @@ ServerContextImpl::ServerContextImpl(
   }
   // If creation failed, do not create the selector.
   if (add_selector) {
-    tls_certificate_selector_ = config.tlsCertificateSelectorFactory()(*this);
+    tls_certificate_selector_ = config.tlsCertificateSelectorFactory().create(*this);
   }
 
   if (tls_certificates.empty() && !config.capabilities().provides_certificates &&

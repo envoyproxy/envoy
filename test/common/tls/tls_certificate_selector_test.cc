@@ -125,12 +125,26 @@ private:
   Ssl::CertificateSelectionCallbackPtr cb_;
 };
 
+class TestTlsCertificateSelectorFactory;
+
+class TestTlsSelectorFactory : public Ssl::TlsCertificateSelectorFactory {
+public:
+  TestTlsSelectorFactory(const Protobuf::Message& config, TestTlsCertificateSelectorFactory& parent)
+      : config_(config), parent_(parent) {}
+  Ssl::TlsCertificateSelectorPtr create(Ssl::TlsCertificateSelectorContext& selector_ctx) override;
+  absl::Status onConfigUpdate() override { return absl::OkStatus(); }
+
+private:
+  const Protobuf::Message& config_;
+  TestTlsCertificateSelectorFactory& parent_;
+};
+
 class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory {
 public:
   using CreateProviderHook =
       std::function<void(const Protobuf::Message&, Server::Configuration::GenericFactoryContext&)>;
 
-  absl::StatusOr<Ssl::TlsCertificateSelectorFactory>
+  absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr>
   createTlsCertificateSelectorFactory(const Protobuf::Message& config,
                                       Server::Configuration::GenericFactoryContext& factory_context,
                                       const Ssl::ServerContextConfig&, bool for_quic) override {
@@ -140,12 +154,7 @@ public:
     if (for_quic) {
       return absl::InvalidArgumentError("does not supported for quic");
     }
-    return [&config, this](Ssl::TlsCertificateSelectorContext& selector_ctx) {
-      ENVOY_LOG_MISC(info, "debug: init provider");
-      auto provider = std::make_unique<TestTlsCertificateSelector>(selector_ctx, config);
-      provider->mod_ = mod_;
-      return provider;
-    };
+    return std::make_unique<TestTlsSelectorFactory>(config, *this);
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::StringValue>();
@@ -154,6 +163,14 @@ public:
 
   CreateProviderHook selector_cb_;
   Ssl::SelectionResult::SelectionStatus mod_;
+};
+
+Ssl::TlsCertificateSelectorPtr
+TestTlsSelectorFactory::create(Ssl::TlsCertificateSelectorContext& selector_ctx) {
+  ENVOY_LOG_MISC(info, "debug: init provider");
+  auto provider = std::make_unique<TestTlsCertificateSelector>(selector_ctx, config_);
+  provider->mod_ = parent_.mod_;
+  return provider;
 };
 
 Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,

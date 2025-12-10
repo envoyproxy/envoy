@@ -44,9 +44,22 @@ private:
   Event::TimerPtr selection_timer_;
 };
 
+class AsyncTlsFactory : public Ssl::TlsCertificateSelectorFactory {
+public:
+  AsyncTlsFactory(const std::string& mode, Stats::Scope& scope) : mode_(mode), scope_(scope) {}
+  Ssl::TlsCertificateSelectorPtr create(Ssl::TlsCertificateSelectorContext& selector_ctx) override {
+    return std::make_unique<AsyncTlsCertificateSelector>(scope_, selector_ctx, mode_);
+  };
+  absl::Status onConfigUpdate() override { return absl::OkStatus(); }
+
+private:
+  const std::string mode_;
+  Stats::Scope& scope_;
+};
+
 class AsyncTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory {
 public:
-  absl::StatusOr<Ssl::TlsCertificateSelectorFactory>
+  absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr>
   createTlsCertificateSelectorFactory(const Protobuf::Message& config,
                                       Server::Configuration::GenericFactoryContext& factory_context,
                                       const Ssl::ServerContextConfig&, bool for_quic) override {
@@ -61,10 +74,7 @@ public:
     }
 
     auto& scope = factory_context.serverFactoryContext().scope();
-
-    return [mode, &scope](Ssl::TlsCertificateSelectorContext& selector_ctx) {
-      return std::make_unique<AsyncTlsCertificateSelector>(scope, selector_ctx, mode);
-    };
+    return std::make_unique<AsyncTlsFactory>(mode, scope);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

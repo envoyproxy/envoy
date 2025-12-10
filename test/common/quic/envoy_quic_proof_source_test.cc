@@ -204,7 +204,7 @@ public:
     auto tls_certificate_selector_factory_cb =
         factory->createTlsCertificateSelectorFactory(any, ctx, *mock_context_config_, true);
     EXPECT_CALL(*mock_context_config_, tlsCertificateSelectorFactory())
-        .WillRepeatedly(Return(tls_certificate_selector_factory_cb.value()));
+        .WillRepeatedly(ReturnRef(*tls_certificate_selector_factory_cb.value()));
 
     EXPECT_CALL(*mock_context_config_, isReady()).WillRepeatedly(Return(true));
     std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{

@@ -21,16 +21,21 @@ namespace {
 
 using StatusHelpers::StatusIs;
 using ::testing::NiceMock;
+using ::testing::Return;
 
 class OnDemandTest : public ::testing::Test {
 protected:
-  absl::StatusOr<Ssl::TlsCertificateSelectorFactory> create(const std::string& config_yaml,
-                                                            bool for_quic = false) {
+  absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr> create(const std::string& config_yaml,
+                                                               bool for_quic = false) {
     envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
     TestUtility::loadFromYaml(config_yaml, config);
     Ssl::TlsCertificateSelectorConfigFactory& provider_factory =
         Config::Utility::getAndCheckFactoryByName<Ssl::TlsCertificateSelectorConfigFactory>(
             "envoy.tls.certificate_selectors.on_demand_secret");
+    EXPECT_CALL(server_context_, disableStatelessSessionResumption())
+        .WillRepeatedly(Return(disable_stateless_resumption_));
+    EXPECT_CALL(server_context_, disableStatefulSessionResumption())
+        .WillRepeatedly(Return(disable_stateful_resumption_));
     return provider_factory.createTlsCertificateSelectorFactory(config, factory_context_,
                                                                 server_context_, for_quic);
   }
@@ -48,12 +53,26 @@ protected:
           name: server
     )EOF";
   }
+
+protected:
+  bool disable_stateless_resumption_{true};
+  bool disable_stateful_resumption_{true};
 };
 
 TEST_F(OnDemandTest, BasicLoadTest) { EXPECT_OK(create(defaultConfig())); }
 
 TEST_F(OnDemandTest, BasicLoadTestQuic) {
   EXPECT_THAT(create(defaultConfig(), true), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, BasicLoadTestStatelessResumption) {
+  disable_stateless_resumption_ = false;
+  EXPECT_THAT(create(defaultConfig()), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, BasicLoadTestStatefulResumption) {
+  disable_stateful_resumption_ = false;
+  EXPECT_THAT(create(defaultConfig()), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 } // namespace

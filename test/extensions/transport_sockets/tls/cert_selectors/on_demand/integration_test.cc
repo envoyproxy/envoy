@@ -49,6 +49,8 @@ public:
       sds_cluster->mutable_load_assignment()->set_cluster_name("sds_cluster");
       ConfigHelper::setHttp2(*sds_cluster);
     });
+    server_ssl_options_.disable_stateless_session_resumption_ = true;
+    server_ssl_options_.disable_stateful_session_resumption_ = true;
     TcpProxySslIntegrationTest::initialize();
     test_server_->waitUntilListenersReady();
   }

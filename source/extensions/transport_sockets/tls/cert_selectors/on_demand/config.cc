@@ -130,6 +130,22 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
   return absl::OkStatus();
 }
 
+absl::Status SecretManager::updateAll() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  for (auto& [secret_name, entry] : cache_) {
+    const auto& cert_config = entry.cert_config_->certConfig();
+    // Refresh only if there is a certificate present and skip notifying.
+    if (cert_config) {
+      absl::Status creation_status = absl::OkStatus();
+      entry.cert_context_ = std::make_shared<AsyncContext>(
+          *stats_scope_, factory_context_, tls_config_, *cert_config, creation_status);
+      setContext(secret_name, entry.cert_context_);
+      RETURN_IF_NOT_OK(creation_status);
+    }
+  }
+  return absl::OkStatus();
+}
+
 absl::Status SecretManager::removeCertificateConfig(absl::string_view secret_name) {
   // We cannot remove the subscription caller directly because this is called during a callback
   // which continues later. Instead, we post to the main as a completion.
@@ -231,13 +247,27 @@ Ssl::SelectionResult AsyncSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl
   };
 }
 
-absl::StatusOr<Ssl::TlsCertificateSelectorFactory>
-OnDemandTlsCertificateSelectorFactory::createTlsCertificateSelectorFactory(
+Ssl::TlsCertificateSelectorPtr
+OnDemandTlsCertificateSelectorFactory::create(Ssl::TlsCertificateSelectorContext&) {
+  return std::make_unique<AsyncSelector>(mapper_factory_(), secret_manager_);
+}
+
+absl::Status OnDemandTlsCertificateSelectorFactory::onConfigUpdate() {
+  return secret_manager_->updateAll();
+}
+
+absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr>
+OnDemandTlsCertificateSelectorConfigFactory::createTlsCertificateSelectorFactory(
     const Protobuf::Message& proto_config,
     Server::Configuration::GenericFactoryContext& factory_context,
     const Ssl::ServerContextConfig& tls_config, bool for_quic) {
   if (for_quic) {
     return absl::InvalidArgumentError("Does not support QUIC listeners.");
+  }
+  if (!tls_config.disableStatelessSessionResumption() ||
+      !tls_config.disableStatefulSessionResumption()) {
+    return absl::InvalidArgumentError(
+        "On demand certificates are not integrated with session resumption support.");
   }
   const ConfigProto& config = MessageUtil::downcastAndValidate<const ConfigProto&>(
       proto_config, factory_context.messageValidationVisitor());
@@ -251,17 +281,12 @@ OnDemandTlsCertificateSelectorFactory::createTlsCertificateSelectorFactory(
   RETURN_IF_NOT_OK(mapper_factory.status());
   // Doing this last since it can kick-start SDS fetches.
   auto secret_manager = std::make_shared<SecretManager>(config, factory_context, tls_config);
-  return [mapper = mapper_factory.value(), secret_manager](
-             Ssl::TlsCertificateSelectorContext&) mutable -> Ssl::TlsCertificateSelectorPtr {
-    // Envoy ensures that per-worker TLS sockets are destroyed before the
-    // filter chain holding the TLS socket factory using a completion. This
-    // means the TLS context config will outlive each AsyncSelector, and it is
-    // safe to refer to it by reference.
-    return std::make_unique<AsyncSelector>(mapper(), secret_manager);
-  };
+  return std::make_unique<OnDemandTlsCertificateSelectorFactory>(*std::move(mapper_factory),
+                                                                 std::move(secret_manager));
 }
 
-REGISTER_FACTORY(OnDemandTlsCertificateSelectorFactory, Ssl::TlsCertificateSelectorConfigFactory);
+REGISTER_FACTORY(OnDemandTlsCertificateSelectorConfigFactory,
+                 Ssl::TlsCertificateSelectorConfigFactory);
 
 } // namespace OnDemand
 } // namespace CertificateSelectors

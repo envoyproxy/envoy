@@ -16,7 +16,7 @@ void TcpProxyIntegrationTest::setupByteMeterAccessLog() {
 }
 
 void TcpProxySslIntegrationTest::initialize() {
-  config_helper_.addSslConfig();
+  config_helper_.addSslConfig(server_ssl_options_);
   TcpProxyIntegrationTest::initialize();
 
   context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(

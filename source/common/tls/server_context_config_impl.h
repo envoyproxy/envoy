@@ -44,7 +44,7 @@ public:
   bool preferClientCiphers() const override { return prefer_client_ciphers_; }
   const std::vector<std::string>& serverNames() const override { return server_names_; }
 
-  Ssl::TlsCertificateSelectorFactory tlsCertificateSelectorFactory() const override;
+  Ssl::TlsCertificateSelectorFactory& tlsCertificateSelectorFactory() const override;
 
 private:
   ServerContextConfigImpl(
@@ -81,7 +81,7 @@ private:
   bool full_scan_certs_on_sni_mismatch_;
   const bool prefer_client_ciphers_;
   // Certificate selector contains a reference to this context so should be destroyed first.
-  Ssl::TlsCertificateSelectorFactory tls_certificate_selector_factory_;
+  Ssl::TlsCertificateSelectorFactoryPtr tls_certificate_selector_factory_;
 };
 
 } // namespace Tls

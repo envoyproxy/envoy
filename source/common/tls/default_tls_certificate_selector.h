@@ -60,17 +60,30 @@ private:
   bool full_scan_certs_on_sni_mismatch_;
 };
 
+class DefaultTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorFactory {
+public:
+  explicit DefaultTlsCertificateSelectorFactory(const Ssl::ServerContextConfig& config)
+      : config_(config) {}
+  Ssl::TlsCertificateSelectorPtr create(Ssl::TlsCertificateSelectorContext& selector_ctx) override {
+    return std::make_unique<DefaultTlsCertificateSelector>(config_, selector_ctx);
+  };
+  absl::Status onConfigUpdate() override { return absl::OkStatus(); }
+
+private:
+  // TLS context config owns this factory instance.
+  const Ssl::ServerContextConfig& config_;
+};
+
 class TlsCertificateSelectorConfigFactoryImpl : public Ssl::TlsCertificateSelectorConfigFactory {
 public:
   std::string name() const override { return "envoy.tls.certificate_selectors.default"; }
-  absl::StatusOr<Ssl::TlsCertificateSelectorFactory>
+  absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr>
   createTlsCertificateSelectorFactory(const Protobuf::Message&,
                                       Server::Configuration::GenericFactoryContext&,
                                       const Ssl::ServerContextConfig& config, bool) override {
-    return [&](Ssl::TlsCertificateSelectorContext& selector_ctx) {
-      return std::make_unique<DefaultTlsCertificateSelector>(config, selector_ctx);
-    };
+    return std::make_unique<DefaultTlsCertificateSelectorFactory>(config);
   }
+
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::Struct>();
   }

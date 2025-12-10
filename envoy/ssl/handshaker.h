@@ -269,8 +269,19 @@ public:
   virtual const std::vector<TlsContext>& getTlsContexts() const PURE;
 };
 
-using TlsCertificateSelectorFactory =
-    std::function<TlsCertificateSelectorPtr(TlsCertificateSelectorContext&)>;
+class TlsCertificateSelectorFactory {
+public:
+  virtual ~TlsCertificateSelectorFactory() = default;
+
+  /** Creates a per-context certificate selector.*/
+  virtual TlsCertificateSelectorPtr create(TlsCertificateSelectorContext&) PURE;
+
+  /** Notify about changes in the TLS context config, e.g. an SDS update to the certificates or the
+   * validation context. */
+  virtual absl::Status onConfigUpdate() PURE;
+};
+
+using TlsCertificateSelectorFactoryPtr = std::unique_ptr<TlsCertificateSelectorFactory>;
 
 class TlsCertificateSelectorConfigFactory : public Config::TypedFactory {
 public:
@@ -285,7 +296,7 @@ public:
    * |validation_visitor| for early validation. This virtual base doesn't
    * perform MessageUtil::downcastAndValidate, but an implementation should.
    */
-  virtual absl::StatusOr<TlsCertificateSelectorFactory>
+  virtual absl::StatusOr<TlsCertificateSelectorFactoryPtr>
   createTlsCertificateSelectorFactory(const Protobuf::Message& config,
                                       Server::Configuration::GenericFactoryContext& factory_context,
                                       const ServerContextConfig& tls_context, bool for_quic) PURE;

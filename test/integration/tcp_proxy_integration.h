@@ -50,6 +50,8 @@ public:
                              const std::string& data_to_send_downstream);
   virtual FakeUpstream* dataStream() { return fake_upstreams_.front().get(); }
 
+protected:
+  ConfigHelper::ServerSslOptions server_ssl_options_;
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Ssl::ClientSslTransportOptions ssl_options_;
   Network::UpstreamTransportSocketFactoryPtr context_;

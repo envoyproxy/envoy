@@ -1351,6 +1351,12 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
     tls_context.set_ocsp_staple_policy(
         envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE);
   }
+  if (options.disable_stateless_session_resumption_) {
+    tls_context.set_disable_stateless_session_resumption(true);
+  }
+  if (options.disable_stateful_session_resumption_) {
+    tls_context.set_disable_stateful_session_resumption(true);
+  }
   tls_context.set_prefer_client_ciphers(options.prefer_client_ciphers_);
   filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);

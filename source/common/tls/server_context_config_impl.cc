@@ -206,16 +206,20 @@ ServerContextConfigImpl::ServerContextConfigImpl(
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {
-  ContextConfigImpl::setSecretUpdateCallback(callback);
+  auto callback_with_notify = [this, callback] {
+    RETURN_IF_NOT_OK(callback());
+    return tls_certificate_selector_factory_->onConfigUpdate();
+  };
+  ContextConfigImpl::setSecretUpdateCallback(callback_with_notify);
   if (session_ticket_keys_provider_) {
     // Once session_ticket_keys_ receives new secret, this callback updates
     // ContextConfigImpl::session_ticket_keys_ with new session ticket keys.
     stk_update_callback_handle_ =
-        session_ticket_keys_provider_->addUpdateCallback([this, callback]() {
+        session_ticket_keys_provider_->addUpdateCallback([this, callback_with_notify]() {
           auto keys_or_error = getSessionTicketKeys(*session_ticket_keys_provider_->secret());
           RETURN_IF_NOT_OK(keys_or_error.status());
           session_ticket_keys_ = *keys_or_error;
-          return callback();
+          return callback_with_notify();
         });
   }
 }
@@ -277,11 +281,11 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-Ssl::TlsCertificateSelectorFactory ServerContextConfigImpl::tlsCertificateSelectorFactory() const {
+Ssl::TlsCertificateSelectorFactory& ServerContextConfigImpl::tlsCertificateSelectorFactory() const {
   if (!tls_certificate_selector_factory_) {
     IS_ENVOY_BUG("No envoy.tls.certificate_selectors registered");
   }
-  return tls_certificate_selector_factory_;
+  return *tls_certificate_selector_factory_;
 }
 
 } // namespace Tls

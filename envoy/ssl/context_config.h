@@ -229,7 +229,7 @@ public:
   /**
    * @return a factory which can be used to create TLS context provider instances.
    */
-  virtual TlsCertificateSelectorFactory tlsCertificateSelectorFactory() const PURE;
+  virtual TlsCertificateSelectorFactory& tlsCertificateSelectorFactory() const PURE;
 
   /**
    * @return reference to the server names configured on the socket factory.
