@@ -68,9 +68,7 @@ message McpRouter {
     google.protobuf.Duration timeout = 3;
 
     // Indicates that during forwarding, the host header will be swapped with
-    // this value. This is useful when routing to external backends like
-    // github.com/mcp where the upstream server expects a specific Host header.
-    // If not set, defaults to the cluster name.
+    // this value.
     string host_rewrite_literal = 4;
   }
 

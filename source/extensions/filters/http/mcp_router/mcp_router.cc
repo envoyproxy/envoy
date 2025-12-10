@@ -749,9 +749,12 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
   // Set required headers for MCP backend
   headers->setMethod(Http::Headers::get().MethodValues.Post);
   headers->setPath(backend.path);
-  // Use host_rewrite_literal if configured, otherwise default to cluster name
-  headers->setHost(backend.host_rewrite_literal.empty() ? backend.cluster_name
-                                                        : backend.host_rewrite_literal);
+  // Use host_rewrite_literal if configured, otherwise pass through original host
+  if (!backend.host_rewrite_literal.empty()) {
+    headers->setHost(backend.host_rewrite_literal);
+  } else if (request_headers_ != nullptr) {
+    headers->setHost(request_headers_->getHostValue());
+  }
   headers->setContentType("application/json");
 
   if (!backend_session_id.empty()) {
