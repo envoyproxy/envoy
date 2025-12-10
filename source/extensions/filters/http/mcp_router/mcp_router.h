@@ -65,6 +65,7 @@ struct McpBackendConfig {
   std::string cluster_name;
   std::string path;
   std::chrono::milliseconds timeout{5000};
+  std::string host_rewrite_literal; // Host header value to use when connecting to the backend.
 };
 
 /** Response received from a backend MCP server. */

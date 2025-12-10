@@ -72,11 +72,13 @@ public:
               cluster: mcp_time_backend
               path: /mcp
               timeout: 5s
+              host_rewrite_literal: time.mcp.example.com
           - name: tools
             mcp_cluster:
               cluster: mcp_tools_backend
               path: /mcp
               timeout: 5s
+              host_rewrite_literal: tools.mcp.example.com
     )EOF");
 
     // MCP filter (validates JSON-RPC, sets metadata)
@@ -210,10 +212,14 @@ TEST_P(McpRouterIntegrationTest, InitializeFanoutToBothBackends) {
   ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
   ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
 
+  EXPECT_EQ("time.mcp.example.com", time_backend_request_->headers().getHostValue());
+
   // Wait for request on tools backend (fake_upstreams_[1])
   ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
   ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
   ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ("tools.mcp.example.com", tools_backend_request_->headers().getHostValue());
 
   // Send response from time backend with session ID
   const std::string time_response = R"({

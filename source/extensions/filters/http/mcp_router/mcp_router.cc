@@ -129,6 +129,7 @@ McpRouterConfig::McpRouterConfig(
     backend.path = mcp_cluster.path().empty() ? "/mcp" : mcp_cluster.path();
     backend.timeout =
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(mcp_cluster, timeout, 5000));
+    backend.host_rewrite_literal = mcp_cluster.host_rewrite_literal();
     backends_.push_back(std::move(backend));
   }
 
@@ -748,7 +749,9 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
   // Set required headers for MCP backend
   headers->setMethod(Http::Headers::get().MethodValues.Post);
   headers->setPath(backend.path);
-  headers->setHost(backend.cluster_name);
+  // Use host_rewrite_literal if configured, otherwise default to cluster name
+  headers->setHost(backend.host_rewrite_literal.empty() ? backend.cluster_name
+                                                        : backend.host_rewrite_literal);
   headers->setContentType("application/json");
 
   if (!backend_session_id.empty()) {

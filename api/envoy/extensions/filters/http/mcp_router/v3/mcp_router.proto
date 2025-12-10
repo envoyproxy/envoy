@@ -66,6 +66,12 @@ message McpRouter {
     // Request timeout.
     // If not set, uses cluster's timeout configuration.
     google.protobuf.Duration timeout = 3;
+
+    // Indicates that during forwarding, the host header will be swapped with
+    // this value. This is useful when routing to external backends like
+    // github.com/mcp where the upstream server expects a specific Host header.
+    // If not set, defaults to the cluster name.
+    string host_rewrite_literal = 4;
   }
 
   // A list of remote MCP servers. MCP router aggregates capabilities, tools and resources from remote MCP servers
