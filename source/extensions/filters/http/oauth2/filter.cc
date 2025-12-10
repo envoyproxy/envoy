@@ -136,7 +136,7 @@ bool cookieNameMatchesBase(absl::string_view cookie_name, absl::string_view base
 }
 
 absl::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderMap& headers,
-                                                      const std::string& base_name,
+                                                      absl::string_view base_name,
                                                       absl::string_view suffix) {
   const std::string suffixed_name = cookieNameWithSuffix(base_name, suffix);
   std::string value = Http::Utility::parseCookieValue(headers, suffixed_name);
