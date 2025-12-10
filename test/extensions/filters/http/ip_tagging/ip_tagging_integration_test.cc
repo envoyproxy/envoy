@@ -44,7 +44,6 @@ TEST_P(IpTaggingIntegrationTest, FileBasedIpTaggingWithReload) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
       request_type: both
       ip_tags_file_provider:
-        ip_tags_refresh_rate: 1s
         ip_tags_datasource:
             filename: "{}"
             watched_directory:
@@ -63,7 +62,6 @@ ip_tags:
       true);
   config_helper_.prependFilter(TestEnvironment::substitute(yaml));
   initialize();
-  test_server_->waitForCounterEq("ip_tagging_reload.reload_success", 1);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -81,8 +79,6 @@ ip_tags:
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  timeSystem().advanceTimeWait(std::chrono::seconds(2));
-  test_server_->waitForCounterGe("ip_tagging_reload.reload_success", 2);
   // Simulate file update.
   TestEnvironment::writeStringToFileForTest(
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"), R"EOF(
@@ -100,8 +96,8 @@ ip_tags:
   TestEnvironment::renameFile(
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
-  timeSystem().advanceTimeWait(std::chrono::seconds(2));
-  test_server_->waitForCounterGe("ip_tagging_reload.reload_success", 3);
+
+  test_server_->waitForCounterGe("ip_tagging_reload.success", 2);
 
   response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -111,6 +107,11 @@ ip_tags:
                                      {"x-forwarded-for", "1.2.3.4"}});
 
   waitForNextUpstreamRequest();
+  std::cerr << upstream_request_->headers()
+                   .get(Http::Headers::get().EnvoyIpTags)[0]
+                   ->value()
+                   .getStringView()
+            << std::endl;
   EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().EnvoyIpTags)[0]->value(),
             "external_updated_request");
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
@@ -137,7 +138,6 @@ TEST_P(IpTaggingIntegrationTest, IptaggingFilterWithReloadNoCrashOnLdsUpdate) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
       request_type: both
       ip_tags_file_provider:
-        ip_tags_refresh_rate: 1s
         ip_tags_datasource:
             filename: "{}"
             watched_directory:
@@ -156,7 +156,6 @@ ip_tags:
       true);
   config_helper_.prependFilter(TestEnvironment::substitute(yaml));
   initialize();
-  test_server_->waitForCounterEq("ip_tagging_reload.reload_success", 1);
 
   // LDS update to modify the listener and corresponding drain.
   {
@@ -171,8 +170,6 @@ ip_tags:
     test_server_->waitForCounterEq("listener_manager.lds.update_success", 2);
     test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
   }
-  timeSystem().advanceTimeWait(std::chrono::seconds(2));
-  test_server_->waitForCounterGe("ip_tagging_reload.reload_success", 2);
 
   // Simulate file update.
   TestEnvironment::writeStringToFileForTest(
@@ -191,8 +188,9 @@ ip_tags:
   TestEnvironment::renameFile(
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
-  timeSystem().advanceTimeWait(std::chrono::seconds(3));
-  test_server_->waitForCounterGe("ip_tagging_reload.reload_success", 3);
+
+  test_server_->waitForCounterGe("ip_tagging_reload.success", 2);
+
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},

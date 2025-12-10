@@ -59,6 +59,7 @@ envoy_cc_library(
         "//source/common/common:backoff_lib",
         "//source/common/common:empty_string",
         "//source/common/init:target_lib",
+        "//source/common/network:lc_trie_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

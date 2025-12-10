@@ -398,7 +398,9 @@ TEST_F(IpTaggingFilterTest, InvalidYamlFile) {
   ip_tags_datasource:
     filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.yaml"
  )EOF";
-  initializeFilter(config_yaml, "INVALID_ARGUMENT: Unable to convert YAML as JSON: ip_tags");
+  initializeFilter(
+      config_yaml,
+      "INVALID_ARGUMENT: unable to create data source 'Unable to convert YAML as JSON: ip_tags");
 }
 
 TEST_F(IpTaggingFilterTest, InvalidJsonFile) {
@@ -408,7 +410,7 @@ TEST_F(IpTaggingFilterTest, InvalidJsonFile) {
   ip_tags_datasource:
     filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.json"
  )EOF";
-  initializeFilter(config_yaml, "INVALID_ARGUMENT: invalid JSON");
+  initializeFilter(config_yaml, "INVALID_ARGUMENT: unable to create data source");
 }
 
 TEST_F(IpTaggingFilterTest, InvalidCidr) {
@@ -891,7 +893,6 @@ INSTANTIATE_TEST_CASE_P(ClearRouteCache, ClearRouteCacheTest,
                                              internal_request_with_yaml_file_config}));
 
 TEST_F(IpTaggingFilterTest, InternalRequestWithReload) {
-  time_system_.advanceTimeWait(std::chrono::seconds(1));
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
 
@@ -901,7 +902,6 @@ TEST_F(IpTaggingFilterTest, InternalRequestWithReload) {
       fmt::format(R"EOF(
 request_type: internal
 ip_tags_file_provider:
-  ip_tags_refresh_rate: 2s
   ip_tags_datasource:
       filename: "{}"
       watched_directory:
@@ -928,7 +928,6 @@ ip_tags:
  )EOF",
       true);
   initializeFilter(yaml);
-  time_system_.advanceTimeAsyncImpl(std::chrono::seconds(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
@@ -962,14 +961,11 @@ ip_tags:
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
 
-  time_system_.advanceTimeAsyncImpl(std::chrono::seconds(6));
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_TRUE(
-      TestUtility::waitForCounterEq(stats_, "ip_tagging_reload.reload_success", 1UL, time_system_));
-
-  EXPECT_EQ(stats_.counterFromString("ip_tagging_reload.reload_error").value(), 0);
+      TestUtility::waitForCounterGe(stats_, "ip_tagging_reload.success", 1UL, time_system_));
 
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
@@ -1002,7 +998,6 @@ TEST_F(IpTaggingFilterTest, InternalRequestWithFailedReloadUsesOldData) {
       fmt::format(R"EOF(
 request_type: internal
 ip_tags_file_provider:
-  ip_tags_refresh_rate: 2s
   ip_tags_datasource:
       filename: "{}"
       watched_directory:
@@ -1026,7 +1021,6 @@ ip_tags
  )EOF",
       true);
   initializeFilter(yaml);
-  time_system_.advanceTimeAsyncImpl(std::chrono::seconds(1));
 
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
@@ -1051,7 +1045,6 @@ ip_tags
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
 
-  time_system_.advanceTimeAsyncImpl(std::chrono::seconds(1));
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
@@ -1063,11 +1056,8 @@ ip_tags
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
 
-  time_system_.advanceTimeAsyncImpl(std::chrono::seconds(6));
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_TRUE(
-      TestUtility::waitForCounterEq(stats_, "ip_tagging_reload.reload_error", 1UL, time_system_));
 
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
@@ -1091,7 +1081,6 @@ ip_tags
 }
 
 TEST_F(IpTaggingFilterTest, IpTagsReloadedInFlightRequestsNotAffected) {
-  time_system_.advanceTimeAsyncImpl(std::chrono::seconds(1));
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
 
@@ -1101,7 +1090,6 @@ TEST_F(IpTaggingFilterTest, IpTagsReloadedInFlightRequestsNotAffected) {
       fmt::format(R"EOF(
 request_type: internal
 ip_tags_file_provider:
-  ip_tags_refresh_rate: 1s
   ip_tags_datasource:
       filename: "{}"
       watched_directory:
@@ -1128,7 +1116,6 @@ ip_tags:
  )EOF",
       true);
   initializeFilter(yaml);
-  time_system_.advanceTimeAsyncImpl(std::chrono::seconds(1));
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
   IpTaggingFilterPeer::synchronizer(filter_).enable();
   std::string sync_point_name = "_trie_lookup_complete";
@@ -1179,12 +1166,11 @@ ip_tags:
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
 
-  time_system_.advanceTimeAsyncImpl(std::chrono::seconds(6));
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_TRUE(
-      TestUtility::waitForCounterEq(stats_, "ip_tagging_reload.reload_success", 1UL, time_system_));
+      TestUtility::waitForCounterGe(stats_, "ip_tagging_reload.success", 1UL, time_system_));
 
   IpTaggingFilterPeer::synchronizer(filter_).signal(sync_point_name);
   t0.join();
