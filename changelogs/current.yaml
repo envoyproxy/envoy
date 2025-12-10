@@ -444,6 +444,9 @@ new_features:
     Added support for per-route configuration override in the ``json_to_metadata`` http filter. Routes can now
     specify different JSON to metadata conversion rules via per-route configuration, allowing different routes
     to extract different metadata from request or response bodies.
+- area: tracing
+  change: |
+    Dynatrace sampler parses and propagates trace capture reason in tracestate.
 - area: proxy_protocol
   change: |
     Added :ref:`tlv_location <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.tlv_location>`
