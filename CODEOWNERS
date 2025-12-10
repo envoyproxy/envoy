@@ -338,7 +338,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Header to metadata
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # Json to metadata
-/*/extensions/filters/http/json_to_metadata @JuniorHsu @kbaichoo
+/*/extensions/filters/http/json_to_metadata @cqi1217 @JuniorHsu @kbaichoo
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter
@@ -456,3 +456,4 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/tap_sinks/ @coolg92003 @yiyibaoguo
 /contrib/peak_ewma/filters/http/ @rroblak @UNOWNED
 /contrib/peak_ewma/load_balancing_policies/ @rroblak @UNOWNED
+/contrib/kae/ @Misakokoro @UNOWNED
