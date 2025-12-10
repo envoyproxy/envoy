@@ -1654,11 +1654,11 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeMode) {
     config_blob->PackFrom(tcp_proxy_config);
   });
 
-  setupConnections(); // This performs TLS handshake - would timeout/fail without fix
+  setupConnections();
   sendAndReceiveTlsData("hello", "world");
 }
 
-// Test that ON_DOWNSTREAM_TLS_HANDSHAKE with max_early_data_bytes works correctly with TLS termination
+// Test that ON_DOWNSTREAM_TLS_HANDSHAKE with max_early_data_bytes works correctly
 TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
