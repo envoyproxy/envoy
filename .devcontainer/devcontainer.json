@@ -2,7 +2,6 @@
   "name": "Envoy Dev",
   "dockerFile": "Dockerfile",
   "runArgs": [
-    "--user=envoybuild",
     "--cap-add=SYS_PTRACE",
     "--cap-add=NET_RAW",
     "--cap-add=NET_ADMIN",
@@ -13,6 +12,9 @@
     // Uncomment next line if you have devcontainer.env
     // "--env-file=.devcontainer/devcontainer.env"
   ],
+
+  // 👇 **Critical**: prevents VS Code from trying to create the user again
+  "updateRemoteUserUID": false,
   "containerEnv": {
     "ENVOY_SRCDIR": "${containerWorkspaceFolder}",
     "HTTPS_PROXY": "${env:VSCODE_CONTAINER_HTTPS_PROXY}",

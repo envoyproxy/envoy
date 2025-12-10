@@ -132,7 +132,7 @@ bool cookieNameMatchesBase(absl::string_view cookie_name, absl::string_view base
   if (cookie_name.size() <= base_name.size() + CookieSuffixDelimiter.size()) {
     return false;
   }
-  return absl::StartsWith(cookie_name, absl::StrCat(base_name, CookieSuffixDelimiter));
+  return cookie_name.starts_with(absl::StrCat(base_name, CookieSuffixDelimiter));
 }
 
 absl::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderMap& headers,
@@ -896,8 +896,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 
   // Generate a CSRF token to prevent CSRF attacks.
   const std::string csrf_token = generateCsrfToken(config_->hmacSecret(), random_string);
-  const std::chrono::seconds csrf_token_expires_in = config_->getCsrfTokenExpiresIn();
-  const std::string csrf_expires = std::to_string(csrf_token_expires_in.count());
+  const std::string csrf_expires = std::to_string(config_->getCsrfTokenExpiresIn().count());
   const std::string csrf_cookie_tail =
       BuildCookieTail(config_->nonceCookieSettings(), csrf_expires);
   // Use the flow id to create a unique cookie name for this OAuth flow.
@@ -992,7 +991,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
     // Cookie names prefixed with "__Secure-" or "__Host-" are special. They MUST be set with the
     // Secure attribute so that the browser handles their deletion properly.
     const bool add_secure_attr =
-        absl::StartsWith(cookie_name, "__Secure-") || absl::StartsWith(cookie_name, "__Host-");
+        cookie_name.starts_with("__Secure-") || cookie_name.starts_with("__Host-");
     const absl::string_view maybe_secure_attr = add_secure_attr ? "; Secure" : "";
 
     response_headers->addReferenceKey(
@@ -1309,7 +1308,7 @@ void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers
   auto add_delete_cookie = [&](absl::string_view base_name, absl::string_view cookie_path) {
     const std::string cookie_name = cookieNameWithSuffix(base_name, flow_id);
     const bool add_secure_attr =
-        absl::StartsWith(cookie_name, "__Secure-") || absl::StartsWith(cookie_name, "__Host-");
+        cookie_name.starts_with("__Secure-") || cookie_name.starts_with("__Host-");
     const absl::string_view maybe_secure_attr = add_secure_attr ? "; Secure" : "";
 
     headers.addReferenceKey(
@@ -1471,7 +1470,7 @@ void OAuth2Filter::removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const
     auto eraseCookieWithSuffix = [&cookies](const std::string& base_name) {
       const std::string prefix = absl::StrCat(base_name, CookieSuffixDelimiter);
       for (auto it = cookies.begin(); it != cookies.end();) {
-        if (absl::StartsWith(it->first, prefix)) {
+        if (it->first.starts_with(prefix)) {
           cookies.erase(it++);
         } else {
           ++it;
