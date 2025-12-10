@@ -407,6 +407,171 @@ TEST_P(McpRouterIntegrationTest, ToolCallRoutesToCorrectBackend) {
   EXPECT_THAT(response->body(), testing::HasSubstr("2023-10-27T10:00:00Z"));
 }
 
+// Test tools/call routes to the second backend (tools) based on prefix
+TEST_P(McpRouterIntegrationTest, ToolCallToSecondBackend) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 5,
+    "params": {
+      "name": "tools__calculator",
+      "arguments": {"a": 1, "b": 2}
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Request should be routed to tools backend (fake_upstreams_[1]) based on "tools__" prefix
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Verify routing to correct backend via host header
+  EXPECT_EQ("tools.mcp.example.com", tools_backend_request_->headers().getHostValue());
+
+  // Verify upstream request body has prefix stripped
+  EXPECT_THAT(tools_backend_request_->body().toString(),
+              testing::HasSubstr("\"name\": \"calculator\""));
+  EXPECT_THAT(tools_backend_request_->body().toString(),
+              testing::Not(testing::HasSubstr("tools__")));
+
+  const std::string backend_response = R"({
+    "jsonrpc": "2.0",
+    "id": 5,
+    "result": {
+      "content": [{"type": "text", "text": "3"}]
+    }
+  })";
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(backend_response);
+  tools_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"text\": \"3\""));
+}
+
+// Test session ID from initialize is propagated in subsequent requests
+TEST_P(McpRouterIntegrationTest, SessionIdPropagation) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Step 1: Initialize to get session ID
+  const std::string init_body = R"({
+    "jsonrpc": "2.0",
+    "method": "initialize",
+    "id": 1,
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {},
+      "clientInfo": {"name": "test-client", "version": "1.0"}
+    }
+  })";
+
+  auto init_response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      init_body);
+
+  // Handle both backends for initialize
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Send responses from both backends with session IDs
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"mcp-session-id", "time-session-abc"}},
+      false);
+  Buffer::OwnedImpl time_body(
+      R"({"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","serverInfo":{"name":"time","version":"1.0"},"capabilities":{}}})");
+  time_backend_request_->encodeData(time_body, true);
+
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"mcp-session-id", "tools-session-xyz"}},
+      false);
+  Buffer::OwnedImpl tools_body(
+      R"({"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","serverInfo":{"name":"tools","version":"1.0"},"capabilities":{}}})");
+  tools_backend_request_->encodeData(tools_body, true);
+
+  ASSERT_TRUE(init_response->waitForEndStream());
+  EXPECT_EQ("200", init_response->headers().getStatusValue());
+
+  auto session_header = init_response->headers().get(Http::LowerCaseString("mcp-session-id"));
+  ASSERT_FALSE(session_header.empty());
+  std::string composite_session = std::string(session_header[0]->value().getStringView());
+  EXPECT_FALSE(composite_session.empty());
+
+  // Step 2: Make a tools/call with the session ID
+  const std::string call_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 2,
+    "params": {
+      "name": "time__get_current_time",
+      "arguments": {}
+    }
+  })";
+
+  FakeStreamPtr time_backend_request2;
+  auto call_response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-session-id", composite_session}},
+      call_body);
+
+  // Verify request goes to time backend with the per-backend session ID
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request2));
+  ASSERT_TRUE(time_backend_request2->waitForEndStream(*dispatcher_));
+
+  auto backend_session =
+      time_backend_request2->headers().get(Http::LowerCaseString("mcp-session-id"));
+  ASSERT_FALSE(backend_session.empty());
+  EXPECT_EQ("time-session-abc", backend_session[0]->value().getStringView());
+
+  time_backend_request2->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl call_response_body(
+      R"({"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"2023-12-10T00:00:00Z"}]}})");
+  time_backend_request2->encodeData(call_response_body, true);
+
+  ASSERT_TRUE(call_response->waitForEndStream());
+  EXPECT_EQ("200", call_response->headers().getStatusValue());
+}
+
 } // namespace
 } // namespace McpRouter
 } // namespace HttpFilters
