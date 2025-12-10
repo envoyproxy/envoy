@@ -324,7 +324,7 @@ void DetectorImpl::initialize(Cluster& cluster) {
         });
   }
   member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
-      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> absl::Status {
+      [this](const HostVector& hosts_added, const HostVector& hosts_removed) {
         for (const HostSharedPtr& host : hosts_added) {
           addHostMonitor(host);
         }
@@ -338,7 +338,6 @@ void DetectorImpl::initialize(Cluster& cluster) {
 
           host_monitors_.erase(host);
         }
-        return absl::OkStatus();
       });
 
   armIntervalTimer();

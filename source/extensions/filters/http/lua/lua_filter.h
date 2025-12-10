@@ -20,7 +20,7 @@ namespace Lua {
 /**
  * All lua stats. @see stats_macros.h
  */
-#define ALL_LUA_FILTER_STATS(COUNTER) COUNTER(errors)
+#define ALL_LUA_FILTER_STATS(COUNTER) COUNTER(errors) COUNTER(executions)
 
 /**
  * Struct definition for all Lua stats. @see stats_macros.h
@@ -419,7 +419,7 @@ private:
   TimeSource& time_source_;
 
   // The inserted crypto object pointers will not be removed from this map.
-  absl::flat_hash_map<std::string, Envoy::Common::Crypto::CryptoObjectPtr> public_key_storage_;
+  absl::flat_hash_map<std::string, Envoy::Common::Crypto::PKeyObjectPtr> public_key_storage_;
 };
 
 /**

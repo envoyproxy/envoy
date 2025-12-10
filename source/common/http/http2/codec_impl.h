@@ -403,7 +403,13 @@ protected:
     }
     void onResetEncoded(uint32_t error_code) {
       if (codec_callbacks_ && error_code != 0) {
-        codec_callbacks_->onCodecLowLevelReset();
+        // TODO(wbpcode): this ensure that onCodecLowLevelReset is only called once. But
+        // we should replace this with a better design later.
+        // See https://github.com/envoyproxy/envoy/issues/42264 for why we need this.
+        if (!codec_low_level_reset_is_called_) {
+          codec_low_level_reset_is_called_ = true;
+          codec_callbacks_->onCodecLowLevelReset();
+        }
       }
     }
 
@@ -800,7 +806,7 @@ private:
   bool raised_goaway_ : 1;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
-  MonotonicTime last_received_data_time_{};
+  MonotonicTime last_received_data_time_;
   Event::TimerPtr keepalive_send_timer_;
   Event::TimerPtr keepalive_timeout_timer_;
   std::chrono::milliseconds keepalive_interval_;

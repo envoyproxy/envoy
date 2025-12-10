@@ -50,12 +50,14 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/config_impl.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/locality_pool.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -450,7 +452,8 @@ LoadMetricStats::StatMapPtr LoadMetricStatsImpl::latch() {
 absl::StatusOr<std::unique_ptr<HostDescriptionImpl>> HostDescriptionImpl::create(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
-    MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
+    MetadataConstSharedPtr locality_metadata,
+    std::shared_ptr<const envoy::config::core::v3::Locality> locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, const AddressVector& address_list) {
   absl::Status creation_status = absl::OkStatus();
@@ -464,7 +467,8 @@ absl::StatusOr<std::unique_ptr<HostDescriptionImpl>> HostDescriptionImpl::create
 HostDescriptionImpl::HostDescriptionImpl(
     absl::Status& creation_status, ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
-    MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
+    MetadataConstSharedPtr locality_metadata,
+    std::shared_ptr<const envoy::config::core::v3::Locality> locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, const AddressVector& address_list)
     : HostDescriptionImplBase(cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
@@ -476,7 +480,8 @@ HostDescriptionImpl::HostDescriptionImpl(
 HostDescriptionImplBase::HostDescriptionImplBase(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
-    MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
+    MetadataConstSharedPtr locality_metadata,
+    std::shared_ptr<const envoy::config::core::v3::Locality> locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, absl::Status& creation_status)
     : cluster_(cluster), hostname_(hostname),
@@ -486,8 +491,8 @@ HostDescriptionImplBase::HostDescriptionImplBase(
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value()),
       endpoint_metadata_(endpoint_metadata), locality_metadata_(locality_metadata),
-      locality_(locality),
-      locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
+      locality_(std::move(locality)),
+      locality_zone_stat_name_(locality_->zone(), cluster->statsScope().symbolTable()),
       priority_(priority),
       socket_factory_(resolveTransportSocketFactory(dest_address, endpoint_metadata_.get())) {
   if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
@@ -632,8 +637,8 @@ Host::CreateConnectionData HostImplBase::createConnection(
   // be redirected to a proxy, create the TCP connection to the proxy's address not the host's
   // address.
   if (proxy_address.has_value()) {
-    auto upstream_local_address =
-        source_address_selector->getUpstreamLocalAddress(address, options);
+    auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(
+        address, options, makeOptRefFromPtr(transport_socket_options.get()));
     ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy at {}",
               proxy_address.value()->asString());
     connection = dispatcher.createClientConnection(
@@ -653,8 +658,8 @@ Host::CreateConnectionData HostImplBase::createConnection(
         dispatcher, *address_list_or_null, source_address_selector, socket_factory,
         transport_socket_options, host, options, happy_eyeballs_config);
   } else {
-    auto upstream_local_address =
-        source_address_selector->getUpstreamLocalAddress(address, options);
+    auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(
+        address, options, makeOptRefFromPtr(transport_socket_options.get()));
     connection = dispatcher.createClientConnection(
         address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
@@ -677,7 +682,7 @@ absl::StatusOr<std::unique_ptr<HostImpl>> HostImpl::create(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr endpoint_metadata,
     MetadataConstSharedPtr locality_metadata, uint32_t initial_weight,
-    const envoy::config::core::v3::Locality& locality,
+    std::shared_ptr<const envoy::config::core::v3::Locality> locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
     const AddressVector& address_list) {
@@ -748,7 +753,7 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
   excluded_hosts_per_locality_ = std::move(update_hosts_params.excluded_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
 
-  THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
+  runUpdateCallbacks(hosts_added, hosts_removed);
 }
 
 PrioritySet::UpdateHostsParams
@@ -829,7 +834,7 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
                     hosts_removed, weighted_priority_health, overprovisioning_factor);
 
   if (!batch_update_) {
-    THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
+    runUpdateCallbacks(hosts_added, hosts_removed);
   }
 }
 
@@ -843,7 +848,7 @@ void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
   HostVector net_hosts_added = filterHosts(scope.all_hosts_added_, scope.all_hosts_removed_);
   HostVector net_hosts_removed = filterHosts(scope.all_hosts_removed_, scope.all_hosts_added_);
 
-  THROW_IF_NOT_OK(runUpdateCallbacks(net_hosts_added, net_hosts_removed));
+  runUpdateCallbacks(net_hosts_added, net_hosts_removed);
 }
 
 void PrioritySetImpl::BatchUpdateScope::updateHosts(
@@ -1171,6 +1176,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                                          config.lrs_report_endpoint_metrics().begin(),
                                          config.lrs_report_endpoint_metrics().end())
                                    : nullptr),
+      shadow_policies_(http_protocol_options_->shadow_policies_),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -1491,6 +1497,27 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
                                                                : Http::Protocol::Http11};
 }
 
+absl::optional<bool>
+ClusterInfoImpl::processHttpForOutlierDetection(Http::ResponseHeaderMap& headers) const {
+  if (http_protocol_options_->outlier_detection_http_error_matcher_.empty()) {
+    return absl::nullopt;
+  }
+
+  Extensions::Common::Matcher::Matcher::MatchStatusVector statuses;
+
+  statuses.reserve(http_protocol_options_->outlier_detection_http_error_matcher_.size());
+  statuses = Extensions::Common::Matcher::Matcher::MatchStatusVector(
+      http_protocol_options_->outlier_detection_http_error_matcher_.size());
+  http_protocol_options_->outlier_detection_http_error_matcher_[0]->onNewStream(statuses);
+
+  // Run matchers.
+  http_protocol_options_->outlier_detection_http_error_matcher_[0]->onHttpResponseHeaders(headers,
+                                                                                          statuses);
+  return absl::optional<bool>(http_protocol_options_->outlier_detection_http_error_matcher_[0]
+                                  ->matchStatus(statuses)
+                                  .matches_);
+}
+
 absl::StatusOr<bool> validateTransportSocketSupportsQuic(
     const envoy::config::core::v3::TransportSocket& transport_socket) {
   // The transport socket is valid for QUIC if it is either a QUIC transport socket,
@@ -1520,6 +1547,9 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
           cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
           cluster_context.serverFactoryContext().singletonManager(),
+          cluster_context.serverFactoryContext().mainThreadDispatcher())),
+      const_locality_shared_pool_(LocalityPool::getConstLocalitySharedPool(
+          cluster_context.serverFactoryContext().singletonManager(),
           cluster_context.serverFactoryContext().mainThreadDispatcher())) {
   auto& server_context = cluster_context.serverFactoryContext();
 
@@ -1533,8 +1563,12 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
   SET_AND_RETURN_IF_NOT_OK(socket_factory_or_error.status(), creation_status);
   auto* raw_factory_pointer = socket_factory_or_error.value().get();
 
+  OptRef<const xds::type::matcher::v3::Matcher> matcher;
+  if (cluster.has_transport_socket_matcher()) {
+    matcher = makeOptRefFromPtr(&cluster.transport_socket_matcher());
+  }
   auto socket_matcher_or_error = TransportSocketMatcherImpl::create(
-      cluster.transport_socket_matches(), *transport_factory_context_,
+      cluster.transport_socket_matches(), matcher, *transport_factory_context_,
       socket_factory_or_error.value(), *stats_scope);
   SET_AND_RETURN_IF_NOT_OK(socket_matcher_or_error.status(), creation_status);
   auto socket_matcher = std::move(*socket_matcher_or_error);
@@ -1609,7 +1643,6 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
         info_->endpointStats().membership_healthy_.set(healthy_hosts);
         info_->endpointStats().membership_degraded_.set(degraded_hosts);
         info_->endpointStats().membership_excluded_.set(excluded_hosts);
-        return absl::OkStatus();
       });
   // Drop overload configuration parsing.
   SET_AND_RETURN_IF_NOT_OK(parseDropOverloadConfig(cluster.load_assignment()), creation_status);
@@ -1867,11 +1900,21 @@ ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& add
   return resolve_status;
 }
 
-absl::Status ClusterImplBase::validateEndpointsForZoneAwareRouting(
-    const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const {
-  if (local_cluster_ && endpoints.priority() > 0) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected non-zero priority for local cluster '{}'.", info()->name()));
+absl::Status ClusterImplBase::validateEndpoints(
+    absl::Span<const envoy::config::endpoint::v3::LocalityLbEndpoints* const> localities,
+    OptRef<const PriorityState> priorities) const {
+  for (const auto* endpoints : localities) {
+    if (local_cluster_ && endpoints->priority() > 0) {
+      return absl::InvalidArgumentError(
+          fmt::format("Unexpected non-zero priority for local cluster '{}'.", info()->name()));
+    }
+  }
+
+  if (priorities.has_value()) {
+    OptRef<const LoadBalancerConfig> lb_config = info_->loadBalancerConfig();
+    if (lb_config.has_value()) {
+      return lb_config->validateEndpoints(*priorities);
+    }
   }
   return absl::OkStatus();
 }
@@ -2109,10 +2152,12 @@ void PriorityStateManager::registerHostForPriority(
           ? parent_.constMetadataSharedPool()->getObject(locality_lb_endpoint.metadata())
           : nullptr;
   const auto host = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
-      HostImpl::create(parent_.info(), hostname, address, endpoint_metadata, locality_metadata,
-                       lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
-                       lb_endpoint.endpoint().health_check_config(),
-                       locality_lb_endpoint.priority(), lb_endpoint.health_status(), address_list),
+      HostImpl::create(
+          parent_.info(), hostname, address, endpoint_metadata, locality_metadata,
+          lb_endpoint.load_balancing_weight().value(),
+          parent_.constLocalitySharedPool()->getObject(locality_lb_endpoint.locality()),
+          lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
+          lb_endpoint.health_status(), address_list),
       std::unique_ptr<HostImpl>));
   registerHostForPriority(host, locality_lb_endpoint);
 }

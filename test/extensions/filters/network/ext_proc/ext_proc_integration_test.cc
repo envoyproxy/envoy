@@ -391,6 +391,38 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamClose) {
   tcp_client->close();
 }
 
+// Test default message timeout (200ms) handling for TCP proxy
+TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDefaultMessageTimeout) {
+  initialize();
+
+  Envoy::IntegrationTcpClientPtr tcp_client =
+      makeTcpConnection(lookupPort("network_ext_proc_filter"));
+
+  Envoy::FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send data from client
+  ASSERT_TRUE(tcp_client->write("client_data_timeout_test", false));
+
+  // Wait for the processing request from ext_proc filter
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+  EXPECT_EQ(request.has_read_data(), true);
+  EXPECT_EQ(request.read_data().data(), "client_data_timeout_test");
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(250));
+
+  verifyCounters({{"streams_started", 1},
+                  {"stream_msgs_sent", 1},
+                  {"stream_msgs_received", 0}, // No response received due to timeout
+                  {"read_data_sent", 1},
+                  {"message_timeouts", 1}}); // Message timeout counter
+
+  ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+
+  tcp_client->close();
+}
+
 TEST_P(NetworkExtProcFilterIntegrationTest, MultipleClientConnections) {
   initialize();
 
@@ -486,13 +518,41 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyUpstreamHalfCloseBothWays) {
 
   ProcessingRequest write_request;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, write_request));
-  EXPECT_EQ(write_request.has_write_data(), true);
-  EXPECT_EQ(write_request.write_data().data(), "server_response");
-  EXPECT_EQ(write_request.write_data().end_of_stream(), true);
 
-  sendWriteGrpcMessage("server_data_inspected", true);
+  if (!write_request.write_data().end_of_stream()) {
+    size_t total_upstream_data = 0;
+    // We got partial data without end_of_stream
+    std::string partial_data = write_request.write_data().data();
+    std::string partial_response = partial_data + "_inspected";
+    sendWriteGrpcMessage(partial_response, false);
 
-  tcp_client->waitForData("server_data_inspected");
+    // Wait for client to receive the partial data
+    total_upstream_data += partial_response.length();
+    ASSERT_TRUE(tcp_client->waitForData(total_upstream_data));
+
+    // Wait for the final message with end_of_stream
+    ProcessingRequest final_request;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, final_request));
+    EXPECT_EQ(final_request.has_write_data(), true);
+    EXPECT_EQ(final_request.write_data().end_of_stream(), true);
+
+    // Respond to the final message
+    std::string final_data = final_request.write_data().data();
+    std::string final_response = final_data.empty() ? "" : final_data + "_inspected";
+    sendReadGrpcMessage(final_response, true);
+
+    // Wait for the final data if non-empty
+    if (!final_response.empty()) {
+      total_upstream_data += final_response.length();
+      ASSERT_TRUE(tcp_client->waitForData(total_upstream_data));
+    }
+  } else {
+    // We got the complete data with end_of_stream in one message
+    EXPECT_EQ(write_request.write_data().data(), "server_response");
+    EXPECT_EQ(write_request.write_data().end_of_stream(), true);
+    sendWriteGrpcMessage("server_data_inspected", true);
+    tcp_client->waitForData("server_data_inspected");
+  }
 
   // Close everything
   ASSERT_TRUE(fake_upstream_connection->close());

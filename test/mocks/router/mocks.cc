@@ -18,6 +18,7 @@ namespace Envoy {
 namespace Router {
 
 MockDirectResponseEntry::MockDirectResponseEntry() = default;
+
 MockDirectResponseEntry::~MockDirectResponseEntry() = default;
 
 TestRetryPolicy::TestRetryPolicy() { num_retries_ = 1; }
@@ -103,7 +104,7 @@ MockRouteEntry::MockRouteEntry()
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(opaque_config_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
-  ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(retry_policy_));
+  ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(base_retry_policy_));
   ON_CALL(*this, internalRedirectPolicy()).WillByDefault(ReturnRef(internal_redirect_policy_));
 
   ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
@@ -165,7 +166,7 @@ MockRoute::MockRoute() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(route_entry_.cluster_name_));
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(route_entry_.opaque_config_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(route_entry_.rate_limit_policy_));
-  ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(route_entry_.retry_policy_));
+  ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(route_entry_.base_retry_policy_));
   ON_CALL(*this, internalRedirectPolicy())
       .WillByDefault(ReturnRef(route_entry_.internal_redirect_policy_));
 

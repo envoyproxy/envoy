@@ -19,6 +19,8 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
@@ -54,15 +56,29 @@ DnsResolverImpl::DnsResolverImpl(
       rotate_nameservers_(config.rotate_nameservers()),
       edns0_max_payload_size_(static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, edns0_max_payload_size, 0))), // 0 means use c-ares default EDNS0
-      resolvers_csv_(resolvers_csv),
+      max_udp_channel_duration_(
+          config.has_max_udp_channel_duration()
+              ? std::chrono::milliseconds(Protobuf::util::TimeUtil::DurationToMilliseconds(
+                    config.max_udp_channel_duration()))
+              : std::chrono::milliseconds::zero()),
+      reinit_channel_on_timeout_(config.reinit_channel_on_timeout()), resolvers_csv_(resolvers_csv),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
+
+  // Initialize the periodic UDP channel refresh timer if configured.
+  if (max_udp_channel_duration_ > std::chrono::milliseconds::zero()) {
+    udp_channel_refresh_timer_ = dispatcher.createTimer([this] { onUdpChannelRefreshTimer(); });
+    udp_channel_refresh_timer_->enableTimer(max_udp_channel_duration_);
+  }
 }
 
 DnsResolverImpl::~DnsResolverImpl() {
   timer_->disableTimer();
+  if (udp_channel_refresh_timer_) {
+    udp_channel_refresh_timer_->disableTimer();
+  }
   ares_destroy(channel_);
 }
 
@@ -236,7 +252,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     // If c-ares returns ARES_ECONNREFUSED and there is no fallback we assume that the channel_ is
     // broken and hence we reinitialize it here.
     if (status == ARES_ECONNREFUSED || status == ARES_EREFUSED || status == ARES_ESERVFAIL ||
-        status == ARES_ENOTIMP) {
+        status == ARES_ENOTIMP || (status == ARES_ETIMEOUT && parent_.reinit_channel_on_timeout_)) {
       parent_.reinitializeChannel();
     }
   }
@@ -446,6 +462,20 @@ void DnsResolverImpl::reinitializeChannel() {
   }
 }
 
+void DnsResolverImpl::onUdpChannelRefreshTimer() {
+  ENVOY_LOG_EVENT(debug, "cares_udp_channel_periodic_refresh",
+                  "Performing periodic UDP channel refresh after {} ms",
+                  max_udp_channel_duration_.count());
+
+  // Reinitialize the channel to refresh UDP sockets.
+  reinitializeChannel();
+
+  // Re-enable the timer for the next periodic refresh.
+  if (udp_channel_refresh_timer_) {
+    udp_channel_refresh_timer_->enableTimer(max_udp_channel_duration_);
+  }
+}
+
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
   ENVOY_LOG_EVENT(trace, "cares_dns_resolution_start", "dns resolution for {} started", dns_name);
@@ -571,6 +601,10 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
     return {true, true};
   }
 
+  if (!parent_.filter_unroutable_families_) {
+    return {true, true};
+  }
+
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
   if (rc.return_value_ != 0) {
@@ -650,7 +684,7 @@ public:
 
   void initialize() override {
     // Initialize c-ares library in case first time.
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     if (!ares_library_initialized_) {
       ares_library_initialized_ = true;
       ENVOY_LOG(trace, "c-ares library initialized.");
@@ -659,7 +693,7 @@ public:
   }
   void terminate() override {
     // Cleanup c-ares library if initialized.
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     if (ares_library_initialized_) {
       ares_library_initialized_ = false;
       ENVOY_LOG(trace, "c-ares library cleaned up.");

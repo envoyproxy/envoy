@@ -22,6 +22,7 @@ Extensions
   health_check_event_sinks/health_check_event_sinks
   health_checker/health_checker
   http/early_header_mutation
+  http/cache_v2
   http/custom_response
   http/ext_proc
   http/header_formatters
@@ -49,3 +50,4 @@ Extensions
   watchdog/watchdog
   load_balancing_policies/load_balancing_policies
   cluster_specifier/cluster_specifier
+  local_address_selectors/local_address_selectors

@@ -32,7 +32,10 @@ public:
 
   ~DownstreamReverseConnectionIOHandle() override;
 
-  // Network::IoHandle overrides
+  // Network::IoHandle overrides.
+  // Intercept reads to handle reverse connection keep-alive pings.
+  Api::IoCallUint64Result read(Buffer::Instance& buffer,
+                               absl::optional<uint64_t> max_length) override;
   Api::IoCallUint64Result close() override;
   Api::SysCallIntResult shutdown(int how) override;
 
@@ -57,6 +60,10 @@ private:
   std::string connection_key_;
   // Flag to ignore close and shutdown calls during socket hand-off.
   bool ignore_close_and_shutdown_{false};
+
+  // Whether to actively echo RPING messages while the connection is idle.
+  // Disabled permanently after the first non-RPING application byte is observed.
+  bool ping_echo_active_{true};
 };
 
 } // namespace ReverseConnection

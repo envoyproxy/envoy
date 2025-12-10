@@ -701,6 +701,19 @@ public:
 
   template <class MessageType>
   static Config::DecodedResourcesWrapper
+  decodeResources(absl::flat_hash_map<std::string, MessageType> resources) {
+    Config::DecodedResourcesWrapper decoded_resources;
+    for (const auto& [name, resource] : resources) {
+      auto owned_resource = std::make_unique<MessageType>(resource);
+      decoded_resources.owned_resources_.emplace_back(
+          new Config::DecodedResourceImpl(std::move(owned_resource), name, {}, ""));
+      decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
+    }
+    return decoded_resources;
+  }
+
+  template <class MessageType>
+  static Config::DecodedResourcesWrapper
   decodeResources(const Protobuf::RepeatedPtrField<Protobuf::Any>& resources,
                   const std::string& version, const std::string& name_field = "name") {
     TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);

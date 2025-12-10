@@ -17,7 +17,7 @@ public:
   ~MockHostSet() override;
 
   void runCallbacks(const HostVector added, const HostVector removed) {
-    THROW_IF_NOT_OK(member_update_cb_helper_.runCallbacks(priority(), added, removed));
+    member_update_cb_helper_.runCallbacks(priority(), added, removed);
   }
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
@@ -59,7 +59,8 @@ public:
   HostsPerLocalitySharedPtr degraded_hosts_per_locality_{new HostsPerLocalityImpl()};
   HostsPerLocalitySharedPtr excluded_hosts_per_locality_{new HostsPerLocalityImpl()};
   LocalityWeightsConstSharedPtr locality_weights_{{}};
-  Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
+  Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
+      member_update_cb_helper_;
   uint32_t priority_{};
   uint32_t overprovisioning_factor_{};
   bool weighted_priority_health_{false};

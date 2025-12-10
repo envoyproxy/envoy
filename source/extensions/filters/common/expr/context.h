@@ -32,6 +32,7 @@ constexpr absl::string_view Scheme = "scheme";
 constexpr absl::string_view Method = "method";
 constexpr absl::string_view Referer = "referer";
 constexpr absl::string_view Headers = "headers";
+constexpr absl::string_view HeadersBytes = "headers_bytes";
 constexpr absl::string_view Time = "time";
 constexpr absl::string_view ID = "id";
 constexpr absl::string_view UserAgent = "useragent";
@@ -87,6 +88,7 @@ constexpr absl::string_view UpstreamLocality = "locality";
 constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_reason";
 constexpr absl::string_view UpstreamRequestAttemptCount = "request_attempt_count";
 constexpr absl::string_view UpstreamConnectionPoolReadyDuration = "cx_pool_ready_duration";
+constexpr absl::string_view UpstreamNumEndpoints = "num_endpoints";
 
 // xDS configuration context properties
 constexpr absl::string_view XDS = "xds";

@@ -34,6 +34,7 @@ envoy_extension_cc_test(
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
         "//test/extensions/load_balancing_policies/common:load_balancer_base_test_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
     ],
 )

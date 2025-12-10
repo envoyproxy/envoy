@@ -95,8 +95,16 @@ public:
   // Override the default's of Envoy::ConnectionPool::ActiveClient for class-specific functions.
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
-  void onAboveWriteBufferHighWatermark() override { callbacks_->onAboveWriteBufferHighWatermark(); }
-  void onBelowWriteBufferLowWatermark() override { callbacks_->onBelowWriteBufferLowWatermark(); }
+  void onAboveWriteBufferHighWatermark() override {
+    if (callbacks_) {
+      callbacks_->onAboveWriteBufferHighWatermark();
+    }
+  }
+  void onBelowWriteBufferLowWatermark() override {
+    if (callbacks_) {
+      callbacks_->onBelowWriteBufferLowWatermark();
+    }
+  }
 
   // Undos the readDisable done in onEvent(Connected)
   void readEnableIfNew();

@@ -8,6 +8,7 @@
 
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
 #include "source/extensions/common/wasm/ext/verify_signature.pb.h"
+#include "source/extensions/common/wasm/ext/sign.pb.h"
 
 #include "include/proxy-wasm/null_plugin.h"
 

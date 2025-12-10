@@ -75,6 +75,15 @@ public:
   virtual void cancel() PURE;
 
   /**
+   * Detach an inflight limit request. This will not cancel the request but will clean up
+   * all context associated with downstream request to avoid dangling references.
+   * NOTE: the callbacks that registered to take the response will be kept to handle the response
+   * when it arrives. The caller is responsible for ensuring that the callbacks have enough
+   * lifetime to handle the response.
+   */
+  virtual void detach() PURE;
+
+  /**
    * Request a limit check. Note that this abstract API matches the design of Lyft's GRPC based
    * rate limit service. See ratelimit.proto for details. Any other rate limit implementations
    * plugged in at this layer should support the same high level API.
@@ -90,7 +99,7 @@ public:
    */
   virtual void limit(RequestCallbacks& callbacks, const std::string& domain,
                      const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                     Tracing::Span& parent_span, OptRef<const StreamInfo::StreamInfo> stream_info,
+                     Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
                      uint32_t hits_addend) PURE;
 };
 

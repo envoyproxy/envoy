@@ -40,6 +40,7 @@ jobs:
 
   macos:
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ fromJSON(needs.load.outputs.request).run.build-macos }}
@@ -48,6 +49,7 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: CI ${{ matrix.name || matrix.target }}
     with:
+      bind-mount: false
       command:
       container-command:
       docker-ipv6: false
@@ -79,7 +81,7 @@ jobs:
             _BAZEL_BUILD_EXTRA_OPTIONS=(
               --remote_download_toplevel
               --flaky_test_attempts=2
-              --config=remote-cache-envoy-engflow
+              --config=remote-cache
               --config=ci)
             export BAZEL_BUILD_EXTRA_OPTIONS=${_BAZEL_BUILD_EXTRA_OPTIONS[*]}
 

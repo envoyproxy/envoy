@@ -21,7 +21,7 @@ namespace File {
 
 AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::FactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   const auto& fal_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(

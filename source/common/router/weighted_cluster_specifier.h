@@ -67,11 +67,13 @@ public:
 private:
   RouteConstSharedPtr pickWeightedCluster(RouteEntryAndRouteConstSharedPtr parent,
                                           const Http::RequestHeaderMap& headers,
+                                          const StreamInfo::StreamInfo& stream_info,
                                           uint64_t random_value) const;
 
   Runtime::Loader& loader_;
   const Http::LowerCaseString random_value_header_;
   const std::string runtime_key_prefix_;
+  const bool use_hash_policy_{};
   std::vector<WeightedClustersConfigEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_{0};
 };

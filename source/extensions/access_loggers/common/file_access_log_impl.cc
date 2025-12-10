@@ -14,9 +14,9 @@ FileAccessLog::FileAccessLog(const Filesystem::FilePathAndType& access_log_file_
   log_file_ = file_or_error.value();
 }
 
-void FileAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
+void FileAccessLog::emitLog(const Formatter::Context& context,
                             const StreamInfo::StreamInfo& stream_info) {
-  log_file_->write(formatter_->formatWithContext(context, stream_info));
+  log_file_->write(formatter_->format(context, stream_info));
 }
 
 } // namespace File

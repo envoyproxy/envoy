@@ -233,7 +233,7 @@ message FilterChain {
   google.protobuf.BoolValue use_proxy_proto = 4
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // [#not-implemented-hide:] filter chain metadata.
+  // Filter chain metadata.
   core.v3.Metadata metadata = 5;
 
   // Optional custom transport socket implementation to use for downstream connections.
@@ -250,9 +250,11 @@ message FilterChain {
   google.protobuf.Duration transport_socket_connect_timeout = 9;
 
   // The unique name (or empty) by which this filter chain is known.
-  // Note: :ref:`filter_chain_matcher
-  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
-  // requires that filter chains are uniquely named within a listener.
+  //
+  // .. note::
+  //     :ref:`filter_chain_matcher
+  //     <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
+  //     requires that filter chains are uniquely named within a listener.
   string name = 7;
 }
 

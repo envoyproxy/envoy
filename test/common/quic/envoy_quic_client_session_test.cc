@@ -9,6 +9,7 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_client_packet_writer_factory_impl.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 
 #include "test/common/quic/test_utils.h"
@@ -52,12 +53,12 @@ public:
   TestEnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                                 quic::QuicConnectionHelperInterface& helper,
                                 quic::QuicAlarmFactory& alarm_factory,
-                                quic::QuicPacketWriter& writer,
+                                quic::QuicPacketWriter* writer,
                                 const quic::ParsedQuicVersionVector& supported_versions,
                                 Event::Dispatcher& dispatcher,
                                 Network::ConnectionSocketPtr&& connection_socket,
                                 quic::ConnectionIdGeneratorInterface& generator)
-      : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
+      : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, writer, true,
                                   supported_versions, dispatcher, std::move(connection_socket),
                                   generator) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
@@ -99,12 +100,15 @@ private:
   uint32_t num_packets_received_{0};
 };
 
-class EnvoyQuicClientSessionTest : public testing::TestWithParam<quic::ParsedQuicVersion> {
+class EnvoyQuicClientSessionTest
+    : public testing::TestWithParam<std::tuple<quic::ParsedQuicVersion, bool>> {
 public:
   EnvoyQuicClientSessionTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_({GetParam()}),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
+        quic_version_({std::get<0>(GetParam())}),
+        writer_(new testing::NiceMock<quic::test::MockPacketWriter>()),
         peer_addr_(
             Network::Test::getCanonicalLoopbackAddress(TestEnvironment::getIpVersionsForTest()[0])),
         self_addr_(Network::Utility::getAddressWithPort(
@@ -117,26 +121,43 @@ public:
         quic_stat_names_(store_.symbolTable()),
         transport_socket_options_(std::make_shared<Network::TransportSocketOptionsImpl>()),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
-                                      POOL_GAUGE_PREFIX(store_, "http3."))}) {
+                                      POOL_GAUGE_PREFIX(store_, "http3."))}),
+        quiche_handles_migration_(std::get<1>(GetParam())) {
     // After binding the listen peer socket, set the bound IP address of the peer.
     peer_addr_ = peer_socket_->connectionInfoProvider().localAddress();
     http3_options_.mutable_quic_protocol_options()
         ->mutable_num_timeouts_to_trigger_port_migration()
         ->set_value(1);
+    if (quiche_handles_migration_) {
+      migration_config_.allow_port_migration = true;
+    }
   }
 
   void SetUp() override {
+    quic::QuicForceBlockablePacketWriter* wrapper = nullptr;
+    if (quiche_handles_migration_) {
+      wrapper = new quic::QuicForceBlockablePacketWriter();
+      // Owns the inner writer.
+      wrapper->set_writer(writer_);
+    }
     quic_connection_ = new TestEnvoyQuicClientConnection(
-        quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_, quic_version_,
-        *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
+        quic::test::TestConnectionId(), connection_helper_, alarm_factory_,
+        (quiche_handles_migration_ ? wrapper : static_cast<quic::QuicPacketWriter*>(writer_)),
+        quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
         connection_id_generator_);
+    EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* migration_helper = nullptr;
+    if (!quiche_handles_migration_) {
+      quic_connection_->setWriterFactory(writer_factory_);
+    } else {
+      migration_helper = &quic_connection_->getOrCreateMigrationHelper(writer_factory_, {});
+    }
 
     OptRef<Http::HttpServerPropertiesCache> cache;
     OptRef<Network::UpstreamTransportSocketFactory> uts_factory;
     envoy_quic_session_ = std::make_unique<EnvoyQuicClientSession>(
         quic_config_, quic_version_,
-        std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-        quic::QuicServerId("example.com", 443), crypto_config_, *dispatcher_,
+        std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_), wrapper, migration_helper,
+        migration_config_, quic::QuicServerId("example.com", 443), crypto_config_, *dispatcher_,
         /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, cache,
         *store_.rootScope(), transport_socket_options_, uts_factory);
 
@@ -147,7 +168,7 @@ public:
     EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
 
     time_system_.advanceTimeWait(std::chrono::milliseconds(1));
-    ON_CALL(writer_, WritePacket(_, _, _, _, _, _))
+    ON_CALL(*writer_, WritePacket(_, _, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
 
     envoy_quic_session_->Initialize();
@@ -193,7 +214,7 @@ protected:
   EnvoyQuicConnectionHelper connection_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
   quic::ParsedQuicVersionVector quic_version_;
-  testing::NiceMock<quic::test::MockPacketWriter> writer_;
+  testing::NiceMock<quic::test::MockPacketWriter>* writer_;
   // Initialized with port 0 and modified during peer_socket_ creation.
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
@@ -219,12 +240,20 @@ protected:
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   std::unique_ptr<QuicHttpClientConnectionImpl> http_connection_;
+  bool quiche_handles_migration_;
+  quic::QuicConnectionMigrationConfig migration_config_{quicConnectionMigrationDisableAllConfig()};
+  QuicClientPacketWriterFactoryImpl writer_factory_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest,
-                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
 
 TEST_P(EnvoyQuicClientSessionTest, ShutdownNoOp) { http_connection_->shutdownNotice(); }
+
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTest, EnvoyQuicClientSessionTest,
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
 
 TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   Http::MockResponseDecoder response_decoder;
@@ -386,7 +415,7 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionClosePopulatesQuicVersionStats) {
             envoy_quic_session_->transportFailureReason());
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_->state());
   std::string quic_version_stat_name;
-  switch (GetParam().transport_version) {
+  switch (quic_version_[0].transport_version) {
   case quic::QUIC_VERSION_IETF_DRAFT_29:
     quic_version_stat_name = "h3_29";
     break;
@@ -509,12 +538,10 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   // Trigger port migration.
   quic_connection_->OnPathDegradingDetected();
   EXPECT_TRUE(envoy_quic_session_->HasPendingPathValidation());
-  auto* path_validation_context =
-      dynamic_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(
-          quic_connection_->GetPathValidationContext());
-  Network::ConnectionSocket& probing_socket = path_validation_context->probingSocket();
-  const Network::Address::InstanceConstSharedPtr& new_self_address =
-      probing_socket.connectionInfoProvider().localAddress();
+  quic::QuicPathValidationContext* path_validation_context =
+      quic_connection_->GetPathValidationContext();
+  const Network::Address::InstanceConstSharedPtr new_self_address =
+      quicAddressToEnvoyAddressInstance(path_validation_context->self_address());
   EXPECT_NE(new_self_address->asString(), self_addr_->asString());
 
   // Send a STATELESS_RESET packet to the probing socket.
@@ -594,7 +621,7 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
   slice.mem_ = buffer;
   slice.len_ = packet->length();
   quic::CrypterPair crypters;
-  quic::CryptoUtils::CreateInitialObfuscators(quic::Perspective::IS_CLIENT, GetParam(),
+  quic::CryptoUtils::CreateInitialObfuscators(quic::Perspective::IS_CLIENT, quic_version_[0],
                                               quic_connection_->connection_id(), &crypters);
   quic_connection_->InstallDecrypter(quic::ENCRYPTION_INITIAL, std::move(crypters.decrypter));
 
@@ -776,7 +803,8 @@ private:
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionDisallowMmsgTests,
                          EnvoyQuicClientSessionDisallowMmsgTest,
-                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
 
 // Ensures that the Network::Utility::readFromSocket function uses `recvmsg` for client QUIC
 // connections when GRO is not supported.
@@ -838,7 +866,8 @@ private:
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionAllowMmsgTests, EnvoyQuicClientSessionAllowMmsgTest,
-                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
 
 TEST_P(EnvoyQuicClientSessionAllowMmsgTest, UsesRecvMmsgWhenNoGroAndMmsgAllowed) {
   if (!Api::OsSysCallsSingleton::get().supportsMmsg()) {

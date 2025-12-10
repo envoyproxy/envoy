@@ -273,6 +273,12 @@ int StreamInfoWrapper::luaVirtualClusterName(lua_State* state) {
   return 1;
 }
 
+int StreamInfoWrapper::luaDrainConnectionUponCompletion(lua_State* state) {
+  UNREFERENCED_PARAMETER(state);
+  stream_info_.setShouldDrainConnectionUponCompletion(true);
+  return 0;
+}
+
 DynamicMetadataMapIterator::DynamicMetadataMapIterator(DynamicMetadataMapWrapper& parent)
     : parent_{parent}, current_{parent_.streamInfo().dynamicMetadata().filter_metadata().begin()} {}
 

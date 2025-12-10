@@ -307,25 +307,24 @@ public:
 
           if (use_eds_) {
             addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-dynamic",
-                      R"(%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
+                      R"(%UPSTREAM_METADATA(test.namespace:key)%)", append);
 
             // Iterate over VirtualHosts, nested Routes and WeightedClusters, adding a dynamic
             // response header.
             for (auto& vhost : *route_config->mutable_virtual_hosts()) {
               addHeader(vhost.mutable_response_headers_to_add(), "x-vhost-dynamic",
-                        R"(vhost:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
+                        R"(vhost:%UPSTREAM_METADATA(test.namespace:key)%)", append);
 
               for (auto& route : *vhost.mutable_routes()) {
                 addHeader(route.mutable_response_headers_to_add(), "x-route-dynamic",
-                          R"(route:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
+                          R"(route:%UPSTREAM_METADATA(test.namespace:key)%)", append);
 
                 if (route.has_route()) {
                   auto* route_action = route.mutable_route();
                   if (route_action->has_weighted_clusters()) {
                     for (auto& c : *route_action->mutable_weighted_clusters()->mutable_clusters()) {
                       addHeader(c.mutable_response_headers_to_add(), "x-weighted-cluster-dynamic",
-                                R"(weighted:%UPSTREAM_METADATA(["test.namespace", "key"])%)",
-                                append);
+                                R"(weighted:%UPSTREAM_METADATA(test.namespace:key)%)", append);
                     }
                   }
                 }
@@ -1390,24 +1389,24 @@ TEST_P(EmptyHeaderIntegrationTest, AllProtocolsPassEmptyHeaders) {
   *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-ds-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
     keep_empty_value: true
   )EOF");
   *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-ds-no-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
   )EOF");
   *vhost.add_response_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-us-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
     keep_empty_value: true
   )EOF");
   *vhost.add_response_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-us-no-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
   )EOF");
 
   config_helper_.addVirtualHost(vhost);

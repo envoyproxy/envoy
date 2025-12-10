@@ -37,10 +37,10 @@ MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 
 class CdsApiImplTest : public testing::Test {
 protected:
-  void setup() {
+  void setup(bool support_multi_ads_sources = false) {
     envoy::config::core::v3::ConfigSource cds_config;
     cds_ = *CdsApiImpl::create(cds_config, nullptr, cm_, *scope_.rootScope(), validation_visitor_,
-                               server_factory_context_);
+                               server_factory_context_, support_multi_ads_sources);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
@@ -380,6 +380,101 @@ TEST_F(CdsApiImplTest, FailureSubscription) {
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   cds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, {});
   EXPECT_EQ("", cds_->versionInfo());
+}
+
+// Tests that when a SotW update happens, a cluster that was added by another
+// source is not removed.
+TEST_F(CdsApiImplTest, MultiAdsSourcesEnabledSotW) {
+  InSequence s;
+  setup(true);
+
+  // 1. Initial SotW update introduces "sotw_cluster_1".
+  const std::string response1_yaml = R"EOF(
+version_info: '0'
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: sotw_cluster_1
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
+  const auto decoded_resources1 =
+      TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
+
+  expectAdd("sotw_cluster_1", "0");
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_TRUE(
+      cds_callbacks_->onConfigUpdate(decoded_resources1.refvec_, response1.version_info()).ok());
+  EXPECT_EQ("0", cds_->versionInfo());
+
+  // 2. A second SotW update removes "sotw_cluster_1" and adds "sotw_cluster_2".
+  // We also imagine an on-demand cluster "od_cluster_1" now exists.
+  const std::string response2_yaml = R"EOF(
+version_info: '1'
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: sotw_cluster_2
+)EOF";
+  auto response2 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_yaml);
+  const auto decoded_resources2 =
+      TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
+
+  // The update should add the new cluster.
+  expectAdd("sotw_cluster_2", "1");
+  // Crucially, it should ONLY remove the cluster it knew about ("sotw_cluster_1").
+  // "od_cluster_1" should NOT be removed.
+  EXPECT_CALL(cm_, removeCluster("sotw_cluster_1", false));
+  EXPECT_CALL(cm_, removeCluster("od_cluster_1", false)).Times(0);
+
+  EXPECT_TRUE(
+      cds_callbacks_->onConfigUpdate(decoded_resources2.refvec_, response2.version_info()).ok());
+  EXPECT_EQ("1", cds_->versionInfo());
+}
+
+// Tests that if a SotW update contains all the clusters it previously managed,
+// no clusters are removed, even if other on-demand clusters exist.
+TEST_F(CdsApiImplTest, MultiAdsSourcesEnabledNoRemoval) {
+  InSequence s;
+  setup(true);
+
+  // 1. Initial SotW update introduces "sotw_cluster_1".
+  const std::string response1_yaml = R"EOF(
+version_info: '0'
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: sotw_cluster_1
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
+  const auto decoded_resources1 =
+      TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
+
+  expectAdd("sotw_cluster_1", "0");
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_TRUE(
+      cds_callbacks_->onConfigUpdate(decoded_resources1.refvec_, response1.version_info()).ok());
+
+  // 2. A second SotW update still contains "sotw_cluster_1".
+  // An on-demand cluster "od_cluster_1" has also been added.
+  const std::string response2_yaml = R"EOF(
+version_info: '1'
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: sotw_cluster_1
+)EOF";
+  auto response2 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_yaml);
+  const auto decoded_resources2 =
+      TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
+
+  // The existing cluster is updated.
+  expectAdd("sotw_cluster_1", "1");
+  // No clusters should be removed.
+  EXPECT_CALL(cm_, removeCluster(_, false)).Times(0);
+
+  EXPECT_TRUE(
+      cds_callbacks_->onConfigUpdate(decoded_resources2.refvec_, response2.version_info()).ok());
+  EXPECT_EQ("1", cds_->versionInfo());
 }
 
 } // namespace

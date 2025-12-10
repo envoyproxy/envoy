@@ -164,6 +164,10 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
         (protocol.has_value() && protocol.value() != Envoy::Http::Protocol::Http11)) {
       // handshake is finished and continue the data processing.
       filter_.callbacks_->upstreamCallbacks()->setPausedForWebsocketUpgrade(false);
+      // Disable the route timeout since the websocket upgrade completed successfully
+      filter_.callbacks_->upstreamCallbacks()->disableRouteTimeoutForWebsocketUpgrade();
+      // Disable per-try timeouts since the websocket upgrade completed successfully
+      filter_.callbacks_->upstreamCallbacks()->disablePerTryTimeoutForWebsocketUpgrade();
       filter_.callbacks_->continueDecoding();
     } else if (Runtime::runtimeFeatureEnabled(
                    "envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain") &&
@@ -199,6 +203,13 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
 
 // This is response data arriving from the codec. Send it through the filter manager.
 void UpstreamCodecFilter::CodecBridge::decodeData(Buffer::Instance& data, bool end_stream) {
+  // Record the time when the first byte of response body is received.
+  if (!first_body_rx_recorded_) {
+    first_body_rx_recorded_ = true;
+    filter_.upstreamTiming().onFirstUpstreamRxBodyByteReceived(
+        filter_.callbacks_->dispatcher().timeSource());
+  }
+
   maybeEndDecode(end_stream);
   filter_.callbacks_->encodeData(data, end_stream);
 }

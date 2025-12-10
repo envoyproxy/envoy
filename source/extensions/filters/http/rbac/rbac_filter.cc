@@ -36,6 +36,9 @@ const absl::flat_hash_set<std::string> ActionValidationVisitor::allowed_inputs_s
         envoy::extensions::matching::common_inputs::network::v3::ServerNameInput::descriptor()
             ->full_name())},
     {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::network::v3::NetworkNamespaceInput::descriptor()
+            ->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
         envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name())},
     {TypeUtil::descriptorFullNameToTypeUrl(
         envoy::extensions::matching::common_inputs::ssl::v3::UriSanInput::descriptor()

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.pb.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/upstream.h"
@@ -17,6 +18,8 @@ namespace Upstream {
 using ClientSideWeightedRoundRobinLbProto = envoy::extensions::load_balancing_policies::
     client_side_weighted_round_robin::v3::ClientSideWeightedRoundRobin;
 using OrcaLoadReportProto = xds::data::orca::v3::OrcaLoadReport;
+using CommonLbConfig = envoy::config::cluster::v3::Cluster::CommonLbConfig;
+using RoundRobinConfig = envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin;
 
 /**
  * Load balancer config used to wrap the config proto.
@@ -34,6 +37,9 @@ public:
   std::chrono::milliseconds blackout_period;
   std::chrono::milliseconds weight_expiration_period;
   std::chrono::milliseconds weight_update_period;
+
+  // Round robin proto overrides that we want to propagate to the worker RR LB (e.g., slow start).
+  RoundRobinConfig round_robin_overrides_;
 
   Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::SlotAllocator& tls_slot_allocator_;
@@ -61,7 +67,8 @@ public:
         : report_handler_(std::move(handler)), weight_(weight), non_empty_since_(non_empty_since),
           last_update_time_(last_update_time) {}
 
-    absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report) override;
+    absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
+                                  const StreamInfo::StreamInfo& stream_info) override;
 
     // Update the weight and timestamps for first and last update time.
     void updateWeightNow(uint32_t weight, const MonotonicTime& now) {
@@ -138,7 +145,7 @@ public:
   // Thread local shim to store callbacks for weight updates of worker local lb.
   class ThreadLocalShim : public Envoy::ThreadLocal::ThreadLocalObject {
   public:
-    Common::CallbackManager<uint32_t> apply_weights_cb_helper_;
+    Common::CallbackManager<void> apply_weights_cb_helper_;
   };
 
   // This class is used to handle the load balancing on the worker thread.
@@ -146,7 +153,7 @@ public:
   public:
     WorkerLocalLb(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                   ClusterLbStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
-                  const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+                  const CommonLbConfig& common_config, const RoundRobinConfig& round_robin_config,
                   TimeSource& time_source, OptRef<ThreadLocalShim> tls_shim);
 
   private:
@@ -160,9 +167,10 @@ public:
     WorkerLocalLbFactory(const Upstream::ClusterInfo& cluster_info,
                          const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
                          Envoy::Random::RandomGenerator& random, TimeSource& time_source,
-                         ThreadLocal::SlotAllocator& tls)
+                         ThreadLocal::SlotAllocator& tls,
+                         const RoundRobinConfig& round_robin_config)
         : cluster_info_(cluster_info), priority_set_(priority_set), runtime_(runtime),
-          random_(random), time_source_(time_source) {
+          random_(random), time_source_(time_source), round_robin_config_(round_robin_config) {
       tls_ = ThreadLocal::TypedSlot<ThreadLocalShim>::makeUnique(tls);
       tls_->set([](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalShim>(); });
     }
@@ -171,7 +179,10 @@ public:
 
     bool recreateOnHostChange() const override { return false; }
 
-    void applyWeightsToAllWorkers(uint32_t priority);
+    Upstream::LoadBalancerPtr createWithCommonLbConfig(const CommonLbConfig& common_lb_config,
+                                                       Upstream::LoadBalancerParams params);
+
+    void applyWeightsToAllWorkers();
 
     std::unique_ptr<Envoy::ThreadLocal::TypedSlot<ThreadLocalShim>> tls_;
 
@@ -180,6 +191,7 @@ public:
     Runtime::Loader& runtime_;
     Envoy::Random::RandomGenerator& random_;
     TimeSource& time_source_;
+    const RoundRobinConfig round_robin_config_;
   };
 
 public:

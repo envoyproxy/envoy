@@ -44,12 +44,12 @@
 namespace Envoy {
 namespace Config {
 namespace {
-absl::Status createGrpcClients(Grpc::AsyncClientManager& async_client_manager,
-                               const envoy::config::core::v3::ApiConfigSource& config_source,
-                               Stats::Scope& stats_scope, bool skip_cluster_check,
-                               bool xdstp_config_source,
-                               Grpc::RawAsyncClientSharedPtr& primary_client,
-                               Grpc::RawAsyncClientSharedPtr& failover_client) {
+absl::Status createUniqueClients(Grpc::AsyncClientManager& async_client_manager,
+                                 const envoy::config::core::v3::ApiConfigSource& config_source,
+                                 Stats::Scope& stats_scope, bool skip_cluster_check,
+                                 bool xdstp_config_source,
+                                 Grpc::RawAsyncClientSharedPtr& primary_client,
+                                 Grpc::RawAsyncClientSharedPtr& failover_client) {
   auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
       async_client_manager, config_source, stats_scope, skip_cluster_check, 0 /*grpc_service_idx*/,
       xdstp_config_source);
@@ -70,6 +70,63 @@ absl::Status createGrpcClients(Grpc::AsyncClientManager& async_client_manager,
     success = factory_failover->createUncachedRawAsyncClient();
     RETURN_IF_NOT_OK_REF(success.status());
     failover_client = std::move(*success);
+  }
+  return absl::OkStatus();
+}
+
+absl::Status createSharedClients(Grpc::AsyncClientManager& async_client_manager,
+                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
+                                 Stats::Scope& stats_scope, bool skip_cluster_check,
+                                 bool xdstp_config_source,
+                                 Grpc::RawAsyncClientSharedPtr& primary_client,
+                                 Grpc::RawAsyncClientSharedPtr& failover_client) {
+  absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>> maybe_grpc_service =
+      Utility::getGrpcConfigFromApiConfigSource(api_config_source, /*grpc_service_idx*/ 0,
+                                                xdstp_config_source);
+  RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
+  if (maybe_grpc_service.value().has_value()) {
+    absl::StatusOr<Grpc::RawAsyncClientSharedPtr> success =
+        async_client_manager.getOrCreateRawAsyncClientWithHashKey(
+            Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value()), stats_scope,
+            skip_cluster_check);
+    RETURN_IF_NOT_OK_REF(success.status());
+    primary_client = std::move(*success);
+  }
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+    absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>> maybe_grpc_service =
+        Utility::getGrpcConfigFromApiConfigSource(api_config_source, /*grpc_service_idx*/ 1,
+                                                  xdstp_config_source);
+    RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
+    if (maybe_grpc_service.value().has_value()) {
+      absl::StatusOr<Grpc::RawAsyncClientSharedPtr> success =
+          async_client_manager.getOrCreateRawAsyncClientWithHashKey(
+              Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value()), stats_scope,
+              skip_cluster_check);
+      RETURN_IF_NOT_OK_REF(success.status());
+      failover_client = std::move(*success);
+    }
+  }
+  return absl::OkStatus();
+}
+
+absl::Status createGrpcClients(Grpc::AsyncClientManager& async_client_manager,
+                               const envoy::config::core::v3::ApiConfigSource& api_config_source,
+                               Stats::Scope& stats_scope, bool skip_cluster_check,
+                               bool xdstp_config_source,
+                               Grpc::RawAsyncClientSharedPtr& primary_client,
+                               Grpc::RawAsyncClientSharedPtr& failover_client) {
+
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_cached_grpc_client_for_xds")) {
+    RETURN_IF_NOT_OK(createSharedClients(async_client_manager, api_config_source, stats_scope,
+                                         skip_cluster_check, xdstp_config_source, primary_client,
+                                         failover_client));
+  } else {
+    RETURN_IF_NOT_OK(createUniqueClients(async_client_manager, api_config_source, stats_scope,
+                                         skip_cluster_check, xdstp_config_source, primary_client,
+                                         failover_client));
+  }
+  if (primary_client == nullptr) {
+    return absl::InvalidArgumentError("gRPC client construction failed for primary cluster.");
   }
   return absl::OkStatus();
 }

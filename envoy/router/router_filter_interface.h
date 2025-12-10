@@ -105,6 +105,18 @@ public:
   virtual void onStreamMaxDurationReached(UpstreamRequest& upstream_request) PURE;
 
   /*
+   * This will be called to set up the route timeout early for websocket upgrades.
+   * This ensures the timeout is active during the upgrade negotiation phase.
+   */
+  virtual void setupRouteTimeoutForWebsocketUpgrade() PURE;
+
+  /*
+   * This will be called to disable the route timeout after websocket upgrade completes.
+   * This prevents the timeout from firing after successful upgrade.
+   */
+  virtual void disableRouteTimeoutForWebsocketUpgrade() PURE;
+
+  /*
    * @returns the Router filter's StreamDecoderFilterCallbacks.
    */
   virtual Http::StreamDecoderFilterCallbacks* callbacks() PURE;

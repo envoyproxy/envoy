@@ -46,6 +46,14 @@ public:
   // The request ID extension used for generation/validation when tunneling.
   virtual const Envoy::Http::RequestIDExtensionSharedPtr& requestIDExtension() const PURE;
 
+  // Optional request header name used to emit the generated request ID on the tunneling request.
+  // If empty, the default header name "x-request-id" is used.
+  virtual const std::string& requestIDHeader() const PURE;
+
+  // Optional dynamic metadata key used to store the generated request ID under the TCP proxy
+  // namespace. If empty, the default key "tunnel_request_id" is used.
+  virtual const std::string& requestIDMetadataKey() const PURE;
+
   // Save HTTP response headers to the downstream filter state.
   virtual void
   propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,

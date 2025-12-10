@@ -141,6 +141,16 @@ Arguments to PING are not allowed. Envoy responds to ECHO immediately with the c
 All other supported commands must contain a key. Supported commands are functionally identical to the
 original Redis command except possibly in failure scenarios.
 
+INFO command
+^^^^^^^^^^^^
+INFO command is handled by envoy differently it aggregates metrics across all shards and returns consolidated cluster-wide statistics.
+An optional section parameter can be provided to filter the output (e.g., INFO memory).
+INFO.SHARD is an Envoy-specific command introduced for debugging purposes that queries a specific shard by index
+and returns that shard's complete INFO response (e.g., INFO.SHARD 0 memory).
+Shard numbering starts from 0 and shards are ordered from lowest to highest slot assignment.
+when using INFO.SHARD command, if the provided shard index is invalid, Envoy will return an error.
+when using INFO.SHARD command, via redis-cli, make sure to use --raw flag to get the proper output format.
+
 For details on each command's usage see the official
 `Redis command reference <https://redis.io/commands>`_.
 
@@ -170,6 +180,21 @@ For details on each command's usage see the official
   TTL, Generic
   TYPE, Generic
   UNLINK, Generic
+  COPY, Generic
+  RENAME, Generic
+  RENAMENX, Generic
+  SORT, Generic
+  SORT_RO, Generic
+  SCRIPT, Generic
+  FLUSHALL, Generic
+  FLUSHDB, Generic
+  SLOWLOG, Generic
+  CONFIG, Generic
+  CLUSTER INFO, Generic
+  CLUSTER SLOTS, Generic
+  CLUSTER KEYSLOT, Generic
+  CLUSTER NODES, Generic
+  RANDOMKEY, Generic
   GEOADD, Geo
   GEODIST, Geo
   GEOHASH, Geo
@@ -177,6 +202,9 @@ For details on each command's usage see the official
   GEORADIUS_RO, Geo
   GEORADIUSBYMEMBER_RO, Geo
   GEOSEARCH, Geo
+  GEOSEARCHSTORE, Geospatial
+  GEORADIUS, Geospatial
+  GEORADIUSBYMEMBER, Geospatial
   HDEL, Hash
   HEXISTS, Hash
   HGET, Hash
@@ -192,8 +220,10 @@ For details on each command's usage see the official
   HSETNX, Hash
   HSTRLEN, Hash
   HVALS, Hash
+  HRANDFIELD, Hash
   PFADD, HyperLogLog
   PFCOUNT, HyperLogLog
+  PFMERGE, HyperLogLog
   LINDEX, List
   LINSERT, List
   LLEN, List
@@ -204,6 +234,8 @@ For details on each command's usage see the official
   LREM, List
   LSET, List
   LTRIM, List
+  LPOS, List
+  RPOPLPUSH, List
   MULTI, Transaction
   RPOP, List
   RPUSH, List
@@ -220,6 +252,14 @@ For details on each command's usage see the official
   SREM, Set
   SCAN, Generic
   SSCAN, Set
+  SDIFF, Set
+  SDIFFSTORE, Set
+  SINTER, Set
+  SINTERSTORE, Set
+  SMISMEMBER, Set
+  SMOVE, Set
+  SUNION, Set
+  SUNIONSTORE, Set
   WATCH, String
   UNWATCH, String
   ZADD, Sorted Set
@@ -243,6 +283,15 @@ For details on each command's usage see the official
   ZPOPMAX, Sorted Set
   ZSCAN, Sorted Set
   ZSCORE, Sorted Set
+  ZDIFF, Sorted Set
+  ZDIFFSTORE, Sorted Set
+  ZINTER, Sorted Set
+  ZINTERSTORE, Sorted Set
+  ZMSCORE, Sorted Set
+  ZRANDMEMBER, Sorted Set
+  ZRANGESTORE, Sorted Set
+  ZUNION, Sorted Set
+  ZUNIONSTORE, Sorted Set
   APPEND, String
   BITCOUNT, String
   BITFIELD, String
@@ -259,6 +308,7 @@ For details on each command's usage see the official
   INCRBY, String
   INCRBYFLOAT, String
   INFO, Server
+  INFO.SHARD, Server
   ROLE, Server
   MGET, String
   MSET, String
@@ -269,6 +319,8 @@ For details on each command's usage see the official
   SETNX, String
   SETRANGE, String
   STRLEN, String
+  MSETNX, String
+  SUBSTR, String
   XACK, Stream
   XADD, Stream
   XAUTOCLAIM, Stream
@@ -289,6 +341,7 @@ For details on each command's usage see the official
   BF.MEXISTS, Bloom
   BF.RESERVE, Bloom
   BF.SCANDUMP, Bloom
+  BITOP, Bitmap
 
 Failure modes
 -------------

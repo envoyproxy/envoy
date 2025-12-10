@@ -94,6 +94,7 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   // ALPN.
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
+  connection_socket->connectionInfoProvider().setListenerInfo(listener_config_->listenerInfo());
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
       dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr(),
       StreamInfo::FilterState::LifeSpan::Connection);

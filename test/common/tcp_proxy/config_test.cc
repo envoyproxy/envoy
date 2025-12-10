@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "envoy/common/hashable.h"
 
 #include "test/common/tcp_proxy/tcp_proxy_test_base.h"
@@ -221,6 +223,98 @@ max_downstream_connection_duration: 10s
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Config config_obj(constructConfigFromYaml(yaml, factory_context));
   EXPECT_EQ(std::chrono::seconds(10), config_obj.maxDownstreamConnectionDuration().value());
+}
+
+TEST(ConfigTest, MaxDownstreamConnectionDurationJitterPercentage) {
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+max_downstream_connection_duration: 10s
+max_downstream_connection_duration_jitter_percentage:
+  value: 50.0
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
+  EXPECT_EQ(std::chrono::seconds(10), config_obj.maxDownstreamConnectionDuration().value());
+  EXPECT_EQ(50.0, config_obj.maxDownstreamConnectionDurationJitterPercentage().value());
+}
+
+TEST(ConfigTest, CalculateActualMaxDownstreamConnectionDuration) {
+  struct TestCase {
+    std::string name;
+    Protobuf::Duration* max_downstream_connection_duration;
+    envoy::type::v3::Percent* max_downstream_connection_duration_jitter_percentage;
+    uint64_t random_value;
+    absl::optional<std::chrono::milliseconds> expected_actual_max_downstream_connection_duration;
+  };
+
+  const auto seconds = [](uint64_t seconds) {
+    auto* d = new Protobuf::Duration();
+    d->set_seconds(seconds);
+    return d;
+  };
+
+  const auto percent = [](double value) {
+    auto* p = new envoy::type::v3::Percent();
+    p->set_value(value);
+    return p;
+  };
+
+  std::vector<TestCase> test_cases = {
+      {/* name */ "0% random value",
+       /* max_downstream_connection_duration */ seconds(10),
+       /* max_downstream_connection_duration_jitter_percentage */ percent(50.0),
+       /* random_value */ 0,
+       /* expected_actual_max_downstream_connection_duration */ std::chrono::milliseconds(10000)},
+      {/* name */ "50% random value",
+       /* max_downstream_connection_duration */ seconds(10),
+       /* max_downstream_connection_duration_jitter_percentage */ percent(50.0),
+       /* random_value */ 2500,
+       /* expected_actual_max_downstream_connection_duration */ std::chrono::milliseconds(12500)},
+      {/* name */ "99.99% random value",
+       /* max_downstream_connection_duration */ seconds(10),
+       /* max_downstream_connection_duration_jitter_percentage */ percent(50.0),
+       /* random_value */ 9999,
+       /* expected_actual_max_downstream_connection_duration */ std::chrono::milliseconds(14999)},
+      {/* name */ "0% jitter",
+       /* max_downstream_connection_duration */ seconds(10),
+       /* max_downstream_connection_duration_jitter_percentage */ percent(0),
+       /* random_value */ 5000,
+       /* expected_actual_max_downstream_connection_duration */ std::chrono::milliseconds(10000)},
+      {/* name */ "100% jitter",
+       /* max_downstream_connection_duration */ seconds(10),
+       /* max_downstream_connection_duration_jitter_percentage */ percent(100),
+       /* random_value */ 5000,
+       /* expected_actual_max_downstream_connection_duration */ std::chrono::milliseconds(15000)},
+      {/* name */ "no jitter",
+       /* max_downstream_connection_duration */ seconds(10),
+       /* max_downstream_connection_duration_jitter_percentage */ nullptr,
+       /* random_value */ 5000,
+       /* expected_actual_max_downstream_connection_duration */ std::chrono::milliseconds(10000)},
+      {/* name */ "no max duration",
+       /* max_downstream_connection_duration */ nullptr,
+       /* max_downstream_connection_duration_jitter_percentage */ percent(50),
+       /* random_value */ 5000,
+       /* expected_actual_max_downstream_connection_duration */ absl::nullopt},
+  };
+
+  for (const auto& test_case : test_cases) {
+    SCOPED_TRACE(test_case.name);
+    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+    ON_CALL(factory_context.server_factory_context_.api_.random_, random())
+        .WillByDefault(Return(test_case.random_value));
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proto_config;
+    proto_config.set_allocated_max_downstream_connection_duration(
+        test_case.max_downstream_connection_duration);
+    proto_config.set_allocated_max_downstream_connection_duration_jitter_percentage(
+        test_case.max_downstream_connection_duration_jitter_percentage);
+    Config config_obj(proto_config, factory_context);
+
+    EXPECT_EQ(test_case.expected_actual_max_downstream_connection_duration,
+              config_obj.calculateMaxDownstreamConnectionDurationWithJitter());
+  }
 }
 
 TEST(ConfigTest, NoRouteConfig) {

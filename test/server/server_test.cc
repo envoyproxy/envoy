@@ -1856,6 +1856,34 @@ TEST_P(ServerInstanceImplTest, TextApplicationLog) {
   ENVOY_LOG_MISC(info, "hello");
 }
 
+// Test that deprecated runtime key warning is logged when skip_deprecated_logs is false
+TEST_P(ServerInstanceImplTest, DeprecatedRuntimeKeyWarningWhenNotSkipped) {
+  // Set skip_deprecated_logs to false (default)
+  ON_CALL(options_, skipDeprecatedLogs()).WillByDefault(Return(false));
+
+  EXPECT_LOG_CONTAINS(
+      "warn",
+      "Usage of the deprecated runtime key overload.global_downstream_max_connections, consider "
+      "switching to "
+      "`envoy.resource_monitors.global_downstream_max_connections` instead."
+      "This runtime key will be removed in future.",
+      { initialize("test/server/test_data/server/deprecated_runtime_key_bootstrap.yaml"); });
+}
+
+// Test that deprecated runtime key warning is suppressed when skip_deprecated_logs is true
+TEST_P(ServerInstanceImplTest, DeprecatedRuntimeKeyWarningWhenSkipped) {
+  // Set skip_deprecated_logs to true
+  ON_CALL(options_, skipDeprecatedLogs()).WillByDefault(Return(true));
+
+  EXPECT_LOG_NOT_CONTAINS(
+      "warn",
+      "Usage of the deprecated runtime key overload.global_downstream_max_connections, consider "
+      "switching to "
+      "`envoy.resource_monitors.global_downstream_max_connections` instead."
+      "This runtime key will be removed in future.",
+      { initialize("test/server/test_data/server/deprecated_runtime_key_bootstrap.yaml"); });
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

@@ -140,6 +140,8 @@ absl::StatusOr<Event::ScaledTimerType> parseTimerType(
     return Event::ScaledTimerType::TransportSocketConnectTimeout;
   case Config::HTTP_DOWNSTREAM_CONNECTION_MAX:
     return Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout;
+  case Config::HTTP_DOWNSTREAM_STREAM_FLUSH:
+    return Event::ScaledTimerType::HttpDownstreamStreamFlush;
   default:
     return absl::InvalidArgumentError(
         fmt::format("Unknown timer type {}", static_cast<int>(config_timer_type)));
@@ -579,10 +581,16 @@ void OverloadManagerImpl::start() {
     // Start a new flush epoch. If all resource updates complete before this callback runs, the last
     // resource update will call flushResourceUpdates to flush the whole batch early.
     ++flush_epoch_;
-    flush_awaiting_updates_ = resources_.size();
+    flush_awaiting_updates_ = resources_.size() + proactive_resources_->size();
 
     for (auto& resource : resources_) {
       resource.second.update(flush_epoch_);
+    }
+
+    for (auto& resource : *proactive_resources_) {
+      const double pressure = resource.second.updateResourcePressure();
+      updateResourcePressure(OverloadProactiveResources::get().resourceToName(resource.first),
+                             pressure, flush_epoch_);
     }
 
     // Record delay.

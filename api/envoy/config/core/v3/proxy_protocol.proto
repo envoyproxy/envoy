@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.core.v3;
 
+import "envoy/config/core/v3/substitution_format_string.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -37,8 +39,27 @@ message TlvEntry {
   // The type of the TLV. Must be a uint8 (0-255) as per the Proxy Protocol v2 specification.
   uint32 type = 1 [(validate.rules).uint32 = {lt: 256}];
 
-  // The value of the TLV. Must be at least one byte long.
-  bytes value = 2 [(validate.rules).bytes = {min_len: 1}];
+  // The static value of the TLV.
+  // Only one of ``value`` or ``format_string`` may be set.
+  bytes value = 2;
+
+  // Uses the :ref:`format string <config_access_log_format_strings>` to dynamically
+  // populate the TLV value from stream information. This allows dynamic values
+  // such as metadata, filter state, or other stream properties to be included in
+  // the TLV.
+  //
+  // For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   type: 0xF0
+  //   format_string:
+  //     text_format_source:
+  //       inline_string: "%DYNAMIC_METADATA(envoy.filters.network:key)%"
+  //
+  // The formatted string will be used directly as the TLV value.
+  // Only one of ``value`` or ``format_string`` may be set.
+  SubstitutionFormatString format_string = 3;
 }
 
 message ProxyProtocolConfig {

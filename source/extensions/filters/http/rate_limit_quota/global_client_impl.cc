@@ -38,12 +38,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-Grpc::RawAsyncClientSharedPtr
-getOrThrow(absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error) {
-  THROW_IF_NOT_OK_REF(client_or_error.status());
-  return client_or_error.value();
-}
-
 using BucketAction = RateLimitQuotaResponse::BucketAction;
 using envoy::type::v3::RateLimitStrategy;
 
@@ -53,17 +47,36 @@ GlobalRateLimitClientImpl::GlobalRateLimitClientImpl(
     std::chrono::milliseconds send_reports_interval,
     Envoy::ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
     Envoy::Event::Dispatcher& main_dispatcher)
-    : domain_name_(domain_name),
-      async_client_(getOrThrow(
-          context.serverFactoryContext()
-              .clusterManager()
-              .grpcAsyncClientManager()
-              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true))),
-      buckets_tls_(buckets_tls), send_reports_interval_(send_reports_interval),
+    : domain_name_(domain_name), buckets_tls_(buckets_tls),
+      send_reports_interval_(send_reports_interval),
       time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()),
-      main_dispatcher_(main_dispatcher) {}
+      main_dispatcher_(main_dispatcher) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
 
-void GlobalRateLimitClientImpl::deleteIsPending() { async_client_.reset(); }
+  absl::StatusOr<Grpc::AsyncClientFactoryPtr> rlqs_stream_client_factory =
+      context.serverFactoryContext()
+          .clusterManager()
+          .grpcAsyncClientManager()
+          .factoryForGrpcService(config_with_hash_key.config(), context.scope(), true);
+  if (!rlqs_stream_client_factory.ok()) {
+    throw EnvoyException(std::string(rlqs_stream_client_factory.status().message()));
+  }
+
+  absl::StatusOr<Grpc::RawAsyncClientPtr> rlqs_stream_client =
+      (*rlqs_stream_client_factory)->createUncachedRawAsyncClient();
+  if (!rlqs_stream_client.ok()) {
+    throw EnvoyException(std::string(rlqs_stream_client.status().message()));
+  }
+  async_client_ = GrpcAsyncClient(std::move(*rlqs_stream_client));
+}
+
+void GlobalRateLimitClientImpl::deleteIsPending() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Deleting the async client also triggers stream_ to reset, if active.
+  // The client & stream must be destroyed before the GlobalRateLimitClientImpl,
+  // as it provides the stream callbacks.
+  async_client_->reset();
+}
 
 void getUsageFromBucket(const CachedBucket& cached_bucket, TimeSource& time_source,
                         BucketQuotaUsage& usage) {
@@ -368,21 +381,21 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
 void GlobalRateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                               const std::string& message) {
   // TODO(tyxia) Revisit later, maybe add some logging.
-  main_dispatcher_.post([&, status, message]() {
-    // Stream is already closed and cannot be referenced further.
-    ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
-    stream_ = nullptr;
-  });
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Stream is already closed and cannot be referenced further.
+  ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
+  stream_ = nullptr;
 }
 
 bool GlobalRateLimitClientImpl::startStreamImpl() {
   // Starts stream if it has not been opened yet.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (stream_ == nullptr) {
     ENVOY_LOG(debug, "Trying to start the new gRPC stream");
-    stream_ = async_client_.start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                                      "envoy.service.rate_limit_quota.v3.RateLimitQuotaService."
-                                      "StreamRateLimitQuotas"),
-                                  *this, Http::AsyncClient::RequestOptions());
+    stream_ = async_client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                                       "envoy.service.rate_limit_quota.v3.RateLimitQuotaService."
+                                       "StreamRateLimitQuotas"),
+                                   *this, Http::AsyncClient::RequestOptions());
   }
   // Returns error status if start failed (i.e., stream_ is nullptr).
   return (stream_ != nullptr);

@@ -146,7 +146,7 @@ TEST_P(AlpnIntegrationTest, Http2RememberSettings) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
 
   {
-    absl::MutexLock l(&fake_upstreams_[0]->lock());
+    absl::MutexLock l(fake_upstreams_[0]->lock());
     IntegrationCodecClientPtr codec_client1 = makeHttpConnection(lookupPort("http"));
     auto response1 = codec_client1->makeHeaderOnlyRequest(default_request_headers_);
     IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));

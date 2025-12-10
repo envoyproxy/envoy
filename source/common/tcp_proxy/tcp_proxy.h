@@ -185,6 +185,8 @@ public:
   Server::Configuration::ServerFactoryContext& serverFactoryContext() const override {
     return server_factory_context_;
   }
+  const std::string& requestIDHeader() const override { return request_id_header_; }
+  const std::string& requestIDMetadataKey() const override { return request_id_metadata_key_; }
 
 private:
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
@@ -194,6 +196,9 @@ private:
   std::string post_path_;
   // Request ID extension for tunneling requests. If null, no request ID is generated.
   Envoy::Http::RequestIDExtensionSharedPtr request_id_extension_;
+  // Optional overrides for request ID header name and metadata key.
+  std::string request_id_header_;
+  std::string request_id_metadata_key_;
   Stats::StatNameManagedStorage route_stat_name_storage_;
   const Router::FilterConfig router_config_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;
@@ -242,6 +247,9 @@ public:
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
     }
+    const absl::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
+      return max_downstream_connection_duration_jitter_percentage_;
+    }
     const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
       return access_log_flush_interval_;
     }
@@ -256,11 +264,23 @@ public:
       return proxy_protocol_tlvs_;
     }
 
+    // Evaluate dynamic TLV formatters and combine with static TLVs.
+    Network::ProxyProtocolTLVVector
+    evaluateDynamicTLVs(const StreamInfo::StreamInfo& stream_info) const;
+
   private:
+    // Structure to hold TLV formatter information.
+    struct TlvFormatter {
+      uint8_t type;
+      Formatter::FormatterPtr formatter;
+    };
+
     static TcpProxyStats generateStats(Stats::Scope& scope);
 
     static Network::ProxyProtocolTLVVector
-    parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs);
+    parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs,
+              Server::Configuration::GenericFactoryContext& context,
+              std::vector<TlvFormatter>& dynamic_tlvs);
 
     // Hold a Scope for the lifetime of the configuration because connections in
     // the UpstreamDrainManager can live longer than the listener.
@@ -270,11 +290,13 @@ public:
     bool flush_access_log_on_connected_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
+    absl::optional<double> max_downstream_connection_duration_jitter_percentage_;
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
     BackOffStrategyPtr backoff_strategy_;
     Network::ProxyProtocolTLVVector proxy_protocol_tlvs_;
+    std::vector<TlvFormatter> dynamic_tlv_formatters_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -302,6 +324,11 @@ public:
   const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
     return shared_config_->maxDownstreamConnectionDuration();
   }
+  const absl::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
+    return shared_config_->maxDownstreamConnectionDurationJitterPercentage();
+  }
+  const absl::optional<std::chrono::milliseconds>
+  calculateMaxDownstreamConnectionDurationWithJitter();
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
     return shared_config_->accessLogFlushInterval();
   }
@@ -333,6 +360,13 @@ public:
   const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
     return shared_config_->proxyProtocolTLVs();
   }
+
+  envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode
+  upstreamConnectMode() const {
+    return upstream_connect_mode_;
+  }
+
+  const absl::optional<uint32_t>& maxEarlyDataBytes() const { return max_early_data_bytes_; }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -386,6 +420,9 @@ private:
   Random::RandomGenerator& random_generator_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
   Regex::Engine& regex_engine_; // Static lifetime object, safe to store as a reference
+  envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode upstream_connect_mode_{
+      envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE};
+  absl::optional<uint32_t> max_early_data_bytes_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -536,7 +573,7 @@ public:
                         std::function<void(Http::ResponseHeaderMap& headers)>,
                         const absl::optional<Grpc::Status::GrpcStatus>,
                         absl::string_view) override {}
-    void sendGoAwayAndClose() override {}
+    void sendGoAwayAndClose(bool graceful [[maybe_unused]] = false) override {}
     void encode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     Http::ResponseHeaderMapOptRef informationalHeaders() override { return {}; }
     void encodeHeaders(Http::ResponseHeaderMapPtr&&, bool, absl::string_view) override {}
@@ -650,6 +687,11 @@ protected:
   void enableRetryTimer();
   void disableRetryTimer();
 
+public:
+  // Public for testing purposes
+  void onDownstreamTlsHandshakeComplete();
+
+protected:
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
@@ -693,6 +735,15 @@ protected:
   bool early_data_end_stream_{false};
   Buffer::OwnedImpl early_data_buffer_{};
   HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
+
+  // Connection establishment mode configuration.
+  envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode connect_mode_{
+      envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE};
+  bool waiting_for_tls_handshake_{false};
+  bool tls_handshake_complete_{false};
+  bool initial_data_received_{false};
+  bool read_disabled_due_to_buffer_{false}; // Track if we disabled reading due to buffer overflow.
+  uint32_t max_buffered_bytes_{65536};      // Default 64KB.
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream

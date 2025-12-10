@@ -35,7 +35,14 @@
 namespace Envoy {
 namespace Http {
 class FilterChainManager;
-}
+class HashPolicy;
+} // namespace Http
+
+namespace Router {
+class ShadowPolicy;
+using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
+class RetryPolicy;
+} // namespace Router
 
 namespace Upstream {
 
@@ -59,13 +66,26 @@ public:
    * Return UpstreamLocalAddress based on the endpoint address.
    * @param endpoint_address is the address used to select upstream local address.
    * @param socket_options applied to the selected address.
+   * @param transport_socket_options transport-level options applied to the connection.
    * @return UpstreamLocalAddress which includes the selected upstream local address and socket
    * options.
    */
-  UpstreamLocalAddress
-  getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr& endpoint_address,
-                          const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const {
-    UpstreamLocalAddress local_address = getUpstreamLocalAddressImpl(endpoint_address);
+  virtual UpstreamLocalAddress getUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      const Network::ConnectionSocket::OptionsSharedPtr& socket_options,
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const PURE;
+};
+
+class UpstreamLocalAddressSelectorBase : public UpstreamLocalAddressSelector {
+public:
+  ~UpstreamLocalAddressSelectorBase() override = default;
+
+  UpstreamLocalAddress getUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      const Network::ConnectionSocket::OptionsSharedPtr& socket_options,
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const override {
+    UpstreamLocalAddress local_address =
+        getUpstreamLocalAddressImpl(endpoint_address, transport_socket_options);
     Network::ConnectionSocket::OptionsSharedPtr connection_options =
         std::make_shared<Network::ConnectionSocket::Options>(
             socket_options ? *socket_options
@@ -83,7 +103,8 @@ private:
    * options is the responsibility of the base class.
    */
   virtual UpstreamLocalAddress getUpstreamLocalAddressImpl(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address) const PURE;
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const PURE;
 };
 
 using UpstreamLocalAddressSelectorConstSharedPtr =
@@ -499,10 +520,10 @@ using HostSetPtr = std::unique_ptr<HostSet>;
 class PrioritySet {
 public:
   using MemberUpdateCb =
-      std::function<absl::Status(const HostVector& hosts_added, const HostVector& hosts_removed)>;
+      std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>;
 
-  using PriorityUpdateCb = std::function<absl::Status(
-      uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed)>;
+  using PriorityUpdateCb = std::function<void(uint32_t priority, const HostVector& hosts_added,
+                                              const HostVector& hosts_removed)>;
 
   virtual ~PrioritySet() = default;
 
@@ -866,6 +887,74 @@ public:
 using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOptionsConfig>;
 
 /**
+ * Interface describing HTTP protocol options exposed by a cluster.
+ */
+class HttpProtocolOptionsConfig : public ProtocolOptionsConfig {
+public:
+  ~HttpProtocolOptionsConfig() override = default;
+
+  /**
+   * @return const Http::Http1Settings& the HTTP/1.1 settings for upstream connections.
+   */
+  virtual const Http::Http1Settings& http1Settings() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Http2ProtocolOptions& the HTTP/2 protocol options for
+   *         upstream connections.
+   */
+  virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Http3ProtocolOptions& the HTTP/3 protocol options for
+   *         upstream connections.
+   */
+  virtual const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::HttpProtocolOptions& the common HTTP protocol options
+   *         that apply to all HTTP versions for upstream connections.
+   */
+  virtual const envoy::config::core::v3::HttpProtocolOptions&
+  commonHttpProtocolOptions() const PURE;
+
+  /**
+   * @return const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>& the
+   *         optional upstream-specific HTTP protocol options. Returns absl::nullopt if not
+   *         configured.
+   */
+  virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
+  upstreamHttpProtocolOptions() const PURE;
+
+  /**
+   * @return const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+   *         the optional alternate protocols cache options for upstream connections. Returns
+   *         absl::nullopt if not configured.
+   */
+  virtual const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  alternateProtocolsCacheOptions() const PURE;
+
+  /**
+   * @return const std::vector<Router::ShadowPolicyPtr>& the shadow policies configured for this
+   *         cluster. The vector is empty if no shadowing takes place.
+   */
+  virtual const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const PURE;
+
+  /**
+   * @return const Router::RetryPolicy* the retry policy configured for this cluster. Returns
+   *         nullptr if no cluster-level retry policy is configured.
+   */
+  virtual const Router::RetryPolicy* retryPolicy() const PURE;
+
+  /**
+   * @return const Http::HashPolicy* the optional hash policy for load balancing. Returns nullptr
+   *         if no hash policy is configured.
+   */
+  virtual const Http::HashPolicy* hashPolicy() const PURE;
+};
+
+using HttpProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const HttpProtocolOptionsConfig>;
+
+/**
  *  Base class for all cluster typed metadata factory.
  */
 class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
@@ -951,29 +1040,9 @@ public:
   virtual uint64_t features() const PURE;
 
   /**
-   * @return const Http::Http1Settings& for HTTP/1.1 connections created on behalf of this cluster.
-   *         @see Http::Http1Settings.
+   * @return const HttpProtocolOptionsConfig& HTTP protocol options for this cluster.
    */
-  virtual const Http::Http1Settings& http1Settings() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Http2ProtocolOptions& for HTTP/2 connections
-   * created on behalf of this cluster.
-   *         @see envoy::config::core::v3::Http2ProtocolOptions.
-   */
-  virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Http3ProtocolOptions& for HTTP/3 connections
-   * created on behalf of this cluster. @see envoy::config::core::v3::Http3ProtocolOptions.
-   */
-  virtual const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::HttpProtocolOptions for all of HTTP versions.
-   */
-  virtual const envoy::config::core::v3::HttpProtocolOptions&
-  commonHttpProtocolOptions() const PURE;
+  virtual const HttpProtocolOptionsConfig& httpProtocolOptions() const PURE;
 
   /**
    * @param name std::string containing the well-known name of the extension for which protocol
@@ -1003,6 +1072,15 @@ public:
    * all load balancers for this cluster.
    */
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
+
+  /**
+   * @param response Http::ResponseHeaderMap response headers received from upstream
+   * @return absl::optional<bool> absl::nullopt is returned when matching did not took place.
+   *         Otherwise, the boolean value indicates the matching result. True indicates that
+   *         response should be treated as error, False as success.
+   */
+  virtual absl::optional<bool>
+  processHttpForOutlierDetection(Http::ResponseHeaderMap& response) const PURE;
 
   /**
    * @return the service discovery type to use for resolving the cluster.
@@ -1173,18 +1251,6 @@ public:
    */
   virtual std::vector<Http::Protocol>
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
-
-  /**
-   * @return http protocol options for upstream connection
-   */
-  virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
-  upstreamHttpProtocolOptions() const PURE;
-
-  /**
-   * @return alternate protocols cache options for upstream connections.
-   */
-  virtual const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
-  alternateProtocolsCacheOptions() const PURE;
 
   /**
    * @return the Http1 Codec Stats.

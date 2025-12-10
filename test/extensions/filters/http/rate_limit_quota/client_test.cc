@@ -108,7 +108,7 @@ protected:
         std::make_shared<ThreadLocalBucketsCache>(std::make_shared<BucketsCache>());
     buckets_tls_->set([initial_tl_buckets_cache](Unused) { return initial_tl_buckets_cache; });
 
-    mock_stream_client->expectClientCreation();
+    mock_stream_client->expectClientCreationWithFactory();
     global_client_ = std::make_unique<GlobalRateLimitClientImpl>(
         mock_stream_client->config_with_hash_key_, mock_stream_client->context_, mock_domain_,
         reporting_interval_, *buckets_tls_, *mock_stream_client->dispatcher_);
@@ -118,6 +118,11 @@ protected:
     global_client_->setCallbacks(std::move(callbacks));
 
     unordered_differencer_.set_repeated_field_comparison(MessageDifferencer::AS_SET);
+  }
+
+  void TearDown() override {
+    // Normally called by TlsStore destructor as part of filter factory cb deletion.
+    mock_stream_client->dispatcher_->deferredDelete(std::move(global_client_));
   }
 
   std::unique_ptr<RateLimitTestClient> mock_stream_client = nullptr;
@@ -1250,6 +1255,57 @@ TEST_F(GlobalClientTest, TestAbandonAction) {
   // Expect the bucket to be wiped.
   std::shared_ptr<CachedBucket> bucket_after = getBucket(*buckets_tls_, sample_id_hash_);
   ASSERT_FALSE(bucket_after);
+}
+
+TEST_F(GlobalClientTest, TestResponseBucketMissingId) {
+  mock_stream_client->expectStreamCreation(1);
+  // Expect expiration timers to start for each of the response's assignments &
+  // a reset of the TokenBucket assignment's expiration timer (even when not
+  // resetting the TokenBucket itself).
+  mock_stream_client->expectTimerCreations(reporting_interval_, action_ttl, 1);
+
+  // Expect initial bucket creations to each trigger immediate bucket-specific
+  // reports.
+  RateLimitQuotaUsageReports initial_report = buildReports(
+      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(initial_report), false));
+
+  cb_ptr_->expectBuckets({sample_id_hash_});
+  global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
+                               std::chrono::milliseconds::zero(), true);
+  cb_ptr_->waitForExpectedBuckets();
+
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
+
+  RateLimitQuotaUsageReports expected_reports = buildReports(
+      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
+
+  mock_stream_client->timer_->invokeCallback();
+  waitForNotification(cb_ptr_->report_sent);
+
+  // Test that an invalid bucket id in a response is ignored but doesn't disrupt processing of other
+  // buckets.
+  auto empty_id_allow_action = buildBlanketAction(BucketId(), false);
+  auto deny_action = buildBlanketAction(sample_bucket_id_, true);
+  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  response->add_bucket_action()->CopyFrom(empty_id_allow_action);
+  response->add_bucket_action()->CopyFrom(deny_action);
+
+  // Mimic sending the response across the stream.
+  WAIT_FOR_LOG_CONTAINS("error", "Received an RLQS response, but a bucket is missing its id.", {
+    global_client_->onReceiveMessage(std::move(response));
+    waitForNotification(cb_ptr_->response_processed);
+  });
+
+  // Expect the deny-all bucket to have made it into TLS.
+  std::shared_ptr<CachedBucket> deny_all_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  ASSERT_TRUE(deny_all_bucket->cached_action);
+  EXPECT_TRUE(unordered_differencer_.Equals(*deny_all_bucket->cached_action, deny_action));
 }
 
 class LocalClientTest : public GlobalClientTest {

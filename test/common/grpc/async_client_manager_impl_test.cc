@@ -212,17 +212,16 @@ public:
     ON_CALL(context_, timeSource()).WillByDefault(testing::ReturnRef(time_system_));
     ON_CALL(context_, api()).WillByDefault(testing::ReturnRef(*api_));
     if (config.has_value()) {
-      async_client_manager_ = std::make_unique<AsyncClientManagerImpl>(
-          cm_, context_.threadLocal(), context_, stat_names_, config.value());
+      async_client_manager_ =
+          std::make_unique<AsyncClientManagerImpl>(config.value(), context_, stat_names_);
     } else {
       async_client_manager_ = std::make_unique<AsyncClientManagerImpl>(
-          cm_, context_.threadLocal(), context_, stat_names_,
-          Bootstrap::GrpcAsyncClientManagerConfig());
+          Bootstrap::GrpcAsyncClientManagerConfig(), context_, stat_names_);
     }
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  Upstream::MockClusterManager cm_;
+  NiceMock<Upstream::MockClusterManager>& cm_{context_.cluster_manager_};
   Stats::MockStore store_;
   Stats::MockScope& scope_{store_.mockScope()};
   Event::SimulatedTimeSystem time_system_;

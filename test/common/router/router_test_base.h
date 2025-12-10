@@ -1,8 +1,12 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
+#include <map>
+#include <string>
 
 #include "source/common/http/context_impl.h"
+#include "source/common/router/config_impl.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 
@@ -70,11 +74,19 @@ public:
   void expectPerTryIdleTimerCreate(std::chrono::milliseconds timeout);
   void expectMaxStreamDurationTimerCreate(std::chrono::milliseconds duration_msec);
   AssertionResult verifyHostUpstreamStats(uint64_t success, uint64_t error);
-  void verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match);
   void verifyAttemptCountInRequestBasic(bool set_include_attempt_count_in_request,
                                         absl::optional<int> preset_count, int expected_count);
   void verifyAttemptCountInResponseBasic(bool set_include_attempt_count_in_response,
                                          absl::optional<int> preset_count, int expected_count);
+
+  // Helper functions for metadata test setup
+  void setRouteMetadataMatchCriteria(const std::string& yaml_content);
+  void setConnectionMetadata(const std::string& yaml_content);
+  void setRequestMetadata(const std::map<std::string, std::string>& fields);
+  void executeMetadataTest(
+      std::function<void(const std::vector<Router::MetadataMatchCriterionConstSharedPtr>&)>
+          validator);
+
   void sendRequest(bool end_stream = true);
   void enableRedirects(uint32_t max_internal_redirects = 1);
   void setNumPreviousRedirect(uint32_t num_previous_redirects);
@@ -122,6 +134,7 @@ public:
   NiceMock<Tracing::MockSpan> span_;
   NiceMock<StreamInfo::MockStreamInfo> upstream_stream_info_;
   std::string redirect_records_data_ = "some data";
+  MetadataMatchCriteriaImplConstPtr route_criteria_;
 };
 
 } // namespace Router

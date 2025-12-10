@@ -18,29 +18,32 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: MaxMind Geolocation Provider]
 // MaxMind geolocation provider :ref:`configuration overview <config_geoip_providers_maxmind>`.
-// At least one geolocation database path :ref:`city_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.city_db_path>`,
-// :ref:`isp_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.isp_db_path>` or
-// :ref:`asn_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.asn_db_path>` or
-// :ref:`anon_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.anon_db_path>` must be configured.
+//
+// At least one geolocation database path must be configured:
+//
+// * :ref:`city_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.city_db_path>`
+// * :ref:`isp_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.isp_db_path>`
+// * :ref:`asn_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.asn_db_path>`
+// * :ref:`anon_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.anon_db_path>`
 // [#extension: envoy.geoip_providers.maxmind]
 
 // [#next-free-field: 6]
 message MaxMindConfig {
-  // Full file path to the Maxmind city database, e.g. /etc/GeoLite2-City.mmdb.
-  // Database file is expected to have .mmdb extension.
+  // Full file path to the MaxMind city database, e.g., ``/etc/GeoLite2-City.mmdb``.
+  // Database file is expected to have ``.mmdb`` extension.
   string city_db_path = 1 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
-  // Full file path to the Maxmind ASN database, e.g. /etc/GeoLite2-ASN.mmdb.
-  // Database file is expected to have .mmdb extension.
-  // When is defined the ASN information will always be fetched from the ``asn_db``.
+  // Full file path to the MaxMind ASN database, e.g., ``/etc/GeoLite2-ASN.mmdb``.
+  // Database file is expected to have ``.mmdb`` extension.
+  // When this is defined, the ASN information will always be fetched from the ``asn_db``.
   string asn_db_path = 2 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
-  // Full file path to the Maxmind anonymous IP database, e.g. /etc/GeoIP2-Anonymous-IP.mmdb.
-  // Database file is expected to have .mmdb extension.
+  // Full file path to the MaxMind Anonymous IP database, e.g., ``/etc/GeoIP2-Anonymous-IP.mmdb``.
+  // Database file is expected to have ``.mmdb`` extension.
   string anon_db_path = 3 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
-  // Full file path to the Maxmind ISP database, e.g. /etc/GeoLite2-ISP.mmdb.
-  // Database file is expected to have .mmdb extension.
+  // Full file path to the MaxMind ISP database, e.g., ``/etc/GeoLite2-ISP.mmdb``.
+  // Database file is expected to have ``.mmdb`` extension.
   // If ``asn_db_path`` is not defined, ASN information will be fetched from
   // ``isp_db`` instead.
   string isp_db_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];

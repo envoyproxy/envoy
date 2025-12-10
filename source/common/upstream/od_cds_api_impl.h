@@ -92,7 +92,7 @@ private:
 
   XdstpOdCdsApiImpl(Config::XdsManager& xds_manager, ClusterManager& cm,
                     MissingClusterNotifier& notifier, Stats::Scope& scope,
-                    Server::Configuration::ServerFactoryContext& server_context,
+                    Server::Configuration::ServerFactoryContext& server_context, bool old_ads,
                     ProtobufMessage::ValidationVisitor& validation_visitor,
                     absl::Status& creation_status);
 
@@ -107,6 +107,7 @@ private:
 
   // A singleton through which all subscriptions will be processed.
   XdstpOdcdsSubscriptionsManagerSharedPtr subscriptions_manager_;
+  const bool old_ads_;
 };
 
 } // namespace Upstream

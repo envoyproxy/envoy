@@ -66,7 +66,7 @@ private:
 class ReverseTunnelAcceptorExtension
     : public Envoy::Network::SocketInterfaceExtension,
       public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
-  // Friend class for testing
+  // Friend class for testing.
   friend class ReverseTunnelAcceptorExtensionTest;
 
 public:
@@ -81,12 +81,17 @@ public:
           UpstreamReverseConnectionSocketInterface& config)
       : Envoy::Network::SocketInterfaceExtension(sock_interface), context_(context),
         socket_interface_(&sock_interface) {
+    stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_acceptor");
+    // Configure ping miss threshold (minimum 1).
+    const uint32_t cfg_threshold =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ping_failure_threshold, 3);
+    ping_failure_threshold_ = std::max<uint32_t>(1, cfg_threshold);
+    // Configure detailed stats flag (defaults to false).
+    enable_detailed_stats_ = config.enable_detailed_stats();
     ENVOY_LOG(debug,
               "ReverseTunnelAcceptorExtension: creating upstream reverse connection "
               "socket interface with stat_prefix: {}",
               stat_prefix_);
-    stat_prefix_ =
-        PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "upstream_reverse_connection");
     // Ensure the socket interface has a reference to this extension early, so stats can be
     // recorded even before onServerInitialized().
     if (socket_interface_ != nullptr) {
@@ -115,6 +120,11 @@ public:
   const std::string& statPrefix() const { return stat_prefix_; }
 
   /**
+   * @return the configured miss threshold for ping health-checks.
+   */
+  uint32_t pingFailureThreshold() const { return ping_failure_threshold_; }
+
+  /**
    * Synchronous version for admin API endpoints that require immediate response on reverse
    * connection stats.
    * @param timeout_ms maximum time to wait for aggregation completion
@@ -137,15 +147,6 @@ public:
    */
   void updateConnectionStats(const std::string& node_id, const std::string& cluster_id,
                              bool increment);
-
-  /**
-   * Update per-worker connection stats for debugging.
-   * @param node_id the node identifier for the connection.
-   * @param cluster_id the cluster identifier for the connection.
-   * @param increment whether to increment (true) or decrement (false) the connection count.
-   */
-  void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
-                                      bool increment);
 
   /**
    * Get per-worker connection stats for debugging.
@@ -174,6 +175,18 @@ private:
   std::unique_ptr<ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>> tls_slot_;
   ReverseTunnelAcceptor* socket_interface_;
   std::string stat_prefix_;
+  uint32_t ping_failure_threshold_{3};
+  bool enable_detailed_stats_{false};
+
+  /**
+   * Update per-worker connection stats for debugging.
+   * This is an internal function called only from updateConnectionStats.
+   * @param node_id the node identifier for the connection.
+   * @param cluster_id the cluster identifier for the connection.
+   * @param increment whether to increment (true) or decrement (false) the connection count.
+   */
+  void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
+                                      bool increment);
 };
 
 } // namespace ReverseConnection

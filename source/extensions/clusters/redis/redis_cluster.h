@@ -166,7 +166,9 @@ private:
               std::make_shared<envoy::config::core::v3::Metadata>(
                   parent.localityLbEndpoint().metadata()),
               parent.lbEndpoint().load_balancing_weight().value(),
-              parent.localityLbEndpoint().locality(),
+              // TODO(adisuissa): Convert to use a shared pool of localities.
+              std::make_shared<const envoy::config::core::v3::Locality>(
+                  parent.localityLbEndpoint().locality()),
               parent.lbEndpoint().endpoint().health_check_config(),
               parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
           primary_(primary) {}

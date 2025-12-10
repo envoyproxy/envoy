@@ -38,7 +38,8 @@ message UpstreamLocalityStats {
   // locality.
   uint64 total_successful_requests = 2;
 
-  // The total number of unfinished requests
+  // The total number of unfinished requests. A request can be an HTTP request
+  // or a TCP connection for a TCP connection pool.
   uint64 total_requests_in_progress = 3;
 
   // The total number of requests that failed due to errors at the endpoint,
@@ -47,7 +48,8 @@ message UpstreamLocalityStats {
 
   // The total number of requests that were issued by this Envoy since
   // the last report. This information is aggregated over all the
-  // upstream endpoints in the locality.
+  // upstream endpoints in the locality. A request can be an HTTP request
+  // or a TCP connection for a TCP connection pool.
   uint64 total_issued_requests = 8;
 
   // The total number of connections in an established state at the time of the

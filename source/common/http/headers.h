@@ -206,6 +206,7 @@ public:
   const LowerCaseString EnvoyUpstreamStreamDurationMs{
       absl::StrCat(prefix(), "-upstream-stream-duration-ms")};
   const LowerCaseString EnvoyDecoratorOperation{absl::StrCat(prefix(), "-decorator-operation")};
+  const LowerCaseString EnvoyCompressionStatus{absl::StrCat(prefix(), "-compression-status")};
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
@@ -373,6 +374,17 @@ public:
     const std::string Http2String{"HTTP/2"};
     const std::string Http3String{"HTTP/3"};
   } ProtocolStrings;
+
+  struct {
+    const std::string ContentLengthTooSmall{"ContentLengthTooSmall"};
+    const std::string ContentTypeNotAllowed{"ContentTypeNotAllowed"};
+    const std::string EtagNotAllowed{"EtagNotAllowed"};
+    const std::string StatusCodeNotAllowed{"StatusCodeNotAllowed"};
+    const std::string Compressed{"Compressed"};
+    const std::string OriginalLengthPrefix{"OriginalLength="};
+    const std::string Separator{";"};
+    const std::string ValueSeparator{","};
+  } EnvoyCompressionStatusValues;
 };
 
 using Headers = ConstSingleton<HeaderValues>;

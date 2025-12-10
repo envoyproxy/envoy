@@ -5,6 +5,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/formatter/substitution_formatter_base.h"
 #include "envoy/http/header_evaluator.h"
 #include "envoy/http/header_map.h"
 
@@ -23,18 +24,20 @@ using HeaderValue = envoy::config::core::v3::HeaderValue;
 
 struct HeadersToAddEntry {
   static absl::StatusOr<std::unique_ptr<HeadersToAddEntry>>
-  create(const HeaderValue& header_value, HeaderAppendAction append_action) {
+  create(const HeaderValue& header_value, HeaderAppendAction append_action,
+         const Formatter::CommandParserPtrVector& command_parsers = {}) {
     absl::Status creation_status = absl::OkStatus();
     auto ret = std::unique_ptr<HeadersToAddEntry>(
-        new HeadersToAddEntry(header_value, append_action, creation_status));
+        new HeadersToAddEntry(header_value, append_action, command_parsers, creation_status));
     RETURN_IF_NOT_OK(creation_status);
     return ret;
   }
   static absl::StatusOr<std::unique_ptr<HeadersToAddEntry>>
-  create(const HeaderValueOption& header_value_option) {
+  create(const HeaderValueOption& header_value_option,
+         const Formatter::CommandParserPtrVector& command_parsers = {}) {
     absl::Status creation_status = absl::OkStatus();
     auto ret = std::unique_ptr<HeadersToAddEntry>(
-        new HeadersToAddEntry(header_value_option, creation_status));
+        new HeadersToAddEntry(header_value_option, command_parsers, creation_status));
     RETURN_IF_NOT_OK(creation_status);
     return ret;
   }
@@ -47,8 +50,11 @@ struct HeadersToAddEntry {
 
 protected:
   HeadersToAddEntry(const HeaderValue& header_value, HeaderAppendAction append_action,
+                    const Formatter::CommandParserPtrVector& command_parsers,
                     absl::Status& creation_status);
-  HeadersToAddEntry(const HeaderValueOption& header_value_option, absl::Status& creation_status);
+  HeadersToAddEntry(const HeaderValueOption& header_value_option,
+                    const Formatter::CommandParserPtrVector& command_parsers,
+                    absl::Status& creation_status);
 };
 
 /**
@@ -89,10 +95,10 @@ public:
     return *instance;
   }
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                        const StreamInfo::StreamInfo& stream_info) const override;
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                        const StreamInfo::StreamInfo* stream_info) const;
 
   /**
@@ -104,10 +110,10 @@ public:
     evaluateHeaders(headers, {stream_info.getRequestHeaders()}, &stream_info);
   }
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const {
-    evaluateHeaders(headers,
-                    Formatter::HttpFormatterContext{
-                        stream_info == nullptr ? nullptr : stream_info->getRequestHeaders()},
-                    stream_info);
+    evaluateHeaders(
+        headers,
+        Formatter::Context{stream_info == nullptr ? nullptr : stream_info->getRequestHeaders()},
+        stream_info);
   }
 
   /*

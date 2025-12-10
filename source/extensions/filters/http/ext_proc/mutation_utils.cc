@@ -24,6 +24,18 @@ using Stats::Counter;
 using envoy::service::ext_proc::v3::BodyMutation;
 using envoy::service::ext_proc::v3::HeaderMutation;
 
+namespace {
+static constexpr absl::string_view kCountExceededMsg =
+    "header_mutation_operation_count_exceeds_limit";
+static constexpr absl::string_view kResultExceedsLimitMsg = "header_mutation_result_exceeds_limit";
+static constexpr absl::string_view kInvalidCharacterInRemoveMsg =
+    "header_mutation_remove_contains_invalid_character";
+static constexpr absl::string_view kInvalidCharacterInSetMsg =
+    "header_mutation_set_contains_invalid_character";
+static constexpr absl::string_view kRemoveFailedMsg = "header_mutation_remove_headers_failed";
+static constexpr absl::string_view kSetFailedMsg = "header_mutation_set_headers_failed";
+} // namespace
+
 bool MutationUtils::headerInMatcher(
     absl::string_view key, const std::vector<Matchers::StringMatcherPtr>& header_matchers) {
   return std::any_of(header_matchers.begin(), header_matchers.end(),
@@ -73,35 +85,49 @@ absl::Status MutationUtils::responseHeaderSizeCheck(const Http::HeaderMap& heade
   const uint32_t remove_size = mutation.remove_headers().size();
   const uint32_t set_size = mutation.set_headers().size();
   const uint32_t max_request_headers_count = headers.maxHeadersCount();
+  bool count_exceeded = false;
 
-  if (remove_size > max_request_headers_count || set_size > max_request_headers_count) {
-    ENVOY_LOG(debug,
-              "Header mutation remove header count {} or set header count {} exceed the "
-              "max header count limit {}. Returning error.",
-              remove_size, set_size, max_request_headers_count);
+  if (remove_size > max_request_headers_count) {
+    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                       "Header mutation remove header count {} exceeds the "
+                       "max header count limit {}. Returning error.",
+                       remove_size, max_request_headers_count);
+    count_exceeded = true;
+  }
+  if (set_size > max_request_headers_count) {
+    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                       "Header mutation set header count {} exceeds the "
+                       "max header count limit {}. Returning error.",
+                       set_size, max_request_headers_count);
+    count_exceeded = true;
+  }
+  if (count_exceeded) {
     rejected_mutations.inc();
-    return absl::InvalidArgumentError(absl::StrCat(
-        "Header mutation remove header count ", std::to_string(remove_size),
-        " or set header count ", std::to_string(set_size), " exceed the HCM header countlimit ",
-        std::to_string(max_request_headers_count)));
+    return absl::InvalidArgumentError(kCountExceededMsg);
   }
   return absl::OkStatus();
 }
 
 absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& headers,
                                                       Counter& rejected_mutations) {
-  if (headers.byteSize() > headers.maxHeadersKb() * 1024 ||
-      headers.size() > headers.maxHeadersCount()) {
-    ENVOY_LOG(debug,
-              "After mutation, the total header count {} or total header size {} bytes, exceed the "
-              "count limit {} or the size limit {} kilobytes. Returning error.",
-              headers.size(), headers.byteSize(), headers.maxHeadersCount(),
-              headers.maxHeadersKb());
+  bool limit_exceeded = false;
+  if (headers.byteSize() > headers.maxHeadersKb() * 1024) {
+    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                       "After mutation, the total header size {} bytes exceeds the "
+                       "size limit {} kilobytes. Returning error.",
+                       headers.byteSize(), headers.maxHeadersKb());
+    limit_exceeded = true;
+  }
+  if (headers.size() > headers.maxHeadersCount()) {
+    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                       "After mutation, the total header count {} exceeds the "
+                       "count limit {}. Returning error.",
+                       headers.size(), headers.maxHeadersCount());
+    limit_exceeded = true;
+  }
+  if (limit_exceeded) {
     rejected_mutations.inc();
-    return absl::InvalidArgumentError(absl::StrCat(
-        "Header mutation causes end result header count ", headers.size(), " or header size ",
-        headers.byteSize(), " bytes, exceeding the count limit ", headers.maxHeadersCount(),
-        " or the size limit ", headers.maxHeadersKb(), " kilobytes"));
+    return absl::InvalidArgumentError(kResultExceedsLimitMsg);
   }
   return absl::OkStatus();
 }
@@ -120,9 +146,10 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
 
   for (const auto& hdr : mutation.remove_headers()) {
     if (!Http::HeaderUtility::headerNameIsValid(hdr)) {
-      ENVOY_LOG(debug, "remove_headers contain invalid character, may not be removed.");
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                         "remove_headers contain invalid character, may not be removed.");
       rejected_mutations.inc();
-      return absl::InvalidArgumentError("Invalid character in remove_headers mutation.");
+      return absl::InvalidArgumentError(kInvalidCharacterInRemoveMsg);
     }
     const LowerCaseString remove_header(hdr);
     switch (checker.check(CheckOperation::REMOVE, remove_header, "")) {
@@ -135,10 +162,10 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       rejected_mutations.inc();
       break;
     case CheckResult::FAIL:
-      ENVOY_LOG(debug, "Header {} may not be removed. Returning error", remove_header);
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                         "Header {} may not be removed. Returning error", remove_header);
       rejected_mutations.inc();
-      return absl::InvalidArgumentError(
-          absl::StrCat("Invalid attempt to remove ", remove_header.get()));
+      return absl::InvalidArgumentError(kRemoveFailedMsg);
     }
   }
 
@@ -153,14 +180,23 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       continue;
     }
 
+    bool invalid_character = false;
     const absl::string_view header_value = sh.header().raw_value();
-    if (!Http::HeaderUtility::headerNameIsValid(sh.header().key()) ||
-        !Http::HeaderUtility::headerValueIsValid(header_value)) {
-      ENVOY_LOG(debug,
-                "set_headers contain invalid character in key or value, may not be appended.");
-      rejected_mutations.inc();
-      return absl::InvalidArgumentError("Invalid character in set_headers mutation.");
+    if (!Http::HeaderUtility::headerNameIsValid(sh.header().key())) {
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                         "set_headers contain invalid character in key, may not be appended.");
+      invalid_character = true;
     }
+    if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                         "set_headers contain invalid character in value, may not be appended.");
+      invalid_character = true;
+    }
+    if (invalid_character) {
+      rejected_mutations.inc();
+      return absl::InvalidArgumentError(kInvalidCharacterInSetMsg);
+    }
+
     const LowerCaseString header_name(sh.header().key());
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
     const auto check_op = (append && !headers.get(header_name).empty()) ? CheckOperation::APPEND
@@ -185,10 +221,10 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       rejected_mutations.inc();
       break;
     case CheckResult::FAIL:
-      ENVOY_LOG(debug, "Header {} may not be modified. Returning error", header_name);
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                         "Header {} may not be modified. Returning error", header_name);
       rejected_mutations.inc();
-      return absl::InvalidArgumentError(
-          absl::StrCat("Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
+      return absl::InvalidArgumentError(kSetFailedMsg);
     }
   }
 

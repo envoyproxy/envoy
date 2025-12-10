@@ -15,6 +15,7 @@ HTTP filters
   basic_auth_filter
   buffer_filter
   cache_filter
+  cache_v2_filter
   cdn_loop_filter
   checksum_filter
   compressor_filter
@@ -51,6 +52,8 @@ HTTP filters
   language_filter
   local_rate_limit_filter
   lua_filter
+  mcp_filter
+  mcp_router_filter
   oauth2_filter
   on_demand_updates_filter
   original_src_filter
@@ -67,3 +70,4 @@ HTTP filters
   thrift_to_metadata_filter
   upstream_codec_filter
   wasm_filter
+  transform_filter

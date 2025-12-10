@@ -331,7 +331,7 @@ public:
    */
   static Api::IoCallUint64Result
   readFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                 UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time,
+                 UdpPacketProcessor& udp_packet_processor, TimeSource& time_source,
                  UdpRecvMsgMethod recv_msg_method, uint32_t* packets_dropped,
                  uint32_t* num_packets_read);
 
@@ -410,6 +410,10 @@ public:
 
     // Restore the original network namespace before returning the function result.
     setns_result = Api::LinuxOsSysCallsSingleton().get().setns(og_netns_fd, CLONE_NEWNET);
+
+    // If we cannot jump back into the original network namespace, this is an unrecoverable error.
+    // It would leave the current thread in another network namespace indefinitely, so we cannot
+    // continue running in that state.
     RELEASE_ASSERT(
         setns_result.return_value_ == 0,
         fmt::format("failed to restore original netns (fd={}): {}", netns_fd, errorDetails(errno)));

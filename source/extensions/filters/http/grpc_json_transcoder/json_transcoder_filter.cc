@@ -594,12 +594,23 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   if (method_->request_type_is_http_body_) {
     stats_->transcoder_request_buffer_bytes_.add(data.length());
     request_data_.move(data);
-    if (decoderBufferLimitReached(request_data_.length())) {
+    if (!method_->descriptor_->client_streaming() &&
+        decoderBufferLimitReached(request_data_.length())) {
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
-    // TODO(euroelessar): Upper bound message size for streaming case.
-    if (end_stream || method_->descriptor_->client_streaming()) {
+    if (method_->descriptor_->client_streaming()) {
+      // To avoid sending a grpc frame larger than 4MB (which grpc will by default reject),
+      // split the input buffer into 1MB pieces until the buffer is smaller than 1MB.
+      Buffer::OwnedImpl remaining_request_data;
+      remaining_request_data.move(request_data_);
+      while (!first_request_sent_ || remaining_request_data.length() > 0) {
+        uint64_t piece_size = std::min<uint64_t>(remaining_request_data.length(),
+                                                 JsonTranscoderConfig::MaxStreamedPieceSize);
+        request_data_.move(remaining_request_data, piece_size);
+        maybeSendHttpBodyRequestMessage(&data);
+      }
+    } else if (end_stream) {
       maybeSendHttpBodyRequestMessage(&data);
     } else {
       // TODO(euroelessar): Avoid buffering if content length is already known.
@@ -700,7 +711,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (per_route_config_->isStreamSSEStyleDelimited()) {
+  if (method_->descriptor_->server_streaming() && per_route_config_->isStreamSSEStyleDelimited()) {
     headers.setContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
   } else {
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);

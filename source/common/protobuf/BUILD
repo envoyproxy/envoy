@@ -1,5 +1,5 @@
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -53,6 +53,7 @@ envoy_cc_library(
         ":cc_wkt_protos",
         "//envoy/common:base_includes",
         "@com_google_protobuf//:protobuf",
+        "@com_google_protoconverter//:all",
     ],
 )
 

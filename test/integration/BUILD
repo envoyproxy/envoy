@@ -131,16 +131,15 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "ads_xdstp_config_sources_integration_test",
-    srcs = ["ads_xdstp_config_sources_integration_test.cc"],
+envoy_cc_test_library(
+    name = "ads_xdstp_config_sources_integration_lib",
+    hdrs = ["ads_xdstp_config_sources_integration.h"],
     rbe_pool = "4core",
     tags = [
         "cpu:3",
     ],
     deps = [
         ":ads_integration_lib",
-        ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
@@ -153,6 +152,18 @@ envoy_cc_test(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "ads_xdstp_config_sources_integration_test",
+    srcs = ["ads_xdstp_config_sources_integration_test.cc"],
+    rbe_pool = "4core",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":ads_xdstp_config_sources_integration_lib",
     ],
 )
 
@@ -692,6 +703,28 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cluster_http_protocol_options_integration_test",
+    size = "large",
+    srcs = ["cluster_http_protocol_options_integration_test.cc"],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "upstream_http_filter_integration_test",
     size = "large",
     srcs = ["upstream_http_filter_integration_test.cc"],
@@ -705,6 +738,7 @@ envoy_cc_test(
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
         "//test/integration/filters:async_upstream_filter_lib",
+        "//test/integration/filters:encode_headers_return_stop_iteration_filter_config_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:repick_cluster_filter_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -816,6 +850,39 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "transport_socket_matcher_integration_test",
+    size = "large",
+    srcs = [
+        "transport_socket_matcher_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/matcher:matcher_lib",
+        "//source/common/upstream:transport_socket_match_lib",
+        "//source/extensions/load_balancing_policies/subset:config",
+        "//source/extensions/matching/common_inputs/transport_socket:config_lib",
+        "//source/extensions/matching/network/common:inputs_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//test/common/upstream:utility_lib",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],
 )
 
@@ -1012,6 +1079,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/integration/filters:local_reply_during_decoding_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -1185,6 +1253,7 @@ envoy_cc_test_library(
         "//envoy/http:header_map_interface",
         "//envoy/http:metadata_interface",
         "//source/common/common:dump_state_utils",
+        "//source/common/http:response_decoder_impl_base",
         "//test/test_common:utility_lib",
     ],
 )
@@ -1286,7 +1355,6 @@ envoy_cc_test_library(
         "//source/extensions/load_balancing_policies/maglev:config",
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
-        "//source/extensions/network/dns_resolver/cares:config",
     ],
 )
 
@@ -1381,6 +1449,7 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:codec_client_lib",
+        "//source/common/http:response_decoder_impl_base",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/quic:quic_stat_names_lib",
@@ -1789,7 +1858,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "extension_discovery_integration_test",
     size = "large",
-    srcs = ["extension_discovery_integration_test.cc"],
+    srcs = envoy_select_enable_http3(["extension_discovery_integration_test.cc"]),
     rbe_pool = "6gig",
     deps = [
         ":http_integration_lib",
@@ -1812,7 +1881,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_extension_discovery_integration_test",
     size = "large",
-    srcs = ["listener_extension_discovery_integration_test.cc"],
+    srcs = envoy_select_enable_http3(["listener_extension_discovery_integration_test.cc"]),
     rbe_pool = "2core",
     deps = [
         ":http_integration_lib",
@@ -2218,9 +2287,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_integration_test",
     size = "large",
-    srcs = envoy_select_admin_functionality([
-        "xds_integration_test.cc",
-    ]),
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//bazel:disable_admin_functionality": [],
+        "//conditions:default": ["xds_integration_test.cc"],
+    }),
     data = [
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
@@ -2916,5 +2987,15 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "ads_lrs_grpc_client_cache_integration_test",
+    srcs = ["ads_lrs_grpc_client_cache_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

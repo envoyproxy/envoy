@@ -3,6 +3,7 @@
 #ifndef THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_FILTERS_HTTP_RATE_LIMIT_QUOTA_FILTER_PERSISTENCE_H_
 #define THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_FILTERS_HTTP_RATE_LIMIT_QUOTA_FILTER_PERSISTENCE_H_
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
@@ -67,12 +68,14 @@ public:
 
   // Get an existing TLS store by index, or create one if not found.
   static std::shared_ptr<TlsStore>
-  getTlsStore(Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+  getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
               Server::Configuration::FactoryContext& context, absl::string_view target_address,
               absl::string_view domain);
 
-  // Test-only: only thread-safe if filter factories are stable.
-  static size_t size() { return stores().size(); }
+  // Register a callback to be called when the last TLS store index is cleared.
+  // This is intended primarily for test synchronization after filter deletion.
+  // Thread-safety is not guaranteed.
+  static void registerEmptiedCb(std::function<void()> cb) { getEmptiedCb() = cb; }
 
   // Test-only: unsafely clear the global map, used in testing to reset static
   // state. A safer alternative is to delete all rate_limit_quota filters from
@@ -83,6 +86,11 @@ public:
   }
 
 private:
+  static std::function<void()>& getEmptiedCb() {
+    static std::function<void()> emptied_cb = nullptr;
+    return emptied_cb;
+  }
+
   // The index is a pair of <target_address, domain>.
   using TlsStoreIndex = std::pair<std::string, std::string>;
 
@@ -96,14 +104,14 @@ private:
     return *tls_stores;
   }
 
-  // Find or initialize a TLS store for the given config.
-  static std::shared_ptr<TlsStore>
-  getTlsStoreImpl(Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                  Server::Configuration::FactoryContext& context, TlsStoreIndex& index,
-                  bool* new_store_out);
-
   // Clear a specified index when it is no longer captured by any filter factories.
-  static void clearTlsStore(const TlsStoreIndex& index) { stores().erase(index); }
+  static void clearTlsStore(const TlsStoreIndex& index) {
+    stores().erase(index);
+    if (stores().empty() && getEmptiedCb() != nullptr) {
+      getEmptiedCb()();
+      getEmptiedCb() = nullptr;
+    }
+  }
 };
 
 } // namespace RateLimitQuota

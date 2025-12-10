@@ -547,7 +547,7 @@ private:
   mutable Thread::MutexBasicLockable lock_;
   absl::flat_hash_map<ScopeImpl*, std::weak_ptr<ScopeImpl>> scopes_ ABSL_GUARDED_BY(lock_);
   ScopeSharedPtr default_scope_;
-  std::list<std::reference_wrapper<Sink>> timer_sinks_;
+  std::vector<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;
   HistogramSettingsConstPtr histogram_settings_;

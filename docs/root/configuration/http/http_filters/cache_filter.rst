@@ -81,3 +81,6 @@ Example filter configuration with a ``FileSystemHttpCache`` cache implementation
 
    :ref:`Persistent on-disk storage backend <config_http_caches_file_system_http_cache>`
       Docs page for File System Http Cache; links to ``FileSystemHttpCacheConfig`` API reference.
+
+   :ref:`Cache filter V2 <config_http_filters_cache_v2>`
+      Version 2 of the cache filter.

@@ -2,25 +2,6 @@
 
 set -e -o pipefail
 
-LLVM_VERSION=${LLVM_VERSION:-"18.1.8"}
-CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \([0-9.]*\).*/\1/')
-LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \([0-9.]*\).*/\1/')
-LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
-
-if [[ -z "$ENVOY_RBE" && "${CLANG_VERSION}" != "${LLVM_VERSION}" ]]; then
-    echo "ERROR: clang version ${CLANG_VERSION} does not match expected ${LLVM_VERSION}" >&2
-    exit 1
-fi
-
-if [[ -z "$ENVOY_RBE" && "${LLVM_COV_VERSION}" != "${LLVM_VERSION}" ]]; then
-    echo "ERROR: llvm-cov version ${LLVM_COV_VERSION} does not match expected ${LLVM_VERSION}" >&2
-    exit 1
-fi
-
-if [[ -z "$ENVOY_RBE" && "${LLVM_PROFDATA_VERSION}" != "${LLVM_VERSION}" ]]; then
-    echo "ERROR: llvm-profdata version ${LLVM_PROFDATA_VERSION} does not match expected ${LLVM_VERSION}" >&2
-    exit 1
-fi
 
 # This is a little hacky
 IS_MOBILE="${IS_MOBILE:-}"
@@ -97,7 +78,7 @@ unpack_coverage_report() {
     mkdir -p "${COVERAGE_DIR}"
     rm -f bazel-out/_coverage/_coverage_report.tar.zst
     mv bazel-out/_coverage/_coverage_report.dat bazel-out/_coverage/_coverage_report.tar.zst
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" --nobuild_tests_only @envoy//tools/zstd -- -d -c "${PWD}/bazel-out/_coverage/_coverage_report.tar.zst" \
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" --nobuild_tests_only @zstd//:zstd_cli -- -d -c "${PWD}/bazel-out/_coverage/_coverage_report.tar.zst" \
         | tar -xf - -C "${COVERAGE_DIR}"
     COVERAGE_JSON="${COVERAGE_DIR}/coverage.json"
 }

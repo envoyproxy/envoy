@@ -37,7 +37,9 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
 }
 
 void EnvoyQuicClientStream::setResponseDecoder(Http::ResponseDecoder& decoder) {
-  response_decoder_handle_ = decoder.createResponseDecoderHandle();
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
+    response_decoder_handle_ = decoder.createResponseDecoderHandle();
+  }
   response_decoder_ = &decoder;
 }
 
@@ -514,7 +516,7 @@ void EnvoyQuicClientStream::onResponseDecoderDead() const {
 }
 
 Http::ResponseDecoder* EnvoyQuicClientStream::getResponseDecoder() {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
+  if (response_decoder_handle_ == nullptr) {
     return response_decoder_;
   }
   if (response_decoder_handle_) {

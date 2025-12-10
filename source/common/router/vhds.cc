@@ -100,8 +100,8 @@ absl::Status VhdsSubscription::onConfigUpdate(
     added_vhosts.emplace_back(
         dynamic_cast<const envoy::config::route::v3::VirtualHost&>(resource.get().resource()));
   }
-  if (config_update_info_->onVhdsUpdate(added_vhosts, added_resource_ids, removed_resources,
-                                        version_info)) {
+  if (config_update_info_->onVhdsUpdate(added_vhosts, std::move(added_resource_ids),
+                                        removed_resources, version_info)) {
     stats_.config_reload_.inc();
     ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} hash={}",
               config_update_info_->protobufConfigurationCast().name(),

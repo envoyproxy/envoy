@@ -37,13 +37,12 @@ public:
   Grpc::SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
 };
 
-class AdsIntegrationTest : public AdsDeltaSotwIntegrationSubStateParamTest,
-                           public HttpIntegrationTest {
+class AdsIntegrationTestBase : public Grpc::BaseGrpcClientIntegrationParamTest,
+                               public HttpIntegrationTest {
 public:
-  AdsIntegrationTest();
-  AdsIntegrationTest(const std::string& config);
-
-  void TearDown() override;
+  AdsIntegrationTestBase(Network::Address::IpVersion ip_version, Grpc::SotwOrDelta sotw_or_delta);
+  AdsIntegrationTestBase(Network::Address::IpVersion ip_version, Grpc::SotwOrDelta sotw_or_delta,
+                         const std::string& config);
 
   envoy::config::cluster::v3::Cluster
   buildCluster(const std::string& name, envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
@@ -87,7 +86,31 @@ public:
   envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
 
 private:
-  void commonInitialize();
+  void commonInitialize(Grpc::SotwOrDelta sotw_or_delta);
+};
+
+class AdsIntegrationTest
+    : public AdsIntegrationTestBase,
+      public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>> {
+public:
+  AdsIntegrationTest() : AdsIntegrationTestBase(ipVersion(), sotwOrDelta()) {}
+  AdsIntegrationTest(const std::string& config)
+      : AdsIntegrationTestBase(ipVersion(), sotwOrDelta(), config) {}
+
+  void TearDown() override { cleanUpXdsConnection(); }
+
+  static std::string protocolTestParamsToString(
+      const ::testing::TestParamInfo<
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>>& p) {
+    return fmt::format(
+        "{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
+        std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
+        std::get<2>(p.param) == Grpc::SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld");
+  }
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
+  Grpc::SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
 };
 
 // When old delta subscription state goes away, we could replace this macro back with

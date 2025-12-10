@@ -1,0 +1,59 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: backend
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: service
+          http_filters:
+          - name: envoy.filters.http.geoip
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.geoip.v3.Geoip
+              xff_config:
+                xff_num_trusted_hops: 1
+              provider:
+                name: "envoy.geoip_providers.maxmind"
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
+                  common_provider_config:
+                    geo_headers_to_add:
+                      country: "x-geo-country"
+                      region: "x-geo-region"
+                      city: "x-geo-city"
+                      asn: "x-geo-asn"
+                  city_db_path: "geoip/GeoLite2-City-Test.mmdb"
+                  isp_db_path: "geoip/GeoIP2-ISP-Test.mmdb"
+                  asn_db_path: "geoip/GeoLite2-ASN-Test.mmdb"
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+  - name: service
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service
+                port_value: 8081

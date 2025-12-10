@@ -39,13 +39,22 @@ public:
   // Http::ConnectionCallbacks
   void onMaxStreamsChanged(uint32_t num_streams) override;
 
-  RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
+  void updateQuicheCapacity() {
     ASSERT(quiche_capacity_ != 0);
     has_created_stream_ = true;
     // Each time a quic stream is allocated the quic capacity needs to get
     // decremented. See comments by quiche_capacity_.
     updateCapacity(quiche_capacity_ - 1);
+  }
+
+  RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
+    updateQuicheCapacity();
     return MultiplexedActiveClientBase::newStreamEncoder(response_decoder);
+  }
+
+  RequestEncoder& newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) override {
+    updateQuicheCapacity();
+    return MultiplexedActiveClientBase::newStreamEncoder(std::move(response_decoder_handle));
   }
 
   uint32_t effectiveConcurrentStreamLimit() const override {

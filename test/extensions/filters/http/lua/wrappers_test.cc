@@ -1418,6 +1418,32 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateNullObject) {
   wrapper.reset();
 }
 
+// Test for ``drainConnectionUponCompletion()`` method.
+TEST_F(LuaStreamInfoWrapperTest, DrainConnectionUponCompletion) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:drainConnectionUponCompletion()
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Initially, the connection should not be set to drain.
+  EXPECT_FALSE(stream_info.shouldDrainConnectionUponCompletion());
+
+  // Call drainConnectionUponCompletion to drain the connection.
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  start("callMe");
+
+  EXPECT_TRUE(stream_info.shouldDrainConnectionUponCompletion());
+
+  wrapper.reset();
+}
+
 class LuaVirtualHostWrapperTest
     : public Filters::Common::Lua::LuaWrappersTestBase<VirtualHostWrapper> {
 public:

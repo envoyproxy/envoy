@@ -128,7 +128,7 @@ DnsCacheImpl::loadDnsCacheEntryWithForceRefresh(absl::string_view raw_host, uint
   bool ignore_cached_entries = force_refresh;
 
   {
-    absl::ReaderMutexLock read_lock{&primary_hosts_lock_};
+    absl::ReaderMutexLock read_lock{primary_hosts_lock_};
     is_overflow = primary_hosts_.size() >= max_hosts_;
     auto tls_host = primary_hosts_.find(host);
     if (tls_host != primary_hosts_.end() && tls_host->second->host_info_->firstResolveComplete()) {
@@ -178,7 +178,7 @@ Upstream::ResourceAutoIncDecPtr DnsCacheImpl::canCreateDnsRequest() {
 }
 
 void DnsCacheImpl::iterateHostMap(IterateHostMapCb iterate_callback) {
-  absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+  absl::ReaderMutexLock reader_lock{primary_hosts_lock_};
   for (const auto& host : primary_hosts_) {
     // Only include hosts that have ever resolved to an address.
     if (host.second->host_info_->address() != nullptr) {
@@ -190,7 +190,7 @@ void DnsCacheImpl::iterateHostMap(IterateHostMapCb iterate_callback) {
 absl::optional<const DnsHostInfoSharedPtr> DnsCacheImpl::getHost(absl::string_view host_name) {
   // Find a host with the given name.
   const auto host_info = [&]() -> const DnsHostInfoSharedPtr {
-    absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+    absl::ReaderMutexLock reader_lock{primary_hosts_lock_};
     auto it = primary_hosts_.find(host_name);
     return it != primary_hosts_.end() ? it->second->host_info_ : nullptr;
   }();
@@ -219,7 +219,7 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
   // Functions like this one that modify primary_hosts_ are only called in the main thread so we
   // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
   auto* primary_host = [&]() {
-    absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+    absl::ReaderMutexLock reader_lock{primary_hosts_lock_};
     auto host_it = primary_hosts_.find(host);
     return host_it != primary_hosts_.end() ? host_it->second.get() : nullptr;
   }();
@@ -252,7 +252,7 @@ DnsCacheImpl::PrimaryHostInfo* DnsCacheImpl::createHost(const std::string& host,
   // independent primary hosts with independent DNS resolutions. I'm not sure how much this will
   // matter, but we could consider collapsing these down and sharing the underlying DNS resolution.
   {
-    absl::WriterMutexLock writer_lock{&primary_hosts_lock_};
+    absl::WriterMutexLock writer_lock{primary_hosts_lock_};
     return primary_hosts_
         // try_emplace() is used here for direct argument forwarding.
         .try_emplace(host,
@@ -269,7 +269,7 @@ DnsCacheImpl::PrimaryHostInfo& DnsCacheImpl::getPrimaryHost(const std::string& h
   // Functions modify primary_hosts_ are only called in the main thread so we
   // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
   ASSERT(main_thread_dispatcher_.isThreadSafe());
-  absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+  absl::ReaderMutexLock reader_lock{primary_hosts_lock_};
   const auto primary_host_it = primary_hosts_.find(host);
   ASSERT(primary_host_it != primary_hosts_.end());
   return *(primary_host_it->second);
@@ -316,7 +316,7 @@ void DnsCacheImpl::removeHost(const std::string& host, const PrimaryHostInfo& pr
   }
   {
     removeCacheEntry(host);
-    absl::WriterMutexLock writer_lock{&primary_hosts_lock_};
+    absl::WriterMutexLock writer_lock{primary_hosts_lock_};
     auto host_it = primary_hosts_.find(host);
     ASSERT(host_it != primary_hosts_.end());
     host_to_erase = std::move(host_it->second);
@@ -335,7 +335,7 @@ void DnsCacheImpl::forceRefreshHosts() {
   // transition and parameters may have changed.
   resolver_->resetNetworking();
 
-  absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+  absl::ReaderMutexLock reader_lock{primary_hosts_lock_};
   for (auto& primary_host : primary_hosts_) {
     // Avoid holding the lock for longer than necessary by just triggering the refresh timer for
     // each host IFF the host is not already refreshing. Cancellation is assumed to be cheap for
@@ -360,7 +360,7 @@ void DnsCacheImpl::forceRefreshHosts() {
 void DnsCacheImpl::setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) {
   bool has_changed = false;
   {
-    absl::MutexLock lock{&ip_version_to_remove_lock_};
+    absl::MutexLock lock{ip_version_to_remove_lock_};
     has_changed = ip_version_to_remove_ != ip_version;
     ip_version_to_remove_ = ip_version;
   }
@@ -369,7 +369,7 @@ void DnsCacheImpl::setIpVersionToRemove(absl::optional<Network::Address::IpVersi
                          "envoy.reloadable_features.dns_cache_filter_unusable_ip_version")) {
     // The IP version to remove has changed, so we need to refresh all logical hosts in the DFP
     // cluster so they filter out the unsupported/unusable IP addresses from their address list.
-    absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+    absl::ReaderMutexLock reader_lock{primary_hosts_lock_};
     for (auto& primary_host : primary_hosts_) {
       for (auto* callbacks : update_callbacks_) {
         auto status = callbacks->callbacks_.onDnsHostAddOrUpdate(primary_host.first,
@@ -390,7 +390,7 @@ void DnsCacheImpl::setIpVersionToRemove(absl::optional<Network::Address::IpVersi
 }
 
 absl::optional<Network::Address::IpVersion> DnsCacheImpl::getIpVersionToRemove() {
-  absl::MutexLock lock{&ip_version_to_remove_lock_};
+  absl::MutexLock lock{ip_version_to_remove_lock_};
   return ip_version_to_remove_;
 }
 
@@ -400,7 +400,7 @@ void DnsCacheImpl::stop() {
   // transition and parameters may have changed.
   resolver_->resetNetworking();
 
-  absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+  absl::ReaderMutexLock reader_lock{primary_hosts_lock_};
   for (auto& primary_host : primary_hosts_) {
     if (primary_host.second->active_query_ != nullptr) {
       primary_host.second->active_query_->cancel(
@@ -444,7 +444,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
     {
-      absl::MutexLock lock{&ip_version_to_remove_lock_};
+      absl::MutexLock lock{ip_version_to_remove_lock_};
       if (ip_version_to_remove_.has_value()) {
         if (config_.preresolve_hostnames_size() > 0) {
           IS_ENVOY_BUG(
@@ -471,7 +471,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   // Functions like this one that modify primary_hosts_ are only called in the main thread so we
   // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
   auto* primary_host_info = [&]() {
-    absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+    absl::ReaderMutexLock reader_lock{primary_hosts_lock_};
     const auto primary_host_it = primary_hosts_.find(host);
     ASSERT(primary_host_it != primary_hosts_.end());
     return primary_host_it->second.get();
@@ -782,7 +782,7 @@ Network::Address::InstanceConstSharedPtr DnsCacheImpl::DnsHostInfoImpl::address(
   const bool filter_unusable_ips = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.dns_cache_filter_unusable_ip_version");
   absl::optional<Network::Address::IpVersion> ip_version_to_remove = parent_.getIpVersionToRemove();
-  absl::ReaderMutexLock lock{&resolve_lock_};
+  absl::ReaderMutexLock lock{resolve_lock_};
   for (const auto& address : address_list_) {
     // If not filtering unusable IPs, OR if there is no IP version to remove, OR if the address is
     // not of the IP family to remove, use the address. This means if the
@@ -804,7 +804,7 @@ DnsCacheImpl::DnsHostInfoImpl::addressList(const bool filtered) const {
     auto ip_version_to_remove = parent_.getIpVersionToRemove();
     if (ip_version_to_remove.has_value()) {
       std::vector<Network::Address::InstanceConstSharedPtr> ret;
-      absl::ReaderMutexLock lock{&resolve_lock_};
+      absl::ReaderMutexLock lock{resolve_lock_};
       for (const auto& address : address_list_) {
         if (address->ip()->version() != *ip_version_to_remove) {
           ret.push_back(address);
@@ -814,7 +814,7 @@ DnsCacheImpl::DnsHostInfoImpl::addressList(const bool filtered) const {
     }
   }
   std::vector<Network::Address::InstanceConstSharedPtr> ret;
-  absl::ReaderMutexLock lock{&resolve_lock_};
+  absl::ReaderMutexLock lock{resolve_lock_};
   ret = address_list_;
   return ret;
 }
@@ -840,19 +840,19 @@ bool DnsCacheImpl::DnsHostInfoImpl::isStale() {
 void DnsCacheImpl::DnsHostInfoImpl::setAddresses(
     std::vector<Network::Address::InstanceConstSharedPtr>&& list, absl::string_view details,
     Network::DnsResolver::ResolutionStatus resolution_status) {
-  absl::WriterMutexLock lock{&resolve_lock_};
+  absl::WriterMutexLock lock{resolve_lock_};
   address_list_ = std::move(list);
   details_ = details;
   resolution_status_ = resolution_status;
 }
 
 void DnsCacheImpl::DnsHostInfoImpl::setDetails(absl::string_view details) {
-  absl::WriterMutexLock lock{&resolve_lock_};
+  absl::WriterMutexLock lock{resolve_lock_};
   details_ = details;
 }
 
 std::string DnsCacheImpl::DnsHostInfoImpl::details() {
-  absl::ReaderMutexLock lock{&resolve_lock_};
+  absl::ReaderMutexLock lock{resolve_lock_};
   return details_;
 }
 
@@ -861,23 +861,23 @@ std::chrono::steady_clock::duration DnsCacheImpl::DnsHostInfoImpl::lastUsedTime(
 }
 
 bool DnsCacheImpl::DnsHostInfoImpl::firstResolveComplete() const {
-  absl::ReaderMutexLock lock{&resolve_lock_};
+  absl::ReaderMutexLock lock{resolve_lock_};
   return first_resolve_complete_;
 }
 
 void DnsCacheImpl::DnsHostInfoImpl::setFirstResolveComplete() {
-  absl::WriterMutexLock lock{&resolve_lock_};
+  absl::WriterMutexLock lock{resolve_lock_};
   first_resolve_complete_ = true;
 }
 
 void DnsCacheImpl::DnsHostInfoImpl::setResolutionStatus(
     Network::DnsResolver::ResolutionStatus resolution_status) {
-  absl::WriterMutexLock lock{&resolve_lock_};
+  absl::WriterMutexLock lock{resolve_lock_};
   resolution_status_ = resolution_status;
 }
 
 Network::DnsResolver::ResolutionStatus DnsCacheImpl::DnsHostInfoImpl::resolutionStatus() const {
-  absl::WriterMutexLock lock{&resolve_lock_};
+  absl::WriterMutexLock lock{resolve_lock_};
   return resolution_status_;
 }
 

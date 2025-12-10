@@ -37,6 +37,16 @@ message CookieConfig {
 
   // The value used for the SameSite cookie attribute.
   SameSite same_site = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // The path attribute for the cookie.
+  //
+  // This controls the scope of the cookie and is useful for path-based routing scenarios
+  // where different logical boundaries or applications may operate with different OAuth2 clients.
+  // The CSRF cookie (nonce cookie) can be configured with a different path than session cookies
+  // to support flows where the callback URL is on a different path.
+  //
+  // If not specified, defaults to ``/``.
+  string path = 2 [(validate.rules).string = {pattern: "^$|^/[^\\x00-\\x1f\\x7f \",;<>\\\\]*$"}];
 }
 
 // [#next-free-field: 8]
@@ -121,12 +131,13 @@ message OAuth2Credentials {
 
   // The domain to set the cookie on. If not set, the cookie will default to the host of the request, not including the subdomains.
   // This is useful when token cookies need to be shared across multiple subdomains.
-  string cookie_domain = 5;
+  string cookie_domain = 5
+      [(validate.rules).string = {pattern: "^$|^[^\\x00-\\x1f\\x7f \",;<>\\\\]+$"}];
 }
 
 // OAuth config
 //
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -254,6 +265,11 @@ message OAuth2Config {
   // If not specified, defaults to ``600s`` (10 minutes), which should provide sufficient time
   // for users to complete the OAuth2 authorization flow.
   google.protobuf.Duration code_verifier_token_expires_in = 25;
+
+  // Disable token encryption. When set to true, both the access token and the ID token will be stored in plain text.
+  // This option should only be used in secure environments where token encryption is not required.
+  // Default is false (tokens are encrypted).
+  bool disable_token_encryption = 26;
 }
 
 // Filter config.

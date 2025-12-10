@@ -10,17 +10,12 @@ on:
         required: true
       app-key:
         required: true
-      gcs-cache-key:
-        required: true
 
     inputs:
       env:
         type: string
         required: true
       caches:
-        type: string
-        required: true
-      gcs-cache-bucket:
         type: string
         required: true
 
@@ -51,19 +46,17 @@ jobs:
 
   bazel:
     permissions:
+      actions: write
       contents: read
       packages: read
     secrets:
       app-id: ${{ secrets.app-id }}
       app-key: ${{ secrets.app-key }}
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_request_cache_bazel.yml
     with:
       arch: ${{ matrix.arch || 'x64' }}
-      bazel-extra: ${{ matrix.bazel-extra }}
       caches: ${{ inputs.caches }}
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       request: ${{ inputs.env }}
       runs-on: ${{ matrix.runs-on }}
       targets: ${{ matrix.targets || '...' }}
@@ -72,14 +65,9 @@ jobs:
       matrix:
         include:
         - name: Bazel (x64/cache)
-          bazel-extra: >-
-            --config=remote-envoy-engflow
         - name: Bazel (arm64/cache)
           arch: arm64
           runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}
-          bazel-extra: >-
-             --config=common-envoy-engflow
-             --config=cache-envoy-engflow
           targets: >-
             //test/...
             //contrib/...

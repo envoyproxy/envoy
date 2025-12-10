@@ -392,10 +392,12 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP2, version) {}
 
 protected:
+  void startHttp2Session(const Http2Frame& settings);
   void startHttp2Session();
   Http2Frame readFrame();
   void sendFrame(const Http2Frame& frame);
   virtual void beginSession();
+  virtual void beginSession(const Http2Frame& settings);
 
   IntegrationTcpClientPtr tcp_client_;
 };

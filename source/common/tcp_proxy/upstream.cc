@@ -35,12 +35,30 @@ void generateAndStoreRequestId(const TunnelingConfigHelper& config, Http::Reques
     // traffic could be anything - HTTPS, MySQL, Postgres, etc.
     config.requestIDExtension()->set(headers, /*edge_request=*/true,
                                      /*keep_external_id=*/false);
-    // Also store the request ID in dynamic metadata to allow TCP access logs to format it.
-    const auto rid = headers.getRequestIdValue();
-    if (!rid.empty()) {
+    // Also store the request ID in dynamic metadata to allow TCP access logs to format it,
+    // and optionally emit it under a custom key if configured.
+    const auto rid_sv = headers.getRequestIdValue();
+    if (!rid_sv.empty()) {
+      const std::string rid(rid_sv);
+      // If the request ID header override is configured, mirror the generated request ID to that
+      // header and remove the default x-request-id to honor the configured header.
+      const std::string& override_header = config.requestIDHeader();
+      if (!override_header.empty()) {
+        const Http::LowerCaseString custom_header(override_header);
+        headers.setCopy(custom_header, rid);
+        if (custom_header.get() != Http::Headers::get().RequestId.get()) {
+          headers.remove(Http::Headers::get().RequestId);
+        }
+      }
+
+      // Write dynamic metadata under the configured key (or default).
+      const std::string& key_override = config.requestIDMetadataKey();
+      const absl::string_view md_key =
+          key_override.empty() ? tunnelRequestIdMetadataKey() : absl::string_view(key_override);
       Protobuf::Struct md;
       auto& fields = *md.mutable_fields();
-      fields[tunnelRequestIdMetadataKey()].mutable_string_value()->assign(rid.data(), rid.size());
+      // Assign the request id to the configured key.
+      fields[std::string(md_key)].mutable_string_value()->assign(rid.data(), rid.size());
       downstream_info.setDynamicMetadata(tunnelRequestIdMetadataNamespace(), md);
     }
   }

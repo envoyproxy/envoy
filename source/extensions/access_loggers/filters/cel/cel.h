@@ -23,7 +23,7 @@ public:
                               Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr,
                               const cel::expr::Expr&);
 
-  bool evaluate(const Formatter::HttpFormatterContext& log_context,
+  bool evaluate(const Formatter::Context& log_context,
                 const StreamInfo::StreamInfo& stream_info) const override;
 
 private:

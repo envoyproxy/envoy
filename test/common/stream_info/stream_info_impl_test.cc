@@ -42,11 +42,11 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 728 ||
+        sizeof(stream_info) == 712 ||
         // with --config=docker-clang
         sizeof(stream_info) == 736 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 704)
+        sizeof(stream_info) == 688)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -84,6 +84,10 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   EXPECT_FALSE(timing.firstUpstreamRxByteReceived());
   upstream_timing.onFirstUpstreamRxByteReceived(test_time_.timeSystem());
   dur = checkDuration(dur, timing.firstUpstreamRxByteReceived());
+
+  EXPECT_FALSE(timing.firstUpstreamRxBodyByteReceived());
+  upstream_timing.onFirstUpstreamRxBodyByteReceived(test_time_.timeSystem());
+  dur = checkDuration(dur, timing.firstUpstreamRxBodyByteReceived());
 
   EXPECT_FALSE(timing.lastUpstreamRxByteReceived());
   upstream_timing.onLastUpstreamRxByteReceived(test_time_.timeSystem());

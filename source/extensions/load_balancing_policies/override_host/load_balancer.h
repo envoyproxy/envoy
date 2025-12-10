@@ -28,7 +28,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace OverrideHost {
 
 using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
@@ -195,6 +195,6 @@ private:
 };
 
 } // namespace OverrideHost
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

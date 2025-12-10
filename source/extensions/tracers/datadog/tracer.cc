@@ -38,6 +38,10 @@ std::shared_ptr<Tracer::ThreadLocalTracer> makeThreadLocalTracer(
   config.agent.http_client = std::make_shared<AgentHTTPClient>(
       cluster_manager, collector_cluster, collector_reference_host, tracer_stats, time_source);
 
+  // Disable telemetry to avoid needing a separate HTTP client for telemetry.
+  // Envoy has its own telemetry system and doesn't need dd-trace-cpp's telemetry.
+  config.telemetry.enabled = false;
+
   datadog::tracing::Expected<datadog::tracing::FinalizedTracerConfig> maybe_config =
       datadog::tracing::finalize_config(config);
   if (datadog::tracing::Error* error = maybe_config.if_error()) {

@@ -7,6 +7,7 @@ envoy_mobile_package()
 envoy_cc_test(
     name = "engine_test",
     srcs = ["engine_test.cc"],
+    env = {"ENVOY_NO_LOG_SINK": ""},
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",

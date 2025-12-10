@@ -36,6 +36,8 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -336,7 +338,7 @@ public:
 
   bool continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster, Http::RequestHeaderMap& headers,
                              bool end_stream, Upstream::HostConstSharedPtr&& host,
-                             absl::optional<std::string> host_selection_detailsi = {});
+                             absl::string_view host_selection_details = {});
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
@@ -346,7 +348,14 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override {
     if (route_entry_ && downstream_headers_) {
-      auto hash_policy = route_entry_->hashPolicy();
+      // Use cluster-level hash policy if available (most specific wins).
+      // If no cluster-level policy is configured, fall back to route-level policy.
+      const Http::HashPolicy* hash_policy =
+          cluster_ != nullptr ? cluster_->httpProtocolOptions().hashPolicy() : nullptr;
+      if (hash_policy == nullptr) {
+        hash_policy = route_entry_->hashPolicy();
+      }
+
       if (hash_policy) {
         return hash_policy->generateHash(
             *downstream_headers_, callbacks_->streamInfo(),
@@ -359,29 +368,64 @@ public:
     return {};
   }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    if (route_entry_) {
-      // Have we been called before? If so, there's no need to recompute because
-      // by the time this method is called for the first time, route_entry_ should
-      // not change anymore.
-      if (metadata_match_ != nullptr) {
-        return metadata_match_.get();
-      }
-
-      // The request's metadata, if present, takes precedence over the route's.
-      const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
-      const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
-      if (filter_it != request_metadata.end()) {
-        if (route_entry_->metadataMatchCriteria() != nullptr) {
-          metadata_match_ =
-              route_entry_->metadataMatchCriteria()->mergeMatchCriteria(filter_it->second);
-        } else {
-          metadata_match_ = std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
-        }
-        return metadata_match_.get();
-      }
-      return route_entry_->metadataMatchCriteria();
+    if (!route_entry_) {
+      return nullptr;
     }
-    return nullptr;
+
+    // Have we been called before? If so, there's no need to recompute because
+    // by the time this method is called for the first time, route_entry_ should
+    // not change anymore.
+    if (metadata_match_ != nullptr) {
+      return metadata_match_.get();
+    }
+
+    OptRef<const Protobuf::Struct> connection_metadata;
+    const auto* downstream_conn = downstreamConnection();
+    if (downstream_conn != nullptr) {
+      const auto& connection_fm = downstream_conn->streamInfo().dynamicMetadata().filter_metadata();
+      if (const auto it = connection_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+          it != connection_fm.end()) {
+        connection_metadata = makeOptRef<const Protobuf::Struct>(it->second);
+      }
+    }
+
+    OptRef<const Protobuf::Struct> request_metadata;
+    const auto& request_fm = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+    if (const auto it = request_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+        it != request_fm.end()) {
+      request_metadata = makeOptRef<const Protobuf::Struct>(it->second);
+    }
+
+    // The precedence is: request metadata > connection metadata > route criteria.
+    // We start with the route's criteria and sequentially merge others on top.
+    const auto* base_criteria = route_entry_->metadataMatchCriteria();
+    Router::MetadataMatchCriteriaConstPtr merged_criteria;
+
+    const auto* current_base = base_criteria;
+
+    // Merge connection metadata, if it exists.
+    if (connection_metadata) {
+      merged_criteria =
+          current_base ? current_base->mergeMatchCriteria(*connection_metadata)
+                       : std::make_unique<Router::MetadataMatchCriteriaImpl>(*connection_metadata);
+      current_base = merged_criteria.get();
+    }
+
+    // Merge request metadata, if it exists.
+    if (request_metadata) {
+      merged_criteria =
+          current_base ? current_base->mergeMatchCriteria(*request_metadata)
+                       : std::make_unique<Router::MetadataMatchCriteriaImpl>(*request_metadata);
+    }
+
+    // If merged_criteria is null, no merges occurred. Return the original base criteria.
+    if (!merged_criteria) {
+      return base_criteria;
+    }
+
+    // Otherwise, cache the newly created criteria and return it.
+    metadata_match_ = std::move(merged_criteria);
+    return metadata_match_.get();
   }
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection().ptr();
@@ -483,6 +527,8 @@ public:
   void onPerTryTimeout(UpstreamRequest& upstream_request) override;
   void onPerTryIdleTimeout(UpstreamRequest& upstream_request) override;
   void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
+  void setupRouteTimeoutForWebsocketUpgrade() override;
+  void disableRouteTimeoutForWebsocketUpgrade() override;
   Http::StreamDecoderFilterCallbacks* callbacks() override { return callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return *config_; }
@@ -537,6 +583,8 @@ private:
   UpstreamRequestPtr createUpstreamRequest();
   absl::optional<absl::string_view> getShadowCluster(const ShadowPolicy& shadow_policy,
                                                      const Http::HeaderMap& headers) const;
+  void applyShadowPolicyHeaders(const ShadowPolicy& shadow_policy,
+                                Http::RequestHeaderMap& headers) const;
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
                        TimeoutRetry is_timeout_retry);
   uint32_t numRequestsAwaitingHeaders();
@@ -560,7 +608,7 @@ private:
   // if a "good" response comes back and we return downstream, so there is no point in waiting
   // for the remaining upstream requests to return.
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
-  void sendNoHealthyUpstreamResponse(absl::optional<std::string> details);
+  void sendNoHealthyUpstreamResponse(absl::string_view details);
   bool setupRedirect(const Http::ResponseHeaderMap& headers);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
                                                 const Http::ResponseHeaderMap& upstream_headers,
@@ -571,9 +619,12 @@ private:
   void doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry);
   void continueDoRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry,
                        Upstream::HostConstSharedPtr&& host, Upstream::ThreadLocalCluster& cluster,
-                       absl::optional<std::string> host_selection_details);
+                       absl::string_view host_selection_details);
 
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
+  // Returns the effective retry policy to use for this request.
+  // Cluster-level retry policy takes precedence over route-level retry policy.
+  const Router::RetryPolicy* getEffectiveRetryPolicy() const;
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -584,6 +635,7 @@ private:
   // Process Orca Load Report if necessary (e.g. cluster has lrsReportMetricNames).
   void maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or_trailers,
                                   UpstreamRequest& upstream_request);
+  bool isEarlyConnectData();
 
   RetryStatePtr retry_state_;
   const FilterConfigSharedPtr config_;

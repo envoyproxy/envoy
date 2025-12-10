@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.common_inputs.stats.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.common_inputs.stats.v3";
+option java_outer_classname = "StatsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/common_inputs/stats/v3;statsv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Stats matcher]
+
+// Specifies the way to match stats with full name.
+message StatFullNameMatchInput {
+}

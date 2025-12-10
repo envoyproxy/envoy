@@ -138,7 +138,6 @@ class RepoNotifier(runner.Runner):
     async def oncall_string(self):
         now = datetime.datetime.now()
         sunday = now - datetime.timedelta(days=now.weekday() + 1)
-        monday = now - datetime.timedelta(days=now.weekday())
         priorweek = now - datetime.timedelta(14)
 
         # Handle the event being created before today.
@@ -148,12 +147,26 @@ class RepoNotifier(runner.Runner):
             content = await response.read()
             parsed_calendar = icalendar.Calendar.from_ical(content)
 
+            # First priority: Look for Sunday data
+            sunday_oncall = None
+            fallback_oncall = None
+
             for component in parsed_calendar.walk():
                 if component.name == "VEVENT":
-                    if (sunday.date() == component.decoded("dtstart").date()):
-                        return component.get("summary")
-                    if (monday.date() == component.decoded("dtstart").date()):
-                        return component.get("summary")
+                    event_date = component.decoded("dtstart").date()
+                    if event_date == sunday.date():
+                        sunday_oncall = component.get("summary")
+                    # Sometimes the event gets truncated and now starts on some other day beside Sunday.
+                    # Fallback to tightest bound before now but after Sunday.
+                    elif event_date > sunday.date() and event_date <= now.date():
+                        fallback_oncall = component.get("summary")
+
+            # Return Sunday data if available, otherwise fall back to current day
+            if sunday_oncall:
+                return sunday_oncall
+            elif fallback_oncall:
+                return fallback_oncall
+
         except Exception as e:
             print("Error while fetching and parsing the on-call calendar: {e}")
         print("unable to find this week's oncall")

@@ -36,8 +36,8 @@ The ``:scheme`` header will be used by Envoy over ``x-forwarded-proto`` where th
 -----
 
 The ``:path`` header is a pseudo-header populated by Envoy using the value of the path of the HTTP
-request. E.g. an HTTP request of the form ``GET /docs/thing HTTP/1.1`` would have a ``:path`` value
-of ``/docs/thing``.
+request, including query parameters. E.g. an HTTP request of the form ``GET /docs/thing HTTP/1.1``
+would have a ``:path`` value of ``/docs/thing``.
 
 :method
 -------
@@ -702,7 +702,7 @@ headers are modified before the request is sent upstream and the response is not
 
 .. attention::
 
-  The following legacy header formatters are still supported, but will be deprecated in the future.
+  The following legacy header formatters are deprecated and will be removed soon.
   The equivalent information can be accessed using indicated substitutes.
 
   ``%DYNAMIC_METADATA(["namespace", "key", ...])%``

@@ -148,3 +148,17 @@ message DynamicMetadataInput {
   // The path to retrieve the Value from the Struct.
   repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
 }
+
+// Input that matches by the network namespace of the listener address.
+// This input returns the network namespace filepath that was used to create the listening socket.
+// On Linux systems, this corresponds to the ``network_namespace_filepath`` field in the
+// :ref:`SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>` configuration.
+//
+// .. note::
+//
+//   This input is only meaningful on Linux systems where network namespaces are supported.
+//   On other platforms, this input will always return an empty value.
+//
+// [#extension: envoy.matching.inputs.network_namespace]
+message NetworkNamespaceInput {
+}

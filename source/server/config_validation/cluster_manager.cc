@@ -19,10 +19,11 @@ absl::StatusOr<ClusterManagerPtr> ValidationClusterManagerFactory::clusterManage
 
 absl::StatusOr<CdsApiPtr> ValidationClusterManagerFactory::createCds(
     const envoy::config::core::v3::ConfigSource& cds_config,
-    const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm) {
+    const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
+    bool support_multi_ads_sources) {
   // Create the CdsApiImpl...
-  auto cluster_or_error =
-      ProdClusterManagerFactory::createCds(cds_config, cds_resources_locator, cm);
+  auto cluster_or_error = ProdClusterManagerFactory::createCds(cds_config, cds_resources_locator,
+                                                               cm, support_multi_ads_sources);
   RETURN_IF_NOT_OK_REF(cluster_or_error.status());
   // ... and then throw it away, so that we don't actually connect to it.
   return nullptr;

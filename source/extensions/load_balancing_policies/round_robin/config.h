@@ -10,7 +10,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace RoundRobin {
 
 using RoundRobinLbProto = envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin;
@@ -47,6 +47,6 @@ public:
 DECLARE_FACTORY(Factory);
 
 } // namespace RoundRobin
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

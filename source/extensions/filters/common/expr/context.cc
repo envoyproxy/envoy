@@ -113,6 +113,13 @@ const RequestLookupValues& RequestLookupValues::get() {
            [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
              return CelValue::CreateMap(&wrapper.headers_);
            }},
+          {HeadersBytes,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.headers_.value_ != nullptr) {
+               return CelValue::CreateInt64(wrapper.headers_.value_->byteSize());
+             }
+             return CelValue::CreateInt64(0);
+           }},
           {Time,
            [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
              return CelValue::CreateTimestamp(absl::FromChrono(wrapper.info_.startTime()));
@@ -235,6 +242,13 @@ const ResponseLookupValues& ResponseLookupValues::get() {
           {Headers,
            [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
              return CelValue::CreateMap(&wrapper.headers_);
+           }},
+          {HeadersBytes,
+           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.headers_.value_ != nullptr) {
+               return CelValue::CreateInt64(wrapper.headers_.value_->byteSize());
+             }
+             return CelValue::CreateInt64(0);
            }},
           {Trailers,
            [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
@@ -400,6 +414,16 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
           {UpstreamRequestAttemptCount,
            [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
              return CelValue::CreateUint64(wrapper.info_.attemptCount().value_or(0));
+           }},
+          {UpstreamNumEndpoints, [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_.upstreamClusterInfo().value_or(nullptr) != nullptr) {
+               return CelValue::CreateUint64(wrapper.info_.upstreamClusterInfo()
+                                                 .value()
+                                                 .get()
+                                                 ->endpointStats()
+                                                 .membership_total_.value());
+             }
+             return {};
            }}});
 }
 

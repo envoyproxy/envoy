@@ -24,6 +24,8 @@ routing PRs, questions, etc. to the right place.
   * HTTP/3, upstream connection management, Envoy Mobile.
 * Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@gmail.com)
   * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
+* Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
+  * Overload manager, security, logging, wasm, data plane.
 
 # Maintainers
 <!--- If you modify maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml -->
@@ -42,8 +44,6 @@ routing PRs, questions, etc. to the right place.
   * Load balancing, GeoIP, overload manager, security.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
   * ext_proc, data plane, flow control, CEL.
-* Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
-  * Overload manager, security, logging, wasm, data plane.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
   * Load balancing, data plane.
 * Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (takeshi@tetrate.io)
@@ -54,6 +54,8 @@ routing PRs, questions, etc. to the right place.
   * Request mirroring, data plane
 * Mike Krinkin ([krinkinmu](https://github.com/krinkinmu)) (krinkin.m.u@gmail.com)
   * Build, tooling.
+* Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
+  * CI, Build.
 
 # Envoy mobile maintainers
 
@@ -78,6 +80,8 @@ without further review.
   * Golang
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
   * Wasm, JWT, gRPC-JSON transcoder
+* Kuo-Chung Hsu ([juniorhsu](https://github.com/juniorhsu)) (CuveeHsu@gmail.com)
+  * Thrift
 
 # Envoy security team
 
@@ -92,6 +96,8 @@ without further review.
 * Thomas Gschwendtner ([tgschwen](https://github.com/tgschwen)) (tgschwen@google.com)
 * Yanjun Xiang ([yanjunxiang-google](https://github.com/yanjunxiang-google)) (yanjunxiang@google.com)
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
+* Kuo-Chung Hsu ([juniorhsu](https://github.com/juniorhsu)) (kuochunghsu@pinterest.com)
+* Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
 
 # Emeritus maintainers
 

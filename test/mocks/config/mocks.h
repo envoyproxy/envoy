@@ -199,7 +199,7 @@ public:
   MOCK_METHOD(Common::CallbackHandlePtr, addDynamicContextUpdateCallback,
               (UpdateNotificationCb callback), (const));
 
-  Common::CallbackManager<absl::string_view> update_cb_handler_;
+  Common::CallbackManager<absl::Status, absl::string_view> update_cb_handler_;
 };
 
 template <class FactoryCallback>

@@ -23,6 +23,7 @@ filters.
   kafka_mesh_filter
   local_rate_limit_filter
   mongo_proxy_filter
+  reverse_tunnel_filter
   mysql_proxy_filter
   postgres_proxy_filter
   rate_limit_filter

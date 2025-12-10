@@ -88,6 +88,7 @@ public:
     uint32_t healthy_endpoints = 0;
     uint32_t degraded_endpoints = 0;
     uint32_t disable_active_hc_endpoints = 0;
+    absl::optional<uint32_t> load_balancing_weight = absl::nullopt;
     absl::optional<bool> weighted_priority_health = absl::nullopt;
     absl::optional<uint32_t> overprovisioning_factor = absl::nullopt;
     absl::optional<uint32_t> drop_overload_numerator = absl::nullopt;
@@ -137,6 +138,10 @@ public:
         endpoint->mutable_endpoint()
             ->mutable_health_check_config()
             ->set_disable_active_health_check(true);
+      }
+      if (endpoint_setting.load_balancing_weight.has_value()) {
+        endpoint->mutable_load_balancing_weight()->set_value(
+            endpoint_setting.load_balancing_weight.value());
       }
     }
 
@@ -805,6 +810,45 @@ TEST_P(EdsIntegrationTest, DataplaneTrafficAfterEdsUpdateOfInitializedCluster) {
 TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterNoDrop) { dropOverloadTest(0, "200"); }
 
 TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterAllDrop) { dropOverloadTest(100, "503"); }
+
+TEST_P(EdsIntegrationTest, LoadBalancerRejectsEndpoints) {
+  autonomous_upstream_ = true;
+  initializeTest(false /* http_active_hc */, [](envoy::config::cluster::v3::Cluster& cluster) {
+    // Maglev (and all load balancers that inherit `ThreadAwareLoadBalancerBase`) has a
+    // constraint that the total endpoint weights must not exceed uint32_max. Use this to generate
+    // errors instead of writing a test load balancing extension.
+    cluster.set_lb_policy(::envoy::config::cluster::v3::Cluster::MAGLEV);
+  });
+  EndpointSettingOptions options;
+  options.total_endpoints = 4;
+  options.healthy_endpoints = 4;
+  options.load_balancing_weight = UINT32_MAX - 1;
+  setEndpoints(options, true, false);
+  test_server_->waitForCounterGe("cluster.cluster_0.update_rejected", 1);
+}
+
+TEST_P(EdsIntegrationTest, LoadBalancerRejectsEndpointsWithHealthcheck) {
+  cluster_.mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
+  autonomous_upstream_ = true;
+  initializeTest(true /* http_active_hc */, [](envoy::config::cluster::v3::Cluster& cluster) {
+    // Disable the healthy panic threshold, which causes the initial update from the EDS update
+    // to not include any of the hosts so that there isn't an error detected for the weights
+    // until after a health check passes.
+    cluster.mutable_common_lb_config()->mutable_healthy_panic_threshold();
+
+    // Maglev (and all load balancers that inherit `ThreadAwareLoadBalancerBase`) has a
+    // constraint that the total endpoint weights must not exceed uint32_max. Use this to generate
+    // errors instead of writing a test load balancing extension.
+    cluster.set_lb_policy(::envoy::config::cluster::v3::Cluster::MAGLEV);
+  });
+
+  EndpointSettingOptions options;
+  options.total_endpoints = 4;
+  options.healthy_endpoints = 4;
+  options.load_balancing_weight = UINT32_MAX - 1;
+  setEndpoints(options, true, false);
+  test_server_->waitForCounterGe("cluster.cluster_0.update_rejected", 1);
+}
 
 } // namespace
 } // namespace Envoy

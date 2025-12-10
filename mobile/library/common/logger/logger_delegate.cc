@@ -44,12 +44,12 @@ DefaultDelegate::~DefaultDelegate() { restoreDelegate(); }
 
 // SinkDelegate
 void DefaultDelegate::log(absl::string_view msg, const spdlog::details::log_msg&) {
-  absl::MutexLock l(&mutex_);
+  absl::MutexLock l(mutex_);
   std::cerr << msg;
 }
 
 void DefaultDelegate::flush() {
-  absl::MutexLock l(&mutex_);
+  absl::MutexLock l(mutex_);
   std::cerr << std::flush;
 }
 

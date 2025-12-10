@@ -37,7 +37,7 @@ public:
         const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config,
         absl::string_view server_id);
 
-    const bool unsafe_unencrypted_testing_mode_;
+    const bool unencrypted_mode_;
     const uint32_t nonce_length_bytes_;
     const quic::LoadBalancerServerId server_id_;
   };

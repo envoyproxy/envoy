@@ -85,14 +85,21 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
                                        Envoy::ConnectionPool::AttachContext& context) {
   ActiveClient* http_client = static_cast<ActiveClient*>(&client);
   auto& http_context = typedContext<HttpAttachContext>(context);
+  // This decoder might have already died if ConnectivityGrid is in use and TCP
+  // win over QUIC.
   Http::ResponseDecoder& response_decoder = *http_context.decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *http_context.callbacks_;
 
   // Track this request on the connection
   http_client->request_count_++;
 
-  Http::RequestEncoder& new_encoder = http_client->newStreamEncoder(response_decoder);
-  callbacks.onPoolReady(new_encoder, client.real_host_description_,
+  Http::RequestEncoder* new_encoder = nullptr;
+  if (http_context.decoder_handle_ == nullptr) {
+    new_encoder = &http_client->newStreamEncoder(response_decoder);
+  } else {
+    new_encoder = &http_client->newStreamEncoder(std::move(http_context.decoder_handle_));
+  }
+  callbacks.onPoolReady(*new_encoder, client.real_host_description_,
                         http_client->codec_client_->streamInfo(),
                         http_client->codec_client_->protocol());
 }
@@ -208,6 +215,11 @@ bool MultiplexedActiveClientBase::closingWithIncompleteStream() const {
 
 RequestEncoder& MultiplexedActiveClientBase::newStreamEncoder(ResponseDecoder& response_decoder) {
   return codec_client_->newStream(response_decoder);
+}
+
+RequestEncoder&
+MultiplexedActiveClientBase::newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) {
+  return codec_client_->newStream(std::move(response_decoder_handle));
 }
 
 } // namespace Http

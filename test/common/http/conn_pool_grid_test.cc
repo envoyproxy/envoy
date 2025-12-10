@@ -182,13 +182,13 @@ public:
   void initialize() {
     quic_connection_persistent_info_ =
 #ifdef ENVOY_ENABLE_QUIC
-        std::make_unique<Quic::PersistentQuicInfoImpl>(dispatcher_, 0);
+        Quic::createPersistentQuicInfoForCluster(dispatcher_, *cluster_);
 #else
         std::make_unique<PersistentQuicInfo>();
 #endif
     host_ = std::shared_ptr<Upstream::HostImpl>(*Upstream::HostImpl::create(
         cluster_, host_impl_hostname_, *Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
-        nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
+        nullptr, nullptr, 1, std::make_shared<const envoy::config::core::v3::Locality>(),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
         envoy::config::core::v3::UNKNOWN, address_list_));
 
@@ -257,7 +257,7 @@ TEST_F(ConnectivityGridTest, HostnameFromTransportSocketFactory) {
   Upstream::MockTransportSocketMatcher* transport_socket_matcher =
       dynamic_cast<Upstream::MockTransportSocketMatcher*>(
           cluster_->transport_socket_matcher_.get());
-  EXPECT_CALL(*transport_socket_matcher, resolve(_, _))
+  EXPECT_CALL(*transport_socket_matcher, resolve(_, _, _))
       .WillOnce(Return(Upstream::TransportSocketMatcher::MatchData(
           factory, transport_socket_matcher->stats_, "test")));
   EXPECT_CALL(factory, defaultServerNameIndication)
@@ -920,7 +920,8 @@ TEST_F(ConnectivityGridTest, SrttMatters) {
 
   // This timer will be returned and armed based on prior rtt.
   Event::MockTimer* failover_timer = new StrictMock<MockTimer>(&dispatcher_);
-  EXPECT_CALL(*failover_timer, enableTimer(std::chrono::milliseconds(4), nullptr));
+  // 1.5 * 2ms = 3ms
+  EXPECT_CALL(*failover_timer, enableTimer(std::chrono::milliseconds(3), nullptr));
   EXPECT_CALL(*failover_timer, enabled()).WillRepeatedly(Return(false));
 
   auto cancel = grid_->newStream(decoder_, callbacks_,
@@ -1728,7 +1729,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   factory->initialize();
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
-  EXPECT_CALL(matcher, resolve(_, _))
+  EXPECT_CALL(matcher, resolve(_, _, _))
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
@@ -1752,7 +1753,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   EXPECT_EQ("HTTP/1 HTTP/2 ALPN", pool2->protocolDescription());
 }
 
-TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
+TEST_F(ConnectivityGridTest, ConnectionCloseDuringAsyncConnect) {
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
@@ -1768,7 +1769,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   factory->initialize();
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
-  EXPECT_CALL(matcher, resolve(_, _))
+  EXPECT_CALL(matcher, resolve(_, _, _))
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 

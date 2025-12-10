@@ -85,7 +85,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, Init) {
 TEST_P(HttpServerPropertiesCacheImplTest, SetAlternativesThenSrtt) {
   initialize();
   EXPECT_EQ(0, protocols_->size());
-  EXPECT_EQ(std::chrono::microseconds(0), protocols_->getSrtt(origin1_));
+  EXPECT_EQ(std::chrono::microseconds(0), protocols_->getSrtt(origin1_, false));
   EXPECT_CALL_WHEN_STORE_VALID(
       addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
@@ -93,7 +93,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, SetAlternativesThenSrtt) {
       addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5|0", kNoTtl));
   protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
-  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, SetSrttThenAlternatives) {
@@ -102,11 +102,11 @@ TEST_P(HttpServerPropertiesCacheImplTest, SetSrttThenAlternatives) {
   EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate("https://hostname1:1", "clear|5|0", kNoTtl));
   protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
-  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
   EXPECT_CALL_WHEN_STORE_VALID(
       addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5|0", kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
-  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, SetConcurrency) {
@@ -349,7 +349,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, CacheLoad) {
       protocols_->findAlternatives(origin1_);
   ASSERT_TRUE(protocols.has_value());
   EXPECT_EQ(protocols1_, protocols.ref());
-  EXPECT_EQ(2, protocols_->getSrtt(origin1_).count());
+  EXPECT_EQ(2, protocols_->getSrtt(origin1_, false).count());
   EXPECT_EQ(3, protocols_->getConcurrentStreams(origin1_));
 }
 
@@ -365,7 +365,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, CacheLoadSrttOnly) {
 
   EXPECT_CALL(*store_, addOrUpdate(_, _, _)).Times(0);
   ASSERT_FALSE(protocols_->findAlternatives(origin1_).has_value());
-  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, ShouldNotUpdateStoreOnCacheLoad) {
@@ -536,18 +536,18 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixSrtt) {
 
   std::chrono::microseconds set_srtt1(42);
   protocols_->setSrtt(origin1, set_srtt1);
-  EXPECT_EQ(protocols_->getSrtt(origin1), set_srtt1);
-  EXPECT_EQ(protocols_->getSrtt(origin2), set_srtt1);
-  EXPECT_EQ(protocols_->getSrtt(origin3), set_srtt1);
-  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin1, true), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin2, true), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin3, true), set_srtt1);
+  EXPECT_NE(protocols_->getSrtt(no_match, true), set_srtt1);
 
   std::chrono::microseconds set_srtt2(422);
   protocols_->setSrtt(origin2, set_srtt2);
-  EXPECT_EQ(protocols_->getSrtt(origin1), set_srtt1);
-  EXPECT_EQ(protocols_->getSrtt(origin2), set_srtt2);
-  EXPECT_EQ(protocols_->getSrtt(origin3), set_srtt2);
-  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt1);
-  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt2);
+  EXPECT_EQ(protocols_->getSrtt(origin1, true), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin2, true), set_srtt2);
+  EXPECT_EQ(protocols_->getSrtt(origin3, true), set_srtt2);
+  EXPECT_NE(protocols_->getSrtt(no_match, true), set_srtt1);
+  EXPECT_NE(protocols_->getSrtt(no_match, true), set_srtt2);
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCanonicalSuffix) {

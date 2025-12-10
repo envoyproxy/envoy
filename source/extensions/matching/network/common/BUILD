@@ -22,6 +22,7 @@ envoy_cc_extension(
         "//envoy/matcher:matcher_interface",
         "//envoy/network:filter_interface",
         "//envoy/registry",
+        "//source/common/common:logger_lib",
         "//source/common/network:utility_lib",
         "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
     ],

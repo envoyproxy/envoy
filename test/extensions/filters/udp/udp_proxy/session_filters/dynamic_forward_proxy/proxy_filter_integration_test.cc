@@ -6,6 +6,7 @@
 
 #include "source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy/config.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy/proxy_filter.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy/dfp_setter.h"
@@ -85,6 +86,10 @@ typed_config:
       stat_prefix: foo
       dns_cache_config:
         name: foo
+        typed_dns_resolver_config:
+          name: envoy.network.dns_resolver.getaddrinfo
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
         dns_lookup_family: {}
         max_hosts: {}
         dns_cache_circuit_breaker:
@@ -142,6 +147,10 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
   dns_cache_config:
     name: foo
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
     dns_lookup_family: {}
     max_hosts: {}
     dns_cache_circuit_breaker:

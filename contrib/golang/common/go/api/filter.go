@@ -210,29 +210,22 @@ type FilterProcessCallbacks interface {
 
 type DecoderFilterCallbacks interface {
 	FilterProcessCallbacks
-	// Sets an upstream address override for the request. When the overridden host exists in the host list of the routed cluster
-	// and can be selected directly, the load balancer bypasses its algorithm and routes traffic directly to the specified host.
-	//
-	// Here are some cases:
-	// 1. Set a valid host(no matter in or not in the cluster), will route to the specified host directly and return 200.
-	// 2. Set a non-IP host, C++ side will return error and not route to cluster.
-	// 3. Set a unavaiable host, and the host is not in the cluster, will req the valid host in the cluster and rerurn 200.
-	// 4. Set a unavaiable host, and the host is in the cluster, but not available(can not connect to the host), will req the unavaiable hoat and rerurn 503.
-	// 5. Set a unavaiable host, and the host is in the cluster, but not available(can not connect to the host), and with retry. when first request with unavaiable host failed 503, the second request will retry with the valid host, then the second request will succeed and finally return 200.
-	// 6. Set a unavaiable host with strict mode, and the host is in the cluster, will req the unavaiable host and rerurn 503.
-	// 7. Set a unavaiable host with strict mode, and the host is not in the cluster, will req the unavaiable host and rerurn 503.
-	// 8. Set a unavaiable host with strict mode and retry. when first request with unavaiable host failed 503, the second request will retry with the valid host, then the second request will succeed and finally return 200.
-	// 9. Set a unavaiable host with strict mode and retry, and the host is not in the cluster, will req the unavaiable host and rerurn 503.
+
+	// SetUpstreamOverrideHost sets an upstream address override for the request.
+	// When the overridden host is available and can be selected directly, the load balancer bypasses its algorithm
+	// and routes traffic directly to the specified host. The strict flag determines whether the HTTP request must
+	// strictly use the overridden destination. If the destination is unavailable and strict is set to true, Envoy
+	// responds with a 503 Service Unavailable error.
 	//
 	// The function takes two arguments:
 	//
-	// host (string): The upstream host address to use for the request. This must be a valid IP address(with port); otherwise, the
-	// C++ side will throw an error.
+	// host (string): The upstream host address to use for the request. This must be a valid IP address(with port);
+	// otherwise, it will return an error.
 	//
 	// strict (boolean): Determines whether the HTTP request must be strictly routed to the requested
-	// host. When set to ``true``, if the requested host is invalid, Envoy will return a 503 status code.
+	// host. When set to ``true``, if the requested host is unavailable, Envoy will return a 503 status code.
 	// The default value is ``false``, which allows Envoy to fall back to its load balancing mechanism. In this case, if the
-	// requested host is invalid, the request will be routed according to the load balancing algorithm and choose other hosts.
+	// requested host is not found, the request will be routed according to the load balancing algorithm.
 	SetUpstreamOverrideHost(host string, strict bool) error
 }
 

@@ -246,6 +246,14 @@ public:
   virtual bool pausedForWebsocketUpgrade() const PURE;
   virtual void setPausedForWebsocketUpgrade(bool value) PURE;
 
+  // Disable the route timeout after websocket upgrade completes successfully.
+  // This should only be used by the upstream codec filter.
+  virtual void disableRouteTimeoutForWebsocketUpgrade() PURE;
+
+  // Disable per-try timeouts after websocket upgrade completes successfully.
+  // This should only be used by the upstream codec filter.
+  virtual void disablePerTryTimeoutForWebsocketUpgrade() PURE;
+
   // Return the upstreamStreamOptions for this stream.
   virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
 
@@ -660,7 +668,7 @@ public:
   /**
    * Attempt to send GOAWAY and close the connection, and no filter chain will move forward.
    */
-  virtual void sendGoAwayAndClose() PURE;
+  virtual void sendGoAwayAndClose(bool graceful = false) PURE;
 
   /**
    * Adds decoded metadata. This function can only be called in

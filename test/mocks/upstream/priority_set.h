@@ -38,8 +38,8 @@ public:
 
   std::vector<HostSetPtr> host_sets_;
   std::vector<Common::CallbackHandlePtr> member_update_cbs_;
-  Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
-  Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
+  Common::CallbackManager<void, const HostVector&, const HostVector&> member_update_cb_helper_;
+  Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
 
   HostMapConstSharedPtr cross_priority_host_map_{std::make_shared<HostMap>()};

@@ -9,7 +9,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace LeastRequest {
 
 using LeastRequestLbProto =
@@ -62,6 +62,6 @@ public:
 DECLARE_FACTORY(Factory);
 
 } // namespace LeastRequest
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

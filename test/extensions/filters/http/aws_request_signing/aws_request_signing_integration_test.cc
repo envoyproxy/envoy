@@ -4,6 +4,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
@@ -107,6 +108,19 @@ typed_config:
   - prefix: x-envoy
   - prefix: x-forwarded
   - exact: x-amzn-trace-id
+)EOF";
+
+const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_INCLUDED_HEADERS = R"EOF(
+name: envoy.filters.http.aws_request_signing
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+  service_name: vpc-lattice-svcs
+  region: ap-southeast-2
+  signing_algorithm: aws_sigv4
+  use_unsigned_payload: true
+  match_included_headers:
+  - prefix: x-custom
+  - exact: user-agent
 )EOF";
 
 const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL = R"EOF(
@@ -230,6 +244,8 @@ public:
     TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI",
                                "http://127.0.0.1/path/to/creds", 1);
     TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
+
+    addBootstrapDefaultDns();
   }
 
   ~AwsRequestSigningIntegrationTest() override {
@@ -257,6 +273,16 @@ public:
       protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
       protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
       ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+    });
+  }
+
+  void addBootstrapDefaultDns() {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* typed_dns_resolver_config = bootstrap.mutable_typed_dns_resolver_config();
+      typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
+      envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+          config;
+      typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
     });
   }
 
@@ -361,6 +387,36 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationUpstream) {
   EXPECT_FALSE(
       upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
 }
+
+TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationWithIncludedHeaders) {
+
+  config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_INCLUDED_HEADERS, true);
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/path"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-custom-header", "custom-value"},
+                                                 {"user-agent", "test-agent"},
+                                                 {"x-other-header", "other-value"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  // check that AWS signing headers are present
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amz-date")).empty());
+  // check that included headers are present
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-custom-header")).empty());
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("user-agent")).empty());
+  // check that non-included headers are still forwarded
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-other-header")).empty());
+}
+
 class MockLogicalDnsClusterFactory : public Upstream::DnsClusterFactory {
 public:
   MockLogicalDnsClusterFactory() = default;
