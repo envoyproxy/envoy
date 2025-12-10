@@ -455,5 +455,11 @@ new_features:
     access TLV values via FilterStateInput without requiring custom HTTP filters to copy metadata. Individual TLV values
     can be accessed via field access: ``%FILTER_STATE(envoy.network.proxy_protocol.tlv:FIELD:key)%``. Defaults to
     ``DYNAMIC_METADATA`` to maintain existing behavior.
+- area: mcp
+  change: |
+    Added :ref:`MCP filter <config_http_filters_mcp>` for parsing Model Context Protocol (MCP) JSON-RPC requests.
+    The filter extracts the ``method`` and ``id`` fields from incoming requests and stores them in dynamic metadata
+    for use by downstream filters and access logging. Notifications (methods starting with ``notifications/``) are
+    correctly handled as they don't have an ``id`` field per the JSON-RPC specification.
 
 deprecated:
