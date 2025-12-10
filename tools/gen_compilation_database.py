@@ -22,9 +22,8 @@ def get_bazel_build_options():
 def get_output_base():
     bazel_startup_options = get_bazel_startup_options()
     bazel_options = get_bazel_build_options()
-    output_base = subprocess.check_output(
+    return subprocess.check_output(
         ["bazel", *bazel_startup_options, "info", *bazel_options, "output_base"]).decode().strip()
-    return output_base
 
 
 # This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.py
