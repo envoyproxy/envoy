@@ -1072,7 +1072,7 @@ envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
     size_t* gauge_id_ptr);
 
 /**
- * envoy_dynamic_module_callback_http_filter_increase_gauge is called by the module to increase the
+ * envoy_dynamic_module_callback_http_filter_increment_gauge is called by the module to increase the
  * value of a previously defined gauge.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
@@ -1081,11 +1081,11 @@ envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
  * @param value is the value to increase the gauge by.
  * @return the result of the operation.
  */
-envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_increase_gauge(
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_increment_gauge(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
 
 /**
- * envoy_dynamic_module_callback_http_filter_increase_gauge_vec is called by the module to increase
+ * envoy_dynamic_module_callback_http_filter_increment_gauge_vec is called by the module to increase
  * the value of a previously defined gauge vec.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
@@ -1097,13 +1097,13 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
  * @return the result of the operation.
  */
 envoy_dynamic_module_type_metrics_result
-envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
+envoy_dynamic_module_callback_http_filter_increment_gauge_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);
 
 /**
- * envoy_dynamic_module_callback_http_filter_decrease_gauge is called by the module to decrease the
+ * envoy_dynamic_module_callback_http_filter_decrement_gauge is called by the module to decrease the
  * value of a previously defined gauge.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
@@ -1112,11 +1112,11 @@ envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
  * @param value is the value to decrease the gauge by.
  * @return the result of the operation.
  */
-envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_decrease_gauge(
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_decrement_gauge(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
 
 /**
- * envoy_dynamic_module_callback_http_filter_decrease_gauge_vec is called by the module to decrease
+ * envoy_dynamic_module_callback_http_filter_decrement_gauge_vec is called by the module to decrease
  * the value of a previously defined gauge vec.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
@@ -1128,7 +1128,7 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
  * @return the result of the operation.
  */
 envoy_dynamic_module_type_metrics_result
-envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
+envoy_dynamic_module_callback_http_filter_decrement_gauge_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);

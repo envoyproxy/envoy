@@ -536,6 +536,12 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex(
       "cluster.test_cluster.ssl.certificate.server_cert.expiration_unix_time_seconds",
       "cluster.ssl.certificate.expiration_unix_time_seconds", {test_cluster, certificate_name});
+
+  // resource name test
+  Tag sds_resource;
+  sds_resource.name_ = tag_names.XDS_RESOURCE_NAME;
+  sds_resource.value_ = "xds_trusted_ca";
+  regex_tester.testRegex("sds.xds_trusted_ca.update_attempt", "sds.update_attempt", {sds_resource});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {
