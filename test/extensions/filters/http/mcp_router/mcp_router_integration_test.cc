@@ -89,6 +89,20 @@ public:
         traffic_mode: PASS_THROUGH
     )EOF");
 
+    // Remove the default router filter.
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* filters = hcm.mutable_http_filters();
+          for (auto it = filters->begin(); it != filters->end();) {
+            if (it->name() == "envoy.filters.http.router") {
+              it = filters->erase(it);
+            } else {
+              ++it;
+            }
+          }
+        });
+
     initialize();
   }
 

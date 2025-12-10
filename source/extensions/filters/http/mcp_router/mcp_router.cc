@@ -119,7 +119,12 @@ SessionCodec::parseCompositeSessionId(const std::string& composite) {
 McpRouterConfig::McpRouterConfig(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     Server::Configuration::FactoryContext& context)
-    : factory_context_(context) {
+    : factory_context_(context),
+      tls_slot_(context.serverFactoryContext().threadLocal().allocateSlot()) {
+
+  // Initialize thread-local fanout manager for fire-and-forget operations
+  tls_slot_->set(
+      [](Event::Dispatcher&) { return std::make_shared<ThreadLocalFanoutManager>(); });
 
   for (const auto& server : proto_config.servers()) {
     McpBackendConfig backend;
@@ -203,6 +208,21 @@ McpRouterFilter::~McpRouterFilter() = default;
 
 void McpRouterFilter::onDestroy() {
   destroyed_ = true;
+
+  // For fire-and-forget fanout, transfer resources to ThreadLocalFanoutManager
+  // so upstream requests can complete after the filter is destroyed
+  if (fire_and_forget_ && multistream_) {
+    auto fanout = std::make_unique<DetachedFanout>(config_->fanoutManager());
+    fanout->muxdemux = std::move(muxdemux_);
+    fanout->multistream = std::move(multistream_);
+    fanout->callbacks = std::move(stream_callbacks_);
+    fanout->headers = std::move(upstream_headers_);
+
+    ENVOY_LOG(debug, "Detaching fire-and-forget fanout with {} callbacks", fanout->callbacks.size());
+    config_->fanoutManager().store(std::move(fanout));
+    return;
+  }
+
   if (multistream_) {
     multistream_.reset(); // This will reset all streams
   }
@@ -216,6 +236,12 @@ void McpRouterFilter::onDestroy() {
 
 Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                          bool end_stream) {
+  // MCP protocol requires POST method
+  if (headers.Method() && headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Get) {
+    sendHttpError(405, "Method Not Allowed");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
   request_headers_ = &headers;
 
   // Extract session ID from header
@@ -324,6 +350,12 @@ bool McpRouterFilter::readMetadataFromMcpFilter() {
   if (method_ == McpMethod::Unknown) {
     ENVOY_LOG(warn, "unsupported or missing method in metadata");
     return false;
+  }
+
+  // Extract request ID.
+  auto id_it = fields.find("id");
+  if (id_it != fields.end() && id_it->second.has_number_value()) {
+    request_id_ = static_cast<int64_t>(id_it->second.number_value());
   }
 
   if (method_ == McpMethod::ToolsCall) {
@@ -552,6 +584,13 @@ void McpRouterFilter::streamData(Buffer::Instance& data, bool end_stream) {
   } else if (single_stream_) {
     single_stream_->sendData(data, end_stream);
   }
+
+  // For fire-and-forget requests (Ping/Notification), send the 202 Accepted response
+  // only after the request body has been fully forwarded to upstreams.
+  // This prevents the connection manager from resetting the stream prematurely.
+  if (fire_and_forget_ && end_stream) {
+    sendAccepted();
+  }
 }
 
 void McpRouterFilter::handleInitialize() {
@@ -561,6 +600,7 @@ void McpRouterFilter::handleInitialize() {
     if (destroyed_)
       return;
 
+    // TODO(botengyao): handle text/event-stream from backends.
     std::string response_body = aggregateInitialize(responses);
 
     absl::flat_hash_map<std::string, std::string> sessions;
@@ -592,7 +632,8 @@ void McpRouterFilter::handleToolsList() {
       return;
 
     std::string response_body = aggregateToolsList(responses);
-    sendJsonResponse(response_body);
+    ENVOY_LOG(debug, "tools/list: response body: {}", response_body);
+    sendJsonResponse(response_body, encoded_session_id_);
   });
 }
 
@@ -622,7 +663,7 @@ void McpRouterFilter::handleToolsCall() {
       return;
 
     if (resp.success) {
-      sendJsonResponse(resp.body);
+      sendJsonResponse(resp.body, encoded_session_id_);
     } else {
       sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
@@ -633,12 +674,13 @@ void McpRouterFilter::handlePingOrNotification() {
   ENVOY_LOG(debug, "Ping/Notification: setting up fanout to {} backends (fire-and-forget)",
             config_->backends().size());
 
-  // Fire-and-forget: set up fanout to all backends, return 202 Accepted immediately
+  // Mark as fire-and-forget so onDestroy() detaches resources instead of resetting
+  fire_and_forget_ = true;
+
+  // Fire-and-forget: set up fanout to all backends
   initializeFanout([](std::vector<BackendResponse>) {
     // Responses ignored for ping or notifications
   });
-
-  sendAccepted();
 }
 
 std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendResponse>& responses) {
@@ -672,7 +714,7 @@ std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendRespons
     root->addKey("jsonrpc");
     root->addString("2.0");
     root->addKey("id");
-    root->addString(request_id_);
+    root->addNumber(request_id_);
     root->addKey("result");
     {
       auto result_map = root->addMap();
@@ -684,7 +726,8 @@ std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendRespons
           if (!resp.success) {
             continue;
           }
-
+          ENVOY_LOG(debug, "Aggregating tools list from backend '{}': {}", resp.backend_name,
+                    resp.body);
           auto parsed_or = Json::Factory::loadFromString(resp.body);
           if (!parsed_or.ok()) {
             ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
@@ -797,7 +840,7 @@ void McpRouterFilter::sendJsonResponse(const std::string& body, const std::strin
   }
 
   decoder_callbacks_->encodeHeaders(std::move(headers), body.empty(), "mcp_router");
-
+  ENVOY_LOG(debug, "Sending JSON response: {}", body);
   if (!body.empty()) {
     Buffer::OwnedImpl response_body(body);
     decoder_callbacks_->encodeData(response_body, true);

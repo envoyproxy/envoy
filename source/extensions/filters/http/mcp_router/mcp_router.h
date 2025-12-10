@@ -107,6 +107,48 @@ private:
   bool completed_{false};
 };
 
+class ThreadLocalFanoutManager;
+
+/**
+ * Resources for fire-and-forget fanout that need to outlive the filter.
+ * Stored in ThreadLocalFanoutManager and cleaned up when all backends respond.
+ */
+struct DetachedFanout : public Logger::Loggable<Logger::Id::filter> {
+  DetachedFanout(ThreadLocalFanoutManager& manager) : manager_(manager) {}
+
+  std::shared_ptr<Http::MuxDemux> muxdemux;
+  std::unique_ptr<Http::MultiStream> multistream;
+  std::vector<std::shared_ptr<BackendStreamCallbacks>> callbacks;
+  std::vector<Http::RequestHeaderMapPtr> headers;
+
+  ThreadLocalFanoutManager& manager_;
+};
+
+/**
+ * Thread-local storage for detached fanout operations.
+ * Allows fire-and-forget fanouts to complete after their filter is destroyed.
+ */
+class ThreadLocalFanoutManager : public ThreadLocal::ThreadLocalObject,
+                                 public Logger::Loggable<Logger::Id::filter> {
+public:
+  // Store a detached fanout and return raw pointer for tracking
+  DetachedFanout* store(std::unique_ptr<DetachedFanout> fanout) {
+    DetachedFanout* raw = fanout.get();
+    fanouts_[raw] = std::move(fanout);
+    ENVOY_LOG(debug, "Stored detached fanout, total: {}", fanouts_.size());
+    return raw;
+  }
+
+  // Remove a detached fanout (called when all backends complete)
+  void remove(DetachedFanout* fanout) {
+    fanouts_.erase(fanout);
+    ENVOY_LOG(debug, "Removed detached fanout, remaining: {}", fanouts_.size());
+  }
+
+private:
+  absl::flat_hash_map<DetachedFanout*, std::unique_ptr<DetachedFanout>> fanouts_;
+};
+
 /** Configuration for the MCP router filter, containing backend server definitions. */
 class McpRouterConfig {
 public:
@@ -119,10 +161,16 @@ public:
   Server::Configuration::FactoryContext& factoryContext() const { return factory_context_; }
   const McpBackendConfig* findBackend(const std::string& name) const;
 
+  // Access thread-local fanout manager for fire-and-forget operations
+  ThreadLocalFanoutManager& fanoutManager() {
+    return tls_slot_->getTyped<ThreadLocalFanoutManager>();
+  }
+
 private:
   std::vector<McpBackendConfig> backends_;
   std::string default_backend_name_;
   Server::Configuration::FactoryContext& factory_context_;
+  ThreadLocal::SlotPtr tls_slot_;
 };
 
 using McpRouterConfigSharedPtr = std::shared_ptr<McpRouterConfig>;
@@ -192,7 +240,7 @@ private:
   Http::RequestHeaderMap* request_headers_{};
   Buffer::OwnedImpl request_body_;
 
-  std::string request_id_;
+  int64_t request_id_{0};
   McpMethod method_{McpMethod::Unknown};
   std::string tool_name_;            // Original prefixed tool name (e.g., "time__get_current_time")
   std::string unprefixed_tool_name_; // Unprefixed tool name for backend (e.g., "get_current_time")
@@ -224,6 +272,7 @@ private:
 
   bool destroyed_{false};
   bool initialized_{false}; // Track if fanout/backend has been initialized
+  bool fire_and_forget_{false}; // If true, detach resources on destroy instead of resetting
 };
 
 } // namespace McpRouter
