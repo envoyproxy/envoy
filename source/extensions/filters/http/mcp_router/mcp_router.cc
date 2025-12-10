@@ -123,8 +123,7 @@ McpRouterConfig::McpRouterConfig(
       tls_slot_(context.serverFactoryContext().threadLocal().allocateSlot()) {
 
   // Initialize thread-local fanout manager for fire-and-forget operations
-  tls_slot_->set(
-      [](Event::Dispatcher&) { return std::make_shared<ThreadLocalFanoutManager>(); });
+  tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalFanoutManager>(); });
 
   for (const auto& server : proto_config.servers()) {
     McpBackendConfig backend;
@@ -218,7 +217,8 @@ void McpRouterFilter::onDestroy() {
     fanout->callbacks = std::move(stream_callbacks_);
     fanout->headers = std::move(upstream_headers_);
 
-    ENVOY_LOG(debug, "Detaching fire-and-forget fanout with {} callbacks", fanout->callbacks.size());
+    ENVOY_LOG(debug, "Detaching fire-and-forget fanout with {} callbacks",
+              fanout->callbacks.size());
     config_->fanoutManager().store(std::move(fanout));
     return;
   }
@@ -237,7 +237,8 @@ void McpRouterFilter::onDestroy() {
 Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                          bool end_stream) {
   // MCP protocol requires POST method
-  if (headers.Method() && headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Get) {
+  if (headers.Method() &&
+      headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Get) {
     sendHttpError(405, "Method Not Allowed");
     return Http::FilterHeadersStatus::StopIteration;
   }

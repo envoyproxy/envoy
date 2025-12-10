@@ -271,7 +271,7 @@ private:
   std::function<void(BackendResponse)> single_backend_callback_;
 
   bool destroyed_{false};
-  bool initialized_{false}; // Track if fanout/backend has been initialized
+  bool initialized_{false};     // Track if fanout/backend has been initialized
   bool fire_and_forget_{false}; // If true, detach resources on destroy instead of resetting
 };
 
