@@ -221,9 +221,11 @@ TEST(DataSourceProviderTest, NonFileDataSourceTest) {
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   NiceMock<ThreadLocal::MockInstance> tls;
 
-  auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
-  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+  auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
+      config, *dispatcher, tls, *api, false,
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0);
+  EXPECT_NE(provider_or_error.value(), nullptr);
+  EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
 }
 
 TEST(DataSourceProviderTest, FileDataSourceButNoWatch) {
@@ -262,9 +264,11 @@ TEST(DataSourceProviderTest, FileDataSourceButNoWatch) {
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   NiceMock<ThreadLocal::MockInstance> tls;
 
-  auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
-  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+  auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
+      config, *dispatcher, tls, *api, false,
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0);
+  EXPECT_NE(provider_or_error.value()->data(), nullptr);
+  EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
@@ -273,7 +277,279 @@ TEST(DataSourceProviderTest, FileDataSourceButNoWatch) {
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 
   // The provider should still return the old content.
-  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+  EXPECT_NE(provider_or_error.value()->data(), nullptr);
+  EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
+
+  // Remove the file.
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+}
+
+TEST(DataSourceProviderTest, FileDataSourceNoWatchWithFailedDataTransformCb) {
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+    file << "Hello, world!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"));
+    file << "Hello, world! Updated!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_new_link"));
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  auto data_transform_cb = [](absl::string_view) {
+    return absl::InvalidArgumentError("Failed to transform data");
+  };
+  auto provider_or_error =
+      DataSource::DataSourceProvider<typename absl::flat_hash_set<std::string>>::create(
+          config, *dispatcher, tls, *api, false, data_transform_cb, 0);
+  EXPECT_FALSE(provider_or_error.ok());
+  EXPECT_EQ("Failed to transform data", provider_or_error.status().message());
+
+  // Remove the file.
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+}
+
+TEST(DataSourceProviderTest, FileDataSourceNoWatchWithDataTransformCb) {
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+    file << "Hello, world!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"));
+    file << "Hello, world! Updated!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_new_link"));
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  auto data_transform_cb = [](absl::string_view data) {
+    absl::flat_hash_set<std::string> transformed_data;
+    transformed_data.emplace(data);
+    return std::make_shared<absl::flat_hash_set<std::string>>(transformed_data);
+  };
+  auto provider_or_error =
+      DataSource::DataSourceProvider<typename absl::flat_hash_set<std::string>>::create(
+          config, *dispatcher, tls, *api, false, data_transform_cb, 0);
+  auto provider = std::move(provider_or_error.value());
+  EXPECT_NE(provider->data(), nullptr);
+  EXPECT_EQ(provider->data()->size(), 1);
+  EXPECT_TRUE(std::find(provider->data()->begin(), provider->data()->end(), "Hello, world!") !=
+              provider->data()->end());
+
+  // Update the symlink to point to the new file.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
+                              TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  // Handle the events if any.
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // The provider should still return the old content.
+  EXPECT_NE(provider->data(), nullptr);
+  EXPECT_EQ(provider->data()->size(), 1);
+  EXPECT_TRUE(std::find(provider->data()->begin(), provider->data()->end(), "Hello, world!") !=
+              provider->data()->end());
+
+  // Remove the file.
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+}
+
+TEST(DataSourceProviderTest, FileDataSourceWithWatchAndFailedDataTransformCbUsesOldData) {
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+    watched_directory:
+      path: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"),
+                                       TestEnvironment::temporaryPath("envoy_test"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+    file << "Hello, world!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"));
+    file << "Hello, world! Updated!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_new_link"));
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  auto data_transform_cb = [](absl::string_view data)
+      -> absl::StatusOr<std::shared_ptr<absl::flat_hash_set<std::string>>> {
+    absl::flat_hash_set<std::string> transformed_data;
+    transformed_data.emplace(data);
+    absl::Status status;
+    if (data != "Hello, world!") {
+      status = absl::InvalidArgumentError("Failed to transform data");
+    }
+    RETURN_IF_NOT_OK_REF(status);
+    return std::make_shared<absl::flat_hash_set<std::string>>(transformed_data);
+  };
+  auto provider_or_error =
+      DataSource::DataSourceProvider<typename absl::flat_hash_set<std::string>>::create(
+          config, *dispatcher, tls, *api, false, data_transform_cb, 0);
+  auto provider = std::move(provider_or_error.value());
+  EXPECT_NE(provider->data(), nullptr);
+  EXPECT_EQ(provider->data()->size(), 1);
+  EXPECT_TRUE(std::find(provider->data()->begin(), provider->data()->end(), "Hello, world!") !=
+              provider->data()->end());
+
+  // Update the symlink to point to the new file.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
+                              TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  // Handle the events if any.
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // The provider should return the old content.
+  EXPECT_NE(provider->data(), nullptr);
+  EXPECT_EQ(provider->data()->size(), 1);
+  EXPECT_TRUE(std::find(provider->data()->begin(), provider->data()->end(), "Hello, world!") !=
+              provider->data()->end());
+
+  // Remove the file.
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+}
+
+TEST(DataSourceProviderTest, FileDataSourceWithWatchAndDataTransformCb) {
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+    watched_directory:
+      path: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"),
+                                       TestEnvironment::temporaryPath("envoy_test"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+    file << "Hello, world!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"));
+    file << "Hello, world! Updated!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_new_link"));
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  auto data_transform_cb = [](absl::string_view data) {
+    absl::flat_hash_set<std::string> transformed_data;
+    transformed_data.emplace(data);
+    return std::make_shared<absl::flat_hash_set<std::string>>(transformed_data);
+  };
+  auto provider_or_error =
+      DataSource::DataSourceProvider<typename absl::flat_hash_set<std::string>>::create(
+          config, *dispatcher, tls, *api, false, data_transform_cb, 0);
+  auto provider = std::move(provider_or_error.value());
+  EXPECT_NE(provider->data(), nullptr);
+  EXPECT_EQ(provider->data()->size(), 1);
+  EXPECT_TRUE(std::find(provider->data()->begin(), provider->data()->end(), "Hello, world!") !=
+              provider->data()->end());
+
+  // Update the symlink to point to the new file.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
+                              TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  // Handle the events if any.
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // The provider should return the updated content.
+  EXPECT_NE(provider->data(), nullptr);
+  EXPECT_EQ(provider->data()->size(), 1);
+  EXPECT_TRUE(std::find(provider->data()->begin(), provider->data()->end(),
+                        "Hello, world! Updated!") != provider->data()->end());
 
   // Remove the file.
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
@@ -322,9 +598,11 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatch) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   // Create a provider with watch.
-  auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
-  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+  auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
+      config, *dispatcher, tls, *api, false,
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0);
+  EXPECT_NE(provider_or_error.value()->data(), nullptr);
+  EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
@@ -333,7 +611,8 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatch) {
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 
   // The provider should return the updated content.
-  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world! Updated!");
+  EXPECT_NE(provider_or_error.value()->data(), nullptr);
+  EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world! Updated!");
 
   // Remove the file.
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
@@ -383,9 +662,11 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
 
   // Create a provider with watch. The max size is set to 15, so the updated content will be
   // ignored.
-  auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 15);
-  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+  auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
+      config, *dispatcher, tls, *api, false,
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 15);
+  EXPECT_NE(provider_or_error.value()->data(), nullptr);
+  EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
@@ -394,7 +675,8 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 
   // The provider should return the old content because the updated content is ignored.
-  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+  EXPECT_NE(provider_or_error.value()->data(), nullptr);
+  EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
 
   // Remove the file.
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
@@ -434,8 +716,9 @@ TEST(DataSourceProviderTest, FileDataSourceAndWatchDirectoryCreationFailure) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   // Creating a provider with an invalid watched directory path should return an error.
-  auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
+  auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
+      config, *dispatcher, tls, *api, false,
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0);
   EXPECT_FALSE(provider_or_error.ok());
   EXPECT_THAT(provider_or_error.status().message(),
               testing::HasSubstr("/non/existent/directory/path"));

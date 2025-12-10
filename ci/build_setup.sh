@@ -11,8 +11,6 @@ if [[ -n "$NO_BUILD_SETUP" ]]; then
     return
 fi
 
-CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
-
 export PPROF_PATH=/thirdparty_build/bin/pprof
 
 if [[ -z "${NUM_CPUS}" ]]; then
@@ -54,8 +52,6 @@ export BUILD_DIR
 
 # Environment setup.
 export ENVOY_TEST_TMPDIR="${ENVOY_TEST_TMPDIR:-$BUILD_DIR/tmp}"
-export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
-export PATH=${LLVM_ROOT}/bin:${PATH}
 
 if [[ -f "/etc/redhat-release" ]]; then
   BAZEL_BUILD_EXTRA_OPTIONS+=("--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1")
@@ -121,19 +117,6 @@ BAZEL_GLOBAL_OPTION_LIST="${BAZEL_GLOBAL_OPTIONS[*]}"
 export BAZEL_STARTUP_OPTION_LIST
 export BAZEL_BUILD_OPTION_LIST
 export BAZEL_GLOBAL_OPTION_LIST
-
-if [[ -z "${ENVOY_RBE}" ]]; then
-    if [[ -e "${LLVM_ROOT}" ]]; then
-        "${CURRENT_SCRIPT_DIR}/../bazel/setup_clang.sh" "${LLVM_ROOT}"
-    else
-        echo "LLVM_ROOT not found, not setting up llvm."
-    fi
-fi
-
-# TODO: remove
-BAZEL_BUILD_OPTIONS+=(
-    "--define=LLVM_DIRECTORY=${LLVM_ROOT}"
-    "--action_env=LLVM_DIRECTORY=${LLVM_ROOT}")
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean "${BAZEL_BUILD_OPTIONS[@]}" --expunge
 

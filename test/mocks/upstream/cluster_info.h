@@ -52,7 +52,7 @@ public:
   }
 };
 
-class MockUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
+class MockUpstreamLocalAddressSelector : public UpstreamLocalAddressSelectorBase {
 public:
   MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address);
 

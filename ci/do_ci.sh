@@ -183,7 +183,6 @@ function bazel_contrib_binary_build() {
 function bazel_envoy_api_build() {
     setup_clang_toolchain
     export CLANG_TOOLCHAIN_SETUP=1
-    export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
     echo "Run protoxform test"
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
         --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
@@ -326,8 +325,8 @@ case $CI_TARGET in
               --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
               "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" \
               > /dev/null
-          TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
-          echo "Generated cache: ${TOTAL_SIZE}"
+        TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
+        echo "Generated cache: ${TOTAL_SIZE}"
         ;;
 
     format-api|check_and_fix_proto_format)
@@ -924,6 +923,23 @@ case $CI_TARGET in
             "${ENVOY_GEN_COMPDB_OPTIONS[@]}"
         # Kill clangd to reload the compilation database
         pkill clangd || :
+        ;;
+
+    pre_refresh_compdb)
+        setup_clang_toolchain
+        # Override the BAZEL_STARTUP_OPTIONS to setting different output directory.
+        # So the compdb headers won't be overwritten by another bazel run.
+        for i in "${!BAZEL_STARTUP_OPTIONS[@]}"; do
+            if [[ ${BAZEL_STARTUP_OPTIONS[i]} == "--output_base"* ]]; then
+                COMPDB_OUTPUT_BASE="${BAZEL_STARTUP_OPTIONS[i]}"-envoy-compdb
+                BAZEL_STARTUP_OPTIONS[i]="${COMPDB_OUTPUT_BASE}"
+                BAZEL_STARTUP_OPTION_LIST="${BAZEL_STARTUP_OPTIONS[*]}"
+                export BAZEL_STARTUP_OPTION_LIST
+            fi
+        done
+        # Ensure that LLVM toolchain is downloaded by using clangd target.
+        # This is used during devcontainer bootstrap.
+        bazel build @llvm_toolchain//:clangd
         ;;
 
     *)
