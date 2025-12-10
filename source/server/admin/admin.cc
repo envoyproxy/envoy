@@ -198,7 +198,11 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                         "For example, source/common*:warning"},
                        {Admin::ParamDescriptor::Type::Enum, "level",
                         "desired logging level, this will change all loggers's level",
-                        prepend("", LogsHandler::levelStrings())}}),
+                        prepend("", LogsHandler::levelStrings())},
+                       {Admin::ParamDescriptor::Type::String, "group",
+                        "Change logging level for a predefined group of loggers by setting to "
+                        "<group_name>:<desired_level>. Requires fine-grain logging. "
+                        "For example, group=http:trace"}}),
           makeHandler("/memory", "print current allocation/heap usage",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false),
           makeHandler("/memory/tcmalloc", "print TCMalloc stats",

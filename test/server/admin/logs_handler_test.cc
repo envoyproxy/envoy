@@ -167,5 +167,73 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::trace);
 }
 
+TEST_P(AdminInstanceTest, LogLevelGroupSetting) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  // Enable fine grain logger
+  Logger::Context::enableFineGrainLogger();
+  FINE_GRAIN_LOG(info, "Build the logger for this file.");
+
+  // Set a baseline level first
+  EXPECT_EQ(Http::Code::OK, postCallback("/logging?level=warning", header_map, response));
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::warn);
+
+  // Initialize another admin file logger to test group functionality across multiple files
+  const std::string admin_file = "source/server/admin/admin.cc";
+  std::atomic<spdlog::logger*> admin_logger;
+  getFineGrainLogContext().initFineGrainLogger(admin_file, admin_logger);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(admin_file)->level(), spdlog::level::warn);
+
+  // Test setting log level for the 'admin' group
+  std::string query = "/logging?group=admin:debug";
+  EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
+  
+  // Verify that multiple files matching admin group patterns have debug level
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::debug);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(admin_file)->level(), spdlog::level::debug);
+
+  // Test with invalid group name
+  response.drain(response.length());
+  query = "/logging?group=invalid_group_name:trace";
+  EXPECT_EQ(Http::Code::BadRequest, postCallback(query, header_map, response));
+  EXPECT_THAT(response.toString(), HasSubstr("unknown group name: invalid_group_name"));
+
+  // Test with empty group name
+  response.drain(response.length());
+  query = "/logging?group=:trace";
+  EXPECT_EQ(Http::Code::BadRequest, postCallback(query, header_map, response));
+  EXPECT_THAT(response.toString(), HasSubstr("empty group name or empty log level"));
+
+  // Test with empty log level
+  response.drain(response.length());
+  query = "/logging?group=http:";
+  EXPECT_EQ(Http::Code::BadRequest, postCallback(query, header_map, response));
+  EXPECT_THAT(response.toString(), HasSubstr("empty group name or empty log level"));
+
+  // Test with invalid log level
+  response.drain(response.length());
+  query = "/logging?group=http:invalid_level";
+  EXPECT_EQ(Http::Code::BadRequest, postCallback(query, header_map, response));
+  EXPECT_THAT(response.toString(), HasSubstr("unknown logger level"));
+
+  // Test whitespace handling around delimiter
+  response.drain(response.length());
+  query = "/logging?group=admin : trace";  // whitespace on both sides
+  EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::trace);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(admin_file)->level(), spdlog::level::trace);
+
+  response.drain(response.length());
+  query = "/logging?group=admin: debug";  // whitespace after only
+  EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::debug);
+
+  response.drain(response.length());
+  query = "/logging?group=admin :info";  // whitespace before only
+  EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::info);
+}
+
 } // namespace Server
 } // namespace Envoy

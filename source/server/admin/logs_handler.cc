@@ -23,6 +23,7 @@ absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> buildLevelMap(
 
   return levels;
 }
+
 } // namespace
 
 LogsHandler::LogsHandler(Server::Instance& server)
@@ -35,6 +36,24 @@ std::vector<absl::string_view> LogsHandler::levelStrings() {
     strings.emplace_back(absl::string_view{level.data(), level.size()});
   }
   return strings;
+}
+
+const absl::flat_hash_map<absl::string_view, std::vector<absl::string_view>>&
+LogsHandler::getLoggerGroups() {
+  // Predefined logger groups for common subsystems.
+  static const absl::flat_hash_map<absl::string_view, std::vector<absl::string_view>> groups({
+    {"http", {"source/common/http/*", "source/common/http/http1/*", "source/common/http/http2/*", "source/common/http/http3/*"}},
+    {"router", {"source/common/router/*"}},
+    {"network", {"source/common/network/*"}},
+    {"upstream", {"source/common/upstream/*"}},
+    {"connection", {"source/common/tcp/*", "source/common/network/connection_impl.cc", "source/common/network/filter_manager_impl.cc"}},
+    {"admin", {"source/server/admin/*"}},
+    {"config", {"source/common/config/*", "source/server/config_validation/*"}},
+    {"grpc", {"source/common/grpc/*"}},
+    {"filter", {"source/common/filter/*", "source/extensions/filters/*"}},
+    {"listener", {"source/server/listener*", "source/common/listener_manager/*"}},
+  });
+  return groups;
 }
 
 Http::Code LogsHandler::handlerLogging(Http::ResponseHeaderMap&, Buffer::Instance& response,
@@ -50,9 +69,16 @@ Http::Code LogsHandler::handlerLogging(Http::ResponseHeaderMap&, Buffer::Instanc
     response.add("usage: /logging?<name>=<level> (change single level)\n");
     response.add("usage: /logging?paths=name1:level1,name2:level2,... (change multiple levels)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
+    response.add("usage: /logging?group=<group_name>:<level> (change group of loggers)\n");
     response.add("levels: ");
     for (auto level_string_view : spdlog::level::level_string_views) {
       response.add(fmt::format("{} ", level_string_view));
+    }
+    response.add("\n");
+    response.add("groups: ");
+    const auto& groups = getLoggerGroups();
+    for (const auto& group : groups) {
+      response.add(fmt::format("{} ", group.first));
     }
 
     response.add("\n");
@@ -83,7 +109,7 @@ Http::Code LogsHandler::handlerReopenLogs(Http::ResponseHeaderMap&, Buffer::Inst
 }
 
 absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params) {
-  // "level" and "paths" will be set to the empty string when this is invoked
+  // "level", "paths", and "group" will be set to the empty string when this is invoked
   // from HTML without setting them, so clean out empty values.
   auto level = params.getFirstValue("level");
   if (level.has_value() && level.value().empty()) {
@@ -94,6 +120,11 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params
   if (paths.has_value() && paths.value().empty()) {
     params.remove("paths");
     paths = std::nullopt;
+  }
+  auto group = params.getFirstValue("group");
+  if (group.has_value() && group.value().empty()) {
+    params.remove("group");
+    group = std::nullopt;
   }
 
   if (params.data().empty()) {
@@ -120,6 +151,44 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params
   absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> name_levels;
   std::vector<std::pair<absl::string_view, int>> glob_levels;
   const bool use_fine_grain_logger = Logger::Context::useFineGrainLogger();
+
+  if (group.has_value()) {
+    // Group parameter requires fine-grain logging to be enabled
+    if (!use_fine_grain_logger) {
+      return absl::InvalidArgumentError("group parameter requires fine-grain logging to be enabled");
+    }
+
+    // Handle group parameter: group=<group_name>:<level>
+    // Split on colon and trim whitespace from each part to allow flexible input like "http : debug"
+    const std::pair<absl::string_view, absl::string_view> group_level_pair =
+        absl::StrSplit(group.value(), absl::MaxSplits(':', 1));
+    absl::string_view group_name = absl::StripAsciiWhitespace(group_level_pair.first);
+    absl::string_view group_level = absl::StripAsciiWhitespace(group_level_pair.second);
+    if (group_name.empty() || group_level.empty()) {
+      return absl::InvalidArgumentError("empty group name or empty log level");
+    }
+
+    const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(group_level);
+    if (!level_to_use.ok()) {
+      return level_to_use.status();
+    }
+
+    const auto& groups = getLoggerGroups();
+    auto group_it = groups.find(group_name);
+    if (group_it == groups.end()) {
+      return absl::InvalidArgumentError(fmt::format("unknown group name: {}", group_name));
+    }
+
+    // Apply the log level to all file patterns in the group
+    for (const auto& pattern : group_it->second) {
+      glob_levels.emplace_back(pattern, *level_to_use);
+    }
+
+    ENVOY_LOG(info, "applying fine-grain log levels for group='{}' with {} pattern(s) at level '{}'",
+              group_name, group_it->second.size(), spdlog::level::level_string_views[*level_to_use]);
+    getFineGrainLogContext().updateVerbositySetting(glob_levels);
+    return absl::OkStatus();
+  }
 
   if (paths.has_value()) {
     // Bulk change log level by name:level pairs, separated by comma.
