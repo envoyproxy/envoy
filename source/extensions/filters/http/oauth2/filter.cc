@@ -897,16 +897,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   // Generate a CSRF token to prevent CSRF attacks.
   const std::string csrf_token = generateCsrfToken(config_->hmacSecret(), random_string);
   const std::chrono::seconds csrf_token_expires_in = config_->getCsrfTokenExpiresIn();
-  std::string csrf_expires = std::to_string(csrf_token_expires_in.count());
-
-  std::string csrf_same_site = getSameSiteString(config_->nonceCookieSettings().same_site_);
-  std::string csrf_path = config_->nonceCookieSettings().path_;
-  std::string csrf_cookie_tail =
-      fmt::format(CookieTailHttpOnlyFormatString, csrf_path, csrf_expires, csrf_same_site);
-  if (!config_->cookieDomain().empty()) {
-    csrf_cookie_tail = absl::StrCat(fmt::format(CookieDomainFormatString, config_->cookieDomain()),
-                                    csrf_cookie_tail);
-  }
+  const std::string csrf_expires = std::to_string(csrf_token_expires_in.count());
+  const std::string csrf_cookie_tail =
+      BuildCookieTail(config_->nonceCookieSettings(), csrf_expires);
   // Use the flow id to create a unique cookie name for this OAuth flow.
   // This allows multiple concurrent OAuth flows to be handled correctly.
   const std::string csrf_cookie_name = cookieNameWithSuffix(cookie_names.oauth_nonce_, flow_id);
@@ -931,16 +924,10 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 
   const std::chrono::seconds code_verifier_token_expires_in =
       config_->getCodeVerifierTokenExpiresIn();
-  std::string expire_in = std::to_string(code_verifier_token_expires_in.count());
-
-  std::string same_site = getSameSiteString(config_->codeVerifierCookieSettings().same_site_);
-  std::string path = config_->codeVerifierCookieSettings().path_;
-  std::string cookie_tail_http_only =
-      fmt::format(CookieTailHttpOnlyFormatString, path, expire_in, same_site);
-  if (!config_->cookieDomain().empty()) {
-    cookie_tail_http_only = absl::StrCat(
-        fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
-  }
+  const std::string code_verifier_expire_in =
+      std::to_string(code_verifier_token_expires_in.count());
+  const std::string code_verifier_cookie_tail =
+      BuildCookieTail(config_->codeVerifierCookieSettings(), code_verifier_expire_in);
   // Use the flow id to create a unique cookie name for this OAuth flow.
   // This allows multiple concurrent OAuth flows to be handled correctly.
   const std::string code_verifier_cookie_name =
@@ -948,7 +935,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
       absl::StrCat(code_verifier_cookie_name, "=",
-                   encrypt(code_verifier, config_->hmacSecret(), random_), cookie_tail_http_only));
+                   encrypt(code_verifier, config_->hmacSecret(), random_),
+                   code_verifier_cookie_tail));
 
   const std::string code_challenge = generateCodeChallenge(code_verifier);
   query_params.overwrite(queryParamsCodeChallenge, code_challenge);
@@ -1137,40 +1125,10 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
   return std::to_string(expires_in.count());
 }
 
-// Helper function to build the cookie tail string.
-std::string OAuth2Filter::BuildCookieTail(int cookie_type) const {
-  std::string same_site;
-  std::string expires_time = expires_in_;
-  std::string path;
-
-  switch (cookie_type) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case 1: // BEARER_TOKEN TYPE
-    same_site = getSameSiteString(config_->bearerTokenCookieSettings().same_site_);
-    path = config_->bearerTokenCookieSettings().path_;
-    break;
-  case 2: // OAUTH_HMAC TYPE
-    same_site = getSameSiteString(config_->hmacCookieSettings().same_site_);
-    path = config_->hmacCookieSettings().path_;
-    break;
-  case 3: // OAUTH_EXPIRES TYPE
-    same_site = getSameSiteString(config_->expiresCookieSettings().same_site_);
-    path = config_->expiresCookieSettings().path_;
-    break;
-  case 4: // ID_TOKEN TYPE
-    same_site = getSameSiteString(config_->idTokenCookieSettings().same_site_);
-    path = config_->idTokenCookieSettings().path_;
-    expires_time = expires_id_token_in_;
-    break;
-  case 5: // REFRESH_TOKEN TYPE
-    same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
-    path = config_->refreshTokenCookieSettings().path_;
-    expires_time = expires_refresh_token_in_;
-    break;
-  }
-
-  std::string cookie_tail =
-      fmt::format(CookieTailHttpOnlyFormatString, path, expires_time, same_site);
+std::string OAuth2Filter::BuildCookieTail(const FilterConfig::CookieSettings& settings,
+                                          absl::string_view expires_time) const {
+  std::string cookie_tail = fmt::format(CookieTailHttpOnlyFormatString, settings.path_,
+                                        expires_time, getSameSiteString(settings.same_site_));
   if (!config_->cookieDomain().empty()) {
     cookie_tail =
         absl::StrCat(fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail);
@@ -1282,13 +1240,15 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
   const CookieNames& cookie_names = config_->cookieNames();
 
   // Set the cookies in the response headers.
-  headers.addReferenceKey(Http::Headers::get().SetCookie,
-                          absl::StrCat(cookie_names.oauth_hmac_, "=", encoded_token,
-                                       BuildCookieTail(2))); // OAUTH_HMAC
+  headers.addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(cookie_names.oauth_hmac_, "=", encoded_token,
+                   BuildCookieTail(config_->hmacCookieSettings(), expires_in_)));
 
-  headers.addReferenceKey(Http::Headers::get().SetCookie,
-                          absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_,
-                                       BuildCookieTail(3))); // OAUTH_EXPIRES
+  headers.addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_,
+                   BuildCookieTail(config_->expiresCookieSettings(), expires_in_)));
 
   absl::flat_hash_map<std::string, std::string> request_cookies =
       Http::Utility::parseCookies(*request_headers_);
@@ -1298,10 +1258,10 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
   }
 
   if (!access_token_.empty()) {
-    headers.addReferenceKey(Http::Headers::get().SetCookie,
-                            absl::StrCat(cookie_names.bearer_token_, "=",
-                                         encryptToken(access_token_),
-                                         BuildCookieTail(1))); // BEARER_TOKEN
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(cookie_names.bearer_token_, "=", encryptToken(access_token_),
+                     BuildCookieTail(config_->bearerTokenCookieSettings(), expires_in_)));
   } else if (request_cookies.contains(cookie_names.bearer_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
@@ -1311,9 +1271,10 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
   }
 
   if (!id_token_.empty()) {
-    headers.addReferenceKey(Http::Headers::get().SetCookie,
-                            absl::StrCat(cookie_names.id_token_, "=", encryptToken(id_token_),
-                                         BuildCookieTail(4))); // ID_TOKEN
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(cookie_names.id_token_, "=", encryptToken(id_token_),
+                     BuildCookieTail(config_->idTokenCookieSettings(), expires_id_token_in_)));
   } else if (request_cookies.contains(cookie_names.id_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
@@ -1326,7 +1287,8 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.refresh_token_, "=",
                                          encryptToken(refresh_token_),
-                                         BuildCookieTail(5))); // REFRESH_TOKEN
+                                         BuildCookieTail(config_->refreshTokenCookieSettings(),
+                                                         expires_refresh_token_in_)));
   } else if (request_cookies.contains(cookie_names.refresh_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,

@@ -382,7 +382,8 @@ private:
                                             const std::chrono::seconds& expires_in) const;
   std::string getExpiresTimeForIdToken(const std::string& id_token,
                                        const std::chrono::seconds& expires_in) const;
-  std::string BuildCookieTail(int cookie_type) const;
+  std::string BuildCookieTail(const FilterConfig::CookieSettings& settings,
+                              absl::string_view expires_time) const;
   void setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
                                const std::string& encoded_token) const;
   void addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers,
