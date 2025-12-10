@@ -207,17 +207,27 @@ uint32_t GradientController::calculateNewLimit() {
 }
 
 RequestForwardingAction GradientController::forwardingDecision() {
-  // Note that a race condition exists here which would allow more outstanding requests than the
-  // concurrency limit bounded by the number of worker threads. After loading num_rq_outstanding_
-  // and before loading concurrency_limit_, another thread could potentially swoop in and modify
-  // num_rq_outstanding_, causing us to move forward with stale values and increment
-  // num_rq_outstanding_.
-  //
-  // TODO (tonya11en): Reconsider using a CAS loop here.
-  if (num_rq_outstanding_.load() < concurrencyLimit()) {
-    ++num_rq_outstanding_;
-    return RequestForwardingAction::Forward;
+  const uint32_t limit = concurrencyLimit();
+
+  // Use a CAS loop to atomically check and increment `num_rq_outstanding_` so long as the `limit`
+  // has not been reached. This prevents a race condition which would allow more outstanding
+  // requests than the concurrency limit, bounded by the number of worker threads, as another thread
+  // could potentially swoop in and modify `num_rq_outstanding_`, causing us to move forward with
+  // stale values and increment `num_rq_outstanding_`.
+
+  uint32_t current_outstanding = num_rq_outstanding_.load(std::memory_order_relaxed);
+
+  while (current_outstanding < limit) {
+    // Testing hook.
+    synchronizer_.syncPoint("forwarding_decision_pre_cas");
+
+    if (num_rq_outstanding_.compare_exchange_weak(current_outstanding, current_outstanding + 1,
+                                                  std::memory_order_release,
+                                                  std::memory_order_relaxed)) {
+      return RequestForwardingAction::Forward;
+    }
   }
+
   stats_.rq_blocked_.inc();
   return RequestForwardingAction::Block;
 }

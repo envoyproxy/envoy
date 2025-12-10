@@ -212,6 +212,12 @@ envoy_extension_cc_test(
     name = "mapped_attribute_builder_test",
     size = "small",
     srcs = ["mapped_attribute_builder_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
@@ -771,5 +777,15 @@ envoy_extension_cc_test_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:trace_context_lib",
         "//source/extensions/tracers/common:factory_base_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "allowed_override_modes_set_test",
+    size = "small",
+    srcs = ["allowed_override_modes_set_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    deps = [
+        "//source/extensions/filters/http/ext_proc:allowed_override_modes_set_lib",
     ],
 )

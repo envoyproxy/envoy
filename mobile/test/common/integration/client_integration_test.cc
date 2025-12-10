@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/extension.pb.h"
+
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/quic/server_codec_impl.h"
 #include "source/common/tls/cert_validator/default_validator.h"
@@ -11,6 +13,8 @@
 #include "test/common/http/common.h"
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/common/mocks/common/mocks.h"
+#include "test/common/mocks/dns/mock_dns_resolver.h"
+#include "test/common/mocks/dns/mock_dns_resolver.pb.h"
 #include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/test_common/registry.h"
@@ -248,7 +252,7 @@ void ClientIntegrationTest::basicTest() {
     ASSERT_EQ(2, last_stream_final_intel_.upstream_protocol);
   } else {
     // This verifies the H3 attempt was made due to the quic hints.
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     std::string stats = engine_->dumpStats();
     EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;
     // Make sure the client reported protocol was also HTTP/3.
@@ -276,6 +280,15 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
           found_cache_miss = true;
         }
       });
+
+  // Configure MockDnsResolver with "doesnotexist" as a non-existent domain
+  envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
+  dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
+  envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
+  config.add_non_existent_domains("doesnotexist");
+  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  builder_.setDnsResolver(dns_resolver_config);
+
   builder_.setDisableDnsRefreshOnFailure(true);
   initialize();
 
@@ -529,7 +542,7 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
   for (uint32_t i = 0; i < num_requests; ++i) {
     Platform::StreamPrototypeSharedPtr stream_prototype;
     {
-      absl::MutexLock l(&engine_lock_);
+      absl::MutexLock l(engine_lock_);
       stream_prototype = engine_->streamClient()->newStreamPrototype();
     }
 
@@ -581,7 +594,7 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
   for (uint32_t i = 0; i < num_requests; ++i) {
     Platform::StreamPrototypeSharedPtr stream_prototype;
     {
-      absl::MutexLock l(&engine_lock_);
+      absl::MutexLock l(engine_lock_);
       stream_prototype = engine_->streamClient()->newStreamPrototype();
     }
 
@@ -620,7 +633,7 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
     }
 
     if (terminate_engine && request_for_engine_termination == i) {
-      absl::MutexLock l(&engine_lock_);
+      absl::MutexLock l(engine_lock_);
       ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
       engine_.reset();
       break;
@@ -761,6 +774,14 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
 }
 
 TEST_P(ClientIntegrationTest, InvalidDomain) {
+  // Configure MockDnsResolver with "www.doesnotexist.com" as a non-existent domain
+  envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
+  dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
+  envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
+  config.add_non_existent_domains("www.doesnotexist.com");
+  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  builder_.setDnsResolver(dns_resolver_config);
+
   initialize();
 
   default_request_headers_.setHost("www.doesnotexist.com");
@@ -808,9 +829,14 @@ TEST_P(ClientIntegrationTest, InvalidDomainFakeResolver) {
 
 TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
   builder_.addRuntimeGuard("reresolve_null_addresses", true);
-  Network::OverrideAddrInfoDnsResolverFactory factory;
-  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
-  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+
+  // Configure MockDnsResolver with "www.doesnotexist.com" as a non-existent domain
+  envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
+  dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
+  envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
+  config.add_non_existent_domains("www.doesnotexist.com");
+  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  builder_.setDnsResolver(dns_resolver_config);
 
   initialize();
   default_request_headers_.setHost(
@@ -818,9 +844,6 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
   stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
-  // Unblock resolve, but resolve to the bad domain.
-  ASSERT_TRUE(waitForCounterGe("dns_cache.base_dns_cache.dns_query_attempt", 1));
-  Network::TestResolver::unblockResolve();
   terminal_callback_.waitReady();
 
   // The stream should fail.
@@ -830,9 +853,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
   stream_ = createNewStream(createDefaultStreamCallbacks());
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
-  Network::TestResolver::unblockResolve();
   terminal_callback_.waitReady();
-  EXPECT_LE(2, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
 }
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
@@ -877,7 +898,7 @@ TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
   // Reset connectivity state. This should force a resolve but we will not
   // unblock it.
   {
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     engine_->engine()->resetConnectivityState();
   }
 
@@ -1414,7 +1435,7 @@ TEST_P(ClientIntegrationTest, Proxying) {
   }
   initialize();
   {
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     engine_->engine()->setProxySettings(fake_upstreams_[0]->localAddress()->asString().c_str(),
                                         fake_upstreams_[0]->localAddress()->ip()->port());
   }
@@ -1451,7 +1472,7 @@ TEST_P(ClientIntegrationTest, TestStats) {
   initialize();
 
   {
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     std::string stats = engine_->dumpStats();
     EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
   }

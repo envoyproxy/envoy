@@ -41,8 +41,8 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
     authorization_handle(Http::CustomHeaders::get().Authorization);
 
 constexpr const char* CookieDeleteFormatString =
-    "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly{}";
+    "{}=deleted; path={}; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+constexpr const char* CookieTailHttpOnlyFormatString = ";path={};Max-Age={};secure;HttpOnly{}";
 constexpr const char* CookieDomainFormatString = ";domain={}";
 
 constexpr const char* OIDCLogoutUrlFormatString =
@@ -879,8 +879,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     std::string csrf_expires = std::to_string(csrf_token_expires_in.count());
 
     std::string same_site = getSameSiteString(config_->nonceCookieSettings().same_site_);
+    std::string path = config_->nonceCookieSettings().path_;
     std::string cookie_tail_http_only =
-        fmt::format(CookieTailHttpOnlyFormatString, csrf_expires, same_site);
+        fmt::format(CookieTailHttpOnlyFormatString, path, csrf_expires, same_site);
     if (!config_->cookieDomain().empty()) {
       cookie_tail_http_only = absl::StrCat(
           fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
@@ -908,8 +909,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   std::string expire_in = std::to_string(code_verifier_token_expires_in.count());
 
   std::string same_site = getSameSiteString(config_->codeVerifierCookieSettings().same_site_);
+  std::string path = config_->codeVerifierCookieSettings().path_;
   std::string cookie_tail_http_only =
-      fmt::format(CookieTailHttpOnlyFormatString, expire_in, same_site);
+      fmt::format(CookieTailHttpOnlyFormatString, path, expire_in, same_site);
   if (!config_->cookieDomain().empty()) {
     cookie_tail_http_only = absl::StrCat(
         fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
@@ -947,13 +949,17 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
     cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
   }
 
-  const std::vector<absl::string_view> cookie_names{
-      config_->cookieNames().oauth_hmac_,  config_->cookieNames().bearer_token_,
-      config_->cookieNames().id_token_,    config_->cookieNames().refresh_token_,
-      config_->cookieNames().oauth_nonce_, config_->cookieNames().code_verifier_,
+  // Map cookie names to their respective paths from configuration.
+  const std::vector<std::pair<absl::string_view, absl::string_view>> cookie_names_with_paths{
+      {config_->cookieNames().oauth_hmac_, config_->hmacCookieSettings().path_},
+      {config_->cookieNames().bearer_token_, config_->bearerTokenCookieSettings().path_},
+      {config_->cookieNames().id_token_, config_->idTokenCookieSettings().path_},
+      {config_->cookieNames().refresh_token_, config_->refreshTokenCookieSettings().path_},
+      {config_->cookieNames().oauth_nonce_, config_->nonceCookieSettings().path_},
+      {config_->cookieNames().code_verifier_, config_->codeVerifierCookieSettings().path_},
   };
 
-  for (const auto& cookie_name : cookie_names) {
+  for (const auto& [cookie_name, cookie_path] : cookie_names_with_paths) {
     // Cookie names prefixed with "__Secure-" or "__Host-" are special. They MUST be set with the
     // Secure attribute so that the browser handles their deletion properly.
     const bool add_secure_attr =
@@ -962,7 +968,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 
     response_headers->addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(fmt::format(CookieDeleteFormatString, cookie_name), cookie_domain,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, cookie_name, cookie_path), cookie_domain,
                      maybe_secure_attr));
   }
 
@@ -1094,29 +1100,36 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
 std::string OAuth2Filter::BuildCookieTail(int cookie_type) const {
   std::string same_site;
   std::string expires_time = expires_in_;
+  std::string path;
 
   switch (cookie_type) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case 1: // BEARER_TOKEN TYPE
     same_site = getSameSiteString(config_->bearerTokenCookieSettings().same_site_);
+    path = config_->bearerTokenCookieSettings().path_;
     break;
   case 2: // OAUTH_HMAC TYPE
     same_site = getSameSiteString(config_->hmacCookieSettings().same_site_);
+    path = config_->hmacCookieSettings().path_;
     break;
   case 3: // OAUTH_EXPIRES TYPE
     same_site = getSameSiteString(config_->expiresCookieSettings().same_site_);
+    path = config_->expiresCookieSettings().path_;
     break;
   case 4: // ID_TOKEN TYPE
     same_site = getSameSiteString(config_->idTokenCookieSettings().same_site_);
+    path = config_->idTokenCookieSettings().path_;
     expires_time = expires_id_token_in_;
     break;
   case 5: // REFRESH_TOKEN TYPE
     same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
+    path = config_->refreshTokenCookieSettings().path_;
     expires_time = expires_refresh_token_in_;
     break;
   }
 
-  std::string cookie_tail = fmt::format(CookieTailHttpOnlyFormatString, expires_time, same_site);
+  std::string cookie_tail =
+      fmt::format(CookieTailHttpOnlyFormatString, path, expires_time, same_site);
   if (!config_->cookieDomain().empty()) {
     cookie_tail =
         absl::StrCat(fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail);
@@ -1247,7 +1260,8 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   } else if (request_cookies.contains(cookie_names.bearer_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_),
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_,
+                                 config_->bearerTokenCookieSettings().path_),
                      cookie_domain));
   }
 
@@ -1258,7 +1272,8 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   } else if (request_cookies.contains(cookie_names.id_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_),
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_,
+                                 config_->idTokenCookieSettings().path_),
                      cookie_domain));
   }
 
@@ -1270,7 +1285,8 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   } else if (request_cookies.contains(cookie_names.refresh_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_,
+                                 config_->refreshTokenCookieSettings().path_),
                      cookie_domain));
   }
 }

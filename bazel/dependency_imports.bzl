@@ -30,8 +30,8 @@ GO_VERSION = "1.24.6"
 JQ_VERSION = "1.7"
 YQ_VERSION = "4.24.4"
 
-BUF_SHA = "5790beb45aaf51a6d7e68ca2255b22e1b14c9ae405a6c472cdcfc228c66abfc1"
-BUF_VERSION = "v1.56.0"
+BUF_SHA = "366ed6c11819d56e122042c18cb8dbcf012f773456821f15324c22d192dfc65c"
+BUF_VERSION = "v1.61.0"
 
 def envoy_dependency_imports(
         go_version = GO_VERSION,
@@ -142,8 +142,15 @@ def envoy_dependency_imports(
     go_repository(
         name = "com_github_cncf_xds_go",
         importpath = "github.com/cncf/xds/go",
-        sum = "h1:B/lvg4tQ5hfFZd4V2hcSfFVfUvAK6GSFKxIIzwnkv8g=",
-        version = "v0.0.0-20220520190051-1e77728a1eaa",
+        sum = "h1:gt7U1Igw0xbJdyaCM5H2CnlAlPSkzrhsebQB6WQWjLA=",
+        version = "v0.0.0-20251110193048-8bfbf64dc13e",
+        build_external = "external",
+    )
+    go_repository(
+        name = "dev_cel_expr",
+        importpath = "cel.dev/expr",
+        sum = "h1:1KrZg61W6TWSxuNZ37Xy49ps13NUovb66QLprthtwi4=",
+        version = "v0.25.1",
         build_external = "external",
     )
     go_repository(
@@ -172,6 +179,14 @@ def envoy_dependency_imports(
         importpath = "github.com/planetscale/vtprotobuf",
         sum = "h1:ujRGEVWJEoaxQ+8+HMl8YEpGaDAgohgZxJ5S+d2TTFQ=",
         version = "v0.6.1-0.20240409071808-615f978279ca",
+        build_external = "external",
+    )
+
+    go_repository(
+        name = "com_github_envoyproxy_protoc_gen_validate",
+        importpath = "github.com/envoyproxy/protoc-gen-validate",
+        sum = "h1:TvGH1wof4H33rezVKWSpqKz5NXWg5VPuZ0uONDT6eb4=",
+        version = "v1.3.0",
         build_external = "external",
     )
 

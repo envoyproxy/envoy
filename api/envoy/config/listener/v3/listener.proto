@@ -15,7 +15,6 @@ import "envoy/config/listener/v3/udp_listener_config.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "xds/annotations/v3/status.proto";
 import "xds/core/v3/collection_entry.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
@@ -190,8 +189,7 @@ message Listener {
   //  connections bound to the filter chain are not drained. If, however, the
   //  filter chain is removed or structurally modified, then the drain for its
   //  connections is initiated.
-  xds.type.matcher.v3.Matcher filter_chain_matcher = 32
-      [(xds.annotations.v3.field_status).work_in_progress = true];
+  xds.type.matcher.v3.Matcher filter_chain_matcher = 32;
 
   // If a connection is redirected using ``iptables``, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to

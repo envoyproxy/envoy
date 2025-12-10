@@ -9,7 +9,6 @@ def envoy_copts(repository, test = False):
         "-Wall",
         "-Wextra",
         "-Werror",
-        "-Wnon-virtual-dtor",
         "-Woverloaded-virtual",
         "-Wold-style-cast",
         "-Wformat",
@@ -133,9 +132,35 @@ def envoy_copts(repository, test = False):
            envoy_select_signal_trace(["-DENVOY_HANDLE_SIGNALS"], repository) + \
            _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
+# Mapping of external dependency short names to their actual Bazel targets.
+# This replaces the need for native.bind() calls and //external: references.
+EXTERNAL_DEPS_MAP = {
+    # Abseil
+    "abseil_strings": "@com_google_absl//absl/strings",
+    # gRPC transcoding
+    "grpc_transcoding": "@grpc_httpjson_transcoding//src:transcoding",
+    "path_matcher": "@grpc_httpjson_transcoding//src:path_matcher",
+    # Google APIs
+    "api_httpbody_protos": "@com_google_googleapis//google/api:httpbody_cc_proto",
+    "http_api_protos": "@com_google_googleapis//google/api:annotations_cc_proto",
+    # nghttp2
+    "nghttp2": "@envoy//bazel/foreign_cc:nghttp2",
+    # gRPC
+    "grpc": "@com_github_grpc_grpc//:grpc++",
+    "grpc_health_proto": "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_cc_proto",
+    # SSL/Crypto (aliases defined in @envoy//bazel)
+    "ssl": "@envoy//bazel:boringssl",
+    "crypto": "@envoy//bazel:boringcrypto",
+    # Bazel tools
+    "bazel_runfiles": "@bazel_tools//tools/cpp/runfiles",
+}
+
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
-    return "//external:%s" % dep
+    if dep in EXTERNAL_DEPS_MAP:
+        return EXTERNAL_DEPS_MAP[dep]
+
+    fail("Unknown external dependency '%s'. Add it to EXTERNAL_DEPS_MAP in bazel/envoy_internal.bzl" % dep)
 
 def envoy_linkstatic():
     return select({
@@ -171,7 +196,7 @@ def tcmalloc_external_dep(repository):
         (
             _repo("//bazel:debug_tcmalloc"),
             _repo("//bazel:gperftools_tcmalloc"),
-        ): _repo("//bazel/foreign_cc:gperftools"),
+        ): _repo("//bazel/external:gperftools"),
         "//conditions:default": _repo("//bazel:tcmalloc_lib"),
     })
 

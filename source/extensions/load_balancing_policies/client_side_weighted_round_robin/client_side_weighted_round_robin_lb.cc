@@ -28,9 +28,13 @@ std::string getHostAddress(const Host* host) {
   return host->address()->asString();
 }
 
-envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin
-getRoundRobinConfig(const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
+RoundRobinConfig getRoundRobinConfig(const CommonLbConfig& common_config,
+                                     const RoundRobinConfig& override_config) {
   TypedRoundRobinLbConfig round_robin_config(common_config, Upstream::LegacyRoundRobinLbProto());
+  if (override_config.has_slow_start_config()) {
+    *round_robin_config.lb_config_.mutable_slow_start_config() =
+        override_config.slow_start_config();
+  }
   return round_robin_config.lb_config_;
 }
 
@@ -51,17 +55,21 @@ ClientSideWeightedRoundRobinLbConfig::ClientSideWeightedRoundRobinLbConfig(
       PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_expiration_period, 180000));
   weight_update_period =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_update_period, 1000));
+
+  if (lb_proto.has_slow_start_config()) {
+    *round_robin_overrides_.mutable_slow_start_config() = lb_proto.slow_start_config();
+  }
 }
 
 ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::WorkerLocalLb(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-    Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-    TimeSource& time_source, OptRef<ThreadLocalShim> tls_shim)
+    Runtime::Loader& runtime, Random::RandomGenerator& random, const CommonLbConfig& common_config,
+    const RoundRobinConfig& round_robin_config, TimeSource& time_source,
+    OptRef<ThreadLocalShim> tls_shim)
     : RoundRobinLoadBalancer(priority_set, local_priority_set, stats, runtime, random,
                              PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
                                  common_config, healthy_panic_threshold, 100, 50),
-                             getRoundRobinConfig(common_config), time_source) {
+                             getRoundRobinConfig(common_config, round_robin_config), time_source) {
   if (tls_shim.has_value()) {
     apply_weights_cb_handle_ = tls_shim->apply_weights_cb_helper_.add([this]() {
       // Refresh the EDF scheduler on the hosts in priority set of the
@@ -265,7 +273,7 @@ ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::createWithCommon
     const CommonLbConfig& common_lb_config, Upstream::LoadBalancerParams params) {
   return std::make_unique<Upstream::ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
       params.priority_set, params.local_priority_set, cluster_info_.lbStats(), runtime_, random_,
-      common_lb_config, time_source_, tls_->get());
+      common_lb_config, round_robin_config_, time_source_, tls_->get());
 }
 
 void ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::applyWeightsToAllWorkers() {
@@ -287,9 +295,9 @@ ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalanc
       dynamic_cast<const ClientSideWeightedRoundRobinLbConfig*>(lb_config.ptr());
   ASSERT(typed_lb_config != nullptr);
   report_handler_ = std::make_shared<OrcaLoadReportHandler>(*typed_lb_config, time_source_);
-  factory_ =
-      std::make_shared<WorkerLocalLbFactory>(cluster_info, priority_set, runtime, random,
-                                             time_source, typed_lb_config->tls_slot_allocator_);
+  factory_ = std::make_shared<WorkerLocalLbFactory>(
+      cluster_info, priority_set, runtime, random, time_source,
+      typed_lb_config->tls_slot_allocator_, typed_lb_config->round_robin_overrides_);
 
   initFromConfig(*typed_lb_config);
 

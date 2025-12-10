@@ -51,6 +51,11 @@ EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setBufferHighWatermark(size_t high_watermark) {
+  high_watermark_ = high_watermark;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
@@ -140,6 +145,12 @@ EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::s
   for (const std::string& hostname : hostnames) {
     dns_preresolve_hostnames_.push_back({hostname /* host */, 443 /* port */});
   }
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setDnsResolver(
+    const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) {
+  dns_resolver_config_ = dns_resolver_config;
   return *this;
 }
 
@@ -632,24 +643,28 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ->PackFrom(kv_config);
   }
 
+  if (dns_resolver_config_.has_value()) {
+    *dns_cache_config->mutable_typed_dns_resolver_config() = *dns_resolver_config_;
+  } else {
 #if defined(__APPLE__)
-  envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
-  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-      "envoy.network.dns_resolver.apple");
-  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-      resolver_config);
+    envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.apple");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
 #else
-  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
-      resolver_config;
-  if (dns_num_retries_.has_value()) {
-    resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
-  }
-  resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
-  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-      "envoy.network.dns_resolver.getaddrinfo");
-  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-      resolver_config);
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        resolver_config;
+    if (dns_num_retries_.has_value()) {
+      resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
+    }
+    resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.getaddrinfo");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
 #endif
+  }
 
   for (const auto& [host, port] : dns_preresolve_hostnames_) {
     envoy::config::core::v3::SocketAddress* address = dns_cache_config->add_preresolve_hostnames();
@@ -1025,9 +1040,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  InternalEngine* envoy_engine = absl::IgnoreLeak(new InternalEngine(
-      std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-      network_thread_priority_, disable_dns_refresh_on_network_change_, enable_logger_));
+  InternalEngine* envoy_engine = absl::IgnoreLeak(
+      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+                         network_thread_priority_, high_watermark_,
+                         disable_dns_refresh_on_network_change_, enable_logger_));
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

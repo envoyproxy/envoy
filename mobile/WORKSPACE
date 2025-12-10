@@ -7,20 +7,7 @@ http_archive(
     name = "bazel_gazelle",
     sha256 = "e467b801046b6598c657309b45d2426dc03513777bd1092af2c62eebf990aca5",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.45.0/bazel-gazelle-v0.45.0.tar.gz",
         "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.45.0/bazel-gazelle-v0.45.0.tar.gz",
-    ],
-)
-
-# TODO(yannic): Remove once https://github.com/bazelbuild/rules_foreign_cc/pull/938
-# is merged and released.
-http_archive(
-    name = "rules_foreign_cc",
-    sha256 = "bbc605fd36048923939845d6843464197df6e6ffd188db704423952825e4760a",
-    strip_prefix = "rules_foreign_cc-a473d42bada74afac4e32b767964c1785232e07b",
-    urls = [
-        "https://storage.googleapis.com/engflow-tools-public/rules_foreign_cc-a473d42bada74afac4e32b767964c1785232e07b.tar.gz",
-        "https://github.com/EngFlow/rules_foreign_cc/archive/a473d42bada74afac4e32b767964c1785232e07b.tar.gz",
     ],
 )
 
@@ -46,10 +33,6 @@ load("@envoy//bazel:api_repositories.bzl", "envoy_api_dependencies")
 
 envoy_api_dependencies()
 
-load("@envoy//bazel:repo.bzl", "envoy_repo")
-
-envoy_repo()
-
 load("@envoy//bazel:repositories.bzl", "envoy_dependencies")
 
 envoy_dependencies()
@@ -70,6 +53,14 @@ load("@envoy//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
 envoy_dependency_imports()
 
+load("@envoy//bazel:repo.bzl", "envoy_repo")
+
+envoy_repo()
+
+load("@envoy//bazel:toolchains.bzl", "envoy_toolchains")
+
+envoy_toolchains()
+
 load("@envoy_mobile//bazel:envoy_mobile_dependencies.bzl", "envoy_mobile_dependencies")
 
 envoy_mobile_dependencies()
@@ -77,6 +68,10 @@ envoy_mobile_dependencies()
 load("@envoy_mobile//bazel:envoy_mobile_toolchains.bzl", "envoy_mobile_toolchains")
 
 envoy_mobile_toolchains()
+
+load("@envoy_mobile//bazel:platforms.bzl", "envoy_mobile_platforms")
+
+envoy_mobile_platforms()
 
 load("//bazel:android_configure.bzl", "android_configure")
 
