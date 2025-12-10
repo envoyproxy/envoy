@@ -21,6 +21,9 @@ Http::FilterFactoryCb McpRouterFilterConfigFactory::createFilterFactoryFromProto
   };
 }
 
+/**
+ * Static registration for the MCP router filter. @see RegisterFactory.
+ */
 REGISTER_FACTORY(McpRouterFilterConfigFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace McpRouter

@@ -208,6 +208,7 @@ private:
   std::vector<std::shared_ptr<BackendStreamCallbacks>> stream_callbacks_;
 
   // Single backend stream (for tools/call)
+  // TODO(botengyao): better to use MuxDemux, but this is simpler now.
   Http::AsyncClient::Stream* single_stream_{};
 
   // Store headers to keep them alive for the duration of the stream
