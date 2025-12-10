@@ -170,8 +170,6 @@ public:
     bool client_with_intermediate_cert_{false};
     bool trust_root_only_{false};
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
-    bool disable_stateful_session_resumption_{false};
-    bool disable_stateless_session_resumption_{false};
   };
 
   // Sets up config with the provided bootstrap.

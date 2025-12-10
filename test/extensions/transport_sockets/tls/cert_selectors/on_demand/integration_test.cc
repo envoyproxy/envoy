@@ -37,11 +37,16 @@ public:
 
   void setup(const std::string& on_demand_config) {
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      config_helper_.configDownstreamTransportSocketWithTls(
-          bootstrap,
-          [&](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-            configToUseSds(common_tls_context, on_demand_config);
-          });
+      auto* filter_chain =
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+      auto* transport_socket = filter_chain->mutable_transport_socket();
+      transport_socket->set_name("envoy.transport_sockets.tls");
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+      configToUseSds(*tls_context.mutable_common_tls_context(), on_demand_config);
+      tls_context.set_disable_stateless_session_resumption(true);
+      tls_context.set_disable_stateful_session_resumption(true);
+      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+
       bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
           bootstrap.static_resources().clusters(0));
       auto* sds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -49,8 +54,6 @@ public:
       sds_cluster->mutable_load_assignment()->set_cluster_name("sds_cluster");
       ConfigHelper::setHttp2(*sds_cluster);
     });
-    server_ssl_options_.disable_stateless_session_resumption_ = true;
-    server_ssl_options_.disable_stateful_session_resumption_ = true;
     TcpProxySslIntegrationTest::initialize();
     test_server_->waitUntilListenersReady();
   }
