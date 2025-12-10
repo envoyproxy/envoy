@@ -362,7 +362,7 @@ void McpFieldExtractor::checkEarlyStop() {
   // Notifications don't have an 'id' field per JSON-RPC spec, so skip it for them
   for (const auto& field : config_.getAlwaysExtract()) {
     if (is_notification_ && field == "id") {
-      continue; // Skip id check for notifications
+      continue;
     }
     if (collected_fields_.count(field) == 0) {
       return;
