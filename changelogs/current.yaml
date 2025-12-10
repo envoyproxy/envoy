@@ -1,10 +1,17 @@
-date: December 10, 2025
+date: Pending
+
+behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
-- area: dns
-  change: |
-    Update c-ares to version 1.34.6 to resolve CVE-2025-0913.
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-    Use-after-free in c-ares can crash Envoy via compromised or malfunctioning DNS.
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
-    advisory: https://github.com/envoyproxy/envoy/security/advisories/GHSA-fg9g-pvc4-776f.
+new_features:
+
+deprecated:
