@@ -1,5 +1,6 @@
 #include "source/extensions/access_loggers/filters/process_ratelimit/provider_singleton.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/grpc/common.h"
 
 namespace Envoy {
@@ -32,16 +33,16 @@ void RateLimiterProviderSingleton::RateLimiterWrapper::setLimiter(
         if (!cancelled->load()) {
           thread_local_limiter->limiter = limiter;
         }
-      },
-      [init_target = init_target_.get(), cancelled = cancelled_]() {
-        if (!cancelled->load()) {
-          init_target->ready();
-        }
       });
+  // The init_target_ is used to wait for the rate limiter to be set from
+  // subscription callback. Once the limiter setter lambda has been set in all
+  // worker threads queues, we can notify the worker thread to continue.
+  init_target_->ready();
 }
 
 RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton::getRateLimiter(
-    Server::Configuration::ServerFactoryContext& factory_context, absl::string_view key,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    Init::Manager& listener_init_manager, absl::string_view key,
     const envoy::config::core::v3::ConfigSource& config_source, intptr_t setter_key,
     SetRateLimiterCb setter) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -79,7 +80,7 @@ RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton
 
   // Add the init target to the listener's init manager to wait for the
   // resource.
-  factory_context.initManager().add(*init_target);
+  listener_init_manager.add(*init_target);
 
   // Otherwise, return a wrapper with a null limiter. The limiter will be
   // set when the config is received.

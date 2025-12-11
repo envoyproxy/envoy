@@ -117,8 +117,9 @@ public:
   using SetRateLimiterCb = std::function<void(LocalRateLimiterSharedPtr)>;
   static RateLimiterWrapperPtr
   getRateLimiter(Server::Configuration::ServerFactoryContext& factory_context,
-                 absl::string_view key, const envoy::config::core::v3::ConfigSource& config_source,
-                 intptr_t setter_key, SetRateLimiterCb setter);
+                 Init::Manager& listener_init_manager, absl::string_view key,
+                 const envoy::config::core::v3::ConfigSource& config_source, intptr_t setter_key,
+                 SetRateLimiterCb setter);
 
   RateLimiterProviderSingleton(Server::Configuration::ServerFactoryContext& factory_context,
                                const envoy::config::core::v3::ConfigSource& config_source)

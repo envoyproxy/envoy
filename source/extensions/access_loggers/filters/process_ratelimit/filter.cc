@@ -12,7 +12,7 @@ namespace Filters {
 namespace ProcessRateLimit {
 
 ProcessRateLimitFilter::ProcessRateLimitFilter(
-    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ServerFactoryContext& context, Init::Manager& listener_init_manager,
     const envoy::extensions::access_loggers::filters::process_ratelimit::v3::ProcessRateLimitFilter&
         config)
     : setter_key_(reinterpret_cast<intptr_t>(this)),
@@ -34,7 +34,7 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
     ExceptionUtil::throwEnvoyException("`dynamic_config` is required.");
   }
   rate_limiter_ = Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
-      getRateLimiter(context, config.dynamic_config().resource_name(),
+      getRateLimiter(context, listener_init_manager, config.dynamic_config().resource_name(),
                      config.dynamic_config().config_source(), setter_key_, std::move(setter));
 }
 

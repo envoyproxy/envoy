@@ -83,12 +83,12 @@ public:
               return ret;
             }));
 
-    ON_CALL(context_.server_factory_context_.init_manager_, add(_))
+    ON_CALL(context_.init_manager_, add(_))
         .WillByDefault(Invoke([this](const Init::Target& target) {
           init_target_handles_.push_back(target.createHandle("test"));
         }));
 
-    ON_CALL(context_.server_factory_context_.init_manager_, initialize(_))
+    ON_CALL(context_.init_manager_, initialize(_))
         .WillByDefault(Invoke([this](const Init::Watcher& watcher) {
           while (!init_target_handles_.empty()) {
             init_target_handles_.back()->initialize(watcher);
@@ -173,7 +173,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, FilterDestructedBeforeCallback) {
   // log2 is to hold the provider singleton alive.
   AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
   ASSERT_EQ(callbackss_.size(), 1);
 
@@ -194,7 +194,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, FilterDestructedBeforeCallback) {
 TEST_F(AccessLogImplTestWithRateLimitFilter, HappyPath) {
   AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
   ASSERT_EQ(callbackss_.size(), 1);
 
@@ -240,7 +240,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitTogether) {
 TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitSeparately) {
   AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
   ASSERT_EQ(callbackss_.size(), 1);
 
@@ -253,7 +253,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitSeparately) {
   // Init the second log with the same token bucket.
   AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  context_.init_manager_.initialize(init_watcher_);
   expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
   time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
   expectWritesAndLog(log2, /*expect_write_times=*/1, /*log_call_times=*/1);
@@ -263,7 +263,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitSeparately) {
 TEST_F(AccessLogImplTestWithRateLimitFilter, TokenBucketUpdatedUnderSameResourceName) {
   AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
   ASSERT_EQ(callbackss_.size(), 1);
 
@@ -285,7 +285,7 @@ fill_interval:
   // Init the second log with the same token bucket.
   AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  context_.init_manager_.initialize(init_watcher_);
   // The new token bucket allows 2 writes per second. We call log 3 times.
   expectWritesAndLog(log2, /*expect_write_times=*/2, /*log_call_times=*/3);
 }
@@ -293,7 +293,7 @@ fill_interval:
 TEST_F(AccessLogImplTestWithRateLimitFilter, RemoveAndAddResource) {
   AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
   ASSERT_EQ(callbackss_.size(), 1);
 
@@ -331,7 +331,7 @@ fill_interval:
   // A new log instance should also pick up the re-added config.
   AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  context_.init_manager_.initialize(init_watcher_);
   // It shares the same token bucket, so it's rate limited.
   expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
 
@@ -343,7 +343,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter,
        RemoveResourceAndGetTokenBucketBeforeNewResourceAdded) {
   AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
   ASSERT_EQ(callbackss_.size(), 1);
 
@@ -367,7 +367,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter,
   EXPECT_CALL(init_watcher_, ready()).Times(0);
   AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
-  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  context_.init_manager_.initialize(init_watcher_);
 
   // 3. Add the resource back.
   EXPECT_CALL(init_watcher_, ready());

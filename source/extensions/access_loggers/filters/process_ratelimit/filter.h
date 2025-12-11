@@ -25,6 +25,7 @@ struct ProcessRateLimitFilterStats {
 class ProcessRateLimitFilter : public AccessLog::Filter {
 public:
   ProcessRateLimitFilter(Server::Configuration::ServerFactoryContext& context,
+                         Init::Manager& listener_init_manager,
                          const envoy::extensions::access_loggers::filters::process_ratelimit::v3::
                              ProcessRateLimitFilter& config);
 
