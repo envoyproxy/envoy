@@ -707,6 +707,16 @@ TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerTest, RequestedApplicationProtocols) {
+  initialize();
+
+  const auto& protocols =
+      filter_manager_->streamInfo().downstreamAddressProvider().requestedApplicationProtocols();
+  EXPECT_TRUE(protocols.empty());
+
+  filter_manager_->destroyFilters();
+}
+
 TEST_F(FilterManagerTest, IdleTimerResets) {
   initialize();
 

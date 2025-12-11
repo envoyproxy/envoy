@@ -8,7 +8,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446",
         release_date = "2025-09-25",
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
-        use_category = ["api", "test_only"],
+        use_category = ["api"],
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/bazel-skylib/blob/{version}/LICENSE",
     ),
