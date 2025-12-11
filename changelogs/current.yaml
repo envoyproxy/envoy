@@ -413,6 +413,10 @@ new_features:
   change: |
     Propagated transport errors from tls_inspector to ``DownstreamTransportFailureReason`` in ``StreamInfo`` for access logging
     prior to the TLS handshake.
+- area: geoip
+  change: |
+    Added support for MaxMind Country database via
+    :ref:`country_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.country_db_path>`.
 - area: tls_inspector
   change: |
     Added configuration parameter to TLS inspector for maximum acceptable client hello size.
@@ -423,6 +427,11 @@ new_features:
   change: |
     Added ``match_included_headers`` to the request signing extension to allow positive header matching while excluding
     other non-SigV4-required headers.
+- area: geoip
+  change: |
+    Added :ref:`custom_header_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.custom_header_config>`
+    to allow extracting the client IP address from a custom request header which can be used instead of
+    ``x-forwarded-for`` header or downstream connection source address.
 - area: ext_authz
   change: |
     Added support for :ref:`metadata_context_namespaces

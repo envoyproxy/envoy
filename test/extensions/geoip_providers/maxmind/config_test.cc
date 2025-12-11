@@ -34,6 +34,9 @@ public:
   static const absl::optional<std::string>& anonDbPath(const GeoipProvider& provider) {
     return provider.config_->anonDbPath();
   }
+  static const absl::optional<std::string>& countryDbPath(const GeoipProvider& provider) {
+    return provider.config_->countryDbPath();
+  }
   static const absl::optional<std::string>& countryHeader(const GeoipProvider& provider) {
     return provider.config_->countryHeader();
   }
@@ -61,6 +64,9 @@ public:
   static const absl::optional<std::string>& ispHeader(const GeoipProvider& provider) {
     return provider.config_->ispHeader();
   }
+  static bool isCityDbPathSet(const GeoipProvider& provider) {
+    return provider.config_->isCityDbPathSet();
+  }
 };
 
 MATCHER_P(HasCityDbPath, expected_db_path, "") {
@@ -71,6 +77,16 @@ MATCHER_P(HasCityDbPath, expected_db_path, "") {
   }
   *result_listener << "expected city_db_path=" << expected_db_path
                    << " but city_db_path was not found in provider config";
+  return false;
+}
+
+MATCHER_P(IsCityDbPathSet, expected, "") {
+  auto provider = std::static_pointer_cast<GeoipProvider>(arg);
+  bool is_set = GeoipProviderPeer::isCityDbPathSet(*provider);
+  if (is_set == expected) {
+    return true;
+  }
+  *result_listener << "expected isCityDbPathSet()=" << expected << " but got " << is_set;
   return false;
 }
 
@@ -93,6 +109,17 @@ MATCHER_P(HasAnonDbPath, expected_db_path, "") {
   }
   *result_listener << "expected anon_db_path=" << expected_db_path
                    << " but anon_db_path was not found in provider config";
+  return false;
+}
+
+MATCHER_P(HasCountryDbPath, expected_db_path, "") {
+  auto provider = std::static_pointer_cast<GeoipProvider>(arg);
+  auto country_db_path = GeoipProviderPeer::countryDbPath(*provider);
+  if (country_db_path && testing::Matches(expected_db_path)(country_db_path.value())) {
+    return true;
+  }
+  *result_listener << "expected country_db_path=" << expected_db_path
+                   << " but country_db_path was not found in provider config";
   return false;
 }
 
@@ -276,10 +303,10 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoDbPaths) {
   TestUtility::loadFromYaml(provider_config_yaml, provider_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MaxmindProviderFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createGeoipProviderDriver(provider_config, "maxmind", context),
-                            Envoy::EnvoyException,
-                            "At least one geolocation database path needs to be configured: "
-                            "city_db_path, isp_db_path, asn_db_path or anon_db_path");
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createGeoipProviderDriver(provider_config, "maxmind", context), Envoy::EnvoyException,
+      "At least one geolocation database path needs to be configured: "
+      "city_db_path, isp_db_path, asn_db_path, anon_db_path or country_db_path");
 }
 
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoGeoHeaders) {
@@ -392,6 +419,49 @@ TEST_F(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoCon
   Geolocation::DriverSharedPtr driver2 =
       factory.createGeoipProviderDriver(provider_config2, "maxmind", context_);
   EXPECT_NE(driver1.get(), driver2.get());
+}
+
+TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbPath) {
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+    country_db_path: %s
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  auto country_db_path = genGeoDbFilePath("GeoIP2-Country-Test.mmdb");
+  auto processed_provider_config_yaml = absl::StrFormat(provider_config_yaml, country_db_path);
+  TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
+  MaxmindProviderFactory factory;
+  Geolocation::DriverSharedPtr driver =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+  // City DB is not configured, so isCityDbPathSet() should return false.
+  EXPECT_THAT(driver, AllOf(HasCountryDbPath(country_db_path), HasCountryHeader("x-geo-country"),
+                            IsCityDbPathSet(false)));
+}
+
+TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbAndCityDbPaths) {
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        city: "x-geo-city"
+    country_db_path: %s
+    city_db_path: %s
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  auto country_db_path = genGeoDbFilePath("GeoIP2-Country-Test.mmdb");
+  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto processed_provider_config_yaml =
+      absl::StrFormat(provider_config_yaml, country_db_path, city_db_path);
+  TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
+  MaxmindProviderFactory factory;
+  Geolocation::DriverSharedPtr driver =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+  // Both Country DB and City DB are configured.
+  EXPECT_THAT(driver, AllOf(HasCountryDbPath(country_db_path), HasCityDbPath(city_db_path),
+                            HasCountryHeader("x-geo-country"), HasCityHeader("x-geo-city"),
+                            IsCityDbPathSet(true)));
 }
 
 } // namespace Maxmind
