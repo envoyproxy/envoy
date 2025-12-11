@@ -314,10 +314,6 @@ public:
         }
         discovery_response.add_resources()->PackFrom(resource);
       } else {
-        // In SotW, if we have a name and want to associate it, we likely need to wrap it.
-        // However, standard behavior for vector without metadata is bare resource.
-        // But bare resource loses name if not embedded.
-        // Since this is a map overload specifically for "resources with names", we should wrap it.
         envoy::service::discovery::v3::Resource resource;
         resource.mutable_resource()->PackFrom(message);
         resource.set_name(name);
