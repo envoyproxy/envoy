@@ -486,6 +486,7 @@ envoy_cc_library(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/upstreams/http:config",
+        "//source/extensions/upstreams/http:ep_specific_config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
         "@com_google_absl//absl/synchronization",

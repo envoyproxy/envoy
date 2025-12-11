@@ -224,8 +224,10 @@ public:
                               uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
                               OptRef<Upstream::Host::CreateConnectionData> data);
   ~MultiplexedActiveClientBase() override = default;
-  // Caps max streams per connection below 2^31 to prevent overflow.
-  static uint32_t maxStreamsPerConnection(uint32_t max_streams_config);
+  // Caps max streams per connection below 2^31 to prevent overflow and
+  // also checks for endpoint-specific max_requests_per_connection configuration.
+  static uint32_t maxStreamsPerConnection(uint32_t max_streams_config,
+                                          Upstream::HostDescriptionConstSharedPtr host);
 
   // ConnPoolImpl::ActiveClient
   bool closingWithIncompleteStream() const override;

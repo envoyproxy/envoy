@@ -1,11 +1,13 @@
 #include "source/common/http/conn_pool_base.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/config/metadata.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/upstreams/http/ep_specific_config.h"
 
 namespace Envoy {
 namespace Http {
@@ -193,8 +195,36 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
   }
 }
 
-uint32_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_streams_config) {
-  return (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
+uint32_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_streams_config,
+                                                              Upstream::HostDescriptionConstSharedPtr host) {
+  uint32_t max_requests = (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
+  
+  // Check for endpoint-specific max_requests_per_connection
+  const auto ep_specific_protocol_options = host->cluster().extensionProtocolOptionsTyped<
+      Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
+      "envoy.extensions.upstreams.http.v3.EpSpecificHttpProtocolOptions");
+
+  if (ep_specific_protocol_options != nullptr) {
+    const auto& config = ep_specific_protocol_options->config();
+    for (const auto& ep_option : config.ep_specific_options()) {
+      const std::string& match_value = ep_option.ep_metadata_match();
+
+      const auto& filter_metadata = 
+          Envoy::Config::Metadata::metadataValue(host->metadata().get(), 
+                                                  "ep_specific_protocol_options",
+                                                  "match");
+      
+      if (filter_metadata.has_string_value() &&
+          filter_metadata.string_value() == match_value) {
+        if (ep_option.has_http_max_requests_per_connection()) {
+          max_requests = ep_option.http_max_requests_per_connection().value();
+        }
+        break;
+      }
+    }
+  }
+  
+  return max_requests;
 }
 
 MultiplexedActiveClientBase::MultiplexedActiveClientBase(
@@ -202,7 +232,7 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(
     uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
     OptRef<Upstream::Host::CreateConnectionData> data)
     : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
+          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection(), parent.host()),
           effective_concurrent_streams, max_configured_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);

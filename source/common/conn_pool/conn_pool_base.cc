@@ -63,20 +63,6 @@ ConnPoolImplBase::ConnPoolImplBase(
   ENVOY_LOG_ONCE_IF(trace, create_new_connection_load_shed_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.connection_pool_new_connection is not "
                     "found. Is it configured?");
-  const auto metadata = host_->metadata(); 
-  if (metadata && metadata->filter_metadata().contains("connection_pool_options")) {
-    const auto& options = metadata->filter_metadata().at("connection_pool_options").fields();
-    if (options.contains("max_concurrent_streams")) {
-      endpoint_limits_.max_concurrent_streams = options.at("max_concurrent_streams").number_value();
-    }
-    if (options.contains("max_requests_per_connection")) {
-      endpoint_limits_.max_requests_per_connection = options.at("max_requests_per_connection").number_value();
-    }
-    ENVOY_LOG(debug, "endpoint {} has specific options: max_concurrent_streams={}, max_requests_per_connection={}", 
-      host_->address() ? host_->address()->asString() : "without address", 
-      endpoint_limits_.max_concurrent_streams, 
-      endpoint_limits_.max_requests_per_connection);
-  }
 }
 
 ConnPoolImplBase::~ConnPoolImplBase() {
