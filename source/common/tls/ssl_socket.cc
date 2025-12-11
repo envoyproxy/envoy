@@ -246,20 +246,20 @@ void SslSocket::drainErrorQueue() {
   }
 
   // Append detailed error info for certificate-related failures.
-  if (saw_cert_verify_failed || saw_no_client_cert) {
+  bool added_detail = false;
+  if (saw_cert_verify_failed) {
     auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
         SSL_get_ex_data(rawSsl(), ContextImpl::sslExtendedSocketInfoIndex()));
     if (extended_socket_info != nullptr) {
       absl::string_view cert_validation_error = extended_socket_info->certificateValidationError();
       if (!cert_validation_error.empty()) {
         absl::StrAppend(&failure_reason_, ":", cert_validation_error);
-      } else if (saw_no_client_cert) {
-        // Provide a default message if no detailed error was captured
-        absl::StrAppend(&failure_reason_, ":peer did not provide required client certificate");
+        added_detail = true;
       }
-    } else if (saw_no_client_cert) {
-      absl::StrAppend(&failure_reason_, ":peer did not provide required client certificate");
     }
+  }
+  if (!added_detail && saw_no_client_cert) {
+    absl::StrAppend(&failure_reason_, ":peer did not provide required client certificate");
   }
 
   if (!failure_reason_.empty()) {
