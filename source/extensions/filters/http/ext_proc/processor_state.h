@@ -250,6 +250,14 @@ public:
   evaluateAttributes(const ExpressionManager& mgr,
                      const Filters::Common::Expr::Activation& activation) const PURE;
 
+  // Check whether this is the last response from the ext_proc server after
+  // the header response is received.
+  bool isLastResponseAfterHeaderResp();
+
+  // Check whether this is the last response from the ext_proc server after
+  // a body response is received.
+  bool isLastResponseAfterBodyResp(bool is_last_body_resp);
+
 protected:
   void setBodyMode(
       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);

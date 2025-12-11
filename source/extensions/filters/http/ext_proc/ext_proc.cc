@@ -1647,6 +1647,8 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
 
   if (decoding_state_.callbackState() != ProcessorState::CallbackState::Idle ||
       encoding_state_.callbackState() != ProcessorState::CallbackState::Idle) {
+    ENVOY_STREAM_LOG(debug, "There are pending responses from the ext_proc server",
+                     *decoder_callbacks_);
     return;
   }
 
@@ -1655,39 +1657,12 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
   switch (response.response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
     if (encoding_state_.noExternalProcess()) {
-      if (decoding_state_.hasNoBody()) {
-        last_response = true;
-        break;
-      }
-      if (decoding_state_.bodyMode() == ProcessingMode::NONE && !decoding_state_.sendTrailers()) {
-        last_response = true;
-        break;
-      }
-      if (decoding_state_.bodyMode() == ProcessingMode::NONE && decoding_state_.sendTrailers()) {
-        if (decoding_state_.completeBodyAvailable() &&
-            (decoding_state_.responseTrailers() == nullptr)) {
-          last_response = true;
-          break;
-        }
-      }
-      if (decoding_state_.bodyMode() != ProcessingMode::NONE && !decoding_state_.sendTrailers()) {
-        if (decoding_state_.responseTrailers() != nullptr) {
-          last_response = true;
-          break;
-        }
-      }
+      last_response = decoding_state_.isLastResponseAfterHeaderResp();
     }
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
     if (encoding_state_.noExternalProcess()) {
-      if (is_last_body_resp) {
-        last_response = true;
-        break;
-      }
-      if (!decoding_state_.sendTrailers() && decoding_state_.responseTrailers() != nullptr) {
-        last_response = true;
-        break;
-      }
+      last_response = decoding_state_.isLastResponseAfterBodyResp(is_last_body_resp);
     }
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
@@ -1696,36 +1671,10 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
     }
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
-    if (encoding_state_.hasNoBody()) {
-      last_response = true;
-      break;
-    }
-    if (encoding_state_.bodyMode() == ProcessingMode::NONE && !encoding_state_.sendTrailers()) {
-      last_response = true;
-      break;
-    }
-    if (encoding_state_.bodyMode() == ProcessingMode::NONE && encoding_state_.sendTrailers()) {
-      if (encoding_state_.completeBodyAvailable() &&
-          (encoding_state_.responseTrailers() == nullptr)) {
-        last_response = true;
-        break;
-      }
-    }
-    if (encoding_state_.bodyMode() != ProcessingMode::NONE && !encoding_state_.sendTrailers()) {
-      if (encoding_state_.responseTrailers() != nullptr) {
-        last_response = true;
-        break;
-      }
-    }
+    last_response = encoding_state_.isLastResponseAfterHeaderResp();
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
-    if (is_last_body_resp) {
-      last_response = true;
-    }
-    if (!encoding_state_.sendTrailers() && encoding_state_.responseTrailers() != nullptr) {
-      last_response = true;
-      break;
-    }
+    last_response = encoding_state_.isLastResponseAfterBodyResp(is_last_body_resp);
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
     last_response = true;
