@@ -21,20 +21,18 @@ void McpParserConfig::initializeDefaults() {
   // Always extract core JSON-RPC fields
   always_extract_.insert("jsonrpc");
   always_extract_.insert("method");
+  always_extract_.insert("id");
 
   // Tools
   addMethodConfig(Methods::TOOLS_CALL, {AttributeExtractionRule("params.name")});
 
   // Resources
   addMethodConfig(Methods::RESOURCES_READ, {AttributeExtractionRule("params.uri")});
-  addMethodConfig(Methods::RESOURCES_LIST, {AttributeExtractionRule("params.cursor")});
   addMethodConfig(Methods::RESOURCES_SUBSCRIBE, {AttributeExtractionRule("params.uri")});
   addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE, {AttributeExtractionRule("params.uri")});
-  addMethodConfig(Methods::RESOURCES_TEMPLATES_LIST, {AttributeExtractionRule("params.cursor")});
 
   // Prompts
   addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule("params.name")});
-  addMethodConfig(Methods::PROMPTS_LIST, {AttributeExtractionRule("params.cursor")});
 
   // Completion
   addMethodConfig(Methods::COMPLETION_COMPLETE, {});
@@ -216,6 +214,7 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
         is_valid_mcp_ = true;
       }
       method_ = std::string(value);
+      is_notification_ = absl::StartsWith(method_, Methods::NOTIFICATION_PREFIX);
     }
   }
 
@@ -344,11 +343,14 @@ void McpFieldExtractor::checkEarlyStop() {
   }
 
   // Update fields_needed_ now that we know the method
-  static bool fields_needed_updated = false;
-  if (!fields_needed_updated) {
+  if (!fields_needed_updated_) {
     const auto& required_fields = config_.getFieldsForMethod(method_);
     fields_needed_ += required_fields.size();
-    fields_needed_updated = true;
+    // Notifications don't have 'id' field, so reduce the expected count
+    if (is_notification_) {
+      fields_needed_--;
+    }
+    fields_needed_updated_ = true;
   }
 
   // Fast path: check if we have collected enough fields
@@ -357,7 +359,11 @@ void McpFieldExtractor::checkEarlyStop() {
   }
 
   // Verify we actually have all required fields (not just the count)
+  // Notifications don't have an 'id' field per JSON-RPC spec, so skip it for them
   for (const auto& field : config_.getAlwaysExtract()) {
+    if (is_notification_ && field == "id") {
+      continue;
+    }
     if (collected_fields_.count(field) == 0) {
       return;
     }

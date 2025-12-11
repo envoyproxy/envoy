@@ -354,8 +354,9 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitContinues) {
 
   // Create a JSON body that exceeds 100 bytes
   std::string json =
-      R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value", "longkey": "this is a very long string to exceed the limit"}, "id": 1})";
+      R"({"jsonrpc": "2.0", "method": "test", "id": 1, "params": {"key": "value", "longkey": "this is a very long string to exceed the limit"}})";
   Buffer::OwnedImpl buffer(json);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
@@ -484,7 +485,7 @@ TEST_F(McpFilterTest, BufferLimitNotSetWhenDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
-// Test body size check in PASS_THROUGH mode
+// Test body size check in PASS_THROUGH mode - reject when required fields are beyond the limit
 TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
@@ -501,11 +502,16 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(50));
   filter_->decodeHeaders(headers, false);
 
-  // Large body should be rejected even in PASS_THROUGH mode
+  // JSON body with required fields (jsonrpc, method, id) in the first 50 bytes.
   std::string json =
       R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value with lots of data"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "reached end_stream or configured body size, don't get enough data.",
+                             _, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
 // Test route cache is NOT cleared by default when metadata is set
