@@ -86,6 +86,10 @@ minor_behavior_changes:
     Execute foreign functions on the effective context, when set by Wasm SDKs. Previously, foreign functions called from
     HTTP or gRPC callbacks could receive a root context instead of a stream context. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.wasm_use_effective_ctx_for_foreign_functions`` to ``false``.
+- area: ext_proc
+  change: |
+    added immediate_responses_sent counter for ext proc in :ref:'FilterStats
+    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcFilterStats>'.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
