@@ -465,6 +465,7 @@ MaxmindDbSharedPtr GeoipProvider::initMaxmindDb(const std::string& db_path,
     RELEASE_ASSERT(MMDB_SUCCESS == result_code,
                    fmt::format("Unable to open Maxmind database file {}. Error {}", db_path,
                                std::string(MMDB_strerror(result_code))));
+    return nullptr;
   }
 
   config_->setDbBuildEpoch(db_type, maxmind_db.metadata.build_epoch);
