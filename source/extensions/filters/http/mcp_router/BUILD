@@ -10,10 +10,24 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "session_codec_lib",
+    srcs = ["session_codec.cc"],
+    hdrs = ["session_codec.h"],
+    deps = [
+        "//source/common/common:base64_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "mcp_router_lib",
     srcs = ["mcp_router.cc"],
     hdrs = ["mcp_router.h"],
     deps = [
+        ":session_codec_lib",
         "//envoy/http:async_client_interface",
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
@@ -21,7 +35,6 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:base64_lib",
         "//source/common/common:fmt_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:header_utility_lib",

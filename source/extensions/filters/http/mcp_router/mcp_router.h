@@ -13,6 +13,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/muxdemux.h"
+#include "source/extensions/filters/http/mcp_router/session_codec.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -38,28 +39,7 @@ enum class McpMethod {
 McpMethod parseMethodString(absl::string_view method_str);
 
 /**
- * Codec for encoding and decoding composite MCP session IDs.
- * Combines route, subject, and per-backend session IDs into a single encoded string.
- */
-class SessionCodec {
-public:
-  static std::string encode(const std::string& data);
-  static std::string decode(const std::string& encoded);
-
-  // Format: {route}@{subject}@{backend1}:{base64(sid1)},{backend2}:{base64(sid2)}
-  static std::string
-  buildCompositeSessionId(const std::string& route, const std::string& subject,
-                          const absl::flat_hash_map<std::string, std::string>& backend_sessions);
-
-  struct ParsedSession {
-    std::string route;
-    std::string subject;
-    absl::flat_hash_map<std::string, std::string> backend_sessions;
-  };
-  static absl::StatusOr<ParsedSession> parseCompositeSessionId(const std::string& composite);
-};
-
-/** Configuration for a single MCP backend server. */
+ * Configuration for a single MCP backend server. */
 struct McpBackendConfig {
   std::string name;
   std::string cluster_name;
