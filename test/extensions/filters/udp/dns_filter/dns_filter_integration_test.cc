@@ -35,6 +35,7 @@ public:
     ai->ai_addr = reinterpret_cast<sockaddr*>(storage);
     memcpy(ai->ai_addr, addr->sockAddr(), addr->sockAddrLen());
     ai->ai_addrlen = addr->sockAddrLen();
+    ai->ai_next = nullptr;
     return ai;
   }
 

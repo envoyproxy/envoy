@@ -413,6 +413,10 @@ new_features:
   change: |
     Propagated transport errors from tls_inspector to ``DownstreamTransportFailureReason`` in ``StreamInfo`` for access logging
     prior to the TLS handshake.
+- area: geoip
+  change: |
+    Added support for MaxMind Country database via
+    :ref:`country_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.country_db_path>`.
 - area: tls_inspector
   change: |
     Added configuration parameter to TLS inspector for maximum acceptable client hello size.
@@ -423,6 +427,11 @@ new_features:
   change: |
     Added ``match_included_headers`` to the request signing extension to allow positive header matching while excluding
     other non-SigV4-required headers.
+- area: geoip
+  change: |
+    Added :ref:`custom_header_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.custom_header_config>`
+    to allow extracting the client IP address from a custom request header which can be used instead of
+    ``x-forwarded-for`` header or downstream connection source address.
 - area: ext_authz
   change: |
     Added support for :ref:`metadata_context_namespaces
@@ -431,8 +440,35 @@ new_features:
     <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces>` in the
     ext-authz network filter. This allows passing connection metadata (such as proxy protocol TLV data) to the
     external authorization server for making authorization decisions.
+- area: admin
+  change: |
+    Added :ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>` to admin
+    interface to restrict access to specific admin endpoints. When configured, only paths matching
+    the specified string matchers will be accessible. All other paths will return 403 Forbidden.
 - area: attributes
   change: |
     Added :ref:`attributes <arch_overview_attributes>` for looking up request or response header bytes.
+- area: json_to_metadata
+  change: |
+    Added support for per-route configuration override in the ``json_to_metadata`` http filter. Routes can now
+    specify different JSON to metadata conversion rules via per-route configuration, allowing different routes
+    to extract different metadata from request or response bodies.
+- area: tracing
+  change: |
+    Dynatrace sampler parses and propagates trace capture reason in tracestate.
+- area: proxy_protocol
+  change: |
+    Added :ref:`tlv_location <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.tlv_location>`
+    configuration field to control where proxy protocol TLV values are stored. When set to ``FILTER_STATE``, TLV values
+    are stored in a single filter state object with key ``envoy.network.proxy_protocol.tlv``, enabling HTTP filters to
+    access TLV values via FilterStateInput without requiring custom HTTP filters to copy metadata. Individual TLV values
+    can be accessed via field access: ``%FILTER_STATE(envoy.network.proxy_protocol.tlv:FIELD:key)%``. Defaults to
+    ``DYNAMIC_METADATA`` to maintain existing behavior.
+- area: mcp
+  change: |
+    Added :ref:`MCP filter <config_http_filters_mcp>` for parsing Model Context Protocol (MCP) JSON-RPC requests.
+    The filter extracts the ``method`` and ``id`` fields from incoming requests and stores them in dynamic metadata
+    for use by downstream filters and access logging. Notifications (methods starting with ``notifications/``) are
+    correctly handled as they don't have an ``id`` field per the JSON-RPC specification.
 
 deprecated:

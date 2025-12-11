@@ -299,12 +299,12 @@ TEST_F(McpJsonParserTest, PartialParsingMidString) {
 
 TEST_F(McpJsonParserTest, PartialParsingEscapeSequence) {
   // Split in the middle of an escape sequence
-  std::string json1 = R"({"jsonrpc": "2.0", "method": "test", "params": {"text": "line1\)";
+  std::string json1 = R"({"jsonrpc": "2.0", "method": "test", "id": 1, "params": {"text": "line1\)";
 
-  auto status1 = parser_->parse(json1);
+  auto status = parser_->parse(json1);
 
   // Early termination.
-  EXPECT_FALSE(status1.ok());
+  EXPECT_FALSE(status.ok());
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
 }
@@ -1158,6 +1158,41 @@ TEST_F(McpJsonParserTest, StringsInArray) {
   const auto* list = parser_->getNestedValue("params.list");
   // Arrays are not stored in the metadata by McpFieldExtractor
   EXPECT_EQ(list, nullptr);
+}
+
+TEST_F(McpJsonParserTest, NotificationWithoutIdIsValid) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "notifications/initialized"
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), "notifications/initialized");
+
+  // id should not be present
+  const auto* id = parser_->getNestedValue("id");
+  EXPECT_EQ(id, nullptr);
+}
+
+TEST_F(McpJsonParserTest, CheckIdForRegularRequest) {
+  std::string json = R"({
+    "id": 2,
+    "jsonrpc": "2.0",
+    "params": {
+      "name": "tool1"
+    },
+    "method": "tools/call"
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+
+  const auto* id = parser_->getNestedValue("id");
+  ASSERT_NE(id, nullptr);
+  EXPECT_EQ(id->number_value(), 2);
 }
 
 } // namespace

@@ -7,10 +7,15 @@ permissions:
 
 on:
   pull_request_target:
+    branches:
+    - main
+    - release/v*
+    - ci/testing
   push:
     branches:
     - main
     - release/v*
+    - ci/testing
   schedule:
   - cron: '30 6 * * *'
 
