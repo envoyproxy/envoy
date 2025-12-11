@@ -1,6 +1,5 @@
 #include "source/extensions/access_loggers/filters/process_ratelimit/provider_singleton.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/grpc/common.h"
 
 namespace Envoy {
