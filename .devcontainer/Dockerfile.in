@@ -12,7 +12,7 @@ RUN apt-get -y update \
   && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
   && chmod 0440 /etc/sudoers.d/$USERNAME \
   # Create build directory and the volume will inherit the ownership
-  && mkdir -p $BUILD_DIR && chown $USERNAME:$USERNAME $BUILD_DIR \
+  && mv /home/$USERNAME $BUILD_DIR && chown $USERNAME:$USERNAME $BUILD_DIR \
   && usermod -d $BUILD_DIR $USERNAME
 
 ENV DEBIAN_FRONTEND=
