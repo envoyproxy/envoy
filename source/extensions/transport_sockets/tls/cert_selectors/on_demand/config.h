@@ -19,12 +19,14 @@ namespace OnDemand {
 
 #define ALL_CERT_SELECTION_STATS(COUNTER, GAUGE, HISTOGRAM)                                        \
   COUNTER(cert_requested)                                                                          \
+  COUNTER(cert_updated)                                                                            \
   GAUGE(cert_active, Accumulate)
 
 struct CertSelectionStats {
   ALL_CERT_SELECTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
                            GENERATE_HISTOGRAM_STRUCT)
 };
+using CertSelectionStatsSharedPtr = std::shared_ptr<CertSelectionStats>;
 
 class AsyncContext;
 using AsyncContextConstSharedPtr = std::shared_ptr<const AsyncContext>;
@@ -160,7 +162,7 @@ public:
 private:
   void doRemoveCertificateConfig(absl::string_view);
   const Stats::ScopeSharedPtr stats_scope_;
-  CertSelectionStats stats_;
+  CertSelectionStatsSharedPtr stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const envoy::config::core::v3::ConfigSource config_source_;
   // Envoy ensures that per-worker TLS sockets are destroyed before the

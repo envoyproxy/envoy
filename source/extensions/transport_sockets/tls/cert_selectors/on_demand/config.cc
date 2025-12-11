@@ -52,7 +52,7 @@ void Handle::notify(AsyncContextConstSharedPtr cert_ctx) {
                           active_context_->ocspStaplePolicy()) == Ssl::OcspStapleAction::Staple);
   }
   Event::Dispatcher& dispatcher = cb_->dispatcher();
-  // TODO: This could benefit from batching events by the dispatcher.
+  // TODO: This could benefit from batching events by the dispatcher in the outer loop.
   dispatcher.post([cb = std::move(cb_), cert_ctx, staple] {
     cb->onCertificateSelectionResult(
         makeOptRefFromPtr(cert_ctx ? &cert_ctx->tlsContext() : nullptr), staple);
@@ -60,8 +60,9 @@ void Handle::notify(AsyncContextConstSharedPtr cert_ctx) {
   cb_ = nullptr;
 }
 
-CertSelectionStats generateCertSelectionStats(Stats::Scope& store) {
-  return {ALL_CERT_SELECTION_STATS(POOL_COUNTER(store), POOL_GAUGE(store), POOL_HISTOGRAM(store))};
+CertSelectionStatsSharedPtr generateCertSelectionStats(Stats::Scope& store) {
+  return std::make_shared<CertSelectionStats>(CertSelectionStats{
+      ALL_CERT_SELECTION_STATS(POOL_COUNTER(store), POOL_GAUGE(store), POOL_HISTOGRAM(store))});
 }
 
 SecretManager::SecretManager(const ConfigProto& config,
@@ -100,8 +101,8 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
         [this](absl::string_view secret_name) -> absl::Status {
           return removeCertificateConfig(secret_name);
         });
-    stats_.cert_requested_.inc();
-    stats_.cert_active_.inc();
+    stats_->cert_requested_.inc();
+    stats_->cert_active_.inc();
   }
 }
 
@@ -174,7 +175,7 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name) {
   }
   cache_.erase(it);
   setContext(secret_name, nullptr);
-  stats_.cert_active_.dec();
+  stats_->cert_active_.dec();
   ENVOY_LOG(trace, "Removed certificate subscription for '{}', notified {} pending connections",
             secret_name, notify_count);
 }
@@ -200,14 +201,16 @@ HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
 }
 
 void SecretManager::setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx) {
-  cert_contexts_.runOnAllThreads([name = std::string(secret_name),
-                                  cert_ctx = std::move(cert_ctx)](OptRef<ThreadLocalCerts> certs) {
-    if (cert_ctx) {
-      certs->ctx_by_name_[name] = cert_ctx;
-    } else {
-      certs->ctx_by_name_.erase(name);
-    }
-  });
+  cert_contexts_.runOnAllThreads(
+      [name = std::string(secret_name),
+       cert_ctx = std::move(cert_ctx)](OptRef<ThreadLocalCerts> certs) {
+        if (cert_ctx) {
+          certs->ctx_by_name_[name] = cert_ctx;
+        } else {
+          certs->ctx_by_name_.erase(name);
+        }
+      },
+      [stats_scope = stats_scope_, stats = stats_] { stats->cert_updated_.inc(); });
 }
 
 absl::optional<AsyncContextConstSharedPtr>
