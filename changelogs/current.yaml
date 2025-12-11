@@ -472,7 +472,8 @@ new_features:
     correctly handled as they don't have an ``id`` field per the JSON-RPC specification.
 - area: ext_proc
   change: |
-    Added new method processingEffects within Filter State. This mehtod returns the per HTTP event procesing_effects that occurred
-    during the filter processing. Introduced a new enum to track if a mutation was applied or why it was rejected.
+    Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
+    ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
+    method processingEffects.
 
 deprecated:

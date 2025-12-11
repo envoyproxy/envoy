@@ -11,7 +11,7 @@ namespace ExternalProcessing {
 class ProcessingEffect {
 public:
   // The processing effect that was applied by the external processor.
-  enum class Effect : char {
+  enum class Effect : uint8_t {
     // No processing effect. This is the default value except for body request/responses with body
     // processing mode
     // FULL_DUPLEX_STREAMED. In this case MutationApplied if the default.
