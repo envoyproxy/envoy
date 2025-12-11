@@ -26,10 +26,10 @@ public:
   bool useXff() const { return use_xff_; }
   uint32_t xffNumTrustedHops() const { return xff_num_trusted_hops_; }
 
-  // Returns true if a custom header should be used to extract the IP address.
-  bool useIpAddressHeader() const { return ip_address_header_.has_value(); }
-  // Returns the header name to use for extracting the IP address.
-  const Http::LowerCaseString& ipAddressHeader() const { return ip_address_header_.value(); }
+  // Returns the custom header name to use for extracting the IP address, if configured.
+  const absl::optional<Http::LowerCaseString>& ipAddressHeader() const {
+    return ip_address_header_;
+  }
 
 private:
   void incCounter(Stats::StatName name);

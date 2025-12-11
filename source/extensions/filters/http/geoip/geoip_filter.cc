@@ -43,19 +43,20 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
   request_headers_ = headers;
 
   Network::Address::InstanceConstSharedPtr remote_address;
-  if (config_->useIpAddressHeader()) {
+  const auto& ip_address_header = config_->ipAddressHeader();
+  if (ip_address_header.has_value()) {
     // Extract IP address from the configured custom header.
-    const auto header_value = headers.get(config_->ipAddressHeader());
+    const auto header_value = headers.get(ip_address_header.value());
     if (!header_value.empty()) {
       const std::string ip_string(header_value[0]->value().getStringView());
       remote_address = Network::Utility::parseInternetAddressNoThrow(ip_string);
       if (remote_address == nullptr) {
         ENVOY_LOG(debug, "Geoip filter: failed to parse IP address from header '{}': '{}'",
-                  config_->ipAddressHeader().get(), ip_string);
+                  ip_address_header->get(), ip_string);
       }
     } else {
       ENVOY_LOG(debug, "Geoip filter: configured header '{}' is missing from request",
-                config_->ipAddressHeader().get());
+                ip_address_header->get());
     }
   } else if (config_->useXff() && config_->xffNumTrustedHops() > 0) {
     remote_address =

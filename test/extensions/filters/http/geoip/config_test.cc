@@ -26,10 +26,7 @@ public:
   static uint32_t xffNumTrustedHops(const GeoipFilter& filter) {
     return filter.config_->xffNumTrustedHops();
   }
-  static bool useIpAddressHeader(const GeoipFilter& filter) {
-    return filter.config_->useIpAddressHeader();
-  }
-  static const Http::LowerCaseString& ipAddressHeader(const GeoipFilter& filter) {
+  static const absl::optional<Http::LowerCaseString>& ipAddressHeader(const GeoipFilter& filter) {
     return filter.config_->ipAddressHeader();
   }
 };
@@ -59,11 +56,12 @@ MATCHER_P(HasXffNumTrustedHops, expected, "") {
 
 MATCHER_P(HasIpAddressHeader, expected, "") {
   auto filter = std::static_pointer_cast<GeoipFilter>(arg);
-  if (GeoipFilterPeer::ipAddressHeader(*filter).get() == expected) {
+  const auto& ip_address_header = GeoipFilterPeer::ipAddressHeader(*filter);
+  if (ip_address_header.has_value() && ip_address_header->get() == expected) {
     return true;
   }
   *result_listener << "expected ip_address_header=" << expected << " but was "
-                   << GeoipFilterPeer::ipAddressHeader(*filter).get();
+                   << (ip_address_header.has_value() ? ip_address_header->get() : "<nullopt>");
   return false;
 }
 
