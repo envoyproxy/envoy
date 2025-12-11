@@ -6,7 +6,7 @@ Redis
 Envoy can act as a Redis proxy, partitioning commands among instances in a cluster.
 In this mode, the goals of Envoy are to maintain availability and partition tolerance
 over consistency. This is the key point when comparing Envoy to `Redis Cluster
-<https://redis.io/topics/cluster-spec>`_. Envoy is designed as a best-effort cache,
+<https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/>`_. Envoy is designed as a best-effort cache,
 meaning that it will not try to reconcile inconsistent data or keep a globally consistent
 view of cluster membership. It also supports routing commands from different workloads to
 different upstream clusters based on their access patterns, eviction, or isolation
@@ -14,11 +14,11 @@ requirements.
 
 The Redis project offers a thorough reference on partitioning as it relates to Redis. See
 "`Partitioning: how to split data among multiple Redis instances
-<https://redis.io/topics/partitioning>`_".
+<https://redis.io/docs/latest/operate/oss_and_stack/management/scaling/>`_".
 
 **Features of Envoy Redis**:
 
-* `Redis protocol <https://redis.io/topics/protocol>`_ codec.
+* `Redis protocol <https://redis.io/docs/latest/develop/reference/protocol-spec/>`_ codec.
 * Hash-based partitioning.
 * Redis transaction support.
 * Ketama distribution.
@@ -66,12 +66,12 @@ close map to 5xx. All other responses from Redis are counted as a success.
 Redis Cluster Support
 ---------------------
 
-Envoy offers support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
+Envoy offers support for `Redis Cluster <https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/>`_.
 
 When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a non-cluster Redis client
 implemented in any language to connect to the proxy as if it's a single node Redis instance.
 The Envoy proxy will keep track of the cluster topology and send commands to the correct Redis node in the
-cluster according to the `spec <https://redis.io/topics/cluster-spec>`_. Advance features such as reading
+cluster according to the `spec <https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/>`_. Advance features such as reading
 from replicas can also be added to the Envoy proxy instead of updating redis clients in each language.
 
 Envoy proxy tracks the topology of the cluster by sending periodic
@@ -395,5 +395,5 @@ response for each in place of the value.
 Protocol
 --------
 
-Although `RESP <https://redis.io/docs/reference/protocol-spec/>`_ is recommended for production use,
-`inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_ are also supported.
+Although `RESP <https://redis.io/docs/latest/develop/reference/protocol-spec/>`_ is recommended for production use,
+`inline commands <https://redis.io/docs/latest/develop/reference/protocol-spec/#inline-commands>`_ are also supported.

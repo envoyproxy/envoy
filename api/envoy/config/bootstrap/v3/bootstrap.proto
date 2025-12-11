@@ -16,6 +16,7 @@ import "envoy/config/metrics/v3/stats.proto";
 import "envoy/config/overload/v3/overload.proto";
 import "envoy/config/trace/v3/http_tracer.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -425,7 +426,7 @@ message Bootstrap {
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Admin";
 
@@ -455,6 +456,21 @@ message Admin {
   // Indicates whether :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`
   // should apply to the admin interface or not.
   bool ignore_global_conn_limit = 6;
+
+  // List of admin paths that are accessible. If not specified, all admin endpoints are accessible.
+  //
+  // When specified, only paths in this list will be accessible, all others will return 403 Forbidden.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //   allow_paths:
+  //   - exact: /stats
+  //   - exact: /ready
+  //   - prefix: /healthcheck
+  //
+  repeated type.matcher.v3.StringMatcher allow_paths = 7;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.

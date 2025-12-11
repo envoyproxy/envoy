@@ -12,17 +12,20 @@ load("//bazel/external/cargo:crates.bzl", "raze_fetch_remote_crates")
 def _python_minor_version(python_version):
     return "_".join(python_version.split(".")[:-1])
 
+GLIBC_VERSION = "2.31"
+
 # Python version for `rules_python`
 PYTHON_VERSION = "3.12.3"
 PYTHON_MINOR_VERSION = _python_minor_version(PYTHON_VERSION)
 
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().
 def envoy_dependencies_extra(
+        glibc_version = GLIBC_VERSION,
         python_version = PYTHON_VERSION,
         ignore_root_user_error = False):
     compatibility_proxy_repo()
     bazel_toolchain_dependencies()
-    setup_sysroots()
+    setup_sysroots(glibc_version = glibc_version)
     emsdk_deps()
     raze_fetch_remote_crates()
     crate_repositories()

@@ -204,6 +204,8 @@ private:
   std::string current_path_cache_;
   size_t fields_needed_{0};
   size_t fields_collected_count_{0};
+  bool fields_needed_updated_{false};
+  bool is_notification_{false};
 };
 
 /**
