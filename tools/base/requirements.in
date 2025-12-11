@@ -6,8 +6,6 @@ aiodocker>=0.22.2
 aiohttp>=3.11.6
 aioquic>=0.9.21
 cffi>=1.15.0
-clang-format==18.1.8
-clang-tidy==18.1.8
 colorama
 coloredlogs
 # NB: When updating this dep you _must_ strip out all the unused wheel hashes

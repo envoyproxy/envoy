@@ -182,6 +182,14 @@ def envoy_dependency_imports(
         build_external = "external",
     )
 
+    go_repository(
+        name = "com_github_envoyproxy_protoc_gen_validate",
+        importpath = "github.com/envoyproxy/protoc-gen-validate",
+        sum = "h1:TvGH1wof4H33rezVKWSpqKz5NXWg5VPuZ0uONDT6eb4=",
+        version = "v1.3.0",
+        build_external = "external",
+    )
+
     rules_proto_grpc_toolchains()
 
 def envoy_download_go_sdks(go_version):

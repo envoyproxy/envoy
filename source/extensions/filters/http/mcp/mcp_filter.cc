@@ -181,7 +181,9 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   }
 
   // Linearize the buffer and create a string_view to avoid copying.
-  const char* linearized = static_cast<const char*>(data.linearize(bytes_parsed_ + to_parse));
+  // Also ensure we don't linearize more than the buffer contains.
+  size_t linearize_size = std::min(bytes_parsed_ + to_parse, buffer_size);
+  const char* linearized = static_cast<const char*>(data.linearize(linearize_size));
   absl::string_view parse_view(linearized + bytes_parsed_, to_parse);
 
   // The partial parser will return an OK status if the requirements are not satisfied.
