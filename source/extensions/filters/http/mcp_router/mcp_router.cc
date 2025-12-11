@@ -687,18 +687,16 @@ void McpRouterFilter::handlePingOrNotification() {
 }
 
 std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendResponse>& responses) {
-  // Check if at least one backend succeeded using std::any_of for clarity
+  // Check if at least one backend succeeded.
   const bool any_success = std::any_of(responses.begin(), responses.end(),
                                        [](const BackendResponse& resp) { return resp.success; });
 
   if (!any_success) {
-    // Use absl::StrCat for efficient string concatenation
     return absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_,
                         R"(,"error":{"code":-32603,"message":"All backends failed"}})");
   }
 
-  // Return gateway capabilities using absl::StrCat for efficiency
-  // Pre-computed static parts avoid repeated string operations
+  // Return gateway capabilities.
   return absl::StrCat(
       R"({"jsonrpc":"2.0","id":)", request_id_, R"(,"result":{)", R"("protocolVersion":")",
       kProtocolVersion, R"(",)",
