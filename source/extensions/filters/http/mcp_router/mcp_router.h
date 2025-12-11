@@ -266,11 +266,11 @@ private:
 
   // Aggregation state
   std::shared_ptr<std::vector<BackendResponse>> pending_responses_;
-  std::shared_ptr<std::atomic<size_t>> response_count_;
+  std::shared_ptr<size_t> response_count_;
   AggregationCallback aggregation_callback_;
   std::function<void(BackendResponse)> single_backend_callback_;
 
-  bool destroyed_{false};
+  std::shared_ptr<bool> destroyed_;
   bool initialized_{false};     // Track if fanout/backend has been initialized
   bool fire_and_forget_{false}; // If true, detach resources on destroy instead of resetting
 };

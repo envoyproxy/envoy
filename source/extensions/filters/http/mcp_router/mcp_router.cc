@@ -201,12 +201,13 @@ void BackendStreamCallbacks::complete() {
 }
 
 McpRouterFilter::McpRouterFilter(McpRouterConfigSharedPtr config)
-    : config_(std::move(config)), muxdemux_(Http::MuxDemux::create(config_->factoryContext())) {}
+    : config_(std::move(config)), muxdemux_(Http::MuxDemux::create(config_->factoryContext())),
+      destroyed_(std::make_shared<bool>(false)) {}
 
 McpRouterFilter::~McpRouterFilter() = default;
 
 void McpRouterFilter::onDestroy() {
-  destroyed_ = true;
+  *destroyed_ = true;
 
   // For fire-and-forget fanout, transfer resources to ThreadLocalFanoutManager
   // so upstream requests can complete after the filter is destroyed
@@ -236,7 +237,7 @@ void McpRouterFilter::onDestroy() {
 
 Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                          bool end_stream) {
-  // MCP protocol requires POST method
+  // TODO(botengyao): also supports /GET sse endpoints.
   if (headers.Method() &&
       headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Get) {
     sendHttpError(405, "Method Not Allowed");
@@ -473,7 +474,8 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
   size_t expected = config_->backends().size();
   pending_responses_ = std::make_shared<std::vector<BackendResponse>>();
   pending_responses_->reserve(expected);
-  response_count_ = std::make_shared<std::atomic<size_t>>(0);
+  response_count_ = std::make_shared<size_t>(0);
+  // destroyed_ is already initialized in constructor
   aggregation_callback_ = std::move(callback);
 
   std::vector<Http::MuxDemux::Callbacks> mux_callbacks;
@@ -484,7 +486,7 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
     auto count = response_count_;
     auto expected_count = expected;
     auto agg_callback = aggregation_callback_;
-    auto destroyed = &destroyed_;
+    auto destroyed = destroyed_;
 
     auto stream_cb = std::make_shared<BackendStreamCallbacks>(
         backend.name,
@@ -598,7 +600,7 @@ void McpRouterFilter::handleInitialize() {
   ENVOY_LOG(debug, "Initialize: setting up fanout to {} backends", config_->backends().size());
 
   initializeFanout([this](std::vector<BackendResponse> responses) {
-    if (destroyed_)
+    if (*destroyed_)
       return;
 
     // TODO(botengyao): handle text/event-stream from backends.
@@ -629,7 +631,7 @@ void McpRouterFilter::handleToolsList() {
   ENVOY_LOG(debug, "tools/list: setting up fanout to {} backends", config_->backends().size());
 
   initializeFanout([this](std::vector<BackendResponse> responses) {
-    if (destroyed_)
+    if (*destroyed_)
       return;
 
     std::string response_body = aggregateToolsList(responses);
@@ -660,7 +662,7 @@ void McpRouterFilter::handleToolsCall() {
             tool_name_, actual_tool, needs_body_rewrite_);
 
   initializeSingleBackend(*backend, [this](BackendResponse resp) {
-    if (destroyed_)
+    if (*destroyed_)
       return;
 
     if (resp.success) {
@@ -828,7 +830,7 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
 }
 
 void McpRouterFilter::sendJsonResponse(const std::string& body, const std::string& session_id) {
-  if (destroyed_)
+  if (*destroyed_)
     return;
 
   auto headers = Http::ResponseHeaderMapImpl::create();
@@ -849,7 +851,7 @@ void McpRouterFilter::sendJsonResponse(const std::string& body, const std::strin
 }
 
 void McpRouterFilter::sendAccepted() {
-  if (destroyed_)
+  if (*destroyed_)
     return;
 
   auto headers = Http::ResponseHeaderMapImpl::create();
@@ -863,7 +865,7 @@ void McpRouterFilter::sendAccepted() {
 }
 
 void McpRouterFilter::sendHttpError(uint64_t status_code, const std::string& message) {
-  if (destroyed_)
+  if (*destroyed_)
     return;
 
   auto headers = Http::ResponseHeaderMapImpl::create();
