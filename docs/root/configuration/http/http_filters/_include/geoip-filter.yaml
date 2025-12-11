@@ -41,6 +41,7 @@ static_resources:
                   city_db_path: "geoip/GeoLite2-City-Test.mmdb"
                   isp_db_path: "geoip/GeoIP2-ISP-Test.mmdb"
                   asn_db_path: "geoip/GeoLite2-ASN-Test.mmdb"
+                  country_db_path: "geoip/GeoIP2-Country-Test.mmdb"
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
