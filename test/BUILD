@@ -52,6 +52,7 @@ envoy_cc_test_library(
         "//test/mocks/access_log:access_log_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:global_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:printers_lib",
     ],
 )

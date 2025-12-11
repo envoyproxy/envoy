@@ -17,7 +17,7 @@ static_resources:
             - name: local_service
               domains: ["*"]
               typed_per_filter_config:
-                envoy.filters.http.compression:
+                envoy.filters.http.compressor:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
                   disabled: true
               routes:
@@ -26,10 +26,10 @@ static_resources:
                 route:
                   cluster: service
                 typed_per_filter_config:
-                  envoy.filters.http.compression:
+                  envoy.filters.http.compressor:
                     "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
                     overrides:
-                      response_direction_config:
+                      response_direction_config: {}
               - match:
                   prefix: "/"
                 route:

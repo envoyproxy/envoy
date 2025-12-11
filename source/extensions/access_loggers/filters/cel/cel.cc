@@ -22,7 +22,7 @@ CELAccessLogExtensionFilter::CELAccessLogExtensionFilter(
         return std::move(compiled_expr.value());
       }()) {}
 
-bool CELAccessLogExtensionFilter::evaluate(const Formatter::HttpFormatterContext& log_context,
+bool CELAccessLogExtensionFilter::evaluate(const Formatter::Context& log_context,
                                            const StreamInfo::StreamInfo& stream_info) const {
   Protobuf::Arena arena;
   const auto result =

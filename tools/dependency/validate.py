@@ -133,7 +133,10 @@ class BuildGraph:
         return deps - exclude_deps
 
     async def _deps_query(self, query_string):
-        return self._mangle_deps_set(await query(query_string))
+        return self._mangle_deps_set(
+            await query(
+                query_string,
+                query_options=tuple(os.environ.get("BAZEL_QUERY_OPTION_LIST", "").split())))
 
     def _filtered_deps_query(self, targets):
         return f'filter("^@.*//", deps(set({" ".join(targets)})))'

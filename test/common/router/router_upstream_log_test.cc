@@ -534,18 +534,18 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
   EXPECT_CALL(*mock_upstream_log_, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamPeriodic);
+      .WillOnce(Invoke(
+          [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamPeriodic);
 
-        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10);
+            EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10);
 
-        EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastUpstreamPeriodicLog(),
-                    testing::IsNull());
-        EXPECT_EQ(stream_info.getUpstreamBytesMeter()->wireBytesReceived(), 9);
-        EXPECT_THAT(stream_info.getUpstreamBytesMeter()->bytesAtLastUpstreamPeriodicLog(),
-                    testing::IsNull());
-      }));
+            EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastUpstreamPeriodicLog(),
+                        testing::IsNull());
+            EXPECT_EQ(stream_info.getUpstreamBytesMeter()->wireBytesReceived(), 9);
+            EXPECT_THAT(stream_info.getUpstreamBytesMeter()->bytesAtLastUpstreamPeriodicLog(),
+                        testing::IsNull());
+          }));
   periodic_log_flush_->invokeCallback();
 
   callbacks_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(8);
@@ -553,21 +553,21 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
   EXPECT_CALL(*mock_upstream_log_, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamPeriodic);
+      .WillOnce(Invoke(
+          [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamPeriodic);
 
-        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10 + 8);
-        EXPECT_EQ(stream_info.getDownstreamBytesMeter()
-                      ->bytesAtLastUpstreamPeriodicLog()
-                      ->wire_bytes_received,
-                  10);
-        EXPECT_EQ(stream_info.getUpstreamBytesMeter()->wireBytesReceived(), 9 + 7);
-        EXPECT_EQ(stream_info.getUpstreamBytesMeter()
-                      ->bytesAtLastUpstreamPeriodicLog()
-                      ->wire_bytes_received,
-                  9);
-      }));
+            EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10 + 8);
+            EXPECT_EQ(stream_info.getDownstreamBytesMeter()
+                          ->bytesAtLastUpstreamPeriodicLog()
+                          ->wire_bytes_received,
+                      10);
+            EXPECT_EQ(stream_info.getUpstreamBytesMeter()->wireBytesReceived(), 9 + 7);
+            EXPECT_EQ(stream_info.getUpstreamBytesMeter()
+                          ->bytesAtLastUpstreamPeriodicLog()
+                          ->wire_bytes_received,
+                      9);
+          }));
   periodic_log_flush_->invokeCallback();
 
   Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl());
@@ -580,21 +580,21 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
                   .host_->outlier_detector_,
               putResult(_, absl::optional<uint64_t>(200)));
   EXPECT_CALL(*mock_upstream_log_, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
+      .WillOnce(Invoke(
+          [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
 
-        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10 + 8 + 6);
-        EXPECT_EQ(stream_info.getDownstreamBytesMeter()
-                      ->bytesAtLastUpstreamPeriodicLog()
-                      ->wire_bytes_received,
-                  10 + 8);
-        EXPECT_EQ(stream_info.getUpstreamBytesMeter()->wireBytesReceived(), 9 + 7 + 5);
-        EXPECT_EQ(stream_info.getUpstreamBytesMeter()
-                      ->bytesAtLastUpstreamPeriodicLog()
-                      ->wire_bytes_received,
-                  9 + 7);
-      }));
+            EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10 + 8 + 6);
+            EXPECT_EQ(stream_info.getDownstreamBytesMeter()
+                          ->bytesAtLastUpstreamPeriodicLog()
+                          ->wire_bytes_received,
+                      10 + 8);
+            EXPECT_EQ(stream_info.getUpstreamBytesMeter()->wireBytesReceived(), 9 + 7 + 5);
+            EXPECT_EQ(stream_info.getUpstreamBytesMeter()
+                          ->bytesAtLastUpstreamPeriodicLog()
+                          ->wire_bytes_received,
+                      9 + 7);
+          }));
   response_decoder->decodeHeaders(std::move(response_headers), false);
 
   EXPECT_CALL(*periodic_log_flush_, disableTimer());

@@ -127,6 +127,7 @@ public:
 
   EngineBuilder& setLogLevel(Logger::Logger::Levels log_level);
   EngineBuilder& setLogger(std::unique_ptr<EnvoyLogger> logger);
+  EngineBuilder& enableLogger(bool logger_on);
   EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
   EngineBuilder& setOnEngineRunning(absl::AnyInvocable<void()> closure);
   EngineBuilder& setOnEngineExit(absl::AnyInvocable<void()> closure);
@@ -180,6 +181,8 @@ public:
   // TODO(abeyad): change this method and the other language APIs to take a {host,port} pair.
   // E.g. addDnsPreresolveHost(std::string host, uint32_t port);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
+  EngineBuilder&
+  setDnsResolver(const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
   EngineBuilder& addNativeFilter(const std::string& name, const Protobuf::Any& typed_config);
 
@@ -202,6 +205,9 @@ public:
   // The value must be an integer between -20 (highest priority) and 19 (lowest priority). Values
   // outside of this range will be ignored.
   EngineBuilder& setNetworkThreadPriority(int thread_priority);
+  // Sets the high watermark for the response buffer. The low watermark is set to half of this
+  // value. Defaults to 2MB if not set.
+  EngineBuilder& setBufferHighWatermark(size_t high_watermark);
 
   // Sets the QUIC connection idle timeout in seconds.
   EngineBuilder& setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds);
@@ -218,6 +224,8 @@ public:
   EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
   // Sets the node.metadata field in the Bootstrap configuration.
   EngineBuilder& setNodeMetadata(Protobuf::Struct node_metadata);
+  // Sets whether to collect Envoy's internal stats (counters & guages). Off by default.
+  EngineBuilder& enableStatsCollection(bool stats_collection_on);
 
 #ifdef ENVOY_MOBILE_XDS
   // Sets the xDS configuration for the Envoy Mobile engine.
@@ -258,6 +266,7 @@ private:
 
   Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;
   std::unique_ptr<EnvoyLogger> logger_{nullptr};
+  bool enable_logger_{true};
   std::unique_ptr<EngineCallbacks> callbacks_;
   std::unique_ptr<EnvoyEventTracker> event_tracker_{nullptr};
 
@@ -284,6 +293,7 @@ private:
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
   absl::optional<int> network_thread_priority_ = absl::nullopt;
+  absl::optional<size_t> high_watermark_ = absl::nullopt;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
@@ -307,6 +317,7 @@ private:
 
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::pair<std::string /* host */, uint32_t /* port */>> dns_preresolve_hostnames_;
+  absl::optional<envoy::config::core::v3::TypedExtensionConfig> dns_resolver_config_;
   std::vector<envoy::config::core::v3::SocketOption> socket_options_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
@@ -332,6 +343,7 @@ private:
   std::string node_id_;
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;
   absl::optional<Protobuf::Struct> node_metadata_ = absl::nullopt;
+  bool enable_stats_collection_ = true;
 #ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif // ENVOY_MOBILE_XDS

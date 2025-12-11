@@ -369,6 +369,9 @@ TEST(BasicFilterConfigTest, TestConfigurationWithTracing) {
       route_config_name: test_route
     tracing:
       max_path_tag_length: 128
+      custom_tags:
+      - tag: "trace-id"
+        value: "%REQUEST_PROPERTY(X-TRACE-ID)%"
       provider:
         name: zipkin
         typed_config:

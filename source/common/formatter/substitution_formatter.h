@@ -33,12 +33,10 @@ public:
   PlainStringFormatter(absl::string_view str) { str_.set_string_value(str); }
 
   // FormatterProvider
-  absl::optional<std::string> formatWithContext(const Context&,
-                                                const StreamInfo::StreamInfo&) const override {
+  absl::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override {
     return str_.string_value();
   }
-  Protobuf::Value formatValueWithContext(const Context&,
-                                         const StreamInfo::StreamInfo&) const override {
+  Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override {
     return str_;
   }
 
@@ -54,13 +52,11 @@ public:
   PlainNumberFormatter(double num) { num_.set_number_value(num); }
 
   // FormatterProvider
-  absl::optional<std::string> formatWithContext(const Context&,
-                                                const StreamInfo::StreamInfo&) const override {
+  absl::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override {
     std::string str = absl::StrFormat("%g", num_.number_value());
     return str;
   }
-  Protobuf::Value formatValueWithContext(const Context&,
-                                         const StreamInfo::StreamInfo&) const override {
+  Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override {
     return num_;
   }
 
@@ -91,8 +87,8 @@ public:
          const CommandParsers& command_parsers = {});
 
   // Formatter
-  std::string formatWithContext(const Context& context,
-                                const StreamInfo::StreamInfo& stream_info) const override;
+  std::string format(const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
   FormatterImpl(absl::Status& creation_status, absl::string_view format,
@@ -118,8 +114,7 @@ public:
                     const CommandParsers& commands = {});
 
   // Formatter
-  std::string formatWithContext(const Context& context,
-                                const StreamInfo::StreamInfo& info) const override;
+  std::string format(const Context& context, const StreamInfo::StreamInfo& info) const override;
 
 private:
   const bool omit_empty_values_;

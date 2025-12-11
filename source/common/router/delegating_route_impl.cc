@@ -5,7 +5,7 @@ namespace Router {
 
 // Router:DelegatingRouteEntry
 void DelegatingRouteEntry::finalizeResponseHeaders(
-    Http::ResponseHeaderMap& headers, const Formatter::HttpFormatterContext& context,
+    Http::ResponseHeaderMap& headers, const Formatter::Context& context,
     const StreamInfo::StreamInfo& stream_info) const {
   return base_route_entry_->finalizeResponseHeaders(headers, context, stream_info);
 }
@@ -30,13 +30,13 @@ const CorsPolicy* DelegatingRouteEntry::corsPolicy() const {
 
 std::string
 DelegatingRouteEntry::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
-                                                 const Formatter::HttpFormatterContext& context,
+                                                 const Formatter::Context& context,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   return base_route_entry_->currentUrlPathAfterRewrite(headers, context, stream_info);
 }
 
 void DelegatingRouteEntry::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
-                                                  const Formatter::HttpFormatterContext& context,
+                                                  const Formatter::Context& context,
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   bool insert_envoy_original_path) const {
   return base_route_entry_->finalizeRequestHeaders(headers, context, stream_info,

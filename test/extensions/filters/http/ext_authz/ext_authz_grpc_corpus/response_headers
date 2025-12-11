@@ -1,0 +1,50 @@
+base {
+  config {
+  }
+  request_data {
+    headers {
+      headers {
+        key: "overwrite-if-exists"
+        value: "original-value"
+      }
+    }
+  }
+  response_data {
+  }
+}
+response {
+  status {
+    code: 0
+    message: "LGTM!"
+  }
+  ok_response {
+    response_headers_to_add {
+      header {
+        key: "append-if-exists-or-add"
+        value: "foo"
+      }
+      append_action: APPEND_IF_EXISTS_OR_ADD
+    }
+    response_headers_to_add {
+      header {
+        key: "add-if-absent"
+        value: "foo"
+      }
+      append_action: ADD_IF_ABSENT
+    }
+    response_headers_to_add {
+      header {
+        key: "overwrite-if-exists-or-add"
+        value: "foo"
+      }
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    }
+    response_headers_to_add {
+      header {
+        key: "overwrite-if-exists"
+        value: "foo"
+      }
+      append_action: OVERWRITE_IF_EXISTS
+    }
+  }
+}

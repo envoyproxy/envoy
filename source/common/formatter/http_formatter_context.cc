@@ -10,11 +10,19 @@ namespace Envoy {
 namespace Formatter {
 
 static constexpr absl::string_view DEFAULT_FORMAT =
-    "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
-    "%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "
-    "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "
-    "\"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" "
-    "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
+    "[%START_TIME%] "
+    "\"%REQUEST_HEADER(:METHOD)% %REQUEST_HEADER(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
+    "%RESPONSE_CODE% "
+    "%RESPONSE_FLAGS% "
+    "%BYTES_RECEIVED% "
+    "%BYTES_SENT% "
+    "%DURATION% "
+    "%RESPONSE_HEADER(X-ENVOY-UPSTREAM-SERVICE-TIME)% "
+    "\"%REQUEST_HEADER(X-FORWARDED-FOR)%\" "
+    "\"%REQUEST_HEADER(USER-AGENT)%\" "
+    "\"%REQUEST_HEADER(X-REQUEST-ID)%\" "
+    "\"%REQUEST_HEADER(:AUTHORITY)%\" "
+    "\"%UPSTREAM_HOST%\"\n";
 
 absl::StatusOr<FormatterPtr> HttpSubstitutionFormatUtils::defaultSubstitutionFormatter() {
   // It is possible that failed to parse the default format string if the required formatters

@@ -191,7 +191,9 @@ private:
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
 
-    void sendGoAwayAndClose() override { return connection_manager_.sendGoAwayAndClose(); }
+    void sendGoAwayAndClose(bool graceful = false) override {
+      return connection_manager_.sendGoAwayAndClose(graceful);
+    }
 
     AccessLog::InstanceSharedPtrVector accessLogHandlers() override {
       const AccessLog::InstanceSharedPtrVector& config_log_handlers =
@@ -601,7 +603,7 @@ private:
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
-  void sendGoAwayAndClose();
+  void sendGoAwayAndClose(bool graceful = false);
 
   // Returns true if a RST_STREAM for the given stream is premature. Premature
   // means the RST_STREAM arrived before response headers were sent and than

@@ -96,7 +96,7 @@ RegisterForeignFunction registerVerifySignatureForeignFunction(
     [](WasmBase&, std::string_view arguments,
        const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       envoy::source::extensions::common::wasm::VerifySignatureArguments args;
-      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+      if (args.ParseFromString(arguments)) {
         const auto& hash = args.hash_function();
         auto signature_str = args.signature();
         auto text_str = args.text();
@@ -209,8 +209,12 @@ RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
     [](WasmBase&, std::string_view arguments,
        const std::function<void*(size_t size)>&) -> WasmResult {
       envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments args;
-      if (args.ParseFromArray(arguments.data(), arguments.size())) {
-        auto context = static_cast<Context*>(proxy_wasm::current_context_);
+      if (args.ParseFromString(arguments)) {
+        auto context = static_cast<Context*>(
+            Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.wasm_use_effective_ctx_for_foreign_functions")
+                ? proxy_wasm::contextOrEffectiveContext()
+                : proxy_wasm::current_context_);
         return context->setEnvoyFilterState(args.path(), args.value(),
                                             toFilterStateLifeSpan(args.span()));
       }
@@ -220,7 +224,11 @@ RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
 RegisterForeignFunction registerClearRouteCacheForeignFunction(
     "clear_route_cache",
     [](WasmBase&, std::string_view, const std::function<void*(size_t size)>&) -> WasmResult {
-      auto context = static_cast<Context*>(proxy_wasm::current_context_);
+      auto context = static_cast<Context*>(
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.wasm_use_effective_ctx_for_foreign_functions")
+              ? proxy_wasm::contextOrEffectiveContext()
+              : proxy_wasm::current_context_);
       context->clearRouteCache();
       return WasmResult::Ok;
     });
@@ -393,7 +401,7 @@ public:
     WasmForeignFunction f = [self](WasmBase&, std::string_view arguments,
                                    const std::function<void*(size_t size)>&) -> WasmResult {
       envoy::source::extensions::common::wasm::DeclarePropertyArguments args;
-      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+      if (args.ParseFromString(arguments)) {
         CelStateType type = CelStateType::Bytes;
         switch (args.type()) {
         case envoy::source::extensions::common::wasm::WasmType::Bytes:

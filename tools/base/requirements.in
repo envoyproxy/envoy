@@ -6,8 +6,6 @@ aiodocker>=0.22.2
 aiohttp>=3.11.6
 aioquic>=0.9.21
 cffi>=1.15.0
-clang-format==18.1.8
-clang-tidy==18.1.8
 colorama
 coloredlogs
 # NB: When updating this dep you _must_ strip out all the unused wheel hashes
@@ -37,7 +35,7 @@ pep8-naming
 ply
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
-protobuf<5.30.0
+protobuf<6.34.0
 pygithub
 pyopenssl>=24.2.1
 pyreadline

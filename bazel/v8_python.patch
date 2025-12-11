@@ -1,0 +1,22 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index f2b2f4da0f8..26aebd1fdca 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -4136,11 +4136,15 @@ genrule(
+         "src/inspector/protocol/Schema.cpp",
+         "src/inspector/protocol/Schema.h",
+     ],
+-    cmd = "$(location :code_generator) --jinja_dir . \
++    cmd = """
++        export PATH=$$(dirname $$(realpath $(PYTHON3))):$$PATH
++        $(location :code_generator) --jinja_dir . \
+            --inspector_protocol_dir third_party/inspector_protocol \
+            --config $(location :src/inspector/inspector_protocol_config.json) \
+            --config_value protocol.path=$(location :include/js_protocol.pdl) \
+-           --output_base $(@D)/src/inspector",
++           --output_base $(@D)/src/inspector
++    """,
++    toolchains = ["@rules_python//python:current_py_toolchain"],
+     local = 1,
+     message = "Generating inspector files",
+     tools = [

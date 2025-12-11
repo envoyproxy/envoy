@@ -160,6 +160,7 @@ Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) 
     ENVOY_CONN_LOG(trace, "Successfully stripped {} bytes of CONNECT header",
                    callbacks_->connection(), bytes_processed);
     need_to_strip_connect_response_ = false;
+    callbacks_->flushWriteBuffer();
   }
   return transport_socket_->doRead(buffer);
 }

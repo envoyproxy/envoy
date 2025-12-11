@@ -1,5 +1,3 @@
-load("github.com/repokitteh/modules/lib/utils.star", "react")
-
 _azp_context_prefix = "ci/azp: "
 _azp_organization = "cncf"
 
@@ -61,6 +59,5 @@ def _retry(config, comment_id, command):
         reaction = "+1"
 
     github.issue_create_comment_reaction(comment_id, reaction)
-
 
 handlers.command(name = "retry-azp", func = _retry)

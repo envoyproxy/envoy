@@ -7,11 +7,8 @@ load(
     "READFILTER_FUZZ_FILTERS",
     "READFILTER_NOFUZZ_FILTERS",
 )
-load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
-
-envoy_py_namespace()
 
 FUZZ_FILTER_COUNT = (
     len(READFILTER_FUZZ_FILTERS) +

@@ -53,6 +53,7 @@ HTTP filters
   local_rate_limit_filter
   lua_filter
   mcp_filter
+  mcp_router_filter
   oauth2_filter
   on_demand_updates_filter
   original_src_filter
@@ -69,3 +70,4 @@ HTTP filters
   thrift_to_metadata_filter
   upstream_codec_filter
   wasm_filter
+  transform_filter

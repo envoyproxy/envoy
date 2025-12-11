@@ -724,7 +724,7 @@ duration_filter:
   NiceMock<MockTimeSystem> time_source;
   TestStreamInfo stream_info(time_source);
 
-  const Formatter::HttpFormatterContext log_context{&request_headers};
+  const Formatter::Context log_context{&request_headers};
 
   stream_info.end_time_ = stream_info.startTimeMonotonic() + std::chrono::microseconds(100000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1));
@@ -763,7 +763,7 @@ duration_filter:
   DurationFilter filter(config.duration_filter(), runtime);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
 
-  const Formatter::HttpFormatterContext log_context{&request_headers};
+  const Formatter::Context log_context{&request_headers};
 
   StreamInfo::MockStreamInfo mock_stream_info;
   EXPECT_CALL(mock_stream_info, currentDuration())
@@ -794,7 +794,7 @@ status_code_filter:
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestStreamInfo info(time_source);
 
-  const Formatter::HttpFormatterContext log_context{&request_headers};
+  const Formatter::Context log_context{&request_headers};
 
   info.setResponseCode(400);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(350));
@@ -1705,8 +1705,7 @@ public:
   SampleExtensionFilter(uint32_t sample_rate) : sample_rate_(sample_rate) {}
 
   // AccessLog::Filter
-  bool evaluate(const Formatter::HttpFormatterContext&,
-                const StreamInfo::StreamInfo&) const override {
+  bool evaluate(const Formatter::Context&, const StreamInfo::StreamInfo&) const override {
     if (current_++ == 0) {
       return true;
     }

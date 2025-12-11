@@ -258,7 +258,11 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "config_dump_handler_test",
-    srcs = envoy_select_admin_functionality(["config_dump_handler_test.cc"]),
+    srcs = select({
+        "//bazel:disable_admin_functionality": [],
+        "//bazel:disable_http3": [],
+        "//conditions:default": ["config_dump_handler_test.cc"],
+    }),
     rbe_pool = "6gig",
     deps = [
         ":admin_instance_lib",

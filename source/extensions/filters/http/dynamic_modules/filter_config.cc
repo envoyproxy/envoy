@@ -53,8 +53,8 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
 
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
-    Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-    Server::Configuration::ServerFactoryContext& context) {
+    const bool terminal_filter, Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+    Stats::Scope& stats_scope, Server::Configuration::ServerFactoryContext& context) {
   auto constructor =
       dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_config_new)>(
           "envoy_dynamic_module_on_http_filter_config_new");
@@ -105,9 +105,42 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
       "envoy_dynamic_module_on_http_filter_http_callout_done");
   RETURN_IF_NOT_OK_REF(on_http_callout_done.status());
 
+  auto on_http_stream_headers =
+      dynamic_module->getFunctionPointer<OnHttpFilterHttpStreamHeadersType>(
+          "envoy_dynamic_module_on_http_filter_http_stream_headers");
+  RETURN_IF_NOT_OK_REF(on_http_stream_headers.status());
+
+  auto on_http_stream_data = dynamic_module->getFunctionPointer<OnHttpFilterHttpStreamDataType>(
+      "envoy_dynamic_module_on_http_filter_http_stream_data");
+  RETURN_IF_NOT_OK_REF(on_http_stream_data.status());
+
+  auto on_http_stream_trailers =
+      dynamic_module->getFunctionPointer<OnHttpFilterHttpStreamTrailersType>(
+          "envoy_dynamic_module_on_http_filter_http_stream_trailers");
+  RETURN_IF_NOT_OK_REF(on_http_stream_trailers.status());
+
+  auto on_http_stream_complete =
+      dynamic_module->getFunctionPointer<OnHttpFilterHttpStreamCompleteType>(
+          "envoy_dynamic_module_on_http_filter_http_stream_complete");
+  RETURN_IF_NOT_OK_REF(on_http_stream_complete.status());
+
+  auto on_http_stream_reset = dynamic_module->getFunctionPointer<OnHttpFilterHttpStreamResetType>(
+      "envoy_dynamic_module_on_http_filter_http_stream_reset");
+  RETURN_IF_NOT_OK_REF(on_http_stream_reset.status());
+
   auto on_scheduled = dynamic_module->getFunctionPointer<OnHttpFilterScheduled>(
       "envoy_dynamic_module_on_http_filter_scheduled");
   RETURN_IF_NOT_OK_REF(on_scheduled.status());
+
+  auto on_downstream_above_write_buffer_high_watermark =
+      dynamic_module->getFunctionPointer<OnHttpFilterDownstreamAboveWriteBufferHighWatermark>(
+          "envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark");
+  RETURN_IF_NOT_OK_REF(on_downstream_above_write_buffer_high_watermark.status());
+
+  auto on_downstream_below_write_buffer_low_watermark =
+      dynamic_module->getFunctionPointer<OnHttpFilterDownstreamBelowWriteBufferLowWatermark>(
+          "envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark");
+  RETURN_IF_NOT_OK_REF(on_downstream_below_write_buffer_low_watermark.status());
 
   auto config = std::make_shared<DynamicModuleHttpFilterConfig>(
       filter_name, filter_config, std::move(dynamic_module), stats_scope, context);
@@ -119,6 +152,7 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
     return absl::InvalidArgumentError("Failed to initialize dynamic module");
   }
 
+  config->terminal_filter_ = terminal_filter;
   config->stat_creation_frozen_ = true;
 
   config->in_module_config_ = filter_config_envoy_ptr;
@@ -133,7 +167,16 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
   config->on_http_filter_stream_complete_ = on_filter_stream_complete.value();
   config->on_http_filter_destroy_ = on_filter_destroy.value();
   config->on_http_filter_http_callout_done_ = on_http_callout_done.value();
+  config->on_http_filter_http_stream_headers_ = on_http_stream_headers.value();
+  config->on_http_filter_http_stream_data_ = on_http_stream_data.value();
+  config->on_http_filter_http_stream_trailers_ = on_http_stream_trailers.value();
+  config->on_http_filter_http_stream_complete_ = on_http_stream_complete.value();
+  config->on_http_filter_http_stream_reset_ = on_http_stream_reset.value();
   config->on_http_filter_scheduled_ = on_scheduled.value();
+  config->on_http_filter_downstream_above_write_buffer_high_watermark_ =
+      on_downstream_above_write_buffer_high_watermark.value();
+  config->on_http_filter_downstream_below_write_buffer_low_watermark_ =
+      on_downstream_below_write_buffer_low_watermark.value();
   return config;
 }
 

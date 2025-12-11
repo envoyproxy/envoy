@@ -10,3 +10,17 @@ index c825050b..7dd168db 100644
          # Select avoids recompiling native arch if only non-native changed
      ] + select({
          ":compiler_emscripten": [
+diff --git a/BUILD b/BUILD
+index c825050b..23f5a03c 100644
+--- a/BUILD
++++ b/BUILD
+@@ -130,6 +130,9 @@ COPTS = select({
+         "-march=rv64gcv1p0",
+         "-menable-experimental-extensions",
+     ],
++    "@platforms//cpu:ppc64le": [
++        "-DTOOLCHAIN_MISS_ASM_HWCAP_H"
++    ],
+     "//conditions:default": [
+     ],
+ })

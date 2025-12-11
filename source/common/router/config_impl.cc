@@ -32,6 +32,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
@@ -517,12 +518,22 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                                      : RetryPolicyImpl::DefaultRetryPolicy;
 
   if (route.has_direct_response() && route.direct_response().has_body()) {
-    auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider::create(
+    auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider<std::string>::create(
         route.direct_response().body(), factory_context.mainThreadDispatcher(),
         factory_context.threadLocal(), factory_context.api(), true,
+        [](absl::string_view data) { return std::make_shared<std::string>(data); },
         vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
     SET_AND_RETURN_IF_NOT_OK(provider_or_error.status(), creation_status);
     direct_response_body_provider_ = std::move(provider_or_error.value());
+  }
+
+  if (route.direct_response().has_body_format()) {
+    Server::GenericFactoryContextImpl generic_context(factory_context,
+                                                      factory_context.messageValidationVisitor());
+    auto formatter_or_error = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+        route.direct_response().body_format(), generic_context);
+    SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
+    direct_response_body_formatter_ = std::move(formatter_or_error.value());
   }
 
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
@@ -683,7 +694,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           absl::StrCat("Failed to create path rewrite formatter: ", formatter_or.status()));
       return;
     }
-    path_rewrite_formatter_ = std::move(formatter_or).value();
+    path_rewrite_formatter_ = std::move(formatter_or.value());
   }
 
   if (path_rewriter_ != nullptr) {
@@ -699,7 +710,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           absl::StrCat("Failed to create host rewrite formatter: ", formatter_or.status()));
       return;
     }
-    host_rewrite_formatter_ = std::move(formatter_or).value();
+    host_rewrite_formatter_ = std::move(formatter_or.value());
   }
 
   if (redirect_config_ != nullptr && redirect_config_->path_redirect_has_query_ &&
@@ -892,7 +903,7 @@ void RouteEntryImplBase::finalizeHostHeader(Http::RequestHeaderMap& headers,
                                                   host_rewrite_path_regex_substitution_);
     hostname = buffer;
   } else if (host_rewrite_formatter_) {
-    buffer = host_rewrite_formatter_->formatWithContext(context, stream_info);
+    buffer = host_rewrite_formatter_->format(context, stream_info);
     hostname = buffer;
   }
 
@@ -903,9 +914,11 @@ void RouteEntryImplBase::finalizeHostHeader(Http::RequestHeaderMap& headers,
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
-                                                const Formatter::HttpFormatterContext& context,
+                                                const Formatter::Context& context,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool keep_original_host_or_path) const {
+  // Apply header transformations configured via request_headers_to_add first.
+  // This is important because host/path rewriting may depend on headers added here.
   for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
@@ -931,7 +944,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
-                                                 const Formatter::HttpFormatterContext& context,
+                                                 const Formatter::Context& context,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
@@ -1002,7 +1015,7 @@ std::string RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
 
   // Handle the case where a path formatter is configured.
   if (path_rewrite_formatter_ != nullptr) {
-    const std::string new_path_only = path_rewrite_formatter_->formatWithContext(context, info);
+    const std::string new_path_only = path_rewrite_formatter_->format(context, info);
     // If formatter produces empty string then return nothing.
     if (new_path_only.empty()) {
       return {};
@@ -1035,6 +1048,23 @@ std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers) co
       ::Envoy::makeOptRefFromPtr(
           const_cast<const ::Envoy::Http::Utility::RedirectConfig*>(redirect_config_.get())),
       headers);
+}
+
+absl::string_view RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& request_headers,
+                                                 const Http::ResponseHeaderMap& response_headers,
+                                                 const StreamInfo::StreamInfo& stream_info,
+                                                 std::string& body_out) const {
+  absl::string_view direct_body = (direct_response_body_provider_ != nullptr &&
+                                   direct_response_body_provider_->data() != nullptr)
+                                      ? *direct_response_body_provider_->data()
+                                      : EMPTY_STRING;
+  if (direct_response_body_formatter_ == nullptr) {
+    return direct_body;
+  }
+
+  body_out = direct_response_body_formatter_->format(
+      {&request_headers, &response_headers, nullptr, direct_body}, stream_info);
+  return body_out;
 }
 
 std::multimap<std::string, std::string>

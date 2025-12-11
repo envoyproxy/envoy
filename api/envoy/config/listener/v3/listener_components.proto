@@ -250,9 +250,11 @@ message FilterChain {
   google.protobuf.Duration transport_socket_connect_timeout = 9;
 
   // The unique name (or empty) by which this filter chain is known.
-  // Note: :ref:`filter_chain_matcher
-  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
-  // requires that filter chains are uniquely named within a listener.
+  //
+  // .. note::
+  //     :ref:`filter_chain_matcher
+  //     <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
+  //     requires that filter chains are uniquely named within a listener.
   string name = 7;
 }
 

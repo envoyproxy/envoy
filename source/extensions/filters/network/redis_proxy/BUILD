@@ -29,6 +29,8 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//source/common/config:datasource_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -60,10 +62,12 @@ envoy_cc_library(
     srcs = [
         "cluster_response_handler.cc",
         "command_splitter_impl.cc",
+        "info_command_handler.cc",
     ],
     hdrs = [
         "cluster_response_handler.h",
         "command_splitter_impl.h",
+        "info_command_handler.h",
     ],
     deps = [
         ":command_splitter_interface",

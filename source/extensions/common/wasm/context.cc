@@ -934,7 +934,7 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
                              std::string_view request, std::chrono::milliseconds timeout,
                              uint32_t* token_ptr) {
   GrpcService service_proto;
-  if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
+  if (!service_proto.ParseFromString(grpc_service)) {
     auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
     const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
     if (thread_local_cluster == nullptr) {
@@ -983,7 +983,7 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
                                std::string_view method_name, const Pairs& initial_metadata,
                                uint32_t* token_ptr) {
   GrpcService service_proto;
-  if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
+  if (!service_proto.ParseFromString(grpc_service)) {
     auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
     const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
     if (thread_local_cluster == nullptr) {
@@ -1460,7 +1460,7 @@ void Context::initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& call
   network_write_filter_callbacks_ = &callbacks;
 }
 
-void Context::log(const Formatter::HttpFormatterContext& log_context,
+void Context::log(const Formatter::Context& log_context,
                   const StreamInfo::StreamInfo& stream_info) {
   // `log` may be called multiple times due to mid-request logging -- we only want to run on the
   // last call.

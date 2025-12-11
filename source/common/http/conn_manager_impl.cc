@@ -270,8 +270,16 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
              StreamInfo::CoreResponseFlag::UpstreamConnectionTermination))) {
       stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
     } else {
+      const bool reset_with_error =
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error");
+      // TODO(wbpcode): We may should not propagate UpstreamProtocolError to downstream as that
+      // indicates an error on the upstream connection and may have nothing to do with the
+      // downstream.
       if (stream.filter_manager_.streamInfo().hasResponseFlag(
               StreamInfo::CoreResponseFlag::UpstreamProtocolError)) {
+        stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
+      } else if (reset_with_error && stream.filter_manager_.streamInfo().hasResponseFlag(
+                                         StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
       } else {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
@@ -780,16 +788,33 @@ void ConnectionManagerImpl::onDrainTimeout() {
   checkForDeferredClose(false);
 }
 
-void ConnectionManagerImpl::sendGoAwayAndClose() {
+void ConnectionManagerImpl::sendGoAwayAndClose(bool graceful) {
   ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggerred from filters.",
                  read_callbacks_->connection());
   if (go_away_sent_) {
     return;
   }
-  codec_->goAway();
-  go_away_sent_ = true;
-  doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
-                    "forced_goaway");
+
+  // Use graceful drain sequence if graceful shutdown is requested.
+  // startDrainSequence() works for both HTTP/1 and HTTP/2:
+  // - HTTP/1: shutdownNotice() + goAway() provides graceful close
+  // - HTTP/2: shutdownNotice() sends GOAWAY with high stream ID, then goAway() sends final GOAWAY
+  if (graceful) {
+    if (drain_state_ == DrainState::NotDraining) {
+      startDrainSequence();
+    }
+    // Consider the "go away" process started once draining begins.
+    // The actual GOAWAY frame will be sent in onDrainTimeout(), but we want to
+    // prevent multiple calls to sendGoAwayAndClose() from starting multiple drain sequences.
+    go_away_sent_ = true;
+  } else {
+    // Immediate close - send GOAWAY and close immediately
+    codec_->shutdownNotice();
+    codec_->goAway();
+    go_away_sent_ = true;
+    doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
+                      "forced_goaway");
+  }
 }
 
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,
@@ -956,7 +981,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 }
 
 void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
-  const Formatter::HttpFormatterContext log_context{
+  const Formatter::Context log_context{
       request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, type,
       active_span_.get()};
 
@@ -1202,6 +1227,9 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
       }
 
+      filter_manager_.streamInfo().setResponseFlag(
+          StreamInfo::CoreResponseFlag::DownstreamProtocolError);
+
       // H/2 codec was resetting requests that were rejected due to headers with underscores,
       // instead of sending 400. Preserving this behavior for now.
       // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
@@ -1243,6 +1271,9 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
   if (Grpc::Common::hasGrpcContentType(*request_headers_)) {
     grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
   }
+
+  filter_manager_.streamInfo().setResponseFlag(
+      StreamInfo::CoreResponseFlag::DownstreamProtocolError);
 
   // H/2 codec was resetting requests that were rejected due to headers with underscores,
   // instead of sending 400. Preserving this behavior for now.
@@ -2029,7 +2060,8 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
 
   // If the codec sets its responseDetails() for a reason other than peer reset, set a
   // DownstreamProtocolError. Either way, propagate details.
-  if (!encoder_details.empty() && reset_reason == StreamResetReason::LocalReset) {
+  if (reset_reason == StreamResetReason::ProtocolError ||
+      (!encoder_details.empty() && reset_reason == StreamResetReason::LocalReset)) {
     filter_manager_.streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::DownstreamProtocolError);
   }
@@ -2083,7 +2115,7 @@ void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
 void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
   ASSERT(!state_.codec_encode_complete_);
   state_.on_reset_stream_called_ = true;
-  ENVOY_STREAM_LOG(debug, "Codec timed out flushing stream", *this);
+  ENVOY_STREAM_LOG(debug, "Codec low level reset", *this);
 
   // TODO(kbaichoo): Update streamInfo to account for the reset.
 
@@ -2102,7 +2134,11 @@ void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span) const 
   ASSERT(connection_manager_tracing_config_.has_value());
 
   const Tracing::HttpTraceContext trace_context(*request_headers_);
-  const Tracing::CustomTagContext ctx{trace_context, filter_manager_.streamInfo()};
+  const Formatter::Context formatter_context{
+      request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, {},
+      active_span_.get()};
+  const Tracing::CustomTagContext ctx{trace_context, filter_manager_.streamInfo(),
+                                      formatter_context};
 
   // Cache the optional custom tags from the route first.
   OptRef<const Tracing::CustomTagMap> route_custom_tags;

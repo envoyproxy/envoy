@@ -240,11 +240,11 @@ void UpstreamRequest::cleanUp() {
 }
 
 void UpstreamRequest::upstreamLog(AccessLog::AccessLogType access_log_type) {
-  const Formatter::HttpFormatterContext log_context{parent_.downstreamHeaders(),
-                                                    upstream_headers_.get(),
-                                                    upstream_trailers_.get(),
-                                                    {},
-                                                    access_log_type};
+  const Formatter::Context log_context{parent_.downstreamHeaders(),
+                                       upstream_headers_.get(),
+                                       upstream_trailers_.get(),
+                                       {},
+                                       access_log_type};
 
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
     upstream_log->log(log_context, stream_info_);
@@ -670,9 +670,15 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   absl::optional<std::chrono::milliseconds> max_stream_duration;
   if (parent_.dynamicMaxStreamDuration().has_value()) {
     max_stream_duration = parent_.dynamicMaxStreamDuration().value();
-  } else if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
-    max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-        upstream_host_->cluster().commonHttpProtocolOptions().max_stream_duration()));
+  } else if (upstream_host_->cluster()
+                 .httpProtocolOptions()
+                 .commonHttpProtocolOptions()
+                 .has_max_stream_duration()) {
+    max_stream_duration = std::chrono::milliseconds(
+        DurationUtil::durationToMilliseconds(upstream_host_->cluster()
+                                                 .httpProtocolOptions()
+                                                 .commonHttpProtocolOptions()
+                                                 .max_stream_duration()));
   }
   if (max_stream_duration.has_value() && max_stream_duration->count()) {
     max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(

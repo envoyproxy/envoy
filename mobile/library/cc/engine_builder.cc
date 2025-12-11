@@ -27,6 +27,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
+#include "absl/debugging/leak_check.h"
 #include "fmt/core.h"
 #include "library/common/internal_engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
@@ -50,6 +51,11 @@ EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setBufferHighWatermark(size_t high_watermark) {
+  high_watermark_ = high_watermark;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
@@ -57,6 +63,11 @@ EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
 
 EngineBuilder& EngineBuilder::setLogger(std::unique_ptr<EnvoyLogger> logger) {
   logger_ = std::move(logger);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableLogger(bool logger_on) {
+  enable_logger_ = logger_on;
   return *this;
 }
 
@@ -134,6 +145,12 @@ EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::s
   for (const std::string& hostname : hostnames) {
     dns_preresolve_hostnames_.push_back({hostname /* host */, 443 /* port */});
   }
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setDnsResolver(
+    const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) {
+  dns_resolver_config_ = dns_resolver_config;
   return *this;
 }
 
@@ -345,6 +362,11 @@ EngineBuilder& EngineBuilder::addRuntimeGuard(std::string guard, bool value) {
 
 EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool value) {
   restart_runtime_guards_.emplace_back(std::move(guard), value);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableStatsCollection(bool stats_collection_on) {
+  enable_stats_collection_ = stats_collection_on;
   return *this;
 }
 
@@ -621,24 +643,28 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ->PackFrom(kv_config);
   }
 
+  if (dns_resolver_config_.has_value()) {
+    *dns_cache_config->mutable_typed_dns_resolver_config() = *dns_resolver_config_;
+  } else {
 #if defined(__APPLE__)
-  envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
-  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-      "envoy.network.dns_resolver.apple");
-  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-      resolver_config);
+    envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.apple");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
 #else
-  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
-      resolver_config;
-  if (dns_num_retries_.has_value()) {
-    resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
-  }
-  resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
-  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-      "envoy.network.dns_resolver.getaddrinfo");
-  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-      resolver_config);
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        resolver_config;
+    if (dns_num_retries_.has_value()) {
+      resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
+    }
+    resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.getaddrinfo");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
 #endif
+  }
 
   for (const auto& [host, port] : dns_preresolve_hostnames_) {
     envoy::config::core::v3::SocketAddress* address = dns_cache_config->add_preresolve_hostnames();
@@ -919,24 +945,29 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Set up stats.
-  auto* list = bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
-  list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
-  list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
-  list->add_patterns()->set_prefix("cluster.base.upstream_cx_");
-  list->add_patterns()->set_prefix("cluster.stats.upstream_cx_");
-  list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
-  list->add_patterns()->set_exact("cluster.base.upstream_http3_broken");
-  list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
-  list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
-  list->add_patterns()->set_prefix("http.hcm.decompressor.");
-  list->add_patterns()->set_prefix("pulse.");
-  list->add_patterns()->set_prefix("runtime.load_success");
-  list->add_patterns()->set_prefix("dns_cache");
-  list->add_patterns()->mutable_safe_regex()->set_regex(
-      "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
-      "total)");
-  list->add_patterns()->set_contains("quic_connection_close_error_code");
-  list->add_patterns()->set_contains("quic_reset_stream_error_code");
+  if (enable_stats_collection_) {
+    auto* list =
+        bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
+    list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
+    list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
+    list->add_patterns()->set_prefix("cluster.base.upstream_cx_");
+    list->add_patterns()->set_prefix("cluster.stats.upstream_cx_");
+    list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
+    list->add_patterns()->set_exact("cluster.base.upstream_http3_broken");
+    list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
+    list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
+    list->add_patterns()->set_prefix("http.hcm.decompressor.");
+    list->add_patterns()->set_prefix("pulse.");
+    list->add_patterns()->set_prefix("runtime.load_success");
+    list->add_patterns()->set_prefix("dns_cache");
+    list->add_patterns()->mutable_safe_regex()->set_regex(
+        "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
+        "total)");
+    list->add_patterns()->set_contains("quic_connection_close_error_code");
+    list->add_patterns()->set_contains("quic_reset_stream_error_code");
+  } else {
+    bootstrap->mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
+  }
   bootstrap->mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
 
   // Set up watchdog
@@ -1009,9 +1040,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  InternalEngine* envoy_engine =
+  InternalEngine* envoy_engine = absl::IgnoreLeak(
       new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-                         network_thread_priority_, disable_dns_refresh_on_network_change_);
+                         network_thread_priority_, high_watermark_,
+                         disable_dns_refresh_on_network_change_, enable_logger_));
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

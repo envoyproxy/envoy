@@ -8,7 +8,9 @@ namespace Envoy {
 class DynamicModulesIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
 public:
-  DynamicModulesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {};
+  DynamicModulesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  };
 
   void
   initializeFilter(const std::string& filter_name, const std::string& config = "",
@@ -636,6 +638,7 @@ public:
               - '*'
               name: local_proxy_route
           stat_prefix: ingress_http
+    per_connection_buffer_limit_bytes: 1024
       )EOF");
   }
 
@@ -662,9 +665,18 @@ TEST_P(DynamicModulesTerminalIntegrationTest, StreamingTerminalFilter) {
   EXPECT_EQ("Who are you?", response->body());
   response->clearBody();
 
+  auto large_response_chunk = std::string(1024, 'a');
   codec_client_->sendData(request_encoder, "Envoy", false);
-  response->waitForBodyData(24);
-  EXPECT_EQ("Hi Envoy. Anything else?", response->body());
+  // Have the client read only a chunk at a time to ensure watermarks are
+  // triggered.
+  for (int i = 0; i < 8; i++) {
+    response->waitForBodyData(1024 * (i + 1));
+  }
+  auto large_response = std::string("");
+  for (int i = 0; i < 8; i++) {
+    large_response += large_response_chunk;
+  }
+  EXPECT_EQ(large_response, response->body());
   response->clearBody();
 
   codec_client_->sendData(request_encoder, "Nope", true);
@@ -675,6 +687,122 @@ TEST_P(DynamicModulesTerminalIntegrationTest, StreamingTerminalFilter) {
                             ->get(Http::LowerCaseString("x-status"))[0]
                             ->value()
                             .getStringView());
+  unsigned int above_watermark_count;
+  unsigned int below_watermark_count;
+  EXPECT_TRUE(absl::SimpleAtoi(response->trailers()
+                                   .get()
+                                   ->get(Http::LowerCaseString("x-above-watermark-count"))[0]
+                                   ->value()
+                                   .getStringView(),
+                               &above_watermark_count));
+  EXPECT_TRUE(absl::SimpleAtoi(response->trailers()
+                                   .get()
+                                   ->get(Http::LowerCaseString("x-below-watermark-count"))[0]
+                                   ->value()
+                                   .getStringView(),
+                               &below_watermark_count));
+  // The filter goes over the watermark count on large response body chunk. With 8 writes, we
+  // expect the counts to generally be 8. However, the response flow is executed to completion
+  // as soon as the 8th chunk is received by the client. In practice, it is extremely likely
+  // for the filter to get 8 above watermark callbacks, and highly likely to get the 8 corresponding
+  // below watermark callbacks, but it is conceivable timing issues can cause either to be one
+  // lower. Checking 7 or 8 should be a good test while also having no chance of flakiness.
+  EXPECT_GE(above_watermark_count, 7);
+  EXPECT_LE(above_watermark_count, 8);
+  EXPECT_GE(below_watermark_count, 7);
+  EXPECT_EQ(below_watermark_count, 8);
+}
+
+// Test basic HTTP stream callout. A GET request with streaming response.
+TEST_P(DynamicModulesIntegrationTest, HttpStreamBasic) {
+  initializeFilter("http_stream_basic", "cluster_0");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  waitForNextUpstreamRequest();
+
+  // Send response headers.
+  Http::TestRequestHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  // Send response body.
+  upstream_request_->encodeData("response_from_upstream", true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("stream_callout_success", response->body());
+  EXPECT_EQ(
+      "basic",
+      response->headers().get(Http::LowerCaseString("x-stream-test"))[0]->value().getStringView());
+}
+
+// Test bidirectional HTTP stream callout. A POST request with streaming request and response.
+TEST_P(DynamicModulesIntegrationTest, HttpStreamBidirectional) {
+  initializeFilter("http_stream_bidirectional", "cluster_0");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  waitForNextUpstreamRequest();
+
+  // Verify the filter sent request data in chunks.
+  EXPECT_TRUE(upstream_request_->complete());
+  std::string received_body = upstream_request_->body().toString();
+  EXPECT_EQ("chunk1chunk2", received_body);
+
+  // Verify trailers were sent.
+  EXPECT_TRUE(upstream_request_->trailers().get() != nullptr);
+
+  // Send response with headers, data, and trailers.
+  Http::TestRequestHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData("chunk_a", false);
+  upstream_request_->encodeData("chunk_b", false);
+  Http::TestResponseTrailerMapImpl response_trailers{{"x-response-trailer", "value"}};
+  upstream_request_->encodeTrailers(response_trailers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("bidirectional_success", response->body());
+  EXPECT_EQ(
+      "bidirectional",
+      response->headers().get(Http::LowerCaseString("x-stream-test"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "2",
+      response->headers().get(Http::LowerCaseString("x-chunks-sent"))[0]->value().getStringView());
+  // Should have received at least 1 data chunk. Due to buffering, the two chunks sent by the
+  // upstream may be coalesced into a single chunk by the time they reach the dynamic module.
+  EXPECT_GE(std::stoi(std::string(response->headers()
+                                      .get(Http::LowerCaseString("x-chunks-received"))[0]
+                                      ->value()
+                                      .getStringView())),
+            1);
+}
+
+// Test upstream reset logic.
+TEST_P(DynamicModulesIntegrationTest, HttpStreamUpstreamReset) {
+  initializeFilter("upstream_reset", "cluster_0");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  waitForNextUpstreamRequest();
+
+  // Send partial response and then reset from upstream to simulate mid-stream failure.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData("partial", false);
+  upstream_request_->encodeResetStream();
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("upstream_reset", response->body());
+  EXPECT_EQ("true",
+            response->headers().get(Http::LowerCaseString("x-reset"))[0]->value().getStringView());
 }
 
 } // namespace Envoy
