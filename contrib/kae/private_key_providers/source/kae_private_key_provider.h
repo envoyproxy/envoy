@@ -41,7 +41,7 @@ class KaePrivateKeyMethodProvider : public virtual Ssl::PrivateKeyMethodProvider
                                     public Logger::Loggable<Logger::Id::connection> {
 public:
   KaePrivateKeyMethodProvider(
-      const envoy::extensions::private_key_providers::kae::v3alpha::KAEPrivateKeyMethodConfig&
+      const envoy::extensions::private_key_providers::kae::v3alpha::KaePrivateKeyMethodConfig&
           config,
       Server::Configuration::TransportSocketFactoryContext& private_key_provider_context,
       LibUadkCryptoSharedPtr libuadk);

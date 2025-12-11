@@ -215,13 +215,13 @@ FakeKaePrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
     const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& proto_config,
     Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) {
   ProtobufTypes::MessagePtr message = std::make_unique<
-      envoy::extensions::private_key_providers::kae::v3alpha::KAEPrivateKeyMethodConfig>();
+      envoy::extensions::private_key_providers::kae::v3alpha::KaePrivateKeyMethodConfig>();
 
   THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
       proto_config.typed_config(), ProtobufMessage::getNullValidationVisitor(), *message));
-  const envoy::extensions::private_key_providers::kae::v3alpha::KAEPrivateKeyMethodConfig conf =
+  const envoy::extensions::private_key_providers::kae::v3alpha::KaePrivateKeyMethodConfig conf =
       MessageUtil::downcastAndValidate<
-          const envoy::extensions::private_key_providers::kae::v3alpha::KAEPrivateKeyMethodConfig&>(
+          const envoy::extensions::private_key_providers::kae::v3alpha::KaePrivateKeyMethodConfig&>(
           *message, private_key_provider_context.messageValidationVisitor());
 
   std::shared_ptr<FakeLibUadkCryptoImpl> libuadk = std::make_shared<FakeLibUadkCryptoImpl>();

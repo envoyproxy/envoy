@@ -345,7 +345,7 @@ void KaePrivateKeyMethodProvider::unregisterPrivateKeyMethod(SSL* ssl) {
 }
 
 KaePrivateKeyMethodProvider::KaePrivateKeyMethodProvider(
-    const envoy::extensions::private_key_providers::kae::v3alpha::KAEPrivateKeyMethodConfig& conf,
+    const envoy::extensions::private_key_providers::kae::v3alpha::KaePrivateKeyMethodConfig& conf,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     LibUadkCryptoSharedPtr libuadk)
     : api_(factory_context.serverFactoryContext().api()), libuadk_(libuadk) {

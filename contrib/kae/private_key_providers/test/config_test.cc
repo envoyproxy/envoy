@@ -83,7 +83,7 @@ TEST_F(KaeConfigTest, CreateRsa1024) {
   const std::string yaml = R"EOF(
       provider_name: kae
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KAEPrivateKeyMethodConfig
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KaePrivateKeyMethodConfig
         poll_delay: 0.02s
         private_key: { "filename": "{{ test_rundir }}/contrib/kae/private_key_providers/test/test_data/rsa-1024.pem" }
 )EOF";
@@ -100,7 +100,7 @@ TEST_F(KaeConfigTest, CreateRsa2048) {
   const std::string yaml = R"EOF(
       provider_name: kae
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KAEPrivateKeyMethodConfig
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KaePrivateKeyMethodConfig
         poll_delay: 0.02s
         private_key: { "filename": "{{ test_rundir }}/contrib/kae/private_key_providers/test/test_data/rsa-2048.pem" }
 )EOF";
@@ -114,7 +114,7 @@ TEST_F(KaeConfigTest, CreateRsa3072) {
   const std::string yaml = R"EOF(
       provider_name: kae
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KAEPrivateKeyMethodConfig
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KaePrivateKeyMethodConfig
         poll_delay: 0.02s
         private_key: { "filename": "{{ test_rundir }}/contrib/kae/private_key_providers/test/test_data/rsa-3072.pem" }
 )EOF";
@@ -128,7 +128,7 @@ TEST_F(KaeConfigTest, CreateRsa4096) {
   const std::string yaml = R"EOF(
       provider_name: kae
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KAEPrivateKeyMethodConfig
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KaePrivateKeyMethodConfig
         poll_delay: 0.02s
         private_key: { "filename": "{{ test_rundir }}/contrib/kae/private_key_providers/test/test_data/rsa-4096.pem" }
 )EOF";
@@ -142,7 +142,7 @@ TEST_F(KaeConfigTest, CreateEcdsaP256) {
   const std::string yaml = R"EOF(
       provider_name: kae
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KAEPrivateKeyMethodConfig
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KaePrivateKeyMethodConfig
         poll_delay: 0.02s
         private_key: { "filename": "{{ test_rundir }}/contrib/kae/private_key_providers/test/test_data/ecdsa-p256.pem" }
 )EOF";
@@ -156,7 +156,7 @@ TEST_F(KaeConfigTest, CreateMissingPrivateKeyFile) {
   const std::string yaml = R"EOF(
       provider_name: kae
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KAEPrivateKeyMethodConfig
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KaePrivateKeyMethodConfig
         poll_delay: 0.02s
         private_key: { "filename": "{{ test_rundir }}/contrib/kae/private_key_providers/test/test_data/missing.pem" }
 )EOF";
@@ -168,7 +168,7 @@ TEST_F(KaeConfigTest, CreateMissingKey) {
   const std::string yaml = R"EOF(
       provider_name: kae
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KAEPrivateKeyMethodConfig
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KaePrivateKeyMethodConfig
         poll_delay: 0.02s
         )EOF";
 
@@ -180,7 +180,7 @@ TEST_F(KaeConfigTest, CreateMissingPollDelay) {
   const std::string yaml = R"EOF(
       provider_name: kae
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KAEPrivateKeyMethodConfig
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KaePrivateKeyMethodConfig
         private_key: { "filename": "{{ test_rundir }}/contrib/kae/private_key_providers/test/test_data/rsa-4096.pem" }
         )EOF";
 
@@ -192,7 +192,7 @@ TEST_F(KaeConfigTest, CreateZeroPollDelay) {
   const std::string yaml = R"EOF(
       provider_name: kae
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KAEPrivateKeyMethodConfig
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.kae.v3alpha.KaePrivateKeyMethodConfig
         poll_delay: 0s
         private_key: { "filename": "{{ test_rundir }}/contrib/kae/private_key_providers/test/test_data/rsa-4096.pem" }
         )EOF";

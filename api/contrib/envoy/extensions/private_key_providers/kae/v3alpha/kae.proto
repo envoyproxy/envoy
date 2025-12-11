@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The private key provider provides RSA sign and decrypt operation
 // hardware acceleration.
 
-message KAEPrivateKeyMethodConfig {
+message KaePrivateKeyMethodConfig {
   // Private key to use in the private key provider. If set to inline_bytes or
   // inline_string, the value needs to be the private key in PEM format.
   config.core.v3.DataSource private_key = 1 [(udpa.annotations.sensitive) = true];

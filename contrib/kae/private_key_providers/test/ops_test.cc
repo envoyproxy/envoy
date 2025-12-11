@@ -246,7 +246,7 @@ TEST_F(KaeProviderRsaTest, TestKaeDeviceInit) {
   envoy::config::core::v3::DataSource* private_key = new envoy::config::core::v3::DataSource();
   private_key->set_allocated_filename(key_file);
 
-  envoy::extensions::private_key_providers::kae::v3alpha::KAEPrivateKeyMethodConfig conf;
+  envoy::extensions::private_key_providers::kae::v3alpha::KaePrivateKeyMethodConfig conf;
   conf.set_allocated_private_key(private_key);
 
   // no device found
