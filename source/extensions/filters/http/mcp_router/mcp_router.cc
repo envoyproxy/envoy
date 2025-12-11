@@ -237,7 +237,7 @@ void McpRouterFilter::onDestroy() {
 
 Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                          bool end_stream) {
-  // TODO(botengyao): also supports /GET sse endpoints.
+  // TODO(botengyao): also supports /GET endpoints.
   if (headers.Method() &&
       headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Get) {
     sendHttpError(405, "Method Not Allowed");
