@@ -236,7 +236,7 @@ message HttpConnectionManager {
     string operation = 11;
 
     // The operation name of the upstream span which will be used for tracing.
-    // This should only works when ``spawn_upstream_span`` is set to true and the upstream
+    // This only takes effect when ``spawn_upstream_span`` is set to true and the upstream
     // span is created.
     //
     // The same :ref:`format specifier <config_access_log_format>` as used for
