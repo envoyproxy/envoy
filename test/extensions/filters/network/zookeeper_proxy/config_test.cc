@@ -33,7 +33,7 @@ latency_threshold_overrides:)EOF";
 
     for (int i = 0; i < opcode_descriptor->value_count(); i++) {
       const auto* opcode_tuple = opcode_descriptor->value(i);
-      std::string opcode = opcode_tuple->name();
+      auto opcode = opcode_tuple->name();
       int threshold_delta = opcode_tuple->number();
       std::string threshold = fmt::format("0.{}s", 150 + threshold_delta);
       yaml += fmt::format(R"EOF(

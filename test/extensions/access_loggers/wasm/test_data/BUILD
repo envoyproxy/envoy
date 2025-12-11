@@ -3,10 +3,6 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
-)
 load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary")
 
 licenses(["notice"])  # Apache 2

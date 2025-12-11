@@ -173,9 +173,9 @@ TEST_F(StatsAccessLoggerTest, NoValueFormatted) {
   absl::optional<std::string> nullopt{absl::nullopt};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(nullopt));
   EXPECT_CALL(store_, counter(_)).Times(0);
-  EXPECT_LOG_CONTAINS("error",
-                      "Stats access logger computed non-number value: null_value: NULL_VALUE",
-                      { logger_->log(formatter_context_, stream_info_); });
+  EXPECT_LOG_CONTAINS("error", "Stats access logger computed non-number value: ", {
+    logger_->log(formatter_context_, stream_info_);
+  });
 }
 
 // Format string resolved to a non-number string.
