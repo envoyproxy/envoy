@@ -691,6 +691,165 @@ TEST_F(GeoipProviderTest, DbEpochGaugeUpdatesWhenReloadedOnMmdbFileUpdate) {
   TestEnvironment::renameFile(city_db_path + "1", city_db_path);
 }
 
+// Country DB specific tests.
+TEST_F(GeoipProviderTest, ValidConfigCountryDbSuccessfulLookup) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(1, captured_lookup_response_.size());
+  const auto& country_it = captured_lookup_response_.find("x-geo-country");
+  EXPECT_EQ("SE", country_it->second);
+  expectStats("country_db");
+}
+
+TEST_F(GeoipProviderTest, CountryDbTakesPrecedenceOverCityDb) {
+  // When both Country DB and City DB are configured, Country DB should be used for country lookup.
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        city: "x-geo-city"
+    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(2, captured_lookup_response_.size());
+  const auto& country_it = captured_lookup_response_.find("x-geo-country");
+  EXPECT_EQ("SE", country_it->second);
+  const auto& city_it = captured_lookup_response_.find("x-geo-city");
+  EXPECT_EQ("Linköping", city_it->second);
+  // Country DB should be used for country lookup.
+  expectStats("country_db", 1, 1, 0);
+  // City DB should only be used for city lookup (not country).
+  expectStats("city_db", 1, 1, 0);
+}
+
+TEST_F(GeoipProviderTest, CountryFallsBackToCityDbWhenCountryDbNotConfigured) {
+  // When only City DB is configured, country lookup should fall back to City DB.
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        city: "x-geo-city"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(2, captured_lookup_response_.size());
+  const auto& country_it = captured_lookup_response_.find("x-geo-country");
+  EXPECT_EQ("SE", country_it->second);
+  const auto& city_it = captured_lookup_response_.find("x-geo-city");
+  EXPECT_EQ("Linköping", city_it->second);
+  // Country should be looked up from City DB.
+  expectStats("city_db", 1, 1, 0);
+}
+
+// Test Country DB lookup error when MMDB_get_entry_data_list fails due to corrupted entry data.
+TEST_F(GeoipProviderTest, CountryDbLookupErrorCorruptedEntryData) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/corrupted-entry-data.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  // Use an IP that should be in the Country DB.
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  // With corrupted entry data, we expect lookup_error to be incremented.
+  expectStats("country_db", 1, 0, 1);
+}
+
+// Test Country DB lookup when country_db is null but City DB is available.
+TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndCityFallback) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        city: "x-geo-city"
+    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+
+  // Force country_db_ to be null using friend peer class.
+  GeoipProviderPeer::setCountryDbToNull(provider_);
+
+  // Use an IP (London, UK) that works in City DB.
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("81.2.69.144");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+
+  // Country header should be missing because the country DB is null and the city DB
+  // skipped the country lookup because isCountryDbPathSet() is true.
+  const auto& country_it = captured_lookup_response_.find("x-geo-country");
+  EXPECT_EQ(captured_lookup_response_.end(), country_it);
+
+  // City header should be present proving lookupInCityDb ran and provider didn't crash.
+  const auto& city_it = captured_lookup_response_.find("x-geo-city");
+  EXPECT_NE(captured_lookup_response_.end(), city_it);
+  EXPECT_EQ("London", city_it->second);
+}
+
+// Test Country DB lookup when country_db is null and NO City DB.
+TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndNoFallback) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+
+  // Force country_db_ to be null.
+  GeoipProviderPeer::setCountryDbToNull(provider_);
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("81.2.69.144");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+
+  auto lookup_cb_std = [&](Geolocation::LookupResult&&) {};
+
+  // Should trigger IS_ENVOY_BUG.
+  EXPECT_ENVOY_BUG(
+      { provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)); },
+      "Maxmind country database must be initialised for performing lookups");
+}
+
 using GeoipProviderDeathTest = GeoipProviderTest;
 
 TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
@@ -1011,165 +1170,6 @@ struct MmdbReloadErrorTestCase mmdb_reload_error_test_cases[] = {
 
 INSTANTIATE_TEST_SUITE_P(TestName, MmdbReloadErrorImplTest,
                          ::testing::ValuesIn(mmdb_reload_error_test_cases));
-
-// Country DB specific tests.
-TEST_F(GeoipProviderTest, ValidConfigCountryDbSuccessfulLookup) {
-  const std::string config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        country: "x-geo-country"
-    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
-  )EOF";
-  initializeProvider(config_yaml, cb_added_nullopt);
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
-  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  EXPECT_EQ(1, captured_lookup_response_.size());
-  const auto& country_it = captured_lookup_response_.find("x-geo-country");
-  EXPECT_EQ("SE", country_it->second);
-  expectStats("country_db");
-}
-
-TEST_F(GeoipProviderTest, CountryDbTakesPrecedenceOverCityDb) {
-  // When both Country DB and City DB are configured, Country DB should be used for country lookup.
-  const std::string config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        country: "x-geo-country"
-        city: "x-geo-city"
-    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
-    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
-  )EOF";
-  initializeProvider(config_yaml, cb_added_nullopt);
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
-  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  EXPECT_EQ(2, captured_lookup_response_.size());
-  const auto& country_it = captured_lookup_response_.find("x-geo-country");
-  EXPECT_EQ("SE", country_it->second);
-  const auto& city_it = captured_lookup_response_.find("x-geo-city");
-  EXPECT_EQ("Linköping", city_it->second);
-  // Country DB should be used for country lookup.
-  expectStats("country_db", 1, 1, 0);
-  // City DB should only be used for city lookup (not country).
-  expectStats("city_db", 1, 1, 0);
-}
-
-TEST_F(GeoipProviderTest, CountryFallsBackToCityDbWhenCountryDbNotConfigured) {
-  // When only City DB is configured, country lookup should fall back to City DB.
-  const std::string config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        country: "x-geo-country"
-        city: "x-geo-city"
-    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
-  )EOF";
-  initializeProvider(config_yaml, cb_added_nullopt);
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
-  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  EXPECT_EQ(2, captured_lookup_response_.size());
-  const auto& country_it = captured_lookup_response_.find("x-geo-country");
-  EXPECT_EQ("SE", country_it->second);
-  const auto& city_it = captured_lookup_response_.find("x-geo-city");
-  EXPECT_EQ("Linköping", city_it->second);
-  // Country should be looked up from City DB.
-  expectStats("city_db", 1, 1, 0);
-}
-
-// Test Country DB lookup error when MMDB_get_entry_data_list fails due to corrupted entry data.
-TEST_F(GeoipProviderTest, CountryDbLookupErrorCorruptedEntryData) {
-  const std::string config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        country: "x-geo-country"
-    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/corrupted-entry-data.mmdb"
-  )EOF";
-  initializeProvider(config_yaml, cb_added_nullopt);
-  // Use an IP that should be in the Country DB.
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
-  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  // With corrupted entry data, we expect lookup_error to be incremented.
-  expectStats("country_db", 1, 0, 1);
-}
-
-// Test Country DB lookup when country_db is null but City DB is available.
-TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndCityFallback) {
-  const std::string config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        country: "x-geo-country"
-        city: "x-geo-city"
-    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
-    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
-  )EOF";
-  initializeProvider(config_yaml, cb_added_nullopt);
-
-  // Force country_db_ to be null using friend peer class.
-  GeoipProviderPeer::setCountryDbToNull(provider_);
-
-  // Use an IP (London, UK) that works in City DB.
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("81.2.69.144");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
-
-  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-
-  // Country header should be missing because the country DB is null and the city DB
-  // skipped the country lookup because isCountryDbPathSet() is true.
-  const auto& country_it = captured_lookup_response_.find("x-geo-country");
-  EXPECT_EQ(captured_lookup_response_.end(), country_it);
-
-  // City header should be present proving lookupInCityDb ran and provider didn't crash.
-  const auto& city_it = captured_lookup_response_.find("x-geo-city");
-  EXPECT_NE(captured_lookup_response_.end(), city_it);
-  EXPECT_EQ("London", city_it->second);
-}
-
-// Test Country DB lookup when country_db is null and NO City DB.
-TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndNoFallback) {
-  const std::string config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        country: "x-geo-country"
-    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
-  )EOF";
-  initializeProvider(config_yaml, cb_added_nullopt);
-
-  // Force country_db_ to be null.
-  GeoipProviderPeer::setCountryDbToNull(provider_);
-
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("81.2.69.144");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-
-  auto lookup_cb_std = [&](Geolocation::LookupResult&&) {};
-
-  // Should trigger IS_ENVOY_BUG.
-  EXPECT_ENVOY_BUG(
-      { provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)); },
-      "Maxmind country database must be initialised for performing lookups");
-}
 
 } // namespace Maxmind
 } // namespace GeoipProviders
