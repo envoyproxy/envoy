@@ -150,10 +150,10 @@ message HttpConnectionManager {
     // [#not-implemented-hide:]
     enum OperationName {
       // The HTTP listener is used for ingress/incoming requests.
-      INGRESS = 0 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"];
+      INGRESS = 0;
 
       // The HTTP listener is used for egress/outgoing requests.
-      EGRESS = 1 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"];
+      EGRESS = 1;
     }
 
     reserved 1, 2;
