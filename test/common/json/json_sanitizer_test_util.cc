@@ -188,7 +188,7 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& diffs
 // Decodes a JSON string with escape sequences into its raw form.
 // This function processes the input `sanitized` string, which may contain
 // Standard JSON escapes (e.g., newline, tab, double quote, backslash) and
-// Unicode hexadecimal escapes (e.g., \\uXXXX). It converts these escapes
+// Unicode hexadecimal escapes (e.g., \\uFFFF). It converts these escapes
 // back into their corresponding characters or UTF-8 sequences.
 //
 // If a '\' character is encountered, it indicates an escape sequence. The
