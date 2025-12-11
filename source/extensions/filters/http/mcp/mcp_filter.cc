@@ -180,15 +180,16 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     to_parse = std::min(to_parse, remaining_limit);
   }
 
-  std::string parse_buffer;
-  parse_buffer.reserve(to_parse);
-  parse_buffer.resize(to_parse);
-  data.copyOut(bytes_parsed_, to_parse, parse_buffer.data());
+  // Linearize the buffer and create a string_view to avoid copying.
+  // Also ensure we don't linearize more than the buffer contains.
+  size_t linearize_size = std::min(bytes_parsed_ + to_parse, buffer_size);
+  const char* linearized = static_cast<const char*>(data.linearize(linearize_size));
+  absl::string_view parse_view(linearized + bytes_parsed_, to_parse);
 
   // The partial parser will return an OK status if the requirements are not satisfied.
   // It will potentially be a bad status due to the partial parse if all the requirements
   // are extracted.
-  auto status = parser_->parse(parse_buffer);
+  auto status = parser_->parse(parse_view);
   bytes_parsed_ += to_parse;
 
   if (parser_->isAllFieldsCollected()) {

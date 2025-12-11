@@ -73,7 +73,11 @@ default_envoy_build_config = repository_rule(
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
-    external_http_archive("grpc_httpjson_transcoding")
+    external_http_archive(
+        name = "grpc_httpjson_transcoding",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:grpc_httpjson_transcoding.patch"],
+    )
     external_http_archive(
         name = "com_google_protoconverter",
         patch_args = ["-p1"],
@@ -158,6 +162,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _numactl()
+    _uadk()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
@@ -390,6 +395,14 @@ def _numactl():
     external_http_archive(
         name = "numactl",
         build_file = "@envoy//bazel/external:numactl.BUILD",
+    )
+
+def _uadk():
+    external_http_archive(
+        name = "uadk",
+        patches = ["@envoy//bazel/foreign_cc:uadk.patch"],
+        patch_args = ["-p1"],
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_github_intel_qatlib():
@@ -646,6 +659,9 @@ def _com_google_protobuf():
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+        },
     )
 
 def _v8():
