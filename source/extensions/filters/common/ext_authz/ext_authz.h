@@ -28,6 +28,7 @@ struct TracingConstantValues {
   const std::string TraceStatus = "ext_authz_status";
   const std::string TraceUnauthz = "ext_authz_unauthorized";
   const std::string TraceOk = "ext_authz_ok";
+  const std::string TraceError = "ext_authz_error";
   const std::string HttpStatus = "ext_authz_http_status";
 };
 

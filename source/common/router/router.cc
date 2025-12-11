@@ -975,7 +975,19 @@ uint64_t Filter::calculateEffectiveBufferLimit() const {
   return std::numeric_limits<uint64_t>::max();
 }
 
+bool Filter::isEarlyConnectData() {
+  return downstream_headers_ != nullptr && Http::HeaderUtility::isConnect(*downstream_headers_) &&
+         !downstream_response_started_ &&
+         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_early_connect_data");
+}
+
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_STREAM_LOG(debug, "router decoding data: {}", *callbacks_, data.length());
+  if (data.length() > 0 && isEarlyConnectData()) {
+    callbacks_->sendLocalReply(Http::Code::BadRequest, "", nullptr, absl::nullopt,
+                               StreamInfo::ResponseCodeDetails::get().EarlyConnectData);
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
   // try timeout timer is not started until onRequestComplete(). It could be zero

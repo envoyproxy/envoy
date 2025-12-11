@@ -139,6 +139,7 @@ build:gcc --copt=-Wno-error=uninitialized
 build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
+build:gcc --cxxopt=-Wno-trigraphs
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
@@ -364,8 +365,7 @@ build:clang-pch --spawn_strategy=local
 build:clang-pch --define=ENVOY_CLANG_PCH=1
 
 # Clang-tidy
-# TODO(phlax): enable this, its throwing some errors as well as finding more issues
-# build:clang-tidy --@envoy_toolshed//format/clang_tidy:executable=@envoy//tools/clang-tidy
+build:clang-tidy --@envoy_toolshed//format/clang_tidy:executable=@envoy//tools/clang-tidy
 build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=//:clang_tidy_config
 build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 build:clang-tidy --output_groups=report
@@ -391,6 +391,9 @@ build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+# This flag may be more generally useful - it sets foreign_cc builds -jauto.
+# It is only set here because if it were the default it risks OOMing on local builds.
+build:remote --@envoy//bazel/foreign_cc:parallel_builds
 
 ## RBE (Engflow Envoy)
 

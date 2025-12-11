@@ -467,7 +467,7 @@ statistics:
   upstream_rq_retry_limit_exceeded, Counter, Total requests not retried due to exceeding :ref:`the configured number of maximum retries <config_http_filters_router_x-envoy-max-retries>`
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
   upstream_rq_retry_success, Counter, Total request retry successes
-  upstream_rq_time, Histogram, Request time milliseconds
+  upstream_rq_time, Histogram, Time from when the downstream request is fully received to when the upstream response is complete
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
   upstream_rq_total, Counter, Total requests initiated by the router to the upstream
 

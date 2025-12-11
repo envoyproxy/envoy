@@ -18,10 +18,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // PROXY protocol listener filter.
 // [#extension: envoy.filters.listener.proxy_protocol]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ProxyProtocol {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.listener.proxy_protocol.v2.ProxyProtocol";
+
+  // Controls where TLV values are stored when rules match.
+  enum TlvLocation {
+    // Store TLV values in dynamic metadata.
+    DYNAMIC_METADATA = 0;
+
+    // Store TLV values in filter state as a single map-like object.
+    FILTER_STATE = 1;
+  }
 
   message KeyValuePair {
     // The namespace — if this is empty, the filter's namespace will be used.
@@ -92,4 +101,7 @@ message ProxyProtocol {
   // See the :ref:`filter's statistics documentation <config_listener_filters_proxy_protocol>` for
   // more information.
   string stat_prefix = 5;
+
+  // Controls where TLV values are stored when rules match. Defaults to DYNAMIC_METADATA.
+  TlvLocation tlv_location = 6;
 }
