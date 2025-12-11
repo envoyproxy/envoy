@@ -115,6 +115,40 @@ const std::string ConfigIsApplePrivateRelayOnly = R"EOF(
           isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
     )EOF";
 
+const std::string ConfigWithCountryDb = R"EOF(
+name: envoy.filters.http.geoip
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.geoip.v3.Geoip
+  xff_config:
+    xff_num_trusted_hops: 1
+  provider:
+    name: envoy.geoip_providers.maxmind
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
+      common_provider_config:
+        geo_headers_to_add:
+          country: "x-geo-country"
+      country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
+)EOF";
+
+const std::string ConfigWithCountryDbAndCityDb = R"EOF(
+name: envoy.filters.http.geoip
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.geoip.v3.Geoip
+  xff_config:
+    xff_num_trusted_hops: 1
+  provider:
+    name: envoy.geoip_providers.maxmind
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
+      common_provider_config:
+        geo_headers_to_add:
+          country: "x-geo-country"
+          city: "x-geo-city"
+      country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
+      city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+)EOF";
+
 const std::string ConfigWithIpAddressHeader = R"EOF(
 name: envoy.filters.http.geoip
 typed_config:
@@ -374,6 +408,47 @@ TEST_P(GeoipFilterIntegrationTest, MetricForDbBuildEpochIsEmitted) {
   initialize();
   EXPECT_EQ(1671567063,
             test_server_->gauge("http.config_test.maxmind.city_db.db_build_epoch")->value());
+}
+
+TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseCountryDb) {
+  config_helper_.prependFilter(TestEnvironment::substitute(ConfigWithCountryDb));
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "216.160.83.56,9.10.11.12"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  EXPECT_EQ("US", headerValue("x-geo-country"));
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.country_db.total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.country_db.hit")->value());
+}
+
+TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseCountryDbAndCityDb) {
+  config_helper_.prependFilter(TestEnvironment::substitute(ConfigWithCountryDbAndCityDb));
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "216.160.83.56,9.10.11.12"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  EXPECT_EQ("US", headerValue("x-geo-country"));
+  EXPECT_EQ("Milton", headerValue("x-geo-city"));
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  // Country should be looked up from Country DB.
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.country_db.total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.country_db.hit")->value());
+  // City should be looked up from City DB, but country should NOT be looked up from City DB.
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.hit")->value());
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseIpAddressHeader) {

@@ -413,6 +413,10 @@ new_features:
   change: |
     Propagated transport errors from tls_inspector to ``DownstreamTransportFailureReason`` in ``StreamInfo`` for access logging
     prior to the TLS handshake.
+- area: geoip
+  change: |
+    Added support for MaxMind Country database via
+    :ref:`country_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.country_db_path>`.
 - area: tls_inspector
   change: |
     Added configuration parameter to TLS inspector for maximum acceptable client hello size.
