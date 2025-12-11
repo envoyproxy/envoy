@@ -295,7 +295,8 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
   EXPECT_EQ(
-      "TLS_error|error:10000092:SSL routines:OPENSSL_internal:ENCRYPTED_LENGTH_TOO_LONG:TLS_error_end",
+      "TLS_error|error:10000092:SSL "
+      "routines:OPENSSL_internal:ENCRYPTED_LENGTH_TOO_LONG:TLS_error_end",
       cb_.streamInfo().downstreamTransportFailureReason());
 }
 
@@ -474,8 +475,7 @@ TEST_P(TlsInspectorTest, NotSsl) {
 TEST_P(TlsInspectorTest, NotSslCloseConnection) {
   std::vector<uint8_t> data;
 
-  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector
-      proto_config;
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   proto_config.set_close_connection_on_client_hello_parsing_errors(true);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
 
@@ -491,8 +491,7 @@ TEST_P(TlsInspectorTest, NotSslCloseConnection) {
   auto& fields = *expected_metadata.mutable_fields();
   fields[Filter::failureReasonKey()].set_string_value(
       Filter::failureReasonClientHelloNotDetected());
-  EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(),
-                                      ProtoEq(expected_metadata)));
+  EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
 
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
