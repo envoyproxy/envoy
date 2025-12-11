@@ -267,6 +267,10 @@ OnDemandTlsCertificateSelectorConfigFactory::createTlsCertificateSelectorFactory
   if (for_quic) {
     return absl::InvalidArgumentError("Does not support QUIC listeners.");
   }
+  // Session ID is currently generated from server names and the included TLS
+  // certificates in the parent TLS context. It would not be safe to allow
+  // resuming with this ID for on-demand TLS certificates which are not present
+  // in the parent TLS context.
   if (!tls_config.disableStatelessSessionResumption() ||
       !tls_config.disableStatefulSessionResumption()) {
     return absl::InvalidArgumentError(

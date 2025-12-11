@@ -206,10 +206,13 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
   prefetch_secret_names:
   - server
   )EOF");
-  auto conn = std::make_unique<ClientSslConnection>(*this);
-  conn->waitForUpstreamConnection();
-  conn->sendAndReceiveTlsData("hello", "world");
-  conn.reset();
+  // Open two connections sequentially.
+  for (int i = 0; i < 2; i++) {
+    auto conn = std::make_unique<ClientSslConnection>(*this);
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+    conn.reset();
+  }
   EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
@@ -225,13 +228,23 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
       name: server
   )EOF");
-  auto conn = std::make_unique<ClientSslConnection>(*this);
-  waitCertsRequested(1);
-  createXdsConnection();
-  waitSendSdsResponse("server");
-  conn->waitForUpstreamConnection();
-  conn->sendAndReceiveTlsData("hello", "world");
-  conn.reset();
+  {
+    auto conn = std::make_unique<ClientSslConnection>(*this);
+    waitCertsRequested(1);
+    createXdsConnection();
+    waitSendSdsResponse("server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+    conn.reset();
+  }
+
+  {
+    // Open a second connection, without expecting SDS.
+    auto conn2 = std::make_unique<ClientSslConnection>(*this);
+    conn2->waitForUpstreamConnection();
+    conn2->sendAndReceiveTlsData("hello", "world");
+    conn2.reset();
+  }
   EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
@@ -333,7 +346,6 @@ TEST_P(OnDemandIntegrationTest, ConnectTimeout) {
         bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
     auto* connect_timeout = filter_chain->mutable_transport_socket_connect_timeout();
     connect_timeout->set_seconds(1);
-    connect_timeout->set_nanos(0);
   });
   setup();
   auto conn = std::make_unique<ClientSslConnection>(*this);

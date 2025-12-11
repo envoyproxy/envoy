@@ -182,7 +182,11 @@ public:
 
 // A handle tracking the certificate selection request. This can be used to supply additonal data
 // to attach to the TLS sockets, and to detect when a request is cancelled.
-class SelectionHandle {};
+class SelectionHandle {
+public:
+  virtual ~SelectionHandle() = default;
+};
+
 using SelectionHandleConstSharedPtr = std::shared_ptr<const SelectionHandle>;
 
 struct SelectionResult {

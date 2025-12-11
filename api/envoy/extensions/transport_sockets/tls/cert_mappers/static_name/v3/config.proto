@@ -16,5 +16,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // A mapping to a fixed secret name for all certificates.
 message StaticName {
+  // The name for the secret to use for all connections.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 }
