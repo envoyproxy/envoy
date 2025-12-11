@@ -20,6 +20,7 @@ namespace Kae {
 inline constexpr char RSA_ALG[] = "rsa";
 inline constexpr char KAE_PATH[] = "/sys/class/uacce";
 inline constexpr char DEVICE_NAME_PREFIX[] = "hisi_hpre-";
+inline constexpr char DEVICE_PATH[] = "/dev";
 
 class LibUadkCryptoImpl : public virtual LibUadkCrypto {
 public:
@@ -28,7 +29,7 @@ public:
       return 0;
     }
 
-    DIR* dir = opendir(KAE_PATH);
+    DIR* dir = opendir(DEVICE_PATH);
     if (!dir) {
       *p_num_instances = 0;
       return 0;
@@ -41,12 +42,6 @@ public:
 
     struct dirent* entry;
     while ((entry = readdir(dir)) != nullptr) {
-      std::string full_path = std::string(KAE_PATH) + "/" + entry->d_name;
-      struct stat sb;
-      if (stat(full_path.c_str(), &sb) != 0 || !S_ISDIR(sb.st_mode)) {
-        continue;
-      }
-
       const char* name = entry->d_name;
       if (std::strncmp(name, prefix, prefix_len) != 0) {
         continue;
@@ -70,17 +65,13 @@ public:
       std::string file_path = std::string(KAE_PATH) + "/" + name + "/available_instances";
       std::ifstream infile(file_path);
       if (!infile.is_open()) {
-        closedir(dir);
-        *p_num_instances = 0;
-        return 0;
+        continue;
       }
 
       uint32_t val = 0;
       infile >> val;
       if (infile.fail()) {
-        closedir(dir);
-        *p_num_instances = 0;
-        return 0;
+        continue;
       }
 
       total += val;
