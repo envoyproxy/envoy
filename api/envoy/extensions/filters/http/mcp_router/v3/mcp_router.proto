@@ -45,14 +45,8 @@ message McpRouter {
     // Default will be the cluster name if not specified.
     string name = 1;
 
-    // [#not-implemented-hide:]
-    // HttpUri-based backend following the FQDN pattern.
-    // Only one of http_uri or mcp_cluster can be specified.
-    config.core.v3.HttpUri http_uri = 2;
-
     // Backend target specification.
-    // Only one of http_uri or mcp_cluster can be specified.
-    McpCluster mcp_cluster = 3;
+    McpCluster mcp_cluster = 2;
   }
 
   // Cluster-based backend configuration.
