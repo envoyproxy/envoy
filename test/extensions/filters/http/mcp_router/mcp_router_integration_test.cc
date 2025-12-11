@@ -586,6 +586,56 @@ TEST_P(McpRouterIntegrationTest, SessionIdPropagation) {
   EXPECT_EQ("200", call_response->headers().getStatusValue());
 }
 
+// Test GET method returns 405 Method Not Allowed
+TEST_P(McpRouterIntegrationTest, GETMethodReturns405) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"}});
+
+  // GET method should return 405 Method Not Allowed
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("405", response->headers().getStatusValue());
+}
+
+// Test tools/call with unknown backend prefix returns 400
+TEST_P(McpRouterIntegrationTest, ToolCallWithUnknownBackendReturns400) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Use a tool name with an unknown backend prefix
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 10,
+    "params": {
+      "name": "unknown_backend__some_tool",
+      "arguments": {}
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Unknown backend prefix should return 400 Bad Request
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
 } // namespace
 } // namespace McpRouter
 } // namespace HttpFilters
