@@ -385,6 +385,24 @@ bool DynamicModuleHttpFilter::sendStreamTrailers(
   return true;
 }
 
+ResponseTrailerMapOptRef DynamicModuleHttpFilter::mutableResponseTrailers() {
+  if (!encoder_callbacks_) {
+    return absl::nullopt;
+  }
+
+  // Return the existing map if it exists
+  ResponseTrailerMapOptRef trailers = encoder_callbacks_->responseTrailers();
+  if (trailers.has_value()) {
+    return trailers;
+  }
+
+  // Otherwise create a new map (this is possible if called before trailer parsing or if the
+  // response has no trailers)
+  Http::ResponseTrailerMap& created = encoder_callbacks_->addEncodedTrailers();
+
+  return ResponseTrailerMapOptRef(created);
+}
+
 void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onHeaders(ResponseHeaderMapPtr&& headers,
                                                                    bool end_stream) {
   // Check if the filter is destroyed before the stream completes.

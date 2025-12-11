@@ -465,7 +465,8 @@ bool envoy_dynamic_module_callback_http_add_response_trailer(
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return addHeaderValueImpl(filter->responseTrailers(), key, key_length, value, value_length);
+  return addHeaderValueImpl(filter->mutableResponseTrailers(), key, key_length, value,
+                            value_length);
 }
 
 bool setHeaderValueImpl(HeadersMapOptRef map, envoy_dynamic_module_type_buffer_module_ptr key,
@@ -514,7 +515,8 @@ bool envoy_dynamic_module_callback_http_set_response_trailer(
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return setHeaderValueImpl(filter->responseTrailers(), key, key_length, value, value_length);
+  return setHeaderValueImpl(filter->mutableResponseTrailers(), key, key_length, value,
+                            value_length);
 }
 
 bool envoy_dynamic_module_callback_http_get_request_headers_size(

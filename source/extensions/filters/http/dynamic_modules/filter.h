@@ -123,6 +123,11 @@ public:
   }
 
   /**
+   * Helper to set/add trailers if none exist (yet)
+   */
+  ResponseTrailerMapOptRef mutableResponseTrailers();
+
+  /**
    * Helper to get the downstream information of the stream.
    */
   StreamInfo::StreamInfo* streamInfo() {
