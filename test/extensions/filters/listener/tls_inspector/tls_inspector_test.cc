@@ -294,10 +294,9 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   const std::vector<uint64_t> bytes_processed =
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
-  EXPECT_EQ(
-      "TLS_error|error:10000092:SSL "
-      "routines:OPENSSL_internal:ENCRYPTED_LENGTH_TOO_LONG:TLS_error_end",
-      cb_.streamInfo().downstreamTransportFailureReason());
+  EXPECT_EQ("TLS_error|error:10000092:SSL "
+            "routines:OPENSSL_internal:ENCRYPTED_LENGTH_TOO_LONG:TLS_error_end",
+            cb_.streamInfo().downstreamTransportFailureReason());
 }
 
 TEST_P(TlsInspectorTest, ClientHelloTooBigTreatParsingErrorAsPlainText) {
