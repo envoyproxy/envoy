@@ -78,7 +78,7 @@ do
     # "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "${CHANGES[@]}" || exit 1
 
     # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
-    "$CI_DIR"/do_ci.sh check_proto_format || exit 1
+    "${SCRIPT_DIR}/proto_format/proto_format.sh" check || exit 1
 
     bazel run //tools/code:check -- \
           -s main \
