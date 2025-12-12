@@ -6,17 +6,12 @@ permissions:
 on:
   workflow_call:
     secrets:
-      gcs-cache-key:
-        required: true
       gpg-key:
         required: true
       gpg-key-password:
         required: true
     inputs:
       arch:
-        type: string
-        required: true
-      gcs-cache-bucket:
         type: string
         required: true
       request:
@@ -38,15 +33,15 @@ concurrency:
 
 jobs:
   binary:
-    secrets:
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
+      actions: read
       contents: read
       packages: read
     name: Binary
     uses: ./.github/workflows/_run.yml
     with:
       arch: ${{ inputs.arch }}
+      bazel-cache: true
       bazel-extra: >-
         --config=rbe
       target: release.server_only
@@ -54,7 +49,6 @@ jobs:
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: true
       request: ${{ inputs.request }}
       runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
@@ -65,6 +59,7 @@ jobs:
 
   docker:
     permissions:
+      actions: read
       contents: read
       packages: read
     name: Docker OCI
@@ -93,10 +88,10 @@ jobs:
 
   distribution:
     permissions:
+      actions: read
       contents: read
       packages: read
     secrets:
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
       gpg-key: ${{ secrets.gpg-key }}
       gpg-key-password: ${{ secrets.gpg-key-password }}
     name: Packages
@@ -105,6 +100,7 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       arch: ${{ inputs.arch }}
+      bazel-cache: true
       bazel-extra: >-
         --config=remote-cache
       downloads: |
@@ -115,7 +111,6 @@ jobs:
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
       docker-ci: false
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       import-gpg: true
       rbe: false
       request: ${{ inputs.request }}

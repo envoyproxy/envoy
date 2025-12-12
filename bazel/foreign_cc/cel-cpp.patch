@@ -1,8 +1,8 @@
 diff --git a/common/internal/byte_string.cc b/common/internal/byte_string.cc
-index e01c797f8..12345678a 100644
+index b9f47922..9d096424 100644
 --- a/common/internal/byte_string.cc
 +++ b/common/internal/byte_string.cc
-@@ -104,6 +104,13 @@
+@@ -104,6 +104,13 @@ ByteString ByteString::Concat(const ByteString& lhs, const ByteString& rhs,
  
  ByteString::ByteString(Allocator<> allocator, absl::string_view string) {
    ABSL_DCHECK_LE(string.size(), max_size());
@@ -17,10 +17,10 @@ index e01c797f8..12345678a 100644
    if (string.size() <= kSmallByteStringCapacity) {
      SetSmall(arena, string);
 diff --git a/common/typeinfo.h b/common/typeinfo.h
-index 06a03c13d..9f5d77980 100644
+index 6c0a1c42..6a284790 100644
 --- a/common/typeinfo.h
 +++ b/common/typeinfo.h
-@@ -80,7 +80,7 @@
+@@ -80,7 +80,7 @@ std::enable_if_t<
      std::conjunction_v<common_internal::HasNativeTypeTraitsId<T>,
                         std::negation<common_internal::HasCelTypeId<T>>>,
      TypeInfo>
@@ -29,7 +29,7 @@ index 06a03c13d..9f5d77980 100644
    return NativeTypeTraits<absl::remove_cvref_t<T>>::Id(t);
  }
  
-@@ -90,7 +90,7 @@
+@@ -90,7 +90,7 @@ std::enable_if_t<
                         std::negation<common_internal::HasCelTypeId<T>>,
                         std::is_final<T>>,
      TypeInfo>
@@ -38,7 +38,7 @@ index 06a03c13d..9f5d77980 100644
    return cel::TypeId<absl::remove_cvref_t<T>>();
  }
  
-@@ -99,7 +99,7 @@
+@@ -99,7 +99,7 @@ std::enable_if_t<
      std::conjunction_v<std::negation<common_internal::HasNativeTypeTraitsId<T>>,
                         common_internal::HasCelTypeId<T>>,
      TypeInfo>
@@ -48,10 +48,10 @@ index 06a03c13d..9f5d77980 100644
  }
  
 diff --git a/common/value.h b/common/value.h
-index abcdef123..987654fed 100644
+index 06225796..18f56e59 100644
 --- a/common/value.h
 +++ b/common/value.h
-@@ -2726,7 +2726,7 @@
+@@ -2794,7 +2794,7 @@ absl::StatusOr<std::pair<Value, int>> StructValueMixin<Base>::Qualify(
      const google::protobuf::DescriptorPool* absl_nonnull descriptor_pool,
      google::protobuf::MessageFactory* absl_nonnull message_factory,
      google::protobuf::Arena* absl_nonnull arena) const {
@@ -60,26 +60,3 @@ index abcdef123..987654fed 100644
    ABSL_DCHECK(descriptor_pool != nullptr);
    ABSL_DCHECK(message_factory != nullptr);
    ABSL_DCHECK(arena != nullptr);
-diff --git a/common/values/value_variant.h b/common/values/value_variant.h
-index 61c19ce5f..fc7969bc8 100644
---- a/common/values/value_variant.h
-+++ b/common/values/value_variant.h
-@@ -737,9 +737,6 @@
- #if defined(__GNUC__) && !defined(__clang__)
- #pragma GCC diagnostic push
- #pragma GCC diagnostic ignored "-Wclass-memaccess"
--#elif defined(__clang__)
--#pragma clang diagnostic push
--#pragma clang diagnostic ignored "-Wnontrivial-memcall"
- #endif
-         alignas(ValueVariant) std::byte tmp[sizeof(ValueVariant)];
-         // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
-@@ -751,8 +748,6 @@
-         std::memcpy(std::addressof(rhs), tmp, sizeof(ValueVariant));
- #if defined(__GNUC__) && !defined(__clang__)
- #pragma GCC diagnostic pop
--#elif defined(__clang__)
--#pragma clang diagnostic pop
- #endif
-       } else {
-         SlowSwap(lhs, rhs, lhs_trivial, rhs_trivial);

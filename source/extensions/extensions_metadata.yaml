@@ -572,6 +572,13 @@ envoy.filters.http.mcp:
   type_urls:
   - envoy.extensions.filters.http.mcp.v3.Mcp
   - envoy.extensions.filters.http.mcp.v3.McpOverride
+envoy.filters.http.mcp_router:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.mcp_router.v3.McpRouter
 envoy.filters.http.oauth2:
   categories:
   - envoy.filters.http
@@ -1537,6 +1544,13 @@ envoy.upstream.local_address_selector.default_local_address_selector:
   status: alpha
   type_urls:
   - envoy.config.upstream.local_address_selector.v3.DefaultLocalAddressSelector
+envoy.upstream.local_address_selector.filter_state_override:
+  categories:
+  - envoy.upstream.local_address_selector
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.local_address_selectors.filter_state_override.v3.Config
 envoy.wasm.runtime.null:
   categories:
   - envoy.wasm.runtime

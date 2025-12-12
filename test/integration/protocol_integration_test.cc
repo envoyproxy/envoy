@@ -2100,9 +2100,11 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
     ASSERT_TRUE(response->reset());
+    // TODO(wbpcode): We should standardize the reset reason for HTTP/2 and HTTP/3.
     EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
                    ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
+               : GetParam().use_universal_header_validator ? Http::StreamResetReason::ProtocolError
+                                                           : Http::StreamResetReason::RemoteReset),
               response->resetReason());
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
@@ -2141,9 +2143,11 @@ TEST_P(DownstreamProtocolIntegrationTest, TrailerWithUnderscoresCauseRequestReje
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
     ASSERT_TRUE(response->reset());
+    // TODO(wbpcode): We should standardize the reset reason for HTTP/2 and HTTP/3.
     EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
                    ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
+               : GetParam().use_universal_header_validator ? Http::StreamResetReason::ProtocolError
+                                                           : Http::StreamResetReason::RemoteReset),
               response->resetReason());
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
@@ -2482,10 +2486,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
-                   ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
-              response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
   }
 }
 
@@ -2538,10 +2539,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
-                   ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
-              response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
   }
 }
 
@@ -4934,10 +4932,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
     // Inconsistency in content-length header and the actually body length should be treated as a
     // stream error.
     ASSERT_TRUE(response->waitForReset());
-    EXPECT_EQ((downstreamProtocol() == Http::CodecType::HTTP3
-                   ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
-              response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
   }
 }
 
@@ -4966,9 +4961,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
   // Inconsistency in content-length header and the actually body length should be treated as a
   // stream error.
   ASSERT_TRUE(response->waitForReset());
-  EXPECT_EQ((downstreamProtocol() == Http::CodecType::HTTP3 ? Http::StreamResetReason::ProtocolError
-                                                            : Http::StreamResetReason::RemoteReset),
-            response->resetReason());
+  EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
 }
 
 class NoUdpGso : public Api::OsSysCallsImpl {
@@ -5244,10 +5237,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
     test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
   } else {
     // H/2 codec does not send 400 on protocol errors
-    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
-                   ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
-              response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
   }
 }
 
@@ -5792,9 +5782,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailerStreamError) {
   ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   ASSERT_TRUE(response->reset());
-  EXPECT_EQ((downstreamProtocol() == Http::CodecType::HTTP3 ? Http::StreamResetReason::ProtocolError
-                                                            : Http::StreamResetReason::RemoteReset),
-            response->resetReason());
+  EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
   if (!use_universal_header_validator_) {
     // TODO(#24620) UHV does not include the DPE prefix in the downstream protocol error reasons
     if (downstreamProtocol() != Http::CodecType::HTTP3) {

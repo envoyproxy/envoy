@@ -3,7 +3,9 @@
 #include <chrono>
 #include <cstdint>
 #include <string>
+#include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
@@ -18,6 +20,33 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
+namespace {
+
+using MetadataProto = ::envoy::config::core::v3::Metadata;
+
+void fillMetadataContext(const MetadataProto& source_metadata,
+                         const std::vector<std::string>& metadata_context_namespaces,
+                         const std::vector<std::string>& typed_metadata_context_namespaces,
+                         MetadataProto& metadata_context) {
+  for (const auto& context_key : metadata_context_namespaces) {
+    const auto& filter_metadata = source_metadata.filter_metadata();
+    if (const auto metadata_it = filter_metadata.find(context_key);
+        metadata_it != filter_metadata.end()) {
+      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    }
+  }
+
+  for (const auto& context_key : typed_metadata_context_namespaces) {
+    const auto& typed_filter_metadata = source_metadata.typed_filter_metadata();
+    if (const auto metadata_it = typed_filter_metadata.find(context_key);
+        metadata_it != typed_filter_metadata.end()) {
+      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+    }
+  }
+}
+
+} // namespace
+
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {
   const std::string final_prefix = fmt::format("ext_authz.{}.", name);
   return {ALL_TCP_EXT_AUTHZ_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
@@ -25,9 +54,16 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
 }
 
 void Filter::callCheck() {
+  // If metadata_context_namespaces or typed_metadata_context_namespaces is specified,
+  // pass matching filter metadata to the ext_authz service.
+  envoy::config::core::v3::Metadata metadata_context;
+  fillMetadataContext(filter_callbacks_->connection().streamInfo().dynamicMetadata(),
+                      config_->metadataContextNamespaces(),
+                      config_->typedMetadataContextNamespaces(), metadata_context);
+
   Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(
       filter_callbacks_, check_request_, config_->includePeerCertificate(),
-      config_->includeTLSSession(), config_->destinationLabels());
+      config_->includeTLSSession(), config_->destinationLabels(), std::move(metadata_context));
   // Store start time of ext_authz filter call
   start_time_ = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime();
   status_ = Status::Calling;

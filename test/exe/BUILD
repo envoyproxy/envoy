@@ -45,7 +45,10 @@ envoy_sh_test(
     coverage = False,
     data = [
         "//source/exe:envoy-static",
-    ],
+    ] + select({
+        "//bazel:clang_build": ["@llvm_toolchain_llvm//:readelf"],
+        "//conditions:default": [],
+    }),
     # Since VS2015 or even earlier, link.exe defaults to PIE generation
     tags = [
         "nofips",
@@ -66,7 +69,7 @@ envoy_sh_test(
 
 envoy_cc_test_library(
     name = "main_common_test_base_lib",
-    srcs = ["main_common_test_base.cc"],
+    srcs = envoy_select_admin_functionality(["main_common_test_base.cc"]),
     hdrs = ["main_common_test_base.h"],
     data = [
         "//test/config/integration:google_com_proxy_port_0",
@@ -156,10 +159,11 @@ envoy_cc_test(
     data = [
         "fips_check.sh",
         "//source/extensions:extensions_metadata.yaml",
+        "@llvm_toolchain_llvm//:objdump",
     ],
     env = select({
         "//bazel:clang_build": {
-            "OBJDUMP": "${LLVM_DIRECTORY}/bin/llvm-objdump",
+            "OBJDUMP": "$(location @llvm_toolchain_llvm//:objdump)",
         },
         "//conditions:default": {},
     }),
