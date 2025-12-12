@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/server/overload/overload_manager.h"
+
 #include "source/common/http/conn_pool_base.h"
 #include "source/common/http/http3/conn_pool.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
@@ -185,7 +187,8 @@ public:
                    HttpServerPropertiesCacheSharedPtr alternate_protocols,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
                    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info,
-                   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry);
+                   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
+                   Server::OverloadManager& overload_manager);
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable
@@ -288,6 +291,7 @@ private:
 
   Http::PersistentQuicInfo& quic_info_;
   Upstream::ResourcePriority priority_;
+  Server::OverloadManager& overload_manager_;
 
   // True iff this pool is draining. No new streams or connections should be created
   // in this state.

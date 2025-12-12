@@ -441,6 +441,8 @@ private:
 
     absl::string_view name() const override { return "admin"; }
 
+    bool addedViaApi() const override { return false; }
+
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;
     const Filter::NetworkFilterFactoriesList empty_network_filter_factory_;

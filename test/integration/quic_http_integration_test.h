@@ -288,8 +288,7 @@ public:
       cluster->http3_options_.set_disable_qpack(*disable_qpack);
     }
     Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-        cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
-        timeSystem())};
+        cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
     // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
     // in-connection version negotiation.
     auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),

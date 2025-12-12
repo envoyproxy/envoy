@@ -205,16 +205,17 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   }
 
   // Perform the matching.
-  auto match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
-  if (match_result.match_state_ != Matcher::MatchState::MatchComplete) {
-    // The returned state from `evaluateMatch` function is `MatchState::UnableToMatch` here.
+  Matcher::MatchResult match_result =
+      Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
+  if (!match_result.isComplete()) {
+    // The returned state from `evaluateMatch` function is `InsufficientData` here.
     return absl::InternalError("Unable to match due to the required data not being available.");
   }
-  if (!match_result.result_) {
+  if (!match_result.isMatch()) {
     return absl::NotFoundError("Matching completed but no match result was found.");
   }
   // Return the matched result for `on_match` case.
-  return match_result.result_();
+  return match_result.action();
 }
 
 void RateLimitQuotaFilter::onDestroy() {

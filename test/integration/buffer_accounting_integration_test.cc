@@ -137,7 +137,6 @@ public:
     }
 
     const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
-    setupHttp1ImplOverrides(protocol_test_params.http1_implementation);
     setupHttp2ImplOverrides(protocol_test_params.http2_implementation);
 
     setServerBufferFactory(buffer_factory_);
@@ -479,7 +478,6 @@ public:
       buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
     }
     const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
-    setupHttp1ImplOverrides(protocol_test_params.http1_implementation);
     setupHttp2ImplOverrides(protocol_test_params.http2_implementation);
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(protocol_test_params.upstream_protocol);

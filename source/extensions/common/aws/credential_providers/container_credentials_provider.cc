@@ -12,12 +12,12 @@ namespace Common {
 namespace Aws {
 
 ContainerCredentialsProvider::ContainerCredentialsProvider(
-    Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
-    absl::string_view credential_uri, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view credential_uri,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view authorization_token,
     absl::string_view cluster_name)
-    : MetadataCredentialsProviderBase(api, context, aws_cluster_manager, cluster_name,
+    : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       credential_uri_(credential_uri), authorization_token_(authorization_token) {}
@@ -38,7 +38,7 @@ void ContainerCredentialsProvider::refresh() {
   if (authorization_token_.empty()) {
     // EKS Pod Identity token is sourced from AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
     if (const auto token_file = std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE)) {
-      token_or_error = api_.fileSystem().fileReadToEnd(std::string(token_file));
+      token_or_error = context_.api().fileSystem().fileReadToEnd(std::string(token_file));
       if (token_or_error.ok()) {
         ENVOY_LOG(debug, "Container authorization token file contents loaded");
         authorization_header = token_or_error.value();
@@ -109,7 +109,7 @@ void ContainerCredentialsProvider::extractCredentials(
     }
   }
 
-  last_updated_ = api_.timeSource().systemTime();
+  last_updated_ = context_.api().timeSource().systemTime();
   setCredentialsToAllThreads(
       std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
   stats_->credential_refreshes_succeeded_.inc();

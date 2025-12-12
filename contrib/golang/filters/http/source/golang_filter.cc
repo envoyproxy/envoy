@@ -970,6 +970,55 @@ CAPIStatus Filter::removeTrailer(ProcessorState& state, absl::string_view key) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_view host,
+                                           bool strict) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  auto* s = dynamic_cast<DecodingProcessorState*>(&state);
+  if (s == nullptr) {
+    ENVOY_LOG(debug,
+              "golang filter invoking cgo api setUpstreamOverrideHost at invalid state: {}, "
+              "which must be DecodingProcessorState",
+              __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  if (!Http::Utility::parseAuthority(host).is_ip_address_) {
+    ENVOY_LOG(debug, "host is not a valid IP address");
+    return CAPIStatus::CAPIInvalidIPAddress;
+  }
+
+  if (state.isThreadSafe()) {
+    // it's safe to write header in the safe thread.
+    s->setUpstreamOverrideHost(std::make_pair(std::string(host), strict));
+  } else {
+    // should deep copy the string_view before post to dispatcher callback.
+    auto host_str = std::string(host);
+
+    auto weak_ptr = weak_from_this();
+    // dispatch a callback to write header in the envoy safe thread, to make the write operation
+    // safety. otherwise, there might be race between reading in the envoy worker thread and writing
+    // in the Go thread.
+    state.getDispatcher().post([this, s, weak_ptr, host_str] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        s->setUpstreamOverrideHost(std::make_pair(std::string(host_str), false));
+      } else {
+        ENVOY_LOG(debug, "golang filter has gone or destroyed in setUpstreamOverrideHost");
+      }
+    });
+  }
+
+  return CAPIStatus::CAPIOK;
+}
+
 CAPIStatus Filter::clearRouteCache(bool refresh) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {

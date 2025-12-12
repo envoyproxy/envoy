@@ -23,7 +23,7 @@ class ContainerCredentialsProvider : public MetadataCredentialsProviderBase,
                                      public Envoy::Singleton::Instance,
                                      public MetadataFetcher::MetadataReceiver {
 public:
-  ContainerCredentialsProvider(Api::Api& api, Server::Configuration::ServerFactoryContext& context,
+  ContainerCredentialsProvider(Server::Configuration::ServerFactoryContext& context,
                                AwsClusterManagerPtr aws_cluster_manager,
                                CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                absl::string_view credential_uri,

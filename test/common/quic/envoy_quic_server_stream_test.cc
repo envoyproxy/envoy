@@ -263,7 +263,7 @@ protected:
 };
 
 TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
-  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr& headers, bool) {
         EXPECT_EQ(host_, headers->getHostValue());
         EXPECT_EQ("/", headers->getPathValue());
@@ -273,7 +273,6 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
         EXPECT_EQ("a=b; c=d",
                   headers->get(Http::Headers::get().Cookie)[0]->value().getStringView());
       }));
-  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
   quiche::HttpHeaderBlock spdy_headers;
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "GET";

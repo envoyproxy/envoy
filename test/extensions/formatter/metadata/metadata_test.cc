@@ -172,27 +172,15 @@ TEST_F(MetadataFormatterTest, NoListenerMetadata) {
 
 // Test that METADATA(VIRTUAL_HOST accesses selected virtual host metadata.
 TEST_F(MetadataFormatterTest, VirtualHostMetadata) {
-  std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(route));
+  auto mock_virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+  stream_info_.virtual_host_ = mock_virtual_host;
+  EXPECT_CALL(*mock_virtual_host, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
 
-  std::shared_ptr<Router::MockVirtualHost> virtual_host{new NiceMock<Router::MockVirtualHost>()};
-  EXPECT_CALL(*route, virtualHost()).WillRepeatedly(testing::ReturnRef(*virtual_host));
-
-  EXPECT_CALL(*virtual_host, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
   EXPECT_EQ("test_value", getTestMetadataFormatter("VIRTUAL_HOST")
                               ->formatWithContext(formatter_context_, stream_info_));
 }
 
-TEST_F(MetadataFormatterTest, VirtualHostMetadataNoRoute) {
-  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(nullptr));
-  EXPECT_EQ("-", getTestMetadataFormatter("VIRTUAL_HOST")
-                     ->formatWithContext(formatter_context_, stream_info_));
-}
-
-TEST_F(MetadataFormatterTest, VirtualHostMetadataNoRouteEntry) {
-  std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(route));
-  EXPECT_CALL(*route, routeEntry()).WillRepeatedly(testing::Return(nullptr));
+TEST_F(MetadataFormatterTest, VirtualHostMetadataNoVirtualHost) {
   EXPECT_EQ("-", getTestMetadataFormatter("VIRTUAL_HOST")
                      ->formatWithContext(formatter_context_, stream_info_));
 }

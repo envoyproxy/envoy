@@ -436,8 +436,10 @@ void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
+  // In case when upstream connection is draining `parent_` will be set to nullptr.
   // TCP Tunneling may call on high/low watermark multiple times.
-  ASSERT(parent_->config_->tunnelingConfigHelper() || !on_high_watermark_called_);
+  ASSERT(parent_ == nullptr || parent_->config_->tunnelingConfigHelper() ||
+         !on_high_watermark_called_);
   on_high_watermark_called_ = true;
 
   if (parent_ != nullptr) {
@@ -447,8 +449,10 @@ void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
 }
 
 void Filter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
+  // In case when upstream connection is draining `parent_` will be set to nullptr.
   // TCP Tunneling may call on high/low watermark multiple times.
-  ASSERT(parent_->config_->tunnelingConfigHelper() || on_high_watermark_called_);
+  ASSERT(parent_ == nullptr || parent_->config_->tunnelingConfigHelper() ||
+         on_high_watermark_called_);
   on_high_watermark_called_ = false;
 
   if (parent_ != nullptr) {
@@ -751,8 +755,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     Stats::Scope& stats_scope,
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
     Server::Configuration::FactoryContext& context)
-    : use_post_(config_message.tunneling_config().use_post()),
-      header_parser_(THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(
+    : header_parser_(THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(
                                                config_message.tunneling_config().headers_to_add()),
                                            Router::HeaderParserPtr)),
       propagate_response_headers_(config_message.tunneling_config().propagate_response_headers()),
@@ -762,8 +765,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       // TODO(vikaschoudhary16): figure out which of the following router_config_ members are
       // not required by tcp_proxy and move them to a different class
       router_config_(context.serverFactoryContext(), route_stat_name_storage_.statName(),
-                     context.serverFactoryContext().localInfo(), stats_scope,
-                     context.serverFactoryContext().clusterManager(),
+                     stats_scope, context.serverFactoryContext().clusterManager(),
                      context.serverFactoryContext().runtime(),
                      context.serverFactoryContext().api().randomGenerator(),
                      std::make_unique<Router::ShadowWriterImpl>(
@@ -773,10 +775,12 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
                      context.serverFactoryContext().httpContext(),
                      context.serverFactoryContext().routerContext()),
       server_factory_context_(context.serverFactoryContext()) {
-  if (!post_path_.empty() && !use_post_) {
+  if (!post_path_.empty() && !config_message.tunneling_config().use_post()) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
   }
-  post_path_ = post_path_.empty() ? "/" : post_path_;
+  if (config_message.tunneling_config().use_post()) {
+    post_path_ = post_path_.empty() ? "/" : post_path_;
+  }
 
   envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
   substitution_format_config.mutable_text_format_source()->set_inline_string(

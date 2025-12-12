@@ -38,24 +38,29 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 
 # Build image base and compiler versions
 
-Currently there are three build images for Linux and one for Windows:
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 20.04 (Focal) with GCC 13 and Clang 18 compiler.
 
-* `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 20.04 (Focal) with GCC 9 and Clang 14 compiler.
-* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 14 compiler, this image is experimental and not well tested.
-* `envoyproxy/envoy-build-windows2019` &mdash; based on Windows ltsc2019 with VS 2019 Build Tools, as well as LLVM.
-
-The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
+The source for theis images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository.
 
-We use the Clang compiler for all Linux CI runs with tests. We have an additional Linux CI run with GCC which builds binary only.
+The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests. This is configured with `--config=clang`. We have an additional Linux CI run with GCC which builds binary only, configured with `--config=gcc`.
+
+# Supported compiler configurations
+
+Envoy supports two compiler toolchain configurations:
+* `--config=clang` - Clang compiler with libc++ standard library (default for CI)
+* `--config=gcc` - GCC compiler with libstdc++ standard library
 
 # C++ standard library
 
 As of November 2019 after [#8859](https://github.com/envoyproxy/envoy/pull/8859) the official released binary is
 [linked against libc++ on Linux](https://github.com/envoyproxy/envoy/blob/main/bazel/README.md#linking-against-libc-on-linux).
-To override the C++ standard library in your build, set environment variable `ENVOY_STDLIB` to `libstdc++` or `libc++` and
-run `./ci/do_ci.sh` as described below.
+
+The standard library is tied to the compiler toolchain:
+* `--config=clang` - Uses libc++ (LLVM standard library)
+* `--config=gcc` - Uses libstdc++ (GNU standard library)
+
+These are the only supported configurations. If you need a different toolchain configuration, you must set it up in your `user.bazelrc` file.
 
 # Building and running tests as a developer
 
@@ -152,8 +157,8 @@ export BAZEL_BUILD_EXTRA_OPTIONS=--config=my-remote-cache
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
 * `api` &mdash; build and run API tests under `-c fastbuild` with clang.
-* `asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang.
-* `asan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-asan` with clang.
+* `asan` &mdash; build and run tests under `-c dbg --config=asan` with clang.
+* `asan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=asan` with clang.
 * `debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
 * `debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
@@ -168,12 +173,12 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `sizeopt` &mdash; build Envoy static binary and run tests under `-c opt --config=sizeopt` with clang.
 * `sizeopt <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt --config=sizeopt` with clang.
 * `sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
-* `coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
-* `coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`. Specify `//contrib/...` to get contrib coverage.
-* `msan` &mdash; build and run tests under `-c dbg --config=clang-msan` with clang.
-* `msan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-msan` with clang.
-* `tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
-* `tsan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-tsan` with clang.
+* `coverage` &mdash; build and run tests under `-c dbg` with clang, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
+* `coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with clang, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`. Specify `//contrib/...` to get contrib coverage.
+* `msan` &mdash; build and run tests under `-c dbg --config=msan` with clang.
+* `msan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=msan` with clang.
+* `tsan` &mdash; build and run tests under `-c dbg --config=tsan` with clang.
+* `tsan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=tsan` with clang.
 * `fuzz` &mdash; build and run fuzz tests under `-c dbg --config=asan-fuzzer` with clang.
 * `fuzz <test>` &mdash; build and run a specified fuzz test or test dir under `-c dbg --config=asan-fuzzer` with clang. If specifying a single fuzz test, must use the full target name with "_with_libfuzzer" for `<test>`.
 * `compile_time_options` &mdash; build Envoy and run tests with various compile-time options toggled to their non-default state, to ensure they still build.

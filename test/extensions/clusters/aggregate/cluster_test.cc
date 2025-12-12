@@ -46,20 +46,19 @@ public:
                                     int degraded_hosts, int unhealthy_hosts, uint32_t priority) {
     Upstream::HostVector hosts;
     for (int i = 0; i < healthy_hosts; ++i) {
-      hosts.emplace_back(
-          Upstream::makeTestHost(cluster, "tcp://127.0.0.1:80", simTime(), 1, priority));
+      hosts.emplace_back(Upstream::makeTestHost(cluster, "tcp://127.0.0.1:80", 1, priority));
     }
 
     for (int i = 0; i < degraded_hosts; ++i) {
       Upstream::HostSharedPtr host =
-          Upstream::makeTestHost(cluster, "tcp://127.0.0.2:80", simTime(), 1, priority);
+          Upstream::makeTestHost(cluster, "tcp://127.0.0.2:80", 1, priority);
       host->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
       hosts.emplace_back(host);
     }
 
     for (int i = 0; i < unhealthy_hosts; ++i) {
       Upstream::HostSharedPtr host =
-          Upstream::makeTestHost(cluster, "tcp://127.0.0.3:80", simTime(), 1, priority);
+          Upstream::makeTestHost(cluster, "tcp://127.0.0.3:80", 1, priority);
       host->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
       hosts.emplace_back(host);
     }
@@ -102,14 +101,13 @@ public:
         cluster_config.cluster_type().typed_config(), ProtobufMessage::getStrictValidationVisitor(),
         config));
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     absl::Status creation_status = absl::OkStatus();
     cluster_ = std::shared_ptr<Cluster>(
         new Cluster(cluster_config, config, factory_context, creation_status));
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
 
     server_context_.cluster_manager_.initializeThreadLocalClusters({"primary", "secondary"});
     primary_.cluster_.info_->name_ = "primary";
@@ -132,7 +130,6 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Ssl::MockContextManager ssl_context_manager_;
 
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_{Api::createApiForTest(server_context_.store_, random_)};
@@ -178,8 +175,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
   // Cluster 2:
   //     Priority 0: 33.3%
   //     Priority 1: 33.3%
-  Upstream::HostSharedPtr host =
-      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
     return Upstream::HostSelectionResponse{host};
   }));
@@ -251,8 +247,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
 
 TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
   initialize(default_yaml_config_);
-  Upstream::HostSharedPtr host =
-      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
   // Set up the HostSet with 0 healthy, 0 degraded and 2 unhealthy.
   setupPrimary(0, 0, 0, 2);
   setupPrimary(1, 0, 0, 2);
@@ -298,8 +293,7 @@ TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
 
 TEST_F(AggregateClusterTest, ClusterInPanicTest) {
   initialize(default_yaml_config_);
-  Upstream::HostSharedPtr host =
-      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
   setupPrimary(0, 1, 0, 4);
   setupPrimary(1, 1, 0, 4);
   setupSecondary(0, 1, 0, 4);
@@ -399,7 +393,7 @@ TEST_F(AggregateClusterTest, ContextDeterminePriorityLoad) {
 
   const uint32_t invalid_priority = 42;
   Upstream::HostSharedPtr host =
-      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime(), 1, invalid_priority);
+      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", 1, invalid_priority);
 
   // The linearized priorities are [P0, P1, S0, S1].
   Upstream::HealthyAndDegradedLoad secondary_priority_1{Upstream::HealthyLoad({0, 0, 0, 100}),

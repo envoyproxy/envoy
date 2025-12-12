@@ -126,6 +126,10 @@ protected:
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }
+      bool setSocketOption(Network::SocketOptionName, absl::Span<uint8_t>) override {
+        IS_ENVOY_BUG("Unexpected function call");
+        return false;
+      }
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
       Network::DetectedCloseType detectedCloseType() const override {

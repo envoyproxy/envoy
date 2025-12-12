@@ -32,14 +32,16 @@ static_resources:
                     {}
                 route:
                   cluster: cluster_0
+                  upgrade_configs:
+                  - upgrade_type: CONNECT
+                    connect_config:
+                      {}
           http_filters:
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           http2_protocol_options:
             allow_connect: true
-          upgrade_configs:
-          - upgrade_type: CONNECT
   clusters:
   - name: cluster_0
     connect_timeout: 5s

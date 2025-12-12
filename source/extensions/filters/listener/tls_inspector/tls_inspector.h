@@ -12,6 +12,7 @@
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
 #include "openssl/ssl.h"
+#include "openssl/ssl3.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -62,7 +63,10 @@ public:
   uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
   uint32_t initialReadBufferSize() const { return initial_read_buffer_size_; }
 
-  static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
+  // This is the maximum size of a ClientHello that boring ssl will accept.
+  // Here is the check in boring ssl:
+  // https://github.com/google/boringssl/blob/56383dabf472100181226cd14249f04c69a0c10b/ssl/tls_record.cc#L133
+  static constexpr size_t TLS_MAX_CLIENT_HELLO = SSL3_RT_MAX_PLAIN_LENGTH;
   static const unsigned TLS_MIN_SUPPORTED_VERSION;
   static const unsigned TLS_MAX_SUPPORTED_VERSION;
 

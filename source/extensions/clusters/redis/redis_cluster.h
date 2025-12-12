@@ -114,7 +114,7 @@ public:
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
-  TimeSource& timeSource() const { return time_source_; }
+  /// TimeSource& timeSource() const { return time_source_; }
 
 protected:
   RedisCluster(const envoy::config::cluster::v3::Cluster& cluster,
@@ -152,13 +152,12 @@ private:
   public:
     static absl::StatusOr<std::unique_ptr<RedisHost>>
     create(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-           Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-           TimeSource& time_source);
+           Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary);
 
   protected:
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
               Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-              TimeSource& time_source, absl::Status& creation_status)
+              absl::Status& creation_status)
         : Upstream::HostImpl(
               creation_status, cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
@@ -168,8 +167,7 @@ private:
               parent.lbEndpoint().load_balancing_weight().value(),
               parent.localityLbEndpoint().locality(),
               parent.lbEndpoint().endpoint().health_check_config(),
-              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status(),
-              time_source),
+              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
           primary_(primary) {}
 
     bool isPrimary() const { return primary_; }

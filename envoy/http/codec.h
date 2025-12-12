@@ -42,13 +42,13 @@ static constexpr uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
 // Default maximum number of headers.
 static constexpr uint32_t DEFAULT_MAX_HEADERS_COUNT = 100;
 
-const char MaxRequestHeadersCountOverrideKey[] =
+constexpr absl::string_view MaxRequestHeadersCountOverrideKey =
     "envoy.reloadable_features.max_request_headers_count";
-const char MaxResponseHeadersCountOverrideKey[] =
+constexpr absl::string_view MaxResponseHeadersCountOverrideKey =
     "envoy.reloadable_features.max_response_headers_count";
-const char MaxRequestHeadersSizeOverrideKey[] =
+constexpr absl::string_view MaxRequestHeadersSizeOverrideKey =
     "envoy.reloadable_features.max_request_headers_size_kb";
-const char MaxResponseHeadersSizeOverrideKey[] =
+constexpr absl::string_view MaxResponseHeadersSizeOverrideKey =
     "envoy.reloadable_features.max_response_headers_size_kb";
 
 class Stream;
@@ -548,10 +548,6 @@ struct Http1Settings {
 
   // If true, Envoy will send a fully qualified URL in the firstline of the request.
   bool send_fully_qualified_url_{false};
-
-  // If true, BalsaParser is used for HTTP/1 parsing; if false, http-parser is
-  // used. See issue #21245.
-  bool use_balsa_parser_{false};
 
   // If true, any non-empty method composed of valid characters is accepted.
   // If false, only methods from a hard-coded list of known methods are accepted.

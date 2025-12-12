@@ -63,7 +63,7 @@ def _default_envoy_build_config_impl(ctx):
     ctx.file("BUILD.bazel", "")
     ctx.symlink(ctx.attr.config, "extensions_build_config.bzl")
 
-_default_envoy_build_config = repository_rule(
+default_envoy_build_config = repository_rule(
     implementation = _default_envoy_build_config_impl,
     attrs = {
         "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
@@ -118,7 +118,7 @@ def envoy_dependencies(skip_targets = []):
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
-        _default_envoy_build_config(name = "envoy_build_config")
+        default_envoy_build_config(name = "envoy_build_config")
 
     # Setup Bazel shell rules
     external_http_archive(name = "rules_shell")
@@ -186,13 +186,17 @@ def envoy_dependencies(skip_targets = []):
     _com_google_protobuf()
     _com_github_envoyproxy_sqlparser()
     _v8()
-    _com_googlesource_chromium_base_trace_event_common()
+    _fast_float()
+    _highway()
+    _dragonbox()
+    _fp16()
+    _simdutf()
+    _intel_ittapi()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _io_hyperscan()
     _io_vectorscan()
     _io_opentelemetry_api_cpp()
-    _llvm_source()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
     _net_zlib()
@@ -215,6 +219,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_examples")
+    external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
 
@@ -236,7 +241,6 @@ def envoy_dependencies(skip_targets = []):
     _go_deps(skip_targets)
     _rust_deps()
     _kafka_deps()
-
     _com_github_wamr()
     _com_github_wasmtime()
 
@@ -262,6 +266,30 @@ def _boringssl_fips():
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
         patches = ["@envoy//bazel:boringssl_fips.patch"],
         patch_args = ["-p1"],
+    )
+
+    NINJA_BUILD_CONTENT = "%s\nexports_files([\"configure.py\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_ninja",
+        build_file_content = NINJA_BUILD_CONTENT,
+    )
+    CMAKE_BUILD_CONTENT = "%s\nexports_files([\"bin/cmake\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_cmake_linux_x86_64",
+        build_file_content = CMAKE_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "fips_cmake_linux_aarch64",
+        build_file_content = CMAKE_BUILD_CONTENT,
+    )
+    GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_go_linux_amd64",
+        build_file_content = GO_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "fips_go_linux_arm64",
+        build_file_content = GO_BUILD_CONTENT,
     )
 
 def _aws_lc():
@@ -392,12 +420,6 @@ def _com_github_qat_zstd():
 def _com_github_lz4_lz4():
     external_http_archive(
         name = "com_github_lz4_lz4",
-        build_file_content = BUILD_ALL_CONTENT,
-    )
-
-def _llvm_source():
-    external_http_archive(
-        name = "llvm_source",
         build_file_content = BUILD_ALL_CONTENT,
     )
 
@@ -541,8 +563,6 @@ def _io_vectorscan():
 def _io_opentelemetry_api_cpp():
     external_http_archive(
         name = "io_opentelemetry_cpp",
-        patches = ["@envoy//bazel:io_opentelemetry_cpp.patch"],
-        patch_args = ["-p1"],
     )
 
 def _com_github_datadog_dd_trace_cpp():
@@ -695,10 +715,19 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
-            "@envoy//bazel:v8_include.patch",
             "@envoy//bazel:v8_ppc64le.patch",
         ],
         patch_args = ["-p1"],
+        patch_cmds = [
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/simdutf/simdutf.h\"!#include \"simdutf.h\"!' {} \\;",
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fp16/src/include/fp16.h\"!#include \"fp16.h\"!' {} \\;",
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/dragonbox/src/include/dragonbox/dragonbox.h\"!#include \"dragonbox/dragonbox.h\"!' {} \\;",
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fast_float/src/include/fast_float/!#include \"fast_float/!' {} \\;",
+        ],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+            "@icu": "@com_github_unicode_org_icu",
+        },
     )
 
     # Needed by proxy_wasm_cpp_host.
@@ -707,16 +736,38 @@ def _v8():
         actual = "@v8//:wee8",
     )
 
-def _com_googlesource_chromium_base_trace_event_common():
+def _fast_float():
     external_http_archive(
-        name = "com_googlesource_chromium_base_trace_event_common",
-        build_file = "@v8//:bazel/BUILD.trace_event_common",
+        name = "fast_float",
     )
 
-    # Needed by v8.
-    native.bind(
-        name = "base_trace_event_common",
-        actual = "@com_googlesource_chromium_base_trace_event_common//:trace_event_common",
+def _highway():
+    external_http_archive(
+        name = "highway",
+    )
+
+def _dragonbox():
+    external_http_archive(
+        name = "dragonbox",
+        build_file = "@envoy//bazel/external:dragonbox.BUILD",
+    )
+
+def _fp16():
+    external_http_archive(
+        name = "fp16",
+        build_file = "@envoy//bazel/external:fp16.BUILD",
+    )
+
+def _simdutf():
+    external_http_archive(
+        name = "simdutf",
+        build_file = "@envoy//bazel/external:simdutf.BUILD",
+    )
+
+def _intel_ittapi():
+    external_http_archive(
+        name = "intel_ittapi",
+        build_file = "@envoy//bazel/external:intel_ittapi.BUILD",
     )
 
 def _com_github_google_quiche():
@@ -746,7 +797,11 @@ def _com_github_grpc_grpc():
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {"@openssl": "@boringssl"},
     )
-    external_http_archive("build_bazel_rules_apple")
+    external_http_archive(
+        "build_bazel_rules_apple",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_apple.patch"],
+    )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(

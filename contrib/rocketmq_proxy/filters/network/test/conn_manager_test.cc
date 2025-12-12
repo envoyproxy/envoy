@@ -97,8 +97,7 @@ public:
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostSharedPtr host_{
-      Upstream::makeTestHost(cluster_info_, "tcp://127.0.0.1:80", simTime())};
+  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_info_, "tcp://127.0.0.1:80")};
   Upstream::PrioritySetImpl priority_set_;
 };
 

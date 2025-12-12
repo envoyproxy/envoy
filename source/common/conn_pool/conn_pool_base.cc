@@ -1,5 +1,7 @@
 #include "source/common/conn_pool/conn_pool_base.h"
 
+#include "envoy/server/overload/load_shed_point.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/debug_recursion_checker.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -52,10 +54,16 @@ ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-    Upstream::ClusterConnectivityState& state)
+    Upstream::ClusterConnectivityState& state, Server::OverloadManager& overload_manager)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
       transport_socket_options_(transport_socket_options), cluster_connectivity_state_(state),
-      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
+      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })),
+      create_new_connection_load_shed_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().ConnectionPoolNewConnection)) {
+  ENVOY_LOG_ONCE_IF(trace, create_new_connection_load_shed_ == nullptr,
+                    "LoadShedPoint envoy.load_shed_points.connection_pool_new_connection is not "
+                    "found. Is it configured?");
+}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
   ENVOY_BUG(isIdleImpl(), dumpState());
@@ -179,6 +187,13 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     return ConnectionResult::ShouldNotConnect;
   }
   ENVOY_LOG(trace, "creating new preconnect connection");
+
+  // Drop new connection attempts if the load shed point indicates overload.
+  if (create_new_connection_load_shed_) {
+    if (create_new_connection_load_shed_->shouldShedLoad()) {
+      return ConnectionResult::LoadShed;
+    }
+  }
 
   const bool can_create_connection = host_->canCreateConnection(priority_);
 
@@ -346,11 +361,13 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
   // length of pending_streams_ to determine if a new connection is needed.
   const ConnectionResult result = tryCreateNewConnections();
   // If there is not enough connecting capacity, the only reason to not
-  // increase capacity is if the connection limits are exceeded.
+  // increase capacity is if the connection limits are exceeded or load shed is
+  // triggered.
   ENVOY_BUG(pending_streams_.size() <= connecting_stream_capacity_ ||
                 connecting_stream_capacity_ > old_capacity ||
                 (result == ConnectionResult::NoConnectionRateLimited ||
-                 result == ConnectionResult::FailedToCreateConnection),
+                 result == ConnectionResult::FailedToCreateConnection ||
+                 result == ConnectionResult::LoadShed),
             fmt::format("Failed to create expected connection: {}", *this));
   if (result == ConnectionResult::FailedToCreateConnection) {
     // This currently only happens for HTTP/3 if secrets aren't yet loaded.
@@ -358,6 +375,11 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
     pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
     onPoolFailure(nullptr, absl::string_view(),
                   ConnectionPool::PoolFailureReason::LocalConnectionFailure, context);
+    return nullptr;
+  } else if (result == ConnectionResult::LoadShed) {
+    pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+    onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
+                  context);
     return nullptr;
   }
   return pending;

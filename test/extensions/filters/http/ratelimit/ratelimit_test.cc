@@ -71,8 +71,8 @@ public:
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(
         route_rate_limit_);
-    filter_callbacks_.route_->virtual_host_.rate_limit_policy_.rate_limit_policy_entry_.clear();
-    filter_callbacks_.route_->virtual_host_.rate_limit_policy_.rate_limit_policy_entry_
+    filter_callbacks_.route_->virtual_host_->rate_limit_policy_.rate_limit_policy_entry_.clear();
+    filter_callbacks_.route_->virtual_host_->rate_limit_policy_.rate_limit_policy_entry_
         .emplace_back(vh_rate_limit_);
 
     if (!route_config_yaml.empty()) {
@@ -148,6 +148,34 @@ public:
         numerator: 50
         denominator: HUNDRED
     )EOF";
+
+  const std::string failure_mode_runtime_zero_percent_config_ = R"EOF(
+  domain: foo
+  rate_limit_service:
+    grpc_service:
+      envoy_grpc:
+        cluster_name: ratelimit
+      timeout: 0.25s
+  failure_mode_deny_percent:
+    runtime_key: test.ratelimit.failure_mode_deny_percent
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  )EOF";
+
+  const std::string failure_mode_runtime_hundred_percent_config_ = R"EOF(
+  domain: foo
+  rate_limit_service:
+    grpc_service:
+      envoy_grpc:
+        cluster_name: ratelimit
+      timeout: 0.25s
+  failure_mode_deny_percent:
+    runtime_key: test.ratelimit.failure_mode_deny_percent
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  )EOF";
 
   Filters::Common::RateLimit::MockClient* client_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
@@ -283,7 +311,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -396,7 +424,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -452,7 +480,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1332,7 +1360,7 @@ TEST_F(HttpRateLimitFilterTest, InternalRequestType) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1375,7 +1403,7 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1427,7 +1455,8 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1477,7 +1506,8 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1525,7 +1555,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(true));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1573,7 +1603,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1623,7 +1653,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1673,7 +1703,8 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1718,7 +1749,8 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
@@ -1997,6 +2029,85 @@ TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsAndOnStreamDone) {
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr,
                                std::make_unique<Http::TestResponseHeaderMapImpl>(), nullptr, "",
                                nullptr);
+}
+
+TEST_F(HttpRateLimitFilterTest, FailureModeZeroPercentFailsOpen) {
+
+  EXPECT_CALL(
+      factory_context_.runtime_loader_.snapshot_,
+      featureEnabled(absl::string_view("test.ratelimit.failure_mode_deny_percent"),
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
+      .WillOnce(testing::Return(false));
+
+  setUpTest(failure_mode_runtime_zero_percent_config_);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
+                               nullptr, "", nullptr);
+
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_error_).value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_failure_mode_allowed_)
+                    .value());
+}
+
+TEST_F(HttpRateLimitFilterTest, FailureModeHundredPercentFailsClose) {
+
+  EXPECT_CALL(
+      factory_context_.runtime_loader_.snapshot_,
+      featureEnabled(absl::string_view("test.ratelimit.failure_mode_deny_percent"),
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(testing::Return(true));
+
+  setUpTest(failure_mode_runtime_hundred_percent_config_);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimitServiceError));
+
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::InternalServerError)));
+      }));
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
+                               nullptr, "", nullptr);
+
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_error_).value());
+  EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_failure_mode_allowed_)
+                    .value());
 }
 
 } // namespace

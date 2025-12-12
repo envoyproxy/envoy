@@ -17,6 +17,10 @@ filter_config {
       cookie: "api_key"
     }
   }
+  forwarding {
+    header: "x-client-id"
+    hide_credentials: false
+  }
 }
 route_config {
   credentials {
@@ -29,6 +33,10 @@ route_config {
     key_sources {
       query: "api_key"
     }
+  }
+  forwarding {
+    header: "x-client-id-2"
+    hide_credentials: true
   }
   allowed_clients: ["fake-client-3"]
 }

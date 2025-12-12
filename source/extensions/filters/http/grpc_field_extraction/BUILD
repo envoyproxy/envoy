@@ -27,6 +27,7 @@ envoy_cc_library(
     external_deps = ["grpc_transcoding"],
     deps = [
         "extractor",
+        "//envoy/common:exception_lib",
         "//source/common/common:minimal_logger_lib",
         "@com_google_absl//absl/status",
         "@com_google_protofieldextraction//:all_libs",

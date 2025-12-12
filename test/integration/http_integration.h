@@ -145,7 +145,6 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
-  void setupHttp1ImplOverrides(Http1ParserImpl http1_implementation);
   void setupHttp2ImplOverrides(Http2Impl http2_implementation);
 
 protected:

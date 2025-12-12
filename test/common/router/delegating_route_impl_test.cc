@@ -39,10 +39,13 @@ TEST(DelegatingRoute, DelegatingRouteTest) {
 
 // Verify that DelegatingRouteEntry class forwards all calls to internal base route.
 TEST(DelegatingRouteEntry, DelegatingRouteEntryTest) {
-  const std::shared_ptr<MockRoute> base_route_ptr = std::make_shared<MockRoute>();
-  const std::shared_ptr<MockRouteEntry> inner_object_ptr = std::make_shared<MockRouteEntry>();
+  const std::shared_ptr<MockRoute> base_route_ptr = std::make_shared<NiceMock<MockRoute>>();
+  const std::shared_ptr<MockRouteEntry> inner_object_ptr =
+      std::make_shared<NiceMock<MockRouteEntry>>();
+  ON_CALL(*base_route_ptr, directResponseEntry()).WillByDefault(Return(nullptr));
+  EXPECT_CALL(*base_route_ptr, routeEntry).WillOnce(Return(inner_object_ptr.get()));
+
   DelegatingRouteEntry wrapper_object(base_route_ptr);
-  EXPECT_CALL(*base_route_ptr, routeEntry).WillRepeatedly(Return(inner_object_ptr.get()));
 
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;

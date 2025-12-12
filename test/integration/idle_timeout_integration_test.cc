@@ -108,7 +108,7 @@ public:
     if (downstream_protocol_ == Http::CodecType::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else {
-      ASSERT_TRUE(response.waitForReset());
+      ASSERT_TRUE(response.waitForAnyTermination());
       codec_client_->close();
     }
     if (!stat_name.empty()) {

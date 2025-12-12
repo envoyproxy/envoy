@@ -31,6 +31,7 @@ public:
               (uint64_t trace_id));
   MOCK_METHOD(uint32_t, maxBufferedRxBytes, (), (const));
   MOCK_METHOD(uint32_t, maxBufferedTxBytes, (), (const));
+  MOCK_METHOD(uint32_t, minStreamedSentBytes, (), (const));
   MOCK_METHOD(Extensions::Common::Tap::Matcher::MatchStatusVector, createMatchStatusVector, (),
               (const));
   MOCK_METHOD(const Extensions::Common::Tap::Matcher&, rootMatcher, (), (const));

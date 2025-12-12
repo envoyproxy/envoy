@@ -259,11 +259,11 @@ void Filter::populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors
   case VhRateLimitOptions::Ignore:
     return;
   case VhRateLimitOptions::Include:
-    populateDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
+    populateDescriptors(route->virtualHost()->rateLimitPolicy(), descriptors, headers);
     return;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
-      populateDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
+      populateDescriptors(route->virtualHost()->rateLimitPolicy(), descriptors, headers);
     }
     return;
   }

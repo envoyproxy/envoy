@@ -54,6 +54,8 @@ public:
     return SocketInterfaceSingleton::get();
   }
 
+  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+
 private:
   const std::string address_{"synthetic"};
 };

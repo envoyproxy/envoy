@@ -2204,7 +2204,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   auto& path_match_criterion = route_entry->pathMatchCriterion();
   EXPECT_EQ("", path_match_criterion.matcher());
   EXPECT_EQ(Router::PathMatchType::None, path_match_criterion.matchType());
-  const auto& route_config = route->virtualHost().routeConfig();
+  const auto& route_config = route->virtualHost()->routeConfig();
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
   auto cluster_info = filter_callbacks->clusterInfo();
@@ -2391,11 +2391,11 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
   EXPECT_TRUE(route_entry.upgradeMap().empty());
   EXPECT_EQ(false, route_entry.internalRedirectPolicy().enabled());
   EXPECT_TRUE(route_entry.shadowPolicies().empty());
-  EXPECT_TRUE(route_impl_->virtualHost().rateLimitPolicy().empty());
-  EXPECT_EQ(nullptr, route_impl_->virtualHost().corsPolicy());
-  EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInRequest());
-  EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInResponse());
-  EXPECT_FALSE(route_impl_->virtualHost().routeConfig().usesVhds());
+  EXPECT_TRUE(route_impl_->virtualHost()->rateLimitPolicy().empty());
+  EXPECT_EQ(nullptr, route_impl_->virtualHost()->corsPolicy());
+  EXPECT_FALSE(route_impl_->virtualHost()->includeAttemptCountInRequest());
+  EXPECT_FALSE(route_impl_->virtualHost()->includeAttemptCountInResponse());
+  EXPECT_FALSE(route_impl_->virtualHost()->routeConfig().usesVhds());
   EXPECT_EQ(nullptr, route_entry.tlsContextMatchCriteria());
 }
 

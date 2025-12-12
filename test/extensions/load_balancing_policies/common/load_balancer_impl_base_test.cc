@@ -40,7 +40,7 @@ public:
     host_set.degraded_hosts_.clear();
     host_set.excluded_hosts_.clear();
     for (uint32_t i = 0; i < num_hosts; ++i) {
-      host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:80", simTime()));
+      host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
     }
     uint32_t i = 0;
     for (; i < num_healthy_hosts; ++i) {

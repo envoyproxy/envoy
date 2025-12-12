@@ -523,7 +523,7 @@ TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
   std::string alt_svc;
 
   // Make sure the srtt gets updated to a non-zero value.
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < 20; ++i) {
     // Make sure that srtt is updated.
     const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
     alt_svc = TestEnvironment::readFileToStringForTest(filename);

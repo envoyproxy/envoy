@@ -15,6 +15,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":network_type_socket_option_lib",
+        ":network_types_lib",
         ":proxy_settings_lib",
         "//library/common:engine_types_lib",
         "//library/common/network:src_addr_socket_option_lib",
@@ -116,6 +117,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "network_types_lib",
+    hdrs = [
+        "network_types.h",
+    ],
+    repository = "@envoy",
+)
+
+envoy_cc_library(
     name = "proxy_resolver_interface_lib",
     hdrs = ["proxy_resolver_interface.h"],
     repository = "@envoy",
@@ -151,6 +160,12 @@ envoy_cc_library(
             "apple_proxy_resolution.h",
             "apple_proxy_resolver.h",
             "apple_system_proxy_settings_monitor.h",
+        ],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        "@envoy//bazel:apple": [
+            "-framework CFNetwork",
         ],
         "//conditions:default": [],
     }),

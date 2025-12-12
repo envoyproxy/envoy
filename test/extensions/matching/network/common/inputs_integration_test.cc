@@ -16,6 +16,9 @@ namespace Envoy {
 namespace Network {
 namespace Matching {
 
+using Matcher::HasNoMatch;
+using Matcher::HasStringAction;
+
 constexpr absl::string_view yaml = R"EOF(
 matcher_tree:
   input:
@@ -93,9 +96,7 @@ TEST_F(InputsIntegrationTest, DestinationIPInput) {
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(InputsIntegrationTest, DestinationPortInput) {
@@ -108,9 +109,7 @@ TEST_F(InputsIntegrationTest, DestinationPortInput) {
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(InputsIntegrationTest, SourceIPInput) {
@@ -123,9 +122,7 @@ TEST_F(InputsIntegrationTest, SourceIPInput) {
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(InputsIntegrationTest, SourcePortInput) {
@@ -138,9 +135,7 @@ TEST_F(InputsIntegrationTest, SourcePortInput) {
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(InputsIntegrationTest, DirectSourceIPInput) {
@@ -153,9 +148,7 @@ TEST_F(InputsIntegrationTest, DirectSourceIPInput) {
   socket.connection_info_provider_->setDirectRemoteAddressForTest(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(InputsIntegrationTest, SourceTypeInput) {
@@ -168,9 +161,7 @@ TEST_F(InputsIntegrationTest, SourceTypeInput) {
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(InputsIntegrationTest, ServerNameInput) {
@@ -183,9 +174,7 @@ TEST_F(InputsIntegrationTest, ServerNameInput) {
   MatchingDataImpl data(socket, filter_state, metadata);
   socket.connection_info_provider_->setRequestedServerName(host);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(InputsIntegrationTest, TransportProtocolInput) {
@@ -197,9 +186,7 @@ TEST_F(InputsIntegrationTest, TransportProtocolInput) {
   MatchingDataImpl data(socket, filter_state, metadata);
   EXPECT_CALL(socket, detectedTransportProtocol).WillOnce(testing::Return("tls"));
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(InputsIntegrationTest, ApplicationProtocolInput) {
@@ -212,9 +199,7 @@ TEST_F(InputsIntegrationTest, ApplicationProtocolInput) {
   std::vector<std::string> protocols = {"http/1.1"};
   EXPECT_CALL(socket, requestedApplicationProtocols).WillOnce(testing::ReturnRef(protocols));
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(InputsIntegrationTest, FilterStateInput) {
@@ -231,9 +216,7 @@ TEST_F(InputsIntegrationTest, FilterStateInput) {
   envoy::config::core::v3::Metadata metadata;
   MatchingDataImpl data(socket, filter_state, metadata);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(InputsIntegrationTest, DynamicMetadataInput) {
@@ -265,27 +248,21 @@ TEST_F(InputsIntegrationTest, FilterStateInputFailure) {
   MatchingDataImpl data(socket, filter_state, metadata);
 
   // No filter state object - no match
-  const auto result_no_fs = match_tree_()->match(data);
-  EXPECT_EQ(result_no_fs.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_FALSE(result_no_fs.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasNoMatch());
 
   filter_state.setData("unknown_key", std::make_shared<Router::StringAccessorImpl>(value),
                        StreamInfo::FilterState::StateType::Mutable,
                        StreamInfo::FilterState::LifeSpan::Connection);
 
   // Unknown key in filter state - no match
-  const auto result_no_key = match_tree_()->match(data);
-  EXPECT_EQ(result_no_key.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_FALSE(result_no_key.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasNoMatch());
 
   filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>("unknown_value"),
                        StreamInfo::FilterState::StateType::Mutable,
                        StreamInfo::FilterState::LifeSpan::Connection);
 
   // Known key in filter state but unknown value - no match
-  const auto result_no_value = match_tree_()->match(data);
-  EXPECT_EQ(result_no_value.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_FALSE(result_no_value.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasNoMatch());
 }
 
 class UdpInputsIntegrationTest : public ::testing::Test {
@@ -320,9 +297,7 @@ TEST_F(UdpInputsIntegrationTest, DestinationIPInput) {
   const Address::Ipv4Instance ip("127.0.0.1", 8080);
   UdpMatchingDataImpl data(ip, ip);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(UdpInputsIntegrationTest, DestinationPortInput) {
@@ -331,9 +306,7 @@ TEST_F(UdpInputsIntegrationTest, DestinationPortInput) {
   const Address::Ipv4Instance ip("127.0.0.1", 8080);
   UdpMatchingDataImpl data(ip, ip);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(UdpInputsIntegrationTest, SourceIPInput) {
@@ -342,9 +315,7 @@ TEST_F(UdpInputsIntegrationTest, SourceIPInput) {
   const Address::Ipv4Instance ip("127.0.0.1", 8080);
   UdpMatchingDataImpl data(ip, ip);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(UdpInputsIntegrationTest, SourcePortInput) {
@@ -353,9 +324,7 @@ TEST_F(UdpInputsIntegrationTest, SourcePortInput) {
   const Address::Ipv4Instance ip("127.0.0.1", 8080);
   UdpMatchingDataImpl data(ip, ip);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 } // namespace Matching

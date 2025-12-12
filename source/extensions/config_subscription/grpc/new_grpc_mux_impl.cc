@@ -242,8 +242,7 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    addSubscription(type_url, options.use_namespace_matching_);
-    return addWatch(type_url, resources, callbacks, resource_decoder, options);
+    entry = addSubscription(type_url, options.use_namespace_matching_);
   }
 
   Watch* watch = entry->second->watch_map_.addWatch(callbacks, *resource_decoder);
@@ -350,19 +349,23 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
-                                     const bool use_namespace_matching) {
+NewGrpcMuxImpl::SubscriptionsMap::iterator
+NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_namespace_matching) {
   // Resource cache is only used for EDS resources.
   EdsResourcesCacheOptRef resources_cache{absl::nullopt};
   if (eds_resources_cache_ &&
       (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
     resources_cache = makeOptRefFromPtr(eds_resources_cache_.get());
   }
-  subscriptions_.emplace(
+  auto [it, success] = subscriptions_.emplace(
       type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_namespace_matching,
                                                     dispatcher_, config_validators_.get(),
                                                     xds_config_tracker_, resources_cache));
+  // Insertion must succeed, as the addSubscription method is only called if
+  // the map doesn't have the type_url.
+  ASSERT(success);
   subscription_ordering_.emplace_back(type_url);
+  return it;
 }
 
 void NewGrpcMuxImpl::trySendDiscoveryRequests() {

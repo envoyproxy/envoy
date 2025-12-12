@@ -265,9 +265,9 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
 
   EnvoyEngine createEngine(EnvoyOnEngineRunning onEngineRunning, EnvoyLogger envoyLogger,
                            String logLevel) {
-    AndroidEngineImpl engine =
-        new AndroidEngineImpl(getContext(), onEngineRunning, envoyLogger, mEnvoyEventTracker,
-                              mEnableProxying, mUseNetworkChangeEvent);
+    AndroidEngineImpl engine = new AndroidEngineImpl(
+        getContext(), onEngineRunning, envoyLogger, mEnvoyEventTracker, mEnableProxying,
+        mUseNetworkChangeEvent, mDisableDnsRefreshOnNetworkChange);
     engine.runWithConfig(createEnvoyConfiguration(), logLevel);
     return engine;
   }

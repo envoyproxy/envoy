@@ -179,6 +179,15 @@ public:
   void primaryConnectionFailure() {
     AssertionResult result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
+    // When GoogleGrpc is used, there may be cases where the connection will be
+    // disconnected before the gRPC library observes the TLS handshake, which will
+    // end up in a fast retry without notifying Envoy that the connection was
+    // disconnected. We wait for a stream to ensure that the gRPC library
+    // observed a successful connection.
+    if (clientType() == Grpc::ClientType::GoogleGrpc) {
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+    }
     result = xds_connection_->close();
     RELEASE_ASSERT(result, result.message());
   }

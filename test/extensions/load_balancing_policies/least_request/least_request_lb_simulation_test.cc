@@ -52,14 +52,13 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
   ASSERT_LT(tolerance_pct, 100);
   ASSERT_GE(tolerance_pct, 0);
 
-  NiceMock<MockTimeSystem> time_source_;
   HostVector hosts;
   absl::node_hash_map<HostConstSharedPtr, uint64_t> host_hits;
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   for (uint64_t i = 0; i < params.num_hosts; i++) {
     const bool should_weight = i < params.num_subset_hosts;
     auto hostPtr = makeTestHost(info, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
-                                time_source_, should_weight ? params.weight : 1);
+                                should_weight ? params.weight : 1);
     host_hits[hostPtr] = 0;
     hosts.push_back(hostPtr);
     if (should_weight) {

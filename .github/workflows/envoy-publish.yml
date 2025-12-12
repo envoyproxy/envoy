@@ -38,9 +38,11 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
-    if: >-
-      ${{ github.event.workflow_run.conclusion == 'success'
-       && (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI) }}
+    if: |
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI)
     uses: ./.github/workflows/_load.yml
     with:
       check-name: publish
@@ -52,13 +54,19 @@ jobs:
       packages: read
     secrets:
       dockerhub-password: >-
-        ${{ fromJSON(needs.load.outputs.trusted)
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
             && secrets.DOCKERHUB_PASSWORD
             || '' }}
       gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
-      gpg-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_GPG_MAINTAINER_KEY || secrets.ENVOY_GPG_SNAKEOIL_KEY }}
+      gpg-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY }}
       gpg-key-password: >-
-        ${{ fromJSON(needs.load.outputs.trusted)
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
             && secrets.ENVOY_GPG_MAINTAINER_KEY_PASSWORD
             || secrets.ENVOY_GPG_SNAKEOIL_KEY_PASSWORD }}
     if: ${{ fromJSON(needs.load.outputs.request).run.publish || fromJSON(needs.load.outputs.request).run.verify }}
@@ -69,14 +77,30 @@ jobs:
     with:
       gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   publish:
     secrets:
-      ENVOY_CI_SYNC_APP_ID: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_CI_SYNC_APP_ID || '' }}
-      ENVOY_CI_SYNC_APP_KEY: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_CI_SYNC_APP_KEY || '' }}
-      ENVOY_CI_PUBLISH_APP_ID: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_CI_PUBLISH_APP_ID || '' }}
-      ENVOY_CI_PUBLISH_APP_KEY: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_CI_PUBLISH_APP_KEY || '' }}
+      ENVOY_CI_SYNC_APP_ID: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_SYNC_APP_ID
+            || '' }}
+      ENVOY_CI_SYNC_APP_KEY: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_SYNC_APP_KEY
+            || '' }}
+      ENVOY_CI_PUBLISH_APP_ID: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_PUBLISH_APP_ID
+            || '' }}
+      ENVOY_CI_PUBLISH_APP_KEY: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_PUBLISH_APP_KEY
+            || '' }}
       gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
     permissions:
       contents: read
@@ -90,7 +114,7 @@ jobs:
     with:
       gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   verify:
     secrets:
@@ -107,7 +131,7 @@ jobs:
     with:
       gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   request:
     secrets:
@@ -117,10 +141,13 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
-    if: >-
-      ${{ always()
-          && (fromJSON(needs.load.outputs.request).run.publish
-              || fromJSON(needs.load.outputs.request).run.verify) }}
+    if: |
+      always()
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && (fromJSON(needs.load.outputs.request).run.publish
+          || fromJSON(needs.load.outputs.request).run.verify)
     needs:
     - load
     - build

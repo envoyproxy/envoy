@@ -161,9 +161,7 @@ TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocument) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -187,9 +185,7 @@ TEST_F(WebIdentityCredentialsProviderTest, EmptyDocument) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -213,9 +209,7 @@ not json
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -239,9 +233,7 @@ TEST_F(WebIdentityCredentialsProviderTest, EmptyJsonResponse) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -268,9 +260,7 @@ TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponse) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -297,9 +287,7 @@ TEST_F(WebIdentityCredentialsProviderTest, NoCredentials) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -328,9 +316,7 @@ TEST_F(WebIdentityCredentialsProviderTest, EmptyCredentials) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -363,9 +349,7 @@ TEST_F(WebIdentityCredentialsProviderTest, CredentialsWithWrongFormat) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);

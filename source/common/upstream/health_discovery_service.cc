@@ -347,7 +347,7 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
                        ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls)
     : server_context_(server_context), cluster_(std::move(cluster)), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
-      hosts_(new HostVector()), time_source_(server_context_.mainThreadDispatcher().timeSource()) {
+      hosts_(new HostVector()) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
   // Set initial hashes for possible delta updates.
@@ -376,7 +376,7 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
       HostSharedPtr endpoint = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
           HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
                            locality_endpoints.locality(), host.endpoint().health_check_config(), 0,
-                           envoy::config::core::v3::UNKNOWN, time_source_),
+                           envoy::config::core::v3::UNKNOWN),
           std::unique_ptr<HostImpl>));
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
       hosts_->push_back(endpoint);
@@ -492,7 +492,7 @@ void HdsCluster::updateHosts(
         host = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
             HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
                              endpoints.locality(), endpoint.endpoint().health_check_config(), 0,
-                             envoy::config::core::v3::UNKNOWN, time_source_),
+                             envoy::config::core::v3::UNKNOWN),
             std::unique_ptr<HostImpl>));
 
         // Set the initial health status as in HdsCluster::initialize.

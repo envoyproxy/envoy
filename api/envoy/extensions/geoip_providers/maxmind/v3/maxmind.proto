@@ -32,6 +32,7 @@ message MaxMindConfig {
 
   // Full file path to the Maxmind ASN database, e.g. /etc/GeoLite2-ASN.mmdb.
   // Database file is expected to have .mmdb extension.
+  // When is defined the ASN information will always be fetched from the ``asn_db``.
   string asn_db_path = 2 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
   // Full file path to the Maxmind anonymous IP database, e.g. /etc/GeoIP2-Anonymous-IP.mmdb.
@@ -40,6 +41,8 @@ message MaxMindConfig {
 
   // Full file path to the Maxmind ISP database, e.g. /etc/GeoLite2-ISP.mmdb.
   // Database file is expected to have .mmdb extension.
+  // If ``asn_db_path`` is not defined, ASN information will be fetched from
+  // ``isp_db`` instead.
   string isp_db_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
   // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.

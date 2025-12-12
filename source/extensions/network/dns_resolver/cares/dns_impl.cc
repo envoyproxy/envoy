@@ -212,7 +212,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     // ARES_ECONNREFUSED. If the PendingResolution has not been cancelled that means that the
     // callback_ target _should_ still be around. In that case, raise the callback_ so the target
     // can be done with this query and initiate a new one.
-    ENVOY_LOG_EVENT(debug, "cares_dns_resolution_destroyed", "dns resolution for {} destroyed",
+    ENVOY_LOG_EVENT(trace, "cares_dns_resolution_destroyed", "dns resolution for {} destroyed",
                     dns_name_);
 
     // Nothing can follow a call to finishResolve due to the deletion of this object upon
@@ -322,7 +322,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 }
 
 void DnsResolverImpl::PendingResolution::finishResolve() {
-  ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
+  ENVOY_LOG_EVENT(trace, "cares_dns_resolution_complete",
                   "dns resolution for {} completed with status {:#06x}: \"{}\"", dns_name_,
                   static_cast<int>(pending_response_.status_), pending_response_.details_);
 
@@ -419,7 +419,7 @@ void DnsResolverImpl::reinitializeChannel() {
   int result = ares_reinit(channel_);
   RELEASE_ASSERT(result == ARES_SUCCESS, "c-ares channel re-initialization failed");
   stats_.reinits_.inc();
-  ENVOY_LOG_EVENT(debug, "cares_channel_reinitialized",
+  ENVOY_LOG_EVENT(trace, "cares_channel_reinitialized",
                   "Reinitialized cares channel via ares_reinit");
 
   if (resolvers_csv_.has_value()) {
@@ -439,7 +439,7 @@ void DnsResolverImpl::reinitializeChannel() {
 
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
-  ENVOY_LOG_EVENT(debug, "cares_dns_resolution_start", "dns resolution for {} started", dns_name);
+  ENVOY_LOG_EVENT(trace, "cares_dns_resolution_start", "dns resolution for {} started", dns_name);
 
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
   // failed initial call to getAddrInfo followed by a synchronous IPv4
@@ -451,7 +451,7 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   if (pending_resolution->completed_) {
     // Resolution does not need asynchronous behavior or network events. For
     // example, localhost lookup.
-    ENVOY_LOG_EVENT(debug, "cares_resolution_completed",
+    ENVOY_LOG_EVENT(trace, "cares_resolution_completed",
                     "dns resolution for {} completed with no async or network events", dns_name);
     return nullptr;
   } else {
@@ -520,14 +520,14 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family)
     switch (family) {
     case AF_INET:
       if (!available_interfaces_.v4_available_) {
-        ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v4 lookup");
+        ENVOY_LOG_EVENT(trace, "cares_resolution_filtered", "filtered v4 lookup");
         onAresGetAddrInfoCallback(ARES_EBADFAMILY, 0, nullptr);
         return;
       }
       break;
     case AF_INET6:
       if (!available_interfaces_.v6_available_) {
-        ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v6 lookup");
+        ENVOY_LOG_EVENT(trace, "cares_resolution_filtered", "filtered v6 lookup");
         onAresGetAddrInfoCallback(ARES_EBADFAMILY, 0, nullptr);
         return;
       }
@@ -644,7 +644,7 @@ public:
     absl::MutexLock lock(&mutex_);
     if (!ares_library_initialized_) {
       ares_library_initialized_ = true;
-      ENVOY_LOG(debug, "c-ares library initialized.");
+      ENVOY_LOG(trace, "c-ares library initialized.");
       ares_library_init(ARES_LIB_INIT_ALL);
     }
   }
@@ -653,7 +653,7 @@ public:
     absl::MutexLock lock(&mutex_);
     if (ares_library_initialized_) {
       ares_library_initialized_ = false;
-      ENVOY_LOG(debug, "c-ares library cleaned up.");
+      ENVOY_LOG(trace, "c-ares library cleaned up.");
       ares_library_cleanup();
     }
   }

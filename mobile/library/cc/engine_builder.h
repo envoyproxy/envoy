@@ -115,6 +115,9 @@ public:
   // Sets the QUIC connection keepalive initial interval in nanoseconds
   EngineBuilder& setKeepAliveInitialIntervalMilliseconds(int keepalive_initial_interval_ms);
 
+  // Sets the maximum number of concurrent streams on a multiplexed connection (HTTP/2 or HTTP/3).
+  EngineBuilder& setMaxConcurrentStreams(int max_concurrent_streams);
+
 #if defined(__APPLE__)
   // Right now, this API is only used by Apple (iOS) to register the Apple proxy resolver API for
   // use in reading and using the system proxy settings.
@@ -216,6 +219,7 @@ private:
   int quic_connection_idle_timeout_seconds_ = 60;
 
   int keepalive_initial_interval_ms_ = 0;
+  int max_concurrent_streams_ = 0;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

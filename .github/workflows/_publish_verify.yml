@@ -83,6 +83,52 @@ jobs:
             - run: docker images | grep envoy
               shell: bash
 
+  distroless:
+    permissions:
+      contents: read
+      packages: read
+    name: ${{ matrix.name || matrix.target }}
+    uses: ./.github/workflows/_run.yml
+    with:
+      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      cache-build-image: ${{ matrix.cache-build-image }}
+      cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
+      container-command: ${{ matrix.container-command }}
+      concurrency-suffix: -${{ matrix.arch || 'x64' }}
+      downloads: ${{ matrix.downloads }}
+      rbe: ${{ matrix.rbe }}
+      request: ${{ inputs.request }}
+      steps-pre: ${{ matrix.steps-pre }}
+      source: ${{ matrix.source }}
+      target: ${{ matrix.target }}
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: distroless
+          target: verify-distroless
+          downloads: |
+            docker: build_images
+          rbe: false
+          source: |
+            export NO_BUILD_SETUP=1
+          steps-pre: |
+            - run: |
+                IMAGES=(
+                    envoy-distroless:distroless-dev)
+                for image in "${IMAGES[@]}"; do
+                    src_name="$(echo ${image} | cut -d: -f1)"
+                    dest_name="$(echo ${image} | cut -d: -f2)"
+                    src="oci-archive:%{{ runner.temp }}/build_images/${src_name}.tar"
+                    dest="docker-daemon:envoyproxy/envoy:${dest_name}"
+                    echo "Copy image: ${src} ${dest}"
+                    skopeo copy -q "${src}" "${dest}"
+                done
+              shell: bash
+            - run: docker images | grep envoy
+              shell: bash
+
   distro:
     secrets:
       gcs-cache-key: ${{ secrets.gcs-cache-key }}

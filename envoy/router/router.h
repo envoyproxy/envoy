@@ -720,6 +720,8 @@ public:
   virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
 };
 
+using VirtualHostConstSharedPtr = std::shared_ptr<const VirtualHost>;
+
 /**
  * Route level hedging policy.
  */
@@ -902,23 +904,6 @@ public:
   virtual const std::string& clusterName() const PURE;
 
   /**
-   * Returns the final host value for the request, taking into account route-level mutations.
-   *
-   * The value returned is computed with the following logic in order:
-   *
-   * 1. If a host rewrite is configured for the route, it returns that value.
-   * 2. If a host rewrite header is specified, it attempts to use the value from that header.
-   * 3. If a host rewrite path regex is configured, it applies the regex to the request path and
-   *    returns the result.
-   * 4. If none of the above apply, it returns the original host value from the request headers.
-   *
-   * @param headers The constant reference to the request headers.
-   * @note This function will not attempt to restore the port in the host value. If port information
-   *       is required, it should be handled separately.
-   */
-  virtual const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const PURE;
-
-  /**
    * Returns the HTTP status code to use when configured cluster is not found.
    * @return Http::Code to use when configured cluster is not found.
    */
@@ -946,11 +931,12 @@ public:
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
    * @param stream_info holds additional information about the request.
-   * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
+   * @param keep_original_host_or_path insert x-envoy-original-path header if path rewritten,
+   *        or x-envoy-original-host header if host rewritten.
    */
   virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                       const StreamInfo::StreamInfo& stream_info,
-                                      bool insert_envoy_original_path) const PURE;
+                                      bool keep_original_host_or_path) const PURE;
 
   /**
    * Returns the request header transforms that would be applied if finalizeRequestHeaders were
@@ -1143,6 +1129,12 @@ public:
    * @return EarlyDataPolicy& the configured early data option.
    */
   virtual const EarlyDataPolicy& earlyDataPolicy() const PURE;
+
+  /**
+   * Refresh the target cluster of the route with the request attributes if possible.
+   */
+  virtual void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 /**
@@ -1276,14 +1268,17 @@ public:
   virtual const std::string& routeName() const PURE;
 
   /**
-   * @return const VirtualHost& the virtual host that owns the route.
+   * @return const VirtualHostConstSharedPtr& the virtual host that owns the route.
+   *
+   * NOTE: This MUST not be null.
    */
-  virtual const VirtualHost& virtualHost() const PURE;
+  virtual const VirtualHostConstSharedPtr& virtualHost() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
 class RouteEntryAndRoute : public RouteEntry, public Route {};
+using RouteEntryAndRouteConstSharedPtr = std::shared_ptr<const RouteEntryAndRoute>;
 
 /**
  * RouteCallback, returns one of these enums to the route matcher to indicate
@@ -1376,6 +1371,17 @@ public:
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 };
 
+struct VirtualHostRoute {
+  VirtualHostConstSharedPtr vhost;
+  RouteConstSharedPtr route;
+
+  // Override -> operator to access methods of route directly.
+  const Route* operator->() const { return route.get(); }
+
+  // Convert the VirtualHostRoute to RouteConstSharedPtr.
+  operator RouteConstSharedPtr() const { return route; }
+};
+
 /**
  * The router configuration.
  */
@@ -1387,11 +1393,11 @@ public:
    * @param headers supplies the request headers.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
-   * @return the route or nullptr if there is no matching route for the request.
+   * @return the route result or nullptr if there is no matching route for the request.
    */
-  virtual RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
-                                    const StreamInfo::StreamInfo& stream_info,
-                                    uint64_t random_value) const PURE;
+  virtual VirtualHostRoute route(const Http::RequestHeaderMap& headers,
+                                 const StreamInfo::StreamInfo& stream_info,
+                                 uint64_t random_value) const PURE;
 
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a
@@ -1408,9 +1414,9 @@ public:
    * @return the route accepted by the callback or nullptr if no match found or none of route is
    * accepted by the callback.
    */
-  virtual RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                                    const StreamInfo::StreamInfo& stream_info,
-                                    uint64_t random_value) const PURE;
+  virtual VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                 const StreamInfo::StreamInfo& stream_info,
+                                 uint64_t random_value) const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

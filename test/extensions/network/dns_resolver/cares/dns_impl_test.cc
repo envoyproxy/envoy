@@ -636,6 +636,7 @@ public:
   const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
   absl::string_view addressType() const override { PANIC("not implemented"); }
+  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
 
   Address::Type type() const override { return instance_.type(); }
   const SocketInterface& socketInterface() const override {

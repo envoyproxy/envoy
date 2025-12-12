@@ -146,6 +146,11 @@ public:
                                           const Options& options,
                                           ProtobufMessage::ValidationVisitor& validation_visitor,
                                           Api::Api& api);
+
+  /**
+   * Raises soft file limit to the hard limit.
+   */
+  static void raiseFileLimits();
 };
 
 /**

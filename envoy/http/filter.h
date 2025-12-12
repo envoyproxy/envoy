@@ -365,6 +365,19 @@ public:
   virtual void clearRouteCache() PURE;
 
   /**
+   * Refresh the target cluster but not the route cache. This is used when we want to change the
+   * target cluster after modifying the request attributes.
+   *
+   * NOTE: this is suggested to replace clearRouteCache() if you only want to determine the target
+   * cluster based on the latest request attributes that have been updated by the filters and do
+   * not want to configure multiple similar routes at the route table.
+   *
+   * NOTE: this depends on the route cluster specifier to support the refreshRouteCluster()
+   * method.
+   */
+  virtual void refreshRouteCluster() PURE;
+
+  /**
    * Schedules a request for a RouteConfiguration update from the management server.
    * @param route_config_updated_cb callback to be called when the configuration update has been
    * propagated to the worker thread.

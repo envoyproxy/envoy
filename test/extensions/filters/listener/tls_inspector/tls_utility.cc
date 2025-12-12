@@ -94,7 +94,54 @@ std::vector<uint8_t> generateClientHelloWithoutExtensions(uint16_t tls_max_versi
   return client_hello;
 }
 
-std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja3_fingerprint) {
+// Helper function to build the client hello message
+std::vector<uint8_t> buildClientHelloMessage(const std::vector<uint8_t>& ciphers,
+                                             const std::vector<uint8_t>& extensions,
+                                             uint16_t tls_version) {
+  std::vector<uint8_t> clienthello = {static_cast<uint8_t>((tls_version & 0xff00) >> 8),
+                                      static_cast<uint8_t>(tls_version & 0xff),
+                                      // client random (32 bytes)
+                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                      // session id
+                                      0};
+  // cipher suite length and ciphers
+  uint16_t ciphers_length = ciphers.size();
+  clienthello.push_back((ciphers_length & 0xff00) >> 8);
+  clienthello.push_back(ciphers_length & 0xff);
+  clienthello.insert(std::end(clienthello), std::begin(ciphers), std::end(ciphers));
+  // compression methods
+  clienthello.push_back(0x01);
+  clienthello.push_back(0x00);
+  // extension length and extensions
+  uint16_t extensions_length = extensions.size();
+  clienthello.push_back((extensions_length & 0xff00) >> 8);
+  clienthello.push_back(extensions_length & 0xff);
+  clienthello.insert(std::end(clienthello), std::begin(extensions), std::end(extensions));
+
+  // headers
+  uint32_t clienthello_bytes = clienthello.size();
+  uint16_t handshake_bytes = clienthello.size() + 4;
+  std::vector<uint8_t> clienthello_message = {
+      // record header
+      0x16, 0x03, 0x01,
+      // handshake bytes
+      static_cast<uint8_t>((handshake_bytes & 0xff00) >> 8),
+      static_cast<uint8_t>(handshake_bytes & 0xff),
+      // handshake header
+      0x01,
+      // client hello bytes
+      static_cast<uint8_t>((clienthello_bytes & 0xff0000) >> 16),
+      static_cast<uint8_t>((clienthello_bytes & 0xff00) >> 8),
+      static_cast<uint8_t>(clienthello_bytes & 0xff)};
+  clienthello_message.insert(std::end(clienthello_message), std::begin(clienthello),
+                             std::end(clienthello));
+
+  return clienthello_message;
+}
+
+std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja3_fingerprint,
+                                                           size_t target_size) {
   // fingerprint should have this format:
   //  SSLVersion,Cipher,SSLExtension,EllipticCurve,EllipticCurvePointFormat
   // Example:
@@ -220,46 +267,32 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
     }
   }
 
-  // client hello message
-  std::vector<uint8_t> clienthello = {// client version
-                                      static_cast<uint8_t>((tls_version & 0xff00) >> 8),
-                                      static_cast<uint8_t>(tls_version & 0xff),
-                                      // client random (32 bytes)
-                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                      // session id
-                                      0};
-  // cipher suite length and ciphers
-  uint16_t ciphers_length = ciphers.size();
-  clienthello.push_back((ciphers_length & 0xff00) >> 8);
-  clienthello.push_back(ciphers_length & 0xff);
-  clienthello.insert(std::end(clienthello), std::begin(ciphers), std::end(ciphers));
-  // compression methods
-  clienthello.push_back(0x01);
-  clienthello.push_back(0x00);
-  // extension length and extensions
-  uint16_t extensions_length = extensions.size();
-  clienthello.push_back((extensions_length & 0xff00) >> 8);
-  clienthello.push_back(extensions_length & 0xff);
-  clienthello.insert(std::end(clienthello), std::begin(extensions), std::end(extensions));
+  // Build initial client hello message
+  std::vector<uint8_t> clienthello_message =
+      buildClientHelloMessage(ciphers, extensions, tls_version);
 
-  // headers
-  uint32_t clienthello_bytes = clienthello.size();
-  uint16_t handshake_bytes = clienthello.size() + 4;
-  std::vector<uint8_t> clienthello_message = {
-      // record header
-      0x16, 0x03, 0x01,
-      // handshake bytes
-      static_cast<uint8_t>((handshake_bytes & 0xff00) >> 8),
-      static_cast<uint8_t>(handshake_bytes & 0xff),
-      // handshake header
-      0x01,
-      // client hello bytes
-      static_cast<uint8_t>((clienthello_bytes & 0xff0000) >> 16),
-      static_cast<uint8_t>((clienthello_bytes & 0xff00) >> 8),
-      static_cast<uint8_t>(clienthello_bytes & 0xff)};
-  clienthello_message.insert(std::end(clienthello_message), std::begin(clienthello),
-                             std::end(clienthello));
+  // Add dummy extension if needed
+  size_t dummy_payload_size = 0;
+  if (clienthello_message.size() < target_size) {
+    // 4 bytes are for the dummy extension header, so we need to subtract that
+    // from the target size to calculate the dummy payload size.
+    dummy_payload_size = target_size - clienthello_message.size() - 4;
+    // Ensure the dummy payload size does not exceed 0xFFFF
+    // (the maximum size for a TLS extension payload).
+    // The limit is 0xFFFF (65535) because, in the TLS protocol, the length field for each extension
+    // is encoded as a 16-bit unsigned integer (2 bytes). This means the maximum value that can be
+    // represented for an extension's payload length is 65535 bytes.
+    if (dummy_payload_size > 0xFFFF) {
+      dummy_payload_size = 0xFFFF;
+    }
+    uint16_t dummy_ext_id = 0xFFFE;
+    extensions.push_back((dummy_ext_id & 0xff00) >> 8);
+    extensions.push_back(dummy_ext_id & 0xff);
+    extensions.push_back((dummy_payload_size & 0xff00) >> 8);
+    extensions.push_back(dummy_payload_size & 0xff);
+    extensions.insert(extensions.end(), dummy_payload_size, 0x00);
+    clienthello_message = buildClientHelloMessage(ciphers, extensions, tls_version);
+  }
 
   return clienthello_message;
 }

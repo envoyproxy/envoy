@@ -94,7 +94,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   auto validator_or_error = cert_validator_factory->createCertValidator(
-      config.certificateValidationContext(), stats_, factory_context_);
+      config.certificateValidationContext(), stats_, factory_context_, scope);
   SET_AND_RETURN_IF_NOT_OK(validator_or_error.status(), creation_status);
   cert_validator_ = std::move(*validator_or_error);
 
@@ -165,7 +165,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   auto verify_mode_or_error = cert_validator_->initializeSslContexts(
-      ssl_contexts, config.capabilities().provides_certificates);
+      ssl_contexts, config.capabilities().provides_certificates, scope);
   SET_AND_RETURN_IF_NOT_OK(verify_mode_or_error.status(), creation_status);
   auto verify_mode = verify_mode_or_error.value();
 
@@ -212,6 +212,13 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       if (!creation_status.ok()) {
         return;
       }
+
+      // Create and set the certificate expiration gauge.
+      Stats::Gauge& expiration_gauge =
+          Extensions::TransportSockets::Tls::createCertificateExpirationGauge(
+              scope, tls_certificate.certificateName());
+      expiration_gauge.set(Utility::getExpirationUnixTime(ctx.cert_chain_.get()).count());
+
       // The must staple extension means the certificate promises to carry
       // with it an OCSP staple. https://tools.ietf.org/html/rfc7633#section-6
       constexpr absl::string_view tls_feature_ext = "1.3.6.1.5.5.7.1.24";

@@ -145,5 +145,13 @@ TEST_F(QuicFilterManagerConnectionImplTest, StreamInfoConnectionId) {
   EXPECT_NE(id.value_or(0), 0);
 }
 
+TEST_F(QuicFilterManagerConnectionImplTest, SetSocketOption) {
+  Network::SocketOptionName sockopt_name;
+  int val = 1;
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+
+  EXPECT_FALSE(impl_.setSocketOption(sockopt_name, sockopt_val));
+}
+
 } // namespace Quic
 } // namespace Envoy

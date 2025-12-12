@@ -15,7 +15,7 @@ HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const Upstream::HostDescriptionConstSharedPtr& host,
     const ConnectionSocket::OptionsSharedPtr options,
-    const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+    OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config)
     : dispatcher_(dispatcher),
       address_list_(sortAddressesWithConfig(address_list, happy_eyeballs_config)),
@@ -97,7 +97,7 @@ std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::so
 std::vector<Address::InstanceConstSharedPtr>
 HappyEyeballsConnectionProvider::sortAddressesWithConfig(
     const std::vector<Address::InstanceConstSharedPtr>& in,
-    const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+    OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config) {
   if (!happy_eyeballs_config.has_value()) {
     return sortAddresses(in);
@@ -121,8 +121,8 @@ HappyEyeballsConnectionProvider::sortAddressesWithConfig(
   Address::IpVersion first_family_ip_version = in[0].get()->ip()->version();
 
   const auto first_address_family_count =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(happy_eyeballs_config.value(), first_address_family_count, 1);
-  switch (happy_eyeballs_config.value().first_address_family_version()) {
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(*happy_eyeballs_config, first_address_family_count, 1);
+  switch (happy_eyeballs_config->first_address_family_version()) {
   case envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT:
     break;
   case envoy::config::cluster::v3::UpstreamConnectionOptions::V4:

@@ -29,6 +29,10 @@ keith:
   maintainer: true
   opsgenie: Keith
   slack: UGS5P90CF
+krinkinmu:
+  maintainer: true
+  opsgenie: Mike
+  slack: U07KZ4B0H5J
 kyessenov:
   opsgenie: kuat
   slack: U7KTRAA8M

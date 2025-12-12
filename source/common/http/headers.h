@@ -176,6 +176,7 @@ public:
   const LowerCaseString EnvoyOriginalDstHost{absl::StrCat(prefix(), "-original-dst-host")};
   const LowerCaseString EnvoyOriginalMethod{absl::StrCat(prefix(), "-original-method")};
   const LowerCaseString EnvoyOriginalPath{absl::StrCat(prefix(), "-original-path")};
+  const LowerCaseString EnvoyOriginalHost{absl::StrCat(prefix(), "-original-host")};
   const LowerCaseString EnvoyOverloaded{absl::StrCat(prefix(), "-overloaded")};
   const LowerCaseString EnvoyDropOverload{absl::StrCat(prefix(), "-drop-overload")};
   const LowerCaseString EnvoyUnconditionalDropOverload{
@@ -238,7 +239,6 @@ public:
   const LowerCaseString Via{"via"};
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
-  const LowerCaseString XSquashDebug{"x-squash-debug"};
   const LowerCaseString EarlyData{"early-data"};
 
   struct {

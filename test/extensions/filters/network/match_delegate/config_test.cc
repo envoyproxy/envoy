@@ -243,7 +243,7 @@ createMatchingTree(const std::string& name, const std::string& value) {
       std::make_unique<InputType>(name), absl::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Network::MatchingData>{
-                            []() { return std::make_unique<ActionType>(); }, nullptr});
+                            []() { return std::make_unique<ActionType>(); }, nullptr, false});
 
   return tree;
 }
@@ -394,7 +394,7 @@ createMatchingTreeWithTestAction(const std::string& name, const std::string& val
       std::make_unique<InputType>(name), absl::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Network::MatchingData>{
-                            []() { return std::make_unique<TestAction>(); }, nullptr});
+                            []() { return std::make_unique<TestAction>(); }, nullptr, false});
   return tree;
 }
 

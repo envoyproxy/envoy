@@ -50,6 +50,10 @@ TEST(MaglevConfigTest, Validate) {
     config.set_name("envoy.load_balancing_policies.maglev");
     envoy::extensions::load_balancing_policies::maglev::v3::Maglev config_msg;
     config_msg.mutable_table_size()->set_value(4);
+    auto* hash_policy = config_msg.mutable_consistent_hashing_lb_config()->add_hash_policy();
+    *hash_policy->mutable_cookie()->mutable_name() = "test-cookie-name";
+    *hash_policy->mutable_cookie()->mutable_path() = "/test/path";
+    hash_policy->mutable_cookie()->mutable_ttl()->set_seconds(1000);
 
     config.mutable_typed_config()->PackFrom(config_msg);
 

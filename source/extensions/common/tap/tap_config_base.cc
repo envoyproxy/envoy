@@ -63,6 +63,13 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   sink_format_ = sinks[0].format();
   sink_type_ = sinks[0].output_sink_type_case();
 
+  if (PROTOBUF_GET_OPTIONAL_WRAPPED(proto_config.output_config(), min_streamed_sent_bytes) !=
+      absl::nullopt) {
+    min_streamed_sent_bytes_ =
+        std::max(proto_config.output_config().min_streamed_sent_bytes().value(),
+                 DefaultMinStreamedSentBytes);
+  }
+
   switch (sink_type_) {
   case ProtoOutputSink::OutputSinkTypeCase::kBufferedAdmin:
     if (admin_streamer == nullptr) {

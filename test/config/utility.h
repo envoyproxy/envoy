@@ -164,8 +164,7 @@ public:
     bool keylog_multiple_ips_{false};
     std::string keylog_path_;
     Network::Address::IpVersion ip_version_{Network::Address::IpVersion::v4};
-    std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
-        san_matchers_{};
+    std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_;
     std::string tls_cert_selector_yaml_{""};
     bool client_with_intermediate_cert_{false};
     bool trust_root_only_{false};
@@ -226,8 +225,6 @@ public:
   static std::string smallBufferFilter();
   // A string for a health check filter which can be used with prependFilter()
   static std::string defaultHealthCheckFilter();
-  // A string for a squash filter which can be used with prependFilter()
-  static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
   // A cluster that uses the startTls transport socket.
@@ -281,8 +278,9 @@ public:
                                                              const std::string& address,
                                                              const std::string& stat_prefix);
 
-  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
-                                                                       const std::string& cluster);
+  static envoy::config::route::v3::RouteConfiguration
+  buildRouteConfig(const std::string& name, const std::string& cluster,
+                   bool header_mutations = false);
 
   // Builds a standard Endpoint suitable for population by finalize().
   static envoy::config::endpoint::v3::Endpoint buildEndpoint(const std::string& address);

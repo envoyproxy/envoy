@@ -25,6 +25,8 @@ public:
   const absl::optional<std::string>& asnDbPath() const { return asn_db_path_; }
 
   bool isLookupEnabledForHeader(const absl::optional<std::string>& header);
+  bool isAsnDbPathSet() const { return asn_db_path_.has_value(); }
+  bool isIspDbPathSet() const { return isp_db_path_.has_value(); }
 
   const absl::optional<std::string>& countryHeader() const { return country_header_; }
   const absl::optional<std::string>& cityHeader() const { return city_header_; }

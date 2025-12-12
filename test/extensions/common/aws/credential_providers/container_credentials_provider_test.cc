@@ -117,7 +117,7 @@ public:
     auto credential_uri = "169.254.170.2:80/path/to/doc";
 
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, mock_manager_,
+        context_, mock_manager_,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -171,9 +171,7 @@ TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
   expectDocument(403, std::move(std::string()));
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
   provider_friend.onClusterAddOrUpdate();
@@ -193,9 +191,7 @@ TEST_F(ContainerCredentialsProviderTest, EmptyDocument) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -219,9 +215,7 @@ not json
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -250,9 +244,7 @@ TEST_F(ContainerCredentialsProviderTest, EmptyValues) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -311,9 +303,7 @@ TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpirationNoEx
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   // No expiration so we will use the default cache duration timer
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
-                                       MetadataCredentialsProviderBase::getCacheDuration()),
-                                   nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -401,7 +391,7 @@ public:
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
 
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, mock_manager_,
+        context_, mock_manager_,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);

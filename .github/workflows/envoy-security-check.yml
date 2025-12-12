@@ -1,0 +1,127 @@
+name: Security check
+
+# This workflow validates that workflow_run events are only triggered by authorized sources
+# It will only run (and fail) if triggered by unauthorized events
+
+on:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
+
+permissions:
+  contents: read
+
+
+jobs:
+  security:
+    permissions:
+      contents: read
+      pull-requests: write  # For commenting on PRs
+    # Only run if this is a potential security violation
+    if: |
+      github.event.workflow_run.conclusion == 'success'
+      && (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI)
+      && (
+        github.event.workflow_run.repository.full_name != github.repository
+        || !contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      )
+    runs-on: ubuntu-24.04
+    name: Security violation - ${{ matrix.action }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - action: log
+        - action: comment
+        - action: slack
+    steps:
+    # CI
+    - name: Log violation details
+      if: matrix.action == 'log'
+      run: |
+        echo "::error::SECURITY VIOLATION DETECTED"
+        echo "::error::Unauthorized workflow_run trigger attempt"
+        echo ""
+        echo "Details:"
+        echo "- Workflow triggered by: ${{ github.event.workflow_run.event }}"
+        echo "- Repository: ${{ github.event.workflow_run.repository.full_name }}"
+        echo "- Expected repository: ${{ github.repository }}"
+        echo "- Workflow run ID: ${{ github.event.workflow_run.id }}"
+        echo "- Actor: ${{ github.event.workflow_run.actor.login }}"
+        echo "- PR: ${{ github.event.workflow_run.pull_requests[0].number || 'N/A' }}"
+        echo ""
+
+        # Check specific violation
+        if [[ "${{ github.event.workflow_run.repository.full_name }}" != "${{ github.repository }}" ]]; then
+          echo "::error::Violation: Workflow triggered from unauthorized repository"
+        fi
+
+        ALLOWED_EVENTS='["pull_request_target", "push", "schedule"]'
+        EVENT="${{ github.event.workflow_run.event }}"
+
+        if ! echo "$ALLOWED_EVENTS" | jq -e --arg event "$EVENT" 'contains([$event])' > /dev/null; then
+          echo "::error::Violation: Workflow triggered by unauthorized event type: $EVENT"
+        fi
+
+    # PR
+    - name: Comment on PR
+      if: matrix.action == 'comment' && github.event.workflow_run.pull_requests[0]
+      uses: actions/github-script@v7
+      with:
+        script: |
+          try {
+            const pr_number = context.payload.workflow_run.pull_requests[0].number;
+            const comment = `
+            ## 🚨 **SECURITY VIOLATION DETECTED** 🚨
+
+            **UNAUTHORIZED WORKFLOW TRIGGER ATTEMPT**
+
+            This pull request attempted to trigger protected workflows through unauthorized means.
+
+            **VIOLATION DETAILS:**
+            - Event type: \`${{ github.event.workflow_run.event }}\`
+            - Repository: \`${{ github.event.workflow_run.repository.full_name }}\`
+            - Expected: \`${{ github.repository }}\`
+
+            **THIS INCIDENT HAS BEEN LOGGED AND REPORTED.**
+            `;
+
+            await github.rest.issues.createComment({
+              owner: '${{ github.repository_owner }}',
+              repo: '${{ github.event.repository.name }}',
+              issue_number: pr_number,
+              body: comment
+            });
+          } catch (error) {
+            console.error('Failed to comment on PR:', error);
+          }
+
+    # SLACK
+    - name: Checkout repository (secure branch)
+      if: matrix.action == 'slack'
+      uses: actions/checkout@v4
+      with:
+        # Explicitly checkout main to avoid malicious code
+        ref: main
+    - name: Notify Slack
+      if: matrix.action == 'slack'
+      run: |
+        cat > /tmp/security_violation.json <<EOF
+        {
+          "actor": "${{ github.event.workflow_run.actor.login }}",
+          "repository": "${{ github.event.workflow_run.repository.full_name }}",
+          "event_type": "${{ github.event.workflow_run.event }}",
+          "workflow_run_id": "${{ github.event.workflow_run.id }}",
+          "workflow_run_url": "${{ github.event.workflow_run.html_url }}",
+          "pr_number": "${{ github.event.workflow_run.pull_requests[0].number || '' }}"
+        }
+        EOF
+
+        # Run security notifier
+        bazel run --config=ci //tools/repo:security_notify -- \
+          --violation_file=/tmp/security_violation.json
+      env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

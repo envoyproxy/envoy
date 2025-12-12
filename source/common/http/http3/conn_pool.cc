@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
@@ -110,9 +111,10 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
     OptRef<PoolConnectResultCallback> connect_callback, Http::PersistentQuicInfo& quic_info,
     OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
-    bool attempt_happy_eyeballs)
+    Server::OverloadManager& overload_manager, bool attempt_happy_eyeballs)
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
-                            random_generator, state, client_fn, codec_fn, protocol, {}, nullptr),
+                            random_generator, state, client_fn, codec_fn, protocol,
+                            overload_manager, {}, nullptr),
       quic_info_(dynamic_cast<Quic::PersistentQuicInfoImpl&>(quic_info)),
       server_id_(sni(transport_socket_options, host),
                  static_cast<uint16_t>(host_->address()->ip()->port())),
@@ -168,7 +170,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  OptRef<PoolConnectResultCallback> connect_callback,
                  Http::PersistentQuicInfo& quic_info,
                  OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
-                 bool attempt_happy_eyeballs) {
+                 Server::OverloadManager& overload_manager, bool attempt_happy_eyeballs) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [&quic_stat_names, rtt_cache,
@@ -209,7 +211,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info,
-      network_observer_registry, attempt_happy_eyeballs);
+      network_observer_registry, overload_manager, attempt_happy_eyeballs);
 }
 
 } // namespace Http3

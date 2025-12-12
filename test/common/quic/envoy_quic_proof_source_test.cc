@@ -52,8 +52,10 @@ public:
     const std::string& root_ca_cert =
         cert_chain.substr(cert_chain.rfind("-----BEGIN CERTIFICATE-----"));
     const std::string path_string("some_path");
+    const std::string cert_name("some_cert_name");
     ON_CALL(cert_validation_ctx_config_, caCert()).WillByDefault(ReturnRef(root_ca_cert));
     ON_CALL(cert_validation_ctx_config_, caCertPath()).WillByDefault(ReturnRef(path_string));
+    ON_CALL(cert_validation_ctx_config_, caCertName()).WillByDefault(ReturnRef(cert_name));
     ON_CALL(cert_validation_ctx_config_, trustChainVerification)
         .WillByDefault(Return(envoy::extensions::transport_sockets::tls::v3::
                                   CertificateValidationContext::VERIFY_TRUST_CHAIN));
@@ -209,6 +211,7 @@ public:
     EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillRepeatedly(Return(tls_cert_configs));
     EXPECT_CALL(tls_cert_config_, pkcs12()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, certificateChainPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+    EXPECT_CALL(tls_cert_config_, certificateName()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, privateKeyMethod()).WillRepeatedly(Return(nullptr));
     EXPECT_CALL(tls_cert_config_, privateKeyPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, password()).WillRepeatedly(ReturnRef(EMPTY_STRING));

@@ -66,10 +66,11 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
 const std::string RouterImpl::route(const Network::Address::Instance& destination_address,
                                     const Network::Address::Instance& source_address) const {
   Network::Matching::UdpMatchingDataImpl data(destination_address, source_address);
-  const auto& result = Matcher::evaluateMatch<Network::UdpMatchingData>(*matcher_, data);
-  ASSERT(result.match_state_ == Matcher::MatchState::MatchComplete);
-  if (result.result_) {
-    return result.result_()->getTyped<RouteMatchAction>().cluster();
+  const Matcher::MatchResult result =
+      Matcher::evaluateMatch<Network::UdpMatchingData>(*matcher_, data);
+  ASSERT(result.isComplete());
+  if (result.isMatch()) {
+    return result.action()->getTyped<RouteMatchAction>().cluster();
   }
 
   return EMPTY_STRING;

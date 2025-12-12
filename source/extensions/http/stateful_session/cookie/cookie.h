@@ -98,7 +98,7 @@ private:
   const std::string name_;
   const std::chrono::seconds ttl_;
   const std::string path_;
-  const Envoy::Http::CookieAttributeRefVector attributes_;
+  std::vector<Envoy::Http::CookieAttribute> attributes_;
   TimeSource& time_source_;
 
   std::function<bool(absl::string_view)> path_matcher_;

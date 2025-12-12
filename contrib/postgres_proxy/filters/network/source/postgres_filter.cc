@@ -1,4 +1,5 @@
 #include "contrib/postgres_proxy/filters/network/source/postgres_filter.h"
+#include "postgres_filter.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
@@ -17,11 +18,15 @@ PostgresFilterConfig::PostgresFilterConfig(const PostgresFilterConfigOptions& co
                                            Stats::Scope& scope)
     : enable_sql_parsing_(config_options.enable_sql_parsing_),
       terminate_ssl_(config_options.terminate_ssl_), upstream_ssl_(config_options.upstream_ssl_),
-      scope_{scope}, stats_{generateStats(config_options.stats_prefix_, scope)} {}
+      downstream_ssl_(config_options.downstream_ssl_), scope_{scope},
+      stats_{generateStats(config_options.stats_prefix_, scope)} {}
 
 PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
     decoder_ = createDecoder(this);
+  }
+  if (!encoder_) {
+    encoder_ = createEncoder();
   }
 }
 
@@ -66,6 +71,8 @@ Network::FilterStatus PostgresFilter::onWrite(Buffer::Instance& data, bool) {
 DecoderPtr PostgresFilter::createDecoder(DecoderCallbacks* callbacks) {
   return std::make_unique<DecoderImpl>(callbacks);
 }
+
+EncoderPtr PostgresFilter::createEncoder() { return std::make_unique<Encoder>(); }
 
 void PostgresFilter::incMessagesBackend() {
   config_->stats_.messages_.inc();
@@ -200,7 +207,9 @@ void PostgresFilter::processQuery(const std::string& sql) {
 }
 
 bool PostgresFilter::onSSLRequest() {
-  if (!config_->terminate_ssl_) {
+  if (config_->downstream_ssl_ ==
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE &&
+      !config_->terminate_ssl_) {
     // Signal to the decoder to continue.
     return true;
   }
@@ -224,6 +233,7 @@ bool PostgresFilter::onSSLRequest() {
         config_->stats_.sessions_terminated_ssl_.inc();
         ENVOY_CONN_LOG(trace, "postgres_proxy: enabled SSL termination.",
                        read_callbacks_->connection());
+        switched_to_tls_ = true;
         // Switch to TLS has been completed.
         // Signal to the decoder to stop processing the current message (SSLRequest).
         // Because Envoy terminates SSL, the message was consumed and should not be
@@ -279,6 +289,27 @@ bool PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& dat
   }
 
   return encrypted;
+}
+
+void PostgresFilter::verifyDownstreamSSL() {
+  if (config_->downstream_ssl_ ==
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE &&
+      (!switched_to_tls_)) {
+    ENVOY_LOG(debug, "postgres_proxy: closing connection because downstream ssl is required but "
+                     "downstream client did not start SSL handshake.");
+    closeConn();
+  }
+}
+
+void PostgresFilter::closeConn() {
+  Buffer::OwnedImpl rbac_error_response = encoder_->buildErrorResponse(
+      "FATAL", "connection denied by Envoy proxy: downstream ssl required.",
+      "28000" // return invalid_authorization_specification
+  );
+
+  // send error response to downstream client
+  write_callbacks_->injectWriteDataToFilterChain(rbac_error_response, false);
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
 Network::FilterStatus PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {

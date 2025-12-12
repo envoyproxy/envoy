@@ -43,7 +43,6 @@ on:
           -e GITHUB_TOKEN
           -e CC
           -e CXX
-          -e COVERAGE_THRESHOLD
           -e BAZEL_BUILD_OPTION_LIST
           -e MOBILE_DOCS_CHECKOUT_DIR
       diskspace-hack:

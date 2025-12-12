@@ -16,6 +16,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/hex.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/tls/utility.h"
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
 #include "absl/strings/ascii.h"
@@ -214,7 +215,16 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
         }
         cb_->socket().setDetectedTransportProtocol("tls");
       } else {
+        if (read_ >= maxConfigReadBytes()) {
+          // We've hit the specified size limit. This is an unreasonably large ClientHello;
+          // indicate failure.
+          config_->stats().client_hello_too_large_.inc();
+          return ParseState::Error;
+        }
         config_->stats().tls_not_found_.inc();
+        ENVOY_LOG(
+            debug, "tls inspector: parseClientHello failed: {}",
+            Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"));
       }
       return ParseState::Done;
     default:

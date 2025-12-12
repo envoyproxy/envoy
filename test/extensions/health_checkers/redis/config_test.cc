@@ -92,6 +92,35 @@ TEST(HealthCheckerFactoryTest, CreateRedisWithLogHCFailure) {
               .get()));
 }
 
+TEST(HealthCheckerFactoryTest, CreateRedisWithAWSIam) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    custom_health_check:
+      name: redis
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
+        aws_iam:
+          region: ap-southeast-2
+          service_name: elasticache
+          cache_name: testcache
+          expiration_time: 900s
+    )EOF";
+
+  NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
+
+  RedisHealthCheckerFactory factory;
+  EXPECT_NE(
+      nullptr,
+      dynamic_cast<CustomRedisHealthChecker*>(
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
+              .get()));
+}
+
 TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
   const std::string yaml = R"EOF(
     timeout: 1s
@@ -116,6 +145,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
                              .value()
                              .get()));
 }
+
 } // namespace
 } // namespace RedisHealthChecker
 } // namespace HealthCheckers

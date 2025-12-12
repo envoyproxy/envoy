@@ -97,7 +97,6 @@ private:
   ClusterInfoConstSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
   HealthCheckerMap health_checkers_map_;
-  TimeSource& time_source_;
   UnitFloat drop_overload_{0};
   const std::string drop_category_;
 

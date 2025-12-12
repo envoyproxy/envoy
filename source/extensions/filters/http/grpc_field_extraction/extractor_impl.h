@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/common/exception.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.validate.h"
 
@@ -21,26 +22,21 @@ using FieldValueExtractorPtr =
     std::unique_ptr<Protobuf::field_extraction::FieldValueExtractorInterface>;
 class ExtractorImpl : public Extractor {
 public:
-  explicit ExtractorImpl(
-      const TypeFinder& type_finder, absl::string_view request_type_url,
-      const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
-          field_extractions)
-      : type_finder_(type_finder), request_type_url_(request_type_url),
-        field_extractions_(field_extractions) {}
-
-  //  The init method should be invoked right after the constructor has been called.
-  absl::Status init();
+  static absl::StatusOr<ExtractorImpl>
+  create(const TypeFinder& type_finder, absl::string_view request_type_url,
+         const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
+             field_extractions);
 
   absl::StatusOr<ExtractionResult>
   processRequest(Protobuf::field_extraction::MessageData& message) const override;
 
 private:
-  const TypeFinder& type_finder_;
-
-  std::string request_type_url_;
-
-  const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
-      field_extractions_;
+  ExtractorImpl() = default;
+  //  The init method should be invoked right after the constructor has been called.
+  absl::Status
+  init(const TypeFinder& type_finder, absl::string_view request_type_url,
+       const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
+           field_extractions);
 
   absl::flat_hash_map<absl::string_view, FieldValueExtractorPtr> per_field_extractors_;
 };
@@ -51,14 +47,10 @@ public:
       const TypeFinder& type_finder, absl::string_view request_type_url,
       const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
           field_extractions) const override {
-    auto extractor =
-        std::make_unique<ExtractorImpl>(type_finder, request_type_url, field_extractions);
-    auto status = extractor->init();
-    if (!status.ok()) {
-      return status;
-    }
-
-    return extractor;
+    absl::StatusOr<ExtractorImpl> extractor =
+        ExtractorImpl::create(type_finder, request_type_url, field_extractions);
+    RETURN_IF_NOT_OK(extractor.status());
+    return std::make_unique<ExtractorImpl>(std::move(extractor.value()));
   }
 };
 

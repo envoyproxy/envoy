@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/http/http2/codec_impl.h"
@@ -49,6 +50,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state,
+                 Server::OverloadManager& overload_manager,
                  absl::optional<HttpServerPropertiesCache::Origin> origin,
                  Http::HttpServerPropertiesCacheSharedPtr cache) {
   return std::make_unique<FixedHttpConnPoolImpl>(
@@ -62,7 +64,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
             pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http2}, origin, cache);
+      std::vector<Protocol>{Protocol::Http2}, overload_manager, origin, cache);
 }
 
 } // namespace Http2

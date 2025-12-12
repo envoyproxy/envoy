@@ -32,8 +32,8 @@ TEST_P(RandomLoadBalancerTest, NoHosts) {
 
 TEST_P(RandomLoadBalancerTest, Normal) {
   init();
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                              makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -54,8 +54,8 @@ TEST_P(RandomLoadBalancerTest, FailClusterOnPanic) {
   init();
 
   hostSet().healthy_hosts_ = {};
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 }

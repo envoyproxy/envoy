@@ -60,7 +60,7 @@ AppleDnsResolverStats AppleDnsResolverImpl::generateAppleDnsResolverStats(Stats:
 AppleDnsResolverImpl::StartResolutionResult
 AppleDnsResolverImpl::startResolution(const std::string& dns_name,
                                       DnsLookupFamily dns_lookup_family, ResolveCb callback) {
-  ENVOY_LOG_EVENT(debug, "apple_dns_start", "DNS resolution for {} started", dns_name);
+  ENVOY_LOG_EVENT(trace, "apple_dns_start", "DNS resolution for {} started", dns_name);
 
   // When an IP address is submitted to c-ares in DnsResolverImpl, c-ares synchronously returns
   // the IP without submitting a DNS query. Because Envoy has come to rely on this behavior, this
@@ -69,7 +69,7 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
   auto address = Utility::parseInternetAddressNoThrow(dns_name);
 
   if (address != nullptr) {
-    ENVOY_LOG_EVENT(debug, "apple_dns_immediate_resolution",
+    ENVOY_LOG_EVENT(trace, "apple_dns_immediate_resolution",
                     "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
                     dns_name, address->asString());
     callback(DnsResolver::ResolutionStatus::Completed, "apple_dns_immediate_success",
@@ -148,7 +148,7 @@ AppleDnsResolverImpl::PendingResolution::PendingResolution(AppleDnsResolverImpl&
       pending_response_(PendingResponse()), dns_lookup_family_(dns_lookup_family) {}
 
 AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
-  ENVOY_LOG(debug, "Destroying PendingResolution for {}", dns_name_);
+  ENVOY_LOG(trace, "Destroying PendingResolution for {}", dns_name_);
 
   // dns_sd.h says:
   //   If the reference's underlying socket is used in a run loop or select() call, it should
@@ -162,7 +162,7 @@ AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   // thus the DNSServiceRef is null.
   // Therefore, only deallocate if the ref is not null.
   if (sd_ref_) {
-    ENVOY_LOG(debug, "DNSServiceRefDeallocate individual sd ref");
+    ENVOY_LOG(trace, "DNSServiceRefDeallocate individual sd ref");
     DnsServiceSingleton::get().dnsServiceRefDeallocate(sd_ref_);
   }
 }
@@ -191,7 +191,7 @@ std::string AppleDnsResolverImpl::PendingResolution::getTraces() {
 }
 
 void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
-  ENVOY_LOG(debug, "DNS resolver file event ({})", events);
+  ENVOY_LOG(trace, "DNS resolver file event ({})", events);
   RELEASE_ASSERT(events & Event::FileReadyType::Read,
                  fmt::format("invalid FileReadyType event={}", events));
   DNSServiceErrorType error = DnsServiceSingleton::get().dnsServiceProcessResult(sd_ref_);
@@ -246,7 +246,7 @@ std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressLis
 }
 
 void AppleDnsResolverImpl::PendingResolution::finishResolve(AppleDnsTrace trace) {
-  ENVOY_LOG_EVENT(debug, "apple_dns_resolution_complete",
+  ENVOY_LOG_EVENT(trace, "apple_dns_resolution_complete",
                   "dns resolution for {} completed with status {}", dns_name_,
                   static_cast<int>(pending_response_.status_));
   addTrace(static_cast<uint8_t>(trace));
@@ -254,10 +254,10 @@ void AppleDnsResolverImpl::PendingResolution::finishResolve(AppleDnsTrace trace)
             std::move(finalAddressList()));
 
   if (owned_) {
-    ENVOY_LOG(debug, "Resolution for {} completed (async)", dns_name_);
+    ENVOY_LOG(trace, "Resolution for {} completed (async)", dns_name_);
     delete this;
   } else {
-    ENVOY_LOG(debug, "Resolution for {} completed (synchronously)", dns_name_);
+    ENVOY_LOG(trace, "Resolution for {} completed (synchronously)", dns_name_);
     synchronously_completed_ = true;
   }
 }
@@ -337,7 +337,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
   // still be non-null and its `sa_family` will be the address family of the query (even if the
   // address itself isn't a meaningful IP address).
 
-  ENVOY_LOG(debug,
+  ENVOY_LOG(trace,
             "DNS for {} resolved with: flags={}[MoreComing={}, Add={}], interface_index={}, "
             "error_code={}, hostname={}",
             dns_name_, flags, flags & kDNSServiceFlagsMoreComing ? "yes" : "no",
@@ -380,7 +380,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
   // Therefore, only add this address to the list if kDNSServiceFlagsAdd is set.
   if (error_code == kDNSServiceErr_NoError && (flags & kDNSServiceFlagsAdd)) {
     auto dns_response = buildDnsResponse(address, ttl);
-    ENVOY_LOG(debug, "Address to add address={}, ttl={}",
+    ENVOY_LOG(trace, "Address to add address={}, ttl={}",
               dns_response.addrInfo().address_->ip()->addressAsString(), ttl);
     if (dns_response.addrInfo().address_->ip()->ipv4()) {
       pending_response_.v4_responses_.push_back(dns_response);
@@ -392,7 +392,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
 
   if (!(flags & kDNSServiceFlagsMoreComing) && isAddressFamilyProcessed(kDNSServiceProtocol_IPv4) &&
       isAddressFamilyProcessed(kDNSServiceProtocol_IPv6)) {
-    ENVOY_LOG(debug, "DNS Resolver flushing queries pending callback");
+    ENVOY_LOG(trace, "DNS Resolver flushing queries pending callback");
     pending_response_.status_ = ResolutionStatus::Completed;
     pending_response_.details_ = absl::StrCat("apple_dns_completed_", error_code);
     AppleDnsTrace trace = (error_code == kDNSServiceErr_NoSuchRecord) ? AppleDnsTrace::NoResult

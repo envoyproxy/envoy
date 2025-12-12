@@ -301,6 +301,7 @@ public:
   CAPIStatus setTrailer(ProcessorState& state, absl::string_view key, absl::string_view value,
                         headerAction act);
   CAPIStatus removeTrailer(ProcessorState& state, absl::string_view key);
+  CAPIStatus setUpstreamOverrideHost(ProcessorState& state, absl::string_view host, bool strict);
 
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
   CAPIStatus getIntegerValue(int id, uint64_t* value);

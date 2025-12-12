@@ -27,7 +27,7 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
   JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
 
   auto factory_primary_or_error = Utility::factoryForGrpcApiConfigSource(
-      data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true, 0);
+      data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true, 0, false);
   THROW_IF_NOT_OK_REF(factory_primary_or_error.status());
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
       Utility::parseRateLimitSettings(api_config_source);
@@ -78,7 +78,7 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
   JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
 
   auto factory_primary_or_error = Utility::factoryForGrpcApiConfigSource(
-      data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true, 0);
+      data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true, 0, false);
   THROW_IF_NOT_OK_REF(factory_primary_or_error.status());
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
       Utility::parseRateLimitSettings(api_config_source);
@@ -116,7 +116,7 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
 SubscriptionPtr
 AdsConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionData& data) {
   return std::make_unique<GrpcSubscriptionImpl>(
-      data.cm_.adsMux(), data.callbacks_, data.resource_decoder_, data.stats_, data.type_url_,
+      data.ads_grpc_mux_, data.callbacks_, data.resource_decoder_, data.stats_, data.type_url_,
       data.dispatcher_, Utility::configSourceInitialFetchTimeout(data.config_), true,
       data.options_);
 }

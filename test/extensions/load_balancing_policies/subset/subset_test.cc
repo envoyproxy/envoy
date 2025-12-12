@@ -487,7 +487,7 @@ public:
           .set_string_value(m_it.second);
     }
 
-    return makeTestHost(info_, url, m, simTime());
+    return makeTestHost(info_, url, m);
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata,
@@ -498,7 +498,7 @@ public:
           .set_string_value(m_it.second);
     }
 
-    return makeTestHost(info_, url, m, locality, simTime());
+    return makeTestHost(info_, url, m, locality);
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostListMetadata& metadata) {
@@ -511,7 +511,7 @@ public:
       }
     }
 
-    return makeTestHost(info_, url, m, simTime());
+    return makeTestHost(info_, url, m);
   }
 
   ProtobufWkt::Struct makeDefaultSubset(HostMetadata metadata) {
@@ -1682,7 +1682,7 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   HostVector hosts;
-  hosts.emplace_back(makeTestHost(info_, "tcp://127.0.0.1:80", simTime()));
+  hosts.emplace_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
   hosts.emplace_back(makeHost("tcp://127.0.0.1:81", {{"version", "1.0"}}));
 
   host_set_.hosts_ = hosts;
