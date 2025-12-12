@@ -434,7 +434,7 @@ envoy_proto_library(
 
 envoy_cc_test_library(
     name = "envoy_quic_h3_fuzz_helper_lib",
-    srcs = ["envoy_quic_h3_fuzz_helper.cc"],
+    srcs = envoy_select_enable_http3(["envoy_quic_h3_fuzz_helper.cc"]),
     hdrs = ["envoy_quic_h3_fuzz_helper.h"],
     deps = [
         ":envoy_quic_h3_fuzz_proto_cc_proto",
