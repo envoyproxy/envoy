@@ -204,6 +204,10 @@ private:
     }
 
     // This will only be used by internal router filter for buffering for retries.
+
+    // If the buffer limit is reached, the router filter will ignore the retry and the following
+    // data will not be buffered. So, we don't need to check the buffer limit here because the
+    // router filter already did that.
     if (buffered_body_ == nullptr) {
       buffered_body_ = std::make_unique<Buffer::OwnedImpl>();
     }
