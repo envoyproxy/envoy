@@ -694,7 +694,7 @@ TEST_F(DnsFilterTest, LocalTypeAQueryFail) {
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
   EXPECT_TRUE(response_ctx_->parse_status_);
 
-  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, response_ctx_->answers_.size());
 
   // Validate stats
@@ -1124,7 +1124,7 @@ TEST_F(DnsFilterTest, ConsumeExternalJsonTableTestNoIpv6Answer) {
 
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
   EXPECT_TRUE(response_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, response_ctx_->answers_.size());
 
   // Validate stats
@@ -2098,7 +2098,7 @@ TEST_F(DnsFilterTest, NonExistentClusterServiceLookup) {
 
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
   EXPECT_TRUE(response_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, response_ctx_->answers_.size());
 
   // Validate stats
@@ -2562,6 +2562,50 @@ server_config:
   // Validate stats
   EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
   EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+TEST_F(DnsFilterTest, NoErrorForKnownDomainWithQueryTypeMismatch) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+
+  const std::string domain("www.foo3.com");
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_AAAA, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(0, response_ctx_->answers_.size());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+  EXPECT_EQ(0, config_->stats().local_aaaa_record_answers_.value());
+  EXPECT_EQ(1, config_->stats().aaaa_record_queries_.value());
+
+  const std::string domain2("www.foo2.com");
+  const std::string query2 =
+      Utils::buildQueryForDomain(domain2, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query2.empty());
+
+  sendQueryFromClient("10.0.0.1:1000", query2);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(0, response_ctx_->answers_.size());
+
+  // Validate stats
+  EXPECT_EQ(2, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(2, config_->stats().known_domain_queries_.value());
+  EXPECT_EQ(0, config_->stats().local_a_record_answers_.value());
+  EXPECT_EQ(1, config_->stats().a_record_queries_.value());
 }
 
 // Test that the bootstrap typed_dns_resolver_config is used when client_config is not set.

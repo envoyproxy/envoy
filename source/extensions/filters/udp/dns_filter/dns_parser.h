@@ -208,6 +208,7 @@ public:
   DnsAnswerMap answers_;
   DnsAnswerMap additional_;
   bool in_callback_;
+  bool known_domain_without_records_{false};
 
   /**
    * @param context the query context for which we are querying the response code
