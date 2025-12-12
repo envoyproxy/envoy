@@ -56,6 +56,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http2_propagate_reset_events);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
+RUNTIME_GUARD(envoy_reloadable_features_new_http_async_client_retry_logic);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_cleanup_cookies);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_encrypt_tokens);
