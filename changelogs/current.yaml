@@ -86,6 +86,10 @@ minor_behavior_changes:
     Execute foreign functions on the effective context, when set by Wasm SDKs. Previously, foreign functions called from
     HTTP or gRPC callbacks could receive a root context instead of a stream context. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.wasm_use_effective_ctx_for_foreign_functions`` to ``false``.
+- area: ext_proc
+  change: |
+    added immediate_responses_sent counter for ext proc in :ref:'FilterStats
+    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcFilterStats>'.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -421,9 +425,21 @@ new_features:
   change: |
     Propagated transport errors from tls_inspector to ``DownstreamTransportFailureReason`` in ``StreamInfo`` for access logging
     prior to the TLS handshake.
+- area: geoip
+  change: |
+    Added support for MaxMind Country database via
+    :ref:`country_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.country_db_path>`.
 - area: tls_inspector
   change: |
     Added configuration parameter to TLS inspector for maximum acceptable client hello size.
+- area: tls
+  change: |
+    Enhanced TLS certificate validation failure messages in access logs to include detailed error information.
+    The ``%DOWNSTREAM_TRANSPORT_FAILURE_REASON%`` and ``%UPSTREAM_TRANSPORT_FAILURE_REASON%`` access log
+    formatters now include specific validation failure reasons such as ``verify cert failed: SAN matcher``,
+    ``verify cert failed: cert hash and spki``, or the OpenSSL verification error string (e.g., certificate
+    has expired, unable to get local issuer certificate). This provides better visibility into TLS handshake
+    failures without requiring debug-level logging.
 - area: ext_proc
   change: |
     Added support for forwarding cluster metadata to ext_proc server.
@@ -431,6 +447,11 @@ new_features:
   change: |
     Added ``match_included_headers`` to the request signing extension to allow positive header matching while excluding
     other non-SigV4-required headers.
+- area: geoip
+  change: |
+    Added :ref:`custom_header_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.custom_header_config>`
+    to allow extracting the client IP address from a custom request header which can be used instead of
+    ``x-forwarded-for`` header or downstream connection source address.
 - area: ext_authz
   change: |
     Added support for :ref:`metadata_context_namespaces
@@ -463,5 +484,11 @@ new_features:
     access TLV values via FilterStateInput without requiring custom HTTP filters to copy metadata. Individual TLV values
     can be accessed via field access: ``%FILTER_STATE(envoy.network.proxy_protocol.tlv:FIELD:key)%``. Defaults to
     ``DYNAMIC_METADATA`` to maintain existing behavior.
+- area: mcp
+  change: |
+    Added :ref:`MCP filter <config_http_filters_mcp>` for parsing Model Context Protocol (MCP) JSON-RPC requests.
+    The filter extracts the ``method`` and ``id`` fields from incoming requests and stores them in dynamic metadata
+    for use by downstream filters and access logging. Notifications (methods starting with ``notifications/``) are
+    correctly handled as they don't have an ``id`` field per the JSON-RPC specification.
 
 deprecated:
