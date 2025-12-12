@@ -11,7 +11,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Geoip {
 
-Network::FilterFactoryCb GeoipFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Network::FilterFactoryCb> GeoipFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::geoip::v3::Geoip& proto_config,
     Server::Configuration::FactoryContext& context) {
   GeoipFilterConfigSharedPtr filter_config(

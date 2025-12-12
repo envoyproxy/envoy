@@ -383,7 +383,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # IP Geolocation
 /*/extensions/filters/http/geoip @nezdolik @ravenblackx
 # IP Geolocation Network Filter
-/*/extensions/filters/network/geoip @agrawroh @nezdolik @wbpcode
+/*/extensions/filters/network/geoip @agrawroh @nezdolik @ravenblackx @wbpcode
 /*/extensions/geoip_providers/common @nezdolik @ravenblackx
 # Maxmind geolocation provider
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx

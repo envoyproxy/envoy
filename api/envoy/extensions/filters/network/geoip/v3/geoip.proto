@@ -28,9 +28,6 @@ message Geoip {
   string metadata_namespace = 1;
 
   // Geoip driver specific configuration which depends on the driver being instantiated.
-  // See the geoip drivers for examples:
-  //
-  // - :ref:`MaxMindConfig <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
   // [#extension-category: envoy.geoip_providers]
   config.core.v3.TypedExtensionConfig provider = 2 [(validate.rules).message = {required: true}];
 }

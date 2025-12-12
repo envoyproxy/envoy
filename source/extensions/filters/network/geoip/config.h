@@ -14,13 +14,13 @@ namespace Geoip {
 /**
  * Config registration for the geoip network filter. @see NamedNetworkFilterConfigFactory.
  */
-class GeoipFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::network::geoip::v3::Geoip> {
+class GeoipFilterFactory : public Common::ExceptionFreeFactoryBase<
+                               envoy::extensions::filters::network::geoip::v3::Geoip> {
 public:
-  GeoipFilterFactory() : FactoryBase("envoy.filters.network.geoip") {}
+  GeoipFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.network.geoip") {}
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::geoip::v3::Geoip& proto_config,
       Server::Configuration::FactoryContext& context) override;
 
