@@ -26,6 +26,8 @@ envoy_extension_cc_test(
     srcs = ["mcp_router_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
     deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:message_lib",
         "//source/extensions/filters/http/mcp_router:mcp_router_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
