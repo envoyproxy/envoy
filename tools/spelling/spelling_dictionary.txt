@@ -1601,6 +1601,7 @@ routable
 vhosts
 infos
 ElastiCache
+Parametrized
 pinterest
 callouts
 streamable

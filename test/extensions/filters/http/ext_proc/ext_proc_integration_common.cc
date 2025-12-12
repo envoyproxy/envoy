@@ -3,6 +3,7 @@
 #include <chrono>
 
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.h"
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
@@ -879,6 +880,66 @@ void ExtProcIntegrationTest::prependExtProcCompositeFilter(const Protobuf::Messa
   composite_filter.mutable_typed_config()->PackFrom(extension_with_matcher);
   config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(composite_filter),
                                true);
+}
+
+void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
+  config_helper_.addConfigModifier([&](ConfigHelper::HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    // Test all three serialization modes.
+    (*json_format->mutable_fields())["ext_proc_plain"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:PLAIN)%");
+    (*json_format->mutable_fields())["ext_proc_typed"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:TYPED)%");
+
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["field_request_header_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_latency_us)%");
+    (*json_format->mutable_fields())["field_request_header_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_call_status)%");
+    (*json_format->mutable_fields())["field_request_body_calls"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_call_count)%");
+    (*json_format->mutable_fields())["field_request_body_total_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_total_latency_us)%");
+    (*json_format->mutable_fields())["field_request_body_max_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_max_latency_us)%");
+    (*json_format->mutable_fields())["field_request_body_last_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_last_call_status)%");
+    (*json_format->mutable_fields())["field_request_trailer_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_latency_us)%");
+    (*json_format->mutable_fields())["field_request_trailer_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_call_status)%");
+    (*json_format->mutable_fields())["field_response_header_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_latency_us)%");
+    (*json_format->mutable_fields())["field_response_header_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_call_status)%");
+    (*json_format->mutable_fields())["field_response_body_calls"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_call_count)%");
+    (*json_format->mutable_fields())["field_response_body_total_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_total_latency_us)%");
+    (*json_format->mutable_fields())["field_response_body_max_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_max_latency_us)%");
+    (*json_format->mutable_fields())["field_response_body_last_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_last_call_status)%");
+    (*json_format->mutable_fields())["field_response_trailer_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_latency_us)%");
+    (*json_format->mutable_fields())["field_response_trailer_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_call_status)%");
+    (*json_format->mutable_fields())["field_bytes_sent"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_sent)%");
+    (*json_format->mutable_fields())["field_bytes_received"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_received)%");
+
+    // Test non-existent field for coverage
+    (*json_format->mutable_fields())["field_non_existent"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:non_existent_field)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
 }
 
 } // namespace ExternalProcessing
