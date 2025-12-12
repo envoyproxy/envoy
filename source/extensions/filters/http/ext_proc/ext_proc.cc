@@ -1645,15 +1645,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
     return;
   }
 
-  if (decoding_state_.callbackState() != ProcessorState::CallbackState::Idle ||
-      encoding_state_.callbackState() != ProcessorState::CallbackState::Idle) {
-    ENVOY_STREAM_LOG(debug, "There are pending responses from the ext_proc server",
-                     *decoder_callbacks_);
-    return;
-  }
-
   bool last_response = false;
-
   switch (response.response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
     if (encoding_state_.noExternalProcess()) {

@@ -604,6 +604,9 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
 }
 
 bool ProcessorState::isLastResponseAfterHeaderResp() {
+  if (callbackState() != ProcessorState::CallbackState::Idle) {
+    return false;
+  }
   if (hasNoBody()) {
     return true;
   }
@@ -617,6 +620,8 @@ bool ProcessorState::isLastResponseAfterHeaderResp() {
   }
   if (bodyMode() != ProcessingMode::NONE && !sendTrailers()) {
     if (responseTrailers() != nullptr) {
+      // If callback state is idle, and trailers are already received,
+      // then there is no more body chunks to send.
       return true;
     }
   }
@@ -624,10 +629,15 @@ bool ProcessorState::isLastResponseAfterHeaderResp() {
 }
 
 bool ProcessorState::isLastResponseAfterBodyResp(bool is_last_body_resp) {
+  if (callbackState() != ProcessorState::CallbackState::Idle) {
+    return false;
+  }
   if (is_last_body_resp) {
     return true;
   }
   if (!sendTrailers() && responseTrailers() != nullptr) {
+    // If callback state is idle, and trailers are already received,
+    // then there is no more body chunks to send.
     return true;
   }
   return false;
