@@ -89,7 +89,7 @@ void setupMockEnumRule(MockProtoApiScrubberFilterConfig& mock_config, const std:
 
 // Custom Matcher to verify that HttpMatchingData contains specific Request Headers
 MATCHER_P(HasRequestHeader, key, "") {
-  const auto headers = arg.responseHeaders();
+  const auto headers = arg.requestHeaders();
   if (!headers.has_value()) {
     return false;
   }
