@@ -1025,7 +1025,7 @@ TEST_F(AsyncClientImplTest, RetryWithStreamWithLegacyLogic) {
   // Remove this test when the runtime flag is removed.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.new_http_async_client_retry_logic", "false"}});
+      {{"envoy.reloadable_features.http_async_client_retry_respect_buffer_limits", "false"}});
 
   ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("upstream.use_retry", 100))
       .WillByDefault(Return(true));
@@ -1084,7 +1084,7 @@ TEST_F(AsyncClientImplTest, DataBufferForRetryOverflowWithLegacyLogic) {
   // Remove this test when the runtime flag is removed.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.new_http_async_client_retry_logic", "false"}});
+      {{"envoy.reloadable_features.http_async_client_retry_respect_buffer_limits", "false"}});
 
   ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("upstream.use_retry", 100))
       .WillByDefault(Return(true));
