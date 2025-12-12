@@ -25,7 +25,7 @@ def envoy_dependencies_extra(
         ignore_root_user_error = False):
     compatibility_proxy_repo()
     bazel_toolchain_dependencies()
-    setup_sysroots(glibc_version = glibc_version)
+    setup_sysroots()
     emsdk_deps()
     raze_fetch_remote_crates()
     crate_repositories()
