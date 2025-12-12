@@ -192,7 +192,7 @@ removed_config_or_runtime:
   change: |
     Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
 - area: http
-  change: | 
+  change: |
     Removed runtime guard ``envoy.reloadable_features.http2_propagate_reset_events`` and legacy code paths.
 - area: xds
   change: |
