@@ -9,6 +9,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/ssl/handshaker.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Ssl {
 
@@ -112,6 +114,17 @@ public:
    * @return CertificateSelectionStatus the cert selection status.
    */
   virtual CertificateSelectionStatus certificateSelectionResult() const PURE;
+
+  /**
+   * Set detailed certificate validation error information.
+   * @param error_details the detailed error message from certificate validation.
+   */
+  virtual void setCertificateValidationError(absl::string_view error_details) PURE;
+
+  /**
+   * @return the detailed certificate validation error message, or empty if none.
+   */
+  virtual absl::string_view certificateValidationError() const PURE;
 };
 
 } // namespace Ssl

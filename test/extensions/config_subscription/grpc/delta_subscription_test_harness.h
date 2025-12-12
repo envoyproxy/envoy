@@ -184,7 +184,6 @@ public:
         resource->mutable_resource()->PackFrom(*load_assignment);
       }
     }
-    Protobuf::RepeatedPtrField<std::string> removed_resources;
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version)).WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       expectSendMessage({}, version);
