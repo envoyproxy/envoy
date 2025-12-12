@@ -120,6 +120,19 @@ public:
     EXPECT_EQ(header_bytes_received, expected_header_bytes_received);
   }
 
+  void cleanupUpstreamAndDownstream() override {
+    // Cleanup the fake connection.
+    if (fake_raw_upstream_connection_) {
+      AssertionResult result = fake_raw_upstream_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_raw_upstream_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      fake_raw_upstream_connection_.reset();
+    }
+    // Cleanup the downstream and (possibly) the other upstreams.
+    HttpProtocolIntegrationTest::cleanupUpstreamAndDownstream();
+  }
+
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
   bool terminate_via_cluster_config_{};
