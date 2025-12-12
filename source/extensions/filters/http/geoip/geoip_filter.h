@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
 #include "envoy/geoip/geoip_provider_driver.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
@@ -25,6 +26,11 @@ public:
   bool useXff() const { return use_xff_; }
   uint32_t xffNumTrustedHops() const { return xff_num_trusted_hops_; }
 
+  // Returns the custom header name to use for extracting the IP address, if configured.
+  const absl::optional<Http::LowerCaseString>& ipAddressHeader() const {
+    return ip_address_header_;
+  }
+
 private:
   void incCounter(Stats::StatName name);
 
@@ -34,6 +40,7 @@ private:
   const Stats::StatName unknown_hit_;
   bool use_xff_;
   const uint32_t xff_num_trusted_hops_;
+  absl::optional<Http::LowerCaseString> ip_address_header_;
 };
 
 using GeoipFilterConfigSharedPtr = std::shared_ptr<GeoipFilterConfig>;

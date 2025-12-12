@@ -8,7 +8,7 @@ tasks:
     - "//test/integration/..."
     - "//test/exe/..."
     test_flags:
-    - "--config=remote-clang"
+    - "--config=clang"
     - "--config=remote-ci"
     - "--define=wasm=disabled"
     - "--jobs=75"
