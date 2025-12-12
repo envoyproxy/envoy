@@ -391,6 +391,48 @@ fill_interval:
   expectWritesAndLog(log2, /*expect_write_times=*/3, /*log_call_times=*/4);
 }
 
+TEST_F(AccessLogImplTestWithRateLimitFilter, TokenBucketUpdatedUsingExistingSubscription) {
+  AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
+      parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.init_manager_.initialize(init_watcher_);
+  ASSERT_EQ(subscriptions_.size(), 1);
+  ASSERT_EQ(callbackss_.size(), 1);
+
+  // 1. Initial config update.
+  EXPECT_CALL(init_watcher_, ready());
+  const auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
+      {{"token_bucket_name", token_bucket_resource_}});
+  EXPECT_TRUE(callbackss_["token_bucket_name"]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+  expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
+
+  // 2. Add log2. It should reuse the subscription and the limiter.
+  AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
+      parseAccessLogFromV3Yaml(default_access_log_), context_);
+  // log2 initialization does not add init target because the resource is
+  // already ready.
+  context_.init_manager_.initialize(init_watcher_);
+
+  // Shared bucket consumed by log1, so log2 is denied.
+  expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
+
+  // 3. Update config.
+  // This triggers setLimiter on both log1 and log2 wrappers.
+  // log2 wrapper has null init_target_.
+  const auto decoded_resources_2 = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
+      {{"token_bucket_name", TestUtility::parseYaml<envoy::type::v3::TokenBucket>(R"EOF(
+max_tokens: 2
+tokens_per_fill: 2
+fill_interval:
+  seconds: 1
+)EOF")}});
+  EXPECT_TRUE(
+      callbackss_["token_bucket_name"]->onConfigUpdate(decoded_resources_2.refvec_, "").ok());
+
+  // Verify log2 works with new config.
+  // New bucket has 2 tokens.
+  expectWritesAndLog(log2, /*expect_write_times=*/2, /*log_call_times=*/3);
+}
+
 } // namespace
 } // namespace ProcessRateLimit
 } // namespace Filters

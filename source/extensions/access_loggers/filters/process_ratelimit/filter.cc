@@ -4,6 +4,7 @@
 
 #include "source/common/init/target_impl.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,8 +34,10 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
   if (!config.has_dynamic_config()) {
     ExceptionUtil::throwEnvoyException("`dynamic_config` is required.");
   }
+  Server::GenericFactoryContextImpl generic_context(
+      context, context.scope(), context.messageValidationVisitor(), &listener_init_manager);
   rate_limiter_ = Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
-      getRateLimiter(context, listener_init_manager, config.dynamic_config().resource_name(),
+      getRateLimiter(generic_context, config.dynamic_config().resource_name(),
                      config.dynamic_config().config_source(), setter_key_, std::move(setter));
 }
 
