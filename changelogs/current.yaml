@@ -490,5 +490,11 @@ new_features:
     The filter extracts the ``method`` and ``id`` fields from incoming requests and stores them in dynamic metadata
     for use by downstream filters and access logging. Notifications (methods starting with ``notifications/``) are
     correctly handled as they don't have an ``id`` field per the JSON-RPC specification.
+- area: mcp
+  change: |
+    Added :ref:`mcp_router HTTP filter <config_http_filters_mcp_router>` which routes MCP (Model Context Protocol)
+    requests to more backend servers. The filter supports fanout to multiple backends for initialize and tools-list requests,
+    single-backend routing for tools-call based on tool name prefix, session management with composite session IDs,
+    and response aggregation.
 
 deprecated:
