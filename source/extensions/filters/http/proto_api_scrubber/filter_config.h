@@ -164,11 +164,16 @@ private:
                           Envoy::Server::Configuration::FactoryContext& context);
 
   // Initializes the descriptor pool from the provided 'data_source'.
-  absl::Status initializeDescriptorPool(Api::Api& api,
-                                        const ::envoy::config::core::v3::DataSource& data_source);
+  // Returns the parsed FileDescriptorSet which is needed for pre-computing the type cache.
+  absl::StatusOr<Envoy::Protobuf::FileDescriptorSet>
+  initializeDescriptorPool(Api::Api& api, const ::envoy::config::core::v3::DataSource& data_source);
 
   // Initializes the type utilities (e.g., type helper, type finder, etc.).
   void initializeTypeUtils();
+
+  // Pre-computes the request and response types for all methods in the descriptor set.
+  // This allows O(1) access to types during request and response processing.
+  void precomputeTypeCache(const Envoy::Protobuf::FileDescriptorSet& descriptor_set);
 
   // Initializes the method's request and response restrictions using the restrictions configured
   // in the proto config.
@@ -215,6 +220,11 @@ private:
   // A lambda function which resolves type URL string to the corresponding `Protobuf::Type*`.
   // Internally, it uses `type_helper_` for type resolution.
   std::unique_ptr<const TypeFinder> type_finder_;
+
+  // Caches for request and response types to avoid repeated lookups and string manipulations.
+  // These are populated during initialization and read-only afterwards, so no mutex is required.
+  absl::flat_hash_map<std::string, const Protobuf::Type*> request_type_cache_;
+  absl::flat_hash_map<std::string, const Protobuf::Type*> response_type_cache_;
 };
 
 // A class to validate the input type specified for the unified matcher in the config.

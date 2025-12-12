@@ -85,9 +85,11 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   filtering_mode_ = filtering_mode;
 
   // Initialize proto descriptor pool.
-  absl::Status descriptor_pool_init_status = initializeDescriptorPool(
+  auto descriptor_set_or_status = initializeDescriptorPool(
       context.serverFactoryContext().api(), proto_config.descriptor_set().data_source());
-  RETURN_IF_ERROR(descriptor_pool_init_status);
+  RETURN_IF_ERROR(descriptor_set_or_status.status());
+
+  const Envoy::Protobuf::FileDescriptorSet& descriptor_set = descriptor_set_or_status.value();
 
   if (proto_config.has_restrictions()) {
     for (const auto& method_restriction_pair : proto_config.restrictions().method_restrictions()) {
@@ -141,7 +143,8 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMessageRestrictions(
   return absl::OkStatus();
 }
 
-absl::Status ProtoApiScrubberFilterConfig::initializeDescriptorPool(
+absl::StatusOr<Envoy::Protobuf::FileDescriptorSet>
+ProtoApiScrubberFilterConfig::initializeDescriptorPool(
     Api::Api& api, const ::envoy::config::core::v3::DataSource& data_source) {
   Envoy::Protobuf::FileDescriptorSet descriptor_set;
 
@@ -184,7 +187,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeDescriptorPool(
   }
 
   descriptor_pool_ = std::move(pool);
-  return absl::OkStatus();
+  return descriptor_set;
 }
 
 absl::Status ProtoApiScrubberFilterConfig::validateFilteringMode(FilteringMode filtering_mode) {
@@ -336,6 +339,62 @@ void ProtoApiScrubberFilterConfig::initializeTypeUtils() {
       [this](absl::string_view type_url) -> const ::Envoy::Protobuf::Type* {
         return type_helper_->Info()->GetTypeByTypeUrl(type_url);
       });
+
+  precomputeTypeCache(descriptor_set);
+}
+
+void ProtoApiScrubberFilterConfig::precomputeTypeCache(
+    const Envoy::Protobuf::FileDescriptorSet& descriptor_set) {
+  for (const auto& file : descriptor_set.file()) {
+    std::string package_prefix;
+    if (!file.package().empty()) {
+      package_prefix = absl::StrCat(file.package(), ".");
+    }
+
+    for (const auto& service : file.service()) {
+      for (const auto& method : service.method()) {
+        // Construct the Method Key (e.g., /package.Service/Method).
+        std::string method_key =
+            absl::StrCat("/", package_prefix, service.name(), "/", method.name());
+
+        // Resolve Request Type.
+        std::string input_type_name = method.input_type();
+        if (absl::StartsWith(input_type_name, ".")) {
+          input_type_name = input_type_name.substr(1);
+        } else if (!package_prefix.empty()) {
+          input_type_name = absl::StrCat(package_prefix, input_type_name);
+        }
+
+        std::string request_type_url =
+            absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", input_type_name);
+
+        if (const auto* req_type = (*type_finder_)(request_type_url)) {
+          request_type_cache_[method_key] = req_type;
+        } else {
+          ENVOY_LOG(error, "Failed to resolve Request Type for {}. URL: {}", method_key,
+                    request_type_url);
+        }
+
+        // Resolve Response Type.
+        std::string output_type_name = method.output_type();
+        if (absl::StartsWith(output_type_name, ".")) {
+          output_type_name = output_type_name.substr(1);
+        } else if (!package_prefix.empty()) {
+          output_type_name = absl::StrCat(package_prefix, output_type_name);
+        }
+
+        std::string response_type_url =
+            absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", output_type_name);
+
+        if (const auto* resp_type = (*type_finder_)(response_type_url)) {
+          response_type_cache_[method_key] = resp_type;
+        } else {
+          ENVOY_LOG(error, "Failed to resolve Response Type for {}. URL: {}", method_key,
+                    response_type_url);
+        }
+      }
+    }
+  }
 }
 
 absl::StatusOr<const MethodDescriptor*>
@@ -356,25 +415,25 @@ ProtoApiScrubberFilterConfig::getMethodDescriptor(const std::string& method_name
 
 absl::StatusOr<const Protobuf::Type*>
 ProtoApiScrubberFilterConfig::getRequestType(const std::string& method_name) const {
-  absl::StatusOr<const MethodDescriptor*> method_or_status = getMethodDescriptor(method_name);
-  RETURN_IF_NOT_OK(method_or_status.status());
+  auto it = request_type_cache_.find(method_name);
+  if (it != request_type_cache_.end()) {
+    return it->second;
+  }
 
-  std::string request_type_url = absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/",
-                                              method_or_status.value()->input_type()->full_name());
-  const Protobuf::Type* request_type = (*type_finder_)(request_type_url);
-  return request_type;
+  // Fallback for cases where method isn't in descriptor pool (should ideally return error)
+  return absl::InvalidArgumentError(
+      fmt::format("Method '{}' not found in descriptor pool (type lookup failed).", method_name));
 }
 
 absl::StatusOr<const Protobuf::Type*>
 ProtoApiScrubberFilterConfig::getResponseType(const std::string& method_name) const {
-  absl::StatusOr<const MethodDescriptor*> method_or_status = getMethodDescriptor(method_name);
-  RETURN_IF_NOT_OK(method_or_status.status());
+  auto it = response_type_cache_.find(method_name);
+  if (it != response_type_cache_.end()) {
+    return it->second;
+  }
 
-  std::string response_type_url =
-      absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/",
-                   method_or_status.value()->output_type()->full_name());
-  const Protobuf::Type* response_type = (*type_finder_)(response_type_url);
-  return response_type;
+  return absl::InvalidArgumentError(
+      fmt::format("Method '{}' not found in descriptor pool (type lookup failed).", method_name));
 }
 
 REGISTER_FACTORY(RemoveFilterActionFactory,
