@@ -117,8 +117,8 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersions, McpRouterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-// Test that ping request returns 202 Accepted
-TEST_P(McpRouterIntegrationTest, PingReturns202) {
+// Test that ping request returns JSON-RPC response with empty result
+TEST_P(McpRouterIntegrationTest, PingReturnsEmptyResult) {
   initializeFilter();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -139,13 +139,16 @@ TEST_P(McpRouterIntegrationTest, PingReturns202) {
                                      {"content-type", "application/json"}},
       request_body);
 
-  // Ping should return 202 Accepted immediately
+  // Per MCP spec: ping must respond with empty result
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("202", response->headers().getStatusValue());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"jsonrpc\":\"2.0\""));
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"id\":3"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"result\":{}"));
 }
 
-// Test notification request returns 202 Accepted
-TEST_P(McpRouterIntegrationTest, NotificationReturns202) {
+// Test notifications/initialized request returns 202 Accepted
+TEST_P(McpRouterIntegrationTest, NotificationInitializedReturns202) {
   initializeFilter();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

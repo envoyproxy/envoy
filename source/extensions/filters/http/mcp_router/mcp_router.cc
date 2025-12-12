@@ -52,25 +52,21 @@ McpMethod parseMethodString(absl::string_view method_str) {
     return McpMethod::ToolsCall;
   if (method_str == "ping")
     return McpMethod::Ping;
-  if (absl::StartsWith(method_str, "notifications/"))
-    return McpMethod::Notification;
+  if (method_str == "notifications/initialized")
+    return McpMethod::NotificationInitialized;
   // TODO(botengyao): Add support for more MCP methods:
   // - resources/list, resources/read, resources/subscribe, resources/unsubscribe
   // - prompts/list, prompts/get
   // - completion/complete
   // - logging/setLevel
+  // - notifications/* (other notifications)
   return McpMethod::Unknown;
 }
 
 McpRouterConfig::McpRouterConfig(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     Server::Configuration::FactoryContext& context)
-    : factory_context_(context),
-      tls_slot_(context.serverFactoryContext().threadLocal().allocateSlot()) {
-
-  // Initialize thread-local fanout manager for fire-and-forget operations
-  tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalFanoutManager>(); });
-
+    : factory_context_(context) {
   for (const auto& server : proto_config.servers()) {
     McpBackendConfig backend;
     const auto& mcp_cluster = server.mcp_cluster();
@@ -147,29 +143,11 @@ void BackendStreamCallbacks::complete() {
 }
 
 McpRouterFilter::McpRouterFilter(McpRouterConfigSharedPtr config)
-    : config_(std::move(config)), muxdemux_(Http::MuxDemux::create(config_->factoryContext())),
-      destroyed_(std::make_shared<bool>(false)) {}
+    : config_(std::move(config)), muxdemux_(Http::MuxDemux::create(config_->factoryContext())) {}
 
 McpRouterFilter::~McpRouterFilter() = default;
 
 void McpRouterFilter::onDestroy() {
-  *destroyed_ = true;
-
-  // For fire-and-forget fanout, transfer resources to ThreadLocalFanoutManager
-  // so upstream requests can complete after the filter is destroyed
-  if (fire_and_forget_ && multistream_) {
-    auto fanout = std::make_unique<DetachedFanout>(config_->fanoutManager());
-    fanout->muxdemux = std::move(muxdemux_);
-    fanout->multistream = std::move(multistream_);
-    fanout->callbacks = std::move(stream_callbacks_);
-    fanout->headers = std::move(upstream_headers_);
-
-    ENVOY_LOG(debug, "Detaching fire-and-forget fanout with {} callbacks",
-              fanout->callbacks.size());
-    config_->fanoutManager().store(std::move(fanout));
-    return;
-  }
-
   if (multistream_) {
     multistream_.reset(); // This will reset all streams
   }
@@ -244,8 +222,11 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
       break;
 
     case McpMethod::Ping:
-    case McpMethod::Notification:
-      handlePingOrNotification();
+      handlePing();
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+
+    case McpMethod::NotificationInitialized:
+      handleNotificationInitialized();
       break;
 
     default:
@@ -421,7 +402,6 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
   pending_responses_ = std::make_shared<std::vector<BackendResponse>>();
   pending_responses_->reserve(expected);
   response_count_ = std::make_shared<size_t>(0);
-  // destroyed_ is already initialized in constructor
   aggregation_callback_ = std::move(callback);
 
   std::vector<Http::MuxDemux::Callbacks> mux_callbacks;
@@ -432,14 +412,9 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
     auto count = response_count_;
     auto expected_count = expected;
     auto agg_callback = aggregation_callback_;
-    auto destroyed = destroyed_;
 
     auto stream_cb = std::make_shared<BackendStreamCallbacks>(
-        backend.name,
-        [responses, count, expected_count, agg_callback, destroyed](BackendResponse resp) {
-          if (*destroyed)
-            return;
-
+        backend.name, [responses, count, expected_count, agg_callback](BackendResponse resp) {
           responses->push_back(std::move(resp));
           if (++(*count) >= expected_count && agg_callback) {
             agg_callback(std::move(*responses));
@@ -533,22 +508,12 @@ void McpRouterFilter::streamData(Buffer::Instance& data, bool end_stream) {
   } else if (single_stream_) {
     single_stream_->sendData(data, end_stream);
   }
-
-  // For fire-and-forget requests (Ping/Notification), send the 202 Accepted response
-  // only after the request body has been fully forwarded to upstreams.
-  // This prevents the connection manager from resetting the stream prematurely.
-  if (fire_and_forget_ && end_stream) {
-    sendAccepted();
-  }
 }
 
 void McpRouterFilter::handleInitialize() {
   ENVOY_LOG(debug, "Initialize: setting up fanout to {} backends", config_->backends().size());
 
   initializeFanout([this](std::vector<BackendResponse> responses) {
-    if (*destroyed_)
-      return;
-
     // TODO(botengyao): handle text/event-stream from backends.
     std::string response_body = aggregateInitialize(responses);
 
@@ -577,9 +542,6 @@ void McpRouterFilter::handleToolsList() {
   ENVOY_LOG(debug, "tools/list: setting up fanout to {} backends", config_->backends().size());
 
   initializeFanout([this](std::vector<BackendResponse> responses) {
-    if (*destroyed_)
-      return;
-
     std::string response_body = aggregateToolsList(responses);
     ENVOY_LOG(debug, "tools/list: response body: {}", response_body);
     sendJsonResponse(response_body, encoded_session_id_);
@@ -608,9 +570,6 @@ void McpRouterFilter::handleToolsCall() {
             tool_name_, actual_tool, needs_body_rewrite_);
 
   initializeSingleBackend(*backend, [this](BackendResponse resp) {
-    if (*destroyed_)
-      return;
-
     if (resp.success) {
       sendJsonResponse(resp.body, encoded_session_id_);
     } else {
@@ -619,16 +578,24 @@ void McpRouterFilter::handleToolsCall() {
   });
 }
 
-void McpRouterFilter::handlePingOrNotification() {
-  ENVOY_LOG(debug, "Ping/Notification: setting up fanout to {} backends (fire-and-forget)",
+void McpRouterFilter::handlePing() {
+  ENVOY_LOG(debug, "Ping: responding immediately with empty result");
+
+  // Ping is a request/response pattern - respond immediately with empty result.
+  // Per MCP spec: The receiver MUST respond promptly with an empty response.
+  std::string response_body =
+      absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_, R"(,"result":{}})");
+  sendJsonResponse(response_body, encoded_session_id_);
+}
+
+void McpRouterFilter::handleNotificationInitialized() {
+  ENVOY_LOG(debug, "notifications/initialized: forwarding to {} backends",
             config_->backends().size());
 
-  // Mark as fire-and-forget so onDestroy() detaches resources instead of resetting
-  fire_and_forget_ = true;
-
-  // Fire-and-forget: set up fanout to all backends
-  initializeFanout([](std::vector<BackendResponse>) {
-    // Responses ignored for ping or notifications
+  // Forward notifications/initialized to all backends and wait for responses.
+  initializeFanout([this](std::vector<BackendResponse>) {
+    // All backends have responded (or failed), send 202 to client.
+    sendAccepted();
   });
 }
 
@@ -774,9 +741,6 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
 }
 
 void McpRouterFilter::sendJsonResponse(const std::string& body, const std::string& session_id) {
-  if (*destroyed_)
-    return;
-
   auto headers = Http::ResponseHeaderMapImpl::create();
   headers->setStatus(200);
   headers->setContentType("application/json");
@@ -795,9 +759,6 @@ void McpRouterFilter::sendJsonResponse(const std::string& body, const std::strin
 }
 
 void McpRouterFilter::sendAccepted() {
-  if (*destroyed_)
-    return;
-
   auto headers = Http::ResponseHeaderMapImpl::create();
   headers->setStatus(202);
 
@@ -809,9 +770,6 @@ void McpRouterFilter::sendAccepted() {
 }
 
 void McpRouterFilter::sendHttpError(uint64_t status_code, const std::string& message) {
-  if (*destroyed_)
-    return;
-
   auto headers = Http::ResponseHeaderMapImpl::create();
   headers->setStatus(status_code);
   headers->setContentType("text/plain");
