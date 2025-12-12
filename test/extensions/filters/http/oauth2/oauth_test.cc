@@ -495,7 +495,12 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenRetryPolicy) {
   retry_policy.mutable_retry_back_off()->mutable_max_interval()->set_seconds(10);
   retry_policy.mutable_num_retries()->set_value(5);
 
-  client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, retry_policy, 2000s);
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  auto parsed_retry_policy = Router::RetryPolicyImpl::create(
+      retry_policy, ProtobufMessage::getNullValidationVisitor(), server_factory_context_);
+
+  client_ =
+      std::make_shared<OAuth2ClientImpl>(cm_, uri, std::move(parsed_retry_policy.value()), 2000s);
 
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(Invoke(
