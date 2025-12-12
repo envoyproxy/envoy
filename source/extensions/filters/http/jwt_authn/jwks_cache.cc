@@ -81,8 +81,6 @@ public:
         return;
       }
 
-      Router::RetryPolicyConstSharedPtr retry_policy = nullptr;
-
       // remote_jwks.retry_policy has an invalid case that could not be validated by the
       // proto validation annotation. It has to be validated by the code.
       if (jwt_provider_.remote_jwks().has_retry_policy()) {
@@ -97,7 +95,7 @@ public:
             route_retry_policy, ProtobufMessage::getNullValidationVisitor(),
             context.serverFactoryContext());
         THROW_IF_NOT_OK_REF(policy_or_error.status());
-        retry_policy = std::move(policy_or_error.value());
+        retry_policy_ = std::move(policy_or_error.value());
       }
 
       if (jwt_provider_.remote_jwks().has_cache_duration()) {
@@ -114,12 +112,14 @@ public:
 
       // create async_fetch for remote_jwks, if is no-op if async_fetch is not enabled.
       async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
-          jwt_provider_.remote_jwks(), std::move(retry_policy), context, fetcher_cb, stats,
+          jwt_provider_.remote_jwks(), retry_policy_, context, fetcher_cb, stats,
           [this](google::jwt_verify::JwksPtr&& jwks) { setJwksToAllThreads(std::move(jwks)); });
     }
   }
 
   const JwtProvider& getJwtProvider() const override { return jwt_provider_; }
+
+  const Router::RetryPolicyConstSharedPtr& retryPolicy() const override { return retry_policy_; }
 
   bool areAudiencesAllowed(const std::vector<std::string>& jwt_audiences) const override {
     return audiences_->areAudiencesAllowed(jwt_audiences);
@@ -195,6 +195,8 @@ private:
 
   // The jwt provider config.
   const JwtProvider& jwt_provider_;
+  // The retry policy for remote jwks fetcher.
+  Router::RetryPolicyConstSharedPtr retry_policy_;
   // Check audience object
   ::google::jwt_verify::CheckAudiencePtr audiences_;
   // the time source
