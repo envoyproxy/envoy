@@ -32,30 +32,16 @@ public:
 
 protected:
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
-                      const Protobuf::MethodDescriptor& service_method,
-                      OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
-      : client_(client), service_method_(service_method),
-        opts_(createRequestOptionsForRetry(retry_policy)) {}
+                      const Protobuf::MethodDescriptor& service_method, bool buffer_body_for_retry)
+      : client_(client), service_method_(service_method) {
+    if (buffer_body_for_retry) {
+      opts_.setBufferBodyForRetry(true);
+    }
+  }
 
   Grpc::AsyncClient<LogRequest, LogResponse> client_;
   const Protobuf::MethodDescriptor& service_method_;
-  const Http::AsyncClient::RequestOptions opts_;
-
-private:
-  Http::AsyncClient::RequestOptions
-  createRequestOptionsForRetry(OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy) {
-    auto opt = Http::AsyncClient::RequestOptions();
-
-    if (!retry_policy) {
-      return opt;
-    }
-
-    const auto grpc_retry_policy =
-        Http::Utility::convertCoreToRouteRetryPolicy(*retry_policy, "connect-failure");
-    opt.setBufferBodyForRetry(true);
-    opt.setRetryPolicy(grpc_retry_policy);
-    return opt;
-  }
+  Http::AsyncClient::RequestOptions opts_;
 };
 
 template <typename LogRequest, typename LogResponse>
@@ -88,9 +74,8 @@ template <typename LogRequest, typename LogResponse>
 class StreamingGrpcAccessLogClient : public GrpcAccessLogClient<LogRequest, LogResponse> {
 public:
   StreamingGrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
-                               const Protobuf::MethodDescriptor& service_method,
-                               OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
-      : GrpcAccessLogClient<LogRequest, LogResponse>(client, service_method, retry_policy) {}
+                               const Protobuf::MethodDescriptor& service_method)
+      : GrpcAccessLogClient<LogRequest, LogResponse>(client, service_method) {}
 
 public:
   struct LocalStream : public Grpc::AsyncStreamCallbacks<LogResponse> {
@@ -104,8 +89,8 @@ public:
     void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
       ASSERT(parent_.stream_ != nullptr);
       if (parent_.stream_->stream_ != nullptr) {
-        // Only reset if we have a stream. Otherwise we had an inline failure and we will clear the
-        // stream data in send().
+        // Only reset if we have a stream. Otherwise we had an inline failure and we will clear
+        // the stream data in send().
         parent_.stream_.reset();
       }
     }
