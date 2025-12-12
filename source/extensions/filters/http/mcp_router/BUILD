@@ -23,16 +23,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "filter_config_lib",
+    srcs = ["filter_config.cc"],
+    hdrs = ["filter_config.h"],
+    deps = [
+        "//envoy/server:filter_config_interface",
+        "@envoy_api//envoy/extensions/filters/http/mcp_router/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "mcp_router_lib",
     srcs = ["mcp_router.cc"],
     hdrs = ["mcp_router.h"],
     deps = [
+        ":filter_config_lib",
         ":session_codec_lib",
         "//envoy/http:async_client_interface",
         "//envoy/http:filter_interface",
-        "//envoy/server:filter_config_interface",
-        "//envoy/stats:stats_interface",
-        "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:fmt_lib",
@@ -47,7 +55,6 @@ envoy_cc_library(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@envoy_api//envoy/extensions/filters/http/mcp_router/v3:pkg_cc_proto",
     ],
 )
 

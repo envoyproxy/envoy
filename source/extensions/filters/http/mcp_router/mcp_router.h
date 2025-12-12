@@ -6,13 +6,12 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/server/filter_config.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/muxdemux.h"
+#include "source/extensions/filters/http/mcp_router/filter_config.h"
 #include "source/extensions/filters/http/mcp_router/session_codec.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -37,16 +36,6 @@ enum class McpMethod {
 };
 
 McpMethod parseMethodString(absl::string_view method_str);
-
-/**
- * Configuration for a single MCP backend server. */
-struct McpBackendConfig {
-  std::string name;
-  std::string cluster_name;
-  std::string path;
-  std::chrono::milliseconds timeout{5000};
-  std::string host_rewrite_literal; // Host header value to use when connecting to the backend.
-};
 
 /** Response received from a backend MCP server. */
 struct BackendResponse {
@@ -86,26 +75,6 @@ private:
   BackendResponse response_;
   bool completed_{false};
 };
-
-/** Configuration for the MCP router filter, containing backend server definitions. */
-class McpRouterConfig {
-public:
-  McpRouterConfig(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
-                  Server::Configuration::FactoryContext& context);
-
-  const std::vector<McpBackendConfig>& backends() const { return backends_; }
-  bool isMultiplexing() const { return backends_.size() > 1; }
-  const std::string& defaultBackendName() const { return default_backend_name_; }
-  Server::Configuration::FactoryContext& factoryContext() const { return factory_context_; }
-  const McpBackendConfig* findBackend(const std::string& name) const;
-
-private:
-  std::vector<McpBackendConfig> backends_;
-  std::string default_backend_name_;
-  Server::Configuration::FactoryContext& factory_context_;
-};
-
-using McpRouterConfigSharedPtr = std::shared_ptr<McpRouterConfig>;
 
 /**
  * HTTP filter that routes MCP requests to one or more backend servers.
