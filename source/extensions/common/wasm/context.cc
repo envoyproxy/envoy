@@ -183,22 +183,22 @@ Context::Context(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plu
       DefaultAllowOnHeadersStopIteration);
 }
 
-Wasm* Context::wasm() const { return static_cast<Wasm*>(wasm_); }
+Wasm* Context::wasmEnvoy() const { return static_cast<Wasm*>(wasm_); }
 Plugin* Context::plugin() const { return static_cast<Plugin*>(plugin_.get()); }
 Context* Context::rootContext() const { return static_cast<Context*>(root_context()); }
-Upstream::ClusterManager& Context::clusterManager() const { return wasm()->clusterManager(); }
+Upstream::ClusterManager& Context::clusterManager() const { return wasmEnvoy()->clusterManager(); }
 
 void Context::error(std::string_view message) { ENVOY_LOG(trace, message); }
 
 uint64_t Context::getCurrentTimeNanoseconds() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
-             wasm()->time_source_.systemTime().time_since_epoch())
+             wasmEnvoy()->time_source_.systemTime().time_since_epoch())
       .count();
 }
 
 uint64_t Context::getMonotonicTimeNanoseconds() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
-             wasm()->time_source_.monotonicTime().time_since_epoch())
+             wasmEnvoy()->time_source_.monotonicTime().time_since_epoch())
       .count();
 }
 
@@ -215,12 +215,12 @@ void Context::onCloseTCP() {
 void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::ResolutionStatus status,
                            std::list<Envoy::Network::DnsResponse>&& response) {
   proxy_wasm::DeferAfterCallActions actions(this);
-  if (wasm()->isFailed() || !wasm()->on_resolve_dns_) {
+  if (wasm()->isFailed() || !wasmEnvoy()->on_resolve_dns_) {
     return;
   }
   if (status != Network::DnsResolver::ResolutionStatus::Completed) {
     buffer_.set("");
-    wasm()->on_resolve_dns_(this, id_, token, 0);
+    wasmEnvoy()->on_resolve_dns_(this, id_, token, 0);
     return;
   }
   // buffer format:
@@ -249,7 +249,7 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
     *b++ = 0;
   };
   buffer_.set(std::move(buffer), s);
-  wasm()->on_resolve_dns_(this, id_, token, s);
+  wasmEnvoy()->on_resolve_dns_(this, id_, token, s);
 }
 
 template <typename I> inline uint32_t align(uint32_t i) {
@@ -263,7 +263,7 @@ template <typename I> inline char* align(char* p) {
 
 void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
   proxy_wasm::DeferAfterCallActions actions(this);
-  if (wasm()->isFailed() || !wasm()->on_stats_update_) {
+  if (wasm()->isFailed() || !wasmEnvoy()->on_stats_update_) {
     return;
   }
   // buffer format:
@@ -349,7 +349,7 @@ void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
     }
   }
   buffer_.set(std::move(buffer), counter_block_size + gauge_block_size);
-  wasm()->on_stats_update_(this, id_, counter_block_size + gauge_block_size);
+  wasmEnvoy()->on_stats_update_(this, id_, counter_block_size + gauge_block_size);
 }
 
 // Native serializer carrying over bit representation from CEL value to the extension.
@@ -950,7 +950,7 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   handler.context_ = this;
   handler.token_ = token;
   auto client_or_error = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-      service_proto, *wasm()->scope_, true /* skip_cluster_check */);
+      service_proto, *wasmEnvoy()->scope_, true /* skip_cluster_check */);
   if (!client_or_error.status().ok()) {
     return WasmResult::BadArgument;
   }
@@ -999,7 +999,7 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   handler.context_ = this;
   handler.token_ = token;
   auto client_or_error = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-      service_proto, *wasm()->scope_, true /* skip_cluster_check */);
+      service_proto, *wasmEnvoy()->scope_, true /* skip_cluster_check */);
   if (!client_or_error.status().ok()) {
     return WasmResult::BadArgument;
   }
@@ -1177,12 +1177,12 @@ uint32_t Context::getLogLevel() {
 bool Context::validateConfiguration(std::string_view configuration,
                                     const std::shared_ptr<PluginBase>& plugin_base) {
   auto plugin = std::static_pointer_cast<Plugin>(plugin_base);
-  if (!wasm()->validate_configuration_) {
+  if (!wasmEnvoy()->validate_configuration_) {
     return true;
   }
   temp_plugin_ = plugin_base;
   auto result =
-      wasm()
+      wasmEnvoy()
           ->validate_configuration_(this, id_, static_cast<uint32_t>(configuration.size()))
           .u64_ != 0;
   temp_plugin_.reset();
@@ -1220,33 +1220,33 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
   }
   auto type = static_cast<MetricType>(metric_type);
   // TODO: Consider rethinking the scoping policy as it does not help in this case.
-  Stats::StatNameManagedStorage storage(toAbslStringView(name), wasm()->scope_->symbolTable());
+  Stats::StatNameManagedStorage storage(toAbslStringView(name), wasmEnvoy()->scope_->symbolTable());
   Stats::StatName stat_name = storage.statName();
   // We prefix the given name with custom_stat_name_ so that these user-defined
   // custom metrics can be distinguished from native Envoy metrics.
   if (type == MetricType::Counter) {
     auto id = wasm()->nextCounterMetricId();
     Stats::Counter* c = &Stats::Utility::counterFromElements(
-        *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name});
-    wasm()->counters_.emplace(id, c);
+        *wasmEnvoy()->scope_, {wasmEnvoy()->custom_stat_namespace_, stat_name});
+    wasmEnvoy()->counters_.emplace(id, c);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   if (type == MetricType::Gauge) {
     auto id = wasm()->nextGaugeMetricId();
     Stats::Gauge* g = &Stats::Utility::gaugeFromStatNames(
-        *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name},
+        *wasmEnvoy()->scope_, {wasmEnvoy()->custom_stat_namespace_, stat_name},
         Stats::Gauge::ImportMode::Accumulate);
-    wasm()->gauges_.emplace(id, g);
+    wasmEnvoy()->gauges_.emplace(id, g);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   // (type == MetricType::Histogram) {
   auto id = wasm()->nextHistogramMetricId();
   Stats::Histogram* h = &Stats::Utility::histogramFromStatNames(
-      *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name},
+      *wasmEnvoy()->scope_, {wasmEnvoy()->custom_stat_namespace_, stat_name},
       Stats::Histogram::Unit::Unspecified);
-  wasm()->histograms_.emplace(id, h);
+  wasmEnvoy()->histograms_.emplace(id, h);
   *metric_id_ptr = id;
   return WasmResult::Ok;
 }
@@ -1254,8 +1254,8 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
 WasmResult Context::incrementMetric(uint32_t metric_id, int64_t offset) {
   auto type = static_cast<MetricType>(metric_id & Wasm::kMetricTypeMask);
   if (type == MetricType::Counter) {
-    auto it = wasm()->counters_.find(metric_id);
-    if (it != wasm()->counters_.end()) {
+    auto it = wasmEnvoy()->counters_.find(metric_id);
+    if (it != wasmEnvoy()->counters_.end()) {
       if (offset > 0) {
         it->second->add(offset);
         return WasmResult::Ok;
@@ -1265,8 +1265,8 @@ WasmResult Context::incrementMetric(uint32_t metric_id, int64_t offset) {
     }
     return WasmResult::NotFound;
   } else if (type == MetricType::Gauge) {
-    auto it = wasm()->gauges_.find(metric_id);
-    if (it != wasm()->gauges_.end()) {
+    auto it = wasmEnvoy()->gauges_.find(metric_id);
+    if (it != wasmEnvoy()->gauges_.end()) {
       if (offset > 0) {
         it->second->add(offset);
         return WasmResult::Ok;
@@ -1283,20 +1283,20 @@ WasmResult Context::incrementMetric(uint32_t metric_id, int64_t offset) {
 WasmResult Context::recordMetric(uint32_t metric_id, uint64_t value) {
   auto type = static_cast<MetricType>(metric_id & Wasm::kMetricTypeMask);
   if (type == MetricType::Counter) {
-    auto it = wasm()->counters_.find(metric_id);
-    if (it != wasm()->counters_.end()) {
+    auto it = wasmEnvoy()->counters_.find(metric_id);
+    if (it != wasmEnvoy()->counters_.end()) {
       it->second->add(value);
       return WasmResult::Ok;
     }
   } else if (type == MetricType::Gauge) {
-    auto it = wasm()->gauges_.find(metric_id);
-    if (it != wasm()->gauges_.end()) {
+    auto it = wasmEnvoy()->gauges_.find(metric_id);
+    if (it != wasmEnvoy()->gauges_.end()) {
       it->second->set(value);
       return WasmResult::Ok;
     }
   } else if (type == MetricType::Histogram) {
-    auto it = wasm()->histograms_.find(metric_id);
-    if (it != wasm()->histograms_.end()) {
+    auto it = wasmEnvoy()->histograms_.find(metric_id);
+    if (it != wasmEnvoy()->histograms_.end()) {
       it->second->recordValue(value);
       return WasmResult::Ok;
     }
@@ -1307,15 +1307,15 @@ WasmResult Context::recordMetric(uint32_t metric_id, uint64_t value) {
 WasmResult Context::getMetric(uint32_t metric_id, uint64_t* result_uint64_ptr) {
   auto type = static_cast<MetricType>(metric_id & Wasm::kMetricTypeMask);
   if (type == MetricType::Counter) {
-    auto it = wasm()->counters_.find(metric_id);
-    if (it != wasm()->counters_.end()) {
+    auto it = wasmEnvoy()->counters_.find(metric_id);
+    if (it != wasmEnvoy()->counters_.end()) {
       *result_uint64_ptr = it->second->value();
       return WasmResult::Ok;
     }
     return WasmResult::NotFound;
   } else if (type == MetricType::Gauge) {
-    auto it = wasm()->gauges_.find(metric_id);
-    if (it != wasm()->gauges_.end()) {
+    auto it = wasmEnvoy()->gauges_.find(metric_id);
+    if (it != wasmEnvoy()->gauges_.end()) {
       *result_uint64_ptr = it->second->value();
       return WasmResult::Ok;
     }
@@ -1876,7 +1876,7 @@ void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr 
       grpc_call_request_.erase(token);
     }
   };
-  if (wasm()->on_grpc_receive_) {
+  if (wasmEnvoy()->on_grpc_receive_) {
     grpc_receive_buffer_ = std::move(response);
     uint32_t response_size = grpc_receive_buffer_->length();
     // Deferred "after VM call" actions are going to be executed upon returning from
@@ -1912,7 +1912,7 @@ void Context::onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus&
       }
     }
   };
-  if (wasm()->on_grpc_close_) {
+  if (wasmEnvoy()->on_grpc_close_) {
     status_code_ = static_cast<uint32_t>(status);
     status_message_ = toAbslStringView(message);
     // Deferred "after VM call" actions are going to be executed upon returning from
