@@ -87,6 +87,42 @@ void setupMockEnumRule(MockProtoApiScrubberFilterConfig& mock_config, const std:
       .WillByDefault(testing::Return(match_tree));
 }
 
+// Custom Matcher to verify that HttpMatchingData contains specific Request Headers
+MATCHER_P(HasRequestHeader, key, "") {
+  const auto headers = arg.responseHeaders();
+  if (!headers.has_value()) {
+    return false;
+  }
+  return !headers->get(Http::LowerCaseString(key)).empty();
+}
+
+// Custom Matcher to verify that HttpMatchingData contains specific Response Headers
+MATCHER_P(HasResponseHeader, key, "") {
+  const auto headers = arg.responseHeaders();
+  if (!headers.has_value()) {
+    return false;
+  }
+  return !headers->get(Http::LowerCaseString(key)).empty();
+}
+
+// Custom Matcher to verify that HttpMatchingData contains specific Request Trailers
+MATCHER_P(HasRequestTrailer, key, "") {
+  const auto trailers = arg.requestTrailers();
+  if (!trailers.has_value()) {
+    return false;
+  }
+  return !trailers->get(Http::LowerCaseString(key)).empty();
+}
+
+// Custom Matcher to verify that HttpMatchingData contains specific Response Trailers
+MATCHER_P(HasResponseTrailer, key, "") {
+  const auto trailers = arg.responseTrailers();
+  if (!trailers.has_value()) {
+    return false;
+  }
+  return !trailers->get(Http::LowerCaseString(key)).empty();
+}
+
 class FieldCheckerTest : public ::testing::Test {
 protected:
   FieldCheckerTest() : api_(Api::createApiForTest()) { setupMocks(); }
@@ -837,6 +873,45 @@ TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
     FieldCheckResults result = field_checker.CheckField({"user"}, &field);
     EXPECT_EQ(result, FieldCheckResults::kInclude);
   });
+}
+
+TEST_F(FieldCheckerTest, ConstructorPropagatesHeadersAndTrailersToMatchTree) {
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_config;
+  std::string method = "method";
+  std::string field_name = "target_field";
+  Http::TestRequestHeaderMapImpl request_headers{{"x-req-header", "true"}};
+  Http::TestResponseHeaderMapImpl response_headers{{"x-res-header", "true"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-req-trailer", "true"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"x-res-trailer", "true"}};
+
+  // Setup the MatchTree expectation
+  // We want to prove that the 'matching_data' passed to the match() method
+  // actually contains the data we passed to the FieldChecker constructor.
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+
+  EXPECT_CALL(
+      *mock_match_tree,
+      match(testing::AllOf(HasRequestHeader("x-req-header"), HasResponseHeader("x-res-header"),
+                           HasRequestTrailer("x-req-trailer"), HasResponseTrailer("x-res-trailer")),
+            testing::_))
+      .WillOnce(testing::Return(Matcher::MatchResult(Matcher::ActionConstSharedPtr{nullptr})));
+
+  // Wire up the config to return our spying match tree.
+  ON_CALL(mock_config, getRequestFieldMatcher(method, field_name))
+      .WillByDefault(testing::Return(mock_match_tree));
+
+  // Instantiate FieldChecker.
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
+                             &request_headers, &response_headers, &request_trailers,
+                             &response_trailers, method, &mock_config);
+
+  // Trigger the check. This calls tryMatch -> match_tree->match(matching_data_)
+  Protobuf::Field field;
+  field.set_name(field_name);
+  field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+
+  field_checker.CheckField({field_name}, &field);
 }
 
 TEST_F(FieldCheckerTest, IncludesType) {
