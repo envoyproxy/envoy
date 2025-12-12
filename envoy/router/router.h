@@ -34,7 +34,9 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
-
+namespace Formatter {
+class Formatter;
+}
 namespace Upstream {
 class ClusterManager;
 class LoadBalancerContext;
@@ -1245,6 +1247,18 @@ public:
    * @return the tracing custom tags.
    */
   virtual const Tracing::CustomTagMap& getCustomTags() const PURE;
+
+  /**
+   * This method returns operation name formatter of span for the route.
+   * @return the operation formatter.
+   */
+  virtual OptRef<const Formatter::Formatter> operation() const PURE;
+
+  /**
+   * This method returns operation name formatter of upstream span for the route.
+   * @return the operation name formatter.
+   */
+  virtual OptRef<const Formatter::Formatter> upstreamOperation() const PURE;
 };
 
 using RouteTracingConstPtr = std::unique_ptr<const RouteTracing>;

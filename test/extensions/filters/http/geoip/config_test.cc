@@ -26,6 +26,9 @@ public:
   static uint32_t xffNumTrustedHops(const GeoipFilter& filter) {
     return filter.config_->xffNumTrustedHops();
   }
+  static const absl::optional<Http::LowerCaseString>& ipAddressHeader(const GeoipFilter& filter) {
+    return filter.config_->ipAddressHeader();
+  }
 };
 namespace {
 
@@ -48,6 +51,17 @@ MATCHER_P(HasXffNumTrustedHops, expected, "") {
   }
   *result_listener << "expected useXff=" << expected << " but was "
                    << GeoipFilterPeer::useXff(*filter);
+  return false;
+}
+
+MATCHER_P(HasIpAddressHeader, expected, "") {
+  auto filter = std::static_pointer_cast<GeoipFilter>(arg);
+  const auto& ip_address_header = GeoipFilterPeer::ipAddressHeader(*filter);
+  if (ip_address_header.has_value() && ip_address_header->get() == expected) {
+    return true;
+  }
+  *result_listener << "expected ip_address_header=" << expected << " but was "
+                   << (ip_address_header.has_value() ? ip_address_header->get() : "<nullopt>");
   return false;
 }
 
@@ -132,10 +146,60 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigUnknownProvider) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GeoipFilterFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context),
+      factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context).IgnoreError(),
       Envoy::EnvoyException,
       "Didn't find a registered implementation for 'envoy.geoip_providers.unknown' with type URL: "
       "''");
+}
+
+TEST(GeoipFilterConfigTest, GeoipFilterConfigWithIpAddressHeader) {
+  TestScopedRuntime scoped_runtime;
+  DummyGeoipProviderFactory dummy_factory;
+  Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(dummy_factory);
+  std::string filter_config_yaml = R"EOF(
+    custom_header_config:
+      header_name: "x-real-ip"
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+  )EOF";
+  GeoipFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor()).Times(2);
+  GeoipFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(filter_config, "geoip", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback,
+              addStreamDecoderFilter(AllOf(HasUseXff(false), HasIpAddressHeader("x-real-ip"))));
+  cb(filter_callback);
+}
+
+TEST(GeoipFilterConfigTest, GeoipFilterConfigMutualExclusionXffAndIpAddressHeader) {
+  TestScopedRuntime scoped_runtime;
+  DummyGeoipProviderFactory dummy_factory;
+  Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(dummy_factory);
+  std::string filter_config_yaml = R"EOF(
+    xff_config:
+      xff_num_trusted_hops: 1
+    custom_header_config:
+      header_name: "x-real-ip"
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+  )EOF";
+  GeoipFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  GeoipFilterFactory factory;
+  auto status_or = factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context);
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_EQ(status_or.status().message(),
+            "Only one of xff_config or custom_header_config can be set in the geoip filter "
+            "configuration");
 }
 
 } // namespace
