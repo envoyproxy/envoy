@@ -424,6 +424,14 @@ new_features:
 - area: tls_inspector
   change: |
     Added configuration parameter to TLS inspector for maximum acceptable client hello size.
+- area: tls
+  change: |
+    Enhanced TLS certificate validation failure messages in access logs to include detailed error information.
+    The ``%DOWNSTREAM_TRANSPORT_FAILURE_REASON%`` and ``%UPSTREAM_TRANSPORT_FAILURE_REASON%`` access log
+    formatters now include specific validation failure reasons such as ``verify cert failed: SAN matcher``,
+    ``verify cert failed: cert hash and spki``, or the OpenSSL verification error string (e.g., certificate
+    has expired, unable to get local issuer certificate). This provides better visibility into TLS handshake
+    failures without requiring debug-level logging.
 - area: ext_proc
   change: |
     Added support for forwarding cluster metadata to ext_proc server.
