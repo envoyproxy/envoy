@@ -1,7 +1,8 @@
+load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
+
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
-load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
