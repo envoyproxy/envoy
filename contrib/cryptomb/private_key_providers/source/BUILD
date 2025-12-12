@@ -25,8 +25,16 @@ envoy_cmake(
         "DYNAMIC_LIB": "off",
         "MB_STANDALONE": "on",
         "Python_EXECUTABLE": "$$EXT_BUILD_ROOT/$(PYTHON3)",
-        "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto_internal.a",
-    },
+    } | select({
+        # FIPS builds use libcrypto.a/libssl.a
+        "//bazel:boringssl_fips": {
+            "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto.a",
+        },
+        # Non-FIPS builds use libcrypto_internal.a/libssl_internal.a
+        "//conditions:default": {
+            "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto_internal.a",
+        },
+    }),
     defines = [
         "OPENSSL_USE_STATIC_LIBS=TRUE",
     ],
