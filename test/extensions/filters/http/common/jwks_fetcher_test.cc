@@ -56,8 +56,23 @@ public:
     TestUtility::loadFromYaml(config_str, remote_jwks_);
     mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"pubkey_cluster"});
+
+    Router::RetryPolicyConstSharedPtr retry_policy = nullptr;
+    if (remote_jwks_.has_retry_policy()) {
+      envoy::config::route::v3::RetryPolicy route_retry_policy =
+          Http::Utility::convertCoreToRouteRetryPolicy(remote_jwks_.retry_policy(),
+                                                       "5xx,gateway-error,connect-failure,reset");
+      // Use the null validation visitor because it used by the async client in the previous
+      // implementation.
+      auto policy_or_error = Router::RetryPolicyImpl::create(
+          route_retry_policy, ProtobufMessage::getNullValidationVisitor(),
+          mock_factory_ctx_.server_factory_context_);
+      THROW_IF_NOT_OK_REF(policy_or_error.status());
+      retry_policy = std::move(policy_or_error.value());
+    }
+
     fetcher_ = JwksFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
-                                   remote_jwks_);
+                                   retry_policy, remote_jwks_);
     EXPECT_TRUE(fetcher_ != nullptr);
   }
 
@@ -213,8 +228,23 @@ public:
     TestUtility::loadFromYaml(config_str, remote_jwks_);
     mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"pubkey_cluster"});
+
+    Router::RetryPolicyConstSharedPtr retry_policy = nullptr;
+    if (remote_jwks_.has_retry_policy()) {
+      envoy::config::route::v3::RetryPolicy route_retry_policy =
+          Http::Utility::convertCoreToRouteRetryPolicy(remote_jwks_.retry_policy(),
+                                                       "5xx,gateway-error,connect-failure,reset");
+      // Use the null validation visitor because it used by the async client in the previous
+      // implementation.
+      auto policy_or_error = Router::RetryPolicyImpl::create(
+          route_retry_policy, ProtobufMessage::getNullValidationVisitor(),
+          mock_factory_ctx_.server_factory_context_);
+      THROW_IF_NOT_OK_REF(policy_or_error.status());
+      retry_policy = std::move(policy_or_error.value());
+    }
+
     fetcher_ = JwksFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
-                                   remote_jwks_);
+                                   retry_policy, remote_jwks_);
     EXPECT_TRUE(fetcher_ != nullptr);
   }
 
