@@ -325,10 +325,7 @@ public:
     }
 
     // Clean up the upstream_requests_.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.router_filter_resetall_on_local_reply")) {
-      resetAll();
-    }
+    resetAll();
     return Http::LocalErrorStatus::Continue;
   }
 
