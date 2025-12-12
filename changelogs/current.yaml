@@ -86,6 +86,10 @@ minor_behavior_changes:
     Execute foreign functions on the effective context, when set by Wasm SDKs. Previously, foreign functions called from
     HTTP or gRPC callbacks could receive a root context instead of a stream context. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.wasm_use_effective_ctx_for_foreign_functions`` to ``false``.
+- area: ext_proc
+  change: |
+    added immediate_responses_sent counter for ext proc in :ref:'FilterStats
+    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcFilterStats>'.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -297,6 +301,14 @@ new_features:
     Added new :ref:`value <envoy_v3_api_field_type.tracing.v3.CustomTag.value>` field and support for
     :ref:`substitution format specifier <config_access_log_format>` to extract values from request and response data for
     custom tags.
+- area: tracing
+  change: |
+    Added new :ref:`tracing operation
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.operation>`
+    and :ref:`upstream tracing operation
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.upstream_operation>`
+    fields in the tracing configuration to set custom operation names for spans with the
+    substitution format specifier.
 - area: generic_proxy
   change: |
     Added custom substitution format specifier support in tracing custom tags for the
@@ -420,6 +432,14 @@ new_features:
 - area: tls_inspector
   change: |
     Added configuration parameter to TLS inspector for maximum acceptable client hello size.
+- area: tls
+  change: |
+    Enhanced TLS certificate validation failure messages in access logs to include detailed error information.
+    The ``%DOWNSTREAM_TRANSPORT_FAILURE_REASON%`` and ``%UPSTREAM_TRANSPORT_FAILURE_REASON%`` access log
+    formatters now include specific validation failure reasons such as ``verify cert failed: SAN matcher``,
+    ``verify cert failed: cert hash and spki``, or the OpenSSL verification error string (e.g., certificate
+    has expired, unable to get local issuer certificate). This provides better visibility into TLS handshake
+    failures without requiring debug-level logging.
 - area: ext_proc
   change: |
     Added support for forwarding cluster metadata to ext_proc server.
