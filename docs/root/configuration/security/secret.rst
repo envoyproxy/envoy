@@ -325,7 +325,7 @@ specific secret name.
 
 In addition to the standard SDS `subscription statistics <subscription_statistics>`, the following
 statistics are produced by the on-demand certificate extension. For downstream listeners, they are
-in the *listener.<stat_prefix.on_demand_secret.* namespace.
+in the *listener.<stat_prefix>.on_demand_secret.* namespace.
 
 .. csv-table::
      :header: Name, Type, Description

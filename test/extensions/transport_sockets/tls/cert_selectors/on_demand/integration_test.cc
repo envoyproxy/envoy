@@ -440,6 +440,39 @@ TEST_P(OnDemandIntegrationTest, ValidationContextUpdate) {
   on_server_init_function_ = [&]() {
     createXdsConnection();
     // This is an invalid CA cert.
+    ca_stream = &waitSendSdsResponse("cacert");
+  };
+  setup();
+  // Connection should work as-expected.
+  {
+    auto conn = std::make_unique<ClientSslConnection>(*this);
+    waitCertsRequested(1);
+    waitSendSdsResponse("server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+    conn.reset();
+  }
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_updated"))->value());
+
+  // Send a wrong CA via validation SDS and open a new connection that fails.
+  {
+    sendSecret(*ca_stream, "cacert", "upstreamcacert");
+    test_server_->waitForCounterEq(onDemandStat("cert_updated"), 2);
+    auto conn = std::make_unique<ClientSslConnection>(*this);
+    while (!conn->connect_callbacks_.closed()) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+    conn.reset();
+  }
+}
+
+TEST_P(OnDemandIntegrationTest, ValidationContextUpdateWithPending) {
+  mtls_ = true;
+  validation_sds_ = true;
+  FakeStream* ca_stream = nullptr;
+  on_server_init_function_ = [&]() {
+    createXdsConnection();
+    // This is an invalid CA cert.
     ca_stream = &waitSendSdsResponse("cacert", "upstreamcacert");
   };
   setup();
