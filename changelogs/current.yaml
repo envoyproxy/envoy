@@ -90,6 +90,11 @@ minor_behavior_changes:
   change: |
     added immediate_responses_sent counter for ext proc in :ref:'FilterStats
     <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcFilterStats>'.
+- area: http
+  change: |
+    Now the retrying of async HTTP client calls will respect the set buffer limits and the retry will be ignored
+    if the buffer limit is exceeded. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.http_async_client_retry_respect_buffer_limits`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
