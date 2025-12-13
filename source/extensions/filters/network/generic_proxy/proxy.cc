@@ -89,7 +89,7 @@ Tracing::OperationName ActiveStream::operationName() const {
   return conn_manager_tracing_config_->operationName();
 }
 
-void ActiveStream::modifySpan(Tracing::Span& span) const {
+void ActiveStream::modifySpan(Tracing::Span& span, bool) const {
   ASSERT(conn_manager_tracing_config_.has_value());
 
   const TraceContextBridge trace_context{*request_header_frame_};

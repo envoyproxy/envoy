@@ -301,12 +301,9 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public RouterFilterInterface {
 public:
   Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
-      : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
-        downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false),
+      : config_(config), stats_(stats),
         allow_multiplexed_upstream_half_close_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
-        upstream_request_started_(false), orca_load_report_received_(false) {}
+            "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {}
 
   ~Filter() override;
 
@@ -676,25 +673,24 @@ private:
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
-  uint32_t connection_buffer_limit_{0};
   uint32_t attempt_count_{0};
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
-  bool grpc_request_ : 1;
-  bool exclude_http_code_stats_ : 1;
-  bool downstream_response_started_ : 1;
-  bool downstream_end_stream_ : 1;
-  bool is_retry_ : 1;
-  bool include_attempt_count_in_request_ : 1;
-  bool include_timeout_retry_header_in_request_ : 1;
-  bool request_buffer_overflowed_ : 1;
-  const bool allow_multiplexed_upstream_half_close_ : 1;
-  bool upstream_request_started_ : 1;
+  bool grpc_request_ : 1 = false;
+  bool exclude_http_code_stats_ : 1 = false;
+  bool downstream_response_started_ : 1 = false;
+  bool downstream_end_stream_ : 1 = false;
+  bool is_retry_ : 1 = false;
+  bool include_attempt_count_in_request_ : 1 = false;
+  bool include_timeout_retry_header_in_request_ : 1 = false;
+  bool request_buffer_overflowed_ : 1 = false;
+  const bool allow_multiplexed_upstream_half_close_ : 1 = false;
+  bool upstream_request_started_ : 1 = false;
   // Indicate that ORCA report is received to process it only once in either response headers or
   // trailers.
-  bool orca_load_report_received_ : 1;
+  bool orca_load_report_received_ : 1 = false;
 };
 
 class ProdFilter : public Filter {
