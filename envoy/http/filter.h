@@ -1121,7 +1121,7 @@ public:
    *
    * @param limit supplies the desired buffer limit.
    */
-  virtual void setEncoderBufferLimit(uint32_t limit) PURE;
+  virtual void setEncoderBufferLimit(uint64_t limit) PURE;
 
   /**
    * This routine returns the current buffer limit for encoder filters. Filters should abide by
@@ -1130,7 +1130,7 @@ public:
    *
    * @return the buffer limit the filter should apply.
    */
-  virtual uint32_t encoderBufferLimit() PURE;
+  virtual uint64_t encoderBufferLimit() PURE;
 };
 
 /**
