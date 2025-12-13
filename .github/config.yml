@@ -172,12 +172,15 @@ run:
     - envoy/**/*
     - source/**/*
     - test/**/*
+    push: paths
   check-build:
     paths:
     - "**/*"
+    push: paths
   check-coverage:
     paths:
     - "**/*"
+    push: paths
   check-runtime:
     paths:
     - source/server/cgroup_cpu_util.*
@@ -187,6 +190,7 @@ run:
   check-san:
     paths:
     - "**/*"
+    push: paths
   mobile-android:
     paths:
     - .bazelrc
@@ -198,6 +202,7 @@ run:
     - mobile/**/*
     - source/common/**/*
     - tools/code_format/check_format.py
+    push: paths
   mobile-android-all:
     paths:
     - .bazelrc
@@ -220,6 +225,7 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
+    push: paths
   mobile-asan:
     paths:
     - .bazelrc
@@ -231,6 +237,7 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
+    push: paths
   mobile-cc:
     paths:
     - .bazelrc
@@ -248,6 +255,7 @@ run:
     - test/integration/*
     - test/mocks/**/*
     - test/test_common/**/*
+    push: paths
   mobile-coverage:
     paths:
     - .bazelrc
@@ -261,6 +269,7 @@ run:
     - test/run_envoy_bazel_coverage.sh
     - tools/code_format/check_format.py
     - tools/coverage/**/*
+    push: paths
   mobile-format:
     paths:
     - .bazelrc
@@ -271,6 +280,7 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
+    push: paths
   mobile-ios:
     paths:
     - .bazelrc
@@ -282,6 +292,7 @@ run:
     - mobile/**/*
     - source/common/**/*
     - tools/code_format/check_format.py
+    push: paths
   mobile-ios-all:
     paths:
     - .bazelrc
@@ -304,6 +315,7 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
+    push: paths
   mobile-perf:
     paths:
     - .bazelrc
@@ -314,6 +326,7 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
+    push: paths
   mobile-release-validation:
     paths:
     - .bazelrc
@@ -324,6 +337,7 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
+    push: paths
   mobile-tsan:
     paths:
     - .bazelrc
@@ -335,6 +349,7 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
+    push: paths
   precheck-deps:
     paths:
     - .bazelrc
@@ -351,9 +366,23 @@ run:
   precheck-format:
     paths:
     - "**/*"
+    push: paths
   precheck-publish:
     paths:
-    - "**/*"
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - api/**/*
+    - bazel/**/*
+    - ci/**/*
+    - contrib/**/*
+    - distribution/**/*
+    - envoy/**/*
+    - examples/**/*
+    - source/**/*
+    - tools/**/*
+    - VERSION.txt
+    push: paths
   release:
     paths:
     - .bazelrc
@@ -369,6 +398,7 @@ run:
     - source/**/*
     - tools/**/*
     - VERSION.txt
+    push: paths
   verify:
     paths:
     - .bazelrc
