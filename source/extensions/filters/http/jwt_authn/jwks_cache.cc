@@ -11,14 +11,14 @@
 #include "source/common/common/matchers.h"
 #include "source/common/config/datasource.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/router/retry_policy_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "absl/types/optional.h"
 #include "jwt_verify_lib/check_audience.h"
-#include "source/common/router/retry_policy_impl.h"
-#include "source/common/protobuf/message_validator_impl.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;

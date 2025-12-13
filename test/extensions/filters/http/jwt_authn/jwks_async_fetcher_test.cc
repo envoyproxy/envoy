@@ -1,8 +1,8 @@
+#include "source/common/router/retry_policy_impl.h"
 #include "source/extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
-#include "source/common/router/retry_policy_impl.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
