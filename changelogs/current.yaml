@@ -184,6 +184,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop`` and legacy code paths.
 - area: http
   change: |
+    Removed runtime guard ``envoy.reloadable_features.http1_balsa_delay_reset`` and legacy code paths.
+- area: http
+  change: |
     Removed runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` and legacy code paths.
 - area: quic
   change: |
