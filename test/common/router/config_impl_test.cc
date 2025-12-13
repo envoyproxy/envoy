@@ -8378,6 +8378,8 @@ virtual_hosts:
               metadata_key:
                 key: com.bar.foo
                 path: [ { key: xx }, { key: yy } ]
+          operation: "%REQ(my-custom-downstream-operation)%"
+          upstream_operation: "my-custom-fixed-upstream-operation"
         route: { cluster: ww2 }
   )EOF";
   BazFactory baz_factory;
@@ -8395,10 +8397,14 @@ virtual_hosts:
   EXPECT_EQ(0, route1->tracingConfig()->getRandomSampling().denominator());
   EXPECT_EQ(100, route1->tracingConfig()->getOverallSampling().numerator());
   EXPECT_EQ(0, route1->tracingConfig()->getOverallSampling().denominator());
+  EXPECT_FALSE(route1->tracingConfig()->operation().has_value());
+  EXPECT_FALSE(route1->tracingConfig()->upstreamOperation().has_value());
 
   // Check default values for client sampling
   EXPECT_EQ(100, route2->tracingConfig()->getClientSampling().numerator());
   EXPECT_EQ(0, route2->tracingConfig()->getClientSampling().denominator());
+  EXPECT_FALSE(route2->tracingConfig()->operation().has_value());
+  EXPECT_FALSE(route2->tracingConfig()->upstreamOperation().has_value());
 
   EXPECT_EQ(1, route3->tracingConfig()->getClientSampling().numerator());
   EXPECT_EQ(0, route3->tracingConfig()->getClientSampling().denominator());
@@ -8406,12 +8412,23 @@ virtual_hosts:
   EXPECT_EQ(1, route3->tracingConfig()->getRandomSampling().denominator());
   EXPECT_EQ(3, route3->tracingConfig()->getOverallSampling().numerator());
   EXPECT_EQ(0, route3->tracingConfig()->getOverallSampling().denominator());
+  EXPECT_TRUE(route3->tracingConfig()->operation().has_value());
+  EXPECT_TRUE(route3->tracingConfig()->upstreamOperation().has_value());
 
   std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
   const Tracing::CustomTagMap& map = route3->tracingConfig()->getCustomTags();
   for (const std::string& custom_tag : custom_tags) {
     EXPECT_NE(map.find(custom_tag), map.end());
   }
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl headers{{"my-custom-downstream-operation", "downstream_op"}};
+  Formatter::Context formatter_context;
+  formatter_context.setRequestHeaders(headers);
+  EXPECT_EQ("downstream_op",
+            route3->tracingConfig()->operation()->format(formatter_context, stream_info));
+  EXPECT_EQ("my-custom-fixed-upstream-operation",
+            route3->tracingConfig()->upstreamOperation()->format(formatter_context, stream_info));
 }
 
 // Test to check Prefix Rewrite for redirects
