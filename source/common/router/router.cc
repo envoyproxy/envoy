@@ -959,16 +959,14 @@ void Filter::sendNoHealthyUpstreamResponse(absl::string_view optional_details) {
 uint64_t Filter::calculateEffectiveBufferLimit() const {
   // Use requestBodyBufferLimit() method which handles both legacy and new
   // configurations. If no buffer limit is configured, fall back to connection limit.
-  uint64_t buffer_limit = request_body_buffer_limit_;
-
-  if (buffer_limit != std::numeric_limits<uint64_t>::max()) {
-    return buffer_limit;
+  if (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max()) {
+    return request_body_buffer_limit_;
   }
 
-  // If no route-level buffer limit is set, use the connection buffer limit.
-  uint32_t current_connection_limit = callbacks_->decoderBufferLimit();
-  if (current_connection_limit != 0) {
-    return static_cast<uint64_t>(current_connection_limit);
+  // If no route-level buffer limit is set, use the stream buffer limit.
+  const uint32_t current_stream_limit = callbacks_->decoderBufferLimit();
+  if (current_stream_limit != 0) {
+    return static_cast<uint64_t>(current_stream_limit);
   }
 
   // If no limits are set at all, return unlimited.
@@ -995,24 +993,22 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // a backoff timer..
   ASSERT(upstream_requests_.size() <= 1);
 
-  bool retry_enabled = retry_state_ && retry_state_->enabled();
-  bool redirect_enabled = route_entry_ && route_entry_->internalRedirectPolicy().enabled();
+  const bool retry_enabled = retry_state_ && retry_state_->enabled();
+  const bool redirect_enabled = route_entry_ && route_entry_->internalRedirectPolicy().enabled();
+  const bool is_redirect_only = redirect_enabled && !retry_enabled;
+  const uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
+
   bool buffering = retry_enabled || redirect_enabled;
-  uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
 
   // Check if we would exceed buffer limits, regardless of current buffering state
   // This ensures error details are set even if retry state was cleared due to upstream reset.
-  bool would_exceed_buffer =
+  const bool would_exceed_buffer =
       (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
 
-  // Handle retry/shadow buffer overflow, excluding redirect-only scenarios.
+  // Handle retry buffer overflow, excluding redirect-only scenarios.
   // For redirect scenarios, buffer overflow should only affect redirect processing, not initial
   // request.
-  bool had_retry_or_shadow = retry_enabled;
-  bool is_redirect_only = redirect_enabled && !retry_enabled;
-
-  if (would_exceed_buffer && had_retry_or_shadow && !is_redirect_only &&
-      !request_buffer_overflowed_) {
+  if (would_exceed_buffer && retry_enabled && !is_redirect_only && !request_buffer_overflowed_) {
     ENVOY_LOG(debug,
               "The request payload has at least {} bytes data which exceeds buffer limit {}. "
               "Giving up on buffering.",
@@ -1146,13 +1142,6 @@ Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_ma
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  // As the decoder filter only pushes back via watermarks once data has reached
-  // it, it can latch the current buffer limit and does not need to update the
-  // limit if another filter increases it.
-  //
-  // Store the connection buffer limit for use in the new buffer limit logic.
-  connection_buffer_limit_ = callbacks_->decoderBufferLimit();
-
   watermark_callbacks_.setDecoderFilterCallbacks(callbacks_);
 }
 
