@@ -13,13 +13,13 @@ namespace Filters {
 namespace ProcessRateLimit {
 
 ProcessRateLimitFilter::ProcessRateLimitFilter(
-    Server::Configuration::ServerFactoryContext& context, Init::Manager& listener_init_manager,
+    Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::access_loggers::filters::process_ratelimit::v3::ProcessRateLimitFilter&
         config)
     : setter_key_(reinterpret_cast<intptr_t>(this)),
       cancel_cb_(std::make_shared<std::atomic<bool>>(false)), context_(context),
-      stats_({ALL_PROCESS_RATELIMIT_FILTER_STATS(
-          POOL_COUNTER_PREFIX(context.scope(), "access_log.process_ratelimit."))}) {
+      stats_({ALL_PROCESS_RATELIMIT_FILTER_STATS(POOL_COUNTER_PREFIX(
+          context.serverFactoryContext().scope(), "access_log.process_ratelimit."))}) {
   auto setter =
       [this, cancel_cb = cancel_cb_](
           Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter)
@@ -34,10 +34,8 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
   if (!config.has_dynamic_config()) {
     ExceptionUtil::throwEnvoyException("`dynamic_config` is required.");
   }
-  Server::GenericFactoryContextImpl generic_context(
-      context, context.scope(), context.messageValidationVisitor(), &listener_init_manager);
   rate_limiter_ = Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
-      getRateLimiter(generic_context, config.dynamic_config().resource_name(),
+      getRateLimiter(context, config.dynamic_config().resource_name(),
                      config.dynamic_config().config_source(), setter_key_, std::move(setter));
 }
 
@@ -46,7 +44,7 @@ ProcessRateLimitFilter::~ProcessRateLimitFilter() {
   // The `cancel_cb_` is set to true to prevent the `limiter` from being set in
   // the `setter` from the main thread.
   cancel_cb_->store(true);
-  context_.mainThreadDispatcher().post(
+  context_.serverFactoryContext().mainThreadDispatcher().post(
       [limiter = std::move(rate_limiter_), setter_key = setter_key_] {
         // remove the setter for this filter.
         limiter->getSubscription()->removeSetter(setter_key);
