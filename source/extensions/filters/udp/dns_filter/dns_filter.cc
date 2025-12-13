@@ -367,12 +367,13 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
 
       if (is_known && getEndpointConfigForDomain(query->name_) != nullptr) {
         context->known_domain_without_records_ = true;
+        continue;
       }
     }
 
     // Forwarding queries is enabled if the configuration contains a client configuration
     // for the dns_filter.
-    if (forward_queries && !context->known_domain_without_records_) {
+    if (forward_queries) {
       ENVOY_LOG(debug, "resolving name [{}] via external resolvers", query->name_);
       resolver_->resolveExternalQuery(std::move(context), query.get());
 
