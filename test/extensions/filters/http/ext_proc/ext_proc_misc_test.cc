@@ -291,8 +291,6 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
 }
 
 // Test Ext_Proc filter and WebSocket configuration combination.
-TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcCombo) {
-  websocketExtProcTest();
-}
+TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcCombo) { websocketExtProcTest(); }
 
 } // namespace Envoy
