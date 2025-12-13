@@ -2,6 +2,7 @@
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/tls/context_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
 #include "test/mocks/server/server_factory_context.h"
@@ -23,6 +24,12 @@ using StatusHelpers::StatusIs;
 using ::testing::NiceMock;
 using ::testing::Return;
 
+class MockTlsCertificateSelectorContext : public Ssl::TlsCertificateSelectorContext {
+public:
+  ~MockTlsCertificateSelectorContext() override = default;
+  MOCK_METHOD(const std::vector<Ssl::TlsContext>&, getTlsContexts, (), (const));
+};
+
 class OnDemandTest : public ::testing::Test {
 protected:
   absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr> create(const std::string& config_yaml,
@@ -41,6 +48,7 @@ protected:
   }
   NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
   NiceMock<Ssl::MockServerContextConfig> server_context_;
+  NiceMock<MockTlsCertificateSelectorContext> selector_context_;
 
   std::string defaultConfig() const {
     return R"EOF(
@@ -73,6 +81,15 @@ TEST_F(OnDemandTest, BasicLoadTestStatelessResumption) {
 TEST_F(OnDemandTest, BasicLoadTestStatefulResumption) {
   disable_stateful_resumption_ = false;
   EXPECT_THAT(create(defaultConfig()), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, QuicCall) {
+  auto factory = create(defaultConfig());
+  EXPECT_OK(factory);
+  auto selector = factory.value()->create(selector_context_);
+  bool sni;
+  absl::InlinedVector<int, 3> curve;
+  EXPECT_DEATH(selector->findTlsContext("", curve, false, &sni), "Not supported with QUIC");
 }
 
 } // namespace
