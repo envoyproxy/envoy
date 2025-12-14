@@ -50,7 +50,8 @@ public:
   OAuth2ClientImpl(Upstream::ClusterManager& cm, const HttpUri& uri,
                    Router::RetryPolicyConstSharedPtr retry_policy,
                    const std::chrono::seconds default_expires_in)
-      : cm_(cm), uri_(uri), retry_policy_(retry_policy), default_expires_in_(default_expires_in) {}
+      : cm_(cm), uri_(uri), retry_policy_(std::move(retry_policy)),
+        default_expires_in_(default_expires_in) {}
 
   ~OAuth2ClientImpl() override {
     if (in_flight_request_ != nullptr) {
