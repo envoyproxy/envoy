@@ -20,7 +20,7 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
       common_provider_config:
-        geo_filter_state_keys:
+        geo_field_keys:
           country: "country"
           region: "region"
           city: "city"

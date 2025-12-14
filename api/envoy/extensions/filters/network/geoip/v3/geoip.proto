@@ -20,14 +20,15 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Geoip :ref:`configuration overview <config_network_filters_geoip>`.
 // [#extension: envoy.filters.network.geoip]
 
+// The network geolocation filter performs IP geolocation lookups on incoming connections
+// and stores the results in the connection's filter state under the well-known key
+// ``envoy.network.geoip``. The stored data is a ``GeoipInfo`` object that supports
+// serialization for access logging and field-level access.
+//
+// See :ref:`well known filter state <well_known_filter_state>` for details on accessing
+// the geolocation data.
 message Geoip {
-  // The key to use for storing geolocation data in filter state.
-  // The geo data is stored as a typed ``GeoipInfo`` object which supports
-  // serialization for access logging and field-level access.
-  // If not specified, defaults to ``envoy.geoip``.
-  string metadata_namespace = 1;
-
   // Geoip driver specific configuration which depends on the driver being instantiated.
   // [#extension-category: envoy.geoip_providers]
-  config.core.v3.TypedExtensionConfig provider = 2 [(validate.rules).message = {required: true}];
+  config.core.v3.TypedExtensionConfig provider = 1 [(validate.rules).message = {required: true}];
 }

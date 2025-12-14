@@ -7,8 +7,9 @@ IP Geolocation
 * :ref:`Network filter v3 API reference <envoy_v3_api_msg_extensions.filters.network.geoip.v3.Geoip>`
 
 The IP geolocation network filter performs geolocation lookups on incoming connections and stores
-the results in filter state. The filter uses the client's remote IP address to determine geographic
-information such as country, city, region, and ASN using a configured geolocation provider.
+the results in the connection's filter state under the well-known key ``envoy.network.geoip``.
+The filter uses the client's remote IP address to determine geographic information such as country,
+city, region, and ASN using a configured geolocation provider.
 
 .. tip::
 
@@ -30,8 +31,8 @@ MaxMind provider is supported.
 * :ref:`MaxMind provider configuration <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
 
 The provider configuration specifies which geolocation fields to look up and what keys to use when
-storing the results. For the network filter, use the ``geo_filter_state_keys`` field in the provider
-configuration to define the filter state field names.
+storing the results. Use the ``geo_field_keys`` field in the provider configuration to define the
+field names for each geolocation attribute.
 
 Example
 -------
@@ -46,7 +47,10 @@ A sample filter configuration:
 Accessing Geolocation Data
 --------------------------
 
-The filter stores geolocation results in a ``GeoipInfo`` object in the connection's filter state.
+The filter stores geolocation results in a ``GeoipInfo`` object in the connection's filter state
+under the well-known key ``envoy.network.geoip``. See :ref:`well known filter state
+<well_known_filter_state>` for details.
+
 The data can be accessed in several ways:
 
 **Access Logs**
@@ -56,15 +60,15 @@ Use the ``FILTER_STATE`` format specifier:
 .. code-block:: text
 
   # Get all geo data as JSON
-  %FILTER_STATE(envoy.geoip:PLAIN)%
+  %FILTER_STATE(envoy.network.geoip:PLAIN)%
 
   # Get a specific field
-  %FILTER_STATE(envoy.geoip:FIELD:country)%
+  %FILTER_STATE(envoy.network.geoip:FIELD:country)%
 
 **Other Filters**
 
 Downstream filters can access the ``GeoipInfo`` object from the connection's filter state using
-the configured key (default: ``envoy.geoip``).
+the well-known key ``envoy.network.geoip``.
 
 Statistics
 ----------

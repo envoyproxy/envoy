@@ -34,38 +34,13 @@ MATCHER_P(HasRemoteAddress, expected_address, "") {
 
 // Matcher to verify filter state has a geo field with the expected value.
 MATCHER_P2(HasGeoField, key, expected_value, "") {
-  if (!arg->template hasData<GeoipInfo>(std::string(DefaultGeoipFilterStateKey))) {
-    *result_listener << "filter state does not contain GeoipInfo at key '"
-                     << DefaultGeoipFilterStateKey << "'";
-    return false;
-  }
-  const auto* geoip_info =
-      arg->template getDataReadOnly<GeoipInfo>(std::string(DefaultGeoipFilterStateKey));
-  if (geoip_info == nullptr) {
-    *result_listener << "GeoipInfo is null";
-    return false;
-  }
-  auto field_value = geoip_info->getGeoField(key);
-  if (!field_value.has_value()) {
-    *result_listener << "geo field '" << key << "' not found";
-    return false;
-  }
-  if (field_value.value() != expected_value) {
-    *result_listener << "geo field '" << key << "' has value '" << field_value.value()
-                     << "', expected '" << expected_value << "'";
-    return false;
-  }
-  return true;
-}
-
-// Matcher to verify filter state has a geo field with the expected value at a custom key.
-MATCHER_P3(FilterStateHasGeoField, filter_state_key, key, expected_value, "") {
-  if (!arg->template hasData<GeoipInfo>(filter_state_key)) {
-    *result_listener << "filter state does not contain GeoipInfo at key '" << filter_state_key
+  if (!arg->template hasData<GeoipInfo>(std::string(GeoipFilterStateKey))) {
+    *result_listener << "filter state does not contain GeoipInfo at key '" << GeoipFilterStateKey
                      << "'";
     return false;
   }
-  const auto* geoip_info = arg->template getDataReadOnly<GeoipInfo>(filter_state_key);
+  const auto* geoip_info =
+      arg->template getDataReadOnly<GeoipInfo>(std::string(GeoipFilterStateKey));
   if (geoip_info == nullptr) {
     *result_listener << "GeoipInfo is null";
     return false;
@@ -169,34 +144,7 @@ TEST_F(GeoipFilterTest, EmptyLookupDoesNotSetFilterState) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 
   // Verify no filter state was set.
-  EXPECT_FALSE(filter_state_->hasData<GeoipInfo>(std::string(DefaultGeoipFilterStateKey)));
-}
-
-TEST_F(GeoipFilterTest, CustomFilterStateKey) {
-  initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    metadata_namespace: "custom.geoip.key"
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-)EOF";
-  initializeFilter(config_yaml);
-
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
-  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      remote_address);
-
-  expectStatsTotalIncremented();
-  EXPECT_CALL(*dummy_driver_, lookup(HasRemoteAddress("1.2.3.4:0"), _))
-      .WillOnce([](Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&& cb) {
-        cb(Geolocation::LookupResult{{"x-geo-city", "TestCity"}});
-      });
-
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
-
-  EXPECT_THAT(filter_state_, FilterStateHasGeoField("custom.geoip.key", "x-geo-city", "TestCity"));
+  EXPECT_FALSE(filter_state_->hasData<GeoipInfo>(std::string(GeoipFilterStateKey)));
 }
 
 TEST_F(GeoipFilterTest, OnDataReturnsContinue) {
@@ -289,7 +237,7 @@ TEST_F(GeoipFilterTest, EmptyValuesAreNotStored) {
   // Verify only non-empty value was stored.
   EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "TestCity"));
   const auto* geoip_info =
-      filter_state_->getDataReadOnly<GeoipInfo>(std::string(DefaultGeoipFilterStateKey));
+      filter_state_->getDataReadOnly<GeoipInfo>(std::string(GeoipFilterStateKey));
   ASSERT_NE(nullptr, geoip_info);
   EXPECT_EQ(1, geoip_info->size());
   EXPECT_FALSE(geoip_info->getGeoField("x-geo-country").has_value());
@@ -324,7 +272,7 @@ TEST_F(GeoipFilterTest, AsyncCallbackStoresFilterState) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 
   // Verify no filter state was set yet.
-  EXPECT_FALSE(filter_state_->hasData<GeoipInfo>(std::string(DefaultGeoipFilterStateKey)));
+  EXPECT_FALSE(filter_state_->hasData<GeoipInfo>(std::string(GeoipFilterStateKey)));
 
   // Now invoke the callback asynchronously.
   captured_cb(Geolocation::LookupResult{{"x-geo-city", "AsyncCity"}});

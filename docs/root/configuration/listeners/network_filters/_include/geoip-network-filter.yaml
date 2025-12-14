@@ -15,7 +15,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
               common_provider_config:
-                geo_filter_state_keys:
+                geo_field_keys:
                   country: "country"
                   city: "city"
                   region: "region"
@@ -34,7 +34,7 @@ static_resources:
               path: /dev/stdout
               log_format:
                 text_format_source:
-                  inline_string: "[%START_TIME%] %DOWNSTREAM_REMOTE_ADDRESS% geo=%FILTER_STATE(envoy.geoip:PLAIN)%\n"
+                  inline_string: "[%START_TIME%] %DOWNSTREAM_REMOTE_ADDRESS% geo=%FILTER_STATE(envoy.network.geoip:PLAIN)%\n"
   clusters:
   - name: cluster_0
     type: STATIC

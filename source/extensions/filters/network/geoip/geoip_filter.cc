@@ -34,14 +34,10 @@ StreamInfo::FilterState::Object::FieldType GeoipInfo::getField(absl::string_view
   return absl::monostate{};
 }
 
-GeoipFilterConfig::GeoipFilterConfig(
-    const envoy::extensions::filters::network::geoip::v3::Geoip& config,
-    const std::string& stat_prefix, Stats::Scope& scope)
+GeoipFilterConfig::GeoipFilterConfig(const envoy::extensions::filters::network::geoip::v3::Geoip&,
+                                     const std::string& stat_prefix, Stats::Scope& scope)
     : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Geoip")),
-      stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")),
-      filter_state_key_(config.metadata_namespace().empty()
-                            ? std::string(DefaultGeoipFilterStateKey)
-                            : config.metadata_namespace()) {
+      stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")) {
   stat_name_set_->rememberBuiltin("total");
 }
 
@@ -80,10 +76,10 @@ void GeoipFilter::onLookupComplete(Geolocation::LookupResult&& result) {
 
   if (!geoip_info->empty()) {
     read_callbacks_->connection().streamInfo().filterState()->setData(
-        config_->filterStateKey(), std::move(geoip_info),
+        std::string(GeoipFilterStateKey), std::move(geoip_info),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
-    ENVOY_LOG(debug, "geoip: stored data in filter state key '{}'", config_->filterStateKey());
+    ENVOY_LOG(debug, "geoip: stored data in filter state key '{}'", GeoipFilterStateKey);
   }
 
   config_->incTotal();

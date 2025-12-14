@@ -15,7 +15,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Geoip {
 
-constexpr absl::string_view DefaultGeoipFilterStateKey = "envoy.geoip";
+// Well-known filter state key for storing geolocation data.
+// See docs/root/configuration/advanced/well_known_filter_state.rst for documentation.
+constexpr absl::string_view GeoipFilterStateKey = "envoy.network.geoip";
 
 /**
  * FilterState object that stores geolocation lookup results.
@@ -56,7 +58,6 @@ public:
                     const std::string& stat_prefix, Stats::Scope& scope);
 
   void incTotal() { incCounter(stat_name_set_->getBuiltin("total", unknown_hit_)); }
-  const std::string& filterStateKey() const { return filter_state_key_; }
 
 private:
   void incCounter(Stats::StatName name);
@@ -65,7 +66,6 @@ private:
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stats_prefix_;
   const Stats::StatName unknown_hit_;
-  const std::string filter_state_key_;
 };
 
 using GeoipFilterConfigSharedPtr = std::shared_ptr<GeoipFilterConfig>;

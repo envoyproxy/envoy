@@ -51,14 +51,10 @@ TEST_F(GeoipConfigTest, CreateFilterFactory) {
 }
 
 TEST_F(GeoipConfigTest, InvalidConfigMissingProvider) {
-  const std::string config_yaml = R"EOF(
-    metadata_namespace: "test"
-)EOF";
-
   envoy::extensions::filters::network::geoip::v3::Geoip proto_config;
   // Proto validation fails for missing required provider field.
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(config_yaml, proto_config),
-                          EnvoyException, "Provider: value is required");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate("{}", proto_config), EnvoyException,
+                          "Provider: value is required");
 }
 
 TEST_F(GeoipConfigTest, FilterIsNotTerminal) {

@@ -42,11 +42,10 @@ GeoipProviderConfig::GeoipProviderConfig(
       stats_scope_(scope.createScope(absl::StrCat(stat_prefix, "maxmind."))),
       stat_name_set_(stats_scope_->symbolTable().makeSet("Maxmind")) {
   const auto& common_config = config.common_provider_config();
-  const bool use_filter_state_keys = common_config.has_geo_filter_state_keys();
 
-  if (use_filter_state_keys) {
-    // Use geo_filter_state_keys for Network GeoIP filter.
-    const auto& keys = common_config.geo_filter_state_keys();
+  if (common_config.has_geo_field_keys()) {
+    // Use geo_field_keys (preferred).
+    const auto& keys = common_config.geo_field_keys();
     country_header_ = getOptionalString(keys.country());
     city_header_ = getOptionalString(keys.city());
     region_header_ = getOptionalString(keys.region());
@@ -58,8 +57,8 @@ GeoipProviderConfig::GeoipProviderConfig(
     anon_proxy_header_ = getOptionalString(keys.anon_proxy());
     isp_header_ = getOptionalString(keys.isp());
     apple_private_relay_header_ = getOptionalString(keys.apple_private_relay());
-  } else {
-    // Fall back to geo_headers_to_add for HTTP GeoIP filter (backward compatible).
+  } else if (common_config.has_geo_headers_to_add()) {
+    // Fall back to deprecated geo_headers_to_add for backward compatibility.
     const auto& headers = common_config.geo_headers_to_add();
     country_header_ = getOptionalString(headers.country());
     city_header_ = getOptionalString(headers.city());
