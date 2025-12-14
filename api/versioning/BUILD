@@ -181,6 +181,7 @@ proto_library(
         "//envoy/extensions/filters/network/direct_response/v3:pkg",
         "//envoy/extensions/filters/network/dubbo_proxy/router/v3:pkg",
         "//envoy/extensions/filters/network/dubbo_proxy/v3:pkg",
+        "//envoy/extensions/filters/network/dynamic_modules/v3:pkg",
         "//envoy/extensions/filters/network/echo/v3:pkg",
         "//envoy/extensions/filters/network/ext_authz/v3:pkg",
         "//envoy/extensions/filters/network/ext_proc/v3:pkg",

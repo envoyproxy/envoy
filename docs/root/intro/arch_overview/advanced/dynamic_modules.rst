@@ -19,9 +19,10 @@ official SDK that abstracts these details and provides a high-level API to imple
 available in Rust. In theory, any language that can produce a shared library can be used to implement dynamic modules.
 Future development may include support for other languages.
 
-Currently, dynamic modules are only supported at the following extension points:
+Currently, dynamic modules are supported at the following extension points:
 
-* As an :ref:`HTTP filter  <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`
+* As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
+* As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 
 There are a few design goals for the dynamic modules:
 
