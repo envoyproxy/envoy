@@ -234,7 +234,7 @@ public:
       envoy::config::route::v3::RetryPolicy route_retry_policy =
           Http::Utility::convertCoreToRouteRetryPolicy(remote_jwks_.retry_policy(),
                                                        "5xx,gateway-error,connect-failure,reset");
-      // Use the null validation visitor because it used by the async client in the previous
+      // Use the null validation visitor because it was used by the async client in the previous
       // implementation.
       auto policy_or_error = Router::RetryPolicyImpl::create(
           route_retry_policy, ProtobufMessage::getNullValidationVisitor(),
