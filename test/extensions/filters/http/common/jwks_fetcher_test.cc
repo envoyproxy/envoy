@@ -50,6 +50,23 @@ http_uri:
     seconds: 5
 )";
 
+Router::RetryPolicyConstSharedPtr
+getRetryPolicy(const RemoteJwks& remote_jwks,
+               Server::Configuration::CommonFactoryContext& context) {
+  if (remote_jwks.has_retry_policy()) {
+    envoy::config::route::v3::RetryPolicy route_retry_policy =
+        Http::Utility::convertCoreToRouteRetryPolicy(remote_jwks.retry_policy(),
+                                                     "5xx,gateway-error,connect-failure,reset");
+    // Use the null validation visitor because it was used by the async client in the previous
+    // implementation.
+    auto policy_or_error = Router::RetryPolicyImpl::create(
+        route_retry_policy, ProtobufMessage::getNullValidationVisitor(), context);
+    THROW_IF_NOT_OK_REF(policy_or_error.status());
+    return std::move(policy_or_error.value());
+  }
+  return nullptr;
+}
+
 class JwksFetcherTest : public testing::Test {
 public:
   void setupFetcher(const std::string& config_str) {
@@ -57,22 +74,9 @@ public:
     mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"pubkey_cluster"});
 
-    Router::RetryPolicyConstSharedPtr retry_policy = nullptr;
-    if (remote_jwks_.has_retry_policy()) {
-      envoy::config::route::v3::RetryPolicy route_retry_policy =
-          Http::Utility::convertCoreToRouteRetryPolicy(remote_jwks_.retry_policy(),
-                                                       "5xx,gateway-error,connect-failure,reset");
-      // Use the null validation visitor because it was used by the async client in the previous
-      // implementation.
-      auto policy_or_error = Router::RetryPolicyImpl::create(
-          route_retry_policy, ProtobufMessage::getNullValidationVisitor(),
-          mock_factory_ctx_.server_factory_context_);
-      THROW_IF_NOT_OK_REF(policy_or_error.status());
-      retry_policy = std::move(policy_or_error.value());
-    }
-
-    fetcher_ = JwksFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
-                                   retry_policy, remote_jwks_);
+    fetcher_ = JwksFetcher::create(
+        mock_factory_ctx_.server_factory_context_.cluster_manager_,
+        getRetryPolicy(remote_jwks_, mock_factory_ctx_.server_factory_context_), remote_jwks_);
     EXPECT_TRUE(fetcher_ != nullptr);
   }
 
@@ -229,22 +233,9 @@ public:
     mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"pubkey_cluster"});
 
-    Router::RetryPolicyConstSharedPtr retry_policy = nullptr;
-    if (remote_jwks_.has_retry_policy()) {
-      envoy::config::route::v3::RetryPolicy route_retry_policy =
-          Http::Utility::convertCoreToRouteRetryPolicy(remote_jwks_.retry_policy(),
-                                                       "5xx,gateway-error,connect-failure,reset");
-      // Use the null validation visitor because it was used by the async client in the previous
-      // implementation.
-      auto policy_or_error = Router::RetryPolicyImpl::create(
-          route_retry_policy, ProtobufMessage::getNullValidationVisitor(),
-          mock_factory_ctx_.server_factory_context_);
-      THROW_IF_NOT_OK_REF(policy_or_error.status());
-      retry_policy = std::move(policy_or_error.value());
-    }
-
-    fetcher_ = JwksFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
-                                   retry_policy, remote_jwks_);
+    fetcher_ = JwksFetcher::create(
+        mock_factory_ctx_.server_factory_context_.cluster_manager_,
+        getRetryPolicy(remote_jwks_, mock_factory_ctx_.server_factory_context_), remote_jwks_);
     EXPECT_TRUE(fetcher_ != nullptr);
   }
 
@@ -324,10 +315,10 @@ TEST_P(JwksFetcherRetryingTest, TestCompleteRetryPolicy) {
 
             const auto retry_on = options.parsed_retry_policy->retryOn();
 
-            EXPECT_TRUE(retry_on | Router::RetryPolicy::RETRY_ON_5XX);
-            EXPECT_TRUE(retry_on | Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR);
-            EXPECT_TRUE(retry_on | Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE);
-            EXPECT_TRUE(retry_on | Router::RetryPolicy::RETRY_ON_RESET);
+            EXPECT_TRUE(retry_on & Router::RetryPolicy::RETRY_ON_5XX);
+            EXPECT_TRUE(retry_on & Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR);
+            EXPECT_TRUE(retry_on & Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE);
+            EXPECT_TRUE(retry_on & Router::RetryPolicy::RETRY_ON_RESET);
 
             return nullptr;
           }));
