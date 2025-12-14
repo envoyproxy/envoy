@@ -31,10 +31,10 @@ std::string oauthScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_
 }
 
 // Transforms the proto list of 'endpoint_params' into a map of string key-value pairs.
-std::map<std::string, std::string>
-endpointParamsMap(const Protobuf::RepeatedPtrField<
-                  envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::EndpointParam>&
-                      endpoint_params_protos) {
+std::map<std::string, std::string> endpointParamsMap(
+    const Protobuf::RepeatedPtrField<
+        envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::EndpointParameter>&
+        endpoint_params_protos) {
   std::map<std::string, std::string> params;
   for (const auto& param : endpoint_params_protos) {
     params[param.name()] = param.value();
