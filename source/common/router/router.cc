@@ -715,8 +715,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // like stream timeout.
   host_selection_cancelable_ = std::move(host_selection_response.cancelable);
   // Configure a callback to be called on asynchronous host selection.
-  on_host_selected_ = ([this, cluster, end_stream](Upstream::HostConstSharedPtr&& host,
-                                                   std::string host_selection_details) -> void {
+  on_host_selected_ = ([this, cluster,
+                        end_stream](Upstream::HostConstSharedPtr&& host,
+                                    absl::string_view host_selection_details) -> void {
     // It should always be safe to call continueDecodeHeaders. In the case the
     // stream had a local reply before host selection completed,
     // the lookup should be canceled.
@@ -2235,7 +2236,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     // as host selection failure).
     continueDoRetry(can_send_early_data, can_use_http3, is_timeout_retry,
                     std::move(host_selection_response.host), *cluster,
-                    std::string(host_selection_response.details));
+                    host_selection_response.details);
   }
 
   ENVOY_STREAM_LOG(debug, "Handling asynchronous host selection for retry\n", *callbacks_);
@@ -2243,8 +2244,8 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
   // selection is complete.
   host_selection_cancelable_ = std::move(host_selection_response.cancelable);
   on_host_selected_ =
-      ([this, can_send_early_data, can_use_http3, is_timeout_retry,
-        cluster](Upstream::HostConstSharedPtr&& host, std::string host_selection_details) -> void {
+      ([this, can_send_early_data, can_use_http3, is_timeout_retry, cluster](
+           Upstream::HostConstSharedPtr&& host, absl::string_view host_selection_details) -> void {
         continueDoRetry(can_send_early_data, can_use_http3, is_timeout_retry, std::move(host),
                         *cluster, host_selection_details);
       });
