@@ -1571,6 +1571,70 @@ TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
+// Test that when route buffer limit is smaller than connection buffer limit, the retry logic
+// uses the actual stream buffer limit (the larger connection limit) and not the route limit.
+// This ensures consistency where if the stream can buffer the data, retries should work.
+TEST_P(ProtocolIntegrationTest, RetryWithRouteLimitSmallerThanConnectionLimit) {
+  // Set connection buffer limit to 64KB.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_per_connection_buffer_limit_bytes()->set_value(64 * 1024);
+  });
+
+  // Set route buffer limit to 1KB (smaller than connection limit).
+  // Before the fix, requests larger than 1KB would fail retry even though the stream can
+  // buffer up to 64KB.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_request_body_buffer_limit()->set_value(1024);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a request with 4KB body. This is larger than the route limit (1KB) but within the
+  // connection limit (64KB).
+  constexpr uint32_t kRequestBodySize = 4 * 1024;
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      kRequestBodySize);
+  waitForNextUpstreamRequest();
+
+  // First attempt fails with 503.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                          std::chrono::milliseconds(500)));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  // Retry should succeed because the actual stream limit (64KB) is used, not the route limit
+  // (1KB).
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(kRequestBodySize, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512U, response->body().size());
+
+  // Verify no retry_or_shadow_abandoned counter was incremented.
+  test_server_->waitForCounterEq("cluster.cluster_0.retry_or_shadow_abandoned", 0);
+}
+
 // Test hitting the decoder buffer filter with too many request bytes to buffer. Ensure the
 // connection manager sends a 413.
 TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {

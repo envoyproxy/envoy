@@ -996,11 +996,21 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   const bool retry_enabled = retry_state_ && retry_state_->enabled();
   const bool redirect_enabled = route_entry_ && route_entry_->internalRedirectPolicy().enabled();
   const bool is_redirect_only = redirect_enabled && !retry_enabled;
-  const uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
+
+  // Use the actual stream buffer limit for retry decisions. This ensures consistency where if
+  // the stream is willing to buffer the data, the router should be willing to retry with it.
+  // The stream buffer limit already gets adjusted in decodeHeaders() based on
+  // request_body_buffer_limit and using the actual stream limit here ensures we don't prematurely
+  // abandon retries for data that the stream can actually buffer.
+  //
+  // A limit of 0 means unlimited.
+  const uint64_t actual_stream_limit = callbacks_->decoderBufferLimit();
+  const uint64_t effective_buffer_limit =
+      actual_stream_limit == 0 ? std::numeric_limits<uint64_t>::max() : actual_stream_limit;
 
   bool buffering = retry_enabled || redirect_enabled;
 
-  // Check if we would exceed buffer limits, regardless of current buffering state
+  // Check if we would exceed buffer limits, regardless of current buffering state.
   // This ensures error details are set even if retry state was cleared due to upstream reset.
   const bool would_exceed_buffer =
       (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);

@@ -3224,7 +3224,9 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+  // Set both route limit and stream limit to 10 bytes.
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(10));
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(10));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3242,7 +3244,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
   router_->retry_state_->expectResetRetry();
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
-  // Send additional 15 bytes - total 55 bytes, which should exceed request body buffer limit (50).
+  // Send additional 15 bytes. Total 20 bytes, which should exceed buffer limit of 10.
   const std::string body2(15, 'y');
   Buffer::OwnedImpl buf2(body2);
   router_->decodeData(buf2, false);
@@ -3254,16 +3256,23 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
-// Test that router uses request_body_buffer_limit when configured instead of
-// per_request_buffer_limit.
+// Test that when route limit > stream limit, the stream limit is increased and used for retries.
 TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  // Configure a large request body buffer limit (50 bytes) but small request buffer limit (10
-  // bytes).
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(50));
+
+  // Initial stream limit is 10 bytes, but route limit is 50 bytes.
+  // The stream limit should be increased to 50 bytes in decodeHeaders.
+  uint64_t stream_buffer_limit = 10;
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly([&]() {
+    return stream_buffer_limit;
+  });
+  EXPECT_CALL(callbacks_, setDecoderBufferLimit(_)).WillOnce([&](uint64_t limit) {
+    stream_buffer_limit = limit;
+  });
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(50));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3274,7 +3283,10 @@ TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
 
-  // Send 40 bytes - should be within request body buffer limit (50) but exceeds retry limit (10).
+  // Verify stream limit was increased to 50.
+  EXPECT_EQ(50U, stream_buffer_limit);
+
+  // Send 40 bytes, within the new buffer limit of 50.
   const std::string body1(40, 'x');
   Buffer::OwnedImpl buf1(body1);
   EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
@@ -3283,7 +3295,7 @@ TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
   router_->retry_state_->expectResetRetry();
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
-  // Send additional 15 bytes - total 55 bytes, which should exceed request body buffer limit (50).
+  // Send additional 15 bytes. Total 55 bytes, which should exceed buffer limit of 50.
   const std::string body2(15, 'y');
   Buffer::OwnedImpl buf2(body2);
   router_->decodeData(buf2, false);
@@ -3295,16 +3307,22 @@ TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
-// Test when request_body_buffer_limit is set we should use request_body_buffer_limit
-// regardless of other settings.
+// Test when route buffer limit > initial stream limit, the stream limit is increased.
 TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
 
-  // Case 1: request_body_buffer_limit=60, per_request_buffer_limit_bytes=20
-  // Should use request_body_buffer_limit = 60
+  // Initial stream limit is 20 bytes, route limit is 60 bytes.
+  // Stream limit should be increased to 60 bytes.
+  uint64_t stream_buffer_limit = 20;
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly([&]() {
+    return stream_buffer_limit;
+  });
+  EXPECT_CALL(callbacks_, setDecoderBufferLimit(_)).WillOnce([&](uint64_t limit) {
+    stream_buffer_limit = limit;
+  });
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(60));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3315,17 +3333,20 @@ TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
 
-  // Send initial data (55 bytes)
+  // Verify stream limit was increased to 60.
+  EXPECT_EQ(60U, stream_buffer_limit);
+
+  // Send initial data (55 bytes).
   const std::string body1(55, 'x');
   Buffer::OwnedImpl buf1(body1);
   EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
   router_->decodeData(buf1, false);
 
-  // Simulate upstream failure to trigger retry logic
+  // Simulate upstream failure to trigger retry logic.
   router_->retry_state_->expectResetRetry();
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
-  // Send additional data (10 bytes) - total 65 bytes should exceed limit of 60
+  // Send additional data (10 bytes). Total 65 bytes, which should exceed limit of 60.
   const std::string body2(10, 'y');
   Buffer::OwnedImpl buf2(body2);
   router_->decodeData(buf2, false);
@@ -3337,18 +3358,20 @@ TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
-// When per_request_buffer_limit_bytes is set but request_body_buffer_limit is not set,
-// we should use min(per_request_buffer_limit_bytes, per_connection_buffer_limit_bytes).
-TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
+// When route buffer limit < stream buffer limit, the retry logic should use the actual stream
+// buffer limit (the limit that was applied), not the route limit. This ensures consistency:
+// if the stream can buffer data, the router should be able to use it for retries.
+TEST_F(RouterTest, BufferLimitLogicRouteLimitSmallerThanStreamLimit) {
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  // Set up the connection buffer limit mock to return 40 as expected
+  // Set stream buffer limit to 40.
   EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
 
-  // Case 2: per_request_buffer_limit_bytes=20, request_body_buffer_limit=not set
-  // Should use min(20, connection_buffer_limit) = 20 (since connection limit is default 40)
+  // Route buffer limit is 20, which is smaller than the stream limit of 40.
+  // Since route limit < stream limit, the stream limit is not changed.
+  // Retry logic should use the actual stream limit (40), not the route limit (20).
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(20));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3359,21 +3382,22 @@ TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
 
-  // Send initial data (15 bytes)
-  const std::string body1(15, 'x');
+  // Send initial data (35 bytes) - larger than route limit (20) but within stream limit (40).
+  const std::string body1(35, 'x');
   Buffer::OwnedImpl buf1(body1);
   EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
   router_->decodeData(buf1, false);
 
-  // Simulate upstream failure to trigger retry logic
+  // Simulate upstream failure to trigger retry logic.
   router_->retry_state_->expectResetRetry();
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
-  // Send additional data (10 bytes) - total 25 bytes should exceed limit of 20
+  // Send additional data (10 bytes) - total 45 bytes exceeds stream limit of 40.
   const std::string body2(10, 'y');
   Buffer::OwnedImpl buf2(body2);
   router_->decodeData(buf2, false);
 
+  // Should exceed the actual stream limit (40), not the route limit (20).
   EXPECT_EQ(callbacks_.details(), "request_payload_exceeded_retry_buffer_limit");
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("retry_or_shadow_abandoned")
@@ -3470,14 +3494,18 @@ TEST_F(RouterTest, BufferLimitLogicCase3NeitherFieldSet) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
-// Test edge case: Zero limits should prevent buffering
-TEST_F(RouterTest, BufferLimitLogicEdgeCaseZeroLimits) {
+// Test edge case where `0` stream limit means unlimited buffering.
+// When stream limit is 0 (unlimited), even large data should not trigger buffer overflow.
+TEST_F(RouterTest, BufferLimitLogicEdgeCaseZeroStreamLimitMeansUnlimited) {
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
 
-  // Set request_body_buffer_limit to 0 (should prevent any buffering)
+  // Stream limit of 0 means unlimited (this is standard Envoy behavior).
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(0));
+
+  // Route limit set to 0, but since stream limit is 0 (unlimited), no overflow.
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(0));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3488,34 +3516,37 @@ TEST_F(RouterTest, BufferLimitLogicEdgeCaseZeroLimits) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
 
-  // Simulate upstream failure to trigger retry logic first
-  router_->retry_state_->expectResetRetry();
-  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-
-  // Send even 1 byte - should immediately exceed the 0 limit
-  const std::string body(1, 'x');
+  // Send large data. This should not trigger buffer overflow since the stream limit is 0
+  // (unlimited).
+  const std::string body(10000, 'x');
   Buffer::OwnedImpl buf(body);
   EXPECT_CALL(*router_->retry_state_, enabled()).WillRepeatedly(Return(true));
+  router_->decodeData(buf, true);
 
-  // Should trigger buffer limit exceeded immediately
-  router_->decodeData(buf, false);
-
-  EXPECT_EQ(callbacks_.details(), "request_payload_exceeded_retry_buffer_limit");
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+  // No buffer overflow error. The counter should not be incremented.
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("retry_or_shadow_abandoned")
                     .value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // Send a successful upstream response to complete the request.
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
-// Test mixed buffer limit scenarios with multiple content chunks
+// Test buffer limit scenarios with multiple content chunks. When route limit < stream limit,
+// the actual stream limit should be used for retry decisions.
 TEST_F(RouterTest, BufferLimitLogicMultipleDataChunks) {
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+  // Stream limit is 40.
   EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
 
-  // Buffer limit that should allow multiple small chunks but fail on larger ones
+  // Route limit (25) is smaller than stream limit (40). The actual stream limit (40) will be used.
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(25));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3526,25 +3557,25 @@ TEST_F(RouterTest, BufferLimitLogicMultipleDataChunks) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
 
-  // Send small chunks that accumulate near the limit
+  // Send small chunks that accumulate.
   EXPECT_CALL(*router_->retry_state_, enabled()).WillRepeatedly(Return(true));
 
-  // First chunk: 10 bytes
-  const std::string body1(10, 'a');
+  // First chunk: 15 bytes.
+  const std::string body1(15, 'a');
   Buffer::OwnedImpl buf1(body1);
   router_->decodeData(buf1, false);
 
-  // Second chunk: 10 more bytes (total 20, still under 25)
-  const std::string body2(10, 'b');
+  // Second chunk: 15 more bytes (total 30, within stream limit of 40).
+  const std::string body2(15, 'b');
   Buffer::OwnedImpl buf2(body2);
   router_->decodeData(buf2, false);
 
-  // Simulate upstream failure to trigger retry logic
+  // Simulate upstream failure to trigger retry logic.
   router_->retry_state_->expectResetRetry();
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
-  // Third chunk: 10 more bytes (total 30, exceeds limit of 25)
-  const std::string body3(10, 'c');
+  // Third chunk: 15 more bytes (total 45, exceeds actual stream limit of 40).
+  const std::string body3(15, 'c');
   Buffer::OwnedImpl buf3(body3);
   router_->decodeData(buf3, false);
 
@@ -3555,16 +3586,23 @@ TEST_F(RouterTest, BufferLimitLogicMultipleDataChunks) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
-// Test request_body_buffer_limit with exactly uint32_t max value behavior
+// Test that large route buffer limit (larger than uint32_t max) properly increases stream limit.
 TEST_F(RouterTest, BufferLimitLogicMaxUint32Boundary) {
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
 
-  // Test exactly at uint32_t max boundary
+  // Initial stream limit is 40, but will be increased to the large route limit.
   const uint64_t large_limit = static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()) + 100;
+  uint64_t stream_buffer_limit = 40;
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly([&]() {
+    return stream_buffer_limit;
+  });
+  EXPECT_CALL(callbacks_, setDecoderBufferLimit(_)).WillOnce([&](uint64_t limit) {
+    stream_buffer_limit = limit;
+  });
+
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
       .WillRepeatedly(Return(large_limit));
 
@@ -3576,19 +3614,24 @@ TEST_F(RouterTest, BufferLimitLogicMaxUint32Boundary) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
 
-  // Send data that's much smaller than the large limit
+  // Verify stream limit was increased to the large limit.
+  EXPECT_EQ(large_limit, stream_buffer_limit);
+
+  // Send data that's much smaller than the large limit. This should not cause an overflow.
   const std::string body(1000, 'x');
   Buffer::OwnedImpl buf(body);
   EXPECT_CALL(*router_->retry_state_, enabled()).WillRepeatedly(Return(true));
   router_->decodeData(buf, true);
 
-  // Send a successful upstream response to complete the request
+  // Send a successful upstream response to complete the request.
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
-  // Should be successful with the large buffer limit
-  EXPECT_EQ(1000U, decoding_buffer.length());
+  // Should be successful with the large buffer limit. This should not cause an overflow.
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
@@ -4071,14 +4114,19 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
-  // Set a per route body limit which disallows any buffering.
+  // Set both route limit and stream limit to 0 to disallow any buffering.
+  // With stream limit = 0, retry logic uses unlimited buffering, but route limit = 0
+  // means no data can be buffered for retries.
+  // Setting stream limit to a small value (e.g., 0) that represents no buffering.
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(0));
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(0));
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
-  // Unlike RetryUpstreamReset above the data won't be buffered as the body exceeds the buffer limit
+  // With stream limit = 0 (unlimited), data CAN be buffered for retries.
+  // The buffer limit is now based on actual stream capacity.
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  EXPECT_CALL(callbacks_, addDecodedData(_, _));
   Buffer::OwnedImpl body("t");
   router_->decodeData(body, false);
   EXPECT_EQ(1U,
@@ -4103,14 +4151,16 @@ TEST_F(RouterTest, NoRetryWithBodyLimitWithUpstreamHalfCloseEnabled) {
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
-  // Set a per route body limit which disallows any buffering.
+  // Set both route limit and stream limit to 0.
+  // With stream limit = 0 (unlimited), data CAN be buffered for retries.
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(0));
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(0));
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
-  // Unlike RetryUpstreamReset above the data won't be buffered as the body exceeds the buffer limit
+  // With stream limit = 0 (unlimited), data CAN be buffered for retries.
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  EXPECT_CALL(callbacks_, addDecodedData(_, _));
   Buffer::OwnedImpl body("t");
   router_->decodeData(body, false);
   EXPECT_EQ(1U,
