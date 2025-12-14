@@ -289,7 +289,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
     bytes_to_write = bytes_to_retry_;
     bytes_to_retry_ = 0;
   } else {
-    bytes_to_write = std::min(write_buffer.length(), static_cast<uint64_t>(16384));
+    bytes_to_write = std::min(write_buffer.length(), data_chunk_send_limit_);
   }
 
   uint64_t total_bytes_written = 0;
@@ -307,7 +307,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       ASSERT(rc == static_cast<int>(bytes_to_write));
       total_bytes_written += rc;
       write_buffer.drain(rc);
-      bytes_to_write = std::min(write_buffer.length(), static_cast<uint64_t>(16384));
+      bytes_to_write = std::min(write_buffer.length(), data_chunk_send_limit_);
     } else {
       int err = SSL_get_error(rawSsl(), rc);
       ENVOY_CONN_LOG(trace, "ssl error occurred while write: {}", callbacks_->connection(),

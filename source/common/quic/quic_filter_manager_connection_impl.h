@@ -142,6 +142,8 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override { return *stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
   bool startSecureTransport() override { return false; }
+  // QUIC has its own congestion control and does not support limiting data chunk sizes.
+  void setTransportSocketDataChunkSendLimit(uint64_t) override {}
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                         std::chrono::microseconds rtt) override;

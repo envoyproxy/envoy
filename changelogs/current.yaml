@@ -517,5 +517,9 @@ new_features:
     requests to more backend servers. The filter supports fanout to multiple backends for initialize and tools-list requests,
     single-backend routing for tools-call based on tool name prefix, session management with composite session IDs,
     and response aggregation.
+- area: tls
+  change: |
+    Added ``setTransportSocketDataChunkSendLimit()`` API to ``Network::Connection`` to allow limiting TLS record
+    sizes. This is useful for working around bugs in clients like libpq that cannot handle TLS records >= 8KB.
 
 deprecated:

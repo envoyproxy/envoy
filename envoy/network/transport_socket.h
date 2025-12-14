@@ -208,6 +208,16 @@ public:
    */
   virtual void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                                 std::chrono::microseconds rtt) PURE;
+
+  /**
+   * Set the maximum size of data chunks that will be written in a single operation.
+   * This is primarily useful for limiting TLS record sizes to work around bugs in certain
+   * clients (e.g., libpq which cannot handle TLS records >= 8KB).
+   * @param data_chunk_size the maximum size of each data chunk in bytes. If set to 0, the
+   *        transport socket will use its default chunk size.
+   * @note This is a no-op for transport sockets that don't support this feature.
+   */
+  virtual void setTransportSocketDataChunkSendLimit(uint64_t data_chunk_size) PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;

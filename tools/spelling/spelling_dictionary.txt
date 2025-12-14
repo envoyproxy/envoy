@@ -1607,6 +1607,7 @@ pinterest
 callouts
 streamable
 extern
+libpq
 NSS
 SSLKEYLOGFILE
 DLB

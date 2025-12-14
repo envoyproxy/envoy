@@ -95,6 +95,7 @@ public:
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   void setBufferLimits(uint32_t limit) override;
   bool startSecureTransport() override;
+  void setTransportSocketDataChunkSendLimit(uint64_t data_chunk_size) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
   absl::optional<uint64_t> congestionWindowInBytes() const override;

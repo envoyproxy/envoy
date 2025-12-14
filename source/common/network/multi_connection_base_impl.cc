@@ -304,6 +304,12 @@ bool MultiConnectionBaseImpl::startSecureTransport() {
   return ret;
 }
 
+void MultiConnectionBaseImpl::setTransportSocketDataChunkSendLimit(uint64_t data_chunk_size) {
+  for (auto& connection : connections_) {
+    connection->setTransportSocketDataChunkSendLimit(data_chunk_size);
+  }
+}
+
 absl::optional<std::chrono::milliseconds> MultiConnectionBaseImpl::lastRoundTripTime() const {
   // Note, this might change before connect finishes.
   return connections_[0]->lastRoundTripTime();
