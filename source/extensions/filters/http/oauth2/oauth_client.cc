@@ -113,8 +113,8 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
     auto options = Http::AsyncClient::RequestOptions().setTimeout(
         std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout)));
 
-    if (retry_policy_.has_value()) {
-      options.setRetryPolicy(retry_policy_.value());
+    if (retry_policy_ != nullptr) {
+      options.setRetryPolicy(retry_policy_);
       options.setBufferBodyForRetry(true);
     }
 

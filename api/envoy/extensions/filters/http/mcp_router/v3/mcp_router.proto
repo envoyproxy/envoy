@@ -2,11 +2,12 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.mcp_router.v3;
 
-import "envoy/config/core/v3/http_uri.proto";
+import "google/protobuf/duration.proto";
 
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp_router.v3";
 option java_outer_classname = "McpRouterProto";
@@ -35,12 +36,32 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 message McpRouter {
   // Specification of the MCP server.
   message McpBackend {
-    // User visible name of the server for logging or error messages. If the name is empty the
-    // :ref:`URI <envoy_v3_api_field_config.core.v3.HttpUri.uri>` value is used.
+    // Unique name for this backend. Used for:
+    // - Tool name prefixing (e.g., "time__get_current_time")
+    // - Session ID composition
+    // - Logging and error messages.
+    // Default will be the cluster name if not specified.
     string name = 1;
 
-    // Specification of the remote MCP server.
-    config.core.v3.HttpUri http_uri = 2;
+    // Backend target specification.
+    McpCluster mcp_cluster = 2;
+  }
+
+  // Cluster-based backend configuration.
+  message McpCluster {
+    // Cluster name to route requests to.
+    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Path to use for MCP requests. Defaults to "/mcp".
+    string path = 2;
+
+    // Request timeout.
+    // If not set, uses cluster's timeout configuration.
+    google.protobuf.Duration timeout = 3;
+
+    // Indicates that during forwarding, the host header will be swapped with
+    // this value.
+    string host_rewrite_literal = 4;
   }
 
   // A list of remote MCP servers. MCP router aggregates capabilities, tools and resources from remote MCP servers

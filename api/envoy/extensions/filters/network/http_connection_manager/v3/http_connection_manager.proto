@@ -141,11 +141,13 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 13]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing";
 
+    // This OperationName makes no sense and is unnecessary in the current tracing API.
+    // [#not-implemented-hide:]
     enum OperationName {
       // The HTTP listener is used for ingress/incoming requests.
       INGRESS = 0;
@@ -219,6 +221,28 @@ message HttpConnectionManager {
     //
     // The default value is false for now for backward compatibility.
     google.protobuf.BoolValue spawn_upstream_span = 10;
+
+    // The operation name of the span which will be used for tracing.
+    //
+    // The same :ref:`format specifier <config_access_log_format>` as used for
+    // :ref:`HTTP access logging <config_access_log>` applies here, however
+    // unknown specifier values are replaced with the empty string instead of ``-``.
+    //
+    // This field will take precedence over and make following settings ineffective:
+    //
+    // * :ref:`route decorator <envoy_v3_api_field_config.route.v3.Route.decorator>` and
+    // * :ref:`x-envoy-decorator-operation <config_http_filters_router_x-envoy-decorator-operation>`
+    //   header will be ignored.
+    string operation = 11;
+
+    // The operation name of the upstream span which will be used for tracing.
+    // This only takes effect when ``spawn_upstream_span`` is set to true and the upstream
+    // span is created.
+    //
+    // The same :ref:`format specifier <config_access_log_format>` as used for
+    // :ref:`HTTP access logging <config_access_log>` applies here, however
+    // unknown specifier values are replaced with the empty string instead of ``-``.
+    string upstream_operation = 12;
   }
 
   message InternalAddressConfig {
