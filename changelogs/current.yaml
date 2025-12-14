@@ -205,6 +205,9 @@ removed_config_or_runtime:
 - area: xds
   change: |
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
+- area: router
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.router_filter_resetall_on_local_reply`` and legacy code paths.
 
 new_features:
 - area: oauth2
