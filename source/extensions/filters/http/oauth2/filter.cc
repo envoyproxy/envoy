@@ -500,8 +500,8 @@ FilterConfig::FilterConfig(
   if (proto_config.has_retry_policy()) {
     auto retry_policy = Http::Utility::convertCoreToRouteRetryPolicy(
         proto_config.retry_policy(), "5xx,gateway-error,connect-failure,reset");
-    // Use the null validation visitor because it used by the async client in the previous
-    // implementation.
+    // Use the null validation visitor for the backward compatibility. The proto should already
+    // been validated during the config load.
     auto parsed_policy_or_error = Router::RetryPolicyImpl::create(
         retry_policy, ProtobufMessage::getNullValidationVisitor(), context);
     THROW_IF_NOT_OK_REF(parsed_policy_or_error.status());
