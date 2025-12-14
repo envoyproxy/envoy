@@ -207,7 +207,7 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 - area: xds
   change: |
-    Removed runtiem guard ``envoy.restart_features.skip_backing_cluster_check_for_sds`` and legacy code paths.
+    Removed runtime guard ``envoy.restart_features.skip_backing_cluster_check_for_sds`` and legacy code paths.
 
 new_features:
 - area: oauth2
