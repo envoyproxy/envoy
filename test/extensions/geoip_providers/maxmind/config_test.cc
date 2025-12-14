@@ -258,14 +258,13 @@ TEST_F(MaxmindProviderConfigTest, EmptyProto) {
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
   const auto provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         region: "x-geo-region"
         city: "x-geo-city"
         anon_vpn: "x-anon-vpn"
         asn: "x-geo-asn"
         anon: "x-geo-anon"
-        anon_vpn: "x-anon-vpn"
         anon_tor: "x-anon-tor"
         anon_proxy: "x-anon-proxy"
         anon_hosting: "x-anon-hosting"
@@ -295,7 +294,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoDbPaths) {
   std::string provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         region: "x-geo-region"
   )EOF";
@@ -326,7 +325,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoGeoHeaders) {
 TEST_F(MaxmindProviderConfigTest, DbPathFormatValidatedWhenNonEmptyValue) {
   std::string provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         isp: "x-geo-isp"
     isp_db_path: "/geoip2/Isp.exe"
   )EOF";
@@ -344,7 +343,7 @@ TEST_F(MaxmindProviderConfigTest, DbPathFormatValidatedWhenNonEmptyValue) {
 TEST_F(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
   const auto provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
         anon_vpn: "x-anon-vpn"
@@ -378,7 +377,7 @@ TEST_F(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
 TEST_F(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoConfig) {
   const auto provider_config_yaml1 = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
         anon_vpn: "x-anon-vpn"
@@ -392,7 +391,7 @@ TEST_F(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoCon
   )EOF";
   const auto provider_config_yaml2 = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
         anon_vpn: "x-anon-vpn"
@@ -424,7 +423,7 @@ TEST_F(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoCon
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbPath) {
   const auto provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
     country_db_path: %s
   )EOF";
@@ -443,7 +442,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbPath) {
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbAndCityDbPaths) {
   const auto provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
     country_db_path: %s

@@ -22,7 +22,7 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
       common_provider_config:
-        geo_headers_to_add:
+        geo_field_keys:
           country: "x-geo-country"
           region: "x-geo-region"
           city: "x-geo-city"
@@ -42,7 +42,7 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
       common_provider_config:
-        geo_headers_to_add:
+        geo_field_keys:
           country: "x-geo-country"
           region: "x-geo-region"
           city: "x-geo-city"
@@ -65,7 +65,7 @@ const std::string ConfigIspAndAsn = R"EOF(
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
         common_provider_config:
-          geo_headers_to_add:
+          geo_field_keys:
             country: "x-geo-country"
             region: "x-geo-region"
             city: "x-geo-city"
@@ -88,7 +88,7 @@ const std::string ConfigIspAndCity = R"EOF(
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
           common_provider_config:
-            geo_headers_to_add:
+            geo_field_keys:
               country: "x-geo-country"
               region: "x-geo-region"
               city: "x-geo-city"
@@ -110,7 +110,7 @@ const std::string ConfigIsApplePrivateRelayOnly = R"EOF(
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
           common_provider_config:
-            geo_headers_to_add:
+            geo_field_keys:
               apple_private_relay: "x-geo-apple-private-relay"
           isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
     )EOF";
@@ -126,7 +126,7 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
       common_provider_config:
-        geo_headers_to_add:
+        geo_field_keys:
           country: "x-geo-country"
       country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
 )EOF";
@@ -142,7 +142,7 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
       common_provider_config:
-        geo_headers_to_add:
+        geo_field_keys:
           country: "x-geo-country"
           city: "x-geo-city"
       country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
@@ -160,7 +160,7 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
       common_provider_config:
-        geo_headers_to_add:
+        geo_field_keys:
           country: "x-geo-country"
           region: "x-geo-region"
           city: "x-geo-city"

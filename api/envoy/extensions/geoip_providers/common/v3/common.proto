@@ -92,7 +92,7 @@ message CommonGeoipProviderConfig {
   // - The :ref:`Network GeoIP filter <config_network_filters_geoip>` stores results in the
   //   connection's filter state under the well-known key ``envoy.network.geoip``.
   //
-  // [#next-free-field: 13]
+  // [#next-free-field: 12]
   message GeolocationFieldKeys {
     // If set, the key will be used to populate the country ISO code associated with the IP address.
     string country = 1;
@@ -143,10 +143,8 @@ message CommonGeoipProviderConfig {
   // Configuration for geolocation headers to add to HTTP requests.
   // This field is deprecated in favor of ``geo_field_keys``. If both are set, ``geo_field_keys``
   // takes precedence.
-  GeolocationHeadersToAdd geo_headers_to_add = 1 [
-    deprecated = true,
-    (envoy.annotations.deprecated_at_minor_version) = "3.0"
-  ];
+  GeolocationHeadersToAdd geo_headers_to_add = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Configuration for geolocation field keys.
   // At least one of ``geo_headers_to_add`` or ``geo_field_keys`` must be set.

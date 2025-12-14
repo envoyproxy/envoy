@@ -54,7 +54,7 @@ const std::string default_updated_city_db_path =
 
 const std::string default_city_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         region: "x-geo-region"
         city: "x-geo-city"
@@ -71,7 +71,7 @@ const std::string default_updated_asn_db_path =
 
 const std::string default_asn_config_yaml = R"EOF(
   common_provider_config:
-    geo_headers_to_add:
+    geo_field_keys:
       asn: "x-geo-asn"
   asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
 )EOF";
@@ -86,7 +86,7 @@ const std::string default_updated_isp_db_path =
 
 const std::string default_isp_config_yaml = R"EOF(
   common_provider_config:
-    geo_headers_to_add:
+    geo_field_keys:
       isp: "x-geo-isp"
   isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
 )EOF";
@@ -101,7 +101,7 @@ const std::string default_updated_anon_db_path =
 
 const std::string default_anon_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         anon: "x-geo-anon"
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
@@ -118,7 +118,7 @@ const std::string default_updated_country_db_path =
 
 const std::string default_country_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
     country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF";
@@ -223,7 +223,7 @@ class GeoipProviderTest : public testing::Test, public GeoipProviderTestBase {};
 TEST_F(GeoipProviderTest, ValidConfigCityAndAsnDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         region: "x-geo-region"
         city: "x-geo-city"
@@ -255,7 +255,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndAsnDbsSuccessfulLookup) {
 TEST_F(GeoipProviderTest, ValidConfigAsnDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         asn: "x-geo-asn"
     asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
   )EOF";
@@ -276,7 +276,7 @@ TEST_F(GeoipProviderTest, ValidConfigAsnDbsSuccessfulLookup) {
 TEST_F(GeoipProviderTest, ValidConfigUsingIspDbSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         asn: "x-geo-asn"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
   )EOF";
@@ -298,7 +298,7 @@ TEST_F(GeoipProviderTest, ValidConfigUsingIspDbSuccessfulLookup) {
 TEST_F(GeoipProviderTest, ValidConfigUsingAsnAndIspDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         asn: "x-geo-asn"
         isp: "x-geo-isp"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
@@ -330,7 +330,7 @@ TEST_F(GeoipProviderTest, AsnDbAndIspDbNotSetCausesEnvoyBug) {
   // This should trigger IS_ENVOY_BUG.
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         asn: "x-geo-asn"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF";
@@ -358,7 +358,7 @@ TEST_F(GeoipProviderTest, AsnLookupFallsBackToIspDb) {
   // 2. ISP database is configured and should provide ASN as fallback
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         asn: "x-geo-asn"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
   )EOF";
@@ -384,7 +384,7 @@ TEST_F(GeoipProviderTest, AsnLookupFallsBackToIspDb) {
 TEST_F(GeoipProviderTest, ValidConfigUsingAsnDbNotReadingIspDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         asn: "x-geo-asn"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
     asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
@@ -408,7 +408,7 @@ TEST_F(GeoipProviderTest, ValidConfigUsingAsnDbNotReadingIspDbsSuccessfulLookup)
 TEST_F(GeoipProviderTest, ValidConfigIspDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         isp: "x-geo-isp"
         asn: "x-geo-asn"
         apple_private_relay: "x-geo-apple-private-relay"
@@ -435,7 +435,7 @@ TEST_F(GeoipProviderTest, ValidConfigIspDbsSuccessfulLookup) {
 TEST_F(GeoipProviderTest, ValidConfigCityLookupError) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/MaxMind-DB-test-ipv4-24.mmdb"
@@ -457,7 +457,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityLookupError) {
 TEST_F(GeoipProviderTest, ValidConfigAnonVpnSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         anon: "x-geo-anon"
         anon_vpn: "x-geo-anon-vpn"
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
@@ -481,7 +481,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonVpnSuccessfulLookup) {
 TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         anon: "x-geo-anon"
         anon_hosting: "x-geo-anon-hosting"
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
@@ -505,7 +505,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
 TEST_F(GeoipProviderTest, ValidConfigUsingCityDbNoHeadersAddedWhenIpIsNotInDb) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF";
@@ -525,7 +525,7 @@ TEST_F(GeoipProviderTest, ValidConfigUsingCityDbNoHeadersAddedWhenIpIsNotInDb) {
 TEST_F(GeoipProviderTest, ValidConfigAnonTorNodeSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         anon: "x-geo-anon"
         anon_tor: "x-geo-anon-tor"
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
@@ -549,7 +549,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonTorNodeSuccessfulLookup) {
 TEST_F(GeoipProviderTest, ValidConfigAnonProxySuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         anon: "x-geo-anon"
         anon_proxy: "x-geo-anon-proxy"
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
@@ -608,7 +608,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
 TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
   constexpr absl::string_view config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         region: "x-geo-region"
         city: "x-geo-city"
@@ -661,7 +661,7 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
 TEST_F(GeoipProviderTest, DbEpochGaugeUpdatesWhenReloadedOnMmdbFileUpdate) {
   constexpr absl::string_view config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         city: "x-geo-city"
     city_db_path: {}
   )EOF";
@@ -695,7 +695,7 @@ TEST_F(GeoipProviderTest, DbEpochGaugeUpdatesWhenReloadedOnMmdbFileUpdate) {
 TEST_F(GeoipProviderTest, ValidConfigCountryDbSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
     country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
   )EOF";
@@ -717,7 +717,7 @@ TEST_F(GeoipProviderTest, CountryDbTakesPrecedenceOverCityDb) {
   // When both Country DB and City DB are configured, Country DB should be used for country lookup.
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
     country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
@@ -746,7 +746,7 @@ TEST_F(GeoipProviderTest, CountryFallsBackToCityDbWhenCountryDbNotConfigured) {
   // When only City DB is configured, country lookup should fall back to City DB.
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
@@ -772,7 +772,7 @@ TEST_F(GeoipProviderTest, CountryFallsBackToCityDbWhenCountryDbNotConfigured) {
 TEST_F(GeoipProviderTest, CountryDbLookupErrorCorruptedEntryData) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
     country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/corrupted-entry-data.mmdb"
   )EOF";
@@ -793,7 +793,7 @@ TEST_F(GeoipProviderTest, CountryDbLookupErrorCorruptedEntryData) {
 TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndCityFallback) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
     country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
@@ -829,7 +829,7 @@ TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndCityFallback) {
 TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndNoFallback) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
     country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
   )EOF";
@@ -855,7 +855,7 @@ using GeoipProviderDeathTest = GeoipProviderTest;
 TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         city: "x-geo-city"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data_atc/GeoLite2-City-Test.mmdb"
   )EOF";
@@ -897,7 +897,7 @@ struct GeoipProviderGeoDbNotSetTestCase geo_db_not_set_test_cases[] = {
     {
         R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         city: "x-geo-city"
         asn: "x-geo-asn"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
@@ -906,7 +906,7 @@ struct GeoipProviderGeoDbNotSetTestCase geo_db_not_set_test_cases[] = {
     {
         R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         city: "x-geo-city"
         asn: "x-geo-asn"
     asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
@@ -915,7 +915,7 @@ struct GeoipProviderGeoDbNotSetTestCase geo_db_not_set_test_cases[] = {
     {
         R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         anon: "x-geo-anon"
         asn: "x-geo-asn"
     asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
@@ -924,7 +924,7 @@ struct GeoipProviderGeoDbNotSetTestCase geo_db_not_set_test_cases[] = {
     {
         R"EOF(
       common_provider_config:
-        geo_headers_to_add:
+        geo_field_keys:
           isp: "x-geo-isp"
           asn: "x-geo-asn"
       asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
@@ -1141,7 +1141,7 @@ TEST_P(MmdbReloadErrorImplTest, MmdbReloadErrorUsesPreviousDb) {
 // Config with full path for city_db reload error test.
 const std::string city_db_reload_error_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         region: "x-geo-region"
         city: "x-geo-city"
@@ -1151,7 +1151,7 @@ const std::string city_db_reload_error_config_yaml = R"EOF(
 // Config with full path for country_db reload error test.
 const std::string country_db_reload_error_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
     country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
   )EOF";
