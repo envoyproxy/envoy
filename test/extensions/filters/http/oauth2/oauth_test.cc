@@ -495,7 +495,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenRetryPolicy) {
   retry_policy.mutable_retry_back_off()->mutable_max_interval()->set_seconds(10);
   retry_policy.mutable_num_retries()->set_value(5);
 
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   auto parsed_retry_policy = Router::RetryPolicyImpl::create(
       retry_policy, ProtobufMessage::getNullValidationVisitor(), server_factory_context_);
 
