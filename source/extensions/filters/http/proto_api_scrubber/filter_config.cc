@@ -396,22 +396,6 @@ void ProtoApiScrubberFilterConfig::precomputeTypeCache(
   }
 }
 
-absl::StatusOr<const MethodDescriptor*>
-ProtoApiScrubberFilterConfig::getMethodDescriptor(const std::string& method_name) const {
-  // Covert grpc method name from `/package.service/method` format to `package.service.method` as
-  // the method `FindMethodByName` expects the method name to be in the latter format.
-  std::string dot_separated_method_name =
-      absl::StrReplaceAll(absl::StripPrefix(method_name, "/"), {{"/", "."}});
-  const MethodDescriptor* method = descriptor_pool_->FindMethodByName(dot_separated_method_name);
-  if (method == nullptr) {
-    return absl::InvalidArgumentError(absl::StrFormat(
-        "Unable to find method `%s` in the descriptor pool configured for this filter.",
-        dot_separated_method_name));
-  }
-
-  return method;
-}
-
 absl::StatusOr<const Protobuf::Type*>
 ProtoApiScrubberFilterConfig::getRequestType(const std::string& method_name) const {
   auto it = request_type_cache_.find(method_name);
