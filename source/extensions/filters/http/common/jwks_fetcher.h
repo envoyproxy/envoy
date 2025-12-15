@@ -75,7 +75,7 @@ public:
    * @return a JwksFetcher instance
    */
   static JwksFetcherPtr
-  create(Upstream::ClusterManager& cm,
+  create(Upstream::ClusterManager& cm, Router::RetryPolicyConstSharedPtr retry_policy,
          const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks);
 };
 } // namespace Common
