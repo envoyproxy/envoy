@@ -73,7 +73,7 @@ The following lists the filter state object keys used by the Envoy extensions to
   <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>` override on a per-route basis.
   Accepts a number string as a constructor.
 
-``envoy.network.geoip``
+``envoy.geoip``
   :ref:`Network GeoIP filter <config_network_filters_geoip>` stores geolocation lookup results
   in this filter state object. The object contains fields for geographic data such as country,
   city, region, and ASN. Supports serialization for access logging and field-level access. Fields:

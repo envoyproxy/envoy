@@ -7,7 +7,7 @@ IP Geolocation
 * :ref:`Network filter v3 API reference <envoy_v3_api_msg_extensions.filters.network.geoip.v3.Geoip>`
 
 The IP geolocation network filter performs geolocation lookups on incoming connections and stores
-the results in the connection's filter state under the well-known key ``envoy.network.geoip``.
+the results in the connection's filter state under the well-known key ``envoy.geoip``.
 The filter uses the client's remote IP address to determine geographic information such as country,
 city, region, and ASN using a configured geolocation provider.
 
@@ -48,7 +48,7 @@ Accessing Geolocation Data
 --------------------------
 
 The filter stores geolocation results in a ``GeoipInfo`` object in the connection's filter state
-under the well-known key ``envoy.network.geoip``. See :ref:`well known filter state
+under the well-known key ``envoy.geoip``. See :ref:`well known filter state
 <well_known_filter_state>` for details.
 
 The data can be accessed in several ways:
@@ -60,15 +60,15 @@ Use the ``FILTER_STATE`` format specifier:
 .. code-block:: text
 
   # Get all geo data as JSON
-  %FILTER_STATE(envoy.network.geoip:PLAIN)%
+  %FILTER_STATE(envoy.geoip:PLAIN)%
 
   # Get a specific field
-  %FILTER_STATE(envoy.network.geoip:FIELD:country)%
+  %FILTER_STATE(envoy.geoip:FIELD:country)%
 
 **Other Filters**
 
 Downstream filters can access the ``GeoipInfo`` object from the connection's filter state using
-the well-known key ``envoy.network.geoip``.
+the well-known key ``envoy.geoip``.
 
 Statistics
 ----------

@@ -90,7 +90,7 @@ message CommonGeoipProviderConfig {
   //
   // - The :ref:`HTTP GeoIP filter <config_http_filters_geoip>` stores results as HTTP request headers.
   // - The :ref:`Network GeoIP filter <config_network_filters_geoip>` stores results in the
-  //   connection's filter state under the well-known key ``envoy.network.geoip``.
+  //   connection's filter state under the well-known key ``envoy.geoip``.
   //
   // [#next-free-field: 12]
   message GeolocationFieldKeys {

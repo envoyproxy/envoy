@@ -17,7 +17,7 @@ namespace Geoip {
 
 // Well-known filter state key for storing geolocation data.
 // See docs/root/configuration/advanced/well_known_filter_state.rst for documentation.
-constexpr absl::string_view GeoipFilterStateKey = "envoy.network.geoip";
+constexpr absl::string_view GeoipFilterStateKey = "envoy.geoip";
 
 /**
  * FilterState object that stores geolocation lookup results.

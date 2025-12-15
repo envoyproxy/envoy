@@ -22,7 +22,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // The network geolocation filter performs IP geolocation lookups on incoming connections
 // and stores the results in the connection's filter state under the well-known key
-// ``envoy.network.geoip``. The stored data is a ``GeoipInfo`` object that supports
+// ``envoy.geoip``. The stored data is a ``GeoipInfo`` object that supports
 // serialization for access logging and field-level access.
 //
 // See :ref:`well known filter state <well_known_filter_state>` for details on accessing
