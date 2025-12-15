@@ -650,7 +650,22 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
 }
 
 void ConnectionImpl::setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) {
+  if (timeout == buffer_high_watermark_timeout_) {
+    return;
+  }
+
   buffer_high_watermark_timeout_ = timeout;
+  if (buffer_high_watermark_timer_) {
+    buffer_high_watermark_timer_->disableTimer();
+    buffer_high_watermark_timer_.reset();
+  }
+
+  // If the connection is already above high watermark, ensure the timeout is (re)scheduled using
+  // the updated value.
+  if (state() == State::Open &&
+      (write_buffer_->highWatermarkTriggered() || read_buffer_->highWatermarkTriggered())) {
+    scheduleBufferHighWatermarkTimeout();
+  }
 }
 
 void ConnectionImpl::onReadBufferLowWatermark() {

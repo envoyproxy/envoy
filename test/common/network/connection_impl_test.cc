@@ -4128,6 +4128,45 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferHighWatermarkTimeoutCancelledO
   read_buffer.buffer.drain(read_buffer.buffer.length());
 }
 
+TEST_F(MockTransportConnectionImplTest, UpdatingBufferHighWatermarkTimeoutResetsTimer) {
+  initializeConnection();
+  InSequence s;
+
+  const std::chrono::milliseconds timeout1(7);
+  const std::chrono::milliseconds timeout2(11);
+  auto* buffer_timer1 = new Event::MockTimer(&dispatcher_);
+
+  connection_->setBufferLimits(1);
+  connection_->setBufferHighWatermarkTimeout(timeout1);
+
+  StreamBuffer read_buffer = connection_->getReadBuffer();
+  EXPECT_CALL(*buffer_timer1, enableTimer(timeout1, _));
+  read_buffer.buffer.add("xy");
+
+  EXPECT_CALL(*buffer_timer1, disableTimer());
+  auto* buffer_timer2 = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*buffer_timer2, enableTimer(timeout2, _));
+  connection_->setBufferHighWatermarkTimeout(timeout2);
+}
+
+TEST_F(MockTransportConnectionImplTest, UpdatingBufferHighWatermarkTimeoutToZeroCancelsTimer) {
+  initializeConnection();
+  InSequence s;
+
+  const std::chrono::milliseconds timeout(7);
+  auto* buffer_timer = new Event::MockTimer(&dispatcher_);
+
+  connection_->setBufferLimits(1);
+  connection_->setBufferHighWatermarkTimeout(timeout);
+
+  StreamBuffer read_buffer = connection_->getReadBuffer();
+  EXPECT_CALL(*buffer_timer, enableTimer(timeout, _));
+  read_buffer.buffer.add("xy");
+
+  EXPECT_CALL(*buffer_timer, disableTimer());
+  connection_->setBufferHighWatermarkTimeout(std::chrono::milliseconds(0));
+}
+
 // Fixture for validating behavior after a connection is closed.
 class PostCloseConnectionImplTest : public MockTransportConnectionImplTest {
 public:
