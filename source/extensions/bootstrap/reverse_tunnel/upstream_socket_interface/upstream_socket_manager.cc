@@ -471,8 +471,14 @@ void UpstreamSocketManager::pingConnections(const std::string& node_id) {
 
 void UpstreamSocketManager::pingConnections() {
   ENVOY_LOG(trace, "reverse_tunnel: pinging connections.");
-  for (auto& itr : accepted_reverse_connections_) {
-    pingConnections(itr.first);
+  // If the last socket for a node errors out the map entry is cleared. So we cant use normal for
+  // loops.
+  for (auto itr = accepted_reverse_connections_.begin();
+       itr != accepted_reverse_connections_.end();) {
+    auto next = std::next(itr);
+
+    pingConnections(itr->first);
+    itr = next;
   }
   ping_timer_->enableTimer(ping_interval_);
 }
