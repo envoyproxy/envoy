@@ -52,7 +52,7 @@ jobs:
       uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@cf1bb45a277cb3c205638b2cd5c984db1c46a412  # codeql-bundle-v4.31.7
+      uses: github/codeql-action/init@1b168cd39490f61582a9beae412bb7057a6b2c4e  # codeql-bundle-v4.31.8
       with:
         languages: cpp
         trap-caching: false
@@ -91,4 +91,4 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@cf1bb45a277cb3c205638b2cd5c984db1c46a412  # codeql-bundle-v4.31.7
+      uses: github/codeql-action/analyze@1b168cd39490f61582a9beae412bb7057a6b2c4e  # codeql-bundle-v4.31.8
