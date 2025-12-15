@@ -9,6 +9,8 @@
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
@@ -18,6 +20,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "grpc_transcoding/type_helper.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
@@ -44,6 +47,58 @@ using StringPairToMatchTreeMap =
     absl::flat_hash_map<std::pair<std::string, std::string>, MatchTreeHttpMatchingDataSharedPtr>;
 using TypeFinder = std::function<const Envoy::Protobuf::Type*(const std::string&)>;
 } // namespace
+
+/**
+ * All stats for the Proto API Scrubber filter. @see stats_macros.h
+ */
+#define ALL_PROTO_API_SCRUBBER_STATS(COUNTER, GAUGE, HISTOGRAM)                                    \
+  COUNTER(request_scrubbing_failed)                                                                \
+  COUNTER(response_scrubbing_failed)                                                               \
+  COUNTER(method_blocked)                                                                          \
+  COUNTER(request_buffer_conversion_error)                                                         \
+  COUNTER(response_buffer_conversion_error)                                                        \
+  COUNTER(invalid_method_name)                                                                     \
+  COUNTER(path_header_missing)                                                                     \
+  COUNTER(total_requests_checked)                                                                  \
+  HISTOGRAM(request_scrubbing_latency, Milliseconds)                                               \
+  HISTOGRAM(response_scrubbing_latency, Milliseconds)
+
+struct ProtoApiScrubberStats {
+  ALL_PROTO_API_SCRUBBER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                               GENERATE_HISTOGRAM_STRUCT)
+
+  // Constructor using helper methods for readability.
+  // Note: GENERATE_COUNTER_STRUCT appends an underscore to the member name.
+  ProtoApiScrubberStats(Envoy::Stats::Scope& scope, absl::string_view prefix)
+      : request_scrubbing_failed_(makeCounter(scope, prefix, "request_scrubbing_failed")),
+        response_scrubbing_failed_(makeCounter(scope, prefix, "response_scrubbing_failed")),
+        method_blocked_(makeCounter(scope, prefix, "method_blocked")),
+        request_buffer_conversion_error_(
+            makeCounter(scope, prefix, "request_buffer_conversion_error")),
+        response_buffer_conversion_error_(
+            makeCounter(scope, prefix, "response_buffer_conversion_error")),
+        invalid_method_name_(makeCounter(scope, prefix, "invalid_method_name")),
+        path_header_missing_(makeCounter(scope, prefix, "path_header_missing")),
+        total_requests_checked_(makeCounter(scope, prefix, "total_requests_checked")),
+        request_scrubbing_latency_(makeHistogram(scope, prefix, "request_scrubbing_latency",
+                                                 Stats::Histogram::Unit::Milliseconds)),
+        response_scrubbing_latency_(makeHistogram(scope, prefix, "response_scrubbing_latency",
+                                                  Stats::Histogram::Unit::Milliseconds)) {}
+
+private:
+  static Stats::Counter& makeCounter(Envoy::Stats::Scope& scope, absl::string_view prefix,
+                                     absl::string_view name) {
+    return scope.counterFromStatName(
+        Stats::StatNameManagedStorage(absl::StrCat(prefix, name), scope.symbolTable()).statName());
+  }
+
+  static Stats::Histogram& makeHistogram(Envoy::Stats::Scope& scope, absl::string_view prefix,
+                                         absl::string_view name, Stats::Histogram::Unit unit) {
+    return scope.histogramFromStatName(
+        Stats::StatNameManagedStorage(absl::StrCat(prefix, name), scope.symbolTable()).statName(),
+        unit);
+  }
+};
 
 // The config for Proto API Scrubber filter. As a thread-safe class, it should be constructed only
 // once and shared among filters for better performance.
@@ -132,10 +187,11 @@ public:
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
+  const ProtoApiScrubberStats& stats() const { return stats_; }
+
 protected:
-  // Protected constructor to make sure that this class is used in a factory fashion using the
-  // public `create` method.
-  ProtoApiScrubberFilterConfig() = default;
+  // Constructor initializes stats.
+  ProtoApiScrubberFilterConfig(ProtoApiScrubberStats stats) : stats_(stats) {}
 
 private:
   friend class MockProtoApiScrubberFilterConfig;
@@ -215,6 +271,8 @@ private:
   // A lambda function which resolves type URL string to the corresponding `Protobuf::Type*`.
   // Internally, it uses `type_helper_` for type resolution.
   std::unique_ptr<const TypeFinder> type_finder_;
+
+  ProtoApiScrubberStats stats_;
 };
 
 // A class to validate the input type specified for the unified matcher in the config.

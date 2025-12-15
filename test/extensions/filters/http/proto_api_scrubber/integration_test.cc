@@ -1,5 +1,6 @@
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/grpc/status.h"
+#include "envoy/stats/histogram.h"
 
 #include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
 
@@ -165,11 +166,11 @@ apikeys::CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb
 }
 
 // ============================================================================
-// TEST GROUP 1: PASS THROUGH
+// TEST GROUP 1: PASS THROUGH & METRICS
 // ============================================================================
 
 // Tests that the simple non-streaming request passes through without modification if there are no
-// restrictions configured in the filter config.
+// restrictions configured in the filter config. Also verifies stats.
 TEST_P(ProtoApiScrubberIntegrationTest, UnaryRequestPassesThrough) {
   config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath()));
   initialize();
@@ -188,6 +189,15 @@ TEST_P(ProtoApiScrubberIntegrationTest, UnaryRequestPassesThrough) {
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify Stats
+  test_server_->waitForCounterGe("proto_api_scrubber.total_requests_checked", 1);
+
+  // Check that latency histogram exists and was used.
+  // Use statStore() instead of stats(), and verify usage.
+  auto& histogram = test_server_->statStore().histogram(
+      "proto_api_scrubber.request_scrubbing_latency", Envoy::Stats::Histogram::Unit::Milliseconds);
+  EXPECT_TRUE(histogram.used());
 }
 
 // Tests that the streaming request passes through without modification if there are no restrictions
@@ -305,7 +315,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField_MatcherFalse) {
 }
 
 // ============================================================================
-// TEST GROUP 3: VALIDATION & REJECTION
+// TEST GROUP 3: VALIDATION, REJECTION & METRICS
 // ============================================================================
 
 // Tests that the request is rejected if the called gRPC method doesn't exist in the descriptor
@@ -324,6 +334,9 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsMethodNotInDescriptor) {
   auto grpc_status = response->headers().GrpcStatus();
   ASSERT_TRUE(grpc_status != nullptr);
   EXPECT_EQ("3", grpc_status->value().getStringView()); // 3 = Invalid Argument
+
+  // Verify Stats: Scrubbing failed because method not found implies no type info found.
+  test_server_->waitForCounterGe("proto_api_scrubber.request_scrubbing_failed", 1);
 }
 
 // Tests that the request is rejected if the gRPC `:path` header is in invalid format.
@@ -345,6 +358,64 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsInvalidPathFormat) {
   auto grpc_status = response->headers().GrpcStatus();
   ASSERT_TRUE(grpc_status != nullptr);
   EXPECT_EQ("3", grpc_status->value().getStringView()); // 3 = Invalid Argument
+
+  // Verify Stats
+  test_server_->waitForCounterGe("proto_api_scrubber.invalid_method_name", 1);
+}
+
+// Tests that the request is rejected if a method-level block rule matches.
+TEST_P(ProtoApiScrubberIntegrationTest, RejectsBlockedMethod) {
+  // Config manually to inject method_restriction
+  std::string full_config_text = fmt::format(R"pb(
+      filtering_mode: OVERRIDE
+      descriptor_set {{ data_source {{ filename: "{0}" }} }}
+      restrictions {{
+        method_restrictions {{
+          key: "{1}"
+          value {{
+            method_restriction {{
+              matcher {{
+                matcher_list {{
+                   matchers {{
+                      predicate {{
+                        single_predicate {{
+                           input {{ name: "envoy.matching.inputs.cel_data_input" typed_config {{ "@type": "type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput" }} }}
+                           custom_match {{ name: "envoy.matching.matchers.cel_matcher" typed_config {{ "@type": "type.googleapis.com/xds.type.matcher.v3.CelMatcher" expr_match {{ cel_expr_parsed {{ expr {{ const_expr {{ bool_value: true }} }} }} }} }} }} }}
+                        }}
+                      }}
+                   }}
+                }}
+              }}
+            }}
+          }}
+        }}
+      }}
+    )pb",
+                                             apikeysDescriptorPath(), kCreateApiKeyMethod);
+
+  ProtoApiScrubberConfig filter_config_proto;
+  Protobuf::TextFormat::ParseFromString(full_config_text, &filter_config_proto);
+  Protobuf::Any any_config;
+  any_config.PackFrom(filter_config_proto);
+  std::string typed_config = fmt::format(R"EOF(
+    name: envoy.filters.http.proto_api_scrubber
+    typed_config: {})EOF",
+                                         MessageUtil::getJsonStringFromMessageOrError(any_config));
+
+  config_helper_.prependFilter(typed_config);
+  initialize();
+
+  auto request_proto = makeCreateApiKeyRequest();
+  auto response = sendGrpcRequest(request_proto, kCreateApiKeyMethod);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Check 403 / Permission Denied
+  auto grpc_status = response->headers().GrpcStatus();
+  ASSERT_TRUE(grpc_status != nullptr);
+  EXPECT_EQ("7", grpc_status->value().getStringView()); // 7 = Permission Denied
+
+  // Verify Stats
+  test_server_->waitForCounterGe("proto_api_scrubber.method_blocked", 1);
 }
 
 } // namespace

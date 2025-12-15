@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/proto_api_scrubber/filter.h"
 
+#include <chrono>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -133,6 +134,10 @@ bool ProtoApiScrubberFilter::checkMethodLevelRestrictions(Envoy::Http::RequestHe
     ENVOY_STREAM_LOG(debug, "Method-level restriction matched for {}, blocking request.",
                      *decoder_callbacks_, method_name_);
 
+    // Observability: Increment blocked counter and set trace tag.
+    filter_config_.stats().method_blocked_.inc();
+    decoder_callbacks_->activeSpan().setTag("proto_scrubber.outcome", "blocked");
+
     rejectRequest(Status::PermissionDenied, "Method not allowed",
                   formatError(kRcDetailFilterProtoApiScrubber,
                               Envoy::Http::CodeUtility::toString(Http::Code::Forbidden),
@@ -157,11 +162,15 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
+  // Observability: Track total requests checked.
+  filter_config_.stats().total_requests_checked_.inc();
+
   is_valid_grpc_request_ = true;
   const auto* path_header = headers.Path();
   // The :path pseudo-header is mandatory for HTTP/2 requests.
   // gRPC runs over HTTP/2, so this header should always be present for valid gRPC requests.
   if (path_header == nullptr) {
+    filter_config_.stats().path_header_missing_.inc();
     rejectRequest(Status::WellKnownGrpcStatus::InvalidArgument, kPathValidationError,
                   formatError(kRcDetailFilterProtoApiScrubber, kRcDetailErrorTypeBadRequest,
                               "PATH_HEADER_MISSING"));
@@ -170,6 +179,7 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
   absl::string_view path_val = path_header->value().getStringView();
 
   if (absl::Status status = validateMethodName(path_val); !status.ok()) {
+    filter_config_.stats().invalid_method_name_.inc();
     rejectRequest(static_cast<Envoy::Grpc::Status::GrpcStatus>(status.code()), status.message(),
                   formatError(kRcDetailFilterProtoApiScrubber,
                               absl::StatusCodeToString(status.code()), kPathValidationError));
@@ -206,6 +216,8 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
   // Move the data to internal gRPC buffer messages representation.
   auto messages = request_msg_converter_->accumulateMessages(data, end_stream);
   if (const absl::Status& status = messages.status(); !status.ok()) {
+    filter_config_.stats().request_buffer_conversion_error_.inc();
+
     // Correctly use the status code from the error for rejectRequest.
     Envoy::Grpc::Status::GrpcStatus grpc_status = Status::WellKnownGrpcStatus::Internal;
     if (status.code() == absl::StatusCode::kFailedPrecondition) {
@@ -236,6 +248,7 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
         createRequestProtoScrubber();
 
     if (!request_scrubber_or_status.ok()) {
+      filter_config_.stats().request_scrubbing_failed_.inc();
       const absl::Status& status = request_scrubber_or_status.status();
 
       ENVOY_STREAM_LOG(error, "Unable to scrub request payload. Error details: {}",
@@ -273,8 +286,18 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
       continue;
     }
 
+    // Observability: Measure Latency
+    auto start_time = std::chrono::steady_clock::now();
     auto status = request_scrubber_->Scrub(stream_message->message());
+    auto end_time = std::chrono::steady_clock::now();
+    auto latency_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    filter_config_.stats().request_scrubbing_latency_.recordValue(latency_ms);
+
     if (!status.ok()) {
+      filter_config_.stats().request_scrubbing_failed_.inc();
+      decoder_callbacks_->activeSpan().setTag("proto_scrubber.request_error", status.ToString());
+
       ENVOY_STREAM_LOG(warn, "Scrubbing failed with error: {}. The request will not be modified.",
                        *decoder_callbacks_, status.ToString());
     }
@@ -324,6 +347,7 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
   // Move the data to internal gRPC buffer messages representation.
   auto messages = response_msg_converter_->accumulateMessages(data, end_stream);
   if (const absl::Status& status = messages.status(); !status.ok()) {
+    filter_config_.stats().response_buffer_conversion_error_.inc();
     rejectResponse(status.raw_code(), status.message(),
                    formatError(kRcDetailFilterProtoApiScrubber,
                                absl::StatusCodeToString(status.code()),
@@ -345,6 +369,8 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
     absl::StatusOr<std::unique_ptr<ProtoScrubber>> response_scrubber_or_status =
         createResponseProtoScrubber();
     if (!response_scrubber_or_status.ok()) {
+      filter_config_.stats().response_scrubbing_failed_.inc();
+
       const absl::Status& status = response_scrubber_or_status.status();
       ENVOY_STREAM_LOG(error, "Unable to scrub request payload. Error details: {}",
                        *encoder_callbacks_, status.ToString());
@@ -373,8 +399,19 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
       continue;
     }
 
+    // Observability: Measure Latency
+    auto start_time = std::chrono::steady_clock::now();
     auto response_scrubber_or_status = response_scrubber_->Scrub(stream_message->message());
+    auto end_time = std::chrono::steady_clock::now();
+    auto latency_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    filter_config_.stats().response_scrubbing_latency_.recordValue(latency_ms);
+
     if (!response_scrubber_or_status.ok()) {
+      filter_config_.stats().response_scrubbing_failed_.inc();
+      encoder_callbacks_->activeSpan().setTag("proto_scrubber.response_error",
+                                              response_scrubber_or_status.ToString());
+
       ENVOY_STREAM_LOG(warn,
                        "Response scrubbing failed with error: {}. The response will not be "
                        "modified.",
@@ -384,6 +421,8 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
     auto buf_convert_status =
         response_msg_converter_->convertBackToBuffer(std::move(stream_message));
     if (!buf_convert_status.ok()) {
+      filter_config_.stats().response_buffer_conversion_error_.inc();
+
       const absl::Status& status = buf_convert_status.status();
       ENVOY_STREAM_LOG(error, "Failed to convert scrubbed message back to envoy buffer: {}",
                        *encoder_callbacks_, status.ToString());
