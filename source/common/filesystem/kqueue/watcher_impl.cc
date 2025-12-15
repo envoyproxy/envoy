@@ -118,9 +118,11 @@ absl::Status WatcherImpl::onKqueueEvent() {
     absl::StatusOr<PathSplitResult> pathname_or_error =
         file_system_.splitPathFromFilename(file->file_);
     if (!pathname_or_error.ok()) {
-      // Use ENVOY_LOG_EVERY_POW_2 to avoid log spam since path failures are persistent.
-      ENVOY_LOG_EVERY_POW_2(warn, "Failed to split path '{}': {}", file->file_,
-                            pathname_or_error.status().message());
+      // Path split failure is permanent and we can't recover.
+      // We remove the broken watch to avoid repeated failures.
+      ENVOY_LOG(warn, "Failed to split path '{}', removing watch: {}", file->file_,
+                pathname_or_error.status().message());
+      removeWatch(file);
       continue;
     }
     PathSplitResult& pathname = pathname_or_error.value();
