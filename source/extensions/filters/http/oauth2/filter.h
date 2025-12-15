@@ -170,12 +170,7 @@ public:
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
   bool disableAccessTokenSetCookie() const { return disable_access_token_set_cookie_; }
   bool disableRefreshTokenSetCookie() const { return disable_refresh_token_set_cookie_; }
-  const OptRef<const RouteRetryPolicy> retryPolicy() const {
-    if (!retry_policy_.has_value()) {
-      return absl::nullopt;
-    }
-    return makeOptRef(retry_policy_.value());
-  }
+  const Router::RetryPolicyConstSharedPtr& retryPolicy() const { return retry_policy_; }
   bool shouldUseRefreshToken(
       const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
   struct CookieSettings {
@@ -239,7 +234,7 @@ private:
   const bool disable_access_token_set_cookie_ : 1;
   const bool disable_refresh_token_set_cookie_ : 1;
   const bool disable_token_encryption_ : 1;
-  absl::optional<RouteRetryPolicy> retry_policy_;
+  Router::RetryPolicyConstSharedPtr retry_policy_;
   const CookieSettings bearer_token_cookie_settings_;
   const CookieSettings hmac_cookie_settings_;
   const CookieSettings expires_cookie_settings_;
@@ -382,7 +377,7 @@ private:
                                             const std::chrono::seconds& expires_in) const;
   std::string getExpiresTimeForIdToken(const std::string& id_token,
                                        const std::chrono::seconds& expires_in) const;
-  std::string BuildCookieTail(const FilterConfig::CookieSettings& settings,
+  std::string buildCookieTail(const FilterConfig::CookieSettings& settings,
                               absl::string_view expires_time) const;
   void setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
                                const std::string& encoded_token) const;

@@ -17,7 +17,9 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/retry_policy_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/escaping.h"
@@ -523,8 +525,14 @@ FilterConfig::FilterConfig(
   }
 
   if (proto_config.has_retry_policy()) {
-    retry_policy_ = Http::Utility::convertCoreToRouteRetryPolicy(
+    auto retry_policy = Http::Utility::convertCoreToRouteRetryPolicy(
         proto_config.retry_policy(), "5xx,gateway-error,connect-failure,reset");
+    // Use the null validation visitor for the backward compatibility. The proto should already
+    // been validated during the config load.
+    auto parsed_policy_or_error = Router::RetryPolicyImpl::create(
+        retry_policy, ProtobufMessage::getNullValidationVisitor(), context);
+    THROW_IF_NOT_OK_REF(parsed_policy_or_error.status());
+    retry_policy_ = std::move(parsed_policy_or_error.value());
   }
 }
 
@@ -898,7 +906,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   const std::string csrf_token = generateCsrfToken(config_->hmacSecret(), random_string);
   const std::string csrf_expires = std::to_string(config_->getCsrfTokenExpiresIn().count());
   const std::string csrf_cookie_tail =
-      BuildCookieTail(config_->nonceCookieSettings(), csrf_expires);
+      buildCookieTail(config_->nonceCookieSettings(), csrf_expires);
   // Use the flow id to create a unique cookie name for this OAuth flow.
   // This allows multiple concurrent OAuth flows to be handled correctly.
   const std::string csrf_cookie_name = cookieNameWithSuffix(cookie_names.oauth_nonce_, flow_id);
@@ -926,7 +934,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   const std::string code_verifier_expire_in =
       std::to_string(code_verifier_token_expires_in.count());
   const std::string code_verifier_cookie_tail =
-      BuildCookieTail(config_->codeVerifierCookieSettings(), code_verifier_expire_in);
+      buildCookieTail(config_->codeVerifierCookieSettings(), code_verifier_expire_in);
   // Use the flow id to create a unique cookie name for this OAuth flow.
   // This allows multiple concurrent OAuth flows to be handled correctly.
   const std::string code_verifier_cookie_name =
@@ -1124,7 +1132,7 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
   return std::to_string(expires_in.count());
 }
 
-std::string OAuth2Filter::BuildCookieTail(const FilterConfig::CookieSettings& settings,
+std::string OAuth2Filter::buildCookieTail(const FilterConfig::CookieSettings& settings,
                                           absl::string_view expires_time) const {
   std::string cookie_tail = fmt::format(CookieTailHttpOnlyFormatString, settings.path_,
                                         expires_time, getSameSiteString(settings.same_site_));
@@ -1242,12 +1250,12 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
   headers.addReferenceKey(
       Http::Headers::get().SetCookie,
       absl::StrCat(cookie_names.oauth_hmac_, "=", encoded_token,
-                   BuildCookieTail(config_->hmacCookieSettings(), expires_in_)));
+                   buildCookieTail(config_->hmacCookieSettings(), expires_in_)));
 
   headers.addReferenceKey(
       Http::Headers::get().SetCookie,
       absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_,
-                   BuildCookieTail(config_->expiresCookieSettings(), expires_in_)));
+                   buildCookieTail(config_->expiresCookieSettings(), expires_in_)));
 
   absl::flat_hash_map<std::string, std::string> request_cookies =
       Http::Utility::parseCookies(*request_headers_);
@@ -1260,7 +1268,7 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.bearer_token_, "=", encryptToken(access_token_),
-                     BuildCookieTail(config_->bearerTokenCookieSettings(), expires_in_)));
+                     buildCookieTail(config_->bearerTokenCookieSettings(), expires_in_)));
   } else if (request_cookies.contains(cookie_names.bearer_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
@@ -1273,7 +1281,7 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.id_token_, "=", encryptToken(id_token_),
-                     BuildCookieTail(config_->idTokenCookieSettings(), expires_id_token_in_)));
+                     buildCookieTail(config_->idTokenCookieSettings(), expires_id_token_in_)));
   } else if (request_cookies.contains(cookie_names.id_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
@@ -1286,7 +1294,7 @@ void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.refresh_token_, "=",
                                          encryptToken(refresh_token_),
-                                         BuildCookieTail(config_->refreshTokenCookieSettings(),
+                                         buildCookieTail(config_->refreshTokenCookieSettings(),
                                                          expires_refresh_token_in_)));
   } else if (request_cookies.contains(cookie_names.refresh_token_)) {
     headers.addReferenceKey(

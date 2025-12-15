@@ -69,7 +69,7 @@ envoy_sh_test(
 
 envoy_cc_test_library(
     name = "main_common_test_base_lib",
-    srcs = ["main_common_test_base.cc"],
+    srcs = envoy_select_admin_functionality(["main_common_test_base.cc"]),
     hdrs = ["main_common_test_base.h"],
     data = [
         "//test/config/integration:google_com_proxy_port_0",

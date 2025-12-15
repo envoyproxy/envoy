@@ -25,6 +25,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
@@ -1020,7 +1021,12 @@ TEST_F(AsyncClientImplTest, Retry) {
   response_decoder_->decodeHeaders(std::move(response_headers2), true);
 }
 
-TEST_F(AsyncClientImplTest, RetryWithStream) {
+TEST_F(AsyncClientImplTest, RetryWithStreamWithLegacyLogic) {
+  // Remove this test when the runtime flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_async_client_retry_respect_buffer_limits", "false"}});
+
   ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("upstream.use_retry", 100))
       .WillByDefault(Return(true));
   Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
@@ -1074,7 +1080,12 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-TEST_F(AsyncClientImplTest, DataBufferForRetryOverflow) {
+TEST_F(AsyncClientImplTest, DataBufferForRetryOverflowWithLegacyLogic) {
+  // Remove this test when the runtime flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_async_client_retry_respect_buffer_limits", "false"}});
+
   ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("upstream.use_retry", 100))
       .WillByDefault(Return(true));
 
@@ -1124,6 +1135,166 @@ TEST_F(AsyncClientImplTest, DataBufferForRetryOverflow) {
   // On retry, data will be empty because it was larger than > 64KB
   Buffer::InstancePtr empty_buffer{new Buffer::OwnedImpl("")};
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(empty_buffer.get()), true));
+  timer_->invokeCallback();
+
+  // Normal response.
+  expectResponseHeaders(stream_callbacks_, 200, true);
+  EXPECT_CALL(stream_callbacks_, onComplete());
+  ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers2), true);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(AsyncClientImplTest, RetryWithStream) {
+  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("upstream.use_retry", 100))
+      .WillByDefault(Return(true));
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual("test body"), true));
+
+  headers.setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, {});
+  stream->sendHeaders(headers, false);
+  stream->sendData(*body, true);
+
+  // Expect retry and retry timer create.
+  timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "503"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), true);
+
+  // Retry request.
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual("test body"), true));
+  timer_->invokeCallback();
+
+  // Normal response.
+  expectResponseHeaders(stream_callbacks_, 200, true);
+  EXPECT_CALL(stream_callbacks_, onComplete());
+  ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers2), true);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(AsyncClientImplTest, DataBufferForRetryOverflow) {
+  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("upstream.use_retry", 100))
+      .WillByDefault(Return(true));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+
+  // Default buffer limit is 64KB, so make the body just over that.
+
+  // large body must be > 64KB
+  const std::string body_str((1 << 16) + 1, 'a');
+  Buffer::InstancePtr large_body{new Buffer::OwnedImpl(body_str)};
+
+  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(body_str), true));
+
+  headers.setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, {});
+  stream->sendHeaders(headers, false);
+  stream->sendData(*large_body, true);
+
+  // No retry timer create since body is too large to buffer and the retry will not be attempted.
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _)).Times(0);
+  EXPECT_CALL(stream_encoder_, encodeHeaders(_, _)).Times(0);
+
+  // Expect failure response.
+  expectResponseHeaders(stream_callbacks_, 503, true);
+  EXPECT_CALL(stream_callbacks_, onComplete());
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "503"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), true);
+
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(AsyncClientImplTest, DataBufferForRetryWithLargerBufferLimit) {
+  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("upstream.use_retry", 100))
+      .WillByDefault(Return(true));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+
+  // Default buffer limit is 64KB, so make the body just over that.
+
+  // large body must be > 64KB
+  const std::string body_str((1 << 16) + 1, 'a');
+  Buffer::InstancePtr large_body{new Buffer::OwnedImpl(body_str)};
+
+  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(body_str), true));
+
+  headers.setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
+  // Set buffer limit to larger than body size.
+  AsyncClient::Stream* stream =
+      client_.start(stream_callbacks_, AsyncClient::StreamOptions().setBufferLimit((1 << 16) + 2));
+  stream->sendHeaders(headers, false);
+  stream->sendData(*large_body, true);
+
+  // Expect retry and retry timer create.
+  timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "503"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), true);
+
+  // Retry request.
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(body_str), true));
   timer_->invokeCallback();
 
   // Normal response.

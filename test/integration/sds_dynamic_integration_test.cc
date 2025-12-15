@@ -1353,36 +1353,6 @@ TEST_P(SdsDynamicClusterIntegrationTest, EdsBootStrapCluster) {
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
 }
 
-// Validate that Envoy rejects dynamic cluster in SDS ApiConfigSource when runtime feature is
-// turned off.
-TEST_P(SdsDynamicClusterIntegrationTest, RejectDynamicSdsCluster) {
-  on_server_init_function_ = [this]() {
-    {
-      // Send CDS response.
-      AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
-      RELEASE_ASSERT(result, result.message());
-      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
-      RELEASE_ASSERT(result, result.message());
-      xds_stream_->startGrpcStream();
-      sendCdsResponse();
-    }
-  };
-  sds_cluster_name_ = "sds_dynamic_cluster.lyft.com";
-  valid_sds_cluster_ = false;
-  config_helper_.addRuntimeOverride("envoy.restart_features.skip_backing_cluster_check_for_sds",
-                                    "false");
-  initialize();
-
-  // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
-  test_server_->waitForGaugeGe("server.state", 0);
-  test_server_->waitForGaugeGe("server.live", 1);
-
-  // Validate that the cds update was rejected.
-  if (clientType() == Grpc::ClientType::EnvoyGrpc) {
-    test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
-  }
-}
-
 // Validate that Envoy starts fine with a non-existent CDS cluster in SDS ApiConfigSource.
 TEST_P(SdsDynamicClusterIntegrationTest, ClusterRefersNonExistentSdsCluster) {
   on_server_init_function_ = [this]() {

@@ -1972,6 +1972,7 @@ message Decorator {
   google.protobuf.BoolValue propagate = 2;
 }
 
+// [#next-free-field: 7]
 message Tracing {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Tracing";
 
@@ -2007,6 +2008,34 @@ message Tracing {
   // each in the HTTP connection manager and the route level, the one configured here takes
   // priority.
   repeated type.tracing.v3.CustomTag custom_tags = 4;
+
+  // The operation name of the span which will be used for tracing.
+  //
+  // The same :ref:`format specifier <config_access_log_format>` as used for
+  // :ref:`HTTP access logging <config_access_log>` applies here, however
+  // unknown specifier values are replaced with the empty string instead of ``-``.
+  //
+  // This field will take precedence over and make following settings ineffective:
+  //
+  // * :ref:`route decorator <envoy_v3_api_field_config.route.v3.Route.decorator>`.
+  // * :ref:`x-envoy-decorator-operation <config_http_filters_router_x-envoy-decorator-operation>`.
+  // * :ref:`HCM tracing operation
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.operation>`.
+  string operation = 5;
+
+  // The operation name of the upstream span which will be used for tracing.
+  // This only takes effect when ``spawn_upstream_span`` is set to true and the upstream
+  // span is created.
+  //
+  // The same :ref:`format specifier <config_access_log_format>` as used for
+  // :ref:`HTTP access logging <config_access_log>` applies here, however
+  // unknown specifier values are replaced with the empty string instead of ``-``.
+  //
+  // This field will take precedence over and make following settings ineffective:
+  //
+  // * :ref:`HCM tracing upstream operation
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.upstream_operation>`
+  string upstream_operation = 6;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against
