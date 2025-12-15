@@ -40,6 +40,8 @@ inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apike
 class ProtoApiScrubberFilterConfigTest : public ::testing::Test {
 protected:
   ProtoApiScrubberFilterConfigTest() : api_(Api::createApiForTest()) {
+    // Enable trace logging to verify logs in tests
+    Envoy::TestEnvironment::setLogLevel(spdlog::level::trace);
     setupMocks();
     initDefaultProtoConfig();
   }
@@ -459,6 +461,46 @@ protected:
     return proto_config;
   }
 
+  // Helper to create a serialized FileDescriptorSet with customizable names.
+  // define_messages: if true, adds message type definitions to the file.
+  //                  if false, methods will refer to types that do not exist (for failure testing).
+  std::string createGenericDescriptor(const std::string& package_name,
+                                      const std::string& service_name,
+                                      const std::string& method_name, const std::string& input_type,
+                                      const std::string& output_type, bool define_messages = true) {
+    Protobuf::FileDescriptorProto file_proto;
+    file_proto.set_name("generic_test.proto");
+
+    // Only set package if it's not empty to test root-level services
+    if (!package_name.empty()) {
+      file_proto.set_package(package_name);
+    }
+    file_proto.set_syntax("proto3");
+
+    if (define_messages) {
+      auto* req_msg = file_proto.add_message_type();
+      req_msg->set_name(input_type);
+
+      auto* resp_msg = file_proto.add_message_type();
+      resp_msg->set_name(output_type);
+    }
+
+    auto* service = file_proto.add_service();
+    service->set_name(service_name);
+
+    auto* method = service->add_method();
+    method->set_name(method_name);
+    method->set_input_type(input_type);
+    method->set_output_type(output_type);
+
+    Envoy::Protobuf::FileDescriptorSet descriptor_set;
+    descriptor_set.add_file()->CopyFrom(file_proto);
+
+    std::string descriptor_bytes;
+    descriptor_set.SerializeToString(&descriptor_bytes);
+    return descriptor_bytes;
+  }
+
   // Helper to create a serialized FileDescriptorSet containing a specific Enum.
   // Defines: enum test.TestEnum { UNKNOWN = 0; ACTIVE = 1; }
   std::string createDescriptorWithTestEnum() {
@@ -477,47 +519,6 @@ protected:
     auto* val1 = enum_type->add_value();
     val1->set_name("ACTIVE");
     val1->set_number(1);
-
-    Envoy::Protobuf::FileDescriptorSet descriptor_set;
-    descriptor_set.add_file()->CopyFrom(file_proto);
-
-    std::string descriptor_bytes;
-    descriptor_set.SerializeToString(&descriptor_bytes);
-    return descriptor_bytes;
-  }
-
-  // Helper to create a serialized FileDescriptorSet with custom names.
-  // This allows testing various naming patterns (nested packages, no package, etc.)
-  std::string createGenericDescriptor(const std::string& package_name,
-                                      const std::string& service_name,
-                                      const std::string& method_name, const std::string& input_type,
-                                      const std::string& output_type) {
-    Protobuf::FileDescriptorProto file_proto;
-    file_proto.set_name("generic_test.proto");
-
-    // Only set package if it's not empty to test root-level services.
-    if (!package_name.empty()) {
-      file_proto.set_package(package_name);
-    }
-    file_proto.set_syntax("proto3");
-
-    // Define Input Message.
-    auto* req_msg = file_proto.add_message_type();
-    req_msg->set_name(input_type);
-
-    // Define Output Message.
-    auto* resp_msg = file_proto.add_message_type();
-    resp_msg->set_name(output_type);
-
-    // Define Service.
-    auto* service = file_proto.add_service();
-    service->set_name(service_name);
-
-    // Define Method.
-    auto* method = service->add_method();
-    method->set_name(method_name);
-    method->set_input_type(input_type);
-    method->set_output_type(output_type);
 
     Envoy::Protobuf::FileDescriptorSet descriptor_set;
     descriptor_set.add_file()->CopyFrom(file_proto);
@@ -1098,7 +1099,6 @@ TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeTypeCacheWithNestedPackages) 
 // Tests that the type cache is correctly populated for descriptors defined at the root level (no
 // package).
 TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeTypeCacheNoPackage) {
-  // Test valid proto without a package statement
   const std::string package = "";
   const std::string service = "RootService";
   const std::string method = "Ping";
@@ -1113,12 +1113,81 @@ TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeTypeCacheNoPackage) {
   ASSERT_THAT(filter_config_or_status, IsOk());
   auto filter_config = filter_config_or_status.value();
 
-  // Logic check: If package is empty, path should be /Service/Method, not /.Service/Method
+  // If package is empty, path should be /Service/Method, not /.Service/Method
   std::string full_method_path = "/RootService/Ping";
 
   auto type_or_status = filter_config->getRequestType(full_method_path);
   ASSERT_THAT(type_or_status, IsOk());
   EXPECT_EQ(type_or_status.value()->name(), "PingReq");
+}
+
+// Tests handling of types defined with relative names (no leading dot) in the descriptor.
+TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeCacheRelativeTypeNames) {
+  std::string package = "rel.pkg";
+  std::string service = "RelService";
+  std::string method = "RelMethod";
+  std::string input = "RelReq";
+  std::string output = "RelResp";
+
+  // Use helper but ensure it sets input_type/output_type exactly as passed strings
+  // (which are relative names here).
+  ProtoApiScrubberConfig config;
+  *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+      createGenericDescriptor(package, service, method, input, output);
+
+  auto filter_config_or_status = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+  ASSERT_THAT(filter_config_or_status, IsOk());
+  auto filter_config = filter_config_or_status.value();
+
+  std::string full_method_path = "/rel.pkg.RelService/RelMethod";
+
+  // Request Type.
+  auto req_type = filter_config->getRequestType(full_method_path);
+  ASSERT_THAT(req_type, IsOk());
+  // The logic should have prepended "rel.pkg." to "RelReq".
+  EXPECT_EQ(req_type.value()->name(), "rel.pkg.RelReq");
+
+  // Response Type.
+  auto resp_type = filter_config->getResponseType(full_method_path);
+  ASSERT_THAT(resp_type, IsOk());
+  // The logic should have prepended "rel.pkg." to "RelResp".
+  EXPECT_EQ(resp_type.value()->name(), "rel.pkg.RelResp");
+}
+
+// Tests that appropriate errors are logged when types referenced by a method
+// are missing from the descriptor pool.
+TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeCacheMissingTypes) {
+  std::string package = "broken.pkg";
+  std::string service = "BrokenService";
+  std::string method = "BrokenMethod";
+  std::string input = "MissingReq";
+  std::string output = "MissingResp";
+
+  // Create a descriptor that defines the service/method but NOT the message types.
+  ProtoApiScrubberConfig config;
+  *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+      createGenericDescriptor(package, service, method, input, output, /*define_messages=*/false);
+
+  // When creating the config, precomputeTypeCache runs and logs errors.
+  // We expect the creation to succeed (soft failure on missing types), but we check logs.
+  EXPECT_LOG_CONTAINS("error",
+                      "Failed to resolve Request Type for /broken.pkg.BrokenService/BrokenMethod",
+                      auto status = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+                      EXPECT_THAT(status, IsOk()););
+
+  // Re-run to catch the second log (response type error).
+  EXPECT_LOG_CONTAINS("error",
+                      "Failed to resolve Response Type for /broken.pkg.BrokenService/BrokenMethod",
+                      ProtoApiScrubberFilterConfig::create(config, factory_context_));
+
+  auto filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_).value();
+
+  // Verify that looking up these types fails gracefully.
+  std::string full_method_path = "/broken.pkg.BrokenService/BrokenMethod";
+  EXPECT_THAT(filter_config->getRequestType(full_method_path).status(),
+              HasStatus(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(filter_config->getResponseType(full_method_path).status(),
+              HasStatus(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(ProtoApiScrubberFilterConfigTest, GetEnumName) {
