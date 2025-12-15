@@ -59,7 +59,7 @@ void WatcherImpl::callAndLogOnError(OnChangedCb& cb, uint32_t events, const std:
     if (!status.ok()) {
       // Use ENVOY_LOG_EVERY_POW_2 to avoid log spam if a callback keeps failing.
       ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' returned error: {}", file,
-                           status.message());
+                            status.message());
     }
   }
   END_TRY
@@ -67,11 +67,11 @@ void WatcherImpl::callAndLogOnError(OnChangedCb& cb, uint32_t events, const std:
       const std::exception& e,
       {
         ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw exception: {}", file,
-                             e.what());
+                              e.what());
       },
       {
         ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw unknown exception",
-                             file);
+                              file);
       });
 }
 

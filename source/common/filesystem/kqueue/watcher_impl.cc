@@ -120,7 +120,7 @@ absl::Status WatcherImpl::onKqueueEvent() {
     if (!pathname_or_error.ok()) {
       // Use ENVOY_LOG_EVERY_POW_2 to avoid log spam since path failures are persistent.
       ENVOY_LOG_EVERY_POW_2(warn, "Failed to split path '{}': {}", file->file_,
-                           pathname_or_error.status().message());
+                            pathname_or_error.status().message());
       continue;
     }
     PathSplitResult& pathname = pathname_or_error.value();
@@ -137,7 +137,7 @@ absl::Status WatcherImpl::onKqueueEvent() {
         auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
         if (!file_or_error.ok()) {
           ENVOY_LOG_EVERY_POW_2(warn, "Failed to re-add watch for '{}': {}", file->file_,
-                               file_or_error.status().message());
+                                file_or_error.status().message());
           continue;
         }
         FileWatchPtr new_file = file_or_error.value();
@@ -162,7 +162,7 @@ absl::Status WatcherImpl::onKqueueEvent() {
         auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
         if (!file_or_error.ok()) {
           ENVOY_LOG_EVERY_POW_2(warn, "Failed to re-add watch for '{}': {}", file->file_,
-                               file_or_error.status().message());
+                                file_or_error.status().message());
           continue;
         }
         FileWatchPtr new_file = file_or_error.value();
@@ -200,7 +200,7 @@ void WatcherImpl::callAndLogOnError(Watcher::OnChangedCb& cb, uint32_t events,
     if (!status.ok()) {
       // Use ENVOY_LOG_EVERY_POW_2 to avoid log spam if a callback keeps failing.
       ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' returned error: {}", file,
-                           status.message());
+                            status.message());
     }
   }
   END_TRY
@@ -208,11 +208,11 @@ void WatcherImpl::callAndLogOnError(Watcher::OnChangedCb& cb, uint32_t events,
       const std::exception& e,
       {
         ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw exception: {}", file,
-                             e.what());
+                              e.what());
       },
       {
         ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw unknown exception",
-                             file);
+                              file);
       });
 }
 
