@@ -110,6 +110,7 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   }
 
   initializeTypeUtils();
+  precomputeTypeCache(descriptor_set);
 
   ENVOY_LOG(trace, "Filter config initialized successfully.");
   return absl::OkStatus();
@@ -339,8 +340,6 @@ void ProtoApiScrubberFilterConfig::initializeTypeUtils() {
       [this](absl::string_view type_url) -> const ::Envoy::Protobuf::Type* {
         return type_helper_->Info()->GetTypeByTypeUrl(type_url);
       });
-
-  precomputeTypeCache(descriptor_set);
 }
 
 void ProtoApiScrubberFilterConfig::precomputeTypeCache(

@@ -486,7 +486,7 @@ protected:
     return descriptor_bytes;
   }
 
-  // Helper to create a serialized FileDescriptorSet with customizable names.
+  // Helper to create a serialized FileDescriptorSet with custom names.
   // This allows testing various naming patterns (nested packages, no package, etc.)
   std::string createGenericDescriptor(const std::string& package_name,
                                       const std::string& service_name,
