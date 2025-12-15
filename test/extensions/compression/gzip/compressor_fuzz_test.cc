@@ -4,6 +4,9 @@
 #include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 #include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
+#include "test/extensions/compression/gzip/compressor_fuzz_input.pb.h"
+#include "test/extensions/compression/gzip/compressor_fuzz_input.pb.validate.h"
+
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
