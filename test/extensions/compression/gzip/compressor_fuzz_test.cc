@@ -74,7 +74,7 @@ DEFINE_PROTO_FUZZER(
     ENVOY_LOG_MISC(debug, "Processing {} bytes", next_data.size());
     full_input.add(next_data);
     Buffer::OwnedImpl buffer{next_data.data(), next_data.size()};
-    bool last_chunk = i == input.data_chunks_size() - 1;
+    const bool last_chunk = i == input.data_chunks_size() - 1;
     compressor.compress(buffer, last_chunk ? Envoy::Compression::Compressor::State::Finish
                                            : Envoy::Compression::Compressor::State::Flush);
     decompressor.decompress(buffer, full_output);
