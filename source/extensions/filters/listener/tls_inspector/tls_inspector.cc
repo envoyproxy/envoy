@@ -236,7 +236,11 @@ ParseState Filter::getParserState(int handshake_status) {
         if (read_ >= maxConfigReadBytes()) {
           setDynamicMetadata(failureReasonClientHelloTooLarge());
           config_->stats().client_hello_too_large_.inc();
+        } else {
+          setDynamicMetadata(failureReasonClientHelloNotDetected());
+          config_->stats().tls_not_found_.inc();
         }
+        setDownstreamTransportFailureReason();
         return ParseState::Error;
       }
       config_->stats().tls_not_found_.inc();
