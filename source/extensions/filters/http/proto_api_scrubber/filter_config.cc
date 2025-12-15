@@ -222,6 +222,17 @@ absl::Status ProtoApiScrubberFilterConfig::validateMethodName(absl::string_view 
                     kConfigInitializationError, method_name));
   }
 
+  // Validate that the method exists in the descriptor pool.
+  // Note: descriptor_pool_ is initialized before this validation is called.
+  absl::StatusOr<const MethodDescriptor*> method_desc =
+      getMethodDescriptor(std::string(method_name));
+
+  if (!method_desc.ok()) {
+    return absl::InvalidArgumentError(
+        fmt::format("{} Invalid method name: '{}'. The method is not found in the descriptor pool.",
+                    kConfigInitializationError, method_name));
+  }
+
   return absl::OkStatus();
 }
 
