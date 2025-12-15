@@ -10,6 +10,7 @@ PUBSUB
 RANDOMKEY
 SLOWLOG
 addrlen
+defragmentation
 evictable
 flushdb
 itr
@@ -221,6 +222,7 @@ dereferencing
 deprioritized
 differentially
 dnsresolvers
+eb
 endpos
 eps
 fo
@@ -278,6 +280,7 @@ Isode
 Iters
 JSON
 JSONs
+jsonrpc
 JWKS
 JWKs
 JWS
@@ -304,6 +307,7 @@ ingressed
 integrations
 iouring
 jkl
+keyspace
 lang
 libcurl
 libsxg
@@ -743,9 +747,12 @@ deduplicate
 deduplicates
 deduplication
 deflater
+defragmenting
 deletable
 deleter
 delim
+demultiplexer
+demux
 denylist
 deque
 dep
@@ -1594,7 +1601,11 @@ routable
 vhosts
 infos
 ElastiCache
+Parametrized
 pinterest
+callouts
+streamable
+extern
 NSS
 SSLKEYLOGFILE
 DLB

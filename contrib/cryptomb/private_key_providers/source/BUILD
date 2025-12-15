@@ -18,7 +18,6 @@ envoy_cmake(
     name = "ipp-crypto",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -26,8 +25,16 @@ envoy_cmake(
         "DYNAMIC_LIB": "off",
         "MB_STANDALONE": "on",
         "Python_EXECUTABLE": "$$EXT_BUILD_ROOT/$(PYTHON3)",
-        "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto_internal.a",
-    },
+    } | select({
+        # FIPS builds use libcrypto.a/libssl.a
+        "//bazel:boringssl_fips": {
+            "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto.a",
+        },
+        # Non-FIPS builds use libcrypto_internal.a/libssl_internal.a
+        "//conditions:default": {
+            "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto_internal.a",
+        },
+    }),
     defines = [
         "OPENSSL_USE_STATIC_LIBS=TRUE",
     ],

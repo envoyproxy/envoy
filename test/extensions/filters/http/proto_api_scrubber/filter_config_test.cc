@@ -459,6 +459,33 @@ protected:
     return proto_config;
   }
 
+  // Helper to create a serialized FileDescriptorSet containing a specific Enum.
+  // Defines: enum test.TestEnum { UNKNOWN = 0; ACTIVE = 1; }
+  std::string createDescriptorWithTestEnum() {
+    Protobuf::FileDescriptorProto file_proto;
+    file_proto.set_name("test_enum.proto");
+    file_proto.set_package("test");
+    file_proto.set_syntax("proto3");
+
+    auto* enum_type = file_proto.add_enum_type();
+    enum_type->set_name("TestEnum");
+
+    auto* val0 = enum_type->add_value();
+    val0->set_name("UNKNOWN");
+    val0->set_number(0);
+
+    auto* val1 = enum_type->add_value();
+    val1->set_name("ACTIVE");
+    val1->set_number(1);
+
+    Envoy::Protobuf::FileDescriptorSet descriptor_set;
+    descriptor_set.add_file()->CopyFrom(file_proto);
+
+    std::string descriptor_bytes;
+    descriptor_set.SerializeToString(&descriptor_bytes);
+    return descriptor_bytes;
+  }
+
   Api::ApiPtr api_;
   ProtoApiScrubberConfig proto_config_;
   std::shared_ptr<const ProtoApiScrubberFilterConfig> filter_config_;
@@ -952,6 +979,86 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetRequestType) {
   }
 }
 
+TEST_F(ProtoApiScrubberFilterConfigTest, GetResponseType) {
+  // 1. Initialize the config
+  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> config_or_status =
+      ProtoApiScrubberFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_EQ(config_or_status.status().code(), absl::StatusCode::kOk);
+  filter_config_ = std::move(config_or_status.value());
+
+  {
+    // Case 1: Valid Method Name
+    // The method name passed from headers usually has the format /Package.Service/Method
+    std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
+
+    absl::StatusOr<const Protobuf::Type*> type_or_status =
+        filter_config_->getResponseType(method_name);
+
+    ASSERT_EQ(type_or_status.status().code(), absl::StatusCode::kOk);
+    ASSERT_NE(type_or_status.value(), nullptr);
+
+    // Verify the resolved input type is correct
+    EXPECT_EQ(type_or_status.value()->name(), "apikeys.ApiKey");
+  }
+
+  {
+    // Case 2: Invalid Method Name (Not in descriptor)
+    std::string method_name = "/apikeys.ApiKeys/NonExistentMethod";
+
+    absl::StatusOr<const Protobuf::Type*> type_or_status =
+        filter_config_->getResponseType(method_name);
+
+    EXPECT_EQ(type_or_status.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(
+        type_or_status.status().message(),
+        testing::HasSubstr(
+            "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the descriptor pool"));
+  }
+}
+
+TEST_F(ProtoApiScrubberFilterConfigTest, GetEnumName) {
+  // Setup Config with the custom Enum descriptor
+  ProtoApiScrubberConfig config;
+  *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+      createDescriptorWithTestEnum();
+
+  // Initialize filter config.
+  auto filter_config_or_status = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+  ASSERT_THAT(filter_config_or_status, IsOk());
+  auto filter_config = filter_config_or_status.value();
+
+  {
+    // Case 1.1: Valid Lookup (Type and Value exist)
+    auto result = filter_config->getEnumName("test.TestEnum", 1);
+    ASSERT_THAT(result, IsOk());
+    EXPECT_EQ(result.value(), "ACTIVE");
+  }
+
+  {
+    // Case 1.2: Valid Lookup (Type and Value exist)
+    auto result = filter_config->getEnumName("test.TestEnum", 0);
+    ASSERT_THAT(result, IsOk());
+    EXPECT_EQ(result.value(), "UNKNOWN");
+  }
+
+  {
+    // Case 2: Invalid Value (Type exists, Value does not)
+    auto result = filter_config->getEnumName("test.TestEnum", 999);
+    EXPECT_THAT(result,
+                HasStatus(absl::StatusCode::kNotFound,
+                          HasSubstr("Enum value '999' not found in enum type 'test.TestEnum'")));
+  }
+
+  {
+    // Case 3: Invalid Type Name (Type does not exist)
+    auto result = filter_config->getEnumName("test.NonExistentEnum", 1);
+    EXPECT_THAT(
+        result,
+        HasStatus(absl::StatusCode::kNotFound,
+                  HasSubstr("Enum type 'test.NonExistentEnum' not found in descriptor pool")));
+  }
+}
+
 TEST_F(ProtoApiScrubberFilterConfigTest, GetTypeFinder) {
   absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> config_or_status =
       ProtoApiScrubberFilterConfig::create(proto_config_, factory_context_);
@@ -1061,6 +1168,76 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MessageNameValidations) {
   EXPECT_THAT(ProtoApiScrubberFilterConfig::create(getConfigWithMessageName("package.Message"),
                                                    factory_context_),
               IsOk());
+}
+
+TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
+  std::string filter_conf_string = R"pb(
+    descriptor_set: {}
+    restrictions: {
+      method_restrictions: {
+        key: "/library.BookService/GetBook"
+        value: {
+          request_field_restrictions: {
+            key: "debug_info"
+            value: {
+              matcher: {
+                matcher_list: {
+                  matchers: {
+                    predicate: {
+                      single_predicate: {
+                        input: {
+                          name: "request"
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] {}
+                          }
+                        }
+                        custom_match: {
+                           name: "cel"
+                          typed_config: {
+                            [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                              expr_match: {
+                                parsed_expr: { expr: { const_expr: { bool_value: true } } }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    on_match: {
+                      action: {
+                        name: "some_unknown_action"
+                        typed_config: {
+                          # Using Google Protobuf Empty as a placeholder for an unknown action
+                          [type.googleapis.com/google.protobuf.Empty] {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  )pb";
+  ProtoApiScrubberConfig proto_config;
+  Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+  *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+          .value();
+
+  // Validate that creating the config throws an EnvoyException because the action
+  // "some_unknown_action" is not registered.
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto status_or_config =
+            ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
+      },
+      EnvoyException,
+      "Didn't find a registered implementation for 'some_unknown_action' with type URL: "
+      "'google.protobuf.Empty'");
 }
 
 } // namespace

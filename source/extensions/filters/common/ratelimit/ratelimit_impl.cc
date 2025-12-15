@@ -51,6 +51,8 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
   request.set_domain(domain);
   request.set_hits_addend(hits_addend);
   for (const Envoy::RateLimit::Descriptor& descriptor : descriptors) {
+    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), trace,
+                        "adding ratelimit descriptor: {}", descriptor.toString());
     envoy::extensions::common::ratelimit::v3::RateLimitDescriptor* new_descriptor =
         request.add_descriptors();
     for (const Envoy::RateLimit::DescriptorEntry& entry : descriptor.entries_) {

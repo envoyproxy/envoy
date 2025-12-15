@@ -74,6 +74,47 @@ public:
         }));
   }
   using TcpProxyTestBase::setup;
+
+  // Helper to set up filter for ON_DOWNSTREAM_DATA mode tests without calling setup().
+  // This avoids conflicting expectations for IMMEDIATE mode.
+  void setupOnDownstreamDataMode(
+      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
+      bool receive_before_connect = true) {
+    configure(config);
+    mock_access_logger_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+    const_cast<AccessLog::InstanceSharedPtrVector&>(config_->accessLogs())
+        .push_back(mock_access_logger_);
+
+    // Set up upstream connection data.
+    upstream_connections_.push_back(std::make_unique<NiceMock<Network::MockClientConnection>>());
+    upstream_connection_data_.push_back(
+        std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>());
+    ON_CALL(*upstream_connection_data_.back(), connection())
+        .WillByDefault(ReturnRef(*upstream_connections_.back()));
+    upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
+    conn_pool_handles_.push_back(
+        std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
+    ON_CALL(*upstream_hosts_.at(0), address())
+        .WillByDefault(Return(*Network::Utility::resolveUrl("tcp://127.0.0.1:80")));
+    EXPECT_CALL(*upstream_connections_.at(0), dispatcher())
+        .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
+
+    // Set receive_before_connect filter state.
+    filter_callbacks_.connection().streamInfo().filterState()->setData(
+        TcpProxy::ReceiveBeforeConnectKey,
+        std::make_unique<StreamInfo::BoolAccessorImpl>(receive_before_connect),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+
+    // Create and initialize filter.
+    filter_ = std::make_unique<Filter>(config_,
+                                       factory_context_.server_factory_context_.cluster_manager_);
+    EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
+    // For ON_DOWNSTREAM_DATA mode with receive_before_connect, readDisable is not called initially.
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setSslConnection(filter_callbacks_.connection_.ssl());
+  }
   void setup(uint32_t connections, bool set_redirect_records, bool receive_before_connect,
              const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) override {
     if (config.has_on_demand()) {
@@ -2447,6 +2488,202 @@ TEST_P(TcpProxyTest, SetDynamicTLVWithStartTime) {
               timestamp_value.find(":") != std::string::npos);
 }
 
+// Test buffer overflow behavior - should only readDisable, not re-trigger connection.
+TEST_P(TcpProxyTest, BufferOverflowOnlyReadDisables) {
+  // Configure with small buffer to test overflow.
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(10);
+
+  // Set up filter for ON_DOWNSTREAM_DATA mode without calling setup() to avoid conflicting
+  // expectations.
+  setupOnDownstreamDataMode(config, true);
+
+  // Initial onNewConnection should return Continue for ON_DOWNSTREAM_DATA
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Set up expectations for connection establishment when onData() triggers it.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // First data chunk - should trigger connection.
+  // Since buffer (5 bytes) < max (10 bytes), we don't read-disable yet.
+  Buffer::OwnedImpl initial_data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(initial_data, false));
+
+  // Connection should be triggered exactly once.
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1);
+
+  // Second data chunk that exceeds buffer - should NOT trigger connection again, but should
+  // read-disable.
+  Buffer::OwnedImpl overflow_data("world!!!"); // 8 bytes, total = 13 > 10 max
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  // No new connection establishment call expected.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(overflow_data, false));
+
+  // Connection should still be triggered exactly once (not twice).
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1);
+}
+
+// Test that connection is triggered exactly once with multiple data chunks.
+TEST_P(TcpProxyTest, SingleConnectionTriggerWithMultipleDataChunks) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+
+  // Set up filter for ON_DOWNSTREAM_DATA mode without calling setup() to avoid conflicting
+  // expectations.
+  setupOnDownstreamDataMode(config, true);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  int connection_attempts = 0;
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillRepeatedly(Invoke([&](auto, auto, auto) {
+        connection_attempts++;
+        return Upstream::TcpPoolData([]() {}, &conn_pool_);
+      }));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillRepeatedly(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // For new API with max_early_data_bytes=1024, readDisable(true) is only called when buffer
+  // exceeds limit. Each chunk is 6 bytes, so we won't exceed 1024, so readDisable shouldn't be
+  // called.
+
+  // First data chunk.
+  Buffer::OwnedImpl data1("chunk1");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data1, false));
+  EXPECT_EQ(connection_attempts, 1);
+
+  // Second data chunk - should NOT trigger another connection.
+  Buffer::OwnedImpl data2("chunk2");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
+  EXPECT_EQ(connection_attempts, 1);
+
+  // Third data chunk - should NOT trigger another connection.
+  Buffer::OwnedImpl data3("chunk3");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data3, false));
+  EXPECT_EQ(connection_attempts, 1);
+
+  // Verify connection was triggered exactly once.
+  EXPECT_EQ(connection_attempts, 1);
+}
+
+// Test empty data with end_stream doesn't trigger connection in ON_DOWNSTREAM_DATA mode.
+TEST_P(TcpProxyTest, EmptyDataWithEndStreamDoesNotTriggerConnection) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+
+  // Set up filter for ON_DOWNSTREAM_DATA mode without calling setup() to avoid conflicting
+  // expectations.
+  setupOnDownstreamDataMode(config, true);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Empty data with end_stream should NOT trigger connection.
+  Buffer::OwnedImpl empty_data;
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(empty_data, true));
+
+  // No connection should be established.
+  EXPECT_TRUE(conn_pool_callbacks_.empty());
+}
+
+// Test that StopIteration in ON_DOWNSTREAM_DATA mode still allows reading.
+TEST_P(TcpProxyTest, StopIterationAllowsReading) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+
+  // Set up filter for ON_DOWNSTREAM_DATA mode without calling setup() to avoid conflicting
+  // expectations.
+  setupOnDownstreamDataMode(config, true);
+
+  // onNewConnection returns Continue for ON_DOWNSTREAM_DATA mode with receive_before_connect
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Setup expectations for when data arrives.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // For new API with max_early_data_bytes=1024, readDisable(true) is only called when buffer
+  // exceeds limit. "test_data" is 9 bytes, so we won't exceed 1024, so readDisable shouldn't be
+  // called.
+
+  // Data can still be received after StopIteration.
+  Buffer::OwnedImpl data("test_data");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Connection should be established.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+// Test large buffer scenario with ON_DOWNSTREAM_DATA mode.
+TEST_P(TcpProxyTest, LargeBufferScenario) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(65536);
+
+  // Use setupOnDownstreamDataMode to avoid conflicting expectations from base setup.
+  setupOnDownstreamDataMode(config, false /* receive_before_connect */);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // With new API, readDisable is only called when buffer exceeds limit, not when it reaches it.
+  // So with 65536 bytes and limit 65536, readDisable should NOT be called.
+  // But we need to send more than 65536 to trigger readDisable.
+  // Actually, let's send 65537 bytes to exceed the limit.
+  std::string large_data(65537, 'A');
+  Buffer::OwnedImpl data(large_data);
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Connection should be established.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
 INSTANTIATE_TEST_SUITE_P(WithOrWithoutUpstream, TcpProxyTest, ::testing::Bool());
 
 TEST(PerConnectionCluster, ObjectFactory) {
@@ -2459,6 +2696,538 @@ TEST(PerConnectionCluster, ObjectFactory) {
   auto object = factory->createFromBytes(cluster);
   ASSERT_NE(nullptr, object);
   EXPECT_EQ(cluster, object->serializeAsString());
+}
+
+// Test configuration parsing for UpstreamConnectMode.
+TEST(TcpProxyConfigTest, UpstreamConnectModeImmediateConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: IMMEDIATE
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_EQ(config.upstreamConnectMode(),
+            envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE);
+}
+
+TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamDataConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: ON_DOWNSTREAM_DATA
+    max_early_data_bytes: 1024
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_EQ(config.upstreamConnectMode(),
+            envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  EXPECT_TRUE(config.maxEarlyDataBytes().has_value());
+  EXPECT_EQ(config.maxEarlyDataBytes().value(), 1024);
+}
+
+TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamTlsHandshakeConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: ON_DOWNSTREAM_TLS_HANDSHAKE
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_EQ(config.upstreamConnectMode(),
+            envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+}
+
+TEST(TcpProxyConfigTest, UpstreamConnectModeDefaultConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  // Should default to IMMEDIATE mode.
+  EXPECT_EQ(config.upstreamConnectMode(),
+            envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE);
+  EXPECT_FALSE(config.maxEarlyDataBytes().has_value());
+}
+
+TEST(TcpProxyConfigTest, UpstreamConnectModeWithEarlyDataBuffering) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: IMMEDIATE
+    max_early_data_bytes: 4096
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  // IMMEDIATE mode with early data buffering enabled.
+  EXPECT_EQ(config.upstreamConnectMode(),
+            envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE);
+  EXPECT_TRUE(config.maxEarlyDataBytes().has_value());
+  EXPECT_EQ(config.maxEarlyDataBytes().value(), 4096);
+}
+
+// Test that ON_DOWNSTREAM_DATA mode requires max_early_data_bytes.
+TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamDataRequiresEarlyDataBytes) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: ON_DOWNSTREAM_DATA
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  // Should throw exception because max_early_data_bytes is not set.
+  EXPECT_THROW_WITH_MESSAGE(
+      Config config(tcp_proxy, factory_context), EnvoyException,
+      "max_early_data_bytes must be set when upstream_connect_mode is ON_DOWNSTREAM_DATA");
+}
+
+// Test TLS handshake completion detection for ON_DOWNSTREAM_TLS_HANDSHAKE mode.
+// Use parameterized testing like the base class.
+class TcpProxyTlsHandshakeTest : public TcpProxyTest {
+public:
+  void setupFilter(const std::string& yaml, bool receive_before_connect = false,
+                   bool expect_initial_read_disable = true) {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+    // Configure without calling the base setup to avoid conflicting expectations.
+    configure(tcp_proxy);
+    mock_access_logger_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+    const_cast<AccessLog::InstanceSharedPtrVector&>(config_->accessLogs())
+        .push_back(mock_access_logger_);
+
+    // Set up upstream connection data.
+    upstream_connections_.push_back(std::make_unique<NiceMock<Network::MockClientConnection>>());
+    upstream_connection_data_.push_back(
+        std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>());
+    ON_CALL(*upstream_connection_data_.back(), connection())
+        .WillByDefault(ReturnRef(*upstream_connections_.back()));
+    upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
+    conn_pool_handles_.push_back(
+        std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
+
+    // Set receive_before_connect filter state.
+    filter_callbacks_.connection().streamInfo().filterState()->setData(
+        TcpProxy::ReceiveBeforeConnectKey,
+        std::make_unique<StreamInfo::BoolAccessorImpl>(receive_before_connect),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+
+    // Create and initialize filter.
+    filter_ = std::make_unique<Filter>(config_,
+                                       factory_context_.server_factory_context_.cluster_manager_);
+    EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
+
+    // For TLS modes with TLS connections, the filter will call readDisable(true)
+    // when waiting for TLS handshake, regardless of receive_before_connect.
+    if (expect_initial_read_disable) {
+      EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+    }
+
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setSslConnection(filter_callbacks_.connection_.ssl());
+  }
+
+  void setupTlsMode() {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: fake_cluster
+      upstream_connect_mode: ON_DOWNSTREAM_TLS_HANDSHAKE
+    )EOF";
+
+    // receive_before_connect=false, expect_initial_read_disable=true
+    setupFilter(yaml, false, true);
+  }
+};
+
+TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeMode_WithTlsConnection_WaitsForHandshake) {
+  // Setup SSL connection before initializing the filter.
+  auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(ssl_connection));
+
+  setupTlsMode();
+
+  // Call onNewConnection() to initialize the filter.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Set up connection pool expectations for when TLS handshake completes.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // Simulate TLS handshake completion.
+  filter_->onDownstreamTlsHandshakeComplete();
+
+  // Verify connection establishment was triggered.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeMode_WithNonTlsConnection_ImmediateConnect) {
+  // No SSL connection.
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(nullptr));
+
+  // Set up connection pool expectations - should be called immediately for non-TLS.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // readDisable(true) is already expected in setupFilter.
+
+  setupTlsMode();
+
+  // Call onNewConnection() to initialize the filter.
+  // Since it's non-TLS, it should connect immediately.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Connection should be established immediately.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+TEST_P(TcpProxyTlsHandshakeTest, EarlyDataBufferExceedsMaxSize) {
+  // Setup SSL connection before initializing the filter.
+  auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(ssl_connection));
+
+  // Configure with small max_buffered_bytes to trigger the overflow.
+  setupFilter(R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: ON_DOWNSTREAM_DATA
+    max_early_data_bytes: 10
+  )EOF",
+              true,   // receive_before_connect
+              false); // expect_initial_read_disable
+
+  // Call onNewConnection() to initialize the filter.
+  // For ON_DOWNSTREAM_DATA mode, it should return Continue to allow data to flow.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Set up connection pool expectations. Connection should be triggered when initial data is
+  // received.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // First, send small amount of data. We should buffer it and trigger connection.
+  // Since buffer (5 bytes) < max (10 bytes), we don't read-disable yet.
+  Buffer::OwnedImpl small_data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(small_data, false));
+
+  // Connection should be triggered by initial data.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+
+  // Now send more data that will exceed max_buffered_bytes (10 bytes total).
+  // Current buffer has 5 bytes, adding 10 more = 15 bytes > 10 max.
+  // This should trigger readDisable(true) to prevent further buffering.
+  Buffer::OwnedImpl more_data("more data!");
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(more_data, false));
+}
+
+TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeViaConnectedEvent) {
+  // Setup SSL connection before initializing the filter.
+  auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(ssl_connection));
+
+  setupTlsMode();
+
+  // Call onNewConnection() to initialize the filter.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Set up connection pool expectations for when TLS handshake completes.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // Simulate TLS handshake completion via Connected event.
+  // This triggers the DownstreamCallbacks which calls onDownstreamEvent internally.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Verify connection establishment was triggered.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+// Instantiate parameterized tests with both values of the runtime feature flag.
+INSTANTIATE_TEST_SUITE_P(TcpProxyTlsHandshakeTestParams, TcpProxyTlsHandshakeTest,
+                         testing::Values(false, true));
+
+// Test that IMMEDIATE mode can be combined with max_early_data_bytes.
+TEST(TcpProxyConfigTest, OrthogonalityImmediateModeWithEarlyData) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: IMMEDIATE
+    max_early_data_bytes: 4096
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  // Both fields should be set independently.
+  EXPECT_EQ(config.upstreamConnectMode(),
+            envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE);
+  EXPECT_TRUE(config.maxEarlyDataBytes().has_value());
+  EXPECT_EQ(config.maxEarlyDataBytes().value(), 4096);
+}
+
+// Test that ON_DOWNSTREAM_TLS_HANDSHAKE can be combined with max_early_data_bytes.
+TEST(TcpProxyConfigTest, OrthogonalityTlsHandshakeModeWithEarlyData) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: ON_DOWNSTREAM_TLS_HANDSHAKE
+    max_early_data_bytes: 8192
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_EQ(config.upstreamConnectMode(),
+            envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+  EXPECT_TRUE(config.maxEarlyDataBytes().has_value());
+  EXPECT_EQ(config.maxEarlyDataBytes().value(), 8192);
+}
+
+// Test that ON_DOWNSTREAM_TLS_HANDSHAKE without max_early_data_bytes works.
+TEST(TcpProxyConfigTest, OrthogonalityTlsHandshakeModeWithoutEarlyData) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: ON_DOWNSTREAM_TLS_HANDSHAKE
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_EQ(config.upstreamConnectMode(),
+            envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+  EXPECT_FALSE(config.maxEarlyDataBytes().has_value());
+}
+
+// Test that buffer exactly at limit does NOT trigger readDisable (only > limit does).
+TEST_P(TcpProxyTest, BufferExactlyAtLimitDoesNotReadDisable) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(5); // Exactly 5 bytes
+
+  // Use setupOnDownstreamDataMode to avoid conflicting expectations from base setup.
+  setupOnDownstreamDataMode(config, false /* receive_before_connect */);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // Send exactly 5 bytes. It should trigger connection but NOT readDisable.
+  Buffer::OwnedImpl exact_data("hello"); // 5 bytes exactly
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(exact_data, false));
+
+  // Connection should be established.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+// Test that ON_DOWNSTREAM_TLS_HANDSHAKE returns StopIteration.
+TEST_P(TcpProxyTest, TlsHandshakeModeReturnsStopIteration) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+
+  setup(1, false, false, config);
+
+  // ON_DOWNSTREAM_TLS_HANDSHAKE should return StopIteration, not Continue.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+}
+
+// Test that multiple tiny data chunks correctly set initial_data_received_ only once.
+TEST_P(TcpProxyTest, MultipleTinyChunksSetInitialDataReceivedOnce) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+
+  // Use setupOnDownstreamDataMode to avoid conflicting expectations from base setup.
+  setupOnDownstreamDataMode(config, false /* receive_before_connect */);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // First tiny chunk. It should trigger connection but NOT readDisable.
+  Buffer::OwnedImpl chunk1("h");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(chunk1, false));
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1);
+
+  // Second tiny chunk. It should NOT trigger connection again.
+  Buffer::OwnedImpl chunk2("e");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(chunk2, false));
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1); // Still only one connection attempt.
+}
+
+// Test that data with max_buffered_bytes=0 triggers connection and readDisable.
+TEST_P(TcpProxyTest, ZeroBufferTriggersReadDisable) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(0);
+
+  // Use setupOnDownstreamDataMode to avoid conflicting expectations from base setup.
+  setupOnDownstreamDataMode(config, false /* receive_before_connect */);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Expect connection to be triggered with data.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // Data should trigger connection and readDisable (since buffer will be at limit).
+  // With max_buffered_bytes=0, any data will cause readDisable.
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  Buffer::OwnedImpl data("a");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+// Test that readDisable works correctly with buffer overflow.
+TEST_P(TcpProxyTest, ReadDisableFalseOnlyWhenActuallyDisabled) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(10); // Small buffer to trigger overflow
+
+  // Use setupOnDownstreamDataMode to avoid conflicting expectations from base setup.
+  setupOnDownstreamDataMode(config, false /* receive_before_connect */);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // Send data that exceeds buffer (11 bytes > 10 byte limit). readDisable(true) should be called.
+  Buffer::OwnedImpl data("hello world"); // 11 bytes
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Connection should be established.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+// Test that legacy filter state receive_before_connect works correctly.
+TEST_P(TcpProxyTest, LegacyFilterStateWithNewApi) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  // Use default mode (IMMEDIATE) without max_early_data_bytes to test legacy behavior.
+  // Don't set max_early_data_bytes, but set legacy filter state.
+
+  setup(1, false, true, config); // receive_before_connect=true via filter state
+
+  // Legacy filter state should work. With receive_before_connect and IMMEDIATE mode,
+  // the base setup() will have already established a connection, so we can just verify
+  // the filter was created successfully.
+  EXPECT_NE(nullptr, filter_.get());
 }
 
 } // namespace

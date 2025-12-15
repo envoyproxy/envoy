@@ -419,6 +419,16 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
   for (const auto& tag : tracing.custom_tags()) {
     custom_tags_.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
   }
+  if (!tracing.operation().empty()) {
+    auto operation = Formatter::FormatterImpl::create(tracing.operation(), true);
+    THROW_IF_NOT_OK_REF(operation.status());
+    operation_ = std::move(operation.value());
+  }
+  if (!tracing.upstream_operation().empty()) {
+    auto operation = Formatter::FormatterImpl::create(tracing.upstream_operation(), true);
+    THROW_IF_NOT_OK_REF(operation.status());
+    upstream_operation_ = std::move(operation.value());
+  }
 }
 
 const envoy::type::v3::FractionalPercent& RouteTracingImpl::getClientSampling() const {
@@ -518,9 +528,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                                      : RetryPolicyImpl::DefaultRetryPolicy;
 
   if (route.has_direct_response() && route.direct_response().has_body()) {
-    auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider::create(
+    auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider<std::string>::create(
         route.direct_response().body(), factory_context.mainThreadDispatcher(),
         factory_context.threadLocal(), factory_context.api(), true,
+        [](absl::string_view data) { return std::make_shared<std::string>(data); },
         vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
     SET_AND_RETURN_IF_NOT_OK(provider_or_error.status(), creation_status);
     direct_response_body_provider_ = std::move(provider_or_error.value());
@@ -1053,8 +1064,9 @@ absl::string_view RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& r
                                                  const Http::ResponseHeaderMap& response_headers,
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  std::string& body_out) const {
-  absl::string_view direct_body = direct_response_body_provider_ != nullptr
-                                      ? direct_response_body_provider_->data()
+  absl::string_view direct_body = (direct_response_body_provider_ != nullptr &&
+                                   direct_response_body_provider_->data() != nullptr)
+                                      ? *direct_response_body_provider_->data()
                                       : EMPTY_STRING;
   if (direct_response_body_formatter_ == nullptr) {
     return direct_body;

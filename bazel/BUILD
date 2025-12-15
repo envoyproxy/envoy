@@ -5,8 +5,8 @@ load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locati
 load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
@@ -157,6 +157,14 @@ config_setting(
 
 config_setting(
     name = "asan_build",
+    values = {"define": "ENVOY_CONFIG_ASAN=1"},
+)
+
+config_setting(
+    name = "local_asan_build",
+    flag_values = {
+        "@envoy_repo//:use_local_llvm_flag": "True",
+    },
     values = {"define": "ENVOY_CONFIG_ASAN=1"},
 )
 
@@ -437,11 +445,6 @@ config_setting(
 config_setting(
     name = "enable_path_normalization_by_default",
     values = {"define": "path_normalization_by_default=true"},
-)
-
-cc_proto_library(
-    name = "grpc_health_proto",
-    deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
 )
 
 config_setting(
@@ -909,81 +912,6 @@ json_data(
         load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
         load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
     ),
-)
-
-platform(
-    name = "android_aarch64",
-    constraint_values = [
-        "@platforms//cpu:aarch64",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_armeabi",
-    constraint_values = [
-        "@platforms//cpu:armv7",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_x86",
-    constraint_values = [
-        "@platforms//cpu:x86_32",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_x86_64",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "macos_x86_64",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:macos",
-    ],
-)
-
-platform(
-    name = "macos_arm64",
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:macos",
-    ],
-)
-
-platform(
-    name = "ios_x86_64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:simulator",
-    ],
-)
-
-platform(
-    name = "ios_sim_arm64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:simulator",
-    ],
-)
-
-platform(
-    name = "ios_arm64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:device",
-    ],
 )
 
 # A dependency required by python protobuf
