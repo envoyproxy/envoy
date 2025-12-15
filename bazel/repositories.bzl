@@ -849,9 +849,6 @@ filegroup(
 def _rules_fuzzing():
     external_http_archive(
         name = "rules_fuzzing",
-        repo_mapping = {
-            "@fuzzing_py_deps": "@fuzzing_pip3",
-        },
         # TODO(asraa): Try this fix for OSS-Fuzz build failure on tar command.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:rules_fuzzing.patch"],
