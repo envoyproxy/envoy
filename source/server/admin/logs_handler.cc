@@ -57,8 +57,7 @@ LogsHandler::getLoggerGroups() {
       {"filter", {"source/common/filter/*", "source/extensions/filters/*"}},
       {"listener", {"source/server/listener*", "source/common/listener_manager/*"}},
       {"tls",
-       {"source/common/tls/*", "source/common/ssl/*",
-        "source/extensions/transport_sockets/tls/*"}},
+       {"source/common/tls/*", "source/common/ssl/*", "source/extensions/transport_sockets/tls/*"}},
       {"quic", {"source/common/quic/*"}},
       {"tracing", {"source/common/tracing/*", "source/extensions/tracers/*"}},
       {"stats", {"source/common/stats/*"}},
@@ -197,10 +196,9 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params
       glob_levels.emplace_back(pattern, *level_to_use);
     }
 
-    ENVOY_LOG(info,
-              "applying fine-grain log levels for group='{}' with {} pattern(s) at level '{}'",
-              group_name, group_it->second.size(),
-              spdlog::level::level_string_views[*level_to_use]);
+    ENVOY_LOG(
+        info, "applying fine-grain log levels for group='{}' with {} pattern(s) at level '{}'",
+        group_name, group_it->second.size(), spdlog::level::level_string_views[*level_to_use]);
     getFineGrainLogContext().updateVerbositySetting(glob_levels);
     return absl::OkStatus();
   }

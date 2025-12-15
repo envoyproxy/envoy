@@ -221,19 +221,19 @@ TEST_P(AdminInstanceTest, LogLevelGroupSetting) {
 
   // Test whitespace handling around delimiter
   response.drain(response.length());
-  query = "/logging?group=admin : trace";  // whitespace on both sides
+  query = "/logging?group=admin : trace"; // whitespace on both sides
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::trace);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(admin_file)->level(),
             spdlog::level::trace);
 
   response.drain(response.length());
-  query = "/logging?group=admin: debug";  // whitespace after only
+  query = "/logging?group=admin: debug"; // whitespace after only
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::debug);
 
   response.drain(response.length());
-  query = "/logging?group=admin :info";  // whitespace before only
+  query = "/logging?group=admin :info"; // whitespace before only
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::info);
 }
