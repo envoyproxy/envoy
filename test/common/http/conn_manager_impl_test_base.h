@@ -288,7 +288,7 @@ public:
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   bool http1_safe_max_connection_duration_{false};
   std::chrono::milliseconds stream_idle_timeout_{};
-  absl::optional<std::chrono::milliseconds> stream_flush_timeout_{};
+  absl::optional<std::chrono::milliseconds> stream_flush_timeout_;
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds request_headers_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};

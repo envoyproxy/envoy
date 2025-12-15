@@ -23,7 +23,10 @@ configure_make(
         "--host aarch64-linux-gnu ",
         "--target aarch64-linux-gnu",
     ],
-    env = select({
+    data = ["@numactl//:numa_archive"],
+    env = {
+        "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/numactl/lib",
+    } | select({
         "//bazel:clang_build": {
             "CFLAGS": "-Wno-unused-command-line-argument -Wno-incompatible-pointer-types",
         },
@@ -35,5 +38,6 @@ configure_make(
     ],
     target_compatible_with = envoy_contrib_linux_aarch64_constraints(),
     visibility = ["//visibility:public"],
+    deps = ["@numactl//:numa"],
     alwayslink = True,
 )

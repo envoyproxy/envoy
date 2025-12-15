@@ -118,8 +118,9 @@ absl::Status WatcherImpl::onKqueueEvent() {
     absl::StatusOr<PathSplitResult> pathname_or_error =
         file_system_.splitPathFromFilename(file->file_);
     if (!pathname_or_error.ok()) {
-      ENVOY_LOG(warn, "Failed to split path '{}': {}", file->file_,
-                pathname_or_error.status().message());
+      // Use ENVOY_LOG_EVERY_POW_2 to avoid log spam since path failures are persistent.
+      ENVOY_LOG_EVERY_POW_2(warn, "Failed to split path '{}': {}", file->file_,
+                           pathname_or_error.status().message());
       continue;
     }
     PathSplitResult& pathname = pathname_or_error.value();
@@ -135,8 +136,8 @@ absl::Status WatcherImpl::onKqueueEvent() {
         // Directory was written -- check if the file we're actually watching appeared.
         auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
         if (!file_or_error.ok()) {
-          ENVOY_LOG(warn, "Failed to re-add watch for '{}': {}", file->file_,
-                    file_or_error.status().message());
+          ENVOY_LOG_EVERY_POW_2(warn, "Failed to re-add watch for '{}': {}", file->file_,
+                               file_or_error.status().message());
           continue;
         }
         FileWatchPtr new_file = file_or_error.value();
@@ -160,8 +161,8 @@ absl::Status WatcherImpl::onKqueueEvent() {
 
         auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
         if (!file_or_error.ok()) {
-          ENVOY_LOG(warn, "Failed to re-add watch for '{}': {}", file->file_,
-                    file_or_error.status().message());
+          ENVOY_LOG_EVERY_POW_2(warn, "Failed to re-add watch for '{}': {}", file->file_,
+                               file_or_error.status().message());
           continue;
         }
         FileWatchPtr new_file = file_or_error.value();
@@ -197,17 +198,22 @@ void WatcherImpl::callAndLogOnError(Watcher::OnChangedCb& cb, uint32_t events,
   TRY_ASSERT_MAIN_THREAD {
     const absl::Status status = cb(events);
     if (!status.ok()) {
-      ENVOY_LOG(warn, "Filesystem watch callback for '{}' returned error: {}", file,
-                status.message());
+      // Use ENVOY_LOG_EVERY_POW_2 to avoid log spam if a callback keeps failing.
+      ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' returned error: {}", file,
+                           status.message());
     }
   }
   END_TRY
   MULTI_CATCH(
       const std::exception& e,
       {
-        ENVOY_LOG(warn, "Filesystem watch callback for '{}' threw exception: {}", file, e.what());
+        ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw exception: {}", file,
+                             e.what());
       },
-      { ENVOY_LOG(warn, "Filesystem watch callback for '{}' threw unknown exception", file); });
+      {
+        ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw unknown exception",
+                             file);
+      });
 }
 
 } // namespace Filesystem

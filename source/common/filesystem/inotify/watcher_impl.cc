@@ -57,17 +57,22 @@ void WatcherImpl::callAndLogOnError(OnChangedCb& cb, uint32_t events, const std:
   TRY_ASSERT_MAIN_THREAD {
     const absl::Status status = cb(events);
     if (!status.ok()) {
-      ENVOY_LOG(warn, "Filesystem watch callback for '{}' returned error: {}", file,
-                status.message());
+      // Use ENVOY_LOG_EVERY_POW_2 to avoid log spam if a callback keeps failing.
+      ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' returned error: {}", file,
+                           status.message());
     }
   }
   END_TRY
   MULTI_CATCH(
       const std::exception& e,
       {
-        ENVOY_LOG(warn, "Filesystem watch callback for '{}' threw exception: {}", file, e.what());
+        ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw exception: {}", file,
+                             e.what());
       },
-      { ENVOY_LOG(warn, "Filesystem watch callback for '{}' threw unknown exception", file); });
+      {
+        ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw unknown exception",
+                             file);
+      });
 }
 
 absl::Status WatcherImpl::onInotifyEvent() {

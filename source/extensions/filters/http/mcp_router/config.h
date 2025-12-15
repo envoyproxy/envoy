@@ -19,6 +19,11 @@ public:
   McpRouterFilterConfigFactory() : FactoryBase("envoy.filters.http.mcp_router") {}
 
 private:
+  bool
+  isTerminalFilterByProtoTyped(const envoy::extensions::filters::http::mcp_router::v3::McpRouter&,
+                               Server::Configuration::ServerFactoryContext&) override {
+    return true;
+  }
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;

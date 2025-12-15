@@ -81,6 +81,21 @@ bool requestWasConnect(const RequestHeaderMapSharedPtr& headers, Protocol protoc
   return HeaderUtility::isConnect(*headers) || Utility::isUpgrade(*headers);
 }
 
+const Formatter::Formatter*
+operationNameFormatter(const Http::TracingConnectionManagerConfig& hcm_config,
+                       const Router::RouteTracing* route_config) {
+  const Formatter::Formatter* formatter =
+      route_config != nullptr ? route_config->operation().ptr() : nullptr;
+  return formatter != nullptr ? formatter : hcm_config.operation_.get();
+}
+const Formatter::Formatter*
+upstreamOperationNameFormatter(const Http::TracingConnectionManagerConfig& hcm_config,
+                               const Router::RouteTracing* route_config) {
+  const Formatter::Formatter* formatter =
+      route_config != nullptr ? route_config->upstreamOperation().ptr() : nullptr;
+  return formatter != nullptr ? formatter : hcm_config.upstream_operation_.get();
+}
+
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
   return ConnectionManagerStats(
@@ -1122,9 +1137,7 @@ bool streamErrorOnlyErrors(absl::string_view error_details) {
 
 void ConnectionManagerImpl::ActiveStream::setRequestDecorator(RequestHeaderMap& headers) {
   ASSERT(active_span_ != nullptr);
-
-  const Router::Decorator* decorater =
-      hasCachedRoute() ? cached_route_.value()->decorator() : nullptr;
+  const Router::Decorator* decorater = route_decorator_;
 
   // If a decorator has been defined, apply it to the active span.
   absl::string_view decorated_operation;
@@ -1168,10 +1181,8 @@ void ConnectionManagerImpl::ActiveStream::setResponseDecorator(ResponseHeaderMap
     // propagated, then pass the decorator's operation name (if defined)
     // as a response header to enable the client service to use it in its client span.
     if (state_.decorated_propagate_ && !state_.decorator_overriden_) {
-      const Router::Decorator* decorater =
-          hasCachedRoute() ? cached_route_.value()->decorator() : nullptr;
       absl::string_view decorated_operation =
-          decorater != nullptr ? decorater->getOperation() : absl::string_view();
+          route_decorator_ != nullptr ? route_decorator_->getOperation() : absl::string_view();
 
       if (!decorated_operation.empty()) {
         // If the decorator operation is defined, set it as the response header.
@@ -1573,6 +1584,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 }
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {
+  ASSERT(connection_manager_tracing_config_.has_value());
+
   const Tracing::Decision tracing_decision =
       Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
 
@@ -1588,8 +1601,15 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   if (!active_span_) {
     return;
   }
-
-  setRequestDecorator(*request_headers_);
+  if (hasCachedRoute()) {
+    route_decorator_ = cached_route_.value()->decorator();
+    route_tracing_ = cached_route_.value()->tracingConfig();
+  }
+  if (!operationNameFormatter(*connection_manager_tracing_config_, route_tracing_)) {
+    // Only set decorator when there is no operation name formatter configured at either
+    // the HCM level or the route level.
+    setRequestDecorator(*request_headers_);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -1813,7 +1833,15 @@ void ConnectionManagerImpl::ActiveStream::refreshTracing() {
     active_span_->setSampled(tracing_decision.traced);
   }
 
-  setRequestDecorator(*request_headers_);
+  if (hasCachedRoute()) {
+    route_decorator_ = cached_route_.value()->decorator();
+    route_tracing_ = cached_route_.value()->tracingConfig();
+  }
+  if (!operationNameFormatter(*connection_manager_tracing_config_, route_tracing_)) {
+    // Only set decorator when there is no operation name formatter configured at either
+    // the HCM level or the route level.
+    setRequestDecorator(*request_headers_);
+  }
 }
 
 // TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
@@ -1971,8 +1999,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     }
   }
 
-  if (connection_manager_tracing_config_.has_value() && active_span_ != nullptr) {
-    setResponseDecorator(headers);
+  if (active_span_ != nullptr) {
+    ASSERT(connection_manager_tracing_config_.has_value());
+    if (!operationNameFormatter(*connection_manager_tracing_config_, route_tracing_)) {
+      // Only apply decorator if there is no operation name formatter configured at either
+      // the HCM level or the route level.
+      setResponseDecorator(headers);
+    }
   }
 
   chargeStats(headers);
@@ -2130,7 +2163,8 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
   return connection_manager_tracing_config_->operation_name_;
 }
 
-void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span) const {
+void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span,
+                                                     bool upstream_span) const {
   ASSERT(connection_manager_tracing_config_.has_value());
 
   const Tracing::HttpTraceContext trace_context(*request_headers_);
@@ -2143,8 +2177,8 @@ void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span) const 
   // Cache the optional custom tags from the route first.
   OptRef<const Tracing::CustomTagMap> route_custom_tags;
 
-  if (hasCachedRoute() && cached_route_.value()->tracingConfig() != nullptr) {
-    route_custom_tags.emplace(cached_route_.value()->tracingConfig()->getCustomTags());
+  if (route_tracing_ != nullptr) {
+    route_custom_tags.emplace(route_tracing_->getCustomTags());
     for (const auto& tag : *route_custom_tags) {
       tag.second->applySpan(span, ctx);
     }
@@ -2155,6 +2189,20 @@ void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span) const 
       // If the tag is defined in both the connection manager and the route,
       // use the route's tag.
       tag.second->applySpan(span, ctx);
+    }
+  }
+
+  // For same stream, there is only one downstream span. It's the active span.
+  // So we can determine whether the span is downstream span by comparing the
+  // span pointer.
+  const Formatter::Formatter* operation =
+      upstream_span
+          ? upstreamOperationNameFormatter(*connection_manager_tracing_config_, route_tracing_)
+          : operationNameFormatter(*connection_manager_tracing_config_, route_tracing_);
+  if (operation != nullptr) {
+    const auto op = operation->format(formatter_context, filter_manager_.streamInfo());
+    if (!op.empty()) {
+      span.setOperation(op);
     }
   }
 }

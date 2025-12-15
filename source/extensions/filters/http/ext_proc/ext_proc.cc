@@ -1957,6 +1957,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   };
 
   sent_immediate_response_ = true;
+  stats_.immediate_responses_sent_.inc();
   ENVOY_STREAM_LOG(debug, "Sending local reply with status code {}", *decoder_callbacks_,
                    status_code);
   const auto details = StringUtil::replaceAllEmptySpace(response.details());

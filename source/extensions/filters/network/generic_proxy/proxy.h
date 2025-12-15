@@ -296,7 +296,7 @@ private:
   // returned by the public tracingConfig() method.
   // Tracing::TracingConfig
   Tracing::OperationName operationName() const override;
-  void modifySpan(Tracing::Span& span) const override;
+  void modifySpan(Tracing::Span& span, bool upstream_span) const override;
   bool verbose() const override;
   uint32_t maxPathTagLength() const override;
   bool spawnUpstreamSpan() const override;
