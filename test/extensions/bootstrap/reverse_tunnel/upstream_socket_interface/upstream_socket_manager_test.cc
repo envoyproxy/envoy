@@ -593,6 +593,44 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
   EXPECT_EQ(getAcceptedReverseConnectionsSize(), 0);
 }
 
+TEST_F(TestUpstreamSocketManager, PingConnectionStaleNodeCleanup) {
+  auto socket1 = createMockSocket(123);
+  auto socket2 = createMockSocket(456);
+
+  const std::string node1 = "node1";
+  const std::string node2 = "node2";
+
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node1, cluster_id, std::move(socket1), ping_interval);
+  socket_manager_->addConnectionSocket(node2, cluster_id, std::move(socket2), ping_interval);
+
+  auto& sockets_node1 = getSocketsForNode(node1);
+  auto& sockets_node2 = getSocketsForNode(node2);
+
+  auto* mock_io_handle1 =
+      dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets_node1.front()->ioHandle());
+  auto* mock_io_handle2 =
+      dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets_node2.front()->ioHandle());
+
+  EXPECT_CALL(*mock_io_handle1, write(_))
+      .Times(1)
+      .WillOnce(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        buffer.drain(buffer.length());
+        return Api::IoCallUint64Result{0, Network::IoSocketError::create(ECONNRESET)};
+      }));
+
+  EXPECT_CALL(*mock_io_handle2, write(_))
+      .Times(1)
+      .WillOnce(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        buffer.drain(buffer.length());
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      }));
+
+  socket_manager_->pingConnections();
+}
+
 TEST_F(TestUpstreamSocketManager, OnPingResponseValidResponse) {
   auto socket = createMockSocket(123);
   const std::string node_id = "test-node";
