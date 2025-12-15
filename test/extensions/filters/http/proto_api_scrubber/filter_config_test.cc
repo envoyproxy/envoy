@@ -40,8 +40,6 @@ inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apike
 class ProtoApiScrubberFilterConfigTest : public ::testing::Test {
 protected:
   ProtoApiScrubberFilterConfigTest() : api_(Api::createApiForTest()) {
-    // Enable trace logging to verify logs in tests
-    Envoy::TestEnvironment::setLogLevel(spdlog::level::trace);
     setupMocks();
     initDefaultProtoConfig();
   }
@@ -1156,7 +1154,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeCacheRelativeTypeNames) {
 
 // Tests that appropriate errors are logged when types referenced by a method
 // are missing from the descriptor pool.
-TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeCacheMissingTypes) {
+TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeTypeCacheMissingTypes) {
   std::string package = "broken.pkg";
   std::string service = "BrokenService";
   std::string method = "BrokenMethod";
@@ -1168,26 +1166,15 @@ TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeCacheMissingTypes) {
   *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
       createGenericDescriptor(package, service, method, input, output, /*define_messages=*/false);
 
-  // When creating the config, precomputeTypeCache runs and logs errors.
-  // We expect the creation to succeed (soft failure on missing types), but we check logs.
-  EXPECT_LOG_CONTAINS("error",
-                      "Failed to resolve Request Type for /broken.pkg.BrokenService/BrokenMethod",
-                      auto status = ProtoApiScrubberFilterConfig::create(config, factory_context_);
-                      EXPECT_THAT(status, IsOk()););
+  auto status_or_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
 
-  // Re-run to catch the second log (response type error).
-  EXPECT_LOG_CONTAINS("error",
-                      "Failed to resolve Response Type for /broken.pkg.BrokenService/BrokenMethod",
-                      ProtoApiScrubberFilterConfig::create(config, factory_context_));
-
-  auto filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_).value();
-
-  // Verify that looking up these types fails gracefully.
-  std::string full_method_path = "/broken.pkg.BrokenService/BrokenMethod";
-  EXPECT_THAT(filter_config->getRequestType(full_method_path).status(),
-              HasStatus(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(filter_config->getResponseType(full_method_path).status(),
-              HasStatus(absl::StatusCode::kInvalidArgument));
+  // Expect failure because the descriptor pool builder will reject the file
+  // due to missing dependency types.
+  EXPECT_EQ(status_or_config.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(
+      status_or_config.status().message(),
+      testing::HasSubstr(
+          "Error occurred in file `generic_test.proto` while trying to build proto descriptors"));
 }
 
 TEST_F(ProtoApiScrubberFilterConfigTest, GetEnumName) {
