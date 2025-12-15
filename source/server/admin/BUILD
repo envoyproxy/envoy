@@ -52,6 +52,7 @@ envoy_cc_library(
         ":runtime_handler_lib",
         ":server_cmd_handler_lib",
         ":server_info_handler_lib",
+        ":cpu_info_handler_lib",
         ":stats_handler_lib",
         ":utils_lib",
         "//envoy/http:filter_interface",
@@ -327,6 +328,22 @@ envoy_cc_library(
         "//source/common/version:version_includes",
         "//source/server:utils_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "cpu_info_handler_lib",
+    srcs = ["cpu_info_handler.cc"],
+    hdrs = ["cpu_info_handler.h"],
+    deps = [
+        ":handler_ctx_lib",
+        ":utils_lib",
+        "//envoy/http:codes_interface",
+        "//envoy/server:admin_interface",
+        "//envoy/server:instance_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
     ],
 )
 

@@ -245,6 +245,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cpu_info_handler_test",
+    srcs = envoy_select_admin_functionality(["cpu_info_handler_test.cc"]),
+    rbe_pool = "6gig",
+    deps = [
+        ":admin_instance_lib",
+        "//source/common/common:fmt_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "clusters_handler_test",
     srcs = envoy_select_admin_functionality(["clusters_handler_test.cc"]),
     rbe_pool = "6gig",

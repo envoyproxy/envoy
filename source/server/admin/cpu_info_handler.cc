@@ -15,8 +15,6 @@
 namespace Envoy {
 namespace Server {
 
-namespace {
-
 #if defined(__linux__)
 // Read the system uptime in seconds from /proc/uptime.
 bool readSystemUptime(double& uptime_seconds) {
@@ -106,8 +104,6 @@ bool readThreadCpuPercent(pid_t pid, pid_t tid, double uptime_seconds, long tick
   return true;
 }
 #endif // defined(__linux__)
-
-} // namespace
 
 CpuInfoHandler::CpuInfoHandler(Server::Instance& server) : HandlerContextBase(server) {}
 

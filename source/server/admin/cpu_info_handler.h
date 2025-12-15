@@ -13,7 +13,7 @@ namespace Server {
 
 class CpuInfoHandler : public HandlerContextBase {
 public:
-  explicit CpuInfoHandler(Server::Instance& server);
+  CpuInfoHandler(Server::Instance& server);
 
   Http::Code handlerWorkersCpu(Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream& admin_stream);
