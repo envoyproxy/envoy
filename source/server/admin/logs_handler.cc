@@ -42,22 +42,28 @@ const absl::flat_hash_map<absl::string_view, std::vector<absl::string_view>>&
 LogsHandler::getLoggerGroups() {
   // Predefined logger groups for common subsystems.
   static const absl::flat_hash_map<absl::string_view, std::vector<absl::string_view>> groups({
-    {"http", {"source/common/http/*", "source/common/http/http1/*", "source/common/http/http2/*", "source/common/http/http3/*"}},
-    {"router", {"source/common/router/*"}},
-    {"network", {"source/common/network/*"}},
-    {"upstream", {"source/common/upstream/*"}},
-    {"connection", {"source/common/tcp/*", "source/common/network/connection_impl.cc", "source/common/network/filter_manager_impl.cc"}},
-    {"admin", {"source/server/admin/*"}},
-    {"config", {"source/common/config/*", "source/server/config_validation/*"}},
-    {"grpc", {"source/common/grpc/*"}},
-    {"filter", {"source/common/filter/*", "source/extensions/filters/*"}},
-    {"listener", {"source/server/listener*", "source/common/listener_manager/*"}},
-    {"tls", {"source/common/tls/*", "source/common/ssl/*", "source/extensions/transport_sockets/tls/*"}},
-    {"quic", {"source/common/quic/*"}},
-    {"tracing", {"source/common/tracing/*", "source/extensions/tracers/*"}},
-    {"stats", {"source/common/stats/*"}},
-    {"runtime", {"source/common/runtime/*"}},
-    {"secret", {"source/common/secret/*", "source/extensions/common/secret/*"}},
+      {"http",
+       {"source/common/http/*", "source/common/http/http1/*", "source/common/http/http2/*",
+        "source/common/http/http3/*"}},
+      {"router", {"source/common/router/*"}},
+      {"network", {"source/common/network/*"}},
+      {"upstream", {"source/common/upstream/*"}},
+      {"connection",
+       {"source/common/tcp/*", "source/common/network/connection_impl.cc",
+        "source/common/network/filter_manager_impl.cc"}},
+      {"admin", {"source/server/admin/*"}},
+      {"config", {"source/common/config/*", "source/server/config_validation/*"}},
+      {"grpc", {"source/common/grpc/*"}},
+      {"filter", {"source/common/filter/*", "source/extensions/filters/*"}},
+      {"listener", {"source/server/listener*", "source/common/listener_manager/*"}},
+      {"tls",
+       {"source/common/tls/*", "source/common/ssl/*",
+        "source/extensions/transport_sockets/tls/*"}},
+      {"quic", {"source/common/quic/*"}},
+      {"tracing", {"source/common/tracing/*", "source/extensions/tracers/*"}},
+      {"stats", {"source/common/stats/*"}},
+      {"runtime", {"source/common/runtime/*"}},
+      {"secret", {"source/common/secret/*", "source/extensions/common/secret/*"}},
   });
   return groups;
 }
@@ -161,7 +167,8 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params
   if (group.has_value()) {
     // Group parameter requires fine-grain logging to be enabled
     if (!use_fine_grain_logger) {
-      return absl::InvalidArgumentError("group parameter requires fine-grain logging to be enabled");
+      return absl::InvalidArgumentError(
+          "group parameter requires fine-grain logging to be enabled");
     }
 
     // Handle group parameter: group=<group_name>:<level>
@@ -190,8 +197,10 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params
       glob_levels.emplace_back(pattern, *level_to_use);
     }
 
-    ENVOY_LOG(info, "applying fine-grain log levels for group='{}' with {} pattern(s) at level '{}'",
-              group_name, group_it->second.size(), spdlog::level::level_string_views[*level_to_use]);
+    ENVOY_LOG(info,
+              "applying fine-grain log levels for group='{}' with {} pattern(s) at level '{}'",
+              group_name, group_it->second.size(),
+              spdlog::level::level_string_views[*level_to_use]);
     getFineGrainLogContext().updateVerbositySetting(glob_levels);
     return absl::OkStatus();
   }

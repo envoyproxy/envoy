@@ -183,15 +183,17 @@ TEST_P(AdminInstanceTest, LogLevelGroupSetting) {
   const std::string admin_file = "source/server/admin/admin.cc";
   std::atomic<spdlog::logger*> admin_logger;
   getFineGrainLogContext().initFineGrainLogger(admin_file, admin_logger);
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(admin_file)->level(), spdlog::level::warn);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(admin_file)->level(),
+            spdlog::level::warn);
 
   // Test setting log level for the 'admin' group
   std::string query = "/logging?group=admin:debug";
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
-  
+
   // Verify that multiple files matching admin group patterns have debug level
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::debug);
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(admin_file)->level(), spdlog::level::debug);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(admin_file)->level(),
+            spdlog::level::debug);
 
   // Test with invalid group name
   response.drain(response.length());
@@ -222,7 +224,8 @@ TEST_P(AdminInstanceTest, LogLevelGroupSetting) {
   query = "/logging?group=admin : trace";  // whitespace on both sides
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::trace);
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(admin_file)->level(), spdlog::level::trace);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(admin_file)->level(),
+            spdlog::level::trace);
 
   response.drain(response.length());
   query = "/logging?group=admin: debug";  // whitespace after only
