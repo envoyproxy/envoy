@@ -45,6 +45,8 @@ public:
       return nullptr;
     }
     return static_cast<T*>(ptr);
+#elif defined(_WIN32)
+    return static_cast<T*>(_aligned_malloc(bytes, Alignment));
 #else
     // Ensure bytes is a multiple of Alignment, which is required by std::aligned_alloc.
     bytes = round_up_to_alignment(bytes);
@@ -56,6 +58,8 @@ public:
     if (p != nullptr) {
 #ifdef ALIGNED_ALLOCATOR_USE_POSIX_MEMALIGN
       free(p);
+#elif defined(_WIN32)
+      _aligned_free(p);
 #else
       std::free(p);
 #endif

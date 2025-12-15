@@ -1,3 +1,46 @@
+diff --git a/build_defs/BUILD.bazel b/build_defs/BUILD.bazel
+index 732514d..e8e451e 100644
+--- a/build_defs/BUILD.bazel
++++ b/build_defs/BUILD.bazel
+@@ -14,7 +14,7 @@ package(
+ 
+ create_compiler_config_setting(
+     name = "config_msvc",
+-    value = "msvc-cl",
++    values = ["msvc-cl", "clang-cl"],
+ )
+ 
+ config_setting(
+diff --git a/build_defs/compiler_config_setting.bzl b/build_defs/compiler_config_setting.bzl
+index 0aca1ad..1457298 100644
+--- a/build_defs/compiler_config_setting.bzl
++++ b/build_defs/compiler_config_setting.bzl
+@@ -14,7 +14,7 @@
+ 
+ """Creates config_setting that allows selecting based on 'compiler' value."""
+ 
+-def create_compiler_config_setting(name, value, visibility = None):
++def create_compiler_config_setting(name, values, visibility = None):
+     # The "do_not_use_tools_cpp_compiler_present" attribute exists to
+     # distinguish between older versions of Bazel that do not support
+     # "@bazel_tools//tools/cpp:compiler" flag_value, and newer ones that do.
+@@ -24,14 +24,12 @@ def create_compiler_config_setting(name, value, visibility = None):
+     if hasattr(cc_common, "do_not_use_tools_cpp_compiler_present"):
+         native.config_setting(
+             name = name,
+-            flag_values = {
+-                "@bazel_tools//tools/cpp:compiler": value,
+-            },
++            flag_values = {"@bazel_tools//tools/cpp:compiler": v for v in values},
+             visibility = visibility,
+         )
+     else:
+         native.config_setting(
+             name = name,
+-            values = {"compiler": value},
++            values = {"compiler": v for v in values},
+             visibility = visibility,
+         )
 diff --git a/src/google/protobuf/stubs/BUILD.bazel b/src/google/protobuf/stubs/BUILD.bazel
 index a7b8c82..4f66827 100644
 --- a/src/google/protobuf/stubs/BUILD.bazel

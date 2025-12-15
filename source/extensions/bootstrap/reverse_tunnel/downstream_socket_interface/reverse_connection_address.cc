@@ -1,8 +1,12 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_address.h"
 
+#ifndef _WIN32
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#else
+#include <winsock2.h>
+#endif // _WIN32
 
 #include <cstring>
 #include <functional>

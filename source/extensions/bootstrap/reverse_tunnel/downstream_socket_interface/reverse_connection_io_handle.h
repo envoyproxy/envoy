@@ -205,7 +205,7 @@ public:
    * Get the file descriptor for the pipe monitor used to wake up accept().
    * @return the file descriptor for the pipe monitor
    */
-  int getPipeMonitorFd() const;
+  os_fd_t getPipeMonitorFd() const;
 
   // Callbacks from RCConnectionWrapper.
   /**
@@ -406,8 +406,8 @@ private:
 
   // Simple pipe-based trigger mechanism to wake up accept() when a connection is established.
   // Inlined directly for simplicity and reduced test coverage requirements.
-  int trigger_pipe_read_fd_{-1};
-  int trigger_pipe_write_fd_{-1};
+  os_fd_t trigger_pipe_read_fd_{INVALID_SOCKET};
+  os_fd_t trigger_pipe_write_fd_{INVALID_SOCKET};
 
   // Connection management : We store the established connections in a queue.
   // and pop the last established connection when data is read on trigger_pipe_read_fd_
@@ -422,7 +422,7 @@ private:
   Event::Dispatcher* worker_dispatcher_{nullptr}; // Dispatcher for the worker thread
 
   // Store original socket FD for cleanup.
-  os_fd_t original_socket_fd_{-1};
+  os_fd_t original_socket_fd_{static_cast<os_fd_t>(-1)};
 };
 
 } // namespace ReverseConnection

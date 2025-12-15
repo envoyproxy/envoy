@@ -23,14 +23,18 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   // > This can be used to test if the object is already resident (dlopen() returns NULL if it
   // > is not, or the object's handle if it is resident).
   //
+  void* handle = nullptr;
+#ifndef _WIN32
   // So we can use RTLD_NOLOAD to check if the module is already loaded to avoid the duplicate call
-  // to the init function.
-  void* handle = dlopen(object_file_absolute_path.c_str(), RTLD_NOLOAD | RTLD_LAZY);
+  // to the init function. Because Windows doesn't support RTLD_NOLOAD, modules that support it
+  // will need to have idempotent init functions.
+  handle = dlopen(object_file_absolute_path.string().c_str(), RTLD_NOLOAD | RTLD_LAZY);
   if (handle != nullptr) {
     // This means the module is already loaded, and the return value is the handle of the already
     // loaded module. We don't need to call the init function again.
     return std::make_unique<DynamicModule>(handle);
   }
+#endif // _WIN32
   // RTLD_LAZY is required for not only performance but also simply to load the module, otherwise
   // dlopen results in Invalid argument.
   int mode = RTLD_LAZY;
@@ -40,13 +44,15 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     // RTLD_LOCAL is used by default to avoid collisions between multiple modules.
     mode |= RTLD_LOCAL;
   }
+#ifndef _WIN32
   if (do_not_close) {
     mode |= RTLD_NODELETE;
   }
-  handle = dlopen(object_file_absolute_path.c_str(), mode);
+#endif // _WIN32
+  handle = dlopen(object_file_absolute_path.string().c_str(), mode);
   if (handle == nullptr) {
     return absl::InvalidArgumentError(absl::StrCat(
-        "Failed to load dynamic module: ", object_file_absolute_path.c_str(), " : ", dlerror()));
+        "Failed to load dynamic module: ", object_file_absolute_path.string(), " : ", dlerror()));
   }
 
   DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle);
@@ -62,14 +68,14 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   const char* abi_version = (*init_function.value())();
   if (abi_version == nullptr) {
     return absl::InvalidArgumentError(
-        absl::StrCat("Failed to initialize dynamic module: ", object_file_absolute_path.c_str()));
+        absl::StrCat("Failed to initialize dynamic module: ", object_file_absolute_path.string()));
   }
   // Checks the kAbiVersion and the version of the dynamic module.
   if (absl::string_view(abi_version) != absl::string_view(kAbiVersion)) {
     return absl::InvalidArgumentError(
         absl::StrCat("ABI version mismatch: got ", abi_version, ", but expected ", kAbiVersion));
   }
-  return dynamic_module;
+  return std::move(dynamic_module);
 }
 
 absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
@@ -82,7 +88,11 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
                                                    " is not set"));
   }
   const std::filesystem::path file_path_absolute =
+#ifndef _WIN32
       std::filesystem::absolute(fmt::format("{}/lib{}.so", module_search_path, module_name));
+#else
+      std::filesystem::absolute(fmt::format("{}/{}.dll", module_search_path, module_name));
+#endif // _WIN32
   return newDynamicModule(file_path_absolute, do_not_close, load_globally);
 }
 

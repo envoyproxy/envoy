@@ -8,6 +8,12 @@ exports_files([
 ])
 
 py_binary(
+    name = "gen_dynamic_modules_windows_exports",
+    srcs = ["gen_dynamic_modules_windows_exports.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
     name = "stack_decode",
     srcs = ["stack_decode.py"],
 )
