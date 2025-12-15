@@ -459,7 +459,7 @@ protected:
     return proto_config;
   }
 
-  // Helper to create a serialized FileDescriptorSet with customizable names.
+  // Helper to create a serialized file descriptor set with custom names.
   // define_messages: if true, adds message type definitions to the file.
   //                  if false, methods will refer to types that do not exist (for failure testing).
   std::string createGenericDescriptor(const std::string& package_name,
