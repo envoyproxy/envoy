@@ -29,7 +29,7 @@ public:
   // configured to reject failed mutations. The "rejected_mutations" counter
   // will be incremented with the number of invalid mutations, regardless of
   // whether an error is returned.
-  // Effect will be overwritted to store the first failing ProcessingEffect. If no
+  // Effect will be overwritten to store the first failing ProcessingEffect. If no
   // mutations fail, then effect will store value MutationsApplied if any
   // mutation was successful and None if nothing if no mutations occurred.
   // TODO(tyxia) Normalizing the headers to lower-case in ext_proc's header mutation.
