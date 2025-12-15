@@ -6,7 +6,6 @@
 
 #include "test/extensions/compression/gzip/compressor_fuzz_input.pb.h"
 #include "test/extensions/compression/gzip/compressor_fuzz_input.pb.validate.h"
-
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
