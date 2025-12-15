@@ -91,9 +91,10 @@ private:
   envoy::config::core::v3::DataSource certificate_data_source_;
   envoy::config::core::v3::DataSource private_key_data_source_;
   DataSourceOptRef certificate_chain_data_source_;
-  Config::DataSource::DataSourceProviderPtr certificate_data_source_provider_;
-  Config::DataSource::DataSourceProviderPtr private_key_data_source_provider_;
-  absl::optional<Config::DataSource::DataSourceProviderPtr> certificate_chain_data_source_provider_;
+  Config::DataSource::DataSourceProviderPtr<std::string> certificate_data_source_provider_;
+  Config::DataSource::DataSourceProviderPtr<std::string> private_key_data_source_provider_;
+  absl::optional<Config::DataSource::DataSourceProviderPtr<std::string>>
+      certificate_chain_data_source_provider_;
   absl::optional<SystemTime> expiration_time_;
   std::chrono::seconds cache_duration_;
 

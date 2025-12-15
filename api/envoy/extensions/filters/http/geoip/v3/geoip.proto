@@ -24,17 +24,43 @@ message Geoip {
   message XffConfig {
     // The number of additional ingress proxy hops from the right side of the
     // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
-    // determining the origin client's IP address. The default is zero if this option
-    // is not specified. See the documentation for
+    // determining the origin client's IP address. See the documentation for
     // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
+    //
+    // Defaults to ``0``.
     uint32 xff_num_trusted_hops = 1;
   }
 
-  // If set, the :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.XffConfig.xff_num_trusted_hops>` field will be used to determine
-  // trusted client address from ``x-forwarded-for`` header.
-  // Otherwise, the immediate downstream connection source address will be used.
-  // [#next-free-field: 2]
+  message CustomHeaderConfig {
+    // The name of the request header to extract the client IP address from.
+    // The header value must contain a valid IP address (IPv4 or IPv6).
+    //
+    // If the header is missing or contains an invalid IP address, the filter will fall back
+    // to using the immediate downstream connection source address.
+    string header_name = 1 [(validate.rules).string = {min_len: 1}];
+  }
+
+  // Configuration for extracting the client IP address from the
+  // ``x-forwarded-for`` header. If set, the
+  // :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.XffConfig.xff_num_trusted_hops>`
+  // field will be used to determine the trusted client address from the ``x-forwarded-for`` header.
+  // If not set, the immediate downstream connection source address will be used.
+  //
+  // Only one of ``xff_config`` or
+  // :ref:`custom_header_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.custom_header_config>`
+  // can be set.
   XffConfig xff_config = 1;
+
+  // Configuration for extracting the client IP address from a custom request header.
+  //
+  // If set, the
+  // :ref:`header_name <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.CustomHeaderConfig.header_name>`
+  // field will be used to extract the client IP address from the specified request header.
+  //
+  // Only one of ``custom_header_config`` or
+  // :ref:`xff_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.xff_config>`
+  // can be set.
+  CustomHeaderConfig custom_header_config = 4;
 
   // Geoip driver specific configuration which depends on the driver being instantiated.
   // See the geoip drivers for examples:

@@ -633,6 +633,9 @@ public:
   absl::string_view requestedServerName() const override {
     return StreamInfoImpl::downstreamAddressProvider().requestedServerName();
   }
+  const std::vector<std::string>& requestedApplicationProtocols() const override {
+    return StreamInfoImpl::downstreamAddressProvider().requestedApplicationProtocols();
+  }
   absl::optional<uint64_t> connectionID() const override {
     return StreamInfoImpl::downstreamAddressProvider().connectionID();
   }

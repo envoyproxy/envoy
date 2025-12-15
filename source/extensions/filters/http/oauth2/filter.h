@@ -170,24 +170,21 @@ public:
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
   bool disableAccessTokenSetCookie() const { return disable_access_token_set_cookie_; }
   bool disableRefreshTokenSetCookie() const { return disable_refresh_token_set_cookie_; }
-  const OptRef<const RouteRetryPolicy> retryPolicy() const {
-    if (!retry_policy_.has_value()) {
-      return absl::nullopt;
-    }
-    return makeOptRef(retry_policy_.value());
-  }
+  const Router::RetryPolicyConstSharedPtr& retryPolicy() const { return retry_policy_; }
   bool shouldUseRefreshToken(
       const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
   struct CookieSettings {
     CookieSettings(const envoy::extensions::filters::http::oauth2::v3::CookieConfig& config)
-        : same_site_(config.same_site()) {}
+        : same_site_(config.same_site()), path_(config.path().empty() ? "/" : config.path()) {}
 
-    // Default constructor
+    // Default constructor.
     CookieSettings()
         : same_site_(envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-                         CookieConfig_SameSite_DISABLED) {}
+                         CookieConfig_SameSite_DISABLED),
+          path_("/") {}
 
     const envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite same_site_;
+    const std::string path_;
   };
 
   const CookieSettings& bearerTokenCookieSettings() const { return bearer_token_cookie_settings_; }
@@ -237,7 +234,7 @@ private:
   const bool disable_access_token_set_cookie_ : 1;
   const bool disable_refresh_token_set_cookie_ : 1;
   const bool disable_token_encryption_ : 1;
-  absl::optional<RouteRetryPolicy> retry_policy_;
+  Router::RetryPolicyConstSharedPtr retry_policy_;
   const CookieSettings bearer_token_cookie_settings_;
   const CookieSettings hmac_cookie_settings_;
   const CookieSettings expires_cookie_settings_;
@@ -378,7 +375,7 @@ private:
                                             const std::chrono::seconds& expires_in) const;
   std::string getExpiresTimeForIdToken(const std::string& id_token,
                                        const std::chrono::seconds& expires_in) const;
-  std::string BuildCookieTail(int cookie_type) const;
+  std::string buildCookieTail(int cookie_type) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,

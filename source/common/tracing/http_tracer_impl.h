@@ -106,7 +106,7 @@ public:
 
 private:
   static void setCommonTags(Span& span, const StreamInfo::StreamInfo& stream_info,
-                            const Config& tracing_config);
+                            const Config& tracing_config, bool upstream_span);
 };
 
 } // namespace Tracing

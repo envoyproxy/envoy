@@ -219,7 +219,7 @@ envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
-envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_increase_gauge(
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_increment_gauge(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto gauge = filter->getFilterConfig().getGaugeById(id);
@@ -231,7 +231,7 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
 }
 
 envoy_dynamic_module_type_metrics_result
-envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
+envoy_dynamic_module_callback_http_filter_increment_gauge_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value) {
@@ -249,7 +249,7 @@ envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
-envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_decrease_gauge(
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_decrement_gauge(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto gauge = filter->getFilterConfig().getGaugeById(id);
@@ -261,7 +261,7 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
 }
 
 envoy_dynamic_module_type_metrics_result
-envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
+envoy_dynamic_module_callback_http_filter_decrement_gauge_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value) {
