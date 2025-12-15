@@ -53,19 +53,16 @@ DEFINE_PROTO_FUZZER(
     break;
   }
 
-  const int32_t target_window_bits = std::clamp(input.window_bits(), 9, 15);
-  const int32_t target_memory_level = std::clamp(input.memory_level(), 1, 9);
-
-  compressor.init(target_compression_level, target_compression_strategy, target_window_bits,
-                  target_memory_level);
-  decompressor.init(target_window_bits);
+  compressor.init(target_compression_level, target_compression_strategy, input.window_bits(),
+                  input.memory_level());
+  decompressor.init(input.window_bits());
 
   ENVOY_LOG_MISC(
       debug,
       "Fuzz test parameters: compression_level={} compression_strategy={} window_bits={} "
       "memory_level={}",
       static_cast<int>(target_compression_level), static_cast<int>(target_compression_strategy),
-      target_window_bits, target_memory_level);
+      input.window_bits(), input.memory_level());
 
   Buffer::OwnedImpl full_input;
   Buffer::OwnedImpl full_output;

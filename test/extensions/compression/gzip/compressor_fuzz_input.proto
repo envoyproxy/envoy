@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "validate/validate.proto";
+
 package envoy.extensions.compression.gzip.compressor.fuzz;
 
 message CompressorFuzzInput {
@@ -18,10 +20,8 @@ message CompressorFuzzInput {
 
   CompressionLevel compression_level = 1;
   CompressionStrategy compression_strategy = 2;
-  // Valid range: 9-15. Values outside this range will be clamped.
-  int32 window_bits = 3;
-  // Valid range: 1-9. Values outside this range will be clamped.
-  int32 memory_level = 4;
+  int32 window_bits = 3 [(validate.rules).int32 = {gte: 9, lte: 15}];
+  int32 memory_level = 4 [(validate.rules).int32 = {gte: 1, lte: 9}];
 
   // Input data chunks to be compressed.
   repeated bytes data_chunks = 5;
