@@ -5122,31 +5122,7 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsBufferedMode) {
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
 
   auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-
-  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    auto* access_log = cm.add_access_log();
-    access_log->set_name("accesslog");
-    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-    access_log_config.set_path(access_log_path);
-    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
-
-    // Test field extraction for coverage.
-    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
-    (*json_format->mutable_fields())["field_request_body_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_processing_effect)%");
-    (*json_format->mutable_fields())["field_request_trailer_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_processing_effect)%");
-    (*json_format->mutable_fields())["field_response_header_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_processing_effect)%");
-    (*json_format->mutable_fields())["field_response_body_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_processing_effect)%");
-    (*json_format->mutable_fields())["field_response_trailer_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_processing_effect)%");
-
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-  });
-
+  initializeLogConfig(access_log_path);
   initializeConfig();
   HttpIntegrationTest::initialize();
 
@@ -5233,27 +5209,7 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsStreamed) {
   proto_config_.set_send_body_without_waiting_for_header_response(true);
 
   auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-
-  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    auto* access_log = cm.add_access_log();
-    access_log->set_name("accesslog");
-    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-    access_log_config.set_path(access_log_path);
-    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
-
-    // Test field extraction for coverage.
-    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
-    (*json_format->mutable_fields())["field_request_body_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_processing_effect)%");
-    (*json_format->mutable_fields())["field_response_header_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_processing_effect)%");
-    (*json_format->mutable_fields())["field_response_body_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_processing_effect)%");
-
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-  });
-
+  initializeLogConfig(access_log_path);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequestWithBody("hello world", [](Http::HeaderMap& headers) {
@@ -5319,22 +5275,7 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsStreamed) {
 TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoContinueAndReplace) {
   auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-
-  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    auto* access_log = cm.add_access_log();
-    access_log->set_name("accesslog");
-    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-    access_log_config.set_path(access_log_path);
-    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
-
-    // Test field extraction for coverage.
-    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
-    (*json_format->mutable_fields())["field_request_body_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_processing_effect)%");
-
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-  });
+  initializeLogConfig(access_log_path);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
@@ -5369,16 +5310,7 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoFailedMutation) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
 
-  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    auto* access_log = cm.add_access_log();
-    access_log->set_name("accesslog");
-    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-    access_log_config.set_path(access_log_path);
-    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
-    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-  });
+  initializeLogConfig(access_log_path);
   initializeConfig();
   HttpIntegrationTest::initialize();
 
@@ -5409,17 +5341,7 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoInvalidMutation) {
   auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
-
-  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    auto* access_log = cm.add_access_log();
-    access_log->set_name("accesslog");
-    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-    access_log_config.set_path(access_log_path);
-    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
-    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-  });
+  initializeLogConfig(access_log_path);
   initializeConfig();
   HttpIntegrationTest::initialize();
 
@@ -5450,20 +5372,11 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoPartialMutationApplied) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
-  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
 
-  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    auto* access_log = cm.add_access_log();
-    access_log->set_name("accesslog");
-    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-    access_log_config.set_path(access_log_path);
-    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
-    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-  });
+  initializeLogConfig(access_log_path);
   initializeConfig();
   HttpIntegrationTest::initialize();
 
