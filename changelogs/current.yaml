@@ -178,6 +178,9 @@ bug_fixes:
   change: |
     Fixed a remote ``jwt_auth`` token fetch crash when two or more auth headers were present and
     ``allow_missing_or_failed`` was set.
+- area: dynamic modules
+  change: |
+    Fixed a soundness bug in the Rust SDK by tightening bounds on the ``HttpFilterConfig`` trait.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
