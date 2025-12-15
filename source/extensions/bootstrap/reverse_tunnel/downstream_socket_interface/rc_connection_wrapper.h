@@ -81,8 +81,7 @@ public:
   }
 
 private:
-  HandshakeFailureReason(Type type, absl::string_view context)
-      : type_(type), context_(context) {}
+  HandshakeFailureReason(Type type, absl::string_view context) : type_(type), context_(context) {}
 
   Type type_;
   std::string context_;

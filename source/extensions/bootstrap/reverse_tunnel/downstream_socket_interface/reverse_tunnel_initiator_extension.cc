@@ -293,13 +293,12 @@ void ReverseTunnelInitiatorExtension::incrementHandshakeStats(const std::string&
   auto& stats_store = context_.scope();
 
   // Get dispatcher name (worker name).
-  std::string dispatcher_name;
+  std::string dispatcher_name = "main_thread"; // Default for main thread
   auto* local_registry = getLocalRegistry();
-  if (local_registry == nullptr) {
-    ENVOY_LOG(error, "reverse_tunnel: No local registry found for handshake stats");
-    return;
+  if (local_registry) {
+    // Dispatcher name is of the form "worker_x" where x is the worker index.
+    dispatcher_name = local_registry->dispatcher().name();
   }
-  dispatcher_name = local_registry->dispatcher().name();
 
   // Base stat name: <stat_prefix>.handshake
   // Labels: worker=<worker_name>, cluster=<cluster_id>, result=<success|failed>,
@@ -315,8 +314,10 @@ void ReverseTunnelInitiatorExtension::incrementHandshakeStats(const std::string&
   std::string result_value = success ? "success" : "failed";
   Stats::StatNameManagedStorage result_key_storage("result", stats_store.symbolTable());
   Stats::StatNameManagedStorage result_value_storage(result_value, stats_store.symbolTable());
-  Stats::StatNameManagedStorage failure_reason_key_storage("failure_reason", stats_store.symbolTable());
-  Stats::StatNameManagedStorage failure_reason_value_storage(failure_reason, stats_store.symbolTable());
+  Stats::StatNameManagedStorage failure_reason_key_storage("failure_reason",
+                                                           stats_store.symbolTable());
+  Stats::StatNameManagedStorage failure_reason_value_storage(failure_reason,
+                                                             stats_store.symbolTable());
 
   // Now create tags vector using the stored StatNames.
   Stats::StatNameTagVector tags;
@@ -334,17 +335,19 @@ void ReverseTunnelInitiatorExtension::incrementHandshakeStats(const std::string&
 
   // Add failure_reason tag for failures.
   if (!success && !failure_reason.empty()) {
-    tags.push_back({failure_reason_key_storage.statName(), failure_reason_value_storage.statName()});
+    tags.push_back(
+        {failure_reason_key_storage.statName(), failure_reason_value_storage.statName()});
   }
 
   // Get or create the counter with tags and increment it.
   // The third parameter takes the tags vector (StatNameTagVectorOptConstRef).
-  auto& handshake_counter = Stats::Utility::counterFromStatNames(
-      stats_store, {stat_storage.statName()}, tags);
+  auto& handshake_counter =
+      Stats::Utility::counterFromStatNames(stats_store, {stat_storage.statName()}, tags);
   handshake_counter.inc();
 
-  ENVOY_LOG(trace, "reverse_tunnel: incremented handshake stat {} with tags worker={}, cluster={}, "
-                   "result={}, failure_reason={}",
+  ENVOY_LOG(trace,
+            "reverse_tunnel: incremented handshake stat {} with tags worker={}, cluster={}, "
+            "result={}, failure_reason={}",
             base_stat_name, dispatcher_name, cluster_id, result_value, failure_reason);
 }
 

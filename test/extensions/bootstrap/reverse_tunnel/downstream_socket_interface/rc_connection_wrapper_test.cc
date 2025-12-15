@@ -40,6 +40,7 @@ protected:
     EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
     EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cluster_manager_));
+    EXPECT_CALL(thread_local_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     // Set stat prefix to "reverse_connections" for tests.
     config_.set_stat_prefix("reverse_connections");
     // Enable detailed stats for tests that need per-node/cluster stats.
@@ -366,10 +367,10 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeSuccess) {
   std::string cluster_stat_name = "test_scope.reverse_connections.cluster.test-cluster.connected";
 
   // Handshake stats use labels (tags) for worker, cluster, result, and reason.
-  // Base stat name: test_scope.reverse_connections.handshake
+  // Base stat name: reverse_connections.handshake (scope will add test_scope. prefix)
   // Tags: worker=worker_0, cluster=test-cluster, result=success
   auto& stats_scope = extension_->getStatsScope();
-  std::string base_stat_name = "test_scope.reverse_connections.handshake";
+  std::string base_stat_name = "reverse_connections.handshake";
   Stats::StatNameManagedStorage stat_storage(base_stat_name, stats_scope.symbolTable());
 
   // Create tags matching the success case.
@@ -386,8 +387,8 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeSuccess) {
   Stats::StatNameManagedStorage result_value_storage("success", stats_scope.symbolTable());
   tags.push_back({result_key_storage.statName(), result_value_storage.statName()});
 
-  auto& handshake_success_counter = Stats::Utility::counterFromStatNames(
-      stats_scope, {stat_storage.statName()}, tags);
+  auto& handshake_success_counter =
+      Stats::Utility::counterFromStatNames(stats_scope, {stat_storage.statName()}, tags);
   uint64_t initial_handshake_success_count = handshake_success_counter.value();
 
   // Call onHandshakeSuccess.
@@ -459,10 +460,10 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeFailure) {
       "test_scope.reverse_connections.cluster.test-cluster.failed";
 
   // Handshake stats use labels (tags) for worker, cluster, result, and failure_reason.
-  // Base stat name: test_scope.reverse_connections.handshake
+  // Base stat name: reverse_connections.handshake (scope will add test_scope. prefix)
   // Tags: worker=worker_0, cluster=test-cluster, result=failed, failure_reason=http.401
   auto& stats_scope = extension_->getStatsScope();
-  std::string base_stat_name = "test_scope.reverse_connections.handshake";
+  std::string base_stat_name = "reverse_connections.handshake";
   Stats::StatNameManagedStorage stat_storage(base_stat_name, stats_scope.symbolTable());
 
   // Create tags matching the failure case with HTTP 401.
@@ -479,12 +480,13 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeFailure) {
   Stats::StatNameManagedStorage result_value_storage("failed", stats_scope.symbolTable());
   tags.push_back({result_key_storage.statName(), result_value_storage.statName()});
 
-  Stats::StatNameManagedStorage failure_reason_key_storage("failure_reason", stats_scope.symbolTable());
+  Stats::StatNameManagedStorage failure_reason_key_storage("failure_reason",
+                                                           stats_scope.symbolTable());
   Stats::StatNameManagedStorage failure_reason_value_storage("http.401", stats_scope.symbolTable());
   tags.push_back({failure_reason_key_storage.statName(), failure_reason_value_storage.statName()});
 
-  auto& handshake_failed_counter = Stats::Utility::counterFromStatNames(
-      stats_scope, {stat_storage.statName()}, tags);
+  auto& handshake_failed_counter =
+      Stats::Utility::counterFromStatNames(stats_scope, {stat_storage.statName()}, tags);
   uint64_t initial_handshake_failed_count = handshake_failed_counter.value();
 
   // Call onHandshakeFailure with HTTP status error.
@@ -550,10 +552,10 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeFailureEncodeError) {
   EXPECT_EQ(wrapper_to_host_map.at(wrapper_ptr), "192.168.1.1");
 
   // Handshake stats use labels (tags) for worker, cluster, result, and failure_reason.
-  // Base stat name: test_scope.reverse_connections.handshake
+  // Base stat name: reverse_connections.handshake (scope will add test_scope. prefix)
   // Tags: worker=worker_0, cluster=test-cluster, result=failed, failure_reason=encode_error
   auto& stats_scope = extension_->getStatsScope();
-  std::string base_stat_name = "test_scope.reverse_connections.handshake";
+  std::string base_stat_name = "reverse_connections.handshake";
   Stats::StatNameManagedStorage stat_storage(base_stat_name, stats_scope.symbolTable());
 
   // Create tags matching the encode error failure case.
@@ -570,12 +572,14 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeFailureEncodeError) {
   Stats::StatNameManagedStorage result_value_storage("failed", stats_scope.symbolTable());
   tags.push_back({result_key_storage.statName(), result_value_storage.statName()});
 
-  Stats::StatNameManagedStorage failure_reason_key_storage("failure_reason", stats_scope.symbolTable());
-  Stats::StatNameManagedStorage failure_reason_value_storage("encode_error", stats_scope.symbolTable());
+  Stats::StatNameManagedStorage failure_reason_key_storage("failure_reason",
+                                                           stats_scope.symbolTable());
+  Stats::StatNameManagedStorage failure_reason_value_storage("encode_error",
+                                                             stats_scope.symbolTable());
   tags.push_back({failure_reason_key_storage.statName(), failure_reason_value_storage.statName()});
 
-  auto& handshake_failed_counter = Stats::Utility::counterFromStatNames(
-      stats_scope, {stat_storage.statName()}, tags);
+  auto& handshake_failed_counter =
+      Stats::Utility::counterFromStatNames(stats_scope, {stat_storage.statName()}, tags);
   uint64_t initial_handshake_failed_count = handshake_failed_counter.value();
 
   // Call onHandshakeFailure with EncodeError.
