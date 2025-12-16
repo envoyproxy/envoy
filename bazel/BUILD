@@ -161,6 +161,14 @@ config_setting(
 )
 
 config_setting(
+    name = "local_asan_build",
+    flag_values = {
+        "@envoy_repo//:use_local_llvm_flag": "True",
+    },
+    values = {"define": "ENVOY_CONFIG_ASAN=1"},
+)
+
+config_setting(
     name = "tsan_build",
     values = {"define": "ENVOY_CONFIG_TSAN=1"},
 )

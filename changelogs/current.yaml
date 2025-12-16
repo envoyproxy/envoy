@@ -90,6 +90,16 @@ minor_behavior_changes:
   change: |
     added immediate_responses_sent counter for ext proc in :ref:'FilterStats
     <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcFilterStats>'.
+- area: http
+  change: |
+    Now the :ref:`route level body buffer limit
+    <envoy_v3_api_field_config.route.v3.Route.request_body_buffer_limit>` will be applied to requests when
+    the route is matched. Previously, it will only be applied when the router filter is reached.
+- area: http
+  change: |
+    Now the retrying of async HTTP client calls will respect the set buffer limits and the retry will be ignored
+    if the buffer limit is exceeded. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.http_async_client_retry_respect_buffer_limits`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -142,6 +152,12 @@ bug_fixes:
   change: |
     Fixed an upstream HTTP filter issue when a route retried on 5xx and the filter returned
     ``FilterHeadersStatus::StopIteration`` in ``encodeHeaders()``.
+- area: router
+  change: |
+    Fixed a bug where the :ref:`vhost per request buffer limit bytes
+    <envoy_v3_api_field_config.route.v3.VirtualHost.per_request_buffer_limit_bytes>`
+    will take precedence over the :ref:`route per request buffer limit bytes
+    <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>`.
 - area: ext_proc
   change: |
     Fixed missing attributes based on request headers (for example, ``request.host``) when ext_proc was configured to run
@@ -173,15 +189,25 @@ bug_fixes:
   change: |
     Fixed a remote ``jwt_auth`` token fetch crash when two or more auth headers were present and
     ``allow_missing_or_failed`` was set.
+- area: dynamic modules
+  change: |
+    Fixed a soundness bug in the Rust SDK by tightening bounds on the ``HttpFilterConfig`` trait.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension``
+    and legacy code paths.
 - area: jwt_authn
   change: |
     Removed runtime guard ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` and legacy code paths.
 - area: tcp
   change: |
     Removed runtime guard ``envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http1_balsa_delay_reset`` and legacy code paths.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` and legacy code paths.
@@ -191,12 +217,21 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http2_propagate_reset_events`` and legacy code paths.
 - area: xds
   change: |
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 - area: xds
   change: |
     Removed runtime guard ``envoy_restart_features_use_eds_cache_for_ads`` and legacy code paths.
+- area: xds
+  change: |
+    Removed runtime guard ``envoy.restart_features.skip_backing_cluster_check_for_sds`` and legacy code paths.
+- area: router
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.router_filter_resetall_on_local_reply`` and legacy code paths.
 
 new_features:
 - area: oauth2
@@ -304,6 +339,14 @@ new_features:
     Added new :ref:`value <envoy_v3_api_field_type.tracing.v3.CustomTag.value>` field and support for
     :ref:`substitution format specifier <config_access_log_format>` to extract values from request and response data for
     custom tags.
+- area: tracing
+  change: |
+    Added new :ref:`tracing operation
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.operation>`
+    and :ref:`upstream tracing operation
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.upstream_operation>`
+    fields in the tracing configuration to set custom operation names for spans with the
+    substitution format specifier.
 - area: generic_proxy
   change: |
     Added custom substitution format specifier support in tracing custom tags for the
@@ -485,5 +528,11 @@ new_features:
     The filter extracts the ``method`` and ``id`` fields from incoming requests and stores them in dynamic metadata
     for use by downstream filters and access logging. Notifications (methods starting with ``notifications/``) are
     correctly handled as they don't have an ``id`` field per the JSON-RPC specification.
+- area: mcp
+  change: |
+    Added :ref:`mcp_router HTTP filter <config_http_filters_mcp_router>` which routes MCP (Model Context Protocol)
+    requests to more backend servers. The filter supports fanout to multiple backends for initialize and tools-list requests,
+    single-backend routing for tools-call based on tool name prefix, session management with composite session IDs,
+    and response aggregation.
 
 deprecated:

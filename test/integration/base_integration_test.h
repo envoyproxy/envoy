@@ -213,6 +213,23 @@ public:
     }
   }
 
+  template <class T>
+  void
+  sendMapDiscoveryResponse(const std::string& type_url,
+                           const absl::flat_hash_map<std::string, T>& state_of_the_world,
+                           const absl::flat_hash_map<std::string, T>& added_or_updated,
+                           const std::vector<std::string>& removed, const std::string& version,
+                           const absl::flat_hash_map<std::string, Protobuf::Any>& metadata = {},
+                           FakeStream* stream = nullptr) {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+        sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
+      sendMapSotwDiscoveryResponse(type_url, state_of_the_world, version, stream, metadata);
+    } else {
+      sendMapDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, stream, {},
+                                    metadata);
+    }
+  }
+
   AssertionResult compareDeltaDiscoveryRequest(
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
@@ -275,6 +292,41 @@ public:
   }
 
   template <class T>
+  void sendMapSotwDiscoveryResponse(
+      const std::string& type_url, const absl::flat_hash_map<std::string, T>& messages,
+      const std::string& version, FakeStream* stream = nullptr,
+      const absl::flat_hash_map<std::string, Protobuf::Any>& metadata = {}) {
+    if (stream == nullptr) {
+      stream = xds_stream_.get();
+    }
+    envoy::service::discovery::v3::DiscoveryResponse discovery_response;
+    discovery_response.set_version_info(version);
+    discovery_response.set_type_url(type_url);
+    for (const auto& [name, message] : messages) {
+      if (!metadata.empty()) {
+        envoy::service::discovery::v3::Resource resource;
+        resource.mutable_resource()->PackFrom(message);
+        resource.set_name(name);
+        resource.set_version(version);
+        for (const auto& kvp : metadata) {
+          auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
+          (*map)[std::string(kvp.first)] = kvp.second;
+        }
+        discovery_response.add_resources()->PackFrom(resource);
+      } else {
+        envoy::service::discovery::v3::Resource resource;
+        resource.mutable_resource()->PackFrom(message);
+        resource.set_name(name);
+        resource.set_version(version);
+        discovery_response.add_resources()->PackFrom(resource);
+      }
+    }
+    static int next_nonce_counter = 0;
+    discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
+    stream->sendGrpcMessage(discovery_response);
+  }
+
+  template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version) {
@@ -313,6 +365,20 @@ public:
     stream->sendGrpcMessage(response);
   }
 
+  template <class T>
+  void sendMapDeltaDiscoveryResponse(
+      const std::string& type_url, const absl::flat_hash_map<std::string, T>& added_or_updated,
+      const std::vector<std::string>& removed, const std::string& version,
+      FakeStream* stream = nullptr, const std::vector<std::string>& aliases = {},
+      const absl::flat_hash_map<std::string, Protobuf::Any>& metadata = {}) {
+    auto response = createMapDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
+                                                       aliases, metadata);
+    if (stream == nullptr) {
+      stream = xds_stream_.get();
+    }
+    stream->sendGrpcMessage(response);
+  }
+
   // Sends a DeltaDiscoveryResponse with a given list of added resources.
   // Note that the resources are expected to be of the same type, and match type_url.
   void sendExplicitResourcesDeltaDiscoveryResponse(
@@ -340,6 +406,30 @@ public:
       envoy::service::discovery::v3::Resource resource;
       resource.mutable_resource()->PackFrom(message);
       resource.set_name(intResourceName(message));
+      resource.set_version(version);
+      for (const auto& alias : aliases) {
+        resource.add_aliases(alias);
+      }
+      for (const auto& kvp : metadata) {
+        auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
+        (*map)[std::string(kvp.first)] = kvp.second;
+      }
+      resources.emplace_back(resource);
+    }
+    return createExplicitResourcesDeltaDiscoveryResponse(type_url, resources, removed);
+  }
+
+  template <class T>
+  envoy::service::discovery::v3::DeltaDiscoveryResponse createMapDeltaDiscoveryResponse(
+      const std::string& type_url, const absl::flat_hash_map<std::string, T>& added_or_updated,
+      const std::vector<std::string>& removed, const std::string& version,
+      const std::vector<std::string>& aliases,
+      const absl::flat_hash_map<std::string, Protobuf::Any>& metadata) {
+    std::vector<envoy::service::discovery::v3::Resource> resources;
+    for (const auto& [name, message] : added_or_updated) {
+      envoy::service::discovery::v3::Resource resource;
+      resource.mutable_resource()->PackFrom(message);
+      resource.set_name(name);
       resource.set_version(version);
       for (const auto& alias : aliases) {
         resource.add_aliases(alias);

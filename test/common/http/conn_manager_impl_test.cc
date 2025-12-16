@@ -7,6 +7,8 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 
+#include "gmock/gmock.h"
+
 using testing::_;
 using testing::An;
 using testing::AnyNumber;
@@ -1596,7 +1598,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   }
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
       TracingConnectionManagerConfig{Tracing::OperationName::Ingress, conn_tracing_tags, percent1,
-                                     percent2, percent1, false, 256});
+                                     percent2, percent1, nullptr, nullptr, 256, false});
   NiceMock<Router::MockRouteTracing>& route_tracing =
       route_config_provider_.route_config_->route_->route_tracing_;
   route_tracing.client_sampling_ = percent1;
@@ -1897,6 +1899,201 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanButDisableTraceDecisionR
   EXPECT_EQ(0UL, tracing_stats_.not_traceable_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowWithHcmOperationFormatter) {
+  setup();
+  tracing_config_->operation_ = Formatter::FormatterImpl::create("hcm_downstream_op").value();
+  tracing_config_->upstream_operation_ =
+      Formatter::FormatterImpl::create("hcm_upstream_op").value();
+
+  auto* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator());
+  // With operation formatter the decorator will be ignored.
+  EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_)).Times(0);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, tracingConfig())
+      .Times(AtLeast(1))
+      .WillRepeatedly(Return(&route_config_provider_.route_config_->route_->route_tracing_));
+  EXPECT_CALL(*span, finishSpan());
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*span, setOperation("hcm_downstream_op"));
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(filter);
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":method", "GET"},
+                                         {":authority", "host"},
+                                         {":path", "/"},
+                                         {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+        filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
+        data.drain(4);
+
+        auto upstream_span = std::make_unique<NiceMock<Tracing::MockSpan>>();
+        EXPECT_CALL(*upstream_span, setOperation("hcm_upstream_op"));
+        filter->callbacks_->tracingConfig()->modifySpan(*upstream_span, true);
+
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowWithRouteOperationFormatter) {
+  setup();
+
+  auto* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator());
+  // With operation formatter the decorator will be ignored.
+  EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_)).Times(0);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, tracingConfig())
+      .Times(AtLeast(1))
+      .WillRepeatedly(Return(&route_config_provider_.route_config_->route_->route_tracing_));
+  route_config_provider_.route_config_->route_->route_tracing_.operation_ =
+      Formatter::FormatterImpl::create("route_downstream_op").value();
+  route_config_provider_.route_config_->route_->route_tracing_.upstream_operation_ =
+      Formatter::FormatterImpl::create("route_upstream_op").value();
+  EXPECT_CALL(*span, finishSpan());
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*span, setOperation("route_downstream_op"));
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(filter);
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":method", "GET"},
+                                         {":authority", "host"},
+                                         {":path", "/"},
+                                         {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+        filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
+        data.drain(4);
+
+        auto upstream_span = std::make_unique<NiceMock<Tracing::MockSpan>>();
+        EXPECT_CALL(*upstream_span, setOperation("route_upstream_op"));
+        filter->callbacks_->tracingConfig()->modifySpan(*upstream_span, true);
+
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowWithOperationFormatter) {
+  setup();
+  // Both HCM and route operation formatters are set, route formatter takes precedence.
+  tracing_config_->operation_ = Formatter::FormatterImpl::create("hcm_downstream_op").value();
+  tracing_config_->upstream_operation_ =
+      Formatter::FormatterImpl::create("hcm_upstream_op").value();
+
+  auto* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator());
+  // With operation formatter the decorator will be ignored.
+  EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_)).Times(0);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, tracingConfig())
+      .Times(AtLeast(1))
+      .WillRepeatedly(Return(&route_config_provider_.route_config_->route_->route_tracing_));
+  route_config_provider_.route_config_->route_->route_tracing_.operation_ =
+      Formatter::FormatterImpl::create("route_downstream_op").value();
+  route_config_provider_.route_config_->route_->route_tracing_.upstream_operation_ =
+      Formatter::FormatterImpl::create("route_upstream_op").value();
+  EXPECT_CALL(*span, finishSpan());
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*span, setOperation("route_downstream_op"));
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(filter);
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":method", "GET"},
+                                         {":authority", "host"},
+                                         {":path", "/"},
+                                         {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+        filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
+        data.drain(4);
+
+        auto upstream_span = std::make_unique<NiceMock<Tracing::MockSpan>>();
+        EXPECT_CALL(*upstream_span, setOperation("route_upstream_op"));
+        filter->callbacks_->tracingConfig()->modifySpan(*upstream_span, true);
+
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorator) {
   setup();
 
@@ -1910,7 +2107,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
             return span;
           }));
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator());
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
@@ -2117,8 +2314,10 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      percent2,
                                      percent1,
-                                     false,
-                                     256});
+                                     nullptr,
+                                     nullptr,
+                                     256,
+                                     false});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
@@ -2201,8 +2400,10 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      percent2,
                                      percent1,
-                                     false,
-                                     256});
+                                     nullptr,
+                                     nullptr,
+                                     256,
+                                     false});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
@@ -2287,8 +2488,10 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      percent2,
                                      percent1,
-                                     false,
-                                     256});
+                                     nullptr,
+                                     nullptr,
+                                     256,
+                                     false});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
@@ -2365,8 +2568,10 @@ TEST_F(HttpConnectionManagerImplTest,
                                      percent1,
                                      percent2,
                                      percent1,
-                                     false,
-                                     256});
+                                     nullptr,
+                                     nullptr,
+                                     256,
+                                     false});
 
   EXPECT_CALL(
       runtime_.snapshot_,
@@ -3471,6 +3676,72 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteOverride) {
   conn_manager_->onData(fake_input, false);
 
   EXPECT_EQ(0U, stats_.named_.downstream_rq_idle_timeout_.value());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test buffer limit and buffer limit refresh.
+TEST_F(HttpConnectionManagerImplTest, BufferLimitAndRefresh) {
+  // Set the initial buffer limit to 122 bytes.
+  initial_buffer_limit_ = 122;
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup();
+  setupFilterChain(1, 0);
+  setUpBufferLimits();
+
+  // Route config mock
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _)).Times(AnyNumber());
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  // Create the stream.
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        Event::MockTimer* idle_timer = setUpTimer();
+        EXPECT_CALL(*idle_timer, enableTimer(_, _));
+        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+        EXPECT_CALL(*idle_timer, enableTimer(_, _));
+        EXPECT_CALL(*idle_timer, disableTimer());
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+        decoder->decodeHeaders(std::move(headers), false);
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // The initial route buffer limit is not valid value and the limit from underlying stream
+  // will be used.
+  { EXPECT_EQ(122U, decoder_filters_[0]->callbacks_->decoderBufferLimit()); }
+
+  // Less buffer limit from route entry will not be applied.
+  {
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
+                requestBodyBufferLimit())
+        .WillOnce(Return(100U));
+    // Clear and refresh the route cache (checking clusterInfo refreshes the route cache)
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // Larger buffer limit from route entry will be applied.
+  {
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
+                requestBodyBufferLimit())
+        .WillOnce(Return(150U));
+
+    // Clear and refresh the route cache (checking clusterInfo refreshes the route cache)
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+
+    EXPECT_EQ(150U, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+  }
+
+  // Cleanup.
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 

@@ -592,8 +592,6 @@ def _com_github_skyapm_cpp2sky():
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
-        patches = ["@envoy//bazel:skywalking_data_collect_protocol.patch"],
-        patch_args = ["-p1"],
     )
 
 def _com_github_nlohmann_json():
