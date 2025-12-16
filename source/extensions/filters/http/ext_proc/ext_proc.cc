@@ -606,7 +606,7 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
     return static_cast<int64_t>(bytes_received_);
   }
   if (field_name == FailedOpenField) {
-    return bool(failed_open_);
+    return failed_open_;
   }
   if (field_name == GrpcStatusBeforeFirstCallField) {
     return static_cast<int64_t>(grpc_status_before_first_call_);
@@ -711,6 +711,11 @@ void Filter::onComplete(ProcessingResponse& response) {
   onReceiveMessage(std::move(resp_ptr));
 }
 
+void Filter::logFailOpen() {
+  stats_.failure_mode_allowed_.inc();
+  logging_info_->setFailedOpen();
+}
+
 void Filter::onError() {
   ENVOY_STREAM_LOG(debug, "Received Error response from server", *decoder_callbacks_);
   stats_.http_not_ok_resp_received_.inc();
@@ -725,8 +730,7 @@ void Filter::onError() {
     // The user would like a none-200-ok response to not cause message processing to fail.
     // Close the external processing.
     processing_complete_ = true;
-    stats_.failure_mode_allowed_.inc();
-    logging_info_->setFailedOpen();
+    logFailOpen();
     clearAsyncState();
   } else {
     // Return an error and stop processing the current stream.
@@ -1904,8 +1908,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // When a message is received out of order,and fail open is configured,
       // ignore it and also ignore the stream for the rest of this filter
       // instance's lifetime to protect us from a malformed server.
-      stats_.failure_mode_allowed_.inc();
-      logging_info_->setFailedOpen();
+      logFailOpen();
       closeStream();
       clearAsyncState(processing_status.raw_code());
       processing_complete_ = true;
@@ -1936,8 +1939,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
   stats_.server_half_closed_.inc();
   if (failureModeAllow()) {
     onGrpcCloseWithStatus(status);
-    stats_.failure_mode_allowed_.inc();
-    logging_info_->setFailedOpen();
+    logFailOpen();
   } else {
     processing_complete_ = true;
     // Since the stream failed, there is no need to handle timeouts, so
@@ -1982,8 +1984,7 @@ void Filter::onMessageTimeout() {
     // the external processor for the rest of the request.
     processing_complete_ = true;
     closeStream();
-    stats_.failure_mode_allowed_.inc();
-    logging_info_->setFailedOpen();
+    logFailOpen();
     clearAsyncState(Grpc::Status::DeadlineExceeded);
 
   } else {

@@ -577,6 +577,7 @@ private:
   StreamOpenState openStream();
   void closeStream();
   void halfCloseAndWaitForRemoteClose();
+  void logFailOpen();
 
   void recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status);
   void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
