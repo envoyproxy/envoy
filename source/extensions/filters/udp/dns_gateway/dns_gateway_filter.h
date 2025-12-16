@@ -9,7 +9,6 @@
 #include "envoy/network/filter.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/common/synthetic_ip/cache_manager.h"
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
@@ -68,16 +67,6 @@ private:
   std::chrono::seconds default_ttl_;
   Common::SyntheticIp::SyntheticIpCacheManagerSharedPtr cache_manager_;
 
-  // Temporary stats store for DNS parser (doesn't persist anything)
-  Stats::IsolatedStoreImpl stats_store_;
-
-  // Stats counters created during construction
-  Stats::Counter& underflow_counter_;
-  Stats::Counter& record_name_overflow_counter_;
-  Stats::Counter& query_parsing_failure_counter_;
-  Stats::Counter& queries_with_additional_rrs_counter_;
-  Stats::Counter& queries_with_ans_or_authority_rrs_counter_;
-  Stats::Histogram& latency_histogram_;
 
   // Use the battle-tested DNS parser from dns_filter
   DnsFilter::DnsMessageParser message_parser_;

@@ -23,19 +23,20 @@ TunnelHostnameLookupConfigFactory::createFilterFactoryFromProto(
 
   // Get or create singleton cache manager
   // This should be the same instance created by the DNS Gateway filter
-  auto cache_manager =
-      context.serverFactoryContext()
-          .singletonManager()
-          .getTyped<Common::SyntheticIp::SyntheticIpCacheManager>(
-              "synthetic_ip_cache_manager_singleton", []() {
-                // This should never be called if DNS Gateway filter is configured first
-                // Return nullptr - we'll check below and return proper error status
-                return nullptr;
-              });
+  auto cache_manager = context.serverFactoryContext()
+                           .singletonManager()
+                           .getTyped<Common::SyntheticIp::SyntheticIpCacheManager>(
+                               "synthetic_ip_cache_manager_singleton", []() {
+                                 // This should never be called if DNS Gateway filter is configured
+                                 // first Return nullptr - we'll check below and return proper error
+                                 // status
+                                 return nullptr;
+                               });
 
   if (!cache_manager) {
-    return absl::InvalidArgumentError("Synthetic IP cache manager not initialized. "
-                                      "Ensure DNS Gateway filter is configured before this filter.");
+    return absl::InvalidArgumentError(
+        "Synthetic IP cache manager not initialized. "
+        "Ensure DNS Gateway filter is configured before this filter.");
   }
 
   return [filter_config, cache_manager](Network::FilterManager& filter_manager) -> void {

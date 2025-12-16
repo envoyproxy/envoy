@@ -91,16 +91,10 @@ DnsGatewayFilter::DnsGatewayFilter(
     Network::UdpReadFilterCallbacks& callbacks, const DnsGatewayConfig& config,
     Common::SyntheticIp::SyntheticIpCacheManagerSharedPtr cache_manager, TimeSource& time_source,
     Random::RandomGenerator& random)
-    : UdpListenerReadFilter(callbacks), cache_manager_(cache_manager), stats_store_(),
-      // Create stats counters during construction
-      underflow_counter_(stats_store_.counterFromString("underflow")),
-      record_name_overflow_counter_(stats_store_.counterFromString("record_name_overflow")),
-      query_parsing_failure_counter_(stats_store_.counterFromString("query_parsing_failure")),
-      queries_with_additional_rrs_counter_(stats_store_.counterFromString("queries_with_additional_rrs")),
-      queries_with_ans_or_authority_rrs_counter_(stats_store_.counterFromString("queries_with_ans_or_authority_rrs")),
-      latency_histogram_(stats_store_.histogramFromString("latency", Stats::Histogram::Unit::Milliseconds)),
+    : UdpListenerReadFilter(callbacks), cache_manager_(cache_manager),
       // Initialize DNS parser with recursion disabled (we don't forward queries)
-      message_parser_(false, time_source, 0, random, latency_histogram_) {
+      // Pass nullptr for histogram since we don't need stats
+      message_parser_(false, time_source, 0, random, nullptr) {
 
   // Parse default TTL
   if (config.has_default_ttl()) {
@@ -123,16 +117,10 @@ DnsGatewayFilter::DnsGatewayFilter(
 }
 
 Network::FilterStatus DnsGatewayFilter::onData(Network::UdpRecvData& data) {
-  DnsFilter::DnsParserCounters parser_counters(
-      underflow_counter_,
-      record_name_overflow_counter_,
-      query_parsing_failure_counter_,
-      queries_with_additional_rrs_counter_,
-      queries_with_ans_or_authority_rrs_counter_);
-
   // Use the safe DNS parser to parse the query
+  // Pass nullptr counters since we don't track stats
   DnsFilter::DnsQueryContextPtr query_context =
-      message_parser_.createQueryContext(data, parser_counters);
+      message_parser_.createQueryContext(data, nullptr);
 
   // If parsing failed, drop the packet silently
   // Don't send error responses to avoid potential loops
